@@ -18,6 +18,8 @@ interface EmailConfig {
   email: string
   is_active: boolean
   updated_at: string
+  from_name: string | null
+  reply_to: string | null
 }
 
 interface EmailTemplate {
@@ -26,6 +28,16 @@ interface EmailTemplate {
   subject: string
   html_body: string
   is_active: boolean
+}
+
+interface EmailSendLogRow {
+  id: number
+  template_key: string
+  to_email: string
+  from_email: string | null
+  status: 'sent' | 'failed'
+  error_message: string | null
+  sent_at: string
 }
 
 interface Props {
@@ -56,6 +68,11 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   const [connecting, setConnecting] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
+  const [fromName, setFromName] = useState('')
+  const [replyTo, setReplyTo] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
+  const [sendLog, setSendLog] = useState<EmailSendLogRow[]>([])
+  const [logLoading, setLogLoading] = useState(false)
 
   const loadConfig = useCallback(async () => {
     setLoading(true)
@@ -69,13 +86,16 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     const { data } = await (
       isSuperadmin
         ? supabase.from('company_email_configs')
-            .select('id, email, is_active, updated_at')
+            .select('id, email, is_active, updated_at, from_name, reply_to')
             .eq('is_superadmin', true)
         : supabase.from('company_email_configs')
-            .select('id, email, is_active, updated_at')
+            .select('id, email, is_active, updated_at, from_name, reply_to')
             .eq('company_id', companyId!)
     ).maybeSingle()
-    setConfig(data as EmailConfig | null)
+    const cfg = data as EmailConfig | null
+    setConfig(cfg)
+    setFromName(cfg?.from_name ?? '')
+    setReplyTo(cfg?.reply_to ?? '')
 
     const { data: tplData } = await (
       isSuperadmin
@@ -250,6 +270,49 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     void loadConfig()
   }
 
+  async function handleSaveMeta() {
+    if (!config) return
+    setSavingMeta(true)
+    const { error } = await supabase
+      .from('company_email_configs')
+      .update({
+        from_name: fromName.trim() || null,
+        reply_to: replyTo.trim() || null,
+      })
+      .eq('id', config.id)
+    setSavingMeta(false)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar la configuración.' })
+      return
+    }
+    void Swal.fire({ icon: 'success', title: 'Guardado', timer: 1200, showConfirmButton: false })
+    void loadConfig()
+  }
+
+  const loadSendLog = useCallback(async () => {
+    if (!isSuperadmin && !companyId) return
+    setLogLoading(true)
+    const { data } = await (
+      isSuperadmin
+        ? supabase.from('email_send_log')
+            .select('id, template_key, to_email, from_email, status, error_message, sent_at')
+            .eq('is_superadmin', true)
+            .order('sent_at', { ascending: false })
+            .limit(20)
+        : supabase.from('email_send_log')
+            .select('id, template_key, to_email, from_email, status, error_message, sent_at')
+            .eq('company_id', companyId!)
+            .order('sent_at', { ascending: false })
+            .limit(20)
+    )
+    setSendLog((data as EmailSendLogRow[]) ?? [])
+    setLogLoading(false)
+  }, [companyId, isSuperadmin])
+
+  useEffect(() => {
+    if (config) void loadSendLog()
+  }, [config, loadSendLog])
+
   if (loading) {
     return (
       <div style={{ padding: '32px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando configuración…</div>
@@ -398,6 +461,130 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               {sendingTest ? 'Enviando…' : 'Enviar prueba'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Sender identity (from_name + reply_to) */}
+      {config && (
+        <div style={{
+          background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
+          borderRadius: '12px', padding: '16px 20px', marginBottom: '20px',
+        }}>
+          <p style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>
+            Identidad del remitente
+          </p>
+          <p style={{ margin: '0 0 12px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+            Personaliza cómo aparecen tus correos en la bandeja de los destinatarios.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>
+                Nombre del remitente
+              </label>
+              <input
+                type="text"
+                value={fromName}
+                onChange={e => setFromName(e.target.value)}
+                placeholder="Ej: AdministradoraXYZ"
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '9px 12px',
+                  borderRadius: '8px', border: '1.5px solid var(--at-line)',
+                  fontSize: '13px', outline: 'none',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '5px' }}>
+                Dirección de respuesta (Reply-To)
+              </label>
+              <input
+                type="email"
+                value={replyTo}
+                onChange={e => setReplyTo(e.target.value)}
+                placeholder="contacto@empresa.com (opcional)"
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '9px 12px',
+                  borderRadius: '8px', border: '1.5px solid var(--at-line)',
+                  fontSize: '13px', outline: 'none',
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ marginTop: '12px', textAlign: 'right' }}>
+            <button
+              onClick={() => void handleSaveMeta()}
+              disabled={savingMeta || (fromName === (config.from_name ?? '') && replyTo === (config.reply_to ?? ''))}
+              style={{
+                padding: '8px 18px', borderRadius: '8px', border: 'none',
+                background: savingMeta ? 'var(--at-line-strong)' : 'var(--at-primary)',
+                color: 'white', cursor: savingMeta ? 'not-allowed' : 'pointer',
+                fontSize: '13px', fontWeight: 600, opacity: (fromName === (config.from_name ?? '') && replyTo === (config.reply_to ?? '')) ? 0.5 : 1,
+              }}
+            >
+              {savingMeta ? 'Guardando…' : 'Guardar identidad'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Send log */}
+      {config && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <h4 style={{ margin: 0, color: 'var(--at-ink)', fontSize: '14px', fontWeight: 700 }}>
+              Últimos envíos
+            </h4>
+            <button
+              onClick={() => void loadSendLog()}
+              disabled={logLoading}
+              style={{
+                background: 'none', border: 'none', color: 'var(--at-primary)',
+                fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {logLoading ? 'Actualizando…' : '↻ Actualizar'}
+            </button>
+          </div>
+          {sendLog.length === 0 ? (
+            <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontStyle: 'italic', margin: 0 }}>
+              Aún no se han enviado correos desde esta cuenta.
+            </p>
+          ) : (
+            <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--at-surface)', borderBottom: '1px solid var(--at-line)' }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Fecha</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Template</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Destinatario</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sendLog.map(row => (
+                    <tr key={row.id} style={{ borderBottom: '1px solid var(--at-line)' }}>
+                      <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
+                        {new Date(row.sent_at).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })}
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--at-ink)' }}>{row.template_key}</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--at-ink)', wordBreak: 'break-all' }}>{row.to_email}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        {row.status === 'sent' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', fontSize: '11px', fontWeight: 600 }}>
+                            ✓ Enviado
+                          </span>
+                        ) : (
+                          <span title={row.error_message ?? ''} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: '11px', fontWeight: 600, cursor: 'help' }}>
+                            ✕ Fallo
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
