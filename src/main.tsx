@@ -4,6 +4,7 @@ import './index.css'
 import './components/shared/shared.css'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary sectionName="root">
       <App />
+      <PwaUpdatePrompt />
     </ErrorBoundary>
   </StrictMode>
 )
