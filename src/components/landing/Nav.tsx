@@ -56,6 +56,9 @@ interface LoginModalProps {
   onLoginWithGoogle: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
+  // Crear empresa nueva (admin self-service, F2.10). Distinto de onRegister
+  // que es para residentes con CUI/DUI.
+  onSignupCompany: () => void
   // Si el usuario tiene un factor TOTP verificado, login() arranca un challenge
   // y deja currentUser en null. El padre nos pasa el challenge activo + cb de
   // verificación/cancelación para renderizar el segundo paso.
@@ -64,7 +67,7 @@ interface LoginModalProps {
   onCancelMfa: () => Promise<void>
 }
 
-export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, mfaChallenge, onVerifyMfa, onCancelMfa }: LoginModalProps) {
+export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa }: LoginModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -239,7 +242,7 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
                   </div>
                   <div className="login-newcomer">
                     <span>{t.login.no_account}</span>
-                    <button className="link-bold" onClick={() => { onClose(); onRegister() }}>{t.login.signup} <Icon.arrow_right size={13} /></button>
+                    <button className="link-bold" onClick={() => { onClose(); onSignupCompany() }}>{t.login.signup} <Icon.arrow_right size={13} /></button>
                   </div>
                 </div>
               </>

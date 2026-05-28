@@ -148,3 +148,9 @@ jobs:
           supabase functions deploy health \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
+
+      - name: Deploy signup-company (no JWT — onboarding self-service público; valida origin + fuerza password + Supabase Auth email confirmation)
+        run: |
+          supabase functions deploy signup-company \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
