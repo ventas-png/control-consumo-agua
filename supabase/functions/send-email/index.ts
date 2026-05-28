@@ -39,6 +39,8 @@ interface EmailConfig {
   access_token: string
   refresh_token: string | null
   token_expiry: string | null
+  from_name: string | null
+  reply_to: string | null
 }
 
 interface TokenRefreshResponse {
@@ -79,11 +81,28 @@ async function refreshAccessToken(
 // Build RFC 2822 message base64url-encoded for Gmail API
 // ---------------------------------------------------------------------------
 
-function buildRawMessage(from: string, to: string, subject: string, htmlBody: string): string {
+// Construye un From con display name si fromName esta presente:
+// `"AdministraTodo" <noreply@admin.com>`. RFC 5322 + encoding UTF-8 del
+// display name por si trae acentos.
+function formatFromHeader(fromEmail: string, fromName: string | null): string {
+  if (!fromName) return fromEmail
+  const encoded = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(fromName)))}?=`
+  return `"${encoded}" <${fromEmail}>`
+}
+
+function buildRawMessage(
+  fromEmail: string,
+  fromName: string | null,
+  replyTo: string | null,
+  to: string,
+  subject: string,
+  htmlBody: string,
+): string {
   const boundary = `----=_Part_${Date.now()}`
   const lines = [
-    `From: ${from}`,
+    `From: ${formatFromHeader(fromEmail, fromName)}`,
     `To: ${to}`,
+    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -121,7 +140,7 @@ async function sendViaGmail(
     const newToken = await refreshAccessToken(config.refresh_token, supabase, config.id)
     if (newToken) accessToken = newToken
   }
-  const raw = buildRawMessage(config.email, to, subject, htmlBody)
+  const raw = buildRawMessage(config.email, config.from_name, config.reply_to, to, subject, htmlBody)
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -344,11 +363,11 @@ Deno.serve(async (req: Request) => {
     const { data: config } = await (
       is_superadmin
         ? supabase.from('company_email_configs')
-            .select('id, email, access_token, refresh_token, token_expiry')
+            .select('id, email, access_token, refresh_token, token_expiry, from_name, reply_to')
             .eq('is_active', true)
             .eq('is_superadmin', true)
         : supabase.from('company_email_configs')
-            .select('id, email, access_token, refresh_token, token_expiry')
+            .select('id, email, access_token, refresh_token, token_expiry, from_name, reply_to')
             .eq('is_active', true)
             .eq('company_id', company_id!)
     ).maybeSingle()
@@ -395,12 +414,40 @@ Deno.serve(async (req: Request) => {
       htmlBody = rendered.html
     }
 
-    await sendViaGmail(config as EmailConfig, to_email, subject, htmlBody, supabase)
+    // Send + log. Log writes con service_role (bypassea RLS); fire-and-forget
+    // si el log mismo falla — no queremos que un error de bitacora bloquee la
+    // entrega del correo en si.
+    const typedConfig = config as EmailConfig
+    try {
+      await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
+      supabase.from('email_send_log').insert({
+        company_id: is_superadmin ? null : company_id,
+        is_superadmin: !!is_superadmin,
+        template_key,
+        to_email,
+        from_email: typedConfig.email,
+        status: 'sent',
+        triggered_by: user.id,
+      }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } catch (sendErr) {
+      const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr)
+      supabase.from('email_send_log').insert({
+        company_id: is_superadmin ? null : company_id,
+        is_superadmin: !!is_superadmin,
+        template_key,
+        to_email,
+        from_email: typedConfig.email,
+        status: 'failed',
+        error_message: errMsg.slice(0, 1000),
+        triggered_by: user.id,
+      }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
+      throw sendErr
+    }
   } catch (err) {
     return new Response(
       JSON.stringify({ error: String(err) }),
