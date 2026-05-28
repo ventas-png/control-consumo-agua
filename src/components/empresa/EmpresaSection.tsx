@@ -12,6 +12,7 @@ import { CustomRoleEditor } from './CustomRoleEditor'
 import { AuditLogModal } from './AuditLogModal'
 import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
+import { usePlanLimits } from '../../hooks/usePlanLimits'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -62,6 +63,12 @@ export function EmpresaSection({ currentUser }: Props) {
   const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
   const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
   const [showAuditLog, setShowAuditLog] = useState(false)
+
+  // Limites efectivos del plan (F2.13). Sobrescriben empresa.max_projects
+  // legacy con el resultado de get_company_effective_limits que respeta
+  // grandfathered overrides via GREATEST(plan, companies.max_X).
+  const planLimits = usePlanLimits(currentUser.company_id ?? null)
+  const effectiveMaxProjects = planLimits.max_projects ?? empresa?.max_projects ?? Infinity
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -376,11 +383,11 @@ export function EmpresaSection({ currentUser }: Props) {
 
   async function crearProyecto() {
     if (!empresa) return
-    if (proyectos.length >= empresa.max_projects) {
+    if (proyectos.length >= effectiveMaxProjects) {
       void Swal.fire({
         icon: 'warning',
         title: 'Límite alcanzado',
-        text: `Tu empresa puede tener máximo ${empresa.max_projects} proyecto(s). Contacta al superadministrador para aumentar el límite.`,
+        text: `Tu plan permite máximo ${effectiveMaxProjects} proyecto(s). Actualízalo desde Perfil → Mi plan para agregar más.`,
         confirmButtonText: 'Entendido',
       })
       return
@@ -721,7 +728,7 @@ export function EmpresaSection({ currentUser }: Props) {
               borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
             }}>
               <div style={{ color: 'var(--at-accent-2)', fontSize: '22px', fontWeight: 700, lineHeight: 1 }}>
-                {proyectos.length}<span style={{ color: 'var(--at-ink-3)', fontSize: '15px' }}>/{empresa?.max_projects ?? 5}</span>
+                {proyectos.length}<span style={{ color: 'var(--at-ink-3)', fontSize: '15px' }}>/{planLimits.max_projects ?? empresa?.max_projects ?? 5}</span>
               </div>
               <div style={{ color: 'var(--at-ink-3)', fontSize: '11px', marginTop: '3px' }}>proyectos</div>
             </div>
@@ -746,14 +753,15 @@ export function EmpresaSection({ currentUser }: Props) {
           <h2 style={{ color: 'var(--at-ink)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
           <button
             onClick={() => void crearProyecto()}
-            disabled={empresa ? proyectos.length >= empresa.max_projects : false}
+            disabled={proyectos.length >= effectiveMaxProjects}
+            title={proyectos.length >= effectiveMaxProjects ? 'Límite del plan alcanzado. Actualiza desde Perfil → Mi plan.' : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '9px 16px', borderRadius: '8px', border: 'none',
-              background: empresa && proyectos.length >= empresa.max_projects
+              background: proyectos.length >= effectiveMaxProjects
                 ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-              color: empresa && proyectos.length >= empresa.max_projects ? 'var(--at-ink-3)' : 'white',
-              cursor: empresa && proyectos.length >= empresa.max_projects ? 'not-allowed' : 'pointer',
+              color: proyectos.length >= effectiveMaxProjects ? 'var(--at-ink-3)' : 'white',
+              cursor: proyectos.length >= effectiveMaxProjects ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontWeight: 600,
             }}
           >
