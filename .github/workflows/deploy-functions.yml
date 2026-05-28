@@ -154,3 +154,19 @@ jobs:
           supabase functions deploy signup-company \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
+
+      - name: Deploy create-checkout-session (JWT requerido — solo company_owner/admin de su company puede iniciar checkout)
+        run: |
+          supabase functions deploy create-checkout-session \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy create-billing-portal-session (JWT requerido — solo company_owner/admin de su company)
+        run: |
+          supabase functions deploy create-billing-portal-session \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy stripe-platform-webhook (no JWT — Stripe firma con HMAC SHA-256, validado contra STRIPE_PLATFORM_WEBHOOK_SECRET)
+        run: |
+          supabase functions deploy stripe-platform-webhook \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt

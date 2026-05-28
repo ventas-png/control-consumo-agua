@@ -310,6 +310,10 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   }
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
   const [subLoading, setSubLoading] = useState(true)
+  const [availablePlans, setAvailablePlans] = useState<Array<{ code: string; name: string; price_monthly_cents: number; price_yearly_cents: number | null; description: string | null; features: string[] }>>([])
+  const [showPlanPicker, setShowPlanPicker] = useState(false)
+  const [billingActionLoading, setBillingActionLoading] = useState(false)
+  const [billingFb, setBillingFb] = useState<FeedbackState>(null)
 
   useEffect(() => {
     if (!currentUser.company_id) { setSubLoading(false); return }
@@ -325,8 +329,84 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         setSubscription(data as unknown as SubscriptionRow | null)
         setSubLoading(false)
       })
+    void supabase
+      .from('billing_plans')
+      .select('code, name, price_monthly_cents, price_yearly_cents, description, features')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (alive && data) setAvailablePlans(data as typeof availablePlans)
+      })
     return () => { alive = false }
   }, [currentUser.company_id])
+
+  // Detecta retornos del checkout via query param (?checkout=success|canceled)
+  // y muestra feedback. Quita el param de la URL para que no se repita en refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ck = params.get('checkout')
+    if (!ck) return
+    if (ck === 'success') {
+      setBillingFb({ type: 'success', msg: 'Pago procesado. La suscripción se activará en unos segundos.' })
+    } else if (ck === 'canceled') {
+      setBillingFb({ type: 'error', msg: 'Cambio de plan cancelado. Tu suscripción actual no se modificó.' })
+    }
+    params.delete('checkout')
+    params.delete('session')
+    const newSearch = params.toString()
+    const url = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash
+    window.history.replaceState({}, '', url)
+  }, [])
+
+  async function handleChangePlan(planCode: string, cycle: 'monthly' | 'yearly') {
+    setBillingFb(null)
+    setBillingActionLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' },
+      })
+      if (error) {
+        setBillingFb({ type: 'error', msg: error.message ?? 'No se pudo crear la sesión de pago.' })
+        return
+      }
+      const result = data as { url?: string; error?: string }
+      if (result?.error || !result?.url) {
+        setBillingFb({ type: 'error', msg: result?.error ?? 'Respuesta inválida del servidor.' })
+        return
+      }
+      window.location.href = result.url
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setBillingFb({ type: 'error', msg: `Error: ${msg}` })
+    } finally {
+      setBillingActionLoading(false)
+    }
+  }
+
+  async function handleManageBilling() {
+    setBillingFb(null)
+    setBillingActionLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-billing-portal-session', { body: {} })
+      if (error) {
+        setBillingFb({ type: 'error', msg: error.message ?? 'No se pudo abrir el portal.' })
+        return
+      }
+      const result = data as { url?: string; error?: string }
+      if (result?.error || !result?.url) {
+        setBillingFb({ type: 'error', msg: result?.error ?? 'Respuesta inválida del servidor.' })
+        return
+      }
+      window.location.href = result.url
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setBillingFb({ type: 'error', msg: `Error: ${msg}` })
+    } finally {
+      setBillingActionLoading(false)
+    }
+  }
+
+  const canManageBilling = currentUser.role === 'company_owner' || currentUser.role === 'admin'
 
   // — Correo —
   const [newEmail, setNewEmail] = useState('')
@@ -657,6 +737,94 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                     </span>
                   )}
                 </div>
+
+                {canManageBilling && (
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--at-chip)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlanPicker(v => !v)}
+                      disabled={billingActionLoading}
+                      style={{
+                        padding: '8px 16px', borderRadius: '8px',
+                        border: '1.5px solid var(--at-primary)', background: 'var(--at-surface)',
+                        color: 'var(--at-primary)', fontSize: '13px', fontWeight: 600,
+                        cursor: billingActionLoading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {showPlanPicker ? 'Ocultar planes' : 'Cambiar plan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleManageBilling()}
+                      disabled={billingActionLoading}
+                      style={{
+                        padding: '8px 16px', borderRadius: '8px',
+                        background: billingActionLoading ? 'var(--at-ink-3)' : 'var(--at-primary)',
+                        color: 'white', border: 'none', fontSize: '13px', fontWeight: 600,
+                        cursor: billingActionLoading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {billingActionLoading ? 'Cargando…' : 'Gestionar suscripción'}
+                    </button>
+                  </div>
+                )}
+
+                {showPlanPicker && canManageBilling && availablePlans.length > 0 && (
+                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {availablePlans.map(p => {
+                      const isCurrent = p.code === subscription.plan?.code
+                      return (
+                        <div key={p.code} style={{
+                          padding: '14px 16px', borderRadius: '10px',
+                          border: `1.5px solid ${isCurrent ? 'var(--at-primary)' : 'var(--at-line)'}`,
+                          background: isCurrent ? 'var(--at-primary-tint, rgba(27,59,54,.05))' : 'var(--at-surface-2)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>
+                                {p.name} {isCurrent && <span style={{ fontSize: '11px', color: 'var(--at-primary)', fontWeight: 600 }}>(actual)</span>}
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                                ${(p.price_monthly_cents / 100).toFixed(2)}/mes
+                                {p.price_yearly_cents && ` · $${(p.price_yearly_cents / 100).toFixed(2)}/año`}
+                              </div>
+                            </div>
+                            {!isCurrent && (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleChangePlan(p.code, 'monthly')}
+                                  disabled={billingActionLoading}
+                                  style={{
+                                    padding: '6px 12px', borderRadius: '6px',
+                                    background: 'var(--at-primary)', color: 'white', border: 'none',
+                                    fontSize: '12px', fontWeight: 600,
+                                    cursor: billingActionLoading ? 'not-allowed' : 'pointer',
+                                  }}
+                                >Mensual</button>
+                                {p.price_yearly_cents && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleChangePlan(p.code, 'yearly')}
+                                    disabled={billingActionLoading}
+                                    style={{
+                                      padding: '6px 12px', borderRadius: '6px',
+                                      background: 'var(--at-accent-2)', color: 'white', border: 'none',
+                                      fontSize: '12px', fontWeight: 600,
+                                      cursor: billingActionLoading ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >Anual</button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <FeedbackMsg fb={billingFb} />
               </>
             )}
           </Card>

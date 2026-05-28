@@ -28,3 +28,9 @@ verify_jwt = false
 # password + email confirmation de Supabase Auth.
 [functions.signup-company]
 verify_jwt = false
+
+# Stripe Platform webhook: publico, valida HMAC signature con
+# STRIPE_PLATFORM_WEBHOOK_SECRET. JWT seria contraproducente — Stripe no
+# envia auth header.
+[functions.stripe-platform-webhook]
+verify_jwt = false
