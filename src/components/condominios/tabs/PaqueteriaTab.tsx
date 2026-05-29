@@ -98,7 +98,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
       estado: 'pendiente', recibido_por: userId,
     }).select('id').single()
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     try { if (data?.id) await notifyPackage(data.id) } catch { /* best-effort */ }
     notify({ variant: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', duration: 1600 })
     resetForm(); onRefresh()
@@ -108,7 +108,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     const { error } = await supabase.from('paquetes_recibidos').update({
       estado: 'entregado', hora_entrega: new Date().toISOString(), entregado_por: userId, entregado_via: 'porteria',
     }).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -118,12 +118,12 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     try {
       const path = buildUploadPath('paquetes-firmas', 'firma.png', 'png')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { Swal.fire('Error', upErr.message, 'error'); return }
+      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
       const { error } = await supabase.from('paquetes_recibidos').update({
         estado: 'entregado', hora_entrega: new Date().toISOString(), entregado_por: userId,
         firma_path: path, entregado_a_nombre: firmaNombre.trim() || null, entregado_via: 'porteria',
       }).eq('id', firmando.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       setFirmando(null); setFirmaNombre(''); onRefresh()
     } finally {
       setFirmaSaving(false)

@@ -82,7 +82,7 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
       ({ error } = await supabase.from('entrega_unidades').insert(payload))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); setItems([]); onRefresh()
   }
 

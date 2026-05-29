@@ -74,7 +74,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
       created_by: userId,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 

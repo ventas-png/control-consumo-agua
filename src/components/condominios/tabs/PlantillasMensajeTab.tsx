@@ -73,7 +73,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
       ? await supabase.from('plantillas_mensaje_cond').update(payload).eq('id', editId)
       : await supabase.from('plantillas_mensaje_cond').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setEditId(null)
     setForm({ ...BLANK })
     onRefresh()

@@ -134,7 +134,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
     const { error } = await supabase.from('cuotas_condominio').insert(inserts)
     setGenerando(false)
 
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${items.length} cuotas de agua generadas`, text: `Total: ${moneda} ${total.toFixed(2)}`, duration: 2000 })
     setSeleccionadas(new Set())
     setShowGenerar(false)

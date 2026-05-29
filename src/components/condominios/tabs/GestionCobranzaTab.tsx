@@ -74,7 +74,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ unidad_id: '', responsable: '', monto_adeudado: '', monto_pagado: '0', etapa: 'aviso_amistoso', fecha_inicio: new Date().toISOString().split('T')[0], observaciones: '' })
     setMostrarForm(false)
     onRefresh()
@@ -85,7 +85,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     if (idx < 0 || idx >= FLUJO_ETAPAS.length - 1) return
     const siguiente = FLUJO_ETAPAS[idx + 1]
     const { error } = await supabase.from('gestion_cobranza').update({ etapa: siguiente }).eq('id', c.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, etapa: siguiente } : null)
     onRefresh()
   }
@@ -97,7 +97,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
       estado: 'resuelto' as EstadoCobranza, etapa: 'resuelto' as EtapaCobranza,
       fecha_resolucion: new Date().toISOString().split('T')[0],
     }).eq('id', c.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado: 'resuelto', etapa: 'resuelto', fecha_resolucion: new Date().toISOString().split('T')[0] } : null)
     onRefresh()
   }
@@ -112,7 +112,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     }
     const nuevos = [...c.contactos, nuevo]
     const { error } = await supabase.from('gestion_cobranza').update({ contactos: nuevos }).eq('id', c.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, contactos: nuevos } : null)
     setContactoForm({ tipo: 'llamada', resultado: '', siguiente_accion: '' })
     onRefresh()
@@ -135,7 +135,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     })
     if (!vals) return
     const { error } = await supabase.from('gestion_cobranza').update({ monto_adeudado: vals.adeudado, monto_pagado: vals.pagado }).eq('id', c.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, monto_adeudado: vals.adeudado, monto_pagado: vals.pagado } : null)
     onRefresh()
   }

@@ -47,7 +47,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
       asunto: msgForm.asunto.trim(), cuerpo: msgForm.cuerpo.trim(), tipo: msgForm.tipo,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Mensaje enviado!', text: 'La administración lo revisará pronto.', duration: 1800 })
     setMsgForm(blankMsg()); setShowMsgForm(false); onRefresh()
   }

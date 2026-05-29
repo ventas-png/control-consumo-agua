@@ -161,7 +161,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }))
     const { error } = await supabase.from('cuotas_condominio').insert(inserts)
     setImportando(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${validas.length} cuotas importadas`, duration: 1800 })
     setCsvRows(null)
     onRefresh()
@@ -223,7 +223,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       estado: 'pendiente',
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Cuota registrada', duration: 1500 })
     resetForm()
     onRefresh()
@@ -269,13 +269,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         metodo_pago: datos.metodo_pago,
         referencia_pago: datos.referencia_pago,
       }).eq('id', cuota.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       onRefresh()
       return
     }
 
     const { error } = await supabase.from('cuotas_condominio').update({ estado: nuevoEstado }).eq('id', cuota.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -325,7 +325,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       referencia_pago: datos.referencia_pago,
     }).in('id', ids)
 
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${ids.length} cuotas marcadas como pagadas`, text: `Total: ${moneda} ${totalMonto.toFixed(2)}`, duration: 2000 })
     setSeleccionadas(new Set())
     onRefresh()
@@ -353,7 +353,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     })
     if (!isConfirmed) return
     const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${vencidas.length} cuotas marcadas como morosas`, duration: 1500 })
     onRefresh()
   }
@@ -376,7 +376,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
       estado: 'generado',
     })
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
     const { value: descargar } = await Swal.fire({
       icon: 'success', title: `Recibo ${numero} creado`,

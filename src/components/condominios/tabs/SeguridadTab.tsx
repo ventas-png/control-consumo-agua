@@ -139,7 +139,7 @@ export function SeguridadTab({
       })
       .select('id')
       .single()
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
 
     // Si se seleccionó una ruta, crear las visitas_control para cada punto
     if (rondaForm.ruta_id && rondaData) {
@@ -190,7 +190,7 @@ export function SeguridadTab({
       fotos: fotosNovedadForm.length > 0 ? fotosNovedadForm : null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Novedad registrada', duration: 1400 })
     setNovedadForm({ tipo: 'observacion', descripcion: '', ubicacion: '', prioridad: 'normal', ronda_id: '' })
     setFotosNovedadForm([])
@@ -268,7 +268,7 @@ export function SeguridadTab({
       .order('hora_entrada', { ascending: false })
       .limit(50)
     setSearching(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (data && data.length > 0) {
       const mapped = data.map((v: Visitante & { unidades?: { nombre: string } }) => ({ ...v, unidad_nombre: v.unidades?.nombre }))
       setSearchResultVisitantes(mapped)
@@ -320,7 +320,7 @@ export function SeguridadTab({
       hora_entrada: new Date().toISOString(),
     })
     setRegSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (strReservaId) {
       setStrIngresados(prev => new Set([...prev, strReservaId]))
       setStrReservaId(null)

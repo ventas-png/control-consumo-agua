@@ -42,7 +42,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
       notas: formCaja.notas || null,
     })
     setSavingCaja(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowCajaForm(false); setFormCaja({ ...BLANK_CAJA }); onRefresh()
   }
 
@@ -66,7 +66,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
       fecha: formMov.fecha,
     })
     setSavingMov(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowMovForm(false); setFormMov({ ...BLANK_MOV }); onRefresh()
   }
 

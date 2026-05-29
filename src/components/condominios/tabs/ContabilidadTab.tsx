@@ -121,7 +121,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
     const { error } = editId
       ? await supabase.from('gastos_condominio').update(payload).eq('id', editId)
       : await supabase.from('gastos_condominio').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -129,7 +129,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
     const r = await Swal.fire({ title: '¿Eliminar gasto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('gastos_condominio').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

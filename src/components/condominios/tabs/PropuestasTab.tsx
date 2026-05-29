@@ -90,7 +90,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     const { error } = editId
       ? await supabase.from('propuestas_inversion').update(payload).eq('id', editId)
       : await supabase.from('propuestas_inversion').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -99,7 +99,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     if (!p) return
     const upd = tipo === 'favor' ? { votos_favor: p.votos_favor + 1 } : { votos_contra: p.votos_contra + 1 }
     const { error } = await supabase.from('propuestas_inversion').update(upd).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -108,7 +108,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     if (estado === 'aprobada') updates.fecha_aprobacion = new Date().toISOString().slice(0, 10)
     if (estado === 'en_ejecucion') updates.fecha_ejecucion = new Date().toISOString().slice(0, 10)
     const { error } = await supabase.from('propuestas_inversion').update(updates).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -116,7 +116,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     const r = await Swal.fire({ title: '¿Eliminar propuesta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('propuestas_inversion').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

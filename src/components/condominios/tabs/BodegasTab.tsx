@@ -64,7 +64,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
     const { error } = editId
       ? await supabase.from('bodegas_condominio').update(payload).eq('id', editId)
       : await supabase.from('bodegas_condominio').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -72,7 +72,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
     const r = await Swal.fire({ title: '¿Eliminar bodega?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('bodegas_condominio').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -81,7 +81,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
     if (estado === 'disponible') { updates.unidad_id = null; updates.fecha_asignacion = null }
     if (estado === 'asignada') updates.fecha_asignacion = new Date().toISOString().slice(0, 10)
     const { error } = await supabase.from('bodegas_condominio').update(updates).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

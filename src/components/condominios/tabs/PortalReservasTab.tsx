@@ -122,7 +122,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
 
     if (amenidadSel) {
       const errReglas = validarReglasAmenidad(amenidadSel, form.fecha, form.hora_inicio, form.hora_fin, unidadId, reservas)
-      if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
+      if (errReglas) { notify({ variant: 'warning', title: 'No permitido', text: errReglas }); return }
     }
 
     const tarifaCalc = amenidadSel ? tarifaAplicable(amenidadSel, form.fecha) : 0
@@ -172,7 +172,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     setSaving(false)
     if (error) {
       if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
-      Swal.fire('Error', error.message, 'error'); return
+      notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     const titulo = requiereAprob
       ? 'Solicitud enviada. La administración debe aprobarla.'

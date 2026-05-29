@@ -69,7 +69,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
       notas: notas || null, cerrado_por: cerradoPor || null, estado: 'borrador',
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setNotas(''); setCerradoPor(''); setPreviewing(false); onRefresh()
   }
 

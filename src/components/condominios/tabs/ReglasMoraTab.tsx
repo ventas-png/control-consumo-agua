@@ -59,7 +59,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
       ? await supabase.from('reglas_mora_config').update(payload).eq('id', editId)
       : await supabase.from('reglas_mora_config').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     cancelar(); onRefresh()
   }
 

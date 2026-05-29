@@ -69,7 +69,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       accion_config: {}, activa: true, notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 
@@ -107,7 +107,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       )
       const { error } = await supabase.from('cuotas_condominio')
         .update({ estado: 'moroso' }).in('id', afectadas.map(c => c.id))
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       notify({ variant: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, duration: 1600 })
       await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
       onRefresh(); return

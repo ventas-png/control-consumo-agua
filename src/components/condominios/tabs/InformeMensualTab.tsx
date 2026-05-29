@@ -60,7 +60,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
       num_incidentes: incidentesMes.length,
     }, { onConflict: 'project_id,periodo' })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `Informe ${ym} generado`, duration: 1600 })
     onRefresh()
   }

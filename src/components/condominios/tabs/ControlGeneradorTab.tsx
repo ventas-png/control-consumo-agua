@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ControlGenerador, TipoRegistroGenerador, EstadoGenerador } from '../../../types'
 
@@ -91,7 +90,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm(p => ({ ...p, nivel_combustible_pct: '', horas_operacion: '', voltaje: '', frecuencia: '', costo: '', observaciones: '' }))
     setMostrarForm(false)
     onRefresh()

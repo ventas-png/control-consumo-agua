@@ -105,10 +105,10 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
     }
     if (editId) {
       const { error } = await supabase.from('agenda_operativa').update(payload).eq('id', editId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { error } = await supabase.from('agenda_operativa').insert(payload)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false)
     cancelForm()
@@ -122,13 +122,13 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('agenda_operativa').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoAgenda) {
     const { error } = await supabase.from('agenda_operativa').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

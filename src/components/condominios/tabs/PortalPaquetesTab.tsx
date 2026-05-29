@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
@@ -70,9 +69,9 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
     try {
       const path = buildUploadPath('paquetes-firmas', 'firma.png', 'png')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { Swal.fire('Error', upErr.message, 'error'); return }
+      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
       const { error } = await supabase.rpc('paquete_firmar_recepcion', { p_paquete_id: firmando.id, p_firma_path: path, p_nombre: nombre.trim() })
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       setFirmando(null)
       notify({ variant: 'success', title: 'Recepción firmada', text: 'Gracias, registramos tu firma.', duration: 1600 })
       onRefresh()
@@ -102,7 +101,7 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
       p_notas: salForm.notas.trim() || null,
     })
     setSalSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetSalForm()
     onRefresh()
     setVerCodigo(data as PaqueteRecibido)

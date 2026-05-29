@@ -97,7 +97,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
       ({ error } = await supabase.from('actas_reunion').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); onRefresh()
   }
 

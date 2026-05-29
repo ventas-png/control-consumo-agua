@@ -87,7 +87,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
     const { error } = editId
       ? await supabase.from('servicios_housekeeping').update(payload).eq('id', editId)
       : await supabase.from('servicios_housekeeping').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -95,13 +95,13 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
     const r = await Swal.fire({ title: '¿Eliminar servicio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('servicios_housekeeping').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoHousekeeping) {
     const { error } = await supabase.from('servicios_housekeeping').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

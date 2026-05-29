@@ -77,7 +77,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       motivo: form.motivo.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 
@@ -145,7 +145,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     })
     const { error } = await supabase.from('recargos_mora').insert(rows)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, duration: 2200 })
     onRefresh()
   }

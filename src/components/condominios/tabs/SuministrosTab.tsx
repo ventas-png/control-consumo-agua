@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
 
@@ -73,7 +72,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0', ubicacion: '', proveedor: '', costo_unitario: '', notas: '' })
     setVista('lista')
     onRefresh()
@@ -92,7 +91,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       realizado_por: movForm.realizado_por.trim() || null, fecha: movForm.fecha,
       notas: movForm.notas.trim() || null,
     })
-    if (errMov) { setSaving(false); Swal.fire('Error', errMov.message, 'error'); return }
+    if (errMov) { setSaving(false); notify({ variant: 'error', title: 'Error', text: errMov.message }); return }
 
     // Actualizar stock
     let nuevoStock = selected.stock_actual
@@ -102,7 +101,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
     const { error: errStock } = await supabase.from('suministros_condominio').update({ stock_actual: nuevoStock }).eq('id', selected.id)
     setSaving(false)
-    if (errStock) { Swal.fire('Error', errStock.message, 'error'); return }
+    if (errStock) { notify({ variant: 'error', title: 'Error', text: errStock.message }); return }
 
     setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: new Date().toISOString().split('T')[0], notas: '' })
     setVista('lista')

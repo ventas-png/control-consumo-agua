@@ -70,7 +70,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
       notas: notas || null, activo: true,
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setSelectedUnidad(''); setSelectedContador(''); setNotas(''); onRefresh()
   }
 

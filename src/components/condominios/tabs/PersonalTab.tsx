@@ -147,7 +147,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     const { error } = editId
       ? await supabase.from('personal_condominio').update(payload).eq('id', editId)
       : await supabase.from('personal_condominio').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -155,13 +155,13 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     const r = await Swal.fire({ title: '¿Eliminar personal?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('personal_condominio').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoPersonal) {
     const { error } = await supabase.from('personal_condominio').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

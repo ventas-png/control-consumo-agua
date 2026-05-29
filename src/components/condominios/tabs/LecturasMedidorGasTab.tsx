@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { LecturaMedidorGas, Unidad } from '../../../types'
 
@@ -71,7 +70,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm(p => ({ ...p, lectura_anterior: '', lectura_actual: '', alerta_fuga: false, observaciones: '' }))
     setMostrarForm(false)
     onRefresh()

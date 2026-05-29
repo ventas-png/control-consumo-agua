@@ -77,7 +77,7 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
       ({ error } = await supabase.from('avisos_cobro').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); setDetalle([{ ...BLANK_ITEM }]); onRefresh()
   }
 

@@ -69,7 +69,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ fecha: hoy, turno: 'mañana', guardia_nombre: '', hora_inicio: '', hora_fin: '', observaciones: '' })
     setNovedades([])
     setMostrarForm(false)
@@ -80,7 +80,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
     const res = await Swal.fire({ title: 'Cerrar turno', text: '¿Marcar bitácora como cerrada?', icon: 'question', showCancelButton: true, confirmButtonText: 'Cerrar turno' })
     if (!res.isConfirmed) return
     const { error } = await supabase.from('bitacora_guardia').update({ estado: 'cerrado' as EstadoBitacoraGuardia }).eq('id', b.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === b.id) setSelected(prev => prev ? { ...prev, estado: 'cerrado' } : null)
     onRefresh()
   }
@@ -90,7 +90,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
     const nueva: NovedadGuardia = { ...novDetalle, hora: novDetalle.hora || new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) }
     const nuevas = [...b.novedades, nueva]
     const { error } = await supabase.from('bitacora_guardia').update({ novedades: nuevas }).eq('id', b.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, novedades: nuevas } : null)
     setNovDetalle({ hora: '', descripcion: '', tipo: 'normal' })
     onRefresh()

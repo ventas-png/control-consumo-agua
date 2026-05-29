@@ -92,7 +92,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
     const { error } = editId
       ? await supabase.from('polizas_seguro').update(payload).eq('id', editId)
       : await supabase.from('polizas_seguro').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -100,13 +100,13 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
     const r = await Swal.fire({ title: '¿Eliminar póliza?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('polizas_seguro').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoPoliza) {
     const { error } = await supabase.from('polizas_seguro').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -59,10 +59,10 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
     }
     if (editId) {
       const { error } = await supabase.from('plantillas_tarea_cargo').update(payload).eq('id', editId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { error } = await supabase.from('plantillas_tarea_cargo').insert({ ...payload, company_id: companyId, project_id: proyectoId })
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false); resetForm(); onRefresh()
   }

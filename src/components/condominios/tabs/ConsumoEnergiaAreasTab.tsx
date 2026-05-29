@@ -80,7 +80,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
       ? await supabase.from('consumo_energia_areas').update(payload).eq('id', editId)
       : await supabase.from('consumo_energia_areas').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 

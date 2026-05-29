@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { Visitante, Unidad } from '../../../types'
@@ -83,9 +82,9 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       valido_hasta: qrGenerado.validoHasta,
     })
     setRegistrando(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
-    Swal.fire('Pre-autorización guardada', 'El visitante tiene acceso hasta el ' + qrGenerado.validoHasta, 'success')
+    notify({ variant: 'success', title: 'Pre-autorización guardada', text: 'El visitante tiene acceso hasta el ' + qrGenerado.validoHasta })
     setQrGenerado(null)
     setForm({ nombre: '', motivo: '', unidadId: '', validoHasta: hoy, identificacion: '' })
   }
@@ -113,7 +112,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       .update({ hora_entrada: new Date().toISOString() })
       .eq('id', resultadoValidacion.visitante.id)
     setRegistrando(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setTokenValidar(''); setResultadoValidacion(null)
     notify({ variant: 'success', title: 'Entrada registrada', text: `${resultadoValidacion.visitante.nombre} ingresó a ${resultadoValidacion.visitante.unidad_nombre}` })

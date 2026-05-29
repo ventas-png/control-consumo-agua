@@ -78,7 +78,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
       ? await supabase.from('tarifas_condominio').update(payload).eq('id', editId)
       : await supabase.from('tarifas_condominio').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 

@@ -71,7 +71,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
         fecha_recordatorio: form.fecha_recordatorio || null,
       }).eq('id', selected.id)
       setSaving(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
       const { error } = await supabase.from('notas_admin').insert({
         company_id: companyId, project_id: proyectoId,
@@ -81,7 +81,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
         fecha_recordatorio: form.fecha_recordatorio || null,
       })
       setSaving(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     }
     resetForm()
     onRefresh()

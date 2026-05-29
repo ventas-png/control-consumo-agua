@@ -89,7 +89,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       ? await supabase.from('contratos_arrendamiento').update(data).eq('id', editingId)
       : await supabase.from('contratos_arrendamiento').insert(data)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     Swal.fire({ icon: 'success', title: editingId ? 'Contrato actualizado' : 'Contrato registrado', timer: 1400, showConfirmButton: false })
     resetForm(); onRefresh()
   }

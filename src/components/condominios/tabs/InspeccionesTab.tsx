@@ -85,7 +85,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
     const { error } = editId
       ? await supabase.from('inspecciones_normativas').update(payload).eq('id', editId)
       : await supabase.from('inspecciones_normativas').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -93,7 +93,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
     const r = await Swal.fire({ title: '¿Eliminar inspección?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('inspecciones_normativas').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

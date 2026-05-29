@@ -73,10 +73,10 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
     }
     if (editId) {
       const { error } = await supabase.from('objetos_perdidos').update(payload).eq('id', editId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { error } = await supabase.from('objetos_perdidos').insert(payload)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false)
     cancelForm()
@@ -90,7 +90,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('objetos_perdidos').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -101,7 +101,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       return
     }
     const { error } = await supabase.from('objetos_perdidos').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -112,7 +112,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       reclamado_por: reclamadoPor || null,
       fecha_reclamo: new Date().toISOString().slice(0, 10),
     }).eq('id', reclamoId)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setReclamoId(null)
     setReclamadoPor('')
     onRefresh()

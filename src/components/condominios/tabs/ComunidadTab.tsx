@@ -63,7 +63,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
       activo: true,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Anuncio publicado', duration: 1500 })
     resetForm()
     onRefresh()
@@ -71,7 +71,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
 
   async function toggleActivo(anuncio: AnuncioComunidad) {
     const { error } = await supabase.from('anuncios_comunidad').update({ activo: !anuncio.activo }).eq('id', anuncio.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

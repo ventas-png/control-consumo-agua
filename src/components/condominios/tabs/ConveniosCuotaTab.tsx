@@ -65,7 +65,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 

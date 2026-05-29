@@ -207,7 +207,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
     })
 
     const { error } = await supabase.from('cuotas_condominio').insert(rows)
-    if (error) { Swal.fire('Error', error.message, 'error'); setGenerando(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setGenerando(false); return }
 
     // Log de auditoría con rubros
     const montoPromedio = seleccionadas.size > 0 ? totalSeleccionado / seleccionadas.size : 0

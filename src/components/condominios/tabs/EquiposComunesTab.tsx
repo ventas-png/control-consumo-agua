@@ -93,7 +93,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     }
     const { error } = await supabase.from('equipos_comunes').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm()
     setMostrarForm(false)
     onRefresh()
@@ -101,7 +101,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
 
   async function actualizarEstado(equipo: EquipoComun, estado: EstadoEquipo) {
     const { error } = await supabase.from('equipos_comunes').update({ estado }).eq('id', equipo.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === equipo.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
   }
@@ -118,7 +118,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
       proximo_mantenimiento: proxima || null,
       estado: 'operativo' as EstadoEquipo,
     }).eq('id', equipo.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === equipo.id) {
       setSelected(prev => prev ? { ...prev, ultimo_mantenimiento: new Date().toISOString().split('T')[0], proximo_mantenimiento: proxima || undefined, estado: 'operativo' } : null)
     }

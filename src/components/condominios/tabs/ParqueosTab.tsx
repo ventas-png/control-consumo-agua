@@ -78,7 +78,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
       ? await supabase.from('parqueos_condominio').update(data).eq('id', editingId)
       : await supabase.from('parqueos_condominio').insert(data)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     Swal.fire({ icon: 'success', title: editingId ? 'Parqueo actualizado' : 'Parqueo registrado', timer: 1400, showConfirmButton: false })
     resetForm(); onRefresh()
   }

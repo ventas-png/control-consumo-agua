@@ -78,7 +78,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
     const { error } = editId
       ? await supabase.from('locales_comerciales').update(payload).eq('id', editId)
       : await supabase.from('locales_comerciales').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -86,7 +86,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
     const r = await Swal.fire({ title: '¿Eliminar local?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('locales_comerciales').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -76,7 +76,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
     const { error } = editId
       ? await supabase.from('documentos_condominio').update(payload).eq('id', editId)
       : await supabase.from('documentos_condominio').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -84,13 +84,13 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
     const r = await Swal.fire({ title: '¿Eliminar documento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('documentos_condominio').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function toggleVigente(d: DocumentoCondominio) {
     const { error } = await supabase.from('documentos_condominio').update({ vigente: !d.vigente }).eq('id', d.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -61,7 +61,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 

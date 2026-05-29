@@ -70,7 +70,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
       notas: form.notas || null, aprobado_por: form.aprobado_por || null,
     }).select().single()
 
-    if (error || !plan) { setSaving(false); return Swal.fire('Error', error?.message ?? 'Error al crear plan', 'error') }
+    if (error || !plan) { setSaving(false); return notify({ variant: 'error', title: 'Error', text: error?.message ?? 'Error al crear plan' }) }
 
     // Generate installments
     const installments = Array.from({ length: numCuotas }, (_, i) => ({

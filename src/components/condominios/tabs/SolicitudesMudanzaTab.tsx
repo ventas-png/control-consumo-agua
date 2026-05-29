@@ -117,13 +117,13 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
         .update({ terminos_mudanza: terminosText.trim(), updated_at: new Date().toISOString() })
         .eq('id', terminosId)
       setSavingTerminos(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
       const { error } = await supabase
         .from('config_condominio')
         .upsert({ company_id: companyId, project_id: proyectoId, terminos_mudanza: terminosText.trim() }, { onConflict: 'project_id' })
       setSavingTerminos(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     }
     notify({ variant: 'success', title: 'Términos guardados', duration: 1400 })
     await cargarTerminos()
@@ -187,7 +187,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
     }
     const { error } = await supabase.from('solicitud_mudanza_unidad').update(payload).eq('id', s.id)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     Swal.fire({ icon: 'success', title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', timer: 1400, showConfirmButton: false })
     setExpandedId(null); onRefresh()
   }
@@ -195,21 +195,21 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
   async function cambiarEstado(id: string, estado: EstadoSolicitudMudanza) {
     if (!canEdit) return
     const { error } = await supabase.from('solicitud_mudanza_unidad').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function toggleCampo(id: string, campo: 'deposito_requerido' | 'deposito_pagado' | 'ascensor_reservado', valor: boolean) {
     if (!canEdit) return
     const { error } = await supabase.from('solicitud_mudanza_unidad').update({ [campo]: valor }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function actualizarMontoDeposito(id: string, monto: number | null) {
     if (!canEdit) return
     const { error } = await supabase.from('solicitud_mudanza_unidad').update({ monto_deposito: monto }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -87,13 +87,13 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     const { error } = editId
       ? await supabase.from('onboarding_residentes').update(payload).eq('id', editId)
       : await supabase.from('onboarding_residentes').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
   async function toggleCheck(id: string, key: keyof OnboardingResidente, val: boolean) {
     const { error } = await supabase.from('onboarding_residentes').update({ [key]: !val }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -102,7 +102,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     const token = crypto.randomUUID().replace(/-/g, '')
     const { error } = await supabase.from('unidades')
       .update({ portal_activo: true, token_portal: token }).eq('id', o.unidad_id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     const url = `${window.location.origin}/portal/${token}`
     await Swal.fire({
       icon: 'success', title: '¡Portal activado!',
@@ -117,7 +117,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     const r = await Swal.fire({ title: '¿Eliminar onboarding?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('onboarding_residentes').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -247,10 +247,10 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     let reservaId: string | null = editId
     if (editId) {
       const { error } = await supabase.from('reservas_str').update(payload).eq('id', editId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { data, error } = await supabase.from('reservas_str').insert(payload).select('id').single()
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
       reservaId = data.id
     }
 
@@ -262,13 +262,13 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     const r = await Swal.fire({ title: '¿Eliminar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('reservas_str').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoSTR) {
     const { error } = await supabase.from('reservas_str').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

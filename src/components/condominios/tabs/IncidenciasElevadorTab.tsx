@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { IncidenciaElevador, TipoIncidenciaElevador, EstadoIncidenciaElevador } from '../../../types'
 
@@ -89,7 +88,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ elevador: 'Elevador 1', tipo: 'falla', descripcion: '', fecha: new Date().toISOString().split('T')[0], hora_inicio: '', hora_fin: '', empresa_servicio: '', tecnico: '', estado: 'reportado', costo: '', proxima_inspeccion: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()

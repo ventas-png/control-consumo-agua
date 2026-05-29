@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { MantenimientoJardineria, TipoJardineria, EstadoJardineria } from '../../../types'
 
@@ -90,7 +89,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ fecha: new Date().toISOString().split('T')[0], tipo: 'mantenimiento_general', areas: [], proveedor: '', trabajadores: '', horas_trabajo: '', insumos: '', costo: '', estado: 'completado', proxima_visita: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()

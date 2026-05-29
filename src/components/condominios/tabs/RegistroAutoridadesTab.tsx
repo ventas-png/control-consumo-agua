@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { RegistroAutoridad, TipoAutoridad, ResultadoAutoridad } from '../../../types'
 
@@ -78,7 +77,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ tipo_autoridad: 'policia', nombre_institucion: '', nombre_funcionario: '', motivo: '', fecha: new Date().toISOString().split('T')[0], hora_llegada: '', hora_salida: '', resultado: 'sin_novedad', documento_referencia: '', requiere_seguimiento: false, fecha_seguimiento: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
 
@@ -72,7 +73,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
       .update(payload)
       .eq('id', s.id)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     Swal.fire({
       icon: 'success',
       title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada',

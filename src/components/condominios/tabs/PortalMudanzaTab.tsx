@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
@@ -108,7 +107,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       const magicCheck = await validateFileMagic(file, 'image')
       if (!magicCheck.ok) {
         setSaving(false)
-        Swal.fire('Error', magicCheck.reason, 'error')
+        notify({ variant: 'error', title: 'Error', text: magicCheck.reason })
         return
       }
       const path = buildUploadPath(unidadId, file.name)
@@ -140,7 +139,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
     const { error } = await supabase.from('solicitud_mudanza_unidad').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     setShowForm(false)
     setForm(blankForm())

@@ -87,7 +87,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
       estado: 'pendiente', recibido_por: userId, codigo_retiro: codigo,
     }).select('*, unidades(nombre)').single()
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     const row = { ...(data as PaqueteRecibido & { unidades?: { nombre: string } | null }), unidad_nombre: (data as { unidades?: { nombre: string } | null }).unidades?.nombre }
     resetForm()
     onRefresh()
@@ -96,7 +96,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
 
   async function confirmarCustodia(id: string) {
     const { error } = await supabase.from('paquetes_recibidos').update({ recibido_por: userId, hora_recepcion: new Date().toISOString() }).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -110,13 +110,13 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     try {
       const path = buildUploadPath('paquetes-firmas', 'firma.png', 'png')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { Swal.fire('Error', upErr.message, 'error'); return }
+      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
       const { error } = await supabase.from('paquetes_recibidos').update({
         estado: 'entregado', hora_entrega: new Date().toISOString(), entregado_por: userId,
         firma_path: path, entregado_a_nombre: entregaNombre.trim() || entregando.autorizado_nombre || null,
         entregado_via: 'porteria',
       }).eq('id', entregando.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       setEntregando(null); setEntregaCodigo(''); setEntregaNombre('')
       onRefresh()
     } finally {

@@ -81,7 +81,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       ? await supabase.from('mascotas').update(data).eq('id', editingId)
       : await supabase.from('mascotas').insert(data)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     Swal.fire({ icon: 'success', title: editingId ? 'Mascota actualizada' : 'Mascota registrada', timer: 1400, showConfirmButton: false })
     resetForm(); onRefresh()
   }
