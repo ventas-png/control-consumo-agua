@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { GestionCobranza, EtapaCobranza, EstadoCobranza, TipoContactoCobranza, ContactoCobranza, Unidad } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -60,7 +61,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
 
   async function guardar() {
     if (!form.responsable.trim() || !form.monto_adeudado) {
-      Swal.fire('Faltan datos', 'Responsable y monto son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Responsable y monto son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('gestion_cobranza').insert({

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { codigoRetiroQrUrl } from '../../../lib/paquetes'
@@ -73,7 +74,7 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
       const { error } = await supabase.rpc('paquete_firmar_recepcion', { p_paquete_id: firmando.id, p_firma_path: path, p_nombre: nombre.trim() })
       if (error) { Swal.fire('Error', error.message, 'error'); return }
       setFirmando(null)
-      Swal.fire({ icon: 'success', title: 'Recepción firmada', text: 'Gracias, registramos tu firma.', timer: 1600, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Recepción firmada', text: 'Gracias, registramos tu firma.', duration: 1600 })
       onRefresh()
     } finally {
       setSaving(false)
@@ -87,8 +88,8 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
   }
 
   async function handleAutorizar() {
-    if (!salForm.descripcion.trim()) { Swal.fire('Error', 'Describe el paquete que dejarás.', 'error'); return }
-    if (!salForm.autorizado_nombre.trim()) { Swal.fire('Error', 'Indica a quién autorizas a recogerlo.', 'error'); return }
+    if (!salForm.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Describe el paquete que dejarás.' }); return }
+    if (!salForm.autorizado_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Indica a quién autorizas a recogerlo.' }); return }
     setSalSaving(true)
     const { data, error } = await supabase.rpc('paquete_autorizar_salida', {
       p_unidad_id: unidadId,

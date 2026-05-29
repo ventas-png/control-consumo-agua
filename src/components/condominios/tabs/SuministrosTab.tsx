@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
 
 interface Props {
@@ -58,7 +59,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   const movsDelSelected = selected ? movimientos.filter(m => m.suministro_id === selected.id) : []
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Faltan datos', 'Nombre obligatorio', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('suministros_condominio').insert({
       company_id: companyId, project_id: proyectoId,
@@ -79,9 +80,9 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   }
 
   async function registrarMovimiento() {
-    if (!selected || !movForm.cantidad) { Swal.fire('Faltan datos', 'Cantidad obligatoria', 'warning'); return }
+    if (!selected || !movForm.cantidad) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Cantidad obligatoria' }); return }
     const cant = parseFloat(movForm.cantidad)
-    if (isNaN(cant) || cant <= 0) { Swal.fire('Inválido', 'Cantidad debe ser positiva', 'warning'); return }
+    if (isNaN(cant) || cant <= 0) { notify({ variant: 'warning', title: 'Inválido', text: 'Cantidad debe ser positiva' }); return }
 
     setSaving(true)
     const { error: errMov } = await supabase.from('movimientos_suministro').insert({

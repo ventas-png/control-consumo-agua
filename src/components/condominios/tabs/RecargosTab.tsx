@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
 
 interface Props {
@@ -61,9 +62,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   }
 
   async function guardar() {
-    if (!form.unidad_id || !form.valor) { Swal.fire('Error', 'Unidad y valor son obligatorios', 'warning'); return }
+    if (!form.unidad_id || !form.valor) { notify({ variant: 'warning', title: 'Error', text: 'Unidad y valor son obligatorios' }); return }
     const monto = montoPreview
-    if (!monto || monto <= 0) { Swal.fire('Error', 'El monto calculado debe ser mayor a 0', 'warning'); return }
+    if (!monto || monto <= 0) { notify({ variant: 'warning', title: 'Error', text: 'El monto calculado debe ser mayor a 0' }); return }
     setSaving(true)
     const { error } = await supabase.from('recargos_mora').insert({
       company_id: companyId, project_id: proyectoId,
@@ -96,7 +97,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       (c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
     )
     const unidadesMorosas = [...new Set(cuotasVenc.map(c => c.unidad_id).filter(Boolean))]
-    if (unidadesMorosas.length === 0) { Swal.fire('Sin cuotas vencidas', 'No hay cuotas vencidas a las que aplicar recargo.', 'info'); return }
+    if (unidadesMorosas.length === 0) { notify({ variant: 'info', title: 'Sin cuotas vencidas', text: 'No hay cuotas vencidas a las que aplicar recargo.' }); return }
 
     let pct = 5
     let tipoRecargo: TipoRecargo = 'porcentaje'
@@ -145,7 +146,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     const { error } = await supabase.from('recargos_mora').insert(rows)
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, timer: 2200, showConfirmButton: false })
+    notify({ variant: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, duration: 2200 })
     onRefresh()
   }
 

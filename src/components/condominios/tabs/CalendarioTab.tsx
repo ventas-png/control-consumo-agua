@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { EventoCalendario, TipoEvento, Asamblea, AgendaItem } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   eventos: EventoCalendario[]
@@ -88,7 +89,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   }
 
   async function handleSave() {
-    if (!form.titulo.trim() || !form.fecha_inicio) return Swal.fire('Campos requeridos', 'Título y fecha de inicio son obligatorios.', 'warning')
+    if (!form.titulo.trim() || !form.fecha_inicio) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y fecha de inicio son obligatorios.' })
     setSaving(true)
     const { error } = await supabase.from('eventos_calendario').insert({
       company_id: companyId,

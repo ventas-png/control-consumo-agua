@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
@@ -38,7 +39,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
 
   async function enviarMensaje() {
     if (!msgForm.asunto.trim() || !msgForm.cuerpo.trim()) {
-      Swal.fire('Error', 'Complete asunto y mensaje.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Complete asunto y mensaje.' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('mensajes_portal').insert({
@@ -47,7 +48,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Mensaje enviado!', text: 'La administración lo revisará pronto.', timer: 1800, showConfirmButton: false })
+    notify({ variant: 'success', title: '¡Mensaje enviado!', text: 'La administración lo revisará pronto.', duration: 1800 })
     setMsgForm(blankMsg()); setShowMsgForm(false); onRefresh()
   }
 
@@ -94,7 +95,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
               <code style={{ flex: 1, background: 'var(--at-surface)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '7px', padding: '7px 10px', fontSize: '12px', color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {portalUrl}
               </code>
-              <button onClick={() => { navigator.clipboard.writeText(portalUrl); Swal.fire({ icon: 'success', title: '¡Copiado!', timer: 1000, showConfirmButton: false }) }}
+              <button onClick={() => { navigator.clipboard.writeText(portalUrl); notify({ variant: 'success', title: '¡Copiado!', duration: 1000 }) }}
                 style={{ padding: '7px 14px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                 📋 Copiar
               </button>

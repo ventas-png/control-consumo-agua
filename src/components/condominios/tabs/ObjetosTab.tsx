@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ObjetoPerdido, EstadoObjeto } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   objetos: ObjetoPerdido[]
@@ -58,7 +59,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   }
 
   async function handleSave() {
-    if (!form.descripcion?.trim()) return Swal.fire('Campo requerido', 'Describe el objeto.', 'warning')
+    if (!form.descripcion?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Describe el objeto.' })
     setSaving(true)
     const payload = {
       company_id: companyId,

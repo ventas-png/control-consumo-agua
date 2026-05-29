@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
 
 interface Props {
@@ -75,7 +76,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   const alertas = equipos.filter(e => ['vencido', 'proximo'].includes(alertaManto(e)))
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Faltan datos', 'Nombre del equipo obligatorio', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del equipo obligatorio' }); return }
     setSaving(true)
     const payload: Record<string, unknown> = {
       company_id: companyId, project_id: proyectoId,

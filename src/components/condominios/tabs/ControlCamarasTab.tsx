@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ControlCamaraSeguridad, TipoCamara, EstadoCamara } from '../../../types'
 
 interface Props {
@@ -75,7 +76,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
 
   async function guardar() {
     if (!form.codigo.trim() || !form.nombre.trim() || !form.ubicacion.trim()) {
-      Swal.fire('Faltan datos', 'Código, nombre y ubicación son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Código, nombre y ubicación son obligatorios' }); return
     }
     setSaving(true)
     const payload = {

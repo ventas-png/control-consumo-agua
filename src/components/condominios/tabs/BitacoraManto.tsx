@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { BitacoraManto } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   registros: BitacoraManto[]
@@ -53,7 +54,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
   }
 
   async function handleSave() {
-    if (!form.responsable.trim()) return Swal.fire('Requerido', 'El responsable es obligatorio.', 'warning')
+    if (!form.responsable.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El responsable es obligatorio.' })
     const tareasValidas = tareas.filter(t => t.tarea.trim())
     setSaving(true)
     const payload = {

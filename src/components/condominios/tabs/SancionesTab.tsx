@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   sanciones: SancionCondominio[]
@@ -37,8 +38,8 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
   async function handleSave() {
-    if (!form.unidad_id || !form.concepto.trim()) return Swal.fire('Requerido', 'Unidad y concepto son obligatorios.', 'warning')
-    if (form.monto <= 0) return Swal.fire('Requerido', 'El monto debe ser mayor a 0.', 'warning')
+    if (!form.unidad_id || !form.concepto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'Unidad y concepto son obligatorios.' })
+    if (form.monto <= 0) return notify({ variant: 'warning', title: 'Requerido', text: 'El monto debe ser mayor a 0.' })
     setSaving(true)
     const { error } = await supabase.from('sanciones_condominio').insert({
       company_id: companyId, project_id: proyectoId,

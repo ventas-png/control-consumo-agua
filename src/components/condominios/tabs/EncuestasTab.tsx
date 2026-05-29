@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { Encuesta, RespuestaEncuesta, EstadoEncuesta, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface PreguntaItem { id: string; texto: string; tipo: 'texto' | 'rating_5' | 'si_no' }
 interface Props {
@@ -57,8 +58,8 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   function removePregunta(idx: number) { setPreguntas(p => p.filter((_, i) => i !== idx)) }
 
   async function handleSaveEncuesta() {
-    if (!formEnc.titulo?.trim()) return Swal.fire('Campo requerido', 'Ingresa el título.', 'warning')
-    if (preguntas.some(p => !p.texto.trim())) return Swal.fire('Campo requerido', 'Todas las preguntas deben tener texto.', 'warning')
+    if (!formEnc.titulo?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el título.' })
+    if (preguntas.some(p => !p.texto.trim())) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Todas las preguntas deben tener texto.' })
     setSavingEnc(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

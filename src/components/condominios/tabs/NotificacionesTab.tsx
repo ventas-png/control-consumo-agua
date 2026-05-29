@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ReglaNotificacion, EventoNotificacion, CanalNotificacion, DestinatarioNotificacion } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   reglas: ReglaNotificacion[]
@@ -65,7 +66,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
   }
 
   async function handleSave() {
-    if (!form.nombre.trim()) return Swal.fire('Requerido', 'El nombre de la regla es obligatorio.', 'warning')
+    if (!form.nombre.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre de la regla es obligatorio.' })
     setSaving(true)
     const payload = {
       nombre: form.nombre.trim(), evento: form.evento, canal: form.canal,

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { EstacionamientoVisita, TipoVehiculoVisita, Unidad } from '../../../types'
 
 interface Props {
@@ -55,7 +56,7 @@ export default function EstacionamientoVisitaTab({
 
   async function guardar() {
     if (!form.espacio.trim() || !form.placa.trim()) {
-      Swal.fire('Faltan datos', 'Espacio y placa son obligatorios', 'warning')
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Espacio y placa son obligatorios' })
       return
     }
     setSaving(true)

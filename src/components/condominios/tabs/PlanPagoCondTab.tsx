@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { PlanPagoCond, CuotaPlanPago } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   planes: PlanPagoCond[]
@@ -52,12 +53,12 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   useEffect(() => { if (selected) fetchCuotas(selected.id) }, [selected, fetchCuotas])
 
   async function handleSave() {
-    if (!form.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
-    if (!form.concepto.trim()) return Swal.fire('Requerido', 'El concepto es obligatorio.', 'warning')
+    if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
+    if (!form.concepto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El concepto es obligatorio.' })
     const montoTotal = parseFloat(form.monto_total)
     const numCuotas = parseInt(form.num_cuotas)
-    if (!montoTotal || montoTotal <= 0) return Swal.fire('Requerido', 'El monto total debe ser mayor a 0.', 'warning')
-    if (!numCuotas || numCuotas < 1) return Swal.fire('Requerido', 'El número de cuotas debe ser al menos 1.', 'warning')
+    if (!montoTotal || montoTotal <= 0) return notify({ variant: 'warning', title: 'Requerido', text: 'El monto total debe ser mayor a 0.' })
+    if (!numCuotas || numCuotas < 1) return notify({ variant: 'warning', title: 'Requerido', text: 'El número de cuotas debe ser al menos 1.' })
 
     const montoCuota = parseFloat((montoTotal / numCuotas).toFixed(2))
     setSaving(true)

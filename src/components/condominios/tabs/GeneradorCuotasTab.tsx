@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog, RubroConfig, RubroDetalle } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
@@ -159,18 +160,18 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
   }
 
   function irAPreview() {
-    if (rubros.length === 0) { Swal.fire('Sin rubros', 'Agrega al menos un rubro para continuar.', 'warning'); return }
-    if (rubros.some(r => !r.nombre.trim())) { Swal.fire('Rubros incompletos', 'Todos los rubros deben tener nombre.', 'warning'); return }
-    if (rubros.some(r => r.valor <= 0)) { Swal.fire('Valor requerido', 'Todos los rubros deben tener un valor mayor a 0.', 'warning'); return }
-    if (!fechaVenc) { Swal.fire('Fecha requerida', 'Selecciona la fecha de vencimiento.', 'warning'); return }
-    if (!conceptoFinal.trim()) { Swal.fire('Concepto requerido', 'Ingresa el concepto.', 'warning'); return }
+    if (rubros.length === 0) { notify({ variant: 'warning', title: 'Sin rubros', text: 'Agrega al menos un rubro para continuar.' }); return }
+    if (rubros.some(r => !r.nombre.trim())) { notify({ variant: 'warning', title: 'Rubros incompletos', text: 'Todos los rubros deben tener nombre.' }); return }
+    if (rubros.some(r => r.valor <= 0)) { notify({ variant: 'warning', title: 'Valor requerido', text: 'Todos los rubros deben tener un valor mayor a 0.' }); return }
+    if (!fechaVenc) { notify({ variant: 'warning', title: 'Fecha requerida', text: 'Selecciona la fecha de vencimiento.' }); return }
+    if (!conceptoFinal.trim()) { notify({ variant: 'warning', title: 'Concepto requerido', text: 'Ingresa el concepto.' }); return }
     // Seleccionar todas por defecto
     setSeleccionadas(new Set(unidadesDisponibles.map(u => u.id)))
     setPaso('preview')
   }
 
   const generar = useCallback(async () => {
-    if (seleccionadas.size === 0) { Swal.fire('Sin unidades', 'Selecciona al menos una unidad.', 'warning'); return }
+    if (seleccionadas.size === 0) { notify({ variant: 'warning', title: 'Sin unidades', text: 'Selecciona al menos una unidad.' }); return }
 
     const metodosUsados = [...new Set(rubros.map(r => r.metodo))]
     const metodoCalculo = metodosUsados.length === 1 ? metodosUsados[0] : 'mixto'

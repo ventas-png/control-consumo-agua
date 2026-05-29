@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { SugerenciaCondominio, CategoriaSugerencia, EstadoSugerencia, Unidad } from '../../../types'
 
 interface Props {
@@ -51,7 +52,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
 
   async function guardar() {
     if (!form.titulo.trim() || !form.descripcion.trim()) {
-      Swal.fire('Error', 'Título y descripción son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Título y descripción son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('sugerencias_condominio').insert({

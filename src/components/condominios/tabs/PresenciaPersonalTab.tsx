@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { PresenciaPersonal, EstadoPresencia } from '../../../types'
 
 interface Props {
@@ -44,7 +45,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
   }, {} as Record<EstadoPresencia, number>)
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Faltan datos', 'Nombre obligatorio', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('presencia_personal').insert({
       company_id: companyId,

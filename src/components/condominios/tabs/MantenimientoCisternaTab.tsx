@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { MantenimientoCisterna, TipoMantenimientoCisterna, EstadoCisterna } from '../../../types'
 
 interface Props {
@@ -68,7 +69,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
 
   async function guardar() {
     if (!form.cisterna.trim()) {
-      Swal.fire('Faltan datos', 'El nombre de la cisterna es obligatorio', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'El nombre de la cisterna es obligatorio' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('mantenimiento_cisterna').insert({

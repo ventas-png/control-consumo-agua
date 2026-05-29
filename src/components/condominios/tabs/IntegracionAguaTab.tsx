@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   unidades: Unidad[]
@@ -100,9 +101,9 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
   }
 
   async function generarCuotasAgua() {
-    if (!tarifa || tarifaNum <= 0) { Swal.fire('Error', 'Ingresa una tarifa válida por m³.', 'warning'); return }
-    if (!periodo) { Swal.fire('Error', 'Selecciona el período.', 'warning'); return }
-    if (seleccionadas.size === 0) { Swal.fire('Error', 'Selecciona al menos una unidad.', 'warning'); return }
+    if (!tarifa || tarifaNum <= 0) { notify({ variant: 'warning', title: 'Error', text: 'Ingresa una tarifa válida por m³.' }); return }
+    if (!periodo) { notify({ variant: 'warning', title: 'Error', text: 'Selecciona el período.' }); return }
+    if (seleccionadas.size === 0) { notify({ variant: 'warning', title: 'Error', text: 'Selecciona al menos una unidad.' }); return }
 
     const items = conGenerables.filter(r => seleccionadas.has(r.contador_id))
     const total = items.reduce((s, r) => s + (r.consumo_ultimo ?? 0) * tarifaNum, 0)
@@ -134,7 +135,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
     setGenerando(false)
 
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${items.length} cuotas de agua generadas`, text: `Total: ${moneda} ${total.toFixed(2)}`, timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: `${items.length} cuotas de agua generadas`, text: `Total: ${moneda} ${total.toFixed(2)}`, duration: 2000 })
     setSeleccionadas(new Set())
     setShowGenerar(false)
     onRefresh()

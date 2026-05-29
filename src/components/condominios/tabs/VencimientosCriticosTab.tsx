@@ -1,6 +1,7 @@
 import { useState, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import {
   VencimientoExtra, CategoriaVencimiento,
   PolizaSeguro, ContratoProveedor, InspeccionNormativa,
@@ -112,7 +113,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
 
   async function guardar() {
     if (!form.titulo.trim() || !form.fecha_vencimiento) {
-      Swal.fire('Error', 'Título y fecha son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Título y fecha son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('vencimientos_extra').insert({

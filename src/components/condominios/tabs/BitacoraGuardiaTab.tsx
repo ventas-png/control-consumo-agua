@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { BitacoraGuardia, TurnoGuardia, EstadoBitacoraGuardia, TipoNovedadGuardia, NovedadGuardia } from '../../../types'
 
 interface Props {
@@ -54,7 +55,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
   function removeNovedad(i: number) { setNovedades(prev => prev.filter((_, idx) => idx !== i)) }
 
   async function guardar() {
-    if (!form.guardia_nombre.trim()) { Swal.fire('Faltan datos', 'Nombre del guardia obligatorio', 'warning'); return }
+    if (!form.guardia_nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del guardia obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('bitacora_guardia').insert({
       company_id: companyId,

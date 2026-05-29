@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ObraMejora, EstadoObra } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   obras: ObraMejora[]
@@ -42,7 +43,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   }
 
   async function handleSave() {
-    if (!form.titulo.trim()) return Swal.fire('Requerido', 'El título es obligatorio.', 'warning')
+    if (!form.titulo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El título es obligatorio.' })
     const progreso = Math.max(0, Math.min(100, parseInt(form.progreso) || 0))
     setSaving(true)
     const payload = {

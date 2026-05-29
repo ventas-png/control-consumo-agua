@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ControlPlagas, TipoControlPlagas, ResultadoControlPlagas } from '../../../types'
 
 interface Props {
@@ -67,7 +68,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   }
 
   async function guardar() {
-    if (areasSeleccionadas.length === 0) { Swal.fire('Faltan datos', 'Selecciona al menos un área', 'warning'); return }
+    if (areasSeleccionadas.length === 0) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Selecciona al menos un área' }); return }
     setSaving(true)
     const { error } = await supabase.from('control_plagas').insert({
       company_id: companyId, project_id: proyectoId,

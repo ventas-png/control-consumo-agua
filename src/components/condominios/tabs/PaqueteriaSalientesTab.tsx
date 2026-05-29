@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { generarCodigoRetiro, codigoRetiroQrUrl } from '../../../lib/paquetes'
@@ -70,9 +71,9 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   }
 
   async function handleRegistrar() {
-    if (!form.descripcion.trim()) { Swal.fire('Error', 'Ingrese una descripción.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad del residente.', 'error'); return }
-    if (!form.autorizado_nombre.trim()) { Swal.fire('Error', 'Indique a quién se autoriza el retiro.', 'error'); return }
+    if (!form.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese una descripción.' }); return }
+    if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad del residente.' }); return }
+    if (!form.autorizado_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Indique a quién se autoriza el retiro.' }); return }
     setSaving(true)
     const codigo = generarCodigoRetiro()
     const { data, error } = await supabase.from('paquetes_recibidos').insert({
@@ -102,7 +103,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   async function handleEntregar(file: File) {
     if (!entregando) return
     if (entregaCodigo.trim().toUpperCase() !== (entregando.codigo_retiro || '').toUpperCase()) {
-      Swal.fire('Código incorrecto', 'El código de retiro no coincide. Verifique con quien recoge.', 'error')
+      notify({ variant: 'error', title: 'Código incorrecto', text: 'El código de retiro no coincide. Verifique con quien recoge.' })
       return
     }
     setEntregaSaving(true)

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { PlantillaTareaCargo, AreaCondominio } from '../../../types'
 
@@ -44,8 +45,8 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
   function resetForm() { setForm(blankForm()); setEditId(null); setShowForm(false) }
 
   async function save() {
-    if (!form.cargo.trim()) { Swal.fire('Error', 'Ingrese el cargo.', 'error'); return }
-    if (!form.titulo.trim()) { Swal.fire('Error', 'Ingrese el título de la tarea.', 'error'); return }
+    if (!form.cargo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el cargo.' }); return }
+    if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título de la tarea.' }); return }
     setSaving(true)
     const payload = {
       cargo: form.cargo.trim(),

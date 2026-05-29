@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { DocumentoCondominio, CategoriaDocumento, VisibilidadDocumento } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   documentos: DocumentoCondominio[]
@@ -61,8 +62,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.titulo?.trim()) return Swal.fire('Campo requerido', 'Ingresa el título del documento.', 'warning')
-    if (!form.url?.trim()) return Swal.fire('Campo requerido', 'Ingresa la URL del documento.', 'warning')
+    if (!form.titulo?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el título del documento.' })
+    if (!form.url?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la URL del documento.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { AutomatizacionCond, TriggerTipoAuto, AccionTipoAuto, CuotaCondominio, TicketMantenimiento } from '../../../types'
 
 interface Props {
@@ -59,7 +60,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   }
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'El nombre es obligatorio', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El nombre es obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('automatizaciones_cond').insert({
       company_id: companyId, project_id: proyectoId,
@@ -84,7 +85,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     // Ejecución real: marcar_moroso sobre cuotas vencidas
     if (a.accion_tipo === 'marcar_moroso' && a.trigger_tipo === 'cuota_vencida_dias') {
       if (afectados === 0) {
-        Swal.fire({ icon: 'success', title: 'Sin elementos afectados', text: '✓ No hay cuotas que cumplan el criterio actualmente.', timer: 2000, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Sin elementos afectados', text: '✓ No hay cuotas que cumplan el criterio actualmente.', duration: 2000 })
         await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
         onRefresh(); return
       }
@@ -107,7 +108,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       const { error } = await supabase.from('cuotas_condominio')
         .update({ estado: 'moroso' }).in('id', afectadas.map(c => c.id))
       if (error) { Swal.fire('Error', error.message, 'error'); return }
-      Swal.fire({ icon: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, timer: 1600, showConfirmButton: false })
+      notify({ variant: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, duration: 1600 })
       await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
       onRefresh(); return
     }

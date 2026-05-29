@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -73,9 +74,9 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.numero_poliza?.trim()) return Swal.fire('Campo requerido', 'Ingresa el número de póliza.', 'warning')
-    if (!form.aseguradora?.trim()) return Swal.fire('Campo requerido', 'Ingresa la aseguradora.', 'warning')
-    if (!form.fecha_vencimiento) return Swal.fire('Campo requerido', 'Ingresa la fecha de vencimiento.', 'warning')
+    if (!form.numero_poliza?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el número de póliza.' })
+    if (!form.aseguradora?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la aseguradora.' })
+    if (!form.fecha_vencimiento) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha de vencimiento.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

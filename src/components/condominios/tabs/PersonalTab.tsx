@@ -7,6 +7,7 @@ import type {
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   personal: PersonalCondominio[]
@@ -117,7 +118,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()); setTagInput('') }
 
   async function handleSave() {
-    if (!form.nombre?.trim()) return Swal.fire('Campo requerido', 'Ingresa el nombre.', 'warning')
+    if (!form.nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre.' })
     setSaving(true)
     const cleanContactos = (form.contactos_emergencia ?? []).filter(c => c.nombre?.trim())
     const cleanCodigos = (form.codigos_acceso ?? []).filter(c => c.codigo?.trim())

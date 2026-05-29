@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { SolicitudCertificado, TipoCertificado, EstadoCertificado, Unidad } from '../../../types'
 
 interface Props {
@@ -46,7 +47,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   const kpis = ESTADOS.map(e => ({ ...e, count: solicitudes.filter(s => s.estado === e.value).length }))
 
   async function guardar() {
-    if (!form.solicitante.trim()) { Swal.fire('Faltan datos', 'Nombre del solicitante obligatorio', 'warning'); return }
+    if (!form.solicitante.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del solicitante obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('solicitudes_certificado').insert({
       company_id: companyId, project_id: proyectoId,

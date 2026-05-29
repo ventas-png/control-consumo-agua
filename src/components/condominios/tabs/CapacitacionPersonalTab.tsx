@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { CapacitacionPersonal, EstadoCapacitacion } from '../../../types'
 
 interface Props {
@@ -51,7 +52,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
 
   async function guardar() {
     if (!form.nombre_empleado.trim() || !form.curso.trim() || !form.fecha_inicio) {
-      Swal.fire('Error', 'Empleado, curso y fecha de inicio son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Empleado, curso y fecha de inicio son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('capacitacion_personal_cond').insert({

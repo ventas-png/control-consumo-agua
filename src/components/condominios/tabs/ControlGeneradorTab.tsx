@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ControlGenerador, TipoRegistroGenerador, EstadoGenerador } from '../../../types'
 
 interface Props {
@@ -71,7 +72,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
 
   async function guardar() {
     if (!form.generador.trim()) {
-      Swal.fire('Faltan datos', 'El nombre del generador es obligatorio', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'El nombre del generador es obligatorio' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('control_generador').insert({

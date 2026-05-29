@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 
@@ -55,7 +56,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
 
   async function guardar() {
     if (!form.concepto.trim() || !form.proveedor_nombre.trim()) {
-      Swal.fire('Campos requeridos', 'Proveedor y concepto son obligatorios.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Proveedor y concepto son obligatorios.' }); return
     }
     setSaving(true)
     const payload = {

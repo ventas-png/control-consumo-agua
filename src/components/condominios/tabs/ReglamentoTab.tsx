@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ArticuloReglamento, CategoriaReglamento } from '../../../types'
 
 interface Props {
@@ -52,7 +53,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
 
   async function guardar() {
     if (!form.capitulo.trim() || !form.numero_articulo.trim() || !form.titulo.trim() || !form.contenido.trim()) {
-      Swal.fire('Faltan datos', 'Capítulo, número, título y contenido son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Capítulo, número, título y contenido son obligatorios' }); return
     }
     setSaving(true)
     if (editando && selected) {

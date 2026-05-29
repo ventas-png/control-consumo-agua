@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -65,8 +66,8 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleGuardar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre de la mascota.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad.', 'error'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre de la mascota.' }); return }
+    if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad.' }); return }
     setSaving(true)
     const data = {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,

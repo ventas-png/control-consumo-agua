@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -47,8 +48,8 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   async function handlePublicar() {
-    if (!form.titulo.trim()) { Swal.fire('Error', 'Ingrese el título del anuncio.', 'error'); return }
-    if (!form.contenido.trim()) { Swal.fire('Error', 'Ingrese el contenido del anuncio.', 'error'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título del anuncio.' }); return }
+    if (!form.contenido.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el contenido del anuncio.' }); return }
     setSaving(true)
     const { error } = await supabase.from('anuncios_comunidad').insert({
       company_id: companyId,
@@ -63,7 +64,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Anuncio publicado', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Anuncio publicado', duration: 1500 })
     resetForm()
     onRefresh()
   }

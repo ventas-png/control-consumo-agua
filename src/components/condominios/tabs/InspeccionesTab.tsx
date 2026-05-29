@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 
@@ -71,7 +72,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.fecha) return Swal.fire('Campo requerido', 'Ingresa la fecha de inspección.', 'warning')
+    if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha de inspección.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ActaReunion, TipoActa } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   actas: ActaReunion[]
@@ -76,7 +77,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   }
 
   async function handleSave() {
-    if (!form.titulo.trim() || !form.fecha) return Swal.fire('Campos requeridos', 'Título y fecha son obligatorios.', 'warning')
+    if (!form.titulo.trim() || !form.fecha) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y fecha son obligatorios.' })
     setSaving(true)
     const payload = {
       titulo: form.titulo.trim(), tipo: form.tipo, fecha: form.fecha,

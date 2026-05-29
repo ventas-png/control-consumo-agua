@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { ConfigCondominio } from '../../../types'
 
@@ -76,7 +77,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
       : await supabase.from('config_condominio').insert(payload)
     setSaving(false)
     if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
-    Swal.fire({ icon: 'success', title: 'Configuración guardada', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Configuración guardada', duration: 1500 })
     onRefresh()
   }
 

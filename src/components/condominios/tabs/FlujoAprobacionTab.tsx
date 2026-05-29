@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { FlujoAprobacionCond, TipoFlujoAprobacion, EstadoFlujoAprobacion } from '../../../types'
 
@@ -43,7 +44,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   const rechazados = flujos.filter(f => f.estado === 'rechazado').length
 
   async function crear() {
-    if (!form.titulo.trim()) { Swal.fire('Campo requerido', 'El título es obligatorio.', 'warning'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Campo requerido', text: 'El título es obligatorio.' }); return }
     setSaving(true)
     const { error } = await supabase.from('flujo_aprobacion_cond').insert({
       company_id: companyId,

@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PrestamoEquipo, EstadoPrestamo, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   prestamos: PrestamoEquipo[]
@@ -44,7 +45,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   const conDeposito = prestamos.filter(p => p.estado === 'prestado' && p.deposito && p.deposito > 0).length
 
   async function handleSave() {
-    if (!form.equipo_nombre.trim() || !form.unidad_id) return Swal.fire('Campos requeridos', 'Equipo y unidad son obligatorios.', 'warning')
+    if (!form.equipo_nombre.trim() || !form.unidad_id) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Equipo y unidad son obligatorios.' })
     setSaving(true)
     const { error } = await supabase.from('prestamos_equipo').insert({
       company_id: companyId, project_id: proyectoId,

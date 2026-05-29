@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   correspondencia: CorrespondenciaCondominio[]
@@ -39,7 +40,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
   async function handleSave() {
-    if (!form.asunto.trim()) return Swal.fire('Requerido', 'El asunto es obligatorio.', 'warning')
+    if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
     setSaving(true)
     const { error } = await supabase.from('correspondencia_condominio').insert({
       company_id: companyId, project_id: proyectoId,

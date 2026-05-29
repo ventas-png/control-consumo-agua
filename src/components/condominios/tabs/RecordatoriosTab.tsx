@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { RecordatorioCondominio, PrioridadRecordatorio, TipoEntidadRecordatorio } from '../../../types'
 
 interface Props {
@@ -59,8 +60,8 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   async function guardar() {
-    if (!form.titulo.trim()) { Swal.fire('Error', 'El título es obligatorio', 'warning'); return }
-    if (!form.fecha_limite) { Swal.fire('Error', 'La fecha límite es obligatoria', 'warning'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El título es obligatorio' }); return }
+    if (!form.fecha_limite) { notify({ variant: 'warning', title: 'Error', text: 'La fecha límite es obligatoria' }); return }
     setSaving(true)
     const { error } = await supabase.from('recordatorios_condominio').insert({
       company_id: companyId, project_id: proyectoId,

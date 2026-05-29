@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog } from '../../../types'
 
@@ -64,10 +65,10 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
   }
 
   async function generar() {
-    if (!monto || parseFloat(monto) <= 0) { Swal.fire('Campo requerido', 'Ingresa un monto válido.', 'warning'); return }
-    if (!fechaVenc) { Swal.fire('Campo requerido', 'Selecciona la fecha de vencimiento.', 'warning'); return }
-    if (!conceptoFinal.trim()) { Swal.fire('Campo requerido', 'Ingresa el concepto.', 'warning'); return }
-    if (seleccionadas.size === 0) { Swal.fire('Sin unidades', 'Selecciona al menos una unidad.', 'warning'); return }
+    if (!monto || parseFloat(monto) <= 0) { notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa un monto válido.' }); return }
+    if (!fechaVenc) { notify({ variant: 'warning', title: 'Campo requerido', text: 'Selecciona la fecha de vencimiento.' }); return }
+    if (!conceptoFinal.trim()) { notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el concepto.' }); return }
+    if (seleccionadas.size === 0) { notify({ variant: 'warning', title: 'Sin unidades', text: 'Selecciona al menos una unidad.' }); return }
 
     const r = await Swal.fire({
       title: `¿Generar ${seleccionadas.size} cuotas?`,
@@ -113,7 +114,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
     setGenerando(false)
     setSeleccionadas(new Set())
     onRefresh()
-    Swal.fire('¡Listo!', `Se generaron ${seleccionadas.size} cuotas de ${conceptoFinal} para el período ${periodo}.`, 'success')
+    notify({ variant: 'success', title: '¡Listo!', text: `Se generaron ${seleccionadas.size} cuotas de ${conceptoFinal} para el período ${periodo}.` })
   }
 
   async function cargarLogs() {

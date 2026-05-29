@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { OnboardingResidente, EstadoOnboarding, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   onboardings: OnboardingResidente[]
@@ -67,7 +68,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.nombre_residente?.trim()) return Swal.fire('Campo requerido', 'Ingresa el nombre del residente.', 'warning')
+    if (!form.nombre_residente?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre del residente.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,
@@ -97,7 +98,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   }
 
   async function activarPortal(o: OnboardingResidente) {
-    if (!o.unidad_id) { Swal.fire('Sin unidad', 'Este onboarding no tiene una unidad asignada.', 'warning'); return }
+    if (!o.unidad_id) { notify({ variant: 'warning', title: 'Sin unidad', text: 'Este onboarding no tiene una unidad asignada.' }); return }
     const token = crypto.randomUUID().replace(/-/g, '')
     const { error } = await supabase.from('unidades')
       .update({ portal_activo: true, token_portal: token }).eq('id', o.unidad_id)

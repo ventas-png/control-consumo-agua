@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { PlantillaCuota, PeriodicidadPlantilla, RubroConfig, Unidad } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
 
@@ -71,11 +72,11 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   }
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'El nombre es obligatorio', 'warning'); return }
-    if (!usarRubros && !form.monto) { Swal.fire('Error', 'El monto es obligatorio', 'warning'); return }
-    if (usarRubros && rubros.length === 0) { Swal.fire('Error', 'Agrega al menos un rubro', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El nombre es obligatorio' }); return }
+    if (!usarRubros && !form.monto) { notify({ variant: 'warning', title: 'Error', text: 'El monto es obligatorio' }); return }
+    if (usarRubros && rubros.length === 0) { notify({ variant: 'warning', title: 'Error', text: 'Agrega al menos un rubro' }); return }
     if (usarRubros && rubros.some(r => !r.nombre.trim() || r.valor <= 0)) {
-      Swal.fire('Error', 'Todos los rubros deben tener nombre y valor mayor a 0', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Todos los rubros deben tener nombre y valor mayor a 0' }); return
     }
 
     setSaving(true)
@@ -126,7 +127,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     if (!periodo) return
 
     const unidadesTarget = unidades.filter(u => u.activo !== false)
-    if (unidadesTarget.length === 0) { Swal.fire('Sin unidades', 'No hay unidades activas para generar cuotas', 'info'); return }
+    if (unidadesTarget.length === 0) { notify({ variant: 'info', title: 'Sin unidades', text: 'No hay unidades activas para generar cuotas' }); return }
 
     const usaRubros = p.rubros && p.rubros.length > 0
     const totalM2 = unidadesTarget.reduce((s, u) => s + (u.area_m2 ?? 0), 0)
@@ -168,7 +169,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     const { error } = await supabase.from('cuotas_condominio').insert(rows)
     setGenerando(null)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${rows.length} cuotas generadas`, text: `Período ${periodo}`, timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: `${rows.length} cuotas generadas`, text: `Período ${periodo}`, duration: 2000 })
     onRefresh()
   }
 

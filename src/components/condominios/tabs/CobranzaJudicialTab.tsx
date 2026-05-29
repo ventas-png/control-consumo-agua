@@ -1,6 +1,7 @@
 import { useState, Fragment, type CSSProperties } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { CobranzaJudicial, EtapaCobranzaJudicial, EstadoCobranzaJudicial, Unidad } from '../../../types'
 
 interface Props {
@@ -47,7 +48,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
 
   async function guardar() {
     if (!form.unidad_id || !form.monto_adeudado) {
-      Swal.fire('Error', 'Unidad y monto son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Unidad y monto son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('cobranza_judicial').insert({

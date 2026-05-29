@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
@@ -85,11 +86,11 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
   const signedFotoUrls = useSignedUrls(amenidadesActivas.map(a => a.foto_url), 'condominios-media')
 
   async function hacerReserva() {
-    if (!form.amenidad_id) { Swal.fire('Error', 'Seleccione una amenidad.', 'error'); return }
-    if (!form.fecha || !form.hora_inicio || !form.hora_fin) { Swal.fire('Error', 'Complete fecha y horario.', 'error'); return }
-    if (form.hora_fin <= form.hora_inicio) { Swal.fire('Error', 'La hora de fin debe ser posterior al inicio.', 'error'); return }
+    if (!form.amenidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione una amenidad.' }); return }
+    if (!form.fecha || !form.hora_inicio || !form.hora_fin) { notify({ variant: 'error', title: 'Error', text: 'Complete fecha y horario.' }); return }
+    if (form.hora_fin <= form.hora_inicio) { notify({ variant: 'error', title: 'Error', text: 'La hora de fin debe ser posterior al inicio.' }); return }
     if (amenidadSel?.reglamento && !form.reglamento_aceptado) {
-      Swal.fire('Reglamento', 'Debes leer y aceptar el reglamento antes de continuar.', 'warning'); return
+      notify({ variant: 'warning', title: 'Reglamento', text: 'Debes leer y aceptar el reglamento antes de continuar.' }); return
     }
     // Conflict check (sólo contra reservas confirmadas, incluyendo tiempos de preparación)
     const conflicto = reservas.find(r => {
@@ -105,7 +106,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
         : r.hora_fin
       return form.hora_inicio < efectivoFin && form.hora_fin > efectivoInicio
     })
-    if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario (o en su tiempo de preparación). Elija otro.', 'warning'); return }
+    if (conflicto) { notify({ variant: 'warning', title: 'Horario ocupado', text: 'Esa amenidad ya está reservada en ese horario (o en su tiempo de preparación). Elija otro.' }); return }
 
     const bloqueo = bloqueos.find(b =>
       b.amenidad_id === form.amenidad_id &&
@@ -115,7 +116,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       const detalle = bloqueo.hora_inicio
         ? `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} ${bloqueo.hora_inicio}–${bloqueo.hora_fin}`
         : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
-      Swal.fire('Amenidad no disponible', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}. Por favor elige otra fecha u horario.`, 'warning')
+      notify({ variant: 'warning', title: 'Amenidad no disponible', text: `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}. Por favor elige otra fecha u horario.` })
       return
     }
 
@@ -151,7 +152,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
         })
         .select('id')
         .single()
-      if (cuotaErr) { setSaving(false); Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
       cuotaId = cuotaData?.id ?? null
     }
 

@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { HistorialResidente, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   historial: HistorialResidente[]
@@ -60,7 +61,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
   }
 
   const handleSave = async () => {
-    if (!form.nombre_completo.trim() || !form.fecha_desde) return Swal.fire('Campos requeridos', 'Nombre y fecha de inicio son obligatorios.', 'warning')
+    if (!form.nombre_completo.trim() || !form.fecha_desde) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Nombre y fecha de inicio son obligatorios.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

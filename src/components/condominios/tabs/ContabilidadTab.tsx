@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -104,8 +105,8 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.concepto?.trim()) return Swal.fire('Campo requerido', 'Ingresa el concepto.', 'warning')
-    if (!form.monto || form.monto <= 0) return Swal.fire('Campo requerido', 'Ingresa el monto.', 'warning')
+    if (!form.concepto?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el concepto.' })
+    if (!form.monto || form.monto <= 0) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el monto.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

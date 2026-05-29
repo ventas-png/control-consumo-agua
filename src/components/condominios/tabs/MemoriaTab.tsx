@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MemoriaLabores, TipoPeriodo, EstadoMemoria } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   memorias: MemoriaLabores[]
@@ -53,8 +54,8 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.titulo?.trim()) return Swal.fire('Campo requerido', 'Ingresa el título.', 'warning')
-    if (!form.periodo?.trim()) return Swal.fire('Campo requerido', 'Ingresa el período (ej. 2026-04).', 'warning')
+    if (!form.titulo?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el título.' })
+    if (!form.periodo?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el período (ej. 2026-04).' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

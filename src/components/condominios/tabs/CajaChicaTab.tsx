@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CajaChica, MovimientoCaja } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   cajas: CajaChica[]
@@ -32,7 +33,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   function setFM<K extends keyof typeof formMov>(k: K, v: typeof formMov[K]) { setFormMov(p => ({ ...p, [k]: v })) }
 
   async function handleAbrirCaja() {
-    if (!formCaja.responsable.trim()) return Swal.fire('Requerido', 'El responsable es obligatorio.', 'warning')
+    if (!formCaja.responsable.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El responsable es obligatorio.' })
     setSavingCaja(true)
     const { error } = await supabase.from('caja_chica').insert({
       company_id: companyId, project_id: proyectoId,
@@ -55,8 +56,8 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
 
   async function handleSaveMovimiento() {
     if (!selected) return
-    if (!formMov.concepto.trim()) return Swal.fire('Requerido', 'El concepto es obligatorio.', 'warning')
-    if (!formMov.monto || parseFloat(formMov.monto) <= 0) return Swal.fire('Requerido', 'El monto debe ser mayor a 0.', 'warning')
+    if (!formMov.concepto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El concepto es obligatorio.' })
+    if (!formMov.monto || parseFloat(formMov.monto) <= 0) return notify({ variant: 'warning', title: 'Requerido', text: 'El monto debe ser mayor a 0.' })
     setSavingMov(true)
     const { error } = await supabase.from('movimientos_caja').insert({
       company_id: companyId, caja_id: selected.id,

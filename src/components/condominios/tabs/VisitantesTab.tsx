@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../../shared/ImageUploader'
@@ -320,7 +321,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
 
   function agregarAcompanante() {
     if (!acompForm.nombre.trim()) {
-      Swal.fire('Error', 'Ingrese el nombre del acompañante.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del acompañante.' })
       return
     }
     setAcompanantes(prev => [...prev, {
@@ -337,8 +338,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   async function handleRegistrar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad a visitar.', 'error'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
+    if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setSaving(true)
     const horaEntrada = new Date().toISOString()
     const { data, error } = await supabase.from('visitantes').insert({
@@ -403,7 +404,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       const { error: ae } = await supabase.from('visitantes').insert(acompRows)
       if (ae) {
         setSaving(false)
-        Swal.fire('Visitante registrado', `Acompañantes no guardados: ${ae.message}`, 'warning')
+        notify({ variant: 'warning', title: 'Visitante registrado', text: `Acompañantes no guardados: ${ae.message}` })
         resetForm()
         onRefresh()
         return
@@ -436,7 +437,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   async function confirmarSalida() {
     if (!salidaPendiente) return
     if (modoSalida === 'con_novedad' && !novedadForm.comentarios.trim()) {
-      Swal.fire('Error', 'Ingrese los comentarios de la novedad.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese los comentarios de la novedad.' }); return
     }
     setGuardandoSalida(true)
     const horaSalida = new Date().toISOString()

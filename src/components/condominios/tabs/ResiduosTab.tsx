@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   residuos: RegistroResiduo[]
@@ -69,7 +70,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.fecha) return Swal.fire('Campo requerido', 'Ingresa la fecha.', 'warning')
+    if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

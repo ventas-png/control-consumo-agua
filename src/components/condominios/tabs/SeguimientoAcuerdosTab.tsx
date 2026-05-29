@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SeguimientoAcuerdo, ActaReunion } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   acuerdos: SeguimientoAcuerdo[]
@@ -39,7 +40,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   }
 
   async function handleSave() {
-    if (!form.titulo.trim()) return Swal.fire('Requerido', 'El título es obligatorio.', 'warning')
+    if (!form.titulo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El título es obligatorio.' })
     setSaving(true)
     const payload = {
       acta_id: form.acta_id || null, titulo: form.titulo.trim(),

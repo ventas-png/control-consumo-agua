@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { EventoComunidad, RegistroAsistenteEvento } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   eventos: EventoComunidad[]
@@ -53,8 +54,8 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   }
 
   async function handleSave() {
-    if (!form.titulo.trim()) return Swal.fire('Requerido', 'El título es obligatorio.', 'warning')
-    if (!form.fecha) return Swal.fire('Requerido', 'La fecha es obligatoria.', 'warning')
+    if (!form.titulo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El título es obligatorio.' })
+    if (!form.fecha) return notify({ variant: 'warning', title: 'Requerido', text: 'La fecha es obligatoria.' })
     setSaving(true)
     const payload = {
       titulo: form.titulo.trim(), descripcion: form.descripcion || null, tipo: form.tipo, fecha: form.fecha,
@@ -84,8 +85,8 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
 
   async function handleSaveAsistente() {
     if (!selected) return
-    if (!formAsistente.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
-    if (!formAsistente.nombre.trim()) return Swal.fire('Requerido', 'El nombre es obligatorio.', 'warning')
+    if (!formAsistente.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
+    if (!formAsistente.nombre.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre es obligatorio.' })
     const { error } = await supabase.from('registro_asistentes_evento').upsert({
       company_id: companyId, evento_id: selected.id,
       unidad_id: formAsistente.unidad_id, nombre: formAsistente.nombre.trim(),

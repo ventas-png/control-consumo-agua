@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MedidorUnidad, Unidad, Contador } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   medidores: MedidorUnidad[]
@@ -60,8 +61,8 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   const disponibles = contadores.filter(c => !medidores.some(m => m.contador_id === c.id && m.activo))
 
   async function handleVincular() {
-    if (!selectedUnidad || !selectedContador) return Swal.fire('Requerido', 'Selecciona unidad y contador.', 'warning')
-    if (vinculados.has(`${selectedUnidad}:${selectedContador}`)) return Swal.fire('Ya vinculado', 'Esta combinación ya existe.', 'info')
+    if (!selectedUnidad || !selectedContador) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona unidad y contador.' })
+    if (vinculados.has(`${selectedUnidad}:${selectedContador}`)) return notify({ variant: 'info', title: 'Ya vinculado', text: 'Esta combinación ya existe.' })
     setSaving(true)
     const { error } = await supabase.from('medidores_unidad').insert({
       company_id: companyId, project_id: proyectoId,

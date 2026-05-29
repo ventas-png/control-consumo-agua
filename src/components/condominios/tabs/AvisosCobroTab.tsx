@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { AvisoCobro } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   avisos: AvisoCobro[]
@@ -58,9 +59,9 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
   }
 
   async function handleSave() {
-    if (!form.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
+    if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
     const items = detalle.filter(it => it.concepto.trim() && it.monto)
-    if (items.length === 0) return Swal.fire('Requerido', 'Agregue al menos un concepto.', 'warning')
+    if (items.length === 0) return notify({ variant: 'warning', title: 'Requerido', text: 'Agregue al menos un concepto.' })
     const monto_total = items.reduce((s, it) => s + parseFloat(it.monto || '0'), 0)
     setSaving(true)
     const payload = {

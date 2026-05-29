@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ReservaSTR, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR, Unidad, HuespedSTR } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
@@ -159,12 +160,12 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
   function agregarHuesped() {
     if (!huespedForm.nombre.trim()) {
-      Swal.fire('Error', 'Ingrese el nombre de la persona.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre de la persona.' })
       return
     }
     const maxAdicionales = (form.num_adultos ?? 1) + (form.num_ninos ?? 0) - 1
     if (huespedes.length >= maxAdicionales) {
-      Swal.fire('Capacidad', 'Ya se alcanzó el máximo de personas adicionales para esta reserva.', 'warning')
+      notify({ variant: 'warning', title: 'Capacidad', text: 'Ya se alcanzó el máximo de personas adicionales para esta reserva.' })
       return
     }
     setHuespedes(prev => [...prev, { ...huespedForm, nombre: huespedForm.nombre.trim() }])
@@ -174,7 +175,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
   function quitarHuesped(index: number) {
     if (huespedes[index]?.visitante_id) {
-      Swal.fire('No permitido', 'Esta persona ya registró su ingreso y no puede eliminarse.', 'info')
+      notify({ variant: 'info', title: 'No permitido', text: 'Esta persona ya registró su ingreso y no puede eliminarse.' })
       return
     }
     setHuespedes(prev => prev.filter((_, i) => i !== index))
@@ -215,9 +216,9 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   }
 
   async function handleSave() {
-    if (!form.huesped_nombre?.trim()) return Swal.fire('Campo requerido', 'Ingresa el nombre del huésped.', 'warning')
-    if (!form.fecha_entrada || !form.fecha_salida) return Swal.fire('Campo requerido', 'Ingresa las fechas.', 'warning')
-    if (form.fecha_salida! <= form.fecha_entrada!) return Swal.fire('Fechas inválidas', 'La salida debe ser posterior a la entrada.', 'warning')
+    if (!form.huesped_nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre del huésped.' })
+    if (!form.fecha_entrada || !form.fecha_salida) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa las fechas.' })
+    if (form.fecha_salida! <= form.fecha_entrada!) return notify({ variant: 'warning', title: 'Fechas inválidas', text: 'La salida debe ser posterior a la entrada.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

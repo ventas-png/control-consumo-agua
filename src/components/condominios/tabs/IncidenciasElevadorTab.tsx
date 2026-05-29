@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { IncidenciaElevador, TipoIncidenciaElevador, EstadoIncidenciaElevador } from '../../../types'
 
 interface Props {
@@ -71,7 +72,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
 
   async function guardar() {
     if (!form.elevador.trim() || !form.descripcion.trim()) {
-      Swal.fire('Faltan datos', 'Elevador y descripción son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Elevador y descripción son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('incidencias_elevador').insert({

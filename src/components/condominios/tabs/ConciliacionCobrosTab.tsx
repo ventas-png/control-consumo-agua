@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, ConciliacionCobrosLog } from '../../../types'
 
@@ -90,7 +91,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
         : `Pago insuficiente: falta ${moneda} ${Math.abs(diferencia).toFixed(2)}. La cuota permanece pendiente.`
       await Swal.fire({ icon: 'warning', title: 'Diferencia registrada', text: diff, confirmButtonColor: 'var(--at-warning)' })
     } else {
-      Swal.fire({ icon: 'success', title: 'Conciliado', text: 'Cuota marcada como pagada.', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Conciliado', text: 'Cuota marcada como pagada.', duration: 1500 })
     }
 
     cancelarConciliacion()

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { VisitaFrecuente, RelacionVisitaFrecuente, Unidad } from '../../../types'
 
 interface Props {
@@ -62,7 +63,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
 
   async function guardar() {
     if (!form.unidad_id || !form.nombre.trim()) {
-      Swal.fire('Faltan datos', 'Unidad y nombre son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Unidad y nombre son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('visitas_frecuentes').insert({
