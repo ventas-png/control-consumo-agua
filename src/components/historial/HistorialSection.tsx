@@ -1,5 +1,6 @@
 import { useState, useMemo, type CSSProperties } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
@@ -119,7 +120,7 @@ export function HistorialSection({
     const cliente = clientes.find(c => c.id === registro.cliente_id)
     const rawTel = cliente?.whatsapp ?? cliente?.telefono ?? ''
     if (!rawTel) {
-      Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono.', 'warning')
+      notify({ variant: 'warning', title: 'Sin Teléfono', text: 'Este cliente no tiene teléfono.' })
       return
     }
     let telefono = rawTel.trim().replace(/[\s\-\.\(\)]/g, '')
@@ -146,9 +147,9 @@ export function HistorialSection({
     if (!error) {
       onEstadoUpdated(editModal.registroId, editModal.estado)
       setEditModal(null)
-      Swal.fire({ icon: 'success', title: 'Estado actualizado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Estado actualizado', duration: 1500 })
     } else {
-      Swal.fire('Error', 'No se pudo actualizar el estado', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el estado' })
     }
     setSavingEstado(false)
   }
@@ -171,15 +172,15 @@ export function HistorialSection({
       .delete({ count: 'exact' })
       .eq('id', registro.id)
     if (error) {
-      Swal.fire('Error', 'No se pudo eliminar la lectura', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo eliminar la lectura' })
       return
     }
     if (count === 0) {
-      Swal.fire('Sin permisos', 'No tienes permisos para eliminar esta lectura.', 'warning')
+      notify({ variant: 'warning', title: 'Sin permisos', text: 'No tienes permisos para eliminar esta lectura.' })
       return
     }
     onRegistroDeleted?.(registro.id)
-    Swal.fire({ icon: 'success', title: 'Lectura eliminada', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Lectura eliminada', duration: 1500 })
   }
 
   function resetFiltros() {

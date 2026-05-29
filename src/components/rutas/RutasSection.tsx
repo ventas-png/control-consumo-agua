@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type CSSProperties, type DragEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { enviarNotificacionRuta, dispararRecordatorioRuta } from '../../lib/email'
@@ -291,7 +292,7 @@ export function RutasSection({
         showConfirmButton: false,
       })
     } catch (err) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo enviar el recordatorio', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo enviar el recordatorio' })
     } finally {
       setRecordandoId(null)
     }
@@ -349,40 +350,40 @@ export function RutasSection({
 
   async function handleGuardar(notificar: boolean) {
     if (!form.nombre.trim()) {
-      Swal.fire('Atención', 'El nombre de la ruta es obligatorio', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'El nombre de la ruta es obligatorio' })
       return
     }
     if (!form.project_id) {
-      Swal.fire('Atención', 'Selecciona el proyecto de la ruta', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Selecciona el proyecto de la ruta' })
       return
     }
     if (tipoRuta === 'clientes' && clientesEnRuta.length === 0) {
-      Swal.fire('Atención', 'Agrega al menos un cliente a la ruta', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Agrega al menos un cliente a la ruta' })
       return
     }
     if (tipoRuta === 'contadores' && contadoresEnRuta.length === 0) {
-      Swal.fire('Atención', 'Agrega al menos un contador a la ruta', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Agrega al menos un contador a la ruta' })
       return
     }
     if (tipoRuta === 'unidades' && unidadesEnRuta.length === 0) {
-      Swal.fire('Atención', 'Agrega al menos una unidad a la ruta', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Agrega al menos una unidad a la ruta' })
       return
     }
     // Validaciones de periodicidad
     if (form.frecuencia === 'unica' && !form.fecha_programada) {
-      Swal.fire('Atención', 'Indica la fecha programada de la ruta', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Indica la fecha programada de la ruta' })
       return
     }
     if (form.frecuencia === 'semanal' && form.dias_semana.length === 0) {
-      Swal.fire('Atención', 'Selecciona al menos un día de la semana', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Selecciona al menos un día de la semana' })
       return
     }
     if (form.frecuencia === 'quincenal' && !form.fecha_inicio) {
-      Swal.fire('Atención', 'Para una ruta quincenal indica la fecha de inicio', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Para una ruta quincenal indica la fecha de inicio' })
       return
     }
     if (form.frecuencia === 'fechas' && form.fechas_especificas.length === 0) {
-      Swal.fire('Atención', 'Agrega al menos una fecha específica', 'warning')
+      notify({ variant: 'warning', title: 'Atención', text: 'Agrega al menos una fecha específica' })
       return
     }
 
@@ -425,7 +426,7 @@ export function RutasSection({
         .eq('id', editando.id)
         .select()
       if (error || !data) {
-        Swal.fire('Error', 'No se pudo actualizar la ruta', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la ruta' })
         setSaving(false)
         return
       }
@@ -434,7 +435,7 @@ export function RutasSection({
     } else {
       const { data, error } = await supabase.from('rutas').insert(payload).select()
       if (error || !data) {
-        Swal.fire('Error', 'No se pudo guardar la ruta', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la ruta' })
         setSaving(false)
         return
       }
@@ -512,7 +513,7 @@ export function RutasSection({
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('rutas').delete().eq('id', ruta.id)
-    if (error) { Swal.fire('Error', 'No se pudo eliminar la ruta', 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: 'No se pudo eliminar la ruta' }); return }
     onRutaDeleted(ruta.id)
   }
 

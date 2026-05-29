@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
@@ -41,7 +41,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
 
   async function handleSubmit() {
     if (!clienteId || !subject.trim() || !firstMessage.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Selecciona un cliente, escribe el asunto y el mensaje inicial.' })
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Selecciona un cliente, escribe el asunto y el mensaje inicial.' })
       return
     }
     await onConfirm({

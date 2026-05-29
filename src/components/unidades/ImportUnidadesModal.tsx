@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -214,7 +214,8 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
   }, [currentUser.user_id, currentUser.company_id])
 
   if (resolveError) {
-    void Swal.fire('Error', resolveError, 'error').then(onClose)
+    notify({ variant: 'error', title: 'Error', text: resolveError })
+    onClose()
     return null
   }
   if (!ids) return null

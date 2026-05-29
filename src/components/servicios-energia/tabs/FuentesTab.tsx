@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyecto, UserSession, ModoSuministroEnergia } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -40,17 +41,17 @@ export default function FuentesTab({
 
   const handleCreate = async () => {
     if (!companyId) {
-      Swal.fire('Error', 'No se pudo identificar la empresa del usuario', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo identificar la empresa del usuario' })
       return
     }
 
     if (proyectos.length === 0) {
-      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear una fuente de energía', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos un proyecto antes de crear una fuente de energía' })
       return
     }
 
     if (fuentesAgua.length === 0) {
-      Swal.fire('Error', 'Debe crear al menos una fuente de agua antes de crear una fuente de energía', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos una fuente de agua antes de crear una fuente de energía' })
       return
     }
 
@@ -171,9 +172,9 @@ export default function FuentesTab({
       const { data, error } = await supabase.from('fuentes_energia').insert([formValues]).select().single()
       if (error) throw error
       onFuenteAdded(data as FuenteEnergia)
-      Swal.fire({ icon: 'success', title: 'Fuente de energía creada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Fuente de energía creada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear la fuente de energía', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear la fuente de energía' })
     }
   }
 
@@ -192,9 +193,9 @@ export default function FuentesTab({
       if (error) throw error
       onFuenteUpdated(editingId, editFormData)
       setEditingId(null)
-      Swal.fire({ icon: 'success', title: 'Fuente actualizada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Fuente actualizada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar la fuente', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo actualizar la fuente' })
     }
   }
 
@@ -213,9 +214,9 @@ export default function FuentesTab({
       const { error } = await supabase.from('fuentes_energia').delete().eq('id', id)
       if (error) throw error
       onFuenteDeleted(id)
-      Swal.fire({ icon: 'success', title: 'Fuente eliminada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Fuente eliminada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la fuente', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la fuente' })
     }
   }
 

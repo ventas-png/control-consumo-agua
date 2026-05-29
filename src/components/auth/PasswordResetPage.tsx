@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
 import { validatePasswordStrength } from '../../lib/validation'
@@ -44,7 +44,7 @@ export function PasswordResetPage({ onBack }: Props) {
       const { error } = await supabase.auth.updateUser({ password: newPassword })
 
       if (error) {
-        Swal.fire('Error', 'No se pudo actualizar la contraseña. Intenta de nuevo.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la contraseña. Intenta de nuevo.' })
         setLoading(false)
         return
       }
@@ -55,7 +55,7 @@ export function PasswordResetPage({ onBack }: Props) {
       await logSecurityEvent('password_reset_completed', { success: true })
       setSuccess(true)
     } catch {
-      Swal.fire('Error', 'Error de conexión. Intenta de nuevo.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Error de conexión. Intenta de nuevo.' })
     } finally {
       setLoading(false)
     }

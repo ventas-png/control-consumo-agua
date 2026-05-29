@@ -261,7 +261,7 @@ export function UnidadesSection({
       errors.push('El piso debe ser un número entero')
 
     if (errors.length > 0) {
-      Swal.fire('Error de validación', errors.join('<br>'), 'error')
+      notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
       return
     }
 
@@ -331,7 +331,7 @@ export function UnidadesSection({
         cancelForm()
         notify({ variant: 'success', title: 'Unidad actualizada', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo actualizar la unidad.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar la unidad.' })
       }
     } else {
       // Resolve project_id and company_id
@@ -408,7 +408,7 @@ export function UnidadesSection({
         cancelForm()
         notify({ variant: 'success', title: 'Unidad creada', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo guardar la unidad.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo guardar la unidad.' })
       }
     }
 
@@ -451,7 +451,7 @@ export function UnidadesSection({
       onUnidadDeleted(u.id)
       notify({ variant: 'success', title: 'Unidad eliminada', duration: 1500 })
     } else {
-      Swal.fire('Error', error.message ?? 'No se pudo eliminar la unidad.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar la unidad.' })
     }
   }
 

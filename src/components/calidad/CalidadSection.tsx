@@ -88,7 +88,7 @@ export function CalidadSection({
       setEditandoId(null)
       Swal.fire({ icon: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', timer: 1500, showConfirmButton: false })
     } catch (e) {
-      Swal.fire('Error', 'No se pudo guardar la fuente: ' + (e instanceof Error ? e.message : ''), 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la fuente: ' + (e instanceof Error ? e.message : '') })
     } finally {
       setSavingFuente(false)
     }
@@ -103,7 +103,7 @@ export function CalidadSection({
 
   async function toggleFuente(id: string, activo: boolean) {
     const { error } = await supabase.from('fuentes_agua').update({ activo: !activo }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onFuentesUpdated(await recargarFuentes())
   }
 
@@ -166,7 +166,7 @@ export function CalidadSection({
       Swal.fire({ icon: 'success', title: cumple_total ? '✅ Análisis guardado — CUMPLE' : '⚠️ Análisis guardado — NO CUMPLE', timer: 2000, showConfirmButton: false })
       setSubTab('historial')
     } catch (e) {
-      Swal.fire('Error', 'No se pudo guardar: ' + (e instanceof Error ? e.message : ''), 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar: ' + (e instanceof Error ? e.message : '') })
     } finally {
       setSavingAnalisis(false)
     }

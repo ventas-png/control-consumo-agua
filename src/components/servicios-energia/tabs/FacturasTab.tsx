@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import FacturaEnergiaModal from '../FacturaEnergiaModal'
 import { supabase } from '../../../lib/supabase'
 
@@ -67,7 +68,7 @@ export default function FacturasTab({
 
         if (error) throw error
         onFacturaUpdated(editingFactura.id, formData)
-        Swal.fire({ icon: 'success', title: 'Factura actualizada', timer: 1500, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Factura actualizada', duration: 1500 })
       } else {
         // Derive project_id from the selected fuente_energia if possible
         const fuente = fuentesEnergia.find(f => f.id === formData.fuente_energia_id)
@@ -82,10 +83,10 @@ export default function FacturasTab({
 
         if (error) throw error
         if (data) onFacturaAdded(data[0] as FacturaEnergia)
-        Swal.fire({ icon: 'success', title: 'Factura creada', timer: 1500, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Factura creada', duration: 1500 })
       }
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo guardar la factura', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo guardar la factura' })
     }
   }
 
@@ -105,9 +106,9 @@ export default function FacturasTab({
       const { error } = await supabase.from('facturas_energia').delete().eq('id', id)
       if (error) throw error
       onFacturaDeleted(id)
-      Swal.fire('Éxito', 'Factura eliminada', 'success')
+      notify({ variant: 'success', title: 'Éxito', text: 'Factura eliminada' })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la factura', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la factura' })
     }
   }
 

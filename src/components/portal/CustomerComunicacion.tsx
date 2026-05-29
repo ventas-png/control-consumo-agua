@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { sanitizeInput } from '../../lib/validation'
@@ -197,7 +197,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       setMessageText('')
       setPendingFile(null)
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar el mensaje.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo enviar el mensaje.' })
     }
   }
 
@@ -797,7 +797,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         e.target.value = ''
                         if (!file) return
                         if (file.size > 10 * 1024 * 1024) {
-                          Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
+                          notify({ variant: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
                           return
                         }
                         setPendingFile(file)

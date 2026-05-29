@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, UserSession, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -50,11 +51,11 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
   async function handleSubmit() {
     const montoNum = parseFloat(monto) || 0
     if (montoNum <= 0 || montoNum > saldo) {
-      void Swal.fire({ icon: 'warning', title: 'Monto inválido' })
+      notify({ variant: 'warning', title: 'Monto inválido' })
       return
     }
     if (!numeroComprobante.trim()) {
-      void Swal.fire({ icon: 'warning', title: 'Número de comprobante requerido' })
+      notify({ variant: 'warning', title: 'Número de comprobante requerido' })
       return
     }
 

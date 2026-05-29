@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Contador, TipoAgua, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -190,8 +190,9 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
   }, [currentUser.user_id, currentUser.company_id])
 
   if (resolveError) {
-    // Mostramos el error vía Swal y cerramos el modal.
-    void Swal.fire('Error', resolveError, 'error').then(onClose)
+    // Mostramos el error y cerramos el modal.
+    notify({ variant: 'error', title: 'Error', text: resolveError })
+    onClose()
     return null
   }
   if (!ids) return null  // brevísimo loading state; el modal se monta cuando ids está listo

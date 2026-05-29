@@ -171,7 +171,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     if (email && !validateEmail(email)) errors.push('Formato de correo electrónico inválido')
 
     if (errors.length > 0) {
-      Swal.fire('Datos incompletos', errors.join('<br>'), 'warning')
+      notify({ variant: 'warning', title: 'Datos incompletos', text: errors.join('<br>') })
       return
     }
 
@@ -228,7 +228,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
           showConfirmButton: true,
         })
       } else {
-        Swal.fire('Error', error.message ?? 'No se pudo vincular el cliente.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo vincular el cliente.' })
       }
       setOnboardingStep('lookup')
       return
@@ -289,7 +289,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (use 8 dígitos o +código+número, ej. +15551234567)')
 
     if (errors.length > 0) {
-      Swal.fire('Error de validación', errors.join('<br>'), 'error')
+      notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
       return
     }
 
@@ -328,7 +328,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
         cancelForm()
         notify({ variant: 'success', title: 'Cliente actualizado', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo actualizar el cliente.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar el cliente.' })
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
@@ -385,7 +385,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       onClienteDeleted(c.id)
       notify({ variant: 'success', title: 'Cliente removido de la empresa', duration: 1500 })
     } else {
-      Swal.fire('Error', error.message ?? 'No se pudo quitar el cliente.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo quitar el cliente.' })
     }
   }
 

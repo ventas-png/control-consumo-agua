@@ -113,7 +113,7 @@ export function TarifasSection({
     if (!validateNumber(consumo_minimo, 0, 99999)) errors.push('Consumo mínimo debe ser un valor entre 0 y 99999')
 
     if (errors.length > 0) {
-      Swal.fire('Error de validación', errors.join('<br>'), 'error')
+      notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
       return
     }
 
@@ -145,7 +145,7 @@ export function TarifasSection({
         cancelForm()
         notify({ variant: 'success', title: 'Tarifa actualizada', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo actualizar la tarifa.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar la tarifa.' })
       }
     } else {
       // Derive project_id from the explicitly selected project in the form.
@@ -182,7 +182,7 @@ export function TarifasSection({
         cancelForm()
         notify({ variant: 'success', title: 'Tarifa creada', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo guardar la tarifa.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo guardar la tarifa.' })
       }
     }
 
@@ -221,7 +221,7 @@ export function TarifasSection({
       onTarifaDeleted(t.id)
       notify({ variant: 'success', title: 'Tarifa eliminada', duration: 1500 })
     } else {
-      Swal.fire('Error', error.message ?? 'No se pudo eliminar la tarifa.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar la tarifa.' })
     }
   }
 

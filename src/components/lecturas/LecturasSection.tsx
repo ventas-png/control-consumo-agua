@@ -1,5 +1,6 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
@@ -193,7 +194,7 @@ export function LecturasSection({
 
   function enviarWhatsApp(registro: Registro) {
     const rawTel = clienteDeUnidad?.whatsapp ?? clienteDeUnidad?.telefono ?? ''
-    if (!rawTel) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono registrado.', 'warning'); return }
+    if (!rawTel) { notify({ variant: 'warning', title: 'Sin Teléfono', text: 'Este cliente no tiene teléfono registrado.' }); return }
     let telefono = rawTel.trim().replace(/[\s\-\.\(\)]/g, '')
     if (telefono.startsWith('+')) telefono = telefono.slice(1)
     else { telefono = telefono.replace(/\D/g, ''); if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono }
@@ -248,10 +249,10 @@ export function LecturasSection({
   }
 
   async function handleGuardar() {
-    if (!unidadSeleccionada) return Swal.fire('Atención', 'Seleccione una unidad primero', 'warning')
-    if (!contadorSeleccionado) return Swal.fire('Atención', 'Seleccione un contador', 'warning')
+    if (!unidadSeleccionada) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una unidad primero' })
+    if (!contadorSeleccionado) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione un contador' })
     if (sinTarifa) {
-      Swal.fire('Sin Tarifa', 'El contador no tiene tarifa asignada. Asigne una tarifa al contador antes de registrar lecturas.', 'warning')
+      notify({ variant: 'warning', title: 'Sin Tarifa', text: 'El contador no tiene tarifa asignada. Asigne una tarifa al contador antes de registrar lecturas.' })
       return
     }
     if (tarifaExpirada) {
@@ -263,13 +264,13 @@ export function LecturasSection({
       })
       return
     }
-    if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
-    if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
+    if (consumo === null || isNaN(consumo)) return notify({ variant: 'error', title: 'Error', text: 'Datos de lectura inválidos' })
+    if (consumo < 0) return notify({ variant: 'error', title: 'Consumo Negativo', text: 'La lectura actual debe ser mayor o igual a la anterior.' })
 
     const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
 
     if (!projectId) {
-      Swal.fire('Error', 'No se pudo determinar el proyecto del usuario', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto del usuario' })
       return
     }
 
@@ -303,7 +304,7 @@ export function LecturasSection({
 
     if (error || !data) {
       console.error('Error inserting registro:', error)
-      Swal.fire('Error', error?.message || 'No se pudo guardar en la base de datos', 'error')
+      notify({ variant: 'error', title: 'Error', text: error?.message || 'No se pudo guardar en la base de datos' })
       return
     }
 
@@ -396,7 +397,7 @@ export function LecturasSection({
         } else {
           setRutaModoManual(false)
         }
-        Swal.fire('Ruta Finalizada', '¡Has completado todas las lecturas de la ruta!', 'success')
+        notify({ variant: 'success', title: 'Ruta Finalizada', text: '¡Has completado todas las lecturas de la ruta!' })
         limpiarFormulario()
         setSelectedUnidadId('')
         setRutaIndex(0)

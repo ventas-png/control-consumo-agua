@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad, UserSession } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 
 interface Props {
   currentUser: UserSession
@@ -98,15 +99,15 @@ function NuevoComunicadoModal({
 
   const handleSend = async () => {
     if (!form.title.trim()) {
-      Swal.fire('Campo requerido', 'El título del comunicado es obligatorio.', 'warning')
+      notify({ variant: 'warning', title: 'Campo requerido', text: 'El título del comunicado es obligatorio.' })
       return
     }
     if (!form.body.trim()) {
-      Swal.fire('Campo requerido', 'El mensaje del comunicado es obligatorio.', 'warning')
+      notify({ variant: 'warning', title: 'Campo requerido', text: 'El mensaje del comunicado es obligatorio.' })
       return
     }
     if (estimated === 0) {
-      Swal.fire('Sin destinatarios', 'Selecciona al menos un destinatario.', 'warning')
+      notify({ variant: 'warning', title: 'Sin destinatarios', text: 'Selecciona al menos un destinatario.' })
       return
     }
 
@@ -134,7 +135,7 @@ function NuevoComunicadoModal({
     setSending(false)
 
     if (!result.success) {
-      Swal.fire('Error', result.error ?? 'No se pudo enviar el comunicado.', 'error')
+      notify({ variant: 'error', title: 'Error', text: result.error ?? 'No se pudo enviar el comunicado.' })
       return
     }
 

@@ -1,5 +1,5 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
@@ -195,7 +195,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         ],
       ],
       colWidths: [22, 12, 26, 12, 12, 26, 16, 18, 18, 18, 18],
-    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
+    }]).catch(err => notify({ variant: 'error', title: 'Error', text: err.message ?? 'No se pudo generar la plantilla' }))
   }
 
   function descargarErrores() {
@@ -223,12 +223,12 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
       name: 'Errores',
       rows: [headers, ...dataRows],
       colWidths: [22, 12, 26, 12, 12, 26, 16, 18, 18, 18, 18, 50],
-    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo exportar', 'error'))
+    }]).catch(err => notify({ variant: 'error', title: 'Error', text: err.message ?? 'No se pudo exportar' }))
   }
 
   async function processFile(file: File) {
     if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      Swal.fire('Formato inválido', 'Solo se aceptan archivos .xlsx, .xls o .csv', 'error')
+      notify({ variant: 'error', title: 'Formato inválido', text: 'Solo se aceptan archivos .xlsx, .xls o .csv' })
       return
     }
     const reader = new FileReader()
@@ -236,7 +236,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
       try {
         const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
-          Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
+          notify({ variant: 'warning', title: 'Archivo vacío', text: 'El archivo no contiene filas de datos.' })
           return
         }
 
@@ -247,7 +247,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           .order('codigo')
 
         if (error) {
-          Swal.fire('Error', 'No se pudieron cargar los clientes globales.', 'error')
+          notify({ variant: 'error', title: 'Error', text: 'No se pudieron cargar los clientes globales.' })
           console.error('Error loading global clients:', error)
           return
         }
@@ -264,7 +264,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         else setActiveTab('conErrores')
         setStep('preview')
       } catch {
-        Swal.fire('Error', 'No se pudo leer el archivo. Verifique que sea un Excel válido.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo leer el archivo. Verifique que sea un Excel válido.' })
       }
     }
     reader.readAsArrayBuffer(file)
@@ -323,7 +323,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         }
         insertados.push(...lote.map(c => ({ ...c } as unknown as Cliente)))
       } else {
-        Swal.fire('Error en inserción', error?.message ?? 'Error al guardar lote de clientes.', 'error')
+        notify({ variant: 'error', title: 'Error en inserción', text: error?.message ?? 'Error al guardar lote de clientes.' })
         setStep('preview')
         return
       }
