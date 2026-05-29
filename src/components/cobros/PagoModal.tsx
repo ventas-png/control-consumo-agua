@@ -1,5 +1,6 @@
 import { useState, type FormEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -34,11 +35,11 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (montoNum <= 0) {
-      void Swal.fire({ icon: 'warning', title: 'Monto inválido', text: 'El monto debe ser mayor a 0' })
+      notify({ variant: 'warning', title: 'Monto inválido', text: 'El monto debe ser mayor a 0' })
       return
     }
     if (montoNum > saldo) {
-      void Swal.fire({ icon: 'warning', title: 'Monto excede el saldo', text: `El saldo pendiente es ${moneda} ${saldo.toFixed(2)}` })
+      notify({ variant: 'warning', title: 'Monto excede el saldo', text: `El saldo pendiente es ${moneda} ${saldo.toFixed(2)}` })
       return
     }
 
@@ -82,7 +83,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
       onSuccess(registro.id, nuevoEstado, nuevoAbonado)
     } catch (err) {
       console.error(err)
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo registrar el pago' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo registrar el pago' })
     } finally {
       setSaving(false)
     }

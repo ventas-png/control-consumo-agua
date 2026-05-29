@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
@@ -115,7 +116,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       .eq('id', current.ccId)
     if (error) {
       setActivoMap(prev => ({ ...prev, [clienteId]: current }))
-      Swal.fire('Error', 'No se pudo actualizar la visibilidad del cliente.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la visibilidad del cliente.' })
     }
   }
   void (canCreateProp && userRole !== 'viewer') // canCreate reservado para uso futuro
@@ -183,7 +184,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     })
 
     if (error) {
-      Swal.fire('Error', 'No se pudo realizar la búsqueda. Verifique conexión.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo realizar la búsqueda. Verifique conexión.' })
       setOnboardingStep('lookup')
       return
     }
@@ -206,7 +207,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
 
   async function linkClientToCompany(clienteId: string, clienteNombre: string) {
     if (!companyId) {
-      Swal.fire('Error', 'No se pudo determinar la empresa actual.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar la empresa actual.' })
       setOnboardingStep('lookup')
       return
     }
@@ -325,7 +326,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       if (!error && data) {
         onClienteUpdated(editingId, data as Cliente)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Cliente actualizado', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Cliente actualizado', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar el cliente.', 'error')
       }
@@ -347,9 +348,9 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
         const newCliente = { ...payload, id: clienteId } as Cliente
         onClienteAdded(newCliente)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Cliente guardado', timer: 2000, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Cliente guardado', duration: 2000 })
       } else {
-        Swal.fire('Error', 'No se pudo guardar el cliente. Verifique conexión.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar el cliente. Verifique conexión.' })
       }
     }
 
@@ -370,7 +371,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     if (!result.isConfirmed) return
 
     if (!companyId) {
-      Swal.fire('Error', 'No se pudo determinar la empresa actual.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar la empresa actual.' })
       return
     }
 
@@ -382,7 +383,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
 
     if (!error) {
       onClienteDeleted(c.id)
-      Swal.fire({ icon: 'success', title: 'Cliente removido de la empresa', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Cliente removido de la empresa', duration: 1500 })
     } else {
       Swal.fire('Error', error.message ?? 'No se pudo quitar el cliente.', 'error')
     }

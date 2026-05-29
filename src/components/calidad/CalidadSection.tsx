@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
@@ -63,9 +64,9 @@ export function CalidadSection({
 
   // Fuentes CRUD
   async function guardarFuente() {
-    if (!fuenteForm.identificador.trim()) return Swal.fire('Atención', 'El identificador es obligatorio.', 'warning')
-    if (!fuenteForm.nombre.trim() || fuenteForm.nombre.length < 2) return Swal.fire('Atención', 'El nombre es obligatorio (mín. 2 caracteres).', 'warning')
-    if (!fuenteForm.tipo_agua) return Swal.fire('Atención', 'Seleccione la tipología de agua.', 'warning')
+    if (!fuenteForm.identificador.trim()) return notify({ variant: 'warning', title: 'Atención', text: 'El identificador es obligatorio.' })
+    if (!fuenteForm.nombre.trim() || fuenteForm.nombre.length < 2) return notify({ variant: 'warning', title: 'Atención', text: 'El nombre es obligatorio (mín. 2 caracteres).' })
+    if (!fuenteForm.tipo_agua) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione la tipología de agua.' })
 
     setSavingFuente(true)
     try {
@@ -124,8 +125,8 @@ export function CalidadSection({
   }
 
   async function guardarAnalisis() {
-    if (!analisisFuenteId) return Swal.fire('Atención', 'Seleccione una fuente de agua.', 'warning')
-    if (!analisisFecha) return Swal.fire('Atención', 'Indique la fecha del análisis.', 'warning')
+    if (!analisisFuenteId) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una fuente de agua.' })
+    if (!analisisFecha) return notify({ variant: 'warning', title: 'Atención', text: 'Indique la fecha del análisis.' })
     if (!fuenteSeleccionada || !tipologiaActual) return
 
     const parametros: Record<string, number> = {}
@@ -134,7 +135,7 @@ export function CalidadSection({
       const v = parametroValues[p.key]
       if (v && v.trim() !== '') { parametros[p.key] = parseFloat(v); algunoIngresado = true }
     })
-    if (!algunoIngresado) return Swal.fire('Atención', 'Ingrese al menos un valor de parámetro.', 'warning')
+    if (!algunoIngresado) return notify({ variant: 'warning', title: 'Atención', text: 'Ingrese al menos un valor de parámetro.' })
 
     const { cumplimiento, cumple_total } = calcularCumplimiento(fuenteSeleccionada.tipo_agua, parametros)
 
@@ -174,7 +175,7 @@ export function CalidadSection({
   function handleReporteFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { Swal.fire('Archivo muy grande', 'El archivo no debe superar 5 MB.', 'error'); e.target.value = ''; return }
+    if (file.size > 5 * 1024 * 1024) { notify({ variant: 'error', title: 'Archivo muy grande', text: 'El archivo no debe superar 5 MB.' }); e.target.value = ''; return }
     setReporteTipo(file.type.includes('pdf') ? 'pdf' : 'imagen')
     setReporteNombre(file.name)
     const reader = new FileReader()
@@ -240,7 +241,7 @@ export function CalidadSection({
   }
 
   function verReporte(r: RegistroCalidad) {
-    if (!r.reporte_base64) return Swal.fire('Sin reporte', 'Este análisis no tiene reporte adjunto.', 'info')
+    if (!r.reporte_base64) return notify({ variant: 'info', title: 'Sin reporte', text: 'Este análisis no tiene reporte adjunto.' })
     const mime = r.reporte_tipo === 'pdf' ? 'application/pdf' : 'image/jpeg'
     const dataUrl = `data:${mime};base64,${r.reporte_base64}`
     const link = document.createElement('a')

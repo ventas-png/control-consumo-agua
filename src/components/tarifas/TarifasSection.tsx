@@ -1,5 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Tarifa, UserRole, UserSession, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
@@ -142,7 +143,7 @@ export function TarifasSection({
       if (!error && data) {
         onTarifaUpdated(editingId, data as Tarifa)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Tarifa actualizada', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Tarifa actualizada', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar la tarifa.', 'error')
       }
@@ -153,7 +154,7 @@ export function TarifasSection({
       const companyId: string | null = currentUser.company_id ?? null
 
       if (!projectId || !companyId) {
-        Swal.fire('Error', 'Debes seleccionar un proyecto para la tarifa.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'Debes seleccionar un proyecto para la tarifa.' })
         setLoading(false)
         return
       }
@@ -179,7 +180,7 @@ export function TarifasSection({
       if (!error && data) {
         onTarifaAdded(data as Tarifa)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Tarifa creada', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Tarifa creada', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo guardar la tarifa.', 'error')
       }
@@ -197,7 +198,7 @@ export function TarifasSection({
     if (!error) {
       onTarifaUpdated(t.id, { activa: !t.activa })
     } else {
-      Swal.fire('Error', 'No se pudo cambiar el estado.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     }
   }
 
@@ -218,7 +219,7 @@ export function TarifasSection({
     const { error } = await supabase.from('tarifas').delete().eq('id', t.id)
     if (!error) {
       onTarifaDeleted(t.id)
-      Swal.fire({ icon: 'success', title: 'Tarifa eliminada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Tarifa eliminada', duration: 1500 })
     } else {
       Swal.fire('Error', error.message ?? 'No se pudo eliminar la tarifa.', 'error')
     }
