@@ -19,46 +19,49 @@ Modo de operación:
   webhook → invoice) con tarjetas de prueba.
 - **Modo live** cuando se cierre la validación.
 
-## 2. Crear los Products + Prices
+## 2. Crear los Products + Prices (modelo por uso, F2.14)
 
-En Stripe Dashboard → Products, crear 3 productos:
+El pricing es **por uso** (multi-line), no flat. Cada plan tiene **4 Prices**:
 
-| Producto | Descripción |
-|---|---|
-| Solo Agua | Lecturas, cobros, rutas y tarifas |
-| Solo Condominios | Cuotas, áreas comunes, visitantes, tickets |
-| Bundle Completo | Agua + Condominios |
+| Componente | Stripe Price recurring | Solo Agua | Solo Condominios | Bundle |
+|---|---|---|---|---|
+| Activación | $X/mes recurring, quantity=1 fijo | $10.00 | $10.00 | $15.00 |
+| Proyecto adicional | $X/mes recurring, quantity por uso | $10.00 | $10.00 | $10.00 |
+| Unidad proyecto principal | $X/mes recurring, quantity por uso | $1.00 | $1.00 | $1.00 |
+| Unidad proyectos adicionales | $X/mes recurring, quantity por uso | $0.80 | $0.80 | $0.80 |
 
-Cada producto debe tener **2 prices**:
+**Total Prices a crear: 12** (3 planes × 4 componentes). Yearly no se soporta todavía en el modelo por uso (queda para PR futura si producto lo pide).
 
-| Price | Solo Agua | Solo Condominios | Bundle |
-|---|---|---|---|
-| Mensual | $10 USD / mes recurring | $10 USD / mes recurring | $15 USD / mes recurring |
-| Anual | $100 USD / año recurring | $100 USD / año recurring | $150 USD / año recurring |
+En Stripe Dashboard → Products, crear 3 productos (Solo Agua, Solo Condominios, Bundle Completo). Para **cada producto** crear los 4 prices marcados como **Recurring monthly**. Anotar los 12 `price_id`.
 
-Anotar los 6 `price_id` (formato `price_1ABC...`). Se ven en la URL del
-price o en su detalle.
+## 3. Poblar `billing_plans.stripe_price_id_*` (modelo por uso, F2.14)
 
-## 3. Poblar `billing_plans.stripe_price_id_*`
-
-Vía SQL Editor (o MCP):
+Vía SQL Editor (o MCP). Los 4 prices por plan (en `_activation`, `_extra_project`, `_unit_primary`, `_unit_extra`):
 
 ```sql
 UPDATE public.billing_plans
-SET stripe_price_id_monthly = 'price_XXX_AGUA_MES',
-    stripe_price_id_yearly  = 'price_XXX_AGUA_ANIO'
+SET stripe_price_id_activation    = 'price_XXX_AGUA_ACTIV',
+    stripe_price_id_extra_project = 'price_XXX_AGUA_PROJ',
+    stripe_price_id_unit_primary  = 'price_XXX_AGUA_UPRIM',
+    stripe_price_id_unit_extra    = 'price_XXX_AGUA_UEXTRA'
 WHERE code = 'agua_only';
 
 UPDATE public.billing_plans
-SET stripe_price_id_monthly = 'price_XXX_CONDO_MES',
-    stripe_price_id_yearly  = 'price_XXX_CONDO_ANIO'
+SET stripe_price_id_activation    = 'price_XXX_COND_ACTIV',
+    stripe_price_id_extra_project = 'price_XXX_COND_PROJ',
+    stripe_price_id_unit_primary  = 'price_XXX_COND_UPRIM',
+    stripe_price_id_unit_extra    = 'price_XXX_COND_UEXTRA'
 WHERE code = 'condominios_only';
 
 UPDATE public.billing_plans
-SET stripe_price_id_monthly = 'price_XXX_BUNDLE_MES',
-    stripe_price_id_yearly  = 'price_XXX_BUNDLE_ANIO'
+SET stripe_price_id_activation    = 'price_XXX_BUNDLE_ACTIV',
+    stripe_price_id_extra_project = 'price_XXX_BUNDLE_PROJ',
+    stripe_price_id_unit_primary  = 'price_XXX_BUNDLE_UPRIM',
+    stripe_price_id_unit_extra    = 'price_XXX_BUNDLE_UEXTRA'
 WHERE code = 'bundle';
 ```
+
+> **Nota**: las columnas legacy `stripe_price_id_monthly` y `stripe_price_id_yearly` quedan inutilizadas en el modelo por uso. Pueden dejarse NULL o eliminarse en migración futura.
 
 ## 4. Configurar Edge Functions secrets en Supabase
 
