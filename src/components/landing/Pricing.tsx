@@ -75,7 +75,13 @@ export function PricingSection({ t, onCta }: { t: Copy; onCta: () => void }) {
             </div>
           </div>
 
-          <aside className="pricing-card">
+          {/*
+            Era <aside>, pero axe lo flagea con "Aside should not be contained
+            in another landmark" porque vive dentro de <main>. Cambiamos a
+            <div role="complementary"> + aria-label que comunica el rol al AT
+            sin promover un landmark a nivel pagina.
+          */}
+          <div className="pricing-card" role="complementary" aria-label={t.pricing.eyebrow}>
             <header className="pc-h">
               <span className="pc-eyebrow">{activeLabel}</span>
               <h3 className="pc-total">
@@ -104,33 +110,44 @@ export function PricingSection({ t, onCta }: { t: Copy; onCta: () => void }) {
               <Icon.arrow_right size={16} />
             </button>
             <p className="pc-foot">{t.pricing.foot}</p>
-          </aside>
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
+// uid global counter para asociar label↔input sin colision en SSR ni dev HMR.
+let prLineUidCounter = 0
+function nextPrLineUid() { return `pr-line-${++prLineUidCounter}` }
+
 function PrLine({ label, value, min, max, step = 1, unit, onChange }: {
   label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (v: number) => void
 }) {
   const dec = () => onChange(Math.max(min, value - step))
   const inc = () => onChange(Math.min(max, value + step))
+  // Memoizamos el uid para que sea estable entre renders pero unico por
+  // instancia (a11y requiere htmlFor↔id matchings; sin esto axe flag los inputs).
+  const [uid] = useState(nextPrLineUid)
+  const numId = `${uid}-num`
+  const sliderId = `${uid}-slider`
   return (
     <div className="pr-line">
       <div className="pr-line-h">
-        <span className="pr-line-l">{label}</span>
+        <label className="pr-line-l" htmlFor={numId}>{label}</label>
         <div className="pr-stepper">
-          <button onClick={dec} aria-label="decrease"><Icon.minus size={12} /></button>
-          <input type="number" value={value} min={min} max={max} step={step}
+          <button onClick={dec} aria-label={`Reducir ${label}`} type="button"><Icon.minus size={12} /></button>
+          <input id={numId} type="number" value={value} min={min} max={max} step={step}
+            aria-label={`${label} (${unit})`}
             onChange={(e) => {
               const n = Number(e.target.value)
               if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)))
             }} />
-          <button onClick={inc} aria-label="increase"><Icon.plus size={12} /></button>
+          <button onClick={inc} aria-label={`Aumentar ${label}`} type="button"><Icon.plus size={12} /></button>
         </div>
       </div>
-      <input type="range" className="pr-slider" min={min} max={max} step={step}
+      <input id={sliderId} type="range" className="pr-slider" min={min} max={max} step={step}
+        aria-label={`${label} (${unit}, slider)`}
         value={value} onChange={(e) => onChange(Number(e.target.value))} />
       <div className="pr-line-foot">
         <span>{min}</span>

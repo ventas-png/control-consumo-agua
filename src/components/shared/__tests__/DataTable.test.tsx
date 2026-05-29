@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { DataTable, type DataTableColumn } from '../DataTable'
+import { checkA11y } from '../../../test/a11y'
 
 interface Row {
   id: string
@@ -208,5 +209,21 @@ describe('DataTable — loading', () => {
     expect(container.querySelectorAll('.shared-skeleton')).toHaveLength(15)
     // No renderiza tabla real
     expect(screen.queryByText('Ana Pérez')).toBeNull()
+  })
+})
+
+describe('DataTable — a11y baseline', () => {
+  it('renderiza sin violaciones de accesibilidad', async () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" />
+    )
+    await checkA11y(container)
+  })
+
+  it('estado vacio no introduce violaciones', async () => {
+    const { container } = render(
+      <DataTable data={[] as Row[]} columns={columns} rowKey="id" emptyState={{ title: 'Sin datos' }} />
+    )
+    await checkA11y(container)
   })
 })
