@@ -261,7 +261,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       foto_url: amenidadFotoUrl,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
     setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
@@ -319,7 +319,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       foto_url: editAmenidadFotoUrl,
     }).eq('id', editingAmenidad.id)
     setSavingEdit(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setEditingAmenidad(null)
     onRefresh()
   }
@@ -352,7 +352,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('amenidades').delete().eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -390,7 +390,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const amen = amenidades.find(a => a.id === reservaForm.amenidad_id)
     if (amen) {
       const errReglas = validarReglasAmenidad(amen, reservaForm.fecha, reservaForm.hora_inicio, reservaForm.hora_fin, reservaForm.unidad_id, reservas)
-      if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
+      if (errReglas) { notify({ variant: 'warning', title: 'No permitido', text: errReglas }); return }
     }
     const tarifaCalc = amen ? tarifaAplicable(amen, reservaForm.fecha) : 0
     const aplicaTarifa = !!(amen?.requiere_tarifa && tarifaCalc > 0)
@@ -446,7 +446,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     setSaving(false)
     if (error) {
       if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
-      Swal.fire('Error', error.message, 'error'); return
+      notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false })
     setShowReservaForm(false)
@@ -484,7 +484,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   async function marcarTarifaPagada(r: ReservaAmenidad) {
     const update: Record<string, unknown> = { tarifa_pagada: true }
     const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -513,7 +513,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       created_by: userId,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setBloqueoForm({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento', notas: '' })
     setShowBloqueoForm(false)
     notify({ variant: 'success', title: 'Bloqueo registrado', duration: 1500 })
@@ -556,7 +556,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       update.deposito_estado = 'pendiente'
     }
     const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
   }
@@ -568,7 +568,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       checkout_por: userId,
       observaciones_uso: observaciones || null,
     }).eq('id', r.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, checkout_at: new Date().toISOString(), checkout_foto_url: fotoUrl, observaciones_uso: observaciones || null } : d)
   }
@@ -584,7 +584,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       update.deposito_retenido_motivo = null
     }
     const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
   }
@@ -645,7 +645,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
     if (error) {
       if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
-      Swal.fire('Error', error.message, 'error'); return
+      notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
@@ -704,7 +704,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     }).eq('id', r.id)
     if (error) {
       if (cuotaId && !r.cuota_id) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
-      Swal.fire('Error', error.message, 'error'); return
+      notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
   }

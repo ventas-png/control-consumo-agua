@@ -84,7 +84,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ titulo: '', descripcion: '', categoria: 'operativa', prioridad: 'media', asignado_a: '', reportado_por: '', area: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '' })
     setMostrarForm(false)
     onRefresh()
@@ -97,7 +97,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
     const patch: Record<string, unknown> = { estado: siguiente }
     if (siguiente === 'completada') patch.fecha_cierre = new Date().toISOString().split('T')[0]
     const { error } = await supabase.from('tareas_condominio').update(patch).eq('id', t.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === t.id) setSelected(prev => prev ? { ...prev, ...patch } as TareaCondominio : null)
     onRefresh()
   }
@@ -119,7 +119,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
     }
     const nuevos = [...t.comentarios, nuevo]
     const { error } = await supabase.from('tareas_condominio').update({ comentarios: nuevos }).eq('id', t.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, comentarios: nuevos } : null)
     setComentario({ autor: '', texto: '' })
     onRefresh()

@@ -71,7 +71,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
     const { error } = editId
       ? await supabase.from('contactos_emergencia').update(payload).eq('id', editId)
       : await supabase.from('contactos_emergencia').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -79,13 +79,13 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
     const r = await Swal.fire({ title: '¿Eliminar contacto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('contactos_emergencia').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function toggleActivo(c: ContactoEmergencia) {
     const { error } = await supabase.from('contactos_emergencia').update({ activo: !c.activo }).eq('id', c.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

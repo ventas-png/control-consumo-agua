@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ControlPiscina, EstadoPiscina, TurbiededadPiscina } from '../../../types'
 
@@ -88,7 +87,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm(p => ({ ...p, ph: '', cloro: '', temperatura: '', num_usuarios: '', observaciones: '' }))
     setMostrarForm(false)
     onRefresh()

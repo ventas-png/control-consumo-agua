@@ -73,7 +73,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       ? await supabase.from('ordenes_compra').update(payload).eq('id', editId)
       : await supabase.from('ordenes_compra').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
 
@@ -92,7 +92,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       updates.fecha_entrega_esperada = new Date().toISOString().slice(0, 10)
     }
     const { error } = await supabase.from('ordenes_compra').update(updates).eq('id', orden.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

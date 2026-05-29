@@ -82,7 +82,7 @@ export function TareasPersonalTab({
       notas: bloqueForm.notas.trim() || null,
     }).select('id').single()
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setBloqueForm(blankBloque(hoy)); setShowBloqueForm(false)
     if (data) setBloqueAbierto(data.id)
     onRefresh()
@@ -128,7 +128,7 @@ export function TareasPersonalTab({
       orden: maxOrden + 1,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setNuevaTarea({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false })
     setAddingTarea(false); onRefresh()
   }

@@ -72,7 +72,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
       estado: 'abierta',
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
   }
 
@@ -82,7 +82,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     setRegistering(true)
     const { error } = await supabase.from('votos').insert({ company_id: companyId, votacion_id: selected, unidad_id: selUnidad, opcion_id: selOpcion })
     setRegistering(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setSelUnidad(''); setSelOpcion('')
     const { data } = await supabase.from('votos').select('*, unidades(nombre)').eq('votacion_id', selected)
     setVotos((data ?? []).map((r: Record<string, unknown>) => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as Voto)))

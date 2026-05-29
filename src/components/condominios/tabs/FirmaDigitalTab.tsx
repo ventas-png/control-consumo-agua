@@ -72,7 +72,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
     const { error } = editId
       ? await supabase.from('firmas_digitales').update(payload).eq('id', editId)
       : await supabase.from('firmas_digitales').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -80,7 +80,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
     const r = await Swal.fire({ title: '¿Eliminar firma?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('firmas_digitales').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -88,7 +88,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
     const { error } = await supabase.from('firmas_digitales').update({
       estado: 'firmado', fecha_firma: new Date().toISOString(),
     }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

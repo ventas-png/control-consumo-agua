@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento } from '../../../types'
@@ -52,7 +51,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
       prioridad: form.prioridad, estado: 'abierto',
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'El equipo de mantenimiento la atenderá pronto.', duration: 2000 })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }

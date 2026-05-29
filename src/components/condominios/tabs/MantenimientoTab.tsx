@@ -136,7 +136,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       foto_urls: fotoUrls,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Ticket creado', duration: 1500 })
     resetForm()
     onRefresh()
@@ -147,7 +147,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     const updates: Record<string, unknown> = { estado }
     if (estado === 'cerrado') updates.fecha_cierre = new Date().toISOString()
     const { error } = await supabase.from('tickets_mantenimiento').update(updates).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

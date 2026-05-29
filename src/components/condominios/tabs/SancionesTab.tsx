@@ -49,7 +49,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
       observaciones: form.observaciones || null, estado: 'pendiente',
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
   }
 

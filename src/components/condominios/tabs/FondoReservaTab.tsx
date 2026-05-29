@@ -79,7 +79,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
       ? await supabase.from('fondo_reserva_condominio').update(payload).eq('id', editId)
       : await supabase.from('fondo_reserva_condominio').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false)
     onRefresh()
   }

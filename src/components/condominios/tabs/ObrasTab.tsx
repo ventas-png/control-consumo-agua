@@ -59,7 +59,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
       ({ error } = await supabase.from('obras_mejoras').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
 

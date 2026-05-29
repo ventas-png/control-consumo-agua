@@ -66,7 +66,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
       ({ error } = await supabase.from('evaluaciones_proveedor').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
   }
 

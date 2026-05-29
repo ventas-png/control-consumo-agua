@@ -105,7 +105,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
       recurrente: false,
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false)
     setForm({ ...BLANK_FORM })
     onRefresh()

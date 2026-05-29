@@ -76,7 +76,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
     const { error } = editId
       ? await supabase.from('llaves_condominio').update(payload).eq('id', editId)
       : await supabase.from('llaves_condominio').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -84,7 +84,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
     const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('llaves_condominio').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -92,7 +92,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
     const updates: Record<string, unknown> = { estado }
     if (estado === 'devuelta') updates.fecha_devolucion = new Date().toISOString().slice(0, 10)
     const { error } = await supabase.from('llaves_condominio').update(updates).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

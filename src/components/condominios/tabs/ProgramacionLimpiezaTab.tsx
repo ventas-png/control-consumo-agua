@@ -87,7 +87,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
       ? await supabase.from('programacion_limpieza').update(payload).eq('id', editId)
       : await supabase.from('programacion_limpieza').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 
@@ -95,7 +95,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
     const hoy = new Date().toISOString().slice(0, 10)
     const proxima = addDays(hoy, FRECUENCIA_DIAS[p.frecuencia])
     const { error } = await supabase.from('programacion_limpieza').update({ ultima_ejecucion: hoy, proxima_ejecucion: proxima, estado: 'completado' }).eq('id', p.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

@@ -58,7 +58,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ unidad_id: '', solicitante: '', tipo: 'solvencia', motivo: '', fecha_solicitud: new Date().toISOString().split('T')[0], observaciones: '' })
     setMostrarForm(false)
     onRefresh()
@@ -72,7 +72,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
     if (siguiente === 'aprobado') patch.fecha_aprobacion = new Date().toISOString().split('T')[0]
     if (siguiente === 'entregado') patch.fecha_entrega = new Date().toISOString().split('T')[0]
     const { error } = await supabase.from('solicitudes_certificado').update(patch).eq('id', s.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, ...patch } as SolicitudCertificado : null)
     onRefresh()
   }

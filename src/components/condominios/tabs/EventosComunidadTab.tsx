@@ -71,7 +71,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
       ({ error } = await supabase.from('eventos_comunidad').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setEditId(null); setForm({ ...BLANK_EVENTO }); onRefresh()
   }
 
@@ -92,7 +92,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
       unidad_id: formAsistente.unidad_id, nombre: formAsistente.nombre.trim(),
       num_personas: parseInt(formAsistente.num_personas) || 1, confirmado: formAsistente.confirmado,
     }, { onConflict: 'evento_id,unidad_id' })
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowAsistenteForm(false); setFormAsistente({ ...BLANK_ASISTENTE }); onRefresh()
   }
 

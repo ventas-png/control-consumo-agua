@@ -362,7 +362,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
     }).select('id').single()
 
-    if (error) { setSaving(false); Swal.fire('Error', error.message, 'error'); return }
+    if (error) { setSaving(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
     // Link pre-registered guest slot to this entry
     if (strCtx?.huespedId && data?.id) {
@@ -442,7 +442,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     setGuardandoSalida(true)
     const horaSalida = new Date().toISOString()
     const { error } = await supabase.from('visitantes').update({ hora_salida: horaSalida }).eq('id', salidaPendiente.id)
-    if (error) { setGuardandoSalida(false); Swal.fire('Error', error.message, 'error'); return }
+    if (error) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
     if (salidaConAcomp) {
       const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
@@ -474,7 +474,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         foto_url: fotosNovedad[0] ?? null,
         fotos: fotosNovedad.length > 0 ? fotosNovedad : null,
       })
-      if (ne) { setGuardandoSalida(false); Swal.fire('Error al registrar novedad', ne.message, 'error'); return }
+      if (ne) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error al registrar novedad', text: ne.message }); return }
     }
     setGuardandoSalida(false)
     setSalidaPendiente(null)

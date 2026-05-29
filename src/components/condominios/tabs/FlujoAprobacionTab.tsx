@@ -58,7 +58,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
       fecha_solicitud: new Date().toISOString().slice(0, 10),
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ ...BLANK })
     setShowForm(false)
     onRefresh()
@@ -81,7 +81,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
       fecha_resolucion: new Date().toISOString().slice(0, 10),
       comentario_resolucion: comentario || null,
     }).eq('id', flujo.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

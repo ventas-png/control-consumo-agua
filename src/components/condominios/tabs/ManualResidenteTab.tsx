@@ -46,7 +46,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
       contenido: form.contenido.trim(), orden: form.orden || 0, activo: true,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 

@@ -70,7 +70,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
     const { error } = editEncuestaId
       ? await supabase.from('encuestas').update(payload).eq('id', editEncuestaId)
       : await supabase.from('encuestas').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSavingEnc(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingEnc(false); return }
     setSavingEnc(false); cancelEncuestaForm(); onRefresh()
   }
 
@@ -79,14 +79,14 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
     if (!r.isConfirmed) return
     await supabase.from('respuestas_encuesta').delete().eq('encuesta_id', id)
     const { error } = await supabase.from('encuestas').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
 
   async function handleEstadoEncuesta(id: string, estado: EstadoEncuesta) {
     const { error } = await supabase.from('encuestas').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -108,7 +108,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
       respuestas: respForm.answers,
     }
     const { error } = await supabase.from('respuestas_encuesta').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSavingResp(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingResp(false); return }
     setSavingResp(false); setShowRespForm(false); onRefresh()
   }
 

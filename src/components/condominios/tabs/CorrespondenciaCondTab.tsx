@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 
 interface Props {
@@ -51,7 +50,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
       unidad_id: form.unidad_id || null, estado: 'pendiente',
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
   }
 

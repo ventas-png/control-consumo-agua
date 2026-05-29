@@ -79,7 +79,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ unidad_id: '', nombre: '', identificacion: '', relacion: 'familiar', telefono: '', placa_vehiculo: '', dias_permitidos: [], hora_desde: '', hora_hasta: '', notas: '' })
     setMostrarForm(false)
     onRefresh()

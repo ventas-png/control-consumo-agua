@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ControlPlagas, TipoControlPlagas, ResultadoControlPlagas } from '../../../types'
 
@@ -82,7 +81,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ tipo: 'fumigacion', empresa: '', tecnico: '', productos: '', fecha: new Date().toISOString().split('T')[0], hora_inicio: '', hora_fin: '', resultado: 'satisfactorio', proxima_visita: '', costo: '', observaciones: '' })
     setAreasSeleccionadas([])
     setMostrarForm(false)

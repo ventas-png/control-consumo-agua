@@ -63,14 +63,14 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
         icono: areaForm.icono, orden: areaForm.orden, activo: areaForm.activo,
       }).eq('id', editAreaId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { error } = await supabase.from('areas_condominio').insert({
         company_id: companyId, project_id: proyectoId,
         nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
         icono: areaForm.icono, orden: areaForm.orden,
       })
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false); resetAreaForm(); onRefresh()
   }
@@ -101,14 +101,14 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         nombre: rutaForm.nombre.trim(), descripcion: rutaForm.descripcion.trim() || null,
         tiempo_estimado_min: rutaForm.tiempo_estimado_min ? parseInt(rutaForm.tiempo_estimado_min) : null,
       }).eq('id', editRutaId)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { data, error } = await supabase.from('rutas_ronda').insert({
         company_id: companyId, project_id: proyectoId,
         nombre: rutaForm.nombre.trim(), descripcion: rutaForm.descripcion.trim() || null,
         tiempo_estimado_min: rutaForm.tiempo_estimado_min ? parseInt(rutaForm.tiempo_estimado_min) : null,
       }).select('id').single()
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
       if (data) setSelectedRutaId(data.id)
     }
     setSaving(false); resetRutaForm(); onRefresh()
@@ -138,7 +138,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
       tiempo_estimado_min: newPuntoTiempo ? parseInt(newPuntoTiempo) : null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setNewPuntoAreaId(''); setNewPuntoInstrucciones(''); setNewPuntoTiempo('')
     setAddingPunto(false); onRefresh()
   }

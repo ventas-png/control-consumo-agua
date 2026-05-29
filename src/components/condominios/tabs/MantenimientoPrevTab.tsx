@@ -1,7 +1,6 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 
 interface Props {
@@ -85,7 +84,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
       costo_estimado: form.costo_estimado || null, activo: true,
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK_PLAN }); onRefresh()
   }
 
@@ -104,7 +103,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
       supabase.from('planes_mantenimiento').update({ ultima_ejecucion: ejecForm.fecha, proxima_ejecucion: proxima }).eq('id', selected),
     ])
     setSavingEjec(false)
-    if (ejRes.error) return Swal.fire('Error', ejRes.error.message, 'error')
+    if (ejRes.error) return notify({ variant: 'error', title: 'Error', text: ejRes.error.message })
     setShowEjecForm(false); setEjecForm({ ...BLANK_EJEC })
     const { data } = await supabase.from('ejecuciones_mantenimiento').select('*').eq('plan_id', selected).order('fecha', { ascending: false })
     setEjecuciones((data ?? []) as EjecucionMantenimiento[])

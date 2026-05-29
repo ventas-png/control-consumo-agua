@@ -82,7 +82,7 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
     const { error } = editId
       ? await supabase.from('solicitudes_concierge').update(payload).eq('id', editId)
       : await supabase.from('solicitudes_concierge').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -90,13 +90,13 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
     const r = await Swal.fire({ title: '¿Eliminar solicitud?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('solicitudes_concierge').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoConcierge) {
     const { error } = await supabase.from('solicitudes_concierge').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

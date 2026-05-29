@@ -1,6 +1,5 @@
 import { useState, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import {
   VencimientoExtra, CategoriaVencimiento,
@@ -126,7 +125,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 

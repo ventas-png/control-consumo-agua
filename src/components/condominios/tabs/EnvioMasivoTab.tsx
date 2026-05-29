@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { PlantillaMensajeCond, CuotaCondominio, Unidad, ReservaAmenidad, CanalPlantilla } from '../../../types'
 
@@ -105,7 +105,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
 
     const { error } = await supabase.from('notificaciones_enviadas').insert(rows)
     setEnviando(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setPaso(3)
   }

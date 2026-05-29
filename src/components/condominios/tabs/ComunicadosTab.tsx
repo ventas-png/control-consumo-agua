@@ -81,7 +81,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
       fecha_envio: form.fecha_envio, firmado: form.firmado,
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
   }
 
@@ -99,7 +99,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
       tipo: TIPO_A_ANUNCIO[c.tipo] ?? 'aviso',
       publicado_por: userId, activo: true,
     })
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Publicado en el portal!', text: 'Los residentes ya pueden verlo.', duration: 1800 })
     onRefresh()
   }

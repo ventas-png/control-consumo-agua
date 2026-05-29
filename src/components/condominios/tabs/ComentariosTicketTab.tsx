@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ComentarioTicket, TicketMantenimiento } from '../../../types'
 
@@ -38,7 +37,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
       contenido: contenido.trim(),
       estado_nuevo: estadoNuevo || null,
     })
-    if (ce) { setSaving(false); Swal.fire('Error', ce.message, 'error'); return }
+    if (ce) { setSaving(false); notify({ variant: 'error', title: 'Error', text: ce.message }); return }
     if (estadoNuevo) {
       await supabase.from('tickets_mantenimiento').update({ estado: estadoNuevo }).eq('id', ticket.id)
     }

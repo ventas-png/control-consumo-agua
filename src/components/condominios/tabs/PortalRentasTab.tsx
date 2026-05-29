@@ -120,7 +120,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
       motivo: motivo.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     onSolicitudChange()
   }
@@ -294,10 +294,10 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     }
     if (editCA) {
       const { error } = await supabase.from('contratos_arrendamiento').update(payload).eq('id', editCA.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSavingCA(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingCA(false); return }
     } else {
       const { error } = await supabase.from('contratos_arrendamiento').insert(payload)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSavingCA(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingCA(false); return }
     }
     setSavingCA(false); setShowCA(false); cargar()
     Swal.fire({ icon: 'success', title: editCA ? 'Contrato actualizado' : 'Contrato creado', timer: 1400, showConfirmButton: false })
@@ -442,10 +442,10 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     let reservaId: string | null = editSTR?.id ?? null
     if (editSTR) {
       const { error } = await supabase.from('reservas_str').update(payload).eq('id', editSTR.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSavingSTR(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingSTR(false); return }
     } else {
       const { data, error } = await supabase.from('reservas_str').insert(payload).select('id').single()
-      if (error) { Swal.fire('Error', error.message, 'error'); setSavingSTR(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingSTR(false); return }
       reservaId = data.id
     }
     if (reservaId) await saveGuests(reservaId)

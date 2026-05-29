@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { PresenciaPersonal, EstadoPresencia } from '../../../types'
 
@@ -59,7 +58,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ nombre: '', cargo: '', fecha: hoy, hora_entrada: '', hora_salida: '', estado: 'presente', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
@@ -67,14 +66,14 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
 
   async function actualizarEstado(id: string, estado: EstadoPresencia) {
     const { error } = await supabase.from('presencia_personal').update({ estado }).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function registrarSalida(id: string) {
     const hora = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
     const { error } = await supabase.from('presencia_personal').update({ hora_salida: hora }).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

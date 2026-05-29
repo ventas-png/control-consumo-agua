@@ -83,7 +83,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
       ? await supabase.from('permisos_obra_unidad').update(payload).eq('id', editId)
       : await supabase.from('permisos_obra_unidad').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 
@@ -91,7 +91,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
     const cfg = ESTADO_FLOW[p.estado]
     if (!cfg.next) return
     const { error } = await supabase.from('permisos_obra_unidad').update({ estado: cfg.next }).eq('id', p.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === p.id ? { ...sel, estado: cfg.next as PermisoObraUnidad['estado'] } : sel)
   }

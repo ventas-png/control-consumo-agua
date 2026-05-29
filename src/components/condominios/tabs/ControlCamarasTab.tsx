@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ControlCamaraSeguridad, TipoCamara, EstadoCamara } from '../../../types'
 
@@ -99,7 +98,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
       error = res.error
     }
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); setMostrarForm(false); setEditando(false)
     onRefresh()
   }

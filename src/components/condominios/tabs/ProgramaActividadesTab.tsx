@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ProgramaActividad, CategoriaActividad, EstadoActividad } from '../../../types'
 
@@ -88,7 +87,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ nombre: '', descripcion: '', categoria: 'recreativa', instructor: '', lugar: '', fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin: '', hora_inicio: '', hora_fin: '', dias_semana: [], cupo_maximo: '', costo: '0', notas: '' })
     setMostrarForm(false)
     onRefresh()

@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ArticuloReglamento, CategoriaReglamento } from '../../../types'
 
@@ -64,7 +63,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
         fecha_vigencia: form.fecha_vigencia || null, notas: form.notas.trim() || null,
       }).eq('id', selected.id)
       setSaving(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
       const { error } = await supabase.from('reglamento_condominio').insert({
         company_id: companyId, project_id: proyectoId,
@@ -74,7 +73,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
         fecha_vigencia: form.fecha_vigencia || null, notas: form.notas.trim() || null,
       })
       setSaving(false)
-      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     }
     resetForm()
     setMostrarForm(false)

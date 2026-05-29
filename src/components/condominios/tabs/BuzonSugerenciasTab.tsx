@@ -62,7 +62,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
       descripcion: form.descripcion.trim(), anonima: form.anonima,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 

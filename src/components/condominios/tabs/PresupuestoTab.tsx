@@ -80,13 +80,13 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
     const existing = presMap[editCat]
     if (existing) {
       const { error } = await supabase.from('presupuesto_condominio').update({ monto_presupuestado: monto, notas: editNotas || null }).eq('id', existing.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
       const { error } = await supabase.from('presupuesto_condominio').insert({
         company_id: companyId, project_id: proyectoId,
         anio, categoria: editCat, monto_presupuestado: monto, notas: editNotas || null,
       })
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false); setEditCat(null); onRefresh()
   }

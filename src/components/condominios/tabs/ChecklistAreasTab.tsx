@@ -91,7 +91,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
       ? await supabase.from('checklist_areas').update(payload).eq('id', editId)
       : await supabase.from('checklist_areas').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 
@@ -99,7 +99,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
     const items = c.items.map((it, i) => i === idx ? { ...it, ok: !it.ok } : it)
     const estado = calcEstado(items)
     const { error } = await supabase.from('checklist_areas').update({ items, estado }).eq('id', c.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === c.id ? { ...sel, items, estado } : sel)
   }

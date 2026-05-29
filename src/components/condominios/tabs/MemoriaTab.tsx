@@ -72,13 +72,13 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
     const { error } = editId
       ? await supabase.from('memoria_labores').update(payload).eq('id', editId)
       : await supabase.from('memoria_labores').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
   async function handlePublicar(id: string) {
     const { error } = await supabase.from('memoria_labores').update({ estado: 'publicado', publicado_por: userId || null }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -86,7 +86,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
     const r = await Swal.fire({ title: '¿Eliminar memoria?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('memoria_labores').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }

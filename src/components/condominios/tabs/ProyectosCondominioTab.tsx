@@ -82,7 +82,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
       ? await supabase.from('proyectos_condominio').update(payload).eq('id', editId)
       : await supabase.from('proyectos_condominio').insert(payload)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     cancelar(); onRefresh()
   }
 

@@ -80,7 +80,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       ? await supabase.from('incidentes_seguridad').update(payload).eq('id', editId)
       : await supabase.from('incidentes_seguridad').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 
@@ -88,7 +88,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
     const cfg = ESTADO_FLOW[i.estado]
     if (!cfg.next) return
     const { error } = await supabase.from('incidentes_seguridad').update({ estado: cfg.next }).eq('id', i.id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === i.id ? { ...sel, estado: cfg.next as IncidenteSeguridad['estado'] } : sel)
   }

@@ -84,7 +84,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
     const { error } = editId
       ? await supabase.from('registros_residuos').update(payload).eq('id', editId)
       : await supabase.from('registros_residuos').insert(payload)
-    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
@@ -92,13 +92,13 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
     const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('registros_residuos').delete().eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoResiduo) {
     const { error } = await supabase.from('registros_residuos').update({ estado }).eq('id', id)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 

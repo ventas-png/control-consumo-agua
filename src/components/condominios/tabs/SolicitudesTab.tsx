@@ -72,7 +72,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
       estado: 'pendiente',
     })
     setSaving(false)
-    if (error) return Swal.fire('Error', error.message, 'error')
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
   }
 

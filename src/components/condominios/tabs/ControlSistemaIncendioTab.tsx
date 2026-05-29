@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
@@ -92,7 +91,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm(p => ({ ...p, identificador: '', ubicacion: '', fecha_vencimiento: '', costo: '', proxima_inspeccion: '', observaciones: '' }))
     setMostrarForm(false)
     onRefresh()

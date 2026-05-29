@@ -72,7 +72,7 @@ export default function EstacionamientoVisitaTab({
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ espacio: '', placa: '', tipo_vehiculo: 'auto', unidad_visitada: '', visitante_nombre: '', autorizado_por: '', notas: '' })
     setMostrarForm(false)
     onRefresh()
@@ -91,7 +91,7 @@ export default function EstacionamientoVisitaTab({
       .from('estacionamiento_visita')
       .update({ hora_salida: new Date().toISOString() })
       .eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

@@ -98,7 +98,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       ? await supabase.from('plantillas_cuota').update(data).eq('id', editingId)
       : await supabase.from('plantillas_cuota').insert(data)
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 
@@ -168,7 +168,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
     const { error } = await supabase.from('cuotas_condominio').insert(rows)
     setGenerando(null)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} cuotas generadas`, text: `Período ${periodo}`, duration: 2000 })
     onRefresh()
   }

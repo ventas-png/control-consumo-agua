@@ -73,7 +73,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
       observaciones: form.observaciones.trim() || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ unidad_id: '', concepto: '', categoria: 'otro', monto: '', fecha_cargo: new Date().toISOString().split('T')[0], fecha_vencimiento: '', referencia: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
@@ -81,7 +81,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
 
   async function marcarPagado(c: CargoAdicionalUnidad) {
     const { error } = await supabase.from('cargos_adicionales_unidad').update({ estado: 'pagado' as EstadoCargoAdicional }).eq('id', c.id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
