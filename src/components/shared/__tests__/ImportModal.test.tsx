@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../ImportModal'
+import { checkA11y } from '../../../test/a11y'
 
 interface Row {
   nombre: string
@@ -170,5 +171,20 @@ describe('ImportModal — pluralización', () => {
     )
     expect(screen.getByText('Cancelar')).toBeDefined()
     expect(screen.getByText(/Importar clientes desde Excel/i)).toBeDefined()
+  })
+
+  it('a11y baseline: modal abierto sin violaciones', async () => {
+    const { container } = render(
+      <ImportModal
+        entityLabel="cliente"
+        entityLabelPlural="clientes"
+        columns={columns}
+        validateRow={validateRow}
+        onInsertBatch={async () => ({ ok: 0 })}
+        onClose={() => {}}
+        onImportado={() => {}}
+      />
+    )
+    await checkA11y(container)
   })
 })

@@ -161,7 +161,8 @@ export function Footer({ t }: { t: Copy }) {
           <div className="foot-cols">
             {cols.map((c) => (
               <div key={c.h} className="foot-col">
-                <h4>{c.h}</h4>
+                {/* h3 (no h4) para no romper la jerarquia: el contexto no tiene h3 previo. */}
+                <h3>{c.h}</h3>
                 <ul>{c.items.map((s) => <li key={s}><a href="#top">{s}</a></li>)}</ul>
               </div>
             ))}

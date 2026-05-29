@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { LandingPage } from '../LandingPage'
+import { checkA11y } from '../../../test/a11y'
 
 beforeEach(() => {
   cleanup()
@@ -94,5 +95,21 @@ describe('LandingPage', () => {
     const codeInput = await screen.findByPlaceholderText('123456') as HTMLInputElement
     fireEvent.change(codeInput, { target: { value: 'abc123def456' } })
     expect(codeInput.value).toBe('123456')
+  })
+
+  it('passes axe accessibility baseline (landing initial render)', async () => {
+    const { container } = setup()
+    await checkA11y(container)
+  })
+
+  it('passes axe accessibility baseline (login modal open)', async () => {
+    const { container } = setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    await checkA11y(container)
+  })
+
+  it('passes axe accessibility baseline (MFA challenge view)', async () => {
+    const { container } = setup({ mfaChallenge: { email: 'user@example.com' } })
+    await checkA11y(container)
   })
 })
