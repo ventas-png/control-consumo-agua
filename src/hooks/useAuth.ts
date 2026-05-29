@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Swal from 'sweetalert2'
+import { confirm } from '../components/shared/Dialog'
 import type { UserSession, UserRole, AssignedRoleInfo } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
@@ -501,29 +501,29 @@ export function useAuth() {
       // Show warning 5 minutes before expiry
       if (timeUntilExpiry <= APP_CONFIG.SESSION_WARNING_BEFORE_EXPIRY && !warningShown) {
         warningShown = true
-        Swal.fire({
-          icon: 'warning',
+        // F3.2: confirm() reemplaza Swal con Radix AlertDialog accesible.
+        // No hay equivalente a allowOutsideClick=false en Radix sin truco —
+        // dejamos que el usuario pueda cerrar con escape; al cerrar igual
+        // intenta refresh.
+        void confirm({
           title: 'Sesión expirando pronto',
-          html: '<p>Tu sesión expirará en 5 minutos.</p><p>Haz clic para continuar activo.</p>',
-          confirmButtonText: 'Continuar',
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          didClose: () => {
-            // User clicked "Continuar" - try to refresh immediately
-            supabase.auth.refreshSession().catch(console.error)
-          }
+          text: 'Tu sesión expirará en 5 minutos. Haz clic para continuar activo.',
+          icon: 'warning',
+          confirmText: 'Continuar',
+          cancelText: 'Cerrar',
+        }).then(() => {
+          supabase.auth.refreshSession().catch(console.error)
         })
       }
 
       // Auto logout when session expires
       if (timeUntilExpiry <= 0) {
-        Swal.fire({
-          icon: 'info',
+        void confirm({
           title: 'Sesión Expirada',
           text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
-          confirmButtonText: 'OK',
-          allowOutsideClick: false,
-          allowEscapeKey: false,
+          icon: 'info',
+          confirmText: 'OK',
+          cancelText: 'Cerrar',
         }).then(() => {
           clearSession()
           setCurrentUser(null)
@@ -702,15 +702,15 @@ export function useAuth() {
   }, [])
 
   const logout = useCallback(async () => {
-    const result = await Swal.fire({
-      title: 'Cerrar Sesión?',
-      text: 'Tendrás que ingresar tus credenciales nuevamente',
+    // F3.2: confirm() de shared/Dialog (Radix AlertDialog + a11y).
+    // API isConfirmed se mantiene 1:1 con SweetAlert2 para minimizar el delta.
+    const result = await confirm({
+      title: '¿Cerrar sesión?',
+      text: 'Tendrás que ingresar tus credenciales nuevamente.',
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#7E9389',
-      confirmButtonText: 'Sí, salir',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, salir',
+      cancelText: 'Cancelar',
     })
 
     if (result.isConfirmed) {
