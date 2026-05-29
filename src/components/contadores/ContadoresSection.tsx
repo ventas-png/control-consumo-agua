@@ -1,5 +1,6 @@
 import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -234,7 +235,7 @@ export function ContadoresSection({
       if (!error && data) {
         onContadorUpdated(editingId, data as Contador)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Contador actualizado', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Contador actualizado', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar el contador.', 'error')
       }
@@ -247,7 +248,7 @@ export function ContadoresSection({
       const companyId: string | null = selectedUnidad?.company_id ?? currentUser.company_id ?? null
 
       if (!projectId || !companyId) {
-        Swal.fire('Error', 'No se pudo determinar el proyecto o empresa. Contacte al administrador.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto o empresa. Contacte al administrador.' })
         setLoading(false)
         return
       }
@@ -287,7 +288,7 @@ export function ContadoresSection({
       if (!error && data) {
         onContadorAdded(data as Contador)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Contador creado', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Contador creado', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo guardar el contador.', 'error')
       }
@@ -305,7 +306,7 @@ export function ContadoresSection({
     if (!error) {
       onContadorUpdated(c.id, { activo: !c.activo })
     } else {
-      Swal.fire('Error', 'No se pudo cambiar el estado.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     }
   }
 
@@ -325,7 +326,7 @@ export function ContadoresSection({
     const { error } = await supabase.from('contadores').delete().eq('id', c.id)
     if (!error) {
       onContadorDeleted(c.id)
-      Swal.fire({ icon: 'success', title: 'Contador eliminado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Contador eliminado', duration: 1500 })
     } else {
       Swal.fire('Error', error.message ?? 'No se pudo eliminar el contador.', 'error')
     }

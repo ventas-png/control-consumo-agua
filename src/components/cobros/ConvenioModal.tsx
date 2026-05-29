@@ -1,5 +1,6 @@
 import { useState, type FormEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -68,7 +69,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
       onSuccess()
     } catch (err) {
       console.error(err)
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear el convenio' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo crear el convenio' })
     } finally {
       setSaving(false)
     }

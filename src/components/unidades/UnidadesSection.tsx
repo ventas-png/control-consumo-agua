@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -328,7 +329,7 @@ export function UnidadesSection({
         onUnidadUpdated(editingId, data as Unidad)
         await batchUpdateContadores(editingId)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Unidad actualizada', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Unidad actualizada', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar la unidad.', 'error')
       }
@@ -371,7 +372,7 @@ export function UnidadesSection({
       }
 
       if (!projectId || !companyId) {
-        Swal.fire('Error', 'No se pudo determinar el proyecto o empresa. Contacte al administrador.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto o empresa. Contacte al administrador.' })
         setLoading(false)
         return
       }
@@ -405,7 +406,7 @@ export function UnidadesSection({
         onUnidadAdded(newUnit)
         await batchUpdateContadores(newUnit.id)
         cancelForm()
-        Swal.fire({ icon: 'success', title: 'Unidad creada', timer: 1800, showConfirmButton: false })
+        notify({ variant: 'success', title: 'Unidad creada', duration: 1800 })
       } else {
         Swal.fire('Error', error?.message ?? 'No se pudo guardar la unidad.', 'error')
       }
@@ -423,7 +424,7 @@ export function UnidadesSection({
     if (!error) {
       onUnidadUpdated(u.id, { activo: !u.activo })
     } else {
-      Swal.fire('Error', 'No se pudo cambiar el estado.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     }
   }
 
@@ -448,7 +449,7 @@ export function UnidadesSection({
     const { error } = await supabase.from('unidades').delete().eq('id', u.id)
     if (!error) {
       onUnidadDeleted(u.id)
-      Swal.fire({ icon: 'success', title: 'Unidad eliminada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Unidad eliminada', duration: 1500 })
     } else {
       Swal.fire('Error', error.message ?? 'No se pudo eliminar la unidad.', 'error')
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, UserRole, UserSession, Pago, ConvenioPago, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -145,7 +146,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
     if (!error) {
       ids.forEach(id => onEstadoUpdated(id, 'mora'))
       setSelectedRows(new Set())
-      void Swal.fire({ icon: 'success', title: `${ids.length} registro(s) marcados en mora`, timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: `${ids.length} registro(s) marcados en mora`, duration: 1500 })
     }
   }
 
@@ -657,7 +658,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
     const { error } = await supabase.from('convenios_pago').update({ estado }).eq('id', id)
     if (!error) {
       onRefresh()
-      void Swal.fire({ icon: 'success', title: 'Estado actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Estado actualizado', duration: 1200 })
     }
   }
 

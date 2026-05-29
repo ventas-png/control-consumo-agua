@@ -1,4 +1,4 @@
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 
 interface Props {
   onLogout: () => void
@@ -22,7 +22,7 @@ export function ConfiguracionSection({ onLogout }: Props) {
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
-          onClick={() => Swal.fire('Info', 'La configuración se gestiona via variables de entorno (.env)', 'info')}
+          onClick={() => notify({ variant: 'info', title: 'Info', text: 'La configuración se gestiona via variables de entorno (.env)' })}
           style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           Ver Info
