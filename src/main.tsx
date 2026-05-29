@@ -5,6 +5,7 @@ import './components/shared/shared.css'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
+import { DialogProvider } from './components/shared/Dialog'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -27,8 +28,10 @@ if (savedTheme === 'dark' || savedTheme === 'light') {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary sectionName="root">
-      <App />
-      <PwaUpdatePrompt />
+      <DialogProvider>
+        <App />
+        <PwaUpdatePrompt />
+      </DialogProvider>
     </ErrorBoundary>
   </StrictMode>
 )
