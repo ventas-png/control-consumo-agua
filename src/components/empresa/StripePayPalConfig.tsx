@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { CompanyPaymentConfig } from '../../types'
 
@@ -171,8 +171,8 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   async function toggleStripe() {
     if (!config.stripe_configured) {
-      void Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'Stripe no está configurado',
         text: 'Configura las credenciales de Stripe primero',
       })
@@ -189,14 +189,13 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     setSavingStripe(false)
 
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error.message })
     } else {
       setConfig(prev => ({ ...prev, stripe_activo: nuevoEstado }))
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: nuevoEstado ? 'Stripe activado' : 'Stripe desactivado',
-        timer: 1500,
-        showConfirmButton: false,
+        duration: 1500,
       })
       onConfigUpdated()
     }
@@ -204,8 +203,8 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   async function togglePayPal() {
     if (!config.paypal_configured) {
-      void Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'PayPal no está configurado',
         text: 'Configura las credenciales de PayPal primero',
       })
@@ -222,14 +221,13 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     setSavingPaypal(false)
 
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error.message })
     } else {
       setConfig(prev => ({ ...prev, paypal_activo: nuevoEstado }))
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: nuevoEstado ? 'PayPal activado' : 'PayPal desactivado',
-        timer: 1500,
-        showConfirmButton: false,
+        duration: 1500,
       })
       onConfigUpdated()
     }
@@ -237,13 +235,13 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   async function guardarStripe(publicKey: string, secretKey: string) {
     if (!publicKey || !secretKey) {
-      void Swal.fire({ icon: 'warning', title: 'Campos requeridos' })
+      notify({ variant: 'warning', title: 'Campos requeridos' })
       return
     }
 
     if (!isValidStripePublicKey(publicKey)) {
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Formato inválido',
         text: 'La Public Key debe comenzar con pk_live_ o pk_test_',
       })
@@ -251,8 +249,8 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     }
 
     if (!isValidStripeSecretKey(secretKey)) {
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Formato inválido',
         text: 'La Secret Key debe comenzar con sk_live_ o sk_test_',
       })
@@ -268,19 +266,18 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     setSavingStripe(false)
 
     if (fnError) {
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error al guardar',
         text: 'No se pudo guardar la configuración. Intenta de nuevo.',
       })
       return
     }
 
-    void Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: 'Stripe configurado',
-      timer: 1500,
-      showConfirmButton: false,
+      duration: 1500,
     })
     setShowStripeForm(false)
     onConfigUpdated()
@@ -289,7 +286,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   async function guardarPayPal(clientId: string, clientSecret: string) {
     if (!clientId || !clientSecret) {
-      void Swal.fire({ icon: 'warning', title: 'Campos requeridos' })
+      notify({ variant: 'warning', title: 'Campos requeridos' })
       return
     }
 
@@ -302,19 +299,18 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     setSavingPaypal(false)
 
     if (fnError) {
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error al guardar',
         text: 'No se pudo guardar la configuración. Intenta de nuevo.',
       })
       return
     }
 
-    void Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: 'PayPal configurado',
-      timer: 1500,
-      showConfirmButton: false,
+      duration: 1500,
     })
     setShowPaypalForm(false)
     onConfigUpdated()
@@ -329,16 +325,15 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
       })
 
       if (!error) {
-        void Swal.fire({
-          icon: 'success',
+        notify({
+          variant: 'success',
           title: 'Conexión exitosa',
           text: 'Stripe está configurado correctamente',
-          timer: 1500,
-          showConfirmButton: false,
+          duration: 1500,
         })
       } else {
-        void Swal.fire({
-          icon: 'error',
+        notify({
+          variant: 'error',
           title: 'Error de conexión',
           text: 'Verifica tus keys de Stripe',
         })
