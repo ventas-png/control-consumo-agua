@@ -1,6 +1,7 @@
 import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -235,8 +236,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function guardarAmenidad() {
-    if (!amenidadForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre.', 'error'); return }
-    if (amenidadForm.requiere_tarifa && !amenidadForm.tarifa_uso) { Swal.fire('Error', 'Indique el monto de la tarifa por uso.', 'error'); return }
+    if (!amenidadForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre.' }); return }
+    if (amenidadForm.requiere_tarifa && !amenidadForm.tarifa_uso) { notify({ variant: 'error', title: 'Error', text: 'Indique el monto de la tarifa por uso.' }); return }
     setSaving(true)
     const { error } = await supabase.from('amenidades').insert({
       company_id: companyId, project_id: proyectoId,
@@ -294,8 +295,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   async function guardarEdicion() {
     if (!editingAmenidad) return
-    if (!editAmenidadForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre.', 'error'); return }
-    if (editAmenidadForm.requiere_tarifa && !editAmenidadForm.tarifa_uso) { Swal.fire('Error', 'Indique el monto de la tarifa por uso.', 'error'); return }
+    if (!editAmenidadForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre.' }); return }
+    if (editAmenidadForm.requiere_tarifa && !editAmenidadForm.tarifa_uso) { notify({ variant: 'error', title: 'Error', text: 'Indique el monto de la tarifa por uso.' }); return }
     setSavingEdit(true)
     const { error } = await supabase.from('amenidades').update({
       nombre: editAmenidadForm.nombre.trim(),
@@ -357,7 +358,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   async function guardarReserva() {
     if (!reservaForm.amenidad_id || !reservaForm.unidad_id || !reservaForm.fecha || !reservaForm.hora_inicio || !reservaForm.hora_fin) {
-      Swal.fire('Error', 'Complete todos los campos requeridos.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Complete todos los campos requeridos.' }); return
     }
     const conflict = reservas.find(r => {
       if (r.amenidad_id !== reservaForm.amenidad_id) return false
@@ -372,7 +373,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         : r.hora_fin
       return reservaForm.hora_inicio < efectivoFin && reservaForm.hora_fin > efectivoInicio
     })
-    if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva confirmada en ese horario para esta amenidad (incluyendo tiempos de preparación).', 'warning'); return }
+    if (conflict) { notify({ variant: 'warning', title: 'Conflicto', text: 'Ya existe una reserva confirmada en ese horario para esta amenidad (incluyendo tiempos de preparación).' }); return }
 
     const bloqueo = bloqueos.find(b =>
       b.amenidad_id === reservaForm.amenidad_id &&
@@ -382,7 +383,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       const detalle = bloqueo.hora_inicio
         ? `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} ${bloqueo.hora_inicio}–${bloqueo.hora_fin}`
         : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
-      Swal.fire('Amenidad bloqueada', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}`, 'warning')
+      notify({ variant: 'warning', title: 'Amenidad bloqueada', text: `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}` })
       return
     }
 
@@ -419,7 +420,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         })
         .select('id')
         .single()
-      if (cuotaErr) { setSaving(false); Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
       cuotaId = cuotaData?.id ?? null
     }
 
@@ -489,14 +490,14 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   async function guardarBloqueo() {
     if (!bloqueoForm.amenidad_id || !bloqueoForm.fecha_inicio || !bloqueoForm.fecha_fin) {
-      Swal.fire('Error', 'Seleccione amenidad y rango de fechas.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Seleccione amenidad y rango de fechas.' }); return
     }
     if (bloqueoForm.fecha_fin < bloqueoForm.fecha_inicio) {
-      Swal.fire('Error', 'La fecha fin debe ser igual o posterior a la fecha inicio.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'La fecha fin debe ser igual o posterior a la fecha inicio.' }); return
     }
     if (!bloqueoForm.dia_completo) {
-      if (!bloqueoForm.hora_inicio || !bloqueoForm.hora_fin) { Swal.fire('Error', 'Indique horario o marque día completo.', 'error'); return }
-      if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) { Swal.fire('Error', 'La hora fin debe ser posterior a la hora inicio.', 'error'); return }
+      if (!bloqueoForm.hora_inicio || !bloqueoForm.hora_fin) { notify({ variant: 'error', title: 'Error', text: 'Indique horario o marque día completo.' }); return }
+      if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) { notify({ variant: 'error', title: 'Error', text: 'La hora fin debe ser posterior a la hora inicio.' }); return }
     }
     setSaving(true)
     const { error } = await supabase.from('amenidades_bloqueos').insert({
@@ -515,7 +516,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     setBloqueoForm({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento', notas: '' })
     setShowBloqueoForm(false)
-    Swal.fire({ icon: 'success', title: 'Bloqueo registrado', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Bloqueo registrado', duration: 1500 })
     onRefresh()
   }
 
@@ -532,7 +533,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const unidad = unidades.find(u => u.id === r.unidad_id)
     const tel = unidad?.propietario_telefono?.trim()
     if (!tel) {
-      Swal.fire('Sin teléfono', `La unidad ${r.unidad_nombre || ''} no tiene un teléfono registrado para el propietario.`, 'warning')
+      notify({ variant: 'warning', title: 'Sin teléfono', text: `La unidad ${r.unidad_nombre || ''} no tiene un teléfono registrado para el propietario.` })
       return
     }
     const mensaje = buildMensajeRecordatorio(r, unidad)
@@ -632,7 +633,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         })
         .select('id')
         .single()
-      if (cuotaErr) { Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      if (cuotaErr) { notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
       cuotaId = cuotaData?.id ?? null
     }
     const update = {
@@ -667,7 +668,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       return r.hora_inicio < efectivoFin && r.hora_fin > efectivoInicio
     })
     if (conflict) {
-      Swal.fire('Conflicto', 'Otra reserva ya confirmada ocupa ese horario (incluyendo tiempos de preparación). No es posible aprobar.', 'warning')
+      notify({ variant: 'warning', title: 'Conflicto', text: 'Otra reserva ya confirmada ocupa ese horario (incluyendo tiempos de preparación). No es posible aprobar.' })
       return
     }
     const amen = amenidades.find(a => a.id === r.amenidad_id)
@@ -691,7 +692,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         })
         .select('id')
         .single()
-      if (cuotaErr) { Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      if (cuotaErr) { notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
       cuotaId = cuotaData?.id ?? null
     }
     const { error } = await supabase.from('reservas_amenidades').update({

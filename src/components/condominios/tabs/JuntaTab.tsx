@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MiembroJunta, CargoJunta, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   junta: MiembroJunta[]
@@ -61,7 +62,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
   }
 
   async function handleSave() {
-    if (!form.nombre.trim() || !form.periodo_inicio) return Swal.fire('Campos requeridos', 'Nombre y fecha de inicio son obligatorios.', 'warning')
+    if (!form.nombre.trim() || !form.periodo_inicio) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Nombre y fecha de inicio son obligatorios.' })
     setSaving(true)
     const payload = {
       cargo: form.cargo, nombre: form.nombre.trim(),

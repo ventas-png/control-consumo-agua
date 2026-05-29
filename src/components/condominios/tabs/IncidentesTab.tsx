@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { IncidenteSeguridad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -65,7 +66,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   }
 
   const handleSave = async () => {
-    if (!form.descripcion.trim()) return Swal.fire('Campo requerido', 'La descripción es obligatoria.', 'warning')
+    if (!form.descripcion.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'La descripción es obligatoria.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

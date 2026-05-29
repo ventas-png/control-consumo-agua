@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
@@ -72,7 +73,7 @@ export function TareasPersonalTab({
 
   // ── CRUD Bloque ─────────────────────────────────────────────
   async function crearBloque() {
-    if (!bloqueForm.personal_id) { Swal.fire('Error', 'Seleccione el empleado.', 'error'); return }
+    if (!bloqueForm.personal_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione el empleado.' }); return }
     setSaving(true)
     const { data, error } = await supabase.from('bloques_turno').insert({
       company_id: companyId, project_id: proyectoId,
@@ -112,7 +113,7 @@ export function TareasPersonalTab({
 
   // ── CRUD Tarea ───────────────────────────────────────────────
   async function agregarTareaDesde(bloqueId: string) {
-    if (!nuevaTarea.titulo.trim() && !nuevaTarea.plantilla_id) { Swal.fire('Error', 'Ingrese título o seleccione plantilla.', 'error'); return }
+    if (!nuevaTarea.titulo.trim() && !nuevaTarea.plantilla_id) { notify({ variant: 'error', title: 'Error', text: 'Ingrese título o seleccione plantilla.' }); return }
     const plantilla = nuevaTarea.plantilla_id ? plantillas.find(p => p.id === nuevaTarea.plantilla_id) : null
     const ts = tareasDeBloque(bloqueId)
     const maxOrden = ts.length ? Math.max(...ts.map(t => t.orden)) : -1
@@ -134,7 +135,7 @@ export function TareasPersonalTab({
 
   async function agregarDesdePlantillas(bloqueId: string, cargo: string) {
     const pls = plantillas.filter(p => p.cargo === cargo && p.activo).sort((a, b) => a.orden - b.orden)
-    if (pls.length === 0) { Swal.fire('Info', 'No hay plantillas activas para ese cargo.', 'info'); return }
+    if (pls.length === 0) { notify({ variant: 'info', title: 'Info', text: 'No hay plantillas activas para ese cargo.' }); return }
     const ts = tareasDeBloque(bloqueId)
     const maxOrden = ts.length ? Math.max(...ts.map(t => t.orden)) : -1
     setSaving(true)

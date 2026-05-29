@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -99,8 +100,8 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   }
 
   async function handleSave() {
-    if (!form.proveedor_nombre?.trim()) return Swal.fire('Campo requerido', 'Ingresa el nombre del proveedor.', 'warning')
-    if (!form.fecha_inicio) return Swal.fire('Campo requerido', 'Ingresa la fecha de inicio.', 'warning')
+    if (!form.proveedor_nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre del proveedor.' })
+    if (!form.fecha_inicio) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha de inicio.' })
     setSaving(true)
     const payload = {
       company_id: companyId,

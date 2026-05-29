@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 
 interface Props {
@@ -59,7 +60,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
 
   async function guardar() {
     if (!form.unidad_id || !form.concepto.trim() || !form.monto) {
-      Swal.fire('Faltan datos', 'Unidad, concepto y monto son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Unidad, concepto y monto son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('cargos_adicionales_unidad').insert({

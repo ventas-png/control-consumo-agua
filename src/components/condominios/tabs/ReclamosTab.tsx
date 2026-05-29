@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { ReclamoCondominio } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   reclamos: ReclamoCondominio[]
@@ -61,7 +62,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleSave() {
-    if (!form.asunto.trim()) return Swal.fire('Requerido', 'El asunto es obligatorio.', 'warning')
+    if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
     setSaving(true)
     const payload = {
       unidad_id: form.unidad_id || null, tipo: form.tipo, asunto: form.asunto.trim(),
@@ -94,7 +95,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
 
   async function handleResponder() {
     if (!selected) return
-    if (!formResp.respuesta_admin.trim()) return Swal.fire('Requerido', 'Escriba una respuesta.', 'warning')
+    if (!formResp.respuesta_admin.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'Escriba una respuesta.' })
     await supabase.from('reclamos_condominio').update({
       respuesta_admin: formResp.respuesta_admin.trim(),
       respondido_por: formResp.respondido_por || null,

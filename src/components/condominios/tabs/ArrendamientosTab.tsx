@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -67,10 +68,10 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   }
 
   async function handleGuardar() {
-    if (!form.arrendatario_nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del arrendatario.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad.', 'error'); return }
-    if (!form.monto_renta || isNaN(Number(form.monto_renta))) { Swal.fire('Error', 'Ingrese el monto de renta.', 'error'); return }
-    if (!form.fecha_inicio) { Swal.fire('Error', 'Ingrese la fecha de inicio.', 'error'); return }
+    if (!form.arrendatario_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del arrendatario.' }); return }
+    if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad.' }); return }
+    if (!form.monto_renta || isNaN(Number(form.monto_renta))) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el monto de renta.' }); return }
+    if (!form.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'Ingrese la fecha de inicio.' }); return }
     setSaving(true)
     const data = {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,

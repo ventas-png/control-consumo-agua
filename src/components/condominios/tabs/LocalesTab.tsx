@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { LocalComercial, EstadoLocal, GiroLocal } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   locales: LocalComercial[]
@@ -62,7 +63,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
   }
 
   async function handleSave() {
-    if (!form.numero_local?.trim()) return Swal.fire('Campo requerido', 'Ingresa el número de local.', 'warning')
+    if (!form.numero_local?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el número de local.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

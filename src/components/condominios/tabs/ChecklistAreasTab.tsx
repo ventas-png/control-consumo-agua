@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ChecklistArea, ChecklistItem } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   checklists: ChecklistArea[]
@@ -77,7 +78,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
     setFormItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: val } : it))
 
   const handleSave = async () => {
-    if (!formArea.trim()) return Swal.fire('Campo requerido', 'El área es obligatoria.', 'warning')
+    if (!formArea.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'El área es obligatoria.' })
     setSaving(true)
     const estado = calcEstado(formItems)
     const payload = {

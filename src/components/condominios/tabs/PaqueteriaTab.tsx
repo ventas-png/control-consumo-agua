@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { notifyPackage } from '../../../lib/paquetesNotify'
@@ -82,8 +83,8 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
   }
 
   async function handleRegistrar() {
-    if (!form.descripcion.trim()) { Swal.fire('Error', 'Ingrese una descripción del paquete.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad destinataria.', 'error'); return }
+    if (!form.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese una descripción del paquete.' }); return }
+    if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad destinataria.' }); return }
     setSaving(true)
     const { data, error } = await supabase.from('paquetes_recibidos').insert({
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
@@ -99,7 +100,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     try { if (data?.id) await notifyPackage(data.id) } catch { /* best-effort */ }
-    Swal.fire({ icon: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', timer: 1600, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', duration: 1600 })
     resetForm(); onRefresh()
   }
 
@@ -165,11 +166,11 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
   const EXPORT_HEADERS = ['Tipo', 'Descripción', 'Unidad', 'Remitente', 'Mensajería', 'Guía', 'Estado', 'Recibido', 'Entregado', 'Entregado a', 'Vía']
 
   function exportarExcelLista() {
-    if (filtrados.length === 0) { Swal.fire('Sin datos', 'No hay paquetes para exportar con el filtro actual.', 'info'); return }
+    if (filtrados.length === 0) { notify({ variant: 'info', title: 'Sin datos', text: 'No hay paquetes para exportar con el filtro actual.' }); return }
     exportarExcel('paqueteria-entrantes', [{ name: 'Paquetería', headers: EXPORT_HEADERS, rows: buildExportRows() }])
   }
   function exportarPDFLista() {
-    if (filtrados.length === 0) { Swal.fire('Sin datos', 'No hay paquetes para exportar con el filtro actual.', 'info'); return }
+    if (filtrados.length === 0) { notify({ variant: 'info', title: 'Sin datos', text: 'No hay paquetes para exportar con el filtro actual.' }); return }
     exportarPDFTabla({
       titulo: 'Paquetería — Entrantes',
       subtitulo: `${filtrados.length} registros · ${pendientes} pendientes`,

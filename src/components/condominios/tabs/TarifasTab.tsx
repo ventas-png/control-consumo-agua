@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { TarifaCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   tarifas: TarifaCondominio[]
@@ -63,7 +64,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
   }
 
   const handleSave = async () => {
-    if (!form.concepto.trim() || !form.monto) return Swal.fire('Campos requeridos', 'Concepto y monto son obligatorios.', 'warning')
+    if (!form.concepto.trim() || !form.monto) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Concepto y monto son obligatorios.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

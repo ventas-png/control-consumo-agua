@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { AsambleaDigital, Unidad } from '../../../types'
 
@@ -123,7 +124,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
     const { error } = await supabase.from('asambleas_digital').update({ acta_url: actaTexto.trim() || null }).eq('id', actaAsamblea.id)
     setSavingActa(false)
     if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
-    Swal.fire({ icon: 'success', title: 'Acta guardada', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Acta guardada', duration: 1500 })
     setSubTab('lista')
     onRefresh()
   }

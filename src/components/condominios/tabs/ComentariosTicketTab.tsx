@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ComentarioTicket, TicketMantenimiento } from '../../../types'
 
 interface Props {
@@ -29,7 +30,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
 
   async function guardar() {
-    if (!contenido.trim()) { Swal.fire('Error', 'Escribe un comentario', 'warning'); return }
+    if (!contenido.trim()) { notify({ variant: 'warning', title: 'Error', text: 'Escribe un comentario' }); return }
     setSaving(true)
     const { error: ce } = await supabase.from('comentarios_ticket').insert({
       company_id: companyId, ticket_id: ticket.id,

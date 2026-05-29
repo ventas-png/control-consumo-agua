@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { EntregaUnidad, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   entregas: EntregaUnidad[]
@@ -64,7 +65,7 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
   }
 
   async function handleSave() {
-    if (!form.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
+    if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
     const validItems = items.filter(it => it.item.trim())
     setSaving(true)
     const payload = {

@@ -1,6 +1,7 @@
 import { useState, type ReactNode} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { InformeMensual, EstadoInformeMensual, CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, IncidenteSeguridad } from '../../../types'
 import { exportarPDFInformeMensual } from '../exportUtils'
 
@@ -60,7 +61,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
     }, { onConflict: 'project_id,periodo' })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `Informe ${ym} generado`, timer: 1600, showConfirmButton: false })
+    notify({ variant: 'success', title: `Informe ${ym} generado`, duration: 1600 })
     onRefresh()
   }
 

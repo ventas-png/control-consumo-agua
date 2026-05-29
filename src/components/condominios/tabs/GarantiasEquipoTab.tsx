@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { GarantiaEquipo, EstadoGarantia } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   garantias: GarantiaEquipo[]
@@ -42,7 +43,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
   }
 
   async function handleSave() {
-    if (!form.equipo.trim()) return Swal.fire('Requerido', 'El nombre del equipo es obligatorio.', 'warning')
+    if (!form.equipo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre del equipo es obligatorio.' })
     setSaving(true)
     const payload = {
       equipo: form.equipo.trim(), area: form.area || null, numero_serie: form.numero_serie || null,

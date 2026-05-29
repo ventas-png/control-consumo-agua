@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza } from '../../../types'
@@ -90,11 +91,11 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
   async function enviar() {
     if (!form.fecha_solicitada) {
-      Swal.fire('Error', 'La fecha propuesta es requerida.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'La fecha propuesta es requerida.' })
       return
     }
     if (terminosMudanza && !form.terminosAceptados) {
-      Swal.fire('Error', 'Debes aceptar los términos de mudanza para continuar.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debes aceptar los términos de mudanza para continuar.' })
       return
     }
 
@@ -116,7 +117,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       })
       if (upErr) {
         setSaving(false)
-        Swal.fire('Error', `No se pudo subir la imagen: ${upErr.message}`, 'error')
+        notify({ variant: 'error', title: 'Error', text: `No se pudo subir la imagen: ${upErr.message}` })
         return
       }
       // S6 phase 2: store the bare path; display sites sign via useSignedUrl.
@@ -140,7 +141,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
     const { error } = await supabase.from('solicitud_mudanza_unidad').insert(payload)
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     setShowForm(false)
     setForm(blankForm())
     cargar()

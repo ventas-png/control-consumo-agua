@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   alertas: AlertaCondominio[]
@@ -143,7 +144,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
   }
 
   async function handleSave() {
-    if (!form.titulo.trim() || !form.fecha_alerta) return Swal.fire('Campos requeridos', 'Título y fecha son obligatorios.', 'warning')
+    if (!form.titulo.trim() || !form.fecha_alerta) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y fecha son obligatorios.' })
     setSaving(true)
     const { error } = await supabase.from('alertas_condominio').insert({
       company_id: companyId,

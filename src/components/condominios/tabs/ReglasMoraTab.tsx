@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ReglaMoraConfig, TipoReglaRecargo, AplicarSobreRecargo } from '../../../types'
 
 interface Props {
@@ -42,7 +43,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
 
   async function guardar() {
     if (!form.nombre.trim() || !form.valor) {
-      Swal.fire('Error', 'Nombre y valor son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Nombre y valor son obligatorios' }); return
     }
     setSaving(true)
     const payload = {

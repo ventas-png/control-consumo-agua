@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { ImageUploader } from '../../shared/ImageUploader'
 import type {
@@ -120,7 +121,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     onSolicitudChange()
   }
 
@@ -274,8 +275,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   function openEditCA(c: ContratoArrendamiento) { setEditCA(c); setFormCA({ ...c }); setShowCA(true) }
 
   async function saveCA() {
-    if (!formCA.arrendatario_nombre?.trim()) { Swal.fire('Error', 'El nombre del arrendatario es requerido.', 'error'); return }
-    if (!formCA.fecha_inicio) { Swal.fire('Error', 'La fecha de inicio es requerida.', 'error'); return }
+    if (!formCA.arrendatario_nombre?.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del arrendatario es requerido.' }); return }
+    if (!formCA.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'La fecha de inicio es requerida.' }); return }
     setSavingCA(true)
     const payload = {
       company_id: companyId, project_id: proyectoId, unidad_id: unidadId,
@@ -307,7 +308,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     if (!r.isConfirmed) return
     await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
     setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
-    Swal.fire({ icon: 'success', title: 'Eliminado', timer: 1200, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Eliminado', duration: 1200 })
   }
 
   // ── STR helpers ─────────────────────────────────────────────────────────────
@@ -357,9 +358,9 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   const maxAdicionalesSTR = (Number(formSTR.num_adultos) || 1) + (Number(formSTR.num_ninos) || 0) - 1
 
   function agregarHuesped() {
-    if (!huespedForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre de la persona.', 'error'); return }
+    if (!huespedForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre de la persona.' }); return }
     if (huespedes.length >= maxAdicionalesSTR) {
-      Swal.fire('Capacidad', 'Ya se alcanzó el máximo de personas adicionales para esta reserva.', 'warning')
+      notify({ variant: 'warning', title: 'Capacidad', text: 'Ya se alcanzó el máximo de personas adicionales para esta reserva.' })
       return
     }
     setHuespedes(prev => [...prev, { ...huespedForm, nombre: huespedForm.nombre.trim() }])
@@ -368,7 +369,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   function quitarHuesped(index: number) {
     if (huespedes[index]?.visitante_id) {
-      Swal.fire('No permitido', 'Esta persona ya registró su ingreso y no puede eliminarse.', 'info')
+      notify({ variant: 'info', title: 'No permitido', text: 'Esta persona ya registró su ingreso y no puede eliminarse.' })
       return
     }
     setHuespedes(prev => prev.filter((_, i) => i !== index))
@@ -409,8 +410,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   }
 
   async function saveSTR() {
-    if (!formSTR.huesped_nombre?.trim()) { Swal.fire('Error', 'El nombre del huésped es requerido.', 'error'); return }
-    if (!formSTR.fecha_entrada || !formSTR.fecha_salida) { Swal.fire('Error', 'Las fechas de entrada y salida son requeridas.', 'error'); return }
+    if (!formSTR.huesped_nombre?.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del huésped es requerido.' }); return }
+    if (!formSTR.fecha_entrada || !formSTR.fecha_salida) { notify({ variant: 'error', title: 'Error', text: 'Las fechas de entrada y salida son requeridas.' }); return }
     setSavingSTR(true)
     const nights = calcNights(formSTR.fecha_entrada!, formSTR.fecha_salida!)
     const total  = nights * (Number(formSTR.monto_noche) || 0)
@@ -457,7 +458,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     if (!res.isConfirmed) return
     await supabase.from('reservas_str').delete().eq('id', r.id)
     setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
-    Swal.fire({ icon: 'success', title: 'Eliminada', timer: 1200, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Eliminada', duration: 1200 })
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────

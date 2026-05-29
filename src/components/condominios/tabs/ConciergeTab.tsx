@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudConcierge, EstadoConcierge, TipoConcierge, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   solicitudes: SolicitudConcierge[]
@@ -67,7 +68,7 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.descripcion?.trim()) return Swal.fire('Campo requerido', 'Describe la solicitud.', 'warning')
+    if (!form.descripcion?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Describe la solicitud.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

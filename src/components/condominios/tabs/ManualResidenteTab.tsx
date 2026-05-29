@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ArticuloManual, SeccionManual } from '../../../types'
 
 interface Props {
@@ -36,7 +37,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
 
   async function guardar() {
     if (!form.titulo.trim() || !form.contenido.trim()) {
-      Swal.fire('Error', 'Título y contenido son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Título y contenido son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('manual_residente_cond').insert({

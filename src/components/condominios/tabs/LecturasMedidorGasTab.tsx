@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { LecturaMedidorGas, Unidad } from '../../../types'
 
 interface Props {
@@ -46,10 +47,10 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
   async function guardar() {
     if (!form.lectura_actual) {
-      Swal.fire('Faltan datos', 'La lectura actual es obligatoria', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'La lectura actual es obligatoria' }); return
     }
     if (!form.unidad_id && !form.area.trim()) {
-      Swal.fire('Faltan datos', 'Selecciona una unidad o especifica un área', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Selecciona una unidad o especifica un área' }); return
     }
     const consumo = consumoCalculado
     const costo_total = consumo != null && form.costo_unitario ? consumo * parseFloat(form.costo_unitario) : null

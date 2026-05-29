@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ProgramaActividad, CategoriaActividad, EstadoActividad } from '../../../types'
 
 interface Props {
@@ -68,7 +69,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
 
   async function guardar() {
     if (!form.nombre.trim() || !form.fecha_inicio) {
-      Swal.fire('Faltan datos', 'Nombre y fecha de inicio son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre y fecha de inicio son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('programa_actividades').insert({
@@ -101,7 +102,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
 
   async function registrarInscripcion(a: ProgramaActividad) {
     if (a.cupo_maximo && a.inscritos >= a.cupo_maximo) {
-      Swal.fire('Sin cupo', 'La actividad no tiene cupos disponibles', 'warning'); return
+      notify({ variant: 'warning', title: 'Sin cupo', text: 'La actividad no tiene cupos disponibles' }); return
     }
     await supabase.from('programa_actividades').update({ inscritos: a.inscritos + 1 }).eq('id', a.id)
     onRefresh()

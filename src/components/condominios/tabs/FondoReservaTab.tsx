@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { FondoReserva } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -63,7 +64,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
   }
 
   const handleSave = async () => {
-    if (!form.concepto.trim() || !form.monto) return Swal.fire('Campos requeridos', 'Concepto y monto son obligatorios.', 'warning')
+    if (!form.concepto.trim() || !form.monto) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Concepto y monto son obligatorios.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

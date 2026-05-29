@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { MantenimientoJardineria, TipoJardineria, EstadoJardineria } from '../../../types'
 
 interface Props {
@@ -73,7 +74,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
 
   async function guardar() {
     if (!form.fecha || form.areas.length === 0) {
-      Swal.fire('Faltan datos', 'Fecha y al menos un área son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Fecha y al menos un área son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('mantenimiento_jardineria').insert({

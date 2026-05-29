@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { PlantillaMensajeCond, CanalPlantilla } from '../../../types'
 
@@ -54,7 +55,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
 
   async function guardar() {
     if (!form.nombre.trim() || !form.cuerpo.trim()) {
-      Swal.fire('Campos requeridos', 'Nombre y cuerpo son obligatorios.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Nombre y cuerpo son obligatorios.' }); return
     }
     setSaving(true)
     const variables = extraerVariables(form.cuerpo)

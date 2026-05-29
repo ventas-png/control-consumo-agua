@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { EvaluacionProveedor, ContratoProveedor } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   evaluaciones: EvaluacionProveedor[]
@@ -51,7 +52,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
   }
 
   async function handleSave() {
-    if (!form.nombre_proveedor.trim()) return Swal.fire('Requerido', 'El nombre del proveedor es obligatorio.', 'warning')
+    if (!form.nombre_proveedor.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre del proveedor es obligatorio.' })
     setSaving(true)
     const payload = {
       proveedor_id: form.proveedor_id || null, nombre_proveedor: form.nombre_proveedor.trim(),

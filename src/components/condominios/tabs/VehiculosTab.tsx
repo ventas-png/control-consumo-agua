@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   vehiculos: VehiculoResidente[]
@@ -42,8 +43,8 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   }
 
   async function handleSave() {
-    if (!form.placa.trim()) return Swal.fire('Requerido', 'La placa es obligatoria.', 'warning')
-    if (!form.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
+    if (!form.placa.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'La placa es obligatoria.' })
+    if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
     setSaving(true)
     const payload = {
       unidad_id: form.unidad_id, placa: form.placa.trim().toUpperCase(),

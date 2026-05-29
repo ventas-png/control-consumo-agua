@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { RegistroAutoridad, TipoAutoridad, ResultadoAutoridad } from '../../../types'
 
 interface Props {
@@ -58,7 +59,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
 
   async function guardar() {
     if (!form.motivo.trim()) {
-      Swal.fire('Faltan datos', 'El motivo es obligatorio', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'El motivo es obligatorio' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('registro_autoridades').insert({

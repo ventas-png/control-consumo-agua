@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ProyectoCondominio, CategoriaProyectoCond, EstadoProyectoCond } from '../../../types'
 
 interface Props {
@@ -64,7 +65,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
   function cancelar() { setMostrarForm(false); setEditId(null) }
 
   async function guardar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'El nombre es obligatorio', 'warning'); return }
+    if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El nombre es obligatorio' }); return }
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

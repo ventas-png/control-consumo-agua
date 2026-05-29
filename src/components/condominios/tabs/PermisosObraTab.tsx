@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PermisoObraUnidad, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   permisos: PermisoObraUnidad[]
@@ -64,7 +65,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   }
 
   const handleSave = async () => {
-    if (!form.descripcion.trim()) return Swal.fire('Campo requerido', 'La descripción es obligatoria.', 'warning')
+    if (!form.descripcion.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'La descripción es obligatoria.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

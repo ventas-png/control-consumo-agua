@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ControlPiscina, EstadoPiscina, TurbiededadPiscina } from '../../../types'
 
 interface Props {
@@ -71,7 +72,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
 
   async function guardar() {
     if (!form.piscina.trim()) {
-      Swal.fire('Faltan datos', 'El nombre de la piscina es obligatorio', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'El nombre de la piscina es obligatorio' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('control_piscina').insert({

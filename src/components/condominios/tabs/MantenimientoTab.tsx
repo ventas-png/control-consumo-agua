@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -118,7 +119,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function handleGuardar() {
-    if (!form.titulo.trim()) { Swal.fire('Error', 'Ingrese el título del ticket.', 'error'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título del ticket.' }); return }
     setSaving(true)
     const { error } = await supabase.from('tickets_mantenimiento').insert({
       company_id: companyId,
@@ -136,7 +137,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Ticket creado', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Ticket creado', duration: 1500 })
     resetForm()
     onRefresh()
   }

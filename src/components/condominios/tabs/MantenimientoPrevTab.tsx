@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   planes: PlanMantenimiento[]
@@ -69,7 +70,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
   }, [selected])
 
   async function handleSavePlan() {
-    if (!form.equipo.trim()) return Swal.fire('Requerido', 'El equipo/área es obligatorio.', 'warning')
+    if (!form.equipo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El equipo/área es obligatorio.' })
     setSaving(true)
     let proxima = form.proxima_ejecucion
     if (!proxima && form.ultima_ejecucion) {

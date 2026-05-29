@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ProgramacionLimpieza } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   programaciones: ProgramacionLimpieza[]
@@ -71,7 +72,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
   }
 
   const handleSave = async () => {
-    if (!form.area.trim()) return Swal.fire('Campo requerido', 'El área es obligatoria.', 'warning')
+    if (!form.area.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'El área es obligatoria.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

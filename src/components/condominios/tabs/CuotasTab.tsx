@@ -1,5 +1,6 @@
 import { useState, useRef, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
@@ -122,7 +123,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       const text = ev.target?.result as string
       const filas = parsearCSV(text)
       if (filas.length === 0) {
-        Swal.fire('Error', 'El archivo CSV no tiene filas válidas. Verifique el formato.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'El archivo CSV no tiene filas válidas. Verifique el formato.' })
       } else {
         setCsvRows(filas)
       }
@@ -135,7 +136,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     if (!csvRows) return
     const validas = csvRows.filter(r => r.status === 'ok' && r.unidadId && r.concepto && r.monto)
     if (validas.length === 0) {
-      Swal.fire('Sin filas válidas', 'Corrija los errores antes de importar.', 'warning')
+      notify({ variant: 'warning', title: 'Sin filas válidas', text: 'Corrija los errores antes de importar.' })
       return
     }
     const { isConfirmed } = await Swal.fire({
@@ -161,7 +162,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     const { error } = await supabase.from('cuotas_condominio').insert(inserts)
     setImportando(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${validas.length} cuotas importadas`, timer: 1800, showConfirmButton: false })
+    notify({ variant: 'success', title: `${validas.length} cuotas importadas`, duration: 1800 })
     setCsvRows(null)
     onRefresh()
   }
@@ -204,10 +205,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
   async function handleGuardar() {
     if (!form.monto || isNaN(Number(form.monto)) || Number(form.monto) <= 0) {
-      Swal.fire('Error', 'Ingrese un monto válido.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese un monto válido.' }); return
     }
     if (!form.periodo) {
-      Swal.fire('Error', 'Seleccione el período.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Seleccione el período.' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('cuotas_condominio').insert({
@@ -223,7 +224,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Cuota registrada', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Cuota registrada', duration: 1500 })
     resetForm()
     onRefresh()
   }
@@ -325,7 +326,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }).in('id', ids)
 
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${ids.length} cuotas marcadas como pagadas`, text: `Total: ${moneda} ${totalMonto.toFixed(2)}`, timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: `${ids.length} cuotas marcadas como pagadas`, text: `Total: ${moneda} ${totalMonto.toFixed(2)}`, duration: 2000 })
     setSeleccionadas(new Set())
     onRefresh()
   }
@@ -341,7 +342,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     const hoy = new Date().toISOString().slice(0, 10)
     const vencidas = cuotas.filter(c => c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
     if (vencidas.length === 0) {
-      Swal.fire({ icon: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', timer: 2000, showConfirmButton: false })
+      notify({ variant: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', duration: 2000 })
       return
     }
     const { isConfirmed } = await Swal.fire({
@@ -353,7 +354,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     if (!isConfirmed) return
     const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${vencidas.length} cuotas marcadas como morosas`, timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: `${vencidas.length} cuotas marcadas como morosas`, duration: 1500 })
     onRefresh()
   }
 

@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudResidente, TipoSolicitud, EstadoSolicitud, PrioridadSolicitud, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   solicitudes: SolicitudResidente[]
@@ -61,7 +62,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
   const urgentes   = solicitudes.filter(s => s.prioridad === 'urgente' && s.estado !== 'resuelto' && s.estado !== 'rechazado').length
 
   async function handleSave() {
-    if (!form.descripcion.trim()) return Swal.fire('Campo requerido', 'La descripción es obligatoria.', 'warning')
+    if (!form.descripcion.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'La descripción es obligatoria.' })
     setSaving(true)
     const { error } = await supabase.from('solicitudes_residente').insert({
       company_id: companyId, project_id: proyectoId,

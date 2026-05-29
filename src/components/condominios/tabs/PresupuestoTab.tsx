@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PresupuestoCondominio, GastoCondominio, CategoriaGasto } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -74,7 +75,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
   async function handleSave() {
     if (!editCat) return
     const monto = parseFloat(editMonto)
-    if (isNaN(monto) || monto < 0) return Swal.fire('Valor inválido', 'Ingresa un monto válido.', 'warning')
+    if (isNaN(monto) || monto < 0) return notify({ variant: 'warning', title: 'Valor inválido', text: 'Ingresa un monto válido.' })
     setSaving(true)
     const existing = presMap[editCat]
     if (existing) {

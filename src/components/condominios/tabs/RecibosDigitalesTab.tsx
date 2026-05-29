@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ReciboDigital, EstadoReciboDigital, CuotaCondominio, Unidad } from '../../../types'
 import { exportarPDFRecibo, exportarExcel } from '../exportUtils'
 
@@ -62,7 +63,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
 
   async function guardar() {
     if (!form.unidad_id || !form.monto || !form.concepto.trim()) {
-      Swal.fire('Error', 'Unidad, monto y concepto son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Unidad, monto y concepto son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('recibos_digitales').insert({

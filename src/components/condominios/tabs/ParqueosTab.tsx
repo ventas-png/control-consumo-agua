@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ParqueoCondominio, Unidad, TipoParqueo } from '../../../types'
 
@@ -62,7 +63,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleGuardar() {
-    if (!form.numero.trim()) { Swal.fire('Error', 'Ingrese el número de parqueo.', 'error'); return }
+    if (!form.numero.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el número de parqueo.' }); return }
     setSaving(true)
     const data = {
       company_id: companyId, project_id: proyectoId,

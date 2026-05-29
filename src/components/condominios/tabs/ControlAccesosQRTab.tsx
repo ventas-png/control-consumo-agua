@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { Visitante, Unidad } from '../../../types'
 
@@ -52,7 +53,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
 
   function generarQR() {
     if (!form.nombre.trim() || !form.unidadId || !form.validoHasta) {
-      Swal.fire('Campos requeridos', 'Nombre, unidad y fecha de validez son obligatorios.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Nombre, unidad y fecha de validez son obligatorios.' }); return
     }
     const token = generarToken()
     const u = unidades.find(x => x.id === form.unidadId)
@@ -115,7 +116,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     onRefresh()
     setTokenValidar(''); setResultadoValidacion(null)
-    Swal.fire('Entrada registrada', `${resultadoValidacion.visitante.nombre} ingresó a ${resultadoValidacion.visitante.unidad_nombre}`, 'success')
+    notify({ variant: 'success', title: 'Entrada registrada', text: `${resultadoValidacion.visitante.nombre} ingresó a ${resultadoValidacion.visitante.unidad_nombre}` })
   }
 
   async function registrarSalida(v: Visitante) {

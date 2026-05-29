@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
@@ -177,7 +178,7 @@ export function SeguridadTab({
   }
 
   async function registrarNovedad() {
-    if (!novedadForm.descripcion.trim()) { Swal.fire('Error', 'Ingrese la descripción.', 'error'); return }
+    if (!novedadForm.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese la descripción.' }); return }
     setSaving(true)
     const { error } = await supabase.from('novedades_seguridad').insert({
       company_id: companyId, project_id: proyectoId,
@@ -190,7 +191,7 @@ export function SeguridadTab({
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Novedad registrada', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Novedad registrada', duration: 1400 })
     setNovedadForm({ tipo: 'observacion', descripcion: '', ubicacion: '', prioridad: 'normal', ronda_id: '' })
     setFotosNovedadForm([])
     setShowNovedadForm(false); onRefresh()
@@ -300,8 +301,8 @@ export function SeguridadTab({
   }
 
   async function handleRegistrarAcceso() {
-    if (!regForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
-    if (!regForm.unidad_id) { Swal.fire('Error', 'Seleccione la unidad a visitar.', 'error'); return }
+    if (!regForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
+    if (!regForm.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setRegSaving(true)
     const { error } = await supabase.from('visitantes').insert({
       company_id: companyId,
@@ -324,7 +325,7 @@ export function SeguridadTab({
       setStrIngresados(prev => new Set([...prev, strReservaId]))
       setStrReservaId(null)
     }
-    Swal.fire({ icon: 'success', title: 'Entrada registrada', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Entrada registrada', duration: 1500 })
     resetAccesos()
     onRefresh()
   }

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { NotaAdmin, CategoriaNota, PrioridadNota } from '../../../types'
 
 interface Props {
@@ -59,7 +60,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
 
   async function guardar() {
     if (!form.titulo.trim() || !form.contenido.trim()) {
-      Swal.fire('Faltan datos', 'Título y contenido son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Título y contenido son obligatorios' }); return
     }
     setSaving(true)
     if (editando && selected) {

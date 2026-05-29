@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   comunicados: ComunicadoCondominio[]
@@ -68,8 +69,8 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   const selected = selectedId ? comunicados.find(c => c.id === selectedId) : null
 
   async function handleSave() {
-    if (!form.titulo.trim() || !form.contenido.trim()) return Swal.fire('Campos requeridos', 'Título y contenido son obligatorios.', 'warning')
-    if (form.destinatario === 'especifico' && !form.unidad_id) return Swal.fire('Requerido', 'Selecciona la unidad destinataria.', 'warning')
+    if (!form.titulo.trim() || !form.contenido.trim()) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y contenido son obligatorios.' })
+    if (form.destinatario === 'especifico' && !form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona la unidad destinataria.' })
     setSaving(true)
     const { error } = await supabase.from('comunicados_condominio').insert({
       company_id: companyId, project_id: proyectoId,
@@ -99,7 +100,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
       publicado_por: userId, activo: true,
     })
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Publicado en el portal!', text: 'Los residentes ya pueden verlo.', timer: 1800, showConfirmButton: false })
+    notify({ variant: 'success', title: '¡Publicado en el portal!', text: 'Los residentes ya pueden verlo.', duration: 1800 })
     onRefresh()
   }
 

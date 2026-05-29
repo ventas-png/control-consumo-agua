@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   votaciones: Votacion[]
@@ -57,8 +58,8 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   }, [selected])
 
   async function handleSave() {
-    if (!form.titulo.trim()) return Swal.fire('Requerido', 'El título es obligatorio.', 'warning')
-    if (form.opciones.some(o => !o.texto.trim())) return Swal.fire('Requerido', 'Completa todas las opciones.', 'warning')
+    if (!form.titulo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El título es obligatorio.' })
+    if (form.opciones.some(o => !o.texto.trim())) return notify({ variant: 'warning', title: 'Requerido', text: 'Completa todas las opciones.' })
     setSaving(true)
     const { error } = await supabase.from('votaciones').insert({
       company_id: companyId, project_id: proyectoId,
@@ -76,8 +77,8 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   }
 
   async function handleVotar() {
-    if (!selected || !selUnidad || !selOpcion) return Swal.fire('Requerido', 'Selecciona unidad y opción.', 'warning')
-    if (votos.some(v => v.unidad_id === selUnidad)) return Swal.fire('Ya votó', 'Esta unidad ya registró su voto.', 'info')
+    if (!selected || !selUnidad || !selOpcion) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona unidad y opción.' })
+    if (votos.some(v => v.unidad_id === selUnidad)) return notify({ variant: 'info', title: 'Ya votó', text: 'Esta unidad ya registró su voto.' })
     setRegistering(true)
     const { error } = await supabase.from('votos').insert({ company_id: companyId, votacion_id: selected, unidad_id: selUnidad, opcion_id: selOpcion })
     setRegistering(false)

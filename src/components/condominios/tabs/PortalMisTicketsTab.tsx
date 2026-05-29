@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento } from '../../../types'
 
@@ -42,7 +43,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
   const abiertos = tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length
 
   async function enviarSolicitud() {
-    if (!form.titulo.trim()) { Swal.fire('Error', 'Ingrese el título de la solicitud.', 'error'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título de la solicitud.' }); return }
     setSaving(true)
     const { error } = await supabase.from('tickets_mantenimiento').insert({
       company_id: companyId, project_id: proyectoId,
@@ -52,7 +53,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'El equipo de mantenimiento la atenderá pronto.', timer: 2000, showConfirmButton: false })
+    notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'El equipo de mantenimiento la atenderá pronto.', duration: 2000 })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 

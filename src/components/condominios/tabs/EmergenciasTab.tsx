@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ContactoEmergencia, TipoContactoEmergencia } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ImportEmergenciasModal } from '../ImportEmergenciasModal'
 
 interface Props {
@@ -57,8 +58,8 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.nombre?.trim()) return Swal.fire('Campo requerido', 'Ingresa el nombre.', 'warning')
-    if (!form.telefono?.trim()) return Swal.fire('Campo requerido', 'Ingresa el teléfono.', 'warning')
+    if (!form.nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre.' })
+    if (!form.telefono?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el teléfono.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

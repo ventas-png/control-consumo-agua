@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
 interface Props {
@@ -75,7 +76,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
 
   async function guardar() {
     if (!form.identificador.trim() || !form.ubicacion.trim()) {
-      Swal.fire('Faltan datos', 'Identificador y ubicación son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Identificador y ubicación son obligatorios' }); return
     }
     setSaving(true)
     const { error } = await supabase.from('control_sistema_incendio').insert({

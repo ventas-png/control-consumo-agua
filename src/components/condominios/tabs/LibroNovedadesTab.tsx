@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { LibroNovedad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   novedades: LibroNovedad[]
@@ -46,7 +47,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
   async function handleSave() {
     if (!form.responsable.trim() || !form.novedades.trim())
-      return Swal.fire('Requerido', 'Responsable y novedades son obligatorios.', 'warning')
+      return notify({ variant: 'warning', title: 'Requerido', text: 'Responsable y novedades son obligatorios.' })
     setSaving(true)
     const { error } = await supabase.from('libro_novedades').insert({
       company_id: companyId, project_id: proyectoId,

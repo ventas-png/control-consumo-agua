@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { AgendaItem, TipoAgenda, EstadoAgenda } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   agenda: AgendaItem[]
@@ -85,8 +86,8 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   }
 
   async function handleSave() {
-    if (!form.titulo?.trim()) return Swal.fire('Campo requerido', 'Ingresa el título.', 'warning')
-    if (!form.fecha) return Swal.fire('Campo requerido', 'Ingresa la fecha.', 'warning')
+    if (!form.titulo?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el título.' })
+    if (!form.fecha) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la fecha.' })
     setSaving(true)
     const payload = {
       company_id: companyId,

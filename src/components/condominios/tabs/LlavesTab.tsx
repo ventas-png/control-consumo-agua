@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { LlaveCondominio, EstadoLlave, TipoLlave, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   llaves: LlaveCondominio[]
@@ -59,7 +60,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
 
   async function handleSave() {
-    if (!form.descripcion?.trim()) return Swal.fire('Campo requerido', 'Ingresa la descripción.', 'warning')
+    if (!form.descripcion?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa la descripción.' })
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,

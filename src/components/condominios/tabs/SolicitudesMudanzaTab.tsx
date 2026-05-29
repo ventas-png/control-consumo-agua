@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { SecureImage } from '../../shared/SecureImage'
 import { useSignedUrl } from '../../../lib/storageUrls'
@@ -106,7 +107,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
   async function guardarTerminos() {
     if (!terminosText.trim()) {
-      Swal.fire('Error', 'El texto de los términos no puede estar vacío.', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'El texto de los términos no puede estar vacío.' })
       return
     }
     setSavingTerminos(true)
@@ -124,7 +125,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       setSavingTerminos(false)
       if (error) { Swal.fire('Error', error.message, 'error'); return }
     }
-    Swal.fire({ icon: 'success', title: 'Términos guardados', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Términos guardados', duration: 1400 })
     await cargarTerminos()
   }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { AreaCondominio, RutaRonda, PuntoControlRuta } from '../../../types'
 
@@ -55,7 +56,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function saveArea() {
-    if (!areaForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del área.', 'error'); return }
+    if (!areaForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del área.' }); return }
     setSaving(true)
     if (editAreaId) {
       const { error } = await supabase.from('areas_condominio').update({
@@ -93,7 +94,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function saveRuta() {
-    if (!rutaForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre de la ruta.', 'error'); return }
+    if (!rutaForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre de la ruta.' }); return }
     setSaving(true)
     if (editRutaId) {
       const { error } = await supabase.from('rutas_ronda').update({

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
 
 interface Props {
@@ -70,7 +71,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   })
 
   async function guardar() {
-    if (!form.titulo.trim()) { Swal.fire('Faltan datos', 'Título obligatorio', 'warning'); return }
+    if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Título obligatorio' }); return }
     setSaving(true)
     const { error } = await supabase.from('tareas_condominio').insert({
       company_id: companyId, project_id: proyectoId,

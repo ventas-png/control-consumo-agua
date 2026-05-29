@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConsumoEnergiaArea } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   consumos: ConsumoEnergiaArea[]
@@ -60,7 +61,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
   }
 
   const handleSave = async () => {
-    if (!form.area.trim() || !form.lectura_actual) return Swal.fire('Campos requeridos', 'Área y lectura actual son obligatorias.', 'warning')
+    if (!form.area.trim() || !form.lectura_actual) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Área y lectura actual son obligatorias.' })
     setSaving(true)
     const la = form.lectura_anterior ? parseFloat(form.lectura_anterior) : null
     const lac = parseFloat(form.lectura_actual)

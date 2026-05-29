@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { AccesoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   accesos: AccesoResidente[]
@@ -41,9 +42,9 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
   }
 
   async function handleSave() {
-    if (!form.unidad_id) return Swal.fire('Requerido', 'Seleccione una unidad.', 'warning')
-    if (!form.identificador.trim()) return Swal.fire('Requerido', 'El identificador es obligatorio.', 'warning')
-    if (!form.titular.trim()) return Swal.fire('Requerido', 'El titular es obligatorio.', 'warning')
+    if (!form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
+    if (!form.identificador.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El identificador es obligatorio.' })
+    if (!form.titular.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El titular es obligatorio.' })
     setSaving(true)
     const payload = {
       unidad_id: form.unidad_id, tipo: form.tipo, identificador: form.identificador.trim(),

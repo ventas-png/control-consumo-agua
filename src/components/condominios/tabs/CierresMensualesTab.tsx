@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { exportarPDFTabla } from '../exportUtils'
 
 interface Props {
@@ -44,8 +45,8 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   const preview = previewing ? calcCierre(periodoNuevo, cuotas, gastos) : null
 
   async function handleGenerar() {
-    if (!periodoNuevo) return Swal.fire('Requerido', 'Selecciona el período a cerrar.', 'warning')
-    if (periodosCerrados.has(periodoNuevo)) return Swal.fire('Ya existe', `El período ${periodoNuevo} ya tiene cierre.`, 'info')
+    if (!periodoNuevo) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona el período a cerrar.' })
+    if (periodosCerrados.has(periodoNuevo)) return notify({ variant: 'info', title: 'Ya existe', text: `El período ${periodoNuevo} ya tiene cierre.` })
     const calc = calcCierre(periodoNuevo, cuotas, gastos)
     const r = await Swal.fire({
       title: `Generar cierre ${periodoNuevo}`,

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { ConvenioCuotaCond, EstadoConvenioCuota, Unidad } from '../../../types'
 
 interface Props {
@@ -47,7 +48,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
 
   async function guardar() {
     if (!form.unidad_id || !form.descripcion.trim() || !form.monto_total || !form.num_cuotas) {
-      Swal.fire('Error', 'Unidad, descripción, monto y número de cuotas son obligatorios', 'warning'); return
+      notify({ variant: 'warning', title: 'Error', text: 'Unidad, descripción, monto y número de cuotas son obligatorios' }); return
     }
     const monto_total = parseFloat(form.monto_total)
     const num_cuotas = parseInt(form.num_cuotas)
