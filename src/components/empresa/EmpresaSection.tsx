@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
@@ -141,9 +142,9 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!formValues) return
     const { error } = await supabase.from('companies').update(formValues).eq('id', empresa.id)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       void cargar()
     }
   }
@@ -159,7 +160,7 @@ export function EmpresaSection({ currentUser }: Props) {
       .from('company-logos')
       .upload(path, file, { contentType: file.type })
     if (uploadError) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo subir el logo.' })
       return
     }
     // Guardamos el path bare; SecureImage firma en cada render.
@@ -318,9 +319,9 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!formValues) return
     const { error } = await supabase.from('projects').update(formValues).eq('id', proyecto.id)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Proyecto actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Proyecto actualizado', duration: 1200 })
       void cargar()
     }
   }
@@ -361,7 +362,7 @@ export function EmpresaSection({ currentUser }: Props) {
   async function aplicarCambioEstado(id: string, estado: Proyecto['estado']) {
     const { error } = await supabase.from('projects').update({ estado }).eq('id', id)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     } else {
       void cargar()
     }
@@ -374,7 +375,7 @@ export function EmpresaSection({ currentUser }: Props) {
       .from('project-logos')
       .upload(path, file, { contentType: file.type })
     if (uploadError) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo del proyecto.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo subir el logo del proyecto.' })
       return
     }
     await supabase.from('projects').update({ logo_url: path }).eq('id', proyectoId)
@@ -384,11 +385,11 @@ export function EmpresaSection({ currentUser }: Props) {
   async function crearProyecto() {
     if (!empresa) return
     if (proyectos.length >= effectiveMaxProjects) {
-      void Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'Límite alcanzado',
         text: `Tu plan permite máximo ${effectiveMaxProjects} proyecto(s). Actualízalo desde Perfil → Mi plan para agregar más.`,
-        confirmButtonText: 'Entendido',
+        duration: 5000,
       })
       return
     }
@@ -412,9 +413,9 @@ export function EmpresaSection({ currentUser }: Props) {
     })
 
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear el proyecto.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo crear el proyecto.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Proyecto creado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Proyecto creado', duration: 1500 })
       void cargar()
     }
   }
@@ -530,7 +531,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
       if (!res.ok) {
         const err = await res.json() as { error?: string }
-        void Swal.fire({ icon: 'error', title: 'Error al crear usuario', text: err.error ?? 'No se pudo crear el usuario.' })
+        notify({ variant: 'error', title: 'Error al crear usuario', text: err.error ?? 'No se pudo crear el usuario.' })
         return
       }
 
@@ -556,11 +557,11 @@ export function EmpresaSection({ currentUser }: Props) {
         await supabase.from('user_roles').insert(newAssignments)
       }
 
-      void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Usuario creado', duration: 1500 })
       void cargar()
     } catch (err) {
       console.error('create-user request failed:', err)
-      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de creación de usuarios. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
+      notify({ variant: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de creación de usuarios. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
     }
   }
 
@@ -612,15 +613,15 @@ export function EmpresaSection({ currentUser }: Props) {
 
       if (!res.ok) {
         const err = await res.json() as { error?: string }
-        void Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: err.error ?? 'No se pudo eliminar el usuario.' })
+        notify({ variant: 'error', title: 'No se pudo eliminar', text: err.error ?? 'No se pudo eliminar el usuario.' })
         return
       }
 
-      void Swal.fire({ icon: 'success', title: 'Usuario eliminado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Usuario eliminado', duration: 1500 })
       void cargar()
     } catch (err) {
       console.error('delete-user request failed:', err)
-      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de eliminación. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
+      notify({ variant: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de eliminación. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
     }
   }
 

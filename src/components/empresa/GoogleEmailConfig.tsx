@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
+import { confirm, notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 
 // Template metadata displayed in the UI
@@ -121,27 +122,26 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       })
       const data = await res.json() as { url?: string; error?: string }
       if (!res.ok || !data.url) {
-        void Swal.fire({ icon: 'error', title: 'Error', text: data.error ?? 'No se pudo iniciar la conexión con Google.' })
+        notify({ variant: 'error', title: 'Error', text: data.error ?? 'No se pudo iniciar la conexión con Google.' })
         return
       }
       // Redirect the current page to Google OAuth
       window.location.href = data.url
     } catch {
-      void Swal.fire({ icon: 'error', title: 'Error de red', text: 'No se pudo conectar con el servidor.' })
+      notify({ variant: 'error', title: 'Error de red', text: 'No se pudo conectar con el servidor.' })
     } finally {
       setConnecting(false)
     }
   }
 
   async function handleDisconnect() {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       icon: 'warning',
       title: '¿Desconectar cuenta de Google?',
       text: 'Los correos dejarán de enviarse desde esta cuenta. Se puede volver a conectar en cualquier momento.',
-      showCancelButton: true,
-      confirmButtonText: 'Desconectar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: 'var(--at-danger)',
+      variant: 'danger',
+      confirmText: 'Desconectar',
+      cancelText: 'Cancelar',
     })
     if (!isConfirmed) return
 
@@ -153,12 +153,12 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     }
     await query
     setConfig(null)
-    void Swal.fire({ icon: 'success', title: 'Desconectado', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Desconectado', duration: 1500 })
   }
 
   async function handleTestEmail() {
     if (!testEmail.trim()) {
-      void Swal.fire({ icon: 'warning', title: 'Ingresa un correo', text: 'Escribe la dirección de correo de prueba.' })
+      notify({ variant: 'warning', title: 'Ingresa un correo', text: 'Escribe la dirección de correo de prueba.' })
       return
     }
     setSendingTest(true)
@@ -177,13 +177,13 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
         },
       })
       if (res.ok) {
-        void Swal.fire({ icon: 'success', title: '¡Correo enviado!', text: `El correo de prueba fue enviado a ${testEmail}.`, timer: 3000, showConfirmButton: false })
+        notify({ variant: 'success', title: '¡Correo enviado!', text: `El correo de prueba fue enviado a ${testEmail}.`, duration: 3000 })
       } else {
         const err = await res.json() as { error?: string }
-        void Swal.fire({ icon: 'error', title: 'Error al enviar', text: err.error ?? 'No se pudo enviar el correo de prueba.' })
+        notify({ variant: 'error', title: 'Error al enviar', text: err.error ?? 'No se pudo enviar el correo de prueba.' })
       }
     } catch {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo conectar con el servidor.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo conectar con el servidor.' })
     } finally {
       setSendingTest(false)
     }
@@ -251,22 +251,21 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       })
     }
 
-    void Swal.fire({ icon: 'success', title: 'Template guardado', timer: 1200, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Template guardado', duration: 1200 })
     void loadConfig()
   }
 
   async function deleteTemplate(templateId: string) {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       icon: 'warning',
       title: '¿Eliminar personalización?',
       text: 'El template volverá al diseño predeterminado del sistema.',
-      showCancelButton: true,
-      confirmButtonText: 'Eliminar',
-      confirmButtonColor: 'var(--at-danger)',
+      variant: 'danger',
+      confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
     await supabase.from('email_templates').delete().eq('id', templateId)
-    void Swal.fire({ icon: 'success', title: 'Eliminado', timer: 1000, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Eliminado', duration: 1000 })
     void loadConfig()
   }
 
@@ -282,10 +281,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       .eq('id', config.id)
     setSavingMeta(false)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar la configuración.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la configuración.' })
       return
     }
-    void Swal.fire({ icon: 'success', title: 'Guardado', timer: 1200, showConfirmButton: false })
+    notify({ variant: 'success', title: 'Guardado', duration: 1200 })
     void loadConfig()
   }
 
