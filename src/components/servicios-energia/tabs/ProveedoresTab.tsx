@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -34,12 +35,12 @@ export default function ProveedoresTab({
 
   const handleCreate = async () => {
     if (!companyId) {
-      Swal.fire('Error', 'No se pudo identificar la empresa del usuario', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo identificar la empresa del usuario' })
       return
     }
 
     if (proyectos.length === 0) {
-      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear un proveedor', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos un proyecto antes de crear un proveedor' })
       return
     }
 
@@ -105,9 +106,9 @@ export default function ProveedoresTab({
       const { data, error } = await supabase.from('proveedores_energia').insert([formValues]).select().single()
       if (error) throw error
       onProveedorAdded(data as ProveedorEnergia)
-      Swal.fire({ icon: 'success', title: 'Proveedor creado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Proveedor creado', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear el proveedor', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear el proveedor' })
     }
   }
 
@@ -126,9 +127,9 @@ export default function ProveedoresTab({
       if (error) throw error
       onProveedorUpdated(editingId, editFormData)
       setEditingId(null)
-      Swal.fire({ icon: 'success', title: 'Proveedor actualizado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Proveedor actualizado', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar el proveedor', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo actualizar el proveedor' })
     }
   }
 
@@ -147,9 +148,9 @@ export default function ProveedoresTab({
       const { error } = await supabase.from('proveedores_energia').delete().eq('id', id)
       if (error) throw error
       onProveedorDeleted(id)
-      Swal.fire({ icon: 'success', title: 'Proveedor eliminado', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Proveedor eliminado', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar el proveedor', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar el proveedor' })
     }
   }
 

@@ -184,7 +184,7 @@ export function ContadoresSection({
       errors.push('Lectura inicial debe ser un número mayor o igual a 0')
 
     if (errors.length > 0) {
-      Swal.fire('Error de validación', errors.join('<br>'), 'error')
+      notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
       return
     }
 
@@ -237,7 +237,7 @@ export function ContadoresSection({
         cancelForm()
         notify({ variant: 'success', title: 'Contador actualizado', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo actualizar el contador.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar el contador.' })
       }
     } else {
       // Derive project_id and company_id from the selected unidad, not from the current user.
@@ -290,7 +290,7 @@ export function ContadoresSection({
         cancelForm()
         notify({ variant: 'success', title: 'Contador creado', duration: 1800 })
       } else {
-        Swal.fire('Error', error?.message ?? 'No se pudo guardar el contador.', 'error')
+        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo guardar el contador.' })
       }
     }
 
@@ -328,7 +328,7 @@ export function ContadoresSection({
       onContadorDeleted(c.id)
       notify({ variant: 'success', title: 'Contador eliminado', duration: 1500 })
     } else {
-      Swal.fire('Error', error.message ?? 'No se pudo eliminar el contador.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar el contador.' })
     }
   }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
@@ -19,7 +19,7 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
 
   async function handleSubmit() {
     if (!subject.trim() || !firstMessage.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Escribe un asunto y el primer mensaje.' })
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Escribe un asunto y el primer mensaje.' })
       return
     }
     await onConfirm({

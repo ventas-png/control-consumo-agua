@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 
@@ -89,14 +90,14 @@ export function SuperAdminSection() {
   async function actualizarMaxProyectos(empresaId: string) {
     const nuevoMax = editingMax[empresaId]
     if (nuevoMax === undefined || nuevoMax < 1) {
-      void Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 proyecto.' })
+      notify({ variant: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 proyecto.' })
       return
     }
     const { error } = await supabase.from('companies').update({ max_projects: nuevoMax }).eq('id', empresaId)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el límite.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       setEditingMax(prev => { const n = { ...prev }; delete n[empresaId]; return n })
       void cargar()
     }
@@ -106,7 +107,7 @@ export function SuperAdminSection() {
     const nuevoMax = editingMaxUnits[empresaId]
     const empresa = empresas.find(e => e.id === empresaId)
     if (nuevoMax === undefined || nuevoMax < 1) {
-      void Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 unidad.' })
+      notify({ variant: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 unidad.' })
       return
     }
     if (empresa && nuevoMax < (empresa.unit_count ?? 0)) {
@@ -118,9 +119,9 @@ export function SuperAdminSection() {
     }
     const { error } = await supabase.from('companies').update({ max_units: nuevoMax }).eq('id', empresaId)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el límite de unidades.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite de unidades.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       setEditingMaxUnits(prev => { const n = { ...prev }; delete n[empresaId]; return n })
       void cargar()
     }
@@ -129,7 +130,7 @@ export function SuperAdminSection() {
   async function toggleServicio(empresaId: string, campo: 'servicio_agua' | 'servicio_condominios', nuevoValor: boolean) {
     const { error } = await supabase.from('companies').update({ [campo]: nuevoValor }).eq('id', empresaId)
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
     } else {
       setEmpresas(prev => prev.map(e => e.id === empresaId ? { ...e, [campo]: nuevoValor } : e))
     }
@@ -178,9 +179,9 @@ export function SuperAdminSection() {
       .eq('id', empresa.id)
 
     if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       void cargar()
     }
   }
@@ -251,7 +252,7 @@ export function SuperAdminSection() {
       .single()
 
     if (empresaError || !nuevaEmpresa) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la empresa.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la empresa.' })
       return
     }
 
@@ -276,9 +277,9 @@ export function SuperAdminSection() {
 
     if (!res.ok) {
       const err = await res.json() as { error?: string }
-      void Swal.fire({ icon: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
+      notify({ variant: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
     } else {
-      void Swal.fire({ icon: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, timer: 2000, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, duration: 2000 })
       void cargar()
     }
   }

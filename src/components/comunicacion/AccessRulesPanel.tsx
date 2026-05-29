@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS, ROLE_LABELS } from './conversationConstants'
 import type { ConversationAccessRule, ConversationCategory, ConversationServiceType } from '../../types'
@@ -37,7 +37,7 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
         categories: existing?.categories ?? null,
       })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error al guardar', text: 'No se pudo actualizar el permiso. Verifique sus permisos de acceso.' })
+      notify({ variant: 'error', title: 'Error al guardar', text: 'No se pudo actualizar el permiso. Verifique sus permisos de acceso.' })
     } finally {
       setSaving(null)
     }
@@ -68,7 +68,7 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
         categories: next,
       })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error al guardar', text: 'No se pudo actualizar la categoría. Verifique sus permisos de acceso.' })
+      notify({ variant: 'error', title: 'Error al guardar', text: 'No se pudo actualizar la categoría. Verifique sus permisos de acceso.' })
     } finally {
       setSaving(null)
     }

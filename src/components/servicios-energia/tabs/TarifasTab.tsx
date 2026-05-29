@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -38,17 +39,17 @@ export default function TarifasTab({
 
   const handleCreate = async () => {
     if (!companyId) {
-      Swal.fire('Error', 'No se pudo identificar la empresa del usuario', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo identificar la empresa del usuario' })
       return
     }
 
     if (proyectos.length === 0) {
-      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear una tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos un proyecto antes de crear una tarifa' })
       return
     }
 
     if (proveedoresEnergia.length === 0) {
-      Swal.fire('Error', 'Debe crear al menos un proveedor antes de crear una tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos un proveedor antes de crear una tarifa' })
       return
     }
 
@@ -150,9 +151,9 @@ export default function TarifasTab({
       const { data, error } = await supabase.from('tarifas_energia').insert([formValues]).select().single()
       if (error) throw error
       onTarifaAdded(data as TarifaEnergia)
-      Swal.fire({ icon: 'success', title: 'Tarifa creada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Tarifa creada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear la tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear la tarifa' })
     }
   }
 
@@ -171,9 +172,9 @@ export default function TarifasTab({
       if (error) throw error
       onTarifaUpdated(editingId, editFormData)
       setEditingId(null)
-      Swal.fire({ icon: 'success', title: 'Tarifa actualizada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Tarifa actualizada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar la tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo actualizar la tarifa' })
     }
   }
 
@@ -192,9 +193,9 @@ export default function TarifasTab({
       const { error } = await supabase.from('tarifas_energia').delete().eq('id', id)
       if (error) throw error
       onTarifaDeleted(id)
-      Swal.fire({ icon: 'success', title: 'Tarifa eliminada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Tarifa eliminada', duration: 1500 })
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la tarifa' })
     }
   }
 

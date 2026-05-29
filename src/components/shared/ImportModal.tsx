@@ -1,5 +1,5 @@
 import { useState, useRef, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
 // ── Tipos públicos ────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export function ImportModal<T>({
       rows: [headers, ...exampleRows],
       colWidths: columns.map(c => c.width ?? 14),
     }]).catch(err =>
-      Swal.fire('Error', err?.message ?? 'No se pudo generar la plantilla', 'error')
+      notify({ variant: 'error', title: 'Error', text: err?.message ?? 'No se pudo generar la plantilla' })
     )
   }
 
@@ -138,14 +138,14 @@ export function ImportModal<T>({
       rows: [headers, ...dataRows],
       colWidths: [...columns.map(c => c.width ?? 14), 50],
     }]).catch(err =>
-      Swal.fire('Error', err?.message ?? 'No se pudo exportar', 'error')
+      notify({ variant: 'error', title: 'Error', text: err?.message ?? 'No se pudo exportar' })
     )
   }
 
   // ── Procesamiento de archivo subido ─────────────────────────────────────
   function processFile(file: File) {
     if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      void Swal.fire('Formato inválido', 'Solo se aceptan archivos .xlsx, .xls o .csv', 'error')
+      notify({ variant: 'error', title: 'Formato inválido', text: 'Solo se aceptan archivos .xlsx, .xls o .csv' })
       return
     }
     const reader = new FileReader()
@@ -153,7 +153,7 @@ export function ImportModal<T>({
       try {
         const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
-          void Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
+          notify({ variant: 'warning', title: 'Archivo vacío', text: 'El archivo no contiene filas de datos.' })
           return
         }
         const parsed: InternalRow<T>[] = raw.map((row, i) => {
@@ -170,7 +170,7 @@ export function ImportModal<T>({
         setRows(parsed)
         setStep('preview')
       } catch {
-        void Swal.fire('Error', 'No se pudo leer el archivo. Verifique que sea un Excel válido.', 'error')
+        notify({ variant: 'error', title: 'Error', text: 'No se pudo leer el archivo. Verifique que sea un Excel válido.' })
       }
     }
     reader.readAsArrayBuffer(file)
@@ -197,7 +197,7 @@ export function ImportModal<T>({
       const batch = validRows.slice(i, i + batchSize)
       const { ok, error } = await onInsertBatch(batch)
       if (error) {
-        void Swal.fire('Error en inserción', error, 'error')
+        notify({ variant: 'error', title: 'Error en inserción', text: error })
         setStep('preview')
         return
       }

@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../types'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { calcularFacturaEnergia } from '../../lib/businessEnergia'
 import { sanitizeInput } from '../../lib/validation'
 
@@ -38,13 +38,13 @@ export default function FacturaEnergiaModal({
 
   const handleCalculateFromTariff = () => {
     if (!selectedFuente?.tarifa_id) {
-      Swal.fire('Error', 'La fuente debe tener una tarifa asignada', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'La fuente debe tener una tarifa asignada' })
       return
     }
 
     const tarifa = tarifasEnergia.find(t => t.id === selectedFuente.tarifa_id)
     if (!tarifa) {
-      Swal.fire('Error', 'No se encontró la tarifa', 'error')
+      notify({ variant: 'error', title: 'Error', text: 'No se encontró la tarifa' })
       return
     }
 
@@ -61,7 +61,7 @@ export default function FacturaEnergiaModal({
       moneda: tarifa.moneda,
     }))
 
-    Swal.fire('Éxito', 'Montos calculados desde la tarifa', 'success')
+    notify({ variant: 'success', title: 'Éxito', text: 'Montos calculados desde la tarifa' })
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -96,7 +96,7 @@ export default function FacturaEnergiaModal({
       await onSave(dataToSave)
       onClose()
     } catch (err: unknown) {
-      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo guardar la factura', 'error')
+      notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo guardar la factura' })
     } finally {
       setLoading(false)
     }

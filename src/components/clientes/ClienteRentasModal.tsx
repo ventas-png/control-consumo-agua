@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type {
   Cliente, Unidad, ContratoArrendamiento, ReservaSTR,
@@ -136,20 +137,20 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
   async function handleGuardarContrato() {
     if (!contratoForm.arrendatario_nombre.trim()) {
-      Swal.fire('Error', 'Ingrese el nombre del arrendatario.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del arrendatario.' }); return
     }
     if (!contratoForm.unidad_id) {
-      Swal.fire('Error', 'Seleccione la unidad.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad.' }); return
     }
     if (!contratoForm.monto_renta || isNaN(Number(contratoForm.monto_renta))) {
-      Swal.fire('Error', 'Ingrese el monto de renta.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese el monto de renta.' }); return
     }
     if (!contratoForm.fecha_inicio) {
-      Swal.fire('Error', 'Ingrese la fecha de inicio.', 'error'); return
+      notify({ variant: 'error', title: 'Error', text: 'Ingrese la fecha de inicio.' }); return
     }
 
     const unidad = clienteUnidades.find(u => u.id === contratoForm.unidad_id)
-    if (!unidad) { Swal.fire('Error', 'Unidad no encontrada.', 'error'); return }
+    if (!unidad) { notify({ variant: 'error', title: 'Error', text: 'Unidad no encontrada.' }); return }
 
     setSavingContrato(true)
     const payload = {
@@ -178,7 +179,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
     setSavingContrato(false)
     if (error) {
-      Swal.fire('Error', error.message ?? 'No se pudo guardar el contrato.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar el contrato.' })
     } else {
       Swal.fire({ icon: 'success', title: editingContratoId ? 'Contrato actualizado' : 'Contrato creado', timer: 1800, showConfirmButton: false })
       cancelContratoForm()
@@ -200,7 +201,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     if (!result.isConfirmed) return
     const { error } = await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
     if (error) {
-      Swal.fire('Error', error.message, 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message })
     } else {
       setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
     }
@@ -253,17 +254,17 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
   async function handleGuardarSTR() {
     if (!strForm.huesped_nombre.trim()) {
-      Swal.fire('Campo requerido', 'Ingresa el nombre del huésped.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre del huésped.' }); return
     }
     if (!strForm.fecha_entrada || !strForm.fecha_salida) {
-      Swal.fire('Campo requerido', 'Ingresa las fechas de entrada y salida.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa las fechas de entrada y salida.' }); return
     }
     if (!strForm.unidad_id) {
-      Swal.fire('Campo requerido', 'Selecciona la unidad.', 'warning'); return
+      notify({ variant: 'warning', title: 'Campo requerido', text: 'Selecciona la unidad.' }); return
     }
 
     const unidad = clienteUnidades.find(u => u.id === strForm.unidad_id)
-    if (!unidad) { Swal.fire('Error', 'Unidad no encontrada.', 'error'); return }
+    if (!unidad) { notify({ variant: 'error', title: 'Error', text: 'Unidad no encontrada.' }); return }
 
     setSavingSTR(true)
     const payload = {
@@ -293,7 +294,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
     setSavingSTR(false)
     if (error) {
-      Swal.fire('Error', error.message ?? 'No se pudo guardar la reserva.', 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar la reserva.' })
     } else {
       Swal.fire({ icon: 'success', title: editingSTRId ? 'Reserva actualizada' : 'Reserva creada', timer: 1800, showConfirmButton: false })
       cancelSTRForm()
@@ -315,7 +316,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     if (!result.isConfirmed) return
     const { error } = await supabase.from('reservas_str').delete().eq('id', r.id)
     if (error) {
-      Swal.fire('Error', error.message, 'error')
+      notify({ variant: 'error', title: 'Error', text: error.message })
     } else {
       setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
     }

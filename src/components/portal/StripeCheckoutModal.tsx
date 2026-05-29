@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import type { Registro, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
@@ -22,7 +23,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
   async function handlePay() {
     const montoNum = parseFloat(monto) || 0
     if (montoNum <= 0 || montoNum > saldo) {
-      void Swal.fire({ icon: 'warning', title: 'Monto inválido' })
+      notify({ variant: 'warning', title: 'Monto inválido' })
       return
     }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
 import { sanitizeInput } from '../../lib/validation'
 import { supabase } from '../../lib/supabase'
@@ -166,7 +167,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         setView('detail')
       }
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la conversación.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la conversación.' })
     }
   }
 
@@ -183,7 +184,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         setView('detail')
       }
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la discusión.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la discusión.' })
     }
   }
 
@@ -260,7 +261,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         assigned_name: currentUser.name,
       })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
     }
   }
 
@@ -272,7 +273,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         assigned_name: null,
       })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo desasignar.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo desasignar.' })
     }
   }
 
@@ -294,7 +295,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       })
       setShowAssignModal(false)
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
     }
   }
 
@@ -302,7 +303,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     try {
       await removeAssignment(assignmentId)
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo quitar la asignación.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo quitar la asignación.' })
     }
   }
 
@@ -314,9 +315,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         patch.closed_at = new Date().toISOString()
       }
       await updateConversation(activeConversationId, patch)
-      Swal.fire({ icon: 'success', title: 'Estado actualizado', timer: 1200, showConfirmButton: false })
+      notify({ variant: 'success', title: 'Estado actualizado', duration: 1200 })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     }
   }
 
@@ -858,7 +859,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                             e.target.value = ''
                             if (!file) return
                             if (file.size > 10 * 1024 * 1024) {
-                              Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
+                              notify({ variant: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
                               return
                             }
                             setPendingFile(file)
