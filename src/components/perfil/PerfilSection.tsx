@@ -315,6 +315,21 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [billingActionLoading, setBillingActionLoading] = useState(false)
   const [billingFb, setBillingFb] = useState<FeedbackState>(null)
 
+  // Pricing por uso (F2.14): RPC calcula total mensual basado en uso real
+  // (proyectos creados, unidades en primary vs extras). Devuelve desglose
+  // para que la UI muestre lo mismo que la pricing card del landing.
+  type UsageBreakdown = {
+    total_cents: number
+    base_activation_cents: number
+    extra_projects_subtotal: number
+    primary_units_subtotal: number
+    extra_units_subtotal: number
+    extra_projects_count: number
+    primary_units_count: number
+    extra_units_count: number
+  }
+  const [usageBreakdown, setUsageBreakdown] = useState<UsageBreakdown | null>(null)
+
   useEffect(() => {
     if (!currentUser.company_id) { setSubLoading(false); return }
     let alive = true
@@ -336,6 +351,13 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       .order('sort_order', { ascending: true })
       .then(({ data }) => {
         if (alive && data) setAvailablePlans(data as typeof availablePlans)
+      })
+    void supabase
+      .rpc('calculate_monthly_total_cents', { p_company_id: currentUser.company_id })
+      .then(({ data }) => {
+        if (!alive || !data) return
+        const row = (data as UsageBreakdown[])?.[0]
+        if (row) setUsageBreakdown(row)
       })
     return () => { alive = false }
   }, [currentUser.company_id])
@@ -705,12 +727,50 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                   {subscription.plan && (
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--at-ink)' }}>
-                        ${(subscription.plan.price_monthly_cents / 100).toFixed(2)}
+                        ${((usageBreakdown?.total_cents ?? subscription.plan.price_monthly_cents) / 100).toFixed(2)}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>USD / mes</div>
                     </div>
                   )}
                 </div>
+
+                {/* Desglose del cobro por uso (F2.14): mismo formato que la
+                    pricing card del landing. Solo se muestra cuando hay uso
+                    real (proyectos extra o unidades) para no contaminar el
+                    caso comun "trial empty workspace". */}
+                {usageBreakdown && usageBreakdown.total_cents > usageBreakdown.base_activation_cents && (
+                  <div style={{ marginTop: '14px', padding: '12px 14px', background: 'var(--at-surface-2)', borderRadius: '10px', fontSize: '12px' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>Desglose del mes</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--at-ink-3)' }}>Activación del plan</span>
+                        <span style={{ color: 'var(--at-ink)', fontWeight: 600 }}>${(usageBreakdown.base_activation_cents / 100).toFixed(2)}</span>
+                      </div>
+                      {usageBreakdown.primary_units_count > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--at-ink-3)' }}>{usageBreakdown.primary_units_count} unidad{usageBreakdown.primary_units_count === 1 ? '' : 'es'} (proyecto principal)</span>
+                          <span style={{ color: 'var(--at-ink)', fontWeight: 600 }}>${(usageBreakdown.primary_units_subtotal / 100).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {usageBreakdown.extra_projects_count > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--at-ink-3)' }}>{usageBreakdown.extra_projects_count} proyecto{usageBreakdown.extra_projects_count === 1 ? '' : 's'} adicional{usageBreakdown.extra_projects_count === 1 ? '' : 'es'}</span>
+                          <span style={{ color: 'var(--at-ink)', fontWeight: 600 }}>${(usageBreakdown.extra_projects_subtotal / 100).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {usageBreakdown.extra_units_count > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--at-ink-3)' }}>{usageBreakdown.extra_units_count} unidad{usageBreakdown.extra_units_count === 1 ? '' : 'es'} en proyectos adicionales</span>
+                          <span style={{ color: 'var(--at-ink)', fontWeight: 600 }}>${(usageBreakdown.extra_units_subtotal / 100).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--at-line)' }}>
+                        <span style={{ color: 'var(--at-ink)', fontWeight: 700 }}>Total mensual</span>
+                        <span style={{ color: 'var(--at-ink)', fontWeight: 800 }}>${(usageBreakdown.total_cents / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {subscription.plan?.features && subscription.plan.features.length > 0 && (
                   <div style={{ marginTop: '14px' }}>
