@@ -22,28 +22,46 @@ interface Props {
   onSelect: (section: AppSection) => void
 }
 
+// F3.3: agrega semantica ARIA Tab Pattern (WAI-ARIA Authoring Practices) — antes
+// era solo <button>s sin role; ahora screen readers anuncian "tab N of N, selected".
 export function NavTabs({ activeSection, userRole, onSelect }: Props) {
   const visibleTabs = TABS.filter(t => t.roles.includes(userRole))
 
   return (
-    <div style={{ display: 'flex', gap: '8px', background: 'var(--at-surface)', padding: '8px', borderRadius: '12px', marginBottom: '20px', overflowX: 'auto' }}>
-      {visibleTabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onSelect(tab.id)}
-          style={{
-            padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer',
-            fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
-            background: activeSection === tab.id
-              ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
-              : 'transparent',
-            color: activeSection === tab.id ? 'white' : '#4a5568',
-            boxShadow: activeSection === tab.id ? '0 4px 16px rgba(27, 59, 54,0.4)' : 'none',
-          }}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div
+      role="tablist"
+      aria-label="Secciones del módulo de agua"
+      style={{ display: 'flex', gap: '8px', background: 'var(--at-surface)', padding: '8px', borderRadius: '12px', marginBottom: '20px', overflowX: 'auto' }}
+    >
+      {visibleTabs.map(tab => {
+        const isActive = activeSection === tab.id
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            type="button"
+            id={`tab-${tab.id}`}
+            aria-selected={isActive}
+            // aria-controls omitido a proposito: el panel se renderiza fuera de
+            // este componente (en App.tsx via switch en activeSection). axe
+            // marca aria-controls a un id inexistente como violacion. La spec
+            // WAI-ARIA permite omitirlo cuando el panel no es co-located.
+            tabIndex={isActive ? 0 : -1}
+            onClick={() => onSelect(tab.id)}
+            style={{
+              padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+              fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
+              background: isActive
+                ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
+                : 'transparent',
+              color: isActive ? 'white' : '#4a5568',
+              boxShadow: isActive ? '0 4px 16px rgba(27, 59, 54,0.4)' : 'none',
+            }}
+          >
+            {tab.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
