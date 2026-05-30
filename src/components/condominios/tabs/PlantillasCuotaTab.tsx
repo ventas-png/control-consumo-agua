@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { PlantillaCuota, PeriodicidadPlantilla, RubroConfig, Unidad } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
 
@@ -108,22 +108,27 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar plantilla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_cuota').delete().eq('id', id)
     onRefresh()
   }
 
   async function generarCuotas(p: PlantillaCuota) {
-    const { value: periodo } = await Swal.fire({
+    const result = await openPromptDialog({
       title: `Generar cuotas — ${p.nombre}`,
-      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
-             <input id="periodo-input" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
-      showCancelButton: true,
-      confirmButtonText: 'Generar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => (document.getElementById('periodo-input') as HTMLInputElement)?.value,
+      fields: [{
+        name: 'periodo',
+        label: 'Período (YYYY-MM)',
+        type: 'month',
+        required: true,
+        initialValue: new Date().toISOString().slice(0, 7),
+        autoFocus: true,
+      }],
+      submitText: 'Generar',
     })
+    if (!result) return
+    const periodo = result.periodo
     if (!periodo) return
 
     const unidadesTarget = unidades.filter(u => u.activo !== false)
@@ -136,12 +141,13 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       ? `rubros variables (${p.rubros!.length} rubro${p.rubros!.length !== 1 ? 's' : ''})`
       : `${moneda} ${p.monto.toLocaleString()} c/u`
 
-    const confirm = await Swal.fire({
+    const conf = await confirm({
       title: '¿Confirmar generación?',
       text: `Se crearán ${unidadesTarget.length} cuotas — ${resumenMonto} — período ${periodo}`,
-      icon: 'question', showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
+      icon: 'question',
+      confirmText: 'Generar',
     })
-    if (!confirm.isConfirmed) return
+    if (!conf.isConfirmed) return
 
     setGenerando(p.id)
     const [year, month] = periodo.split('-').map(Number)

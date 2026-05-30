@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
 
 interface Props {
@@ -107,15 +107,21 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   }
 
   async function registrarMantenimiento(equipo: EquipoComun) {
-    const { value: proxima } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Registrar mantenimiento',
-      html: `<label style="display:block;margin-bottom:6px;font-size:13px">Fecha próximo mantenimiento:</label><input type="date" id="proxima" class="swal2-input" style="margin-top:0">`,
-      showCancelButton: true, confirmButtonText: 'Guardar',
-      preConfirm: () => (document.getElementById('proxima') as HTMLInputElement)?.value || null,
+      fields: [{
+        name: 'proxima',
+        label: 'Fecha próximo mantenimiento',
+        type: 'date',
+        autoFocus: true,
+      }],
+      submitText: 'Guardar',
     })
+    if (!result) return
+    const proxima = result.proxima || null
     const { error } = await supabase.from('equipos_comunes').update({
       ultimo_mantenimiento: new Date().toISOString().split('T')[0],
-      proximo_mantenimiento: proxima || null,
+      proximo_mantenimiento: proxima,
       estado: 'operativo' as EstadoEquipo,
     }).eq('id', equipo.id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }

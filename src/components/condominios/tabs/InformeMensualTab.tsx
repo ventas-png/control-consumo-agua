@@ -1,7 +1,7 @@
 import { useState, type ReactNode} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { InformeMensual, EstadoInformeMensual, CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, IncidenteSeguridad } from '../../../types'
 import { exportarPDFInformeMensual } from '../exportUtils'
 
@@ -30,13 +30,20 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
   const [saving, setSaving] = useState(false)
 
   async function generar() {
-    const { value: periodo } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Generar informe mensual',
-      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
-             <input id="periodo-inf" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
-      showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
-      preConfirm: () => (document.getElementById('periodo-inf') as HTMLInputElement)?.value,
+      fields: [{
+        name: 'periodo',
+        label: 'Período (YYYY-MM)',
+        type: 'month',
+        required: true,
+        initialValue: new Date().toISOString().slice(0, 7),
+        autoFocus: true,
+      }],
+      submitText: 'Generar',
     })
+    if (!result) return
+    const periodo = result.periodo
     if (!periodo) return
 
     const ym = periodo // 'YYYY-MM'
@@ -66,14 +73,20 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
   }
 
   async function publicar(c: InformeMensual) {
-    const { value: notas } = await Swal.fire({
+    const result = await openPromptDialog({
       title: `Publicar informe ${c.periodo}`,
-      html: `<p style="font-size:13px;margin-bottom:8px">Notas del administrador (opcional):</p>
-             <textarea id="notas-inf" class="swal2-textarea" style="font-size:13px">${c.notas ?? ''}</textarea>`,
-      showCancelButton: true, confirmButtonText: 'Publicar', cancelButtonText: 'Cancelar',
-      preConfirm: () => (document.getElementById('notas-inf') as HTMLTextAreaElement)?.value ?? '',
+      fields: [{
+        name: 'notas',
+        label: 'Notas del administrador (opcional)',
+        control: 'textarea',
+        rows: 4,
+        initialValue: c.notas ?? '',
+        autoFocus: true,
+      }],
+      submitText: 'Publicar',
     })
-    if (notas === undefined) return
+    if (!result) return
+    const notas = result.notas
     await supabase.from('informes_mensuales').update({
       estado: 'publicado', firmado_por: autorNombre, notas: notas || null,
     }).eq('id', c.id)

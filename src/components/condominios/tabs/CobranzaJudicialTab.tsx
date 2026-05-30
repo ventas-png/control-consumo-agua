@@ -1,7 +1,7 @@
 import { useState, Fragment, type CSSProperties } from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { CobranzaJudicial, EtapaCobranzaJudicial, EstadoCobranzaJudicial, Unidad } from '../../../types'
 
 interface Props {
@@ -81,13 +81,20 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
   }
 
   async function editarNotas(c: CobranzaJudicial) {
-    const { value } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Actualizar notas',
-      input: 'textarea', inputValue: c.notas ?? '',
-      inputAttributes: { rows: '4', style: 'font-size:13px' },
-      showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'notas',
+        label: 'Notas',
+        control: 'textarea',
+        rows: 4,
+        initialValue: c.notas ?? '',
+        autoFocus: true,
+      }],
+      submitText: 'Guardar',
     })
-    if (value === undefined) return
+    if (!result) return
+    const value = result.notas
     await supabase.from('cobranza_judicial').update({ notas: value || null }).eq('id', c.id)
     onRefresh()
   }

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { ProyectoCondominio, CategoriaProyectoCond, EstadoProyectoCond } from '../../../types'
 
 interface Props {
@@ -87,24 +87,31 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
   }
 
   async function actualizarAvance(p: ProyectoCondominio) {
-    const { value } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Actualizar avance',
-      html: `<input id="pct" class="swal2-input" type="number" min="0" max="100" value="${p.porcentaje_avance}" style="font-size:14px">
-             <p style="font-size:11px;color:var(--at-ink-3)">0–100%</p>`,
-      showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const v = parseInt((document.getElementById('pct') as HTMLInputElement)?.value ?? '0')
-        return Math.min(100, Math.max(0, v))
-      },
+      fields: [{
+        name: 'pct',
+        label: 'Porcentaje de avance',
+        type: 'number',
+        required: true,
+        initialValue: String(p.porcentaje_avance),
+        min: 0,
+        max: 100,
+        helpText: '0–100%',
+        autoFocus: true,
+      }],
+      submitText: 'Guardar',
     })
-    if (value === undefined) return
+    if (!result) return
+    const v = parseInt(result.pct || '0')
+    const value = Math.min(100, Math.max(0, v))
     const nuevoEstado: EstadoProyectoCond = value === 100 ? 'completado' : p.estado === 'planificado' ? 'en_progreso' : p.estado
     await supabase.from('proyectos_condominio').update({ porcentaje_avance: value, estado: nuevoEstado }).eq('id', p.id)
     onRefresh()
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar proyecto?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await confirm({ title: '¿Eliminar proyecto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
     await supabase.from('proyectos_condominio').delete().eq('id', id)
     onRefresh()

@@ -1,6 +1,7 @@
 import { useState, type ReactNode} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
+import { confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { toast } from '../../../lib/toast'
 import { CierreAnual, EstadoCierreAnual, CuotaCondominio, GastoCondominio } from '../../../types'
 
@@ -27,13 +28,22 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
 
   async function generarCierre() {
     const anioActual = new Date().getFullYear()
-    const { value: anio } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Generar cierre anual',
-      html: `<p style="font-size:13px;margin-bottom:8px">Año a cerrar:</p>
-             <input id="anio-cierre" class="swal2-input" type="number" value="${anioActual}" min="2020" max="${anioActual}" style="font-size:14px">`,
-      showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
-      preConfirm: () => parseInt((document.getElementById('anio-cierre') as HTMLInputElement)?.value ?? ''),
+      fields: [{
+        name: 'anio',
+        label: 'Año a cerrar',
+        type: 'number',
+        required: true,
+        initialValue: String(anioActual),
+        min: 2020,
+        max: anioActual,
+        autoFocus: true,
+      }],
+      submitText: 'Generar',
     })
+    if (!result) return
+    const anio = parseInt(result.anio)
     if (!anio) return
 
     const periodoPrefix = String(anio)
@@ -67,11 +77,12 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
   }
 
   async function firmar(c: CierreAnual) {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: `¿Cerrar definitivamente el año ${c.anio}?`,
-      html: '<p style="font-size:13px;color:var(--at-ink-2)">Esta acción marca el cierre como definitivo. No podrá volver a estado borrador.</p>',
-      icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'Sí, cerrar', cancelButtonText: 'Cancelar',
+      text: 'Esta acción marca el cierre como definitivo. No podrá volver a estado borrador.',
+      icon: 'warning',
+      variant: 'danger',
+      confirmText: 'Sí, cerrar',
     })
     if (!isConfirmed) return
     await supabase.from('cierres_anuales').update({
