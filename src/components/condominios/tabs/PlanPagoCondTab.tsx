@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PlanPagoCond, CuotaPlanPago } from '../../../types'
 import type { Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   planes: PlanPagoCond[]
@@ -85,7 +84,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('planes_pago_condominio').delete().eq('id', id)
     if (selected?.id === id) { setSelected(null); setCuotas([]) }

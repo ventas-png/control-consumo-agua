@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { FondoReserva } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -85,7 +84,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
   }
 
   const handleDelete = async (m: FondoReserva) => {
-    const r = await Swal.fire({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('fondo_reserva_condominio').delete().eq('id', m.id)
     onRefresh()

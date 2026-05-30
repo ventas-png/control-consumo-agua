@@ -1,6 +1,6 @@
 import { useState, useRef, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
@@ -332,7 +332,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar cuota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
+    const result = await confirm({ title: '¿Eliminar cuota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     await supabase.from('cuotas_condominio').delete().eq('id', id)
     onRefresh()

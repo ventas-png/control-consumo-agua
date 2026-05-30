@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { SolicitudCertificado, TipoCertificado, EstadoCertificado, Unidad } from '../../../types'
 
 interface Props {
@@ -78,7 +77,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   }
 
   async function rechazar(s: SolicitudCertificado) {
-    const res = await Swal.fire({ title: 'Rechazar solicitud', text: '¿Confirmar rechazo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Rechazar', confirmButtonColor: 'var(--at-danger)' })
+    const res = await confirm({ title: 'Rechazar solicitud', text: '¿Confirmar rechazo?', icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!res.isConfirmed) return
     await supabase.from('solicitudes_certificado').update({ estado: 'rechazado' as EstadoCertificado }).eq('id', s.id)
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, estado: 'rechazado' } as SolicitudCertificado : null)

@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 
 interface Props {
@@ -86,7 +85,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   }
 
   async function anular(c: CargoAdicionalUnidad) {
-    const res = await Swal.fire({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Anular', confirmButtonColor: 'var(--at-danger)' })
+    const res = await confirm({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
     if (!res.isConfirmed) return
     await supabase.from('cargos_adicionales_unidad').update({ estado: 'anulado' as EstadoCargoAdicional }).eq('id', c.id)
     onRefresh()

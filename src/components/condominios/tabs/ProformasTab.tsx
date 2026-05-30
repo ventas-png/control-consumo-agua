@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { confirm } from '../../shared/Dialog'
 import { Proforma, ContratoProveedor } from '../../../types'
 
 interface Props {
@@ -108,14 +109,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
   }
 
   async function rechazar(p: Proforma) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Rechazar proforma?', text: p.concepto, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar' })
+    const res = await confirm({ title: '¿Rechazar proforma?', text: p.concepto, icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!res.isConfirmed) return
     await supabase.from('proformas_condominio').update({ estado: 'rechazada' }).eq('id', p.id)
     onRefresh()
   }
 
   async function eliminar(p: Proforma) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar?', text: p.concepto, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await confirm({ title: '¿Eliminar?', text: p.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('proformas_condominio').delete().eq('id', p.id)
     onRefresh()

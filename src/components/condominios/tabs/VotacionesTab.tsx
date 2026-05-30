@@ -1,8 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   votaciones: Votacion[]
@@ -89,7 +88,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   }
 
   async function handleCerrar(id: string) {
-    const r = await Swal.fire({ title: '¿Cerrar votación?', text: 'No se podrán registrar más votos.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Cerrar votación?', text: 'No se podrán registrar más votos.', icon: 'warning', variant: 'danger', confirmText: 'Cerrar' })
     if (!r.isConfirmed) return
     const v = votaciones.find(x => x.id === id)
     const counts = (v?.opciones ?? []).map(o => ({ texto: o.texto, count: votos.filter(vt => vt.opcion_id === o.id).length }))

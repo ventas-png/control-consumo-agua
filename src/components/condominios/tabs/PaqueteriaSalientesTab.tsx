@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { generarCodigoRetiro, codigoRetiroQrUrl } from '../../../lib/paquetes'
@@ -125,14 +124,14 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   }
 
   async function devolver(id: string) {
-    const r = await Swal.fire({ title: '¿Devolver al residente?', text: 'El paquete sale de custodia sin entregarse al tercero.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Devolver', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Devolver al residente?', text: 'El paquete sale de custodia sin entregarse al tercero.', icon: 'warning', confirmText: 'Devolver' })
     if (!r.isConfirmed) return
     await supabase.from('paquetes_recibidos').update({ estado: 'devuelto' }).eq('id', id)
     onRefresh()
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('paquetes_recibidos').delete().eq('id', id)
     onRefresh()

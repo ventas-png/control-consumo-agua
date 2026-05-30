@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { AsambleaDigital, Unidad } from '../../../types'
 
@@ -106,7 +106,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   async function eliminar(a: AsambleaDigital) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar asamblea?', text: a.titulo, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', cancelButtonText: 'Cancelar', confirmButtonText: 'Eliminar' })
+    const res = await confirm({ title: '¿Eliminar asamblea?', text: a.titulo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('asambleas_digital').delete().eq('id', a.id)
     onRefresh()

@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ObjetoPerdido, EstadoObjeto } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   objetos: ObjetoPerdido[]
@@ -84,10 +83,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   }
 
   async function handleDelete(id: string) {
-    const result = await Swal.fire({
-      title: '¿Eliminar objeto?', icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
-    })
+    const result = await confirm({ title: '¿Eliminar objeto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('objetos_perdidos').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

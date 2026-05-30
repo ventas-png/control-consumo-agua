@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import { toast } from '../../../lib/toast'
+import { confirm } from '../../shared/Dialog'
 import type { Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto } from '../../../types'
 
 interface Props {
@@ -120,7 +120,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar asamblea?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar asamblea?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('asambleas').delete().eq('id', id)
     if (selectedId === id) setSelectedId(null)

@@ -1,8 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MedidorUnidad, Unidad, Contador } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   medidores: MedidorUnidad[]
@@ -75,7 +74,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   }
 
   async function handleDesactivar(id: string) {
-    const r = await Swal.fire({ title: '¿Desvincular medidor?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Desvincular', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Desvincular medidor?', icon: 'warning', variant: 'danger', confirmText: 'Desvincular' })
     if (!r.isConfirmed) return
     await supabase.from('medidores_unidad').update({ activo: false }).eq('id', id)
     onRefresh()

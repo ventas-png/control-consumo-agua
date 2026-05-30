@@ -6,8 +6,7 @@ import type {
 } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   personal: PersonalCondominio[]
@@ -152,7 +151,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar personal?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar personal?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('personal_condominio').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

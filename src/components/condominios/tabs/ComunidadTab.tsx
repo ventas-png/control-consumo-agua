@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -76,7 +75,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar anuncio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
+    const result = await confirm({ title: '¿Eliminar anuncio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     await supabase.from('anuncios_comunidad').delete().eq('id', id)
     onRefresh()

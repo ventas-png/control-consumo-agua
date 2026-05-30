@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -152,7 +151,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar ticket?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
+    const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     await supabase.from('tickets_mantenimiento').delete().eq('id', id)
     onRefresh()

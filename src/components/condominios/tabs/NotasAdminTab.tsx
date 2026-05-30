@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { NotaAdmin, CategoriaNota, PrioridadNota } from '../../../types'
 
 interface Props {
@@ -100,7 +99,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function resolver(n: NotaAdmin) {
-    const res = await Swal.fire({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', showCancelButton: true, confirmButtonText: 'Resolver', confirmButtonColor: 'var(--at-success)' })
+    const res = await confirm({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', confirmText: 'Resolver' })
     if (!res.isConfirmed) return
     await supabase.from('notas_admin').update({ resuelta: true, fijada: false }).eq('id', n.id)
     if (selected?.id === n.id) setSelected(null)
@@ -108,7 +107,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function eliminar(n: NotaAdmin) {
-    const res = await Swal.fire({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const res = await confirm({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('notas_admin').delete().eq('id', n.id)
     if (selected?.id === n.id) setSelected(null)

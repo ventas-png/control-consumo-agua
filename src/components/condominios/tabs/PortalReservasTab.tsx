@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
@@ -186,7 +186,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
   }
 
   async function cancelarReserva(id: string) {
-    const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No' })
+    const r = await confirm({ title: '¿Cancelar reserva?', icon: 'question', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
     const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)

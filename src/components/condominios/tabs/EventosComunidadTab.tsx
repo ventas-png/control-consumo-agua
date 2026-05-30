@@ -2,8 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { EventoComunidad, RegistroAsistenteEvento } from '../../../types'
 import type { Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   eventos: EventoComunidad[]
@@ -76,7 +75,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar evento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar evento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('eventos_comunidad').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)

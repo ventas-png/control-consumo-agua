@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { PlantillaTareaCargo, AreaCondominio } from '../../../types'
 
@@ -68,7 +67,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
   }
 
   async function deletePlantilla(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar plantilla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_tarea_cargo').delete().eq('id', id)
     onRefresh()

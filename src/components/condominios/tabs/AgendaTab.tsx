@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { AgendaItem, TipoAgenda, EstadoAgenda } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   agenda: AgendaItem[]
@@ -116,10 +115,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
-    const result = await Swal.fire({
-      title: '¿Eliminar elemento?', icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
-    })
+    const result = await confirm({ title: '¿Eliminar elemento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('agenda_operativa').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

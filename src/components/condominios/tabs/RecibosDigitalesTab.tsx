@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { ReciboDigital, EstadoReciboDigital, CuotaCondominio, Unidad } from '../../../types'
 import { exportarPDFRecibo, exportarExcel } from '../exportUtils'
 
@@ -90,7 +89,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
   }
 
   async function anular(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Anular recibo?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Anular', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await confirm({ title: '¿Anular recibo?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
     if (!isConfirmed) return
     await supabase.from('recibos_digitales').update({ estado: 'anulado' }).eq('id', id)
     onRefresh()

@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -132,10 +131,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   }
 
   async function handleDelete(id: string) {
-    const result = await Swal.fire({
-      title: '¿Eliminar contrato?', text: 'Esta acción no se puede deshacer.',
-      icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
-    })
+    const result = await confirm({ title: '¿Eliminar contrato?', text: 'Esta acción no se puede deshacer.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('contratos_proveedores').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

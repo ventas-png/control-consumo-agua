@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { confirm } from '../../shared/Dialog'
 import type { CuotaCondominio, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -37,14 +37,14 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
   const saldo = totals.total - totals.pagado
 
   async function marcarPagada(id: string) {
-    const r = await Swal.fire({ title: '¿Marcar como pagada?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, pagada', confirmButtonColor: 'var(--at-success)' })
+    const r = await confirm({ title: '¿Marcar como pagada?', icon: 'question', confirmText: 'Sí, pagada' })
     if (!r.isConfirmed) return
     await supabase.from('cuotas_condominio').update({ estado: 'pagado' }).eq('id', id)
     onRefresh()
   }
 
   async function marcarMorosa(id: string) {
-    const r = await Swal.fire({ title: '¿Marcar como morosa?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, morosa', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Marcar como morosa?', icon: 'warning', variant: 'danger', confirmText: 'Sí, morosa' })
     if (!r.isConfirmed) return
     await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).eq('id', id)
     onRefresh()
