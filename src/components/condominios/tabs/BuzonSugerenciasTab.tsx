@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { SugerenciaCondominio, CategoriaSugerencia, EstadoSugerencia, Unidad } from '../../../types'
 
 interface Props {
@@ -67,18 +67,26 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
   }
 
   async function responder(s: SugerenciaCondominio) {
-    const { value: respuesta } = await Swal.fire({
+    // F3.4c: PromptDialog con textarea accesible (label + aria-required)
+    const result = await openPromptDialog({
       title: 'Responder sugerencia',
-      html: `<p style="font-size:13px;font-weight:600;margin-bottom:6px">${s.titulo}</p>
-             <textarea id="resp-sug" class="swal2-textarea" placeholder="Escribe la respuesta…" style="font-size:13px"></textarea>`,
-      showCancelButton: true, confirmButtonText: 'Responder', cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const v = (document.getElementById('resp-sug') as HTMLTextAreaElement)?.value?.trim()
-        if (!v) { Swal.showValidationMessage('La respuesta no puede estar vacía') }
-        return v
-      },
+      description: s.titulo,
+      fields: [
+        {
+          name: 'respuesta',
+          label: 'Respuesta',
+          control: 'textarea',
+          placeholder: 'Escribe la respuesta…',
+          required: true,
+          rows: 4,
+          autoFocus: true,
+        },
+      ],
+      submitText: 'Responder',
+      validate: (data) => data.respuesta.trim() ? null : 'La respuesta no puede estar vacía',
     })
-    if (!respuesta) return
+    if (!result) return
+    const respuesta = result.respuesta.trim()
     await supabase.from('sugerencias_condominio').update({
       estado: 'respondida', respuesta, respondido_por: autorNombre,
       fecha_respuesta: new Date().toISOString(),
