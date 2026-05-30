@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { OnboardingResidente, EstadoOnboarding, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
@@ -104,12 +103,13 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
       .update({ portal_activo: true, token_portal: token }).eq('id', o.unidad_id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     const url = `${window.location.origin}/portal/${token}`
-    await Swal.fire({
-      icon: 'success', title: '¡Portal activado!',
-      html: `<p style="font-size:13px;margin-bottom:8px">Comparte este enlace con el residente:</p>
-             <code style="background:var(--at-chip);padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all">${url}</code>`,
-      confirmButtonText: 'Copiar y cerrar',
-    }).then(() => navigator.clipboard.writeText(url).catch(() => {}))
+    await navigator.clipboard.writeText(url).catch(() => {})
+    notify({
+      variant: 'success',
+      title: '¡Portal activado!',
+      text: `Enlace copiado al portapapeles: ${url}`,
+      duration: 3000,
+    })
     onRefresh()
   }
 

@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla } from '../exportUtils'
 
@@ -48,16 +47,15 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
     if (!periodoNuevo) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona el período a cerrar.' })
     if (periodosCerrados.has(periodoNuevo)) return notify({ variant: 'info', title: 'Ya existe', text: `El período ${periodoNuevo} ya tiene cierre.` })
     const calc = calcCierre(periodoNuevo, cuotas, gastos)
-    const r = await Swal.fire({
+    const r = await confirm({
       title: `Generar cierre ${periodoNuevo}`,
-      html: `<div style="text-align:left;font-size:13px">
-        <p>Cuotas emitidas: <b>${moneda} ${calc.totalEmitidas.toFixed(2)}</b></p>
-        <p>Cuotas cobradas: <b>${moneda} ${calc.totalCobradas.toFixed(2)}</b></p>
-        <p>Gastos del mes: <b>${moneda} ${calc.totalGastos.toFixed(2)}</b></p>
-        <p>Saldo: <b style="color:${calc.saldo >= 0 ? 'var(--at-success)' : 'var(--at-danger)'}">${moneda} ${calc.saldo.toFixed(2)}</b></p>
-        <p>Unidades morosas: <b>${calc.unidadesMorosas}</b></p>
-      </div>`,
-      icon: 'question', showCancelButton: true, confirmButtonText: 'Confirmar Cierre', confirmButtonColor: 'var(--at-primary)',
+      text: `Cuotas emitidas: ${moneda} ${calc.totalEmitidas.toFixed(2)} · `
+          + `Cobradas: ${moneda} ${calc.totalCobradas.toFixed(2)} · `
+          + `Gastos: ${moneda} ${calc.totalGastos.toFixed(2)} · `
+          + `Saldo: ${moneda} ${calc.saldo.toFixed(2)} · `
+          + `Unidades morosas: ${calc.unidadesMorosas}`,
+      icon: 'question',
+      confirmText: 'Confirmar Cierre',
     })
     if (!r.isConfirmed) return
     setSaving(true)

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   unidades: Unidad[]
@@ -108,13 +107,11 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
     const items = conGenerables.filter(r => seleccionadas.has(r.contador_id))
     const total = items.reduce((s, r) => s + (r.consumo_ultimo ?? 0) * tarifaNum, 0)
 
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: `Generar ${items.length} cuotas de agua`,
-      html: `<p style="font-size:13px;color:var(--at-ink-2);margin:0 0 8px">Período: <strong>${periodo}</strong></p>
-             <p style="font-size:13px;color:var(--at-ink-2);margin:0 0 8px">Tarifa: <strong>${moneda} ${tarifaNum.toFixed(4)}/m³</strong></p>
-             <p style="font-size:16px;font-weight:800;color:var(--at-primary)">Total a generar: ${moneda} ${total.toFixed(2)}</p>`,
-      icon: 'question', showCancelButton: true,
-      confirmButtonText: '💧 Generar cuotas', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-primary)',
+      text: `Período: ${periodo} · Tarifa: ${moneda} ${tarifaNum.toFixed(4)}/m³ · Total: ${moneda} ${total.toFixed(2)}`,
+      icon: 'question',
+      confirmText: '💧 Generar cuotas',
     })
     if (!isConfirmed) return
 

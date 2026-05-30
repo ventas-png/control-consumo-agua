@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { AutomatizacionCond, TriggerTipoAuto, AccionTipoAuto, CuotaCondominio, TicketMantenimiento } from '../../../types'
 
@@ -89,15 +88,14 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
         await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
         onRefresh(); return
       }
-      const { isConfirmed } = await Swal.fire({
+      const { isConfirmed } = await confirm({
         title: `Ejecutar: ${a.nombre}`,
-        html: `<div style="text-align:left;font-size:14px">
-          <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
-          <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
-          <p style="font-size:20px;font-weight:800;color:var(--at-danger);margin:12px 0">${afectados} cuota${afectados !== 1 ? 's' : ''} serán marcadas como morosas</p>
-        </div>`,
-        icon: 'warning', showCancelButton: true,
-        confirmButtonText: '⚡ Ejecutar ahora', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
+        text: `Disparador: ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)} · `
+            + `Acción: ${accion.icon} ${accion.label} · `
+            + `${afectados} cuota${afectados !== 1 ? 's' : ''} serán marcadas como morosas`,
+        icon: 'warning',
+        variant: 'danger',
+        confirmText: '⚡ Ejecutar ahora',
       })
       if (!isConfirmed) return
 
@@ -114,16 +112,14 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     }
 
     // Para otras acciones: solo evaluación informativa
-    await Swal.fire({
+    notify({
+      variant: afectados > 0 ? 'warning' : 'success',
       title: `Evaluar: ${a.nombre}`,
-      html: `<div style="text-align:left;font-size:14px">
-        <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
-        <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
-        <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? 'var(--at-danger)' : 'var(--at-success)'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
-        ${afectados > 0 ? `<p style="color:var(--at-ink-3);font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:var(--at-success);font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
-      </div>`,
-      icon: afectados > 0 ? 'warning' : 'success',
-      confirmButtonText: 'Entendido',
+      text: `Disparador: ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)} · `
+          + `Acción: ${accion.icon} ${accion.label} · `
+          + `${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}`
+          + (afectados > 0 ? ' — revisa el Centro de Notificaciones.' : ''),
+      duration: 4000,
     })
     await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
     onRefresh()
