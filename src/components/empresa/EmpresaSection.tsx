@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
+import { openTextPrompt, openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
@@ -117,30 +118,27 @@ export function EmpresaSection({ currentUser }: Props) {
 
   async function editarEmpresa() {
     if (!empresa) return
-    const { value: formValues } = await Swal.fire({
-      title: 'Editar Información de Empresa',
-      html: `
-        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
-        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
-        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
-        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
-        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
-        return {
-          nombre,
-          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
-          email: (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim() || null,
-          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
-        }
-      },
+    // F3.4b: PromptDialog reemplaza Swal.fire con html:/preConfirm: por
+    // forma type-safe con InputField accesible (label asociado, aria-required).
+    const formValues = await openPromptDialog({
+      title: 'Editar información de empresa',
+      fields: [
+        { name: 'nombre', label: 'Nombre de la empresa', required: true, initialValue: empresa.nombre },
+        { name: 'nit', label: 'NIT', initialValue: empresa.nit ?? '' },
+        { name: 'email', label: 'Email de contacto', type: 'email', autoComplete: 'email', initialValue: empresa.email ?? '' },
+        { name: 'telefono', label: 'Teléfono', type: 'tel', autoComplete: 'tel', initialValue: empresa.telefono ?? '' },
+      ],
+      submitText: 'Guardar',
+      validate: (data) => data.nombre.trim() ? null : 'El nombre es obligatorio',
     })
     if (!formValues) return
-    const { error } = await supabase.from('companies').update(formValues).eq('id', empresa.id)
+    const payload = {
+      nombre: formValues.nombre.trim(),
+      nit: formValues.nit.trim() || null,
+      email: formValues.email.trim() || null,
+      telefono: formValues.telefono.trim() || null,
+    }
+    const { error } = await supabase.from('companies').update(payload).eq('id', empresa.id)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
     } else {
@@ -394,15 +392,15 @@ export function EmpresaSection({ currentUser }: Props) {
       return
     }
 
-    const { value: nombre } = await Swal.fire({
+    // F3.4b: openTextPrompt accesible — antes Swal.fire con input:'text'
+    // y inputValidator. Devuelve string|null sin que el caller maneje
+    // formValues.value.
+    const nombre = await openTextPrompt({
       title: 'Nuevo Proyecto',
-      input: 'text',
-      inputLabel: 'Nombre del proyecto',
-      inputPlaceholder: 'Ej: Proyecto Norte',
-      showCancelButton: true,
-      confirmButtonText: 'Crear',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (v: string) => !v.trim() ? 'El nombre es obligatorio' : null,
+      label: 'Nombre del proyecto',
+      placeholder: 'Ej: Proyecto Norte',
+      required: true,
+      validate: (v) => !v.trim() ? 'El nombre es obligatorio' : null,
     })
 
     if (!nombre) return
