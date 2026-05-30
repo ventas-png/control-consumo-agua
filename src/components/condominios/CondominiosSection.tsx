@@ -1278,12 +1278,16 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           flexShrink: 0,
         }}>
           {!sidebarCollapsed && (
-            <nav style={{ padding: '6px 0' }}>
+            <nav style={{ padding: '6px 0' }} aria-label="Pestañas del módulo condominios">
               {visibleSections.find(s => s.id === activeSection)?.tabs
                 .map(tid => TABS.find(t => t.id === tid))
                 .filter(Boolean)
                 .map(tab => tab && (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as CondominioTab)}
+                    type="button"
+                    aria-current={activeTab === tab.id ? 'page' : undefined}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       width: '100%', padding: '7px 14px', border: 'none',
@@ -1294,7 +1298,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
                       fontWeight: activeTab === tab.id ? 700 : 400,
                       textAlign: 'left',
                     }}>
-                    <span>{tab.icon}</span>
+                    <span aria-hidden="true">{tab.icon}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {tab.label}
                     </span>

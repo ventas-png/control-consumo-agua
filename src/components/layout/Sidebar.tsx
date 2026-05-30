@@ -466,8 +466,9 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
 
   return (
     <aside
+      id="app-sidebar"
       role="navigation"
-      aria-label="Menu principal"
+      aria-label="Menú principal"
       className={`app-sidebar${isOpen ? ' open' : ''}`}
       style={{
         width: '256px',
