@@ -1,8 +1,8 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CajaChica, MovimientoCaja } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 
 interface Props {
   cajas: CajaChica[]
@@ -47,8 +47,19 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   }
 
   async function handleCerrarCaja(caja: CajaChica) {
-    const { value: cerrado_por } = await Swal.fire({ title: 'Cerrar Caja', input: 'text', inputLabel: 'Cerrado por', inputPlaceholder: 'Nombre del responsable', showCancelButton: true, confirmButtonText: 'Cerrar caja' })
-    if (!cerrado_por) return
+    const result = await openPromptDialog({
+      title: 'Cerrar Caja',
+      fields: [{
+        name: 'cerrado_por',
+        label: 'Cerrado por',
+        placeholder: 'Nombre del responsable',
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Cerrar caja',
+    })
+    if (!result?.cerrado_por) return
+    const cerrado_por = result.cerrado_por
     await supabase.from('caja_chica').update({ estado: 'cerrada', fecha_cierre: new Date().toISOString().slice(0, 10), cerrado_por }).eq('id', caja.id)
     if (selected?.id === caja.id) setSelected(p => p ? { ...p, estado: 'cerrada' } : null)
     onRefresh()
@@ -71,7 +82,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   }
 
   async function handleDeleteMovimiento(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar movimiento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar movimiento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('movimientos_caja').delete().eq('id', id)
     onRefresh()
