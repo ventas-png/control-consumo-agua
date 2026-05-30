@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ReglaNotificacion, EventoNotificacion, CanalNotificacion, DestinatarioNotificacion } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   reglas: ReglaNotificacion[]
@@ -90,7 +89,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar regla?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar regla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('reglas_notificacion').delete().eq('id', id)
     onRefresh()

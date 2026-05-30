@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { PlantillaMensajeCond, CanalPlantilla } from '../../../types'
 
@@ -85,7 +84,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
   }
 
   async function eliminar(p: PlantillaMensajeCond) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_mensaje_cond').delete().eq('id', p.id)
     onRefresh()

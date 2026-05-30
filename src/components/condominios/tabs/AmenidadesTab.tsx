@@ -1,7 +1,7 @@
 import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -341,15 +341,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       })
       return
     }
-    const r = await Swal.fire({
-      title: '¿Eliminar amenidad?',
-      text: 'Esta acción no se puede deshacer.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
-    })
+    const r = await confirm({ title: '¿Eliminar amenidad?', text: 'Esta acción no se puede deshacer.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('amenidades').delete().eq('id', id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -464,7 +456,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function cancelarReserva(id: string) {
-    const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Cancelar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
     const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
@@ -733,7 +725,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function eliminarBloqueo(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar bloqueo?', icon: 'warning', variant: 'danger', confirmText: 'Sí, eliminar', cancelText: 'No' })
     if (!r.isConfirmed) return
     await supabase.from('amenidades_bloqueos').delete().eq('id', id)
     onRefresh()

@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { FirmaDigital, EstadoFirma, TipoDocumentoFirma, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   firmas: FirmaDigital[]
@@ -77,7 +76,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar firma?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar firma?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('firmas_digitales').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

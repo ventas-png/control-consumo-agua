@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { BitacoraGuardia, TurnoGuardia, EstadoBitacoraGuardia, TipoNovedadGuardia, NovedadGuardia } from '../../../types'
 
 interface Props {
@@ -77,7 +76,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
   }
 
   async function cerrarTurno(b: BitacoraGuardia) {
-    const res = await Swal.fire({ title: 'Cerrar turno', text: '¿Marcar bitácora como cerrada?', icon: 'question', showCancelButton: true, confirmButtonText: 'Cerrar turno' })
+    const res = await confirm({ title: 'Cerrar turno', text: '¿Marcar bitácora como cerrada?', icon: 'question', confirmText: 'Cerrar turno' })
     if (!res.isConfirmed) return
     const { error } = await supabase.from('bitacora_guardia').update({ estado: 'cerrado' as EstadoBitacoraGuardia }).eq('id', b.id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }

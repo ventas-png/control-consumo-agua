@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { Encuesta, RespuestaEncuesta, EstadoEncuesta, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface PreguntaItem { id: string; texto: string; tipo: 'texto' | 'rating_5' | 'si_no' }
 interface Props {
@@ -75,7 +74,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   }
 
   async function handleDeleteEncuesta(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('respuestas_encuesta').delete().eq('encuesta_id', id)
     const { error } = await supabase.from('encuestas').delete().eq('id', id)

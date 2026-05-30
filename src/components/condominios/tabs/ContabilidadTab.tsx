@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -126,7 +125,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar gasto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar gasto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('gastos_condominio').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

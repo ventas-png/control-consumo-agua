@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { AutomatizacionCond, TriggerTipoAuto, AccionTipoAuto, CuotaCondominio, TicketMantenimiento } from '../../../types'
 
 interface Props {
@@ -130,7 +130,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar automatización?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await confirm({ title: '¿Eliminar automatización?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
     await supabase.from('automatizaciones_cond').delete().eq('id', id)
     onRefresh()

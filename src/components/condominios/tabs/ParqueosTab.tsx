@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ParqueoCondominio, Unidad, TipoParqueo } from '../../../types'
 
@@ -89,7 +89,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar parqueo?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar parqueo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('parqueos_condominio').delete().eq('id', id)
     onRefresh()

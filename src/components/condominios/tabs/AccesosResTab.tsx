@@ -2,8 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { AccesoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   accesos: AccesoResidente[]
@@ -63,7 +62,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar acceso?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar acceso?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('accesos_residentes').delete().eq('id', id)
     onRefresh()

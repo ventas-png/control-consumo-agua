@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
@@ -104,7 +104,7 @@ export function TareasPersonalTab({
   }
 
   async function deleteBloque(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar bloque?', text: 'Se eliminan también las tareas asociadas.', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar bloque?', text: 'Se eliminan también las tareas asociadas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('bloques_turno').delete().eq('id', id)
     if (bloqueAbierto === id) setBloqueAbierto(null)

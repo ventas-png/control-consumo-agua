@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MemoriaLabores, TipoPeriodo, EstadoMemoria } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   memorias: MemoriaLabores[]
@@ -83,7 +82,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar memoria?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar memoria?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('memoria_labores').delete().eq('id', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
 
 interface Props {
@@ -103,7 +102,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   }
 
   async function cancelar(t: TareaCondominio) {
-    const res = await Swal.fire({ title: 'Cancelar tarea', text: '¿Seguro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cancelar tarea' })
+    const res = await confirm({ title: 'Cancelar tarea', text: '¿Seguro?', icon: 'warning', confirmText: 'Cancelar tarea' })
     if (!res.isConfirmed) return
     await supabase.from('tareas_condominio').update({ estado: 'cancelada' as EstadoTarea }).eq('id', t.id)
     if (selected?.id === t.id) setSelected(prev => prev ? { ...prev, estado: 'cancelada' } as TareaCondominio : null)

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { GestionCobranza, EtapaCobranza, EstadoCobranza, TipoContactoCobranza, ContactoCobranza, Unidad } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -91,7 +91,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
   }
 
   async function marcarResuelto(c: GestionCobranza) {
-    const res = await Swal.fire({ title: 'Marcar como resuelto', text: '¿Confirmar resolución del cobro?', icon: 'question', showCancelButton: true, confirmButtonText: 'Resolver' })
+    const res = await confirm({ title: 'Marcar como resuelto', text: '¿Confirmar resolución del cobro?', icon: 'question', confirmText: 'Resolver' })
     if (!res.isConfirmed) return
     const { error } = await supabase.from('gestion_cobranza').update({
       estado: 'resuelto' as EstadoCobranza, etapa: 'resuelto' as EtapaCobranza,

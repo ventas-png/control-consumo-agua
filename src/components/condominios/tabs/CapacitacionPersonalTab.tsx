@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { CapacitacionPersonal, EstadoCapacitacion } from '../../../types'
 
 interface Props {
@@ -79,7 +78,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
     await supabase.from('capacitacion_personal_cond').delete().eq('id', id)
     onRefresh()

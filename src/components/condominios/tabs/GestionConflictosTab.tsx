@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { confirm } from '../../shared/Dialog'
 import { InfraccionCondominio, SugerenciaCondominio, Unidad, EstadoInfraccion, EstadoSugerencia } from '../../../types'
 
 interface Props {
@@ -112,14 +113,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
   }
 
   async function archivarSugerencia(sug: SugerenciaCondominio) {
-    const { isConfirmed } = await Swal.fire({
-      title: 'Archivar sugerencia',
-      text: '¿Archivar esta sugerencia?',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Archivar',
-      cancelButtonText: 'Cancelar',
-    })
+    const { isConfirmed } = await confirm({ title: 'Archivar sugerencia', text: '¿Archivar esta sugerencia?', confirmText: 'Archivar' })
     if (!isConfirmed) return
     setResolviendo(sug.id)
     const { error } = await supabase.from('sugerencias_condominio').update({ estado: 'archivada' }).eq('id', sug.id)

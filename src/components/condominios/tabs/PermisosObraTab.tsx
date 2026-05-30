@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PermisoObraUnidad, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   permisos: PermisoObraUnidad[]
@@ -97,14 +96,14 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   }
 
   const rechazar = async (p: PermisoObraUnidad) => {
-    const r = await Swal.fire({ title: '¿Rechazar permiso?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Rechazar' })
+    const r = await confirm({ title: '¿Rechazar permiso?', icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!r.isConfirmed) return
     await supabase.from('permisos_obra_unidad').update({ estado: 'rechazado' }).eq('id', p.id)
     onRefresh()
   }
 
   const handleDelete = async (p: PermisoObraUnidad) => {
-    const r = await Swal.fire({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('permisos_obra_unidad').delete().eq('id', p.id)
     if (selected?.id === p.id) setSelected(null)

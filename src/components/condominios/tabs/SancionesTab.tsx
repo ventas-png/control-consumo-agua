@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
   sanciones: SancionCondominio[]
@@ -55,7 +54,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
 
   async function cambiarEstado(id: string, estado: string, msg?: string) {
     if (msg) {
-      const r = await Swal.fire({ title: msg, icon: 'question', showCancelButton: true, confirmButtonText: 'Confirmar' })
+      const r = await confirm({ title: msg, icon: 'question', confirmText: 'Confirmar' })
       if (!r.isConfirmed) return
     }
     await supabase.from('sanciones_condominio').update({ estado }).eq('id', id)

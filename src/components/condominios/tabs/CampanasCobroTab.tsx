@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { confirm } from '../../shared/Dialog'
 import { toast } from '../../../lib/toast'
 import { CampanaCobro, CanalCampana, EstadoCampana, CuotaCondominio, Unidad } from '../../../types'
 
@@ -91,7 +92,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar campaña?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await confirm({ title: '¿Eliminar campaña?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
     await supabase.from('campanas_cobro').delete().eq('id', id)
     onRefresh()

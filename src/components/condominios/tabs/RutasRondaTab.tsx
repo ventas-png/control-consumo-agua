@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { AreaCondominio, RutaRonda, PuntoControlRuta } from '../../../types'
 
@@ -76,7 +75,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function deleteArea(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('areas_condominio').delete().eq('id', id)
     onRefresh()
@@ -115,7 +114,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function deleteRuta(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar ruta?', text: 'Se eliminarán también los puntos de control.', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar ruta?', text: 'Se eliminarán también los puntos de control.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('rutas_ronda').delete().eq('id', id)
     if (selectedRutaId === id) setSelectedRutaId(null)

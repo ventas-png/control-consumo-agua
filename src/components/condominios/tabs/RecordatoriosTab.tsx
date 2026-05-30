@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import { RecordatorioCondominio, PrioridadRecordatorio, TipoEntidadRecordatorio } from '../../../types'
 
 interface Props {
@@ -87,7 +86,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   async function eliminar(id: string) {
-    const res = await Swal.fire({ title: '¿Eliminar recordatorio?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await confirm({ title: '¿Eliminar recordatorio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('recordatorios_condominio').delete().eq('id', id)
     onRefresh()
