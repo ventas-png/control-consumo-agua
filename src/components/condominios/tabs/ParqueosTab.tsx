@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ParqueoCondominio, Unidad, TipoParqueo } from '../../../types'
@@ -79,7 +78,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
       : await supabase.from('parqueos_condominio').insert(data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    Swal.fire({ icon: 'success', title: editingId ? 'Parqueo actualizado' : 'Parqueo registrado', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: editingId ? 'Parqueo actualizado' : 'Parqueo registrado', duration: 1400 })
     resetForm(); onRefresh()
   }
 

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { FondoReservaMovimiento } from '../../../types'
 
@@ -66,7 +66,8 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
 
   async function guardar() {
     if (!form.concepto.trim() || !form.monto || parseFloat(form.monto) <= 0) {
-      return Swal.fire({ icon: 'warning', title: 'Datos requeridos', text: 'Completa concepto y monto.', confirmButtonColor: 'var(--at-primary)' })
+      notify({ variant: 'warning', title: 'Datos requeridos', text: 'Completa concepto y monto.' })
+      return
     }
     setSaving(true)
     const { error } = await supabase.from('fondo_reserva').insert({
@@ -77,7 +78,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setForm({ tipo: 'aportacion', concepto: '', monto: '', fecha: new Date().toISOString().slice(0, 10), referencia: '', notas: '' })
     onRefresh()
   }

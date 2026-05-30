@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { useSignedUrls } from '../../../lib/storageUrls'
@@ -181,7 +180,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
           : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
         : '¡Reserva confirmada!'
-    Swal.fire({ icon: 'success', title: titulo, timer: 2600, showConfirmButton: false })
+    notify({ variant: 'success', title: titulo, duration: 2600 })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 

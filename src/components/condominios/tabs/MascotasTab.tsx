@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
@@ -82,7 +81,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       : await supabase.from('mascotas').insert(data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    Swal.fire({ icon: 'success', title: editingId ? 'Mascota actualizada' : 'Mascota registrada', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: editingId ? 'Mascota actualizada' : 'Mascota registrada', duration: 1400 })
     resetForm(); onRefresh()
   }
 
