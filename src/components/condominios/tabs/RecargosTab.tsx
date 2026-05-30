@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
 
 interface Props {
@@ -107,26 +107,40 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       pct = reglaActiva.valor
       tipoRecargo = reglaActiva.tipo === 'porcentaje' ? 'porcentaje' : 'monto_fijo'
       motivo = `Recargo automático — ${reglaActiva.nombre}`
-      const conf = await Swal.fire({
+      const conf = await confirm({
+        icon: 'question',
         title: 'Aplicar mora automática',
-        html: `<p style="font-size:13px;color:var(--at-ink-2)">Usando regla: <b>${reglaActiva.nombre}</b><br>
-               Tipo: <b>${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'}</b><br>
-               ${unidadesMorosas.length} unidades afectadas</p>`,
-        icon: 'question', showCancelButton: true,
-        confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
+        text: `Usando regla "${reglaActiva.nombre}" — Tipo: ${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'} · ${unidadesMorosas.length} unidades afectadas`,
+        variant: 'danger',
+        confirmText: 'Aplicar',
       })
       if (!conf.isConfirmed) return
     } else {
-      const { value } = await Swal.fire({
+      // F3.4d: PromptDialog accesible reemplaza Swal con input number + preConfirm
+      const result = await openPromptDialog({
         title: 'Recargo masivo por mora',
-        html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
-               <input id="pct-input" class="swal2-input" type="number" min="0.1" max="100" step="0.1" value="5" style="font-size:14px">
-               <p style="font-size:11px;color:var(--at-ink-3);margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
-        showCancelButton: true, confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar',
-        preConfirm: () => parseFloat((document.getElementById('pct-input') as HTMLInputElement)?.value ?? '0'),
+        description: `${unidadesMorosas.length} unidades con cuotas vencidas. Configura reglas automáticas en la pestaña "Reglas mora".`,
+        fields: [
+          {
+            name: 'pct',
+            label: 'Porcentaje de recargo',
+            type: 'number',
+            required: true,
+            initialValue: '5',
+            min: 0.1,
+            max: 100,
+            step: 0.1,
+            autoFocus: true,
+          },
+        ],
+        submitText: 'Aplicar',
+        validate: (data) => {
+          const v = parseFloat(data.pct)
+          return v > 0 ? null : 'Porcentaje debe ser mayor a 0'
+        },
       })
-      if (!value || value <= 0) return
-      pct = value
+      if (!result) return
+      pct = parseFloat(result.pct)
     }
 
     setSaving(true)

@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
 import { StatusBadge } from '../../shared/StatusBadge'
@@ -37,14 +37,23 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
     .reduce((s, h) => s + h.pagos_periodo, 0)
 
   async function generarSnapshot() {
-    const { value: periodo } = await Swal.fire({
+    // F3.4d: PromptDialog con input type='month' accesible
+    const result = await openPromptDialog({
       title: 'Generar snapshot de saldos',
-      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
-             <input id="periodo-snap" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
-      showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
-      preConfirm: () => (document.getElementById('periodo-snap') as HTMLInputElement)?.value,
+      fields: [
+        {
+          name: 'periodo',
+          label: 'Período (YYYY-MM)',
+          type: 'month',
+          required: true,
+          initialValue: new Date().toISOString().slice(0, 7),
+          autoFocus: true,
+        },
+      ],
+      submitText: 'Generar',
     })
-    if (!periodo) return
+    if (!result) return
+    const periodo = result.periodo
 
     setSaving(true)
     const rows = unidades.filter(u => u.activo).map(u => {

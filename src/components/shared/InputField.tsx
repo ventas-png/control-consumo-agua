@@ -23,7 +23,7 @@ export interface InputFieldProps {
   label: string
   value: string
   onChange: (value: string) => void
-  type?: 'text' | 'email' | 'tel' | 'number' | 'password' | 'url' | 'date' | 'time'
+  type?: 'text' | 'email' | 'tel' | 'number' | 'password' | 'url' | 'date' | 'time' | 'month' | 'week' | 'datetime-local'
   placeholder?: string
   required?: boolean
   disabled?: boolean
