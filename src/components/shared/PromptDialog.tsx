@@ -35,6 +35,15 @@ export interface PromptFieldDef extends Omit<InputFieldProps, 'value' | 'onChang
   name: string
   /** Valor inicial */
   initialValue?: string
+  /** F3.4c: tipo de control. Default 'input' (InputField).
+   *   'textarea' = caja multiline accesible
+   *   'select' = dropdown con options[]
+   */
+  control?: 'input' | 'textarea' | 'select'
+  /** Solo para control='select' */
+  options?: Array<{ value: string; label: string }>
+  /** Solo para control='textarea': filas iniciales */
+  rows?: number
 }
 
 export interface PromptDialogOptions {
@@ -145,14 +154,17 @@ function PromptDialogContent({ options }: { options: PromptDialogOptions }) {
               </Dialog.Description>
             )}
             <div style={{ marginTop: options.description ? 0 : '14px' }}>
-              {options.fields.map(field => (
-                <InputField
-                  key={field.name}
-                  {...field}
-                  value={values[field.name] ?? ''}
-                  onChange={(v) => setValues(prev => ({ ...prev, [field.name]: v }))}
-                />
-              ))}
+              {options.fields.map(field => {
+                const val = values[field.name] ?? ''
+                const setVal = (v: string) => setValues(prev => ({ ...prev, [field.name]: v }))
+                if (field.control === 'textarea') {
+                  return <TextareaField key={field.name} def={field} value={val} onChange={setVal} />
+                }
+                if (field.control === 'select') {
+                  return <SelectField key={field.name} def={field} value={val} onChange={setVal} />
+                }
+                return <InputField key={field.name} {...field} value={val} onChange={setVal} />
+              })}
             </div>
             {error && (
               <p
@@ -237,3 +249,106 @@ export async function openTextPrompt(opts: {
 // Actualmente el DialogProvider de F3.2 ya incluye los keyframes
 // at-dialog-overlay-in / at-dialog-content-in, asi que PromptDialogRoot
 // los hereda sin agregar nada nuevo. Solo hay que montar PromptDialogRoot.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TextareaField y SelectField — controles adicionales para PromptDialog.
+// Comparten el wrapper a11y de InputField (label, aria-required, aria-invalid,
+// aria-describedby) pero rinden textarea/select internamente.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useId as useIdF3c } from 'react'
+
+function TextareaField({ def, value, onChange }: { def: PromptFieldDef; value: string; onChange: (v: string) => void }) {
+  const reactId = useIdF3c()
+  const id = def.id ?? `field-${reactId}`
+  const helpId = def.helpText ? `${id}-help` : undefined
+  const errorId = def.error ? `${id}-error` : undefined
+  const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+        {def.label}
+        {def.required && <span aria-hidden="true" style={{ color: 'var(--at-danger)', marginLeft: '4px' }}>*</span>}
+      </label>
+      <textarea
+        id={id}
+        name={def.name}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={def.placeholder}
+        required={def.required}
+        disabled={def.disabled}
+        rows={def.rows ?? 3}
+        maxLength={def.maxLength}
+        aria-required={def.required || undefined}
+        aria-invalid={!!def.error || undefined}
+        aria-describedby={describedBy}
+        autoFocus={def.autoFocus}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '10px 12px',
+          border: `1.5px solid ${def.error ? 'var(--at-danger)' : 'var(--at-line)'}`,
+          borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit',
+          background: def.disabled ? 'var(--at-surface-2)' : 'var(--at-surface)',
+          color: def.disabled ? 'var(--at-ink-3)' : 'var(--at-ink)',
+          outline: 'none', resize: 'vertical', minHeight: '70px',
+        }}
+      />
+      {def.helpText && !def.error && (
+        <p id={helpId} style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>{def.helpText}</p>
+      )}
+      {def.error && (
+        <p id={errorId} role="alert" style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>{def.error}</p>
+      )}
+    </div>
+  )
+}
+
+function SelectField({ def, value, onChange }: { def: PromptFieldDef; value: string; onChange: (v: string) => void }) {
+  const reactId = useIdF3c()
+  const id = def.id ?? `field-${reactId}`
+  const helpId = def.helpText ? `${id}-help` : undefined
+  const errorId = def.error ? `${id}-error` : undefined
+  const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined
+  const options = def.options ?? []
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+        {def.label}
+        {def.required && <span aria-hidden="true" style={{ color: 'var(--at-danger)', marginLeft: '4px' }}>*</span>}
+      </label>
+      <select
+        id={id}
+        name={def.name}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={def.required}
+        disabled={def.disabled}
+        aria-required={def.required || undefined}
+        aria-invalid={!!def.error || undefined}
+        aria-describedby={describedBy}
+        autoFocus={def.autoFocus}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '10px 12px',
+          border: `1.5px solid ${def.error ? 'var(--at-danger)' : 'var(--at-line)'}`,
+          borderRadius: '8px', fontSize: '14px',
+          background: def.disabled ? 'var(--at-surface-2)' : 'var(--at-surface)',
+          color: def.disabled ? 'var(--at-ink-3)' : 'var(--at-ink)',
+          outline: 'none',
+        }}
+      >
+        {!def.required && <option value="">— Seleccionar —</option>}
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {def.helpText && !def.error && (
+        <p id={helpId} style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>{def.helpText}</p>
+      )}
+      {def.error && (
+        <p id={errorId} role="alert" style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>{def.error}</p>
+      )}
+    </div>
+  )
+}

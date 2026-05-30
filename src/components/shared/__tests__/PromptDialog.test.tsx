@@ -66,6 +66,50 @@ describe('PromptDialog', () => {
     expect(result).toBe('Foo')
   })
 
+  it('textarea control rinde <textarea> con label asociado', async () => {
+    render(<PromptDialogRoot />)
+    const promise = openPromptDialog({
+      title: 'Responder',
+      fields: [
+        { name: 'respuesta', label: 'Tu respuesta', control: 'textarea', required: true, rows: 5 },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Responder')).toBeTruthy())
+    const textarea = screen.getByLabelText(/Tu respuesta/)
+    expect(textarea.tagName).toBe('TEXTAREA')
+    expect((textarea as HTMLTextAreaElement).rows).toBe(5)
+    fireEvent.change(textarea, { target: { value: 'OK' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }))
+    const result = await promise
+    expect(result?.respuesta).toBe('OK')
+  })
+
+  it('select control rinde <select> con options', async () => {
+    render(<PromptDialogRoot />)
+    const promise = openPromptDialog({
+      title: 'Estado',
+      fields: [
+        {
+          name: 'estado',
+          label: 'Nuevo estado',
+          control: 'select',
+          required: true,
+          options: [
+            { value: 'pendiente', label: 'Pendiente' },
+            { value: 'pagado', label: 'Pagado' },
+          ],
+        },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Estado')).toBeTruthy())
+    const select = screen.getByLabelText(/Nuevo estado/) as HTMLSelectElement
+    expect(select.tagName).toBe('SELECT')
+    fireEvent.change(select, { target: { value: 'pagado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }))
+    const result = await promise
+    expect(result?.estado).toBe('pagado')
+  })
+
   it('a11y baseline: dialog abierto sin violaciones', async () => {
     const { container } = render(<PromptDialogRoot />)
     void openPromptDialog({
