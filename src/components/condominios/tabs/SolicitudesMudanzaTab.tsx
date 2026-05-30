@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import { SecureImage } from '../../shared/SecureImage'
 import { useSignedUrl } from '../../../lib/storageUrls'
@@ -162,17 +162,20 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
   async function resolver(s: SolicitudMudanzaUnidad, nuevoEstado: 'aprobada' | 'rechazada') {
     if (!canEdit) return
-    const { value: comentario } = await Swal.fire({
+    const result = await openPromptDialog({
       title: nuevoEstado === 'aprobada' ? '¿Aprobar solicitud?' : '¿Rechazar solicitud?',
-      input: 'textarea',
-      inputLabel: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo',
-      inputPlaceholder: 'Escriba un comentario…',
-      showCancelButton: true,
-      confirmButtonColor: nuevoEstado === 'aprobada' ? 'var(--at-success)' : 'var(--at-danger)',
-      confirmButtonText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
-      cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'comentario',
+        label: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Escriba un comentario…',
+        autoFocus: true,
+      }],
+      submitText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
     })
-    if (comentario === undefined) return
+    if (!result) return
+    const comentario = result.comentario
 
     setSaving(true)
     const payload: Record<string, unknown> = {

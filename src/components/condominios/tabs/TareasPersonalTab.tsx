@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
@@ -152,14 +152,22 @@ export function TareasPersonalTab({
 
   async function marcarTarea(tareaId: string, estado: EstadoTareaBloque) {
     if (estado === 'con_observacion') {
-      const { value: notas } = await Swal.fire({
+      const result = await openPromptDialog({
         title: '¿Qué observación encontraste?',
-        input: 'textarea', inputPlaceholder: 'Describe la observación o problema...',
-        showCancelButton: true, confirmButtonText: 'Registrar', cancelButtonText: 'Cancelar',
+        fields: [{
+          name: 'notas',
+          label: 'Observación',
+          control: 'textarea',
+          rows: 4,
+          placeholder: 'Describe la observación o problema...',
+          required: true,
+          autoFocus: true,
+        }],
+        submitText: 'Registrar',
       })
-      if (notas === undefined) return
+      if (!result) return
       await supabase.from('tareas_bloque').update({
-        estado, notas_operativo: notas as string,
+        estado, notas_operativo: result.notas,
         completada_en: new Date().toISOString(),
       }).eq('id', tareaId)
     } else {
