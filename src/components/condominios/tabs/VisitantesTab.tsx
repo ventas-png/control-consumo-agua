@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
@@ -415,7 +414,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     const msg = acompanantes.length > 0
       ? `Visita registrada con ${acompanantes.length} acompañante${acompanantes.length > 1 ? 's' : ''}`
       : 'Visita registrada'
-    Swal.fire({ icon: 'success', title: msg, timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: msg, duration: 1500 })
     resetForm()
     onRefresh()
   }

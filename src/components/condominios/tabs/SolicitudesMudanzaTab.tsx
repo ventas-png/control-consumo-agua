@@ -188,7 +188,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
     const { error } = await supabase.from('solicitud_mudanza_unidad').update(payload).eq('id', s.id)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    Swal.fire({ icon: 'success', title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', duration: 1400 })
     setExpandedId(null); onRefresh()
   }
 

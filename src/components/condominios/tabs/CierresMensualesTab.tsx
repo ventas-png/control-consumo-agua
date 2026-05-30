@@ -96,7 +96,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   async function toggleEstado(c: CierreMensual) {
     const nuevoEstado = c.estado === 'cerrado' ? 'borrador' : 'cerrado'
     if (nuevoEstado === 'cerrado') {
-      const r = await Swal.fire({ title: `¿Cerrar período ${c.periodo}?`, text: 'Un cierre finalizado bloquea modificaciones.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar período', confirmButtonColor: 'var(--at-danger)' })
+      const r = await confirm({ title: `¿Cerrar período ${c.periodo}?`, text: 'Un cierre finalizado bloquea modificaciones.', icon: 'warning', variant: 'danger', confirmText: 'Cerrar período' })
       if (!r.isConfirmed) return
     }
     await supabase.from('cierres_mensuales').update({ estado: nuevoEstado }).eq('id', c.id)
