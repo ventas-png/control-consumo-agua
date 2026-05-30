@@ -73,9 +73,11 @@ interface Props {
   currentUser: UserSession
   onMenuToggle: () => void
   onNavigate?: (section: AppSection) => void
+  // F3.3b: refleja estado del sidebar para aria-expanded del hamburger
+  sidebarOpen?: boolean
 }
 
-export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate }: Props) {
+export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, sidebarOpen = false }: Props) {
   const { isOnline } = useOffline()
   const { pref, cycle } = useTheme()
   const themeIcon = pref === 'auto' ? '🌗' : pref === 'light' ? '☀️' : '🌙'
@@ -102,7 +104,10 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate }:
         <button
           className="app-hamburger"
           onClick={onMenuToggle}
-          aria-label="Abrir menú"
+          aria-label={sidebarOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
+          aria-controls="app-sidebar"
+          aria-expanded={sidebarOpen}
+          type="button"
           style={{
             display: 'none',
             alignItems: 'center',
