@@ -1,8 +1,8 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PrestamoEquipo, EstadoPrestamo, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 
 interface Props {
   prestamos: PrestamoEquipo[]
@@ -66,16 +66,22 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   }
 
   async function marcarDevuelto(p: PrestamoEquipo) {
-    const r = await Swal.fire({
-      title: '¿Marcar como devuelto?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, devuelto', confirmButtonColor: 'var(--at-success)',
-      input: 'text', inputLabel: 'Observaciones de devolución (opcional)', inputPlaceholder: 'Ej: devuelto en buen estado',
+    const result = await openPromptDialog({
+      title: '¿Marcar como devuelto?',
+      fields: [{
+        name: 'observaciones',
+        label: 'Observaciones de devolución (opcional)',
+        placeholder: 'Ej: devuelto en buen estado',
+        autoFocus: true,
+      }],
+      submitText: 'Sí, devuelto',
     })
-    if (!r.isConfirmed) return
+    if (!result) return
     await supabase.from('prestamos_equipo').update({
       estado: 'devuelto',
       fecha_devolucion: new Date().toISOString().slice(0, 10),
       hora_devolucion: new Date().toTimeString().slice(0, 5),
-      observaciones: r.value || p.observaciones,
+      observaciones: result.observaciones || p.observaciones,
     }).eq('id', p.id)
     onRefresh()
   }
@@ -86,7 +92,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
+    const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('prestamos_equipo').delete().eq('id', id)
     onRefresh()

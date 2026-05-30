@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import { FlujoAprobacionCond, TipoFlujoAprobacion, EstadoFlujoAprobacion } from '../../../types'
 
@@ -65,16 +65,20 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   }
 
   async function resolver(flujo: FlujoAprobacionCond, nuevoEstado: 'aprobado' | 'rechazado') {
-    const { value: comentario } = await Swal.fire({
+    const result = await openPromptDialog({
       title: nuevoEstado === 'aprobado' ? '✅ Aprobar solicitud' : '❌ Rechazar solicitud',
-      input: 'textarea',
-      inputPlaceholder: 'Comentario (opcional)…',
-      showCancelButton: true,
-      confirmButtonText: nuevoEstado === 'aprobado' ? 'Aprobar' : 'Rechazar',
-      confirmButtonColor: nuevoEstado === 'aprobado' ? 'var(--at-success)' : 'var(--at-danger)',
-      cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'comentario',
+        label: 'Comentario',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Comentario (opcional)…',
+        autoFocus: true,
+      }],
+      submitText: nuevoEstado === 'aprobado' ? 'Aprobar' : 'Rechazar',
     })
-    if (comentario === undefined) return
+    if (!result) return
+    const comentario = result.comentario
     const { error } = await supabase.from('flujo_aprobacion_cond').update({
       estado: nuevoEstado,
       aprobado_por: autorNombre || null,
@@ -86,7 +90,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   }
 
   async function eliminar(flujo: FlujoAprobacionCond) {
-    const r = await Swal.fire({ title: '¿Eliminar solicitud?', text: flujo.titulo, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar solicitud?', text: flujo.titulo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('flujo_aprobacion_cond').delete().eq('id', flujo.id)
     onRefresh()

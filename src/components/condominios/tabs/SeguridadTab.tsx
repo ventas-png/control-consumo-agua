@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
@@ -168,13 +168,21 @@ export function SeguridadTab({
   }
 
   async function marcarVisitaConNovedad(visitaId: string) {
-    const { value: notas } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Registrar novedad en este punto',
-      input: 'textarea', inputPlaceholder: 'Describe la novedad encontrada...',
-      showCancelButton: true, confirmButtonText: 'Registrar', cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'notas',
+        label: 'Novedad',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Describe la novedad encontrada...',
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Registrar',
     })
-    if (notas === undefined) return
-    await marcarVisita(visitaId, 'novedad', notas as string)
+    if (!result) return
+    await marcarVisita(visitaId, 'novedad', result.notas)
   }
 
   async function registrarNovedad() {
@@ -198,7 +206,7 @@ export function SeguridadTab({
   }
 
   async function eliminarNovedad(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar novedad?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar novedad?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('novedades_seguridad').delete().eq('id', id)
     onRefresh()
