@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 
@@ -82,13 +82,22 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
     if (!cfg.next) return
     const updates: Partial<OrdenCompra> = { estado: cfg.next }
     if (cfg.next === 'recibida') {
-      const { value: montoReal } = await Swal.fire({
+      const result = await openPromptDialog({
         title: 'Monto real de la OC',
-        input: 'number', inputPlaceholder: `Estimado: ${orden.monto_estimado ?? '—'}`,
-        showCancelButton: true, confirmButtonText: 'Confirmar recepción',
+        fields: [{
+          name: 'montoReal',
+          label: 'Monto real',
+          type: 'number',
+          placeholder: `Estimado: ${orden.monto_estimado ?? '—'}`,
+          min: 0,
+          step: 0.01,
+          autoFocus: true,
+        }],
+        submitText: 'Confirmar recepción',
       })
-      if (montoReal === undefined) return
-      updates.monto_real = montoReal ? parseFloat(montoReal as string) : orden.monto_estimado
+      if (!result) return
+      const montoReal = result.montoReal
+      updates.monto_real = montoReal ? parseFloat(montoReal) : orden.monto_estimado
       updates.fecha_entrega_esperada = new Date().toISOString().slice(0, 10)
     }
     const { error } = await supabase.from('ordenes_compra').update(updates).eq('id', orden.id)
@@ -97,14 +106,14 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   }
 
   async function cancelar(orden: OrdenCompra) {
-    const r = await Swal.fire({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Cancelar OC' })
+    const r = await confirm({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', variant: 'danger', confirmText: 'Cancelar OC' })
     if (!r.isConfirmed) return
     await supabase.from('ordenes_compra').update({ estado: 'cancelada' }).eq('id', orden.id)
     onRefresh()
   }
 
   async function eliminar(orden: OrdenCompra) {
-    const r = await Swal.fire({ title: '¿Eliminar borrador?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar borrador?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('ordenes_compra').delete().eq('id', orden.id)
     onRefresh()

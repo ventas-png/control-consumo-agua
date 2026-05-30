@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
@@ -53,12 +53,21 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
   }
 
   async function responderMensaje(id: string) {
-    const { value: respuesta } = await Swal.fire({
-      title: 'Responder al residente', input: 'textarea', inputPlaceholder: 'Escriba la respuesta...',
-      showCancelButton: true, confirmButtonText: 'Enviar respuesta', cancelButtonText: 'Cancelar',
+    const result = await openPromptDialog({
+      title: 'Responder al residente',
+      fields: [{
+        name: 'respuesta',
+        label: 'Respuesta',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Escriba la respuesta...',
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Enviar respuesta',
     })
-    if (!respuesta) return
-    await supabase.from('mensajes_portal').update({ estado: 'respondido', respuesta: respuesta as string, respondido_en: new Date().toISOString() }).eq('id', id)
+    if (!result?.respuesta) return
+    await supabase.from('mensajes_portal').update({ estado: 'respondido', respuesta: result.respuesta, respondido_en: new Date().toISOString() }).eq('id', id)
     onRefresh()
   }
 

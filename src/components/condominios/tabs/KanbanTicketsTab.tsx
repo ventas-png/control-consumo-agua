@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import { TicketMantenimiento, EstadoTicket, PrioridadTicket } from '../../../types'
 
@@ -66,26 +67,41 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
     setMoviendo(ticket.id)
     const updates: Partial<TicketMantenimiento> = { estado: nuevoEstado }
     if (nuevoEstado === 'cerrado') {
-      const { value: notas } = await Swal.fire({
-        title: 'Cerrar ticket', input: 'textarea',
-        inputLabel: 'Notas de cierre (opcional)', inputPlaceholder: 'Descripción de la solución...',
-        showCancelButton: true, confirmButtonText: 'Cerrar ticket', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-success)',
+      const result = await openPromptDialog({
+        title: 'Cerrar ticket',
+        fields: [{
+          name: 'notas',
+          label: 'Notas de cierre (opcional)',
+          control: 'textarea',
+          rows: 4,
+          placeholder: 'Descripción de la solución...',
+          autoFocus: true,
+        }],
+        submitText: 'Cerrar ticket',
       })
-      if (notas === undefined) { setMoviendo(null); return }
-      updates.notas_cierre = notas || null
+      if (!result) { setMoviendo(null); return }
+      updates.notas_cierre = result.notas || null
       updates.fecha_cierre = new Date().toISOString()
       if (ticket.costo_estimado) {
-        const { value: costoReal } = await Swal.fire({
-          title: 'Costo real', input: 'number',
-          inputLabel: `Costo estimado: ${moneda} ${ticket.costo_estimado}`,
-          inputPlaceholder: '0.00', showCancelButton: true, confirmButtonText: 'Confirmar', confirmButtonColor: 'var(--at-success)',
+        const costoResult = await openPromptDialog({
+          title: 'Costo real',
+          fields: [{
+            name: 'costoReal',
+            label: `Costo estimado: ${moneda} ${ticket.costo_estimado}`,
+            type: 'number',
+            placeholder: '0.00',
+            min: 0,
+            step: 0.01,
+            autoFocus: true,
+          }],
+          submitText: 'Confirmar',
         })
-        if (costoReal !== undefined) updates.costo_real = costoReal ? parseFloat(costoReal as string) : null
+        if (costoResult) updates.costo_real = costoResult.costoReal ? parseFloat(costoResult.costoReal) : null
       }
     }
     const { error } = await supabase.from('tickets_mantenimiento').update(updates).eq('id', ticket.id)
     setMoviendo(null)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

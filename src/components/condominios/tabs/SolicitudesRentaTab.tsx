@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
 
@@ -46,17 +46,20 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
 
   async function resolver(s: SolicitudRentaUnidad, nuevoEstado: 'aprobada' | 'rechazada') {
     if (!canEdit) return
-    const { value: comentario } = await Swal.fire({
+    const result = await openPromptDialog({
       title: nuevoEstado === 'aprobada' ? '¿Aprobar solicitud?' : '¿Rechazar solicitud?',
-      input: 'textarea',
-      inputLabel: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo (recomendado)',
-      inputPlaceholder: 'Escriba un comentario…',
-      showCancelButton: true,
-      confirmButtonColor: nuevoEstado === 'aprobada' ? 'var(--at-success)' : 'var(--at-danger)',
-      confirmButtonText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
-      cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'comentario',
+        label: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo (recomendado)',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Escriba un comentario…',
+        autoFocus: true,
+      }],
+      submitText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
     })
-    if (comentario === undefined) return
+    if (!result) return
+    const comentario = result.comentario
 
     setSaving(true)
     const payload: Partial<SolicitudRentaUnidad> & { estado: string } = {
@@ -74,10 +77,10 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
       .eq('id', s.id)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada',
-      timer: 1400, showConfirmButton: false,
+      duration: 1400,
     })
     setExpandedId(null)
     onRefresh()
