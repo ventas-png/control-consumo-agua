@@ -6,6 +6,7 @@ import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { DialogProvider } from './components/shared/Dialog'
+import { PromptDialogRoot } from './components/shared/PromptDialog'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -31,6 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <DialogProvider>
         <App />
         <PwaUpdatePrompt />
+        <PromptDialogRoot />
       </DialogProvider>
     </ErrorBoundary>
   </StrictMode>
