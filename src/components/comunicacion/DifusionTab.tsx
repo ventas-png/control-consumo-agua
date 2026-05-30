@@ -1,8 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad, UserSession } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 
 interface Props {
   currentUser: UserSession
@@ -111,15 +110,13 @@ function NuevoComunicadoModal({
       return
     }
 
-    const confirm = await Swal.fire({
+    const conf = await confirm({
       title: '¿Enviar comunicado?',
-      html: `Se enviará a <b>${estimated}</b> cliente${estimated !== 1 ? 's' : ''}${form.send_email ? ' (con email)' : ''}.`,
+      text: `Se enviará a ${estimated} cliente${estimated !== 1 ? 's' : ''}${form.send_email ? ' (con email)' : ''}.`,
       icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, enviar',
-      cancelButtonText: 'Cancelar',
+      confirmText: 'Sí, enviar',
     })
-    if (!confirm.isConfirmed) return
+    if (!conf.isConfirmed) return
 
     setSending(true)
     const result = await createBroadcast({
@@ -143,12 +140,11 @@ function NuevoComunicadoModal({
       ? ` · ${result.emailsSent} emails enviados${result.emailErrors > 0 ? `, ${result.emailErrors} fallidos` : ''}`
       : ''
 
-    Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: 'Comunicado enviado',
       text: `${result.recipientCount} destinatarios${emailInfo}`,
-      timer: 3000,
-      showConfirmButton: false,
+      duration: 3000,
     })
     onSent()
     onClose()

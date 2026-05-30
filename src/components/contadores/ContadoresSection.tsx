@@ -1,6 +1,5 @@
 import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -311,17 +310,14 @@ export function ContadoresSection({
   }
 
   async function handleEliminar(c: Contador) {
-    const confirm = await Swal.fire({
+    const conf = await confirm({
       title: '¿Eliminar contador?',
-      html: `<b>${c.numero_serie}</b> será eliminado permanentemente.`,
+      text: `${c.numero_serie} será eliminado permanentemente.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, eliminar',
     })
-    if (!confirm.isConfirmed) return
+    if (!conf.isConfirmed) return
 
     const { error } = await supabase.from('contadores').delete().eq('id', c.id)
     if (!error) {

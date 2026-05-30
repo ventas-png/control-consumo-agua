@@ -1,6 +1,5 @@
 import { useState, useMemo, type CSSProperties } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
@@ -155,16 +154,12 @@ export function HistorialSection({
   }
 
   async function eliminarRegistro(registro: Registro) {
-    const result = await Swal.fire({
+    const result = await confirm({
       icon: 'warning',
       title: '¿Eliminar lectura?',
-      html: `Se eliminará la lectura de <b>${registro.cliente_nombre ?? 'este cliente'}</b> del <b>${formatDate(registro.fecha)}</b>.<br/>Esta acción no se puede deshacer.`,
-      showCancelButton: true,
-      confirmButtonText: '🗑️ Eliminar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: 'var(--at-danger)',
-      reverseButtons: true,
-      focusCancel: true,
+      text: `Se eliminará la lectura de ${registro.cliente_nombre ?? 'este cliente'} del ${formatDate(registro.fecha)}. Esta acción no se puede deshacer.`,
+      variant: 'danger',
+      confirmText: '🗑️ Eliminar',
     })
     if (!result.isConfirmed) return
     const { error, count } = await supabase

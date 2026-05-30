@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { notify, confirm } from '../../shared/Dialog'
 import FacturaEnergiaModal from '../FacturaEnergiaModal'
 import { supabase } from '../../../lib/supabase'
 
@@ -91,14 +90,7 @@ export default function FacturasTab({
   }
 
   const handleDelete = async (id: string) => {
-    const { isConfirmed } = await Swal.fire({
-      title: '¿Eliminar?',
-      text: '¿Está seguro de que desea eliminar esta factura?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      confirmButtonText: 'Eliminar',
-    })
+    const { isConfirmed } = await confirm({ title: '¿Eliminar?', text: '¿Está seguro de que desea eliminar esta factura?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
 
     if (!isConfirmed) return
 

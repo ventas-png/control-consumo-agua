@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import type { Registro, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -50,22 +49,17 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
 
       // Aquí iría la integración con Stripe.js (stripe-js library)
       // Por ahora mostramos un placeholder
-      void Swal.fire({
-        icon: 'info',
+      notify({
+        variant: 'info',
         title: 'Integración Stripe',
-        html: `
-          <p>Redirigiendo a Stripe para procesar el pago...</p>
-          <p style="font-family: monospace; font-size: 11px; color: var(--at-ink-3); margin-top: 12px;">
-            Client Secret: ${clientSecret.substring(0, 20)}...
-          </p>
-        `,
+        text: `Redirigiendo a Stripe para procesar el pago... (Client Secret: ${clientSecret.substring(0, 20)}...)`,
       })
 
       onSuccess()
     } catch (err: any) {
       console.error(err)
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error',
         text: err.message || 'No se pudo procesar el pago',
       })

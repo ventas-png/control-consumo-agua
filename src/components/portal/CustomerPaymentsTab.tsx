@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -189,8 +189,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                   {paymentConfig.paypal_activo && (
                     <button
                       onClick={() => {
-                        void Swal.fire({
-                          icon: 'info',
+                        notify({
+                          variant: 'info',
                           title: 'PayPal',
                           text: 'Integración de PayPal disponible próximamente',
                         })

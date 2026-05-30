@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Tarifa, UserRole, UserSession, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
@@ -203,15 +202,12 @@ export function TarifasSection({
   }
 
   async function handleEliminar(t: Tarifa) {
-    const result = await Swal.fire({
+    const result = await confirm({
       title: '¿Eliminar tarifa?',
-      html: `<b>${t.nombre}</b> será eliminada permanentemente.`,
+      text: `${t.nombre} será eliminada permanentemente.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, eliminar',
     })
 
     if (!result.isConfirmed) return

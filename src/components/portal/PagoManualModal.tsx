@@ -1,5 +1,4 @@
 import { useState, type ChangeEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, UserSession, FormaPago } from '../../types'
@@ -96,24 +95,18 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
 
       if (error) throw error
 
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: '✅ Pago registrado',
-        html: `
-          <p>Tu pago de <strong>${moneda} ${montoNum.toFixed(2)}</strong> está en revisión.</p>
-          <p style="font-size: 13px; color: var(--at-ink-3); margin-top: 12px;">
-            El gestor de cobros verificará tu comprobante en las próximas horas.
-          </p>
-        `,
-        timer: 3000,
-        showConfirmButton: false,
+        text: `Tu pago de ${moneda} ${montoNum.toFixed(2)} está en revisión. El gestor de cobros verificará tu comprobante en las próximas horas.`,
+        duration: 3000,
       })
 
       onSuccess()
     } catch (err: any) {
       console.error(err)
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error',
         text: err.message || 'No se pudo registrar el pago',
       })
