@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
 import { sanitizeInput } from '../../lib/validation'
@@ -240,7 +239,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       setPendingFile(null)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Error desconocido'
-      Swal.fire({ icon: 'error', title: 'Error al enviar', text: msg })
+      notify({ variant: 'error', title: 'Error al enviar', text: msg })
       return
     }
 

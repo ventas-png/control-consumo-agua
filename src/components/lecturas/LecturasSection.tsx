@@ -1,6 +1,6 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { notify, confirm } from '../shared/Dialog'
 import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
@@ -311,16 +311,7 @@ export function LecturasSection({
     const nuevoRegistro = data[0] as Registro
     onRegistroAdded(nuevoRegistro)
 
-    const result = await Swal.fire({
-      icon: 'success',
-      title: 'Lectura Guardada',
-      text: '¿Deseas enviar el recibo por WhatsApp?',
-      showCancelButton: true,
-      confirmButtonColor: '#25D366',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Enviar WhatsApp',
-      cancelButtonText: 'No, gracias',
-    })
+    const result = await confirm({ title: 'Lectura Guardada', text: '¿Deseas enviar el recibo por WhatsApp?', icon: 'question', confirmText: 'Enviar WhatsApp', cancelText: 'No, gracias' })
 
     if (result.isConfirmed) enviarWhatsApp(nuevoRegistro)
 

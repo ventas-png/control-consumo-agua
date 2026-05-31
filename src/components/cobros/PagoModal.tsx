@@ -1,5 +1,4 @@
 import { useState, type FormEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
@@ -72,12 +71,11 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
       if (regError) throw regError
 
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: esPagoCompleto ? '✅ Pago completo aplicado' : '💳 Abono registrado',
-        html: `<b>${moneda} ${montoNum.toFixed(2)}</b> aplicado vía <b>${formasPagoLabels[formaPago]}</b>${numeroDocumento ? `<br>Doc: <b>${numeroDocumento}</b>` : ''}`,
-        timer: 2000,
-        showConfirmButton: false,
+        text: `${moneda} ${montoNum.toFixed(2)} aplicado vía ${formasPagoLabels[formaPago]}${numeroDocumento ? ` · Doc: ${numeroDocumento}` : ''}`,
+        duration: 2000,
       })
 
       onSuccess(registro.id, nuevoEstado, nuevoAbonado)

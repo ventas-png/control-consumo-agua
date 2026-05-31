@@ -1,5 +1,4 @@
 import { useState, type FormEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente } from '../../types'
@@ -58,12 +57,11 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         .update({ estado: 'mora' })
         .in('id', registros.map(r => r.id))
 
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: '🤝 Convenio creado',
-        html: `Convenio <b>#${numeroConvenio}</b> por <b>${moneda} ${totalCargos.toFixed(2)}</b>`,
-        timer: 2000,
-        showConfirmButton: false,
+        text: `Convenio #${numeroConvenio} por ${moneda} ${totalCargos.toFixed(2)}`,
+        duration: 2000,
       })
 
       onSuccess()

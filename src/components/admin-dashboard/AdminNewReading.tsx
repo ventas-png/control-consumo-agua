@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent} from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type { Cliente, Contador, Tarifa } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -54,8 +54,8 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
     e.preventDefault()
 
     if (!selectedClienteId || !lecturaAnterior || !lecturaActual) {
-      void Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'Campos requeridos',
         text: 'Complete los datos de cliente y lecturas',
       })
@@ -99,12 +99,11 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
 
       if (error) throw error
 
-      void Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: 'Lectura registrada',
         text: `Se registró la lectura para ${selectedCliente?.nombre}`,
-        timer: 1500,
-        showConfirmButton: false,
+        duration: 1500,
       })
 
       // Reset form
@@ -119,8 +118,8 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       onReadingAdded()
     } catch (err) {
       console.error(err)
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error',
         text: 'No se pudo guardar la lectura',
       })
