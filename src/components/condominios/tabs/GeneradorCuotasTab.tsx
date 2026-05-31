@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog, RubroConfig, RubroDetalle } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
@@ -176,14 +175,11 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
     const metodosUsados = [...new Set(rubros.map(r => r.metodo))]
     const metodoCalculo = metodosUsados.length === 1 ? metodosUsados[0] : 'mixto'
 
-    const r = await Swal.fire({
+    const r = await confirm({
       title: `¿Generar ${seleccionadas.size} cuotas?`,
-      html: `<b>${conceptoFinal}</b> · ${rubros.length} rubro(s)<br>Período: ${periodo} · Vence: ${fechaVenc}<br>Total: <b>${moneda} ${totalSeleccionado.toLocaleString('es', { minimumFractionDigits: 2 })}</b>`,
+      text: `${conceptoFinal} · ${rubros.length} rubro(s) · Período: ${periodo} · Vence: ${fechaVenc} · Total: ${moneda} ${totalSeleccionado.toLocaleString('es', { minimumFractionDigits: 2 })}`,
       icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-primary)',
-      confirmButtonText: 'Generar',
-      cancelButtonText: 'Cancelar',
+      confirmText: 'Generar',
     })
     if (!r.isConfirmed) return
 

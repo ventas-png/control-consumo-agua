@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
+import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, UserRole, UserSession, Pago, ConvenioPago, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -208,25 +208,28 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
           }
         }
 
-        void Swal.fire({
-          icon: 'success',
+        notify({
+          variant: 'success',
           title: '✅ Pago verificado',
           text: `Pago de ${moneda} ${pago.monto.toFixed(2)} ha sido verificado correctamente`,
-          timer: 2000,
-          showConfirmButton: false,
+          duration: 2000,
         })
       } else {
         // Ask for rejection reason
-        const { value: razon } = await Swal.fire({
-          icon: 'question',
+        const promptResult = await openPromptDialog({
           title: '❌ Rechazar Pago',
-          input: 'textarea',
-          inputPlaceholder: 'Motivo del rechazo...',
-          inputAttributes: { required: 'true' },
-          showCancelButton: true,
-          confirmButtonText: 'Rechazar',
-          cancelButtonText: 'Cancelar',
+          fields: [{
+            name: 'razon',
+            label: 'Motivo del rechazo',
+            control: 'textarea',
+            rows: 4,
+            placeholder: 'Motivo del rechazo...',
+            required: true,
+            autoFocus: true,
+          }],
+          submitText: 'Rechazar',
         })
+        const razon = promptResult?.razon
 
         if (razon) {
           const { error } = await supabase
@@ -242,20 +245,19 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
 
           if (error) throw error
 
-          void Swal.fire({
-            icon: 'success',
+          notify({
+            variant: 'success',
             title: '❌ Pago rechazado',
             text: 'El cliente será notificado del rechazo',
-            timer: 2000,
-            showConfirmButton: false,
+            duration: 2000,
           })
         }
       }
 
       void cargarPagosYConvenios()
     } catch (err: any) {
-      void Swal.fire({
-        icon: 'error',
+      notify({
+        variant: 'error',
         title: 'Error',
         text: err.message || 'No se pudo procesar la verificación',
       })

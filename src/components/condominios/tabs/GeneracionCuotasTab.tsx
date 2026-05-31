@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog } from '../../../types'
 
@@ -70,14 +69,11 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
     if (!conceptoFinal.trim()) { notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el concepto.' }); return }
     if (seleccionadas.size === 0) { notify({ variant: 'warning', title: 'Sin unidades', text: 'Selecciona al menos una unidad.' }); return }
 
-    const r = await Swal.fire({
+    const r = await confirm({
       title: `¿Generar ${seleccionadas.size} cuotas?`,
-      html: `<b>${conceptoFinal}</b> · ${moneda} ${parseFloat(monto).toFixed(2)}<br>Período: ${periodo} · Vence: ${fechaVenc}`,
+      text: `${conceptoFinal} · ${moneda} ${parseFloat(monto).toFixed(2)} · Período: ${periodo} · Vence: ${fechaVenc}`,
       icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-primary)',
-      confirmButtonText: 'Generar',
-      cancelButtonText: 'Cancelar',
+      confirmText: 'Generar',
     })
     if (!r.isConfirmed) return
 

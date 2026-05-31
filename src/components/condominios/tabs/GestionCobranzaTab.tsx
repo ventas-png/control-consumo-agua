@@ -1,7 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { GestionCobranza, EtapaCobranza, EstadoCobranza, TipoContactoCobranza, ContactoCobranza, Unidad } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -119,24 +119,20 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
   }
 
   async function actualizarMontos(c: GestionCobranza) {
-    const { value: vals } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Actualizar montos',
-      html: `
-        <div style="margin-bottom:10px"><label style="font-size:13px">Monto adeudado (${moneda}):</label>
-        <input id="adeudado" class="swal2-input" type="number" value="${c.monto_adeudado}" style="margin-top:4px"></div>
-        <div><label style="font-size:13px">Monto pagado (${moneda}):</label>
-        <input id="pagado" class="swal2-input" type="number" value="${c.monto_pagado}" style="margin-top:4px"></div>
-      `,
-      showCancelButton: true, confirmButtonText: 'Actualizar',
-      preConfirm: () => ({
-        adeudado: parseFloat((document.getElementById('adeudado') as HTMLInputElement)?.value || '0'),
-        pagado: parseFloat((document.getElementById('pagado') as HTMLInputElement)?.value || '0'),
-      }),
+      fields: [
+        { name: 'adeudado', label: `Monto adeudado (${moneda})`, type: 'number', initialValue: String(c.monto_adeudado), min: 0, step: 0.01, autoFocus: true },
+        { name: 'pagado', label: `Monto pagado (${moneda})`, type: 'number', initialValue: String(c.monto_pagado), min: 0, step: 0.01 },
+      ],
+      submitText: 'Actualizar',
     })
-    if (!vals) return
-    const { error } = await supabase.from('gestion_cobranza').update({ monto_adeudado: vals.adeudado, monto_pagado: vals.pagado }).eq('id', c.id)
+    if (!result) return
+    const adeudado = parseFloat(result.adeudado || '0')
+    const pagado = parseFloat(result.pagado || '0')
+    const { error } = await supabase.from('gestion_cobranza').update({ monto_adeudado: adeudado, monto_pagado: pagado }).eq('id', c.id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, monto_adeudado: vals.adeudado, monto_pagado: vals.pagado } : null)
+    if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, monto_adeudado: adeudado, monto_pagado: pagado } : null)
     onRefresh()
   }
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import { supabase } from '../../lib/supabase'
 import type {
   Cliente, Unidad, ContratoArrendamiento, ReservaSTR,
@@ -181,22 +180,19 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     if (error) {
       notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar el contrato.' })
     } else {
-      Swal.fire({ icon: 'success', title: editingContratoId ? 'Contrato actualizado' : 'Contrato creado', timer: 1800, showConfirmButton: false })
+      notify({ variant: 'success', title: editingContratoId ? 'Contrato actualizado' : 'Contrato creado', duration: 1800 })
       cancelContratoForm()
       await fetchData()
     }
   }
 
   async function handleEliminarContrato(c: ContratoArrendamiento) {
-    const result = await Swal.fire({
+    const result = await confirm({
       title: '¿Eliminar contrato?',
       text: `Arrendatario: ${c.arrendatario_nombre}`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, eliminar',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
@@ -296,22 +292,19 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     if (error) {
       notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar la reserva.' })
     } else {
-      Swal.fire({ icon: 'success', title: editingSTRId ? 'Reserva actualizada' : 'Reserva creada', timer: 1800, showConfirmButton: false })
+      notify({ variant: 'success', title: editingSTRId ? 'Reserva actualizada' : 'Reserva creada', duration: 1800 })
       cancelSTRForm()
       await fetchData()
     }
   }
 
   async function handleEliminarSTR(r: ReservaSTR) {
-    const result = await Swal.fire({
+    const result = await confirm({
       title: '¿Eliminar reserva?',
       text: `Huésped: ${r.huesped_nombre}`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, eliminar',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('reservas_str').delete().eq('id', r.id)
