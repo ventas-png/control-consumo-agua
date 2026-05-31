@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyecto, UserSession, ModoSuministroEnergia } from '../../../types'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -200,14 +200,12 @@ export default function FuentesTab({
   }
 
   const handleDelete = async (id: string, nombre: string) => {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: '¿Eliminar fuente?',
-      html: `<b>${nombre}</b> y todas sus facturas serán eliminadas.`,
+      text: `${nombre} y todas sus facturas serán eliminadas.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
     try {

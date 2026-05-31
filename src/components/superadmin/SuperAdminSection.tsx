@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
+import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 
@@ -111,8 +111,8 @@ export function SuperAdminSection() {
       return
     }
     if (empresa && nuevoMax < (empresa.unit_count ?? 0)) {
-      void Swal.fire({
-        icon: 'warning', title: 'Límite menor al uso actual',
+      notify({
+        variant: 'warning', title: 'Límite menor al uso actual',
         text: `Esta empresa ya tiene ${empresa.unit_count} unidades creadas. El nuevo límite debe ser igual o mayor.`,
       })
       return
@@ -137,41 +137,48 @@ export function SuperAdminSection() {
   }
 
   async function editarEmpresa(empresa: Empresa) {
-    const { value: formValues } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Editar Empresa',
-      html: `
-        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
-        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
-        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
-        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
-        <select id="swal-plan" class="swal2-select">
-          <option value="basico" ${empresa.plan === 'basico' ? 'selected' : ''}>Plan Básico</option>
-          <option value="profesional" ${empresa.plan === 'profesional' ? 'selected' : ''}>Plan Profesional</option>
-          <option value="enterprise" ${empresa.plan === 'enterprise' ? 'selected' : ''}>Plan Enterprise</option>
-        </select>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center;color:var(--at-ink-3);font-size:14px;">
-          <input id="swal-activa" type="checkbox" ${empresa.activa ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--at-primary);" />
-          Empresa activa
-        </label>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
-        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
-        return {
-          nombre,
-          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
-          email: (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim() || null,
-          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
-          plan: (document.getElementById('swal-plan') as HTMLSelectElement)?.value,
-          activa: (document.getElementById('swal-activa') as HTMLInputElement)?.checked,
-        }
-      },
+      fields: [
+        { name: 'nombre', label: 'Nombre de la empresa', required: true, initialValue: empresa.nombre, autoFocus: true },
+        { name: 'nit', label: 'NIT', initialValue: empresa.nit ?? '' },
+        { name: 'email', label: 'Email de contacto', type: 'email', initialValue: empresa.email ?? '' },
+        { name: 'telefono', label: 'Teléfono', type: 'tel', initialValue: empresa.telefono ?? '' },
+        {
+          name: 'plan',
+          label: 'Plan',
+          control: 'select',
+          options: [
+            { value: 'basico', label: 'Plan Básico' },
+            { value: 'profesional', label: 'Plan Profesional' },
+            { value: 'enterprise', label: 'Plan Enterprise' },
+          ],
+          initialValue: empresa.plan ?? 'basico',
+        },
+        {
+          name: 'activa',
+          label: 'Estado',
+          control: 'select',
+          options: [
+            { value: 'true', label: 'Activa' },
+            { value: 'false', label: 'Inactiva' },
+          ],
+          initialValue: empresa.activa ? 'true' : 'false',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (data) => data.nombre?.trim() ? null : 'El nombre es obligatorio',
     })
 
-    if (!formValues) return
+    if (!result) return
+    const formValues = {
+      nombre: result.nombre.trim(),
+      nit: result.nit?.trim() || null,
+      email: result.email?.trim() || null,
+      telefono: result.telefono?.trim() || null,
+      plan: result.plan,
+      activa: result.activa === 'true',
+    }
 
     const { error } = await supabase
       .from('companies')
@@ -187,51 +194,40 @@ export function SuperAdminSection() {
   }
 
   async function crearEmpresa() {
-    const { value: formValues } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Nueva Empresa',
-      html: `
-        <input id="swal-empresa" class="swal2-input" placeholder="Nombre de la empresa *" />
-        <input id="swal-nit" class="swal2-input" placeholder="NIT (opcional)" />
-        <input id="swal-email-empresa" class="swal2-input" placeholder="Email de la empresa (opcional)" type="email" />
-        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono (opcional)" />
-        <input id="swal-max" class="swal2-input" placeholder="Límite de proyectos" type="number" value="5" min="1" />
-        <input id="swal-max-units" class="swal2-input" placeholder="Límite de unidades" type="number" value="50" min="1" />
-        <hr style="border-color:rgba(255,255,255,0.1);margin:8px 0;" />
-        <input id="swal-owner-nombre" class="swal2-input" placeholder="Nombre del administrador *" />
-        <input id="swal-owner-email" class="swal2-input" placeholder="Email del administrador *" type="email" />
-        <input id="swal-owner-pass" class="swal2-input" placeholder="Contraseña temporal *" type="password" />
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Crear',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const empresaNombre = (document.getElementById('swal-empresa') as HTMLInputElement)?.value?.trim()
-        const ownerNombre = (document.getElementById('swal-owner-nombre') as HTMLInputElement)?.value?.trim()
-        const ownerEmail = (document.getElementById('swal-owner-email') as HTMLInputElement)?.value?.trim()
-        const ownerPass = (document.getElementById('swal-owner-pass') as HTMLInputElement)?.value
-        const maxProj = parseInt((document.getElementById('swal-max') as HTMLInputElement)?.value ?? '5')
-        const maxUnits = parseInt((document.getElementById('swal-max-units') as HTMLInputElement)?.value ?? '50')
-        if (!empresaNombre || !ownerNombre || !ownerEmail || !ownerPass) {
-          Swal.showValidationMessage('Los campos marcados con * son obligatorios')
-          return false
+      description: 'Datos de la empresa y de su administrador inicial.',
+      fields: [
+        { name: 'empresaNombre', label: 'Nombre de la empresa', required: true, autoFocus: true },
+        { name: 'nit', label: 'NIT', helpText: 'Opcional' },
+        { name: 'emailEmpresa', label: 'Email de la empresa', type: 'email', helpText: 'Opcional' },
+        { name: 'telefono', label: 'Teléfono', type: 'tel', helpText: 'Opcional' },
+        { name: 'maxProj', label: 'Límite de proyectos', type: 'number', min: 1, initialValue: '5' },
+        { name: 'maxUnits', label: 'Límite de unidades', type: 'number', min: 1, initialValue: '50' },
+        { name: 'ownerNombre', label: 'Nombre del administrador', required: true },
+        { name: 'ownerEmail', label: 'Email del administrador', type: 'email', required: true },
+        { name: 'ownerPass', label: 'Contraseña temporal', type: 'password', required: true, helpText: 'Mínimo 8 caracteres' },
+      ],
+      submitText: 'Crear',
+      validate: (data) => {
+        if (!data.empresaNombre?.trim() || !data.ownerNombre?.trim() || !data.ownerEmail?.trim() || !data.ownerPass) {
+          return 'Los campos marcados con * son obligatorios'
         }
-        if (ownerPass.length < 8) {
-          Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres')
-          return false
-        }
-        return {
-          empresaNombre,
-          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
-          emailEmpresa: (document.getElementById('swal-email-empresa') as HTMLInputElement)?.value?.trim() || null,
-          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
-          ownerNombre,
-          ownerEmail,
-          ownerPass,
-          maxProj: isNaN(maxProj) ? 5 : maxProj,
-          maxUnits: isNaN(maxUnits) ? 50 : maxUnits,
-        }
+        if (data.ownerPass.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+        return null
       },
     })
+    const formValues = result ? {
+      empresaNombre: result.empresaNombre.trim(),
+      nit: result.nit?.trim() || null,
+      emailEmpresa: result.emailEmpresa?.trim() || null,
+      telefono: result.telefono?.trim() || null,
+      ownerNombre: result.ownerNombre.trim(),
+      ownerEmail: result.ownerEmail.trim(),
+      ownerPass: result.ownerPass,
+      maxProj: parseInt(result.maxProj) || 5,
+      maxUnits: parseInt(result.maxUnits) || 50,
+    } : null
 
     if (!formValues) return
 

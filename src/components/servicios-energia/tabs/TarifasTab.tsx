@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -179,14 +179,12 @@ export default function TarifasTab({
   }
 
   const handleDelete = async (id: string, nombre: string) => {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: '¿Eliminar tarifa?',
-      html: `<b>${nombre}</b> será eliminada permanentemente.`,
+      text: `${nombre} será eliminada permanentemente.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
     try {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProveedorEnergia, Proyecto, UserSession } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -44,63 +44,58 @@ export default function ProveedoresTab({
       return
     }
 
-    const proyectoOptions = proyectos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
+    const proyectoOptions = proyectos.map(p => ({ value: p.id, label: p.nombre }))
 
-    const { value: formValues } = await Swal.fire({
+    const fields = [
+      { name: 'nombre', label: 'Nombre', placeholder: 'EEGSA', required: true, autoFocus: true } as const,
+    ]
+    if (proyectos.length > 1) {
+      fields.push({
+        name: 'project_id',
+        label: 'Proyecto',
+        control: 'select',
+        options: proyectoOptions,
+        required: true,
+      } as never)
+    }
+    fields.push(
+      { name: 'nit', label: 'NIT', placeholder: '9999999-9' } as never,
+      { name: 'contacto', label: 'Contacto', placeholder: '2290-1234' } as never,
+      {
+        name: 'tipo',
+        label: 'Tipo',
+        control: 'select',
+        options: [
+          { value: 'distribuidora', label: 'Distribuidora' },
+          { value: 'comercializadora', label: 'Comercializadora' },
+          { value: 'autogeneracion', label: 'Autogeneración' },
+        ],
+        initialValue: 'distribuidora',
+        required: true,
+      } as never,
+    )
+
+    const result = await openPromptDialog({
       title: 'Nuevo Proveedor de Energía',
-      html: `
-        <div style="text-align: left;">
-          <label style="display:block;margin:0.5rem 0;font-weight:bold;">Nombre *</label>
-          <input id="prov_nombre" placeholder="EEGSA" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-
-          ${proyectos.length > 1 ? `
-          <label style="display:block;margin:0.75rem 0 0.25rem;font-weight:bold;">Proyecto *</label>
-          <select id="prov_project" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            <option value="">Seleccionar proyecto</option>
-            ${proyectoOptions}
-          </select>
-          ` : `<input type="hidden" id="prov_project" value="${defaultProjectId ?? ''}" />`}
-
-          <label style="display:block;margin:0.75rem 0 0.25rem;">NIT</label>
-          <input id="prov_nit" placeholder="9999999-9" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-
-          <label style="display:block;margin:0.75rem 0 0.25rem;">Contacto</label>
-          <input id="prov_contacto" placeholder="2290-1234" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-
-          <label style="display:block;margin:0.75rem 0 0.25rem;">Tipo *</label>
-          <select id="prov_tipo" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            <option value="distribuidora">Distribuidora</option>
-            <option value="comercializadora">Comercializadora</option>
-            <option value="autogeneracion">Autogeneración</option>
-          </select>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Crear',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('prov_nombre') as HTMLInputElement)?.value?.trim() ?? ''
-        const projectId = (document.getElementById('prov_project') as HTMLInputElement | HTMLSelectElement)?.value ?? ''
-        const nit = (document.getElementById('prov_nit') as HTMLInputElement)?.value ?? ''
-        const contacto = (document.getElementById('prov_contacto') as HTMLInputElement)?.value ?? ''
-        const tipo = (document.getElementById('prov_tipo') as HTMLSelectElement)?.value ?? 'distribuidora'
-
-        if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
-
-        return {
-          nombre: sanitizeInput(nombre),
-          nit: sanitizeInput(nit) || null,
-          contacto: sanitizeInput(contacto) || null,
-          tipo,
-          project_id: projectId,
-          company_id: companyId,
-          activo: true,
-        }
+      fields,
+      submitText: 'Crear',
+      validate: (data) => {
+        if (!data.nombre?.trim()) return 'El nombre es requerido'
+        if (proyectos.length > 1 && (!data.project_id || data.project_id === 'null')) return 'Debe seleccionar un proyecto'
+        return null
       },
     })
 
-    if (!formValues) return
+    if (!result) return
+    const formValues = {
+      nombre: sanitizeInput(result.nombre),
+      nit: sanitizeInput(result.nit) || null,
+      contacto: sanitizeInput(result.contacto) || null,
+      tipo: result.tipo,
+      project_id: proyectos.length > 1 ? result.project_id : (defaultProjectId ?? ''),
+      company_id: companyId,
+      activo: true,
+    }
 
     try {
       const { data, error } = await supabase.from('proveedores_energia').insert([formValues]).select().single()
@@ -134,14 +129,12 @@ export default function ProveedoresTab({
   }
 
   const handleDelete = async (id: string, nombre: string) => {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: '¿Eliminar proveedor?',
-      html: `<b>${nombre}</b> será eliminado permanentemente.`,
+      text: `${nombre} será eliminado permanentemente.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
     try {
