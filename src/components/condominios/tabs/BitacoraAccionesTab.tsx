@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { notify } from '../../shared/Dialog'
 import { BitacoraAccion, AccionBitacora } from '../../../types'
 
 interface Props {
@@ -107,7 +108,7 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
                       {b.detalles && (
                         <button onClick={() => {
                           const pre = JSON.stringify(b.detalles, null, 2)
-                          import('sweetalert2').then(({ default: Swal }) => Swal.fire({ title: 'Detalles', html: `<pre style="text-align:left;font-size:11px;max-height:300px;overflow:auto">${pre}</pre>`, width: 500 }))
+                          notify({ variant: 'info', title: 'Detalles', text: pre, duration: 8000 })
                         }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 13 }}>🔍</button>
                       )}
                     </td>

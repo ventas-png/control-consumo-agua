@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
@@ -90,7 +89,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       : await supabase.from('contratos_arrendamiento').insert(data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    Swal.fire({ icon: 'success', title: editingId ? 'Contrato actualizado' : 'Contrato registrado', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: editingId ? 'Contrato actualizado' : 'Contrato registrado', duration: 1400 })
     resetForm(); onRefresh()
   }
 

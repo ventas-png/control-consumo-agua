@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import Swal from 'sweetalert2'
 import { confirm, notify } from '../shared/Dialog'
+import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 
 // Template metadata displayed in the UI
@@ -192,51 +192,38 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   async function editTemplate(def: typeof TEMPLATE_DEFS[0]) {
     const existing = templates.find((t: EmailTemplate) => t.template_key === def.key)
 
-    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--at-line);border-radius:8px;font-size:13px;color:var(--at-ink);background:#fff;outline:none;font-family:inherit'
-
-    const { value: formValues } = await Swal.fire({
+    const result = await openPromptDialog({
       title: `${def.icon} ${def.label}`,
-      width: 700,
-      html: `
-        <div style="text-align:left;display:flex;flex-direction:column;gap:12px;">
-          <p style="margin:0;font-size:12px;color:var(--at-ink-3);">${def.desc}</p>
-          <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Asunto del correo</label>
-            <input id="swal-subject" style="${inpStyle}" placeholder="Ej: Recibo de consumo — {{mes}} | {{empresa_nombre}}"
-              value="${(existing?.subject ?? '').replace(/"/g, '&quot;')}" />
-          </div>
-          <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Cuerpo HTML del correo</label>
-            <p style="margin:0 0 5px;font-size:11px;color:var(--at-ink-3);">Usa <code>{{variable}}</code> para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.</p>
-            <textarea id="swal-body" style="${inpStyle};height:220px;resize:vertical;font-family:monospace;font-size:12px;">${existing?.html_body ?? ''}</textarea>
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      ...(existing ? {
-        footer: `<button id="swal-delete-tpl" type="button" style="background:none;border:none;color:var(--at-danger);font-size:13px;font-weight:600;cursor:pointer;">Eliminar personalización</button>`,
-        didOpen: () => {
-          document.getElementById('swal-delete-tpl')?.addEventListener('click', () => {
-            Swal.close()
-            void deleteTemplate(existing.id)
-          })
+      description: def.desc,
+      fields: [
+        {
+          name: 'subject',
+          label: 'Asunto del correo',
+          placeholder: 'Ej: Recibo de consumo — {{mes}} | {{empresa_nombre}}',
+          initialValue: existing?.subject ?? '',
+          autoFocus: true,
         },
-      } : {}),
-      preConfirm: () => {
-        const subject = (document.getElementById('swal-subject') as HTMLInputElement)?.value?.trim()
-        const html_body = (document.getElementById('swal-body') as HTMLTextAreaElement)?.value?.trim()
-        if (html_body && !subject) {
-          Swal.showValidationMessage('Si defines el cuerpo, el asunto también es obligatorio.')
-          return false
+        {
+          name: 'html_body',
+          label: 'Cuerpo HTML del correo',
+          control: 'textarea',
+          rows: 10,
+          helpText: 'Usa {{variable}} para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.',
+          initialValue: existing?.html_body ?? '',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (data) => {
+        if (data.html_body?.trim() && !data.subject?.trim()) {
+          return 'Si defines el cuerpo, el asunto también es obligatorio.'
         }
-        return { subject, html_body }
+        return null
       },
     })
 
-    if (!formValues) return
-    const { subject, html_body } = formValues as { subject: string; html_body: string }
+    if (!result) return
+    const subject = result.subject?.trim() ?? ''
+    const html_body = result.html_body?.trim() ?? ''
 
     if (!subject && !html_body) return // nothing to save
 
@@ -628,17 +615,33 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
                       <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--at-ink-3)' }}>{def.desc}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => void editTemplate(def)}
-                    style={{
-                      padding: '6px 14px', borderRadius: '7px',
-                      border: '1.5px solid rgba(27, 59, 54,.3)',
-                      background: 'rgba(27, 59, 54,.08)', color: 'var(--at-primary-hover)',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {custom ? 'Editar' : 'Personalizar'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => void editTemplate(def)}
+                      style={{
+                        padding: '6px 14px', borderRadius: '7px',
+                        border: '1.5px solid rgba(27, 59, 54,.3)',
+                        background: 'rgba(27, 59, 54,.08)', color: 'var(--at-primary-hover)',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {custom ? 'Editar' : 'Personalizar'}
+                    </button>
+                    {custom && (
+                      <button
+                        onClick={() => void deleteTemplate(custom.id)}
+                        title="Eliminar personalización"
+                        style={{
+                          padding: '6px 10px', borderRadius: '7px',
+                          border: '1.5px solid rgba(220, 53, 69,.3)',
+                          background: 'rgba(220, 53, 69,.08)', color: 'var(--at-danger)',
+                          cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
