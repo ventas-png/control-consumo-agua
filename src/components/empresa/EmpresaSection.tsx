@@ -329,32 +329,26 @@ export function EmpresaSection({ currentUser }: Props) {
     const actual = proyecto.estado ?? 'activo'
     const config = ESTADO_CONFIG[actual]
 
-    const { value: nuevoEstado } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Cambiar estado del proyecto',
-      html: `
-        <p style="color:var(--at-ink-2);margin-bottom:16px">Estado actual: <strong style="color:${config.color}">${config.label}</strong></p>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${estados.filter(e => e !== actual).map(e => {
-            const c = ESTADO_CONFIG[e]
-            return `<button data-estado="${e}" type="button" style="padding:10px 16px;border-radius:8px;border:1px solid ${c.color}44;background:${c.bg};color:${c.color};font-weight:600;font-size:14px;cursor:pointer">${c.label}</button>`
-          }).join('')}
-        </div>
-      `,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        document.querySelectorAll('[data-estado]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            Swal.close()
-            const estado = (btn as HTMLElement).dataset.estado as Proyecto['estado']
-            // eslint-disable-next-line @typescript-eslint/no-use-before-define
-            void aplicarCambioEstado(proyecto.id, estado)
-          })
-        })
-      },
+      description: `Estado actual: ${config.label}`,
+      fields: [{
+        name: 'estado',
+        label: 'Nuevo estado',
+        control: 'select',
+        required: true,
+        options: estados.filter(e => e !== actual).map(e => ({
+          value: e ?? 'activo',
+          label: ESTADO_CONFIG[e ?? 'activo'].label,
+        })),
+        autoFocus: true,
+      }],
+      submitText: 'Cambiar estado',
     })
-    void nuevoEstado
+    if (!result) return
+    const nuevoEstado = result.estado as Proyecto['estado']
+    if (!nuevoEstado) return
+    await aplicarCambioEstado(proyecto.id, nuevoEstado)
   }
 
   async function aplicarCambioEstado(id: string, estado: Proyecto['estado']) {
@@ -421,95 +415,77 @@ export function EmpresaSection({ currentUser }: Props) {
   async function crearAdmin() {
     const showAgua = currentUser.servicio_agua !== false
     const showCond = currentUser.servicio_condominios !== false
-    const condOpts = CONDOMINIOS_ROLES.map(r => `<option value="${r.id}">${r.label}</option>`).join('')
-    const selStyle = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px;margin-top:8px;background:#fff;color:var(--at-ink)'
-    const cols = showAgua && showCond ? '1fr 1fr' : '1fr'
 
-    const { value: formValues } = await Swal.fire({
+    const fields: Array<Parameters<typeof openPromptDialog>[0]['fields'][number]> = [
+      { name: 'nombre', label: 'Nombre completo', required: true, autoFocus: true },
+      { name: 'email', label: 'Correo electrónico', type: 'email', required: true, autoComplete: 'email' },
+      { name: 'password', label: 'Contraseña temporal', type: 'password', required: true, helpText: 'Mínimo 8 caracteres' },
+    ]
+    if (showAgua) {
+      fields.push(
+        { name: 'aguaEnabled', label: '💧 Acceso a Control de Agua', control: 'checkbox' },
+        {
+          name: 'aguaRol',
+          label: 'Rol en Agua',
+          control: 'select',
+          initialValue: 'viewer',
+          options: [
+            { value: 'admin', label: 'Administrador — acceso completo' },
+            { value: 'operator', label: 'Operador — lecturas y operaciones' },
+            { value: 'collector', label: 'Gestor de Cobros' },
+            { value: 'viewer', label: 'Visualizador — solo lectura' },
+          ],
+        },
+      )
+    }
+    if (showCond) {
+      fields.push(
+        { name: 'condEnabled', label: '🏢 Acceso a Condominios', control: 'checkbox' },
+        {
+          name: 'condRol',
+          label: 'Rol en Condominios',
+          control: 'select',
+          options: CONDOMINIOS_ROLES.map(r => ({ value: r.id, label: r.label })),
+        },
+      )
+    }
+
+    const result = await openPromptDialog({
       title: 'Nuevo Usuario',
-      width: 520,
-      html: `
-        <div style="text-align:left">
-          <input id="swal-nombre" class="swal2-input" placeholder="Nombre completo" style="margin:0 0 8px" />
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-            <input id="swal-email" class="swal2-input" placeholder="Correo electrónico" type="email" style="margin:0" />
-            <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" style="margin:0" />
-          </div>
-          <p style="font-size:11px;color:var(--at-ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:0 0 10px">
-            Acceso a aplicaciones
-          </p>
-          <div style="display:grid;grid-template-columns:${cols};gap:12px">
-            ${showAgua ? `
-            <div id="card-agua" style="border:1px solid var(--at-primary)33;border-radius:10px;padding:12px">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
-                <input type="checkbox" id="chk-agua" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-primary)" />
-                💧 Control de Agua
-              </label>
-              <select id="swal-rol-agua" disabled style="${selStyle};opacity:0.4">
-                <option value="admin">Administrador — acceso completo</option>
-                <option value="operator">Operador — lecturas y operaciones</option>
-                <option value="collector">Gestor de Cobros</option>
-                <option value="viewer">Visualizador — solo lectura</option>
-              </select>
-            </div>
-            ` : ''}
-            ${showCond ? `
-            <div id="card-cond" style="border:1px solid var(--at-accent)33;border-radius:10px;padding:12px">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
-                <input type="checkbox" id="chk-cond" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-accent)" />
-                🏢 Condominios
-              </label>
-              <select id="swal-rol-cond" disabled style="${selStyle};opacity:0.4">
-                <option value="">— Seleccionar rol —</option>
-                ${condOpts}
-              </select>
-            </div>
-            ` : ''}
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Crear usuario',
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        const wireToggle = (chkId: string, selId: string, cardId: string, color: string) => {
-          const chk = document.getElementById(chkId) as HTMLInputElement | null
-          const sel = document.getElementById(selId) as HTMLSelectElement | null
-          const card = document.getElementById(cardId) as HTMLDivElement | null
-          if (!chk || !sel || !card) return
-          chk.addEventListener('change', () => {
-            sel.disabled = !chk.checked
-            sel.style.opacity = chk.checked ? '1' : '0.4'
-            card.style.borderColor = chk.checked ? color + '88' : color + '33'
-            card.style.background = chk.checked ? color + '11' : 'transparent'
-          })
+      description: 'Marca las aplicaciones a las que debe tener acceso y elige el rol.',
+      fields,
+      submitText: 'Crear usuario',
+      validate: (data) => {
+        if (!data.nombre?.trim() || !data.email?.trim() || !data.password) {
+          return 'Nombre, correo y contraseña son obligatorios'
         }
-        wireToggle('chk-agua', 'swal-rol-agua', 'card-agua', 'var(--at-primary)')
-        wireToggle('chk-cond', 'swal-rol-cond', 'card-cond', 'var(--at-accent)')
-      },
-      preConfirm: () => {
-        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
-        const email = (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim()
-        const password = (document.getElementById('swal-password') as HTMLInputElement)?.value
-        const aguaEnabled = showAgua && (document.getElementById('chk-agua') as HTMLInputElement)?.checked
-        const condEnabled = showCond && (document.getElementById('chk-cond') as HTMLInputElement)?.checked
-        const aguaRol = aguaEnabled ? (document.getElementById('swal-rol-agua') as HTMLSelectElement)?.value : null
-        const condRol = condEnabled ? ((document.getElementById('swal-rol-cond') as HTMLSelectElement)?.value || null) : null
-
-        if (!nombre || !email || !password) { Swal.showValidationMessage('Nombre, correo y contraseña son obligatorios'); return false }
-        if (password.length < 8) { Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres'); return false }
-        if (!aguaEnabled && !condEnabled) { Swal.showValidationMessage('Selecciona acceso a al menos una aplicación'); return false }
-        if (condEnabled && !condRol) { Swal.showValidationMessage('Selecciona un rol para Condominios'); return false }
-        // El tier de plataforma (app_users.role) NO debe ser un rol exento.
-        // 'admin' salta TODO el RBAC (condominios incluido) vía user_has_permission,
-        // así que un "Admin de Agua" se crea como 'operator' (no exento) y recibe
-        // su poder de agua desde el rol RBAC "Admin Agua" (user_roles), no del tier.
-        const platformTier = aguaRol === 'admin' ? 'operator' : (aguaRol ?? 'viewer')
-        return { nombre, email, password, rol: platformTier, aguaRol, condRol }
+        if (data.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+        const aguaEnabled = showAgua && data.aguaEnabled === 'true'
+        const condEnabled = showCond && data.condEnabled === 'true'
+        if (!aguaEnabled && !condEnabled) return 'Selecciona acceso a al menos una aplicación'
+        if (condEnabled && !data.condRol) return 'Selecciona un rol para Condominios'
+        return null
       },
     })
 
-    if (!formValues) return
+    if (!result) return
+    const aguaEnabled = showAgua && result.aguaEnabled === 'true'
+    const condEnabled = showCond && result.condEnabled === 'true'
+    const aguaRol = aguaEnabled ? result.aguaRol : null
+    const condRol = condEnabled ? (result.condRol || null) : null
+    // El tier de plataforma (app_users.role) NO debe ser un rol exento.
+    // 'admin' salta TODO el RBAC (condominios incluido) vía user_has_permission,
+    // así que un "Admin de Agua" se crea como 'operator' (no exento) y recibe
+    // su poder de agua desde el rol RBAC "Admin Agua" (user_roles), no del tier.
+    const platformTier = aguaRol === 'admin' ? 'operator' : (aguaRol ?? 'viewer')
+    const formValues = {
+      nombre: result.nombre.trim(),
+      email: result.email.trim(),
+      password: result.password,
+      rol: platformTier,
+      aguaRol,
+      condRol,
+    }
 
     try {
       const { data: session } = await supabase.auth.getSession()
@@ -572,32 +548,23 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function eliminarUsuario(usuario: Usuario) {
-    const { isConfirmed } = await Swal.fire({
-      icon: 'warning',
+    const result = await openPromptDialog({
       title: 'Eliminar usuario definitivamente',
-      html: `
-        <p style="color:var(--at-ink-2);font-size:14px;line-height:1.5;margin:0 0 14px;text-align:left">
-          Esta acción <strong>no se puede deshacer</strong>. Se eliminarán el acceso y el perfil de
-          <strong>${usuario.full_name}</strong>. Los registros que haya creado se conservan,
-          pero quedarán sin autor asignado.
-        </p>
-        <p style="color:var(--at-ink-3);font-size:13px;margin:0;text-align:left">
-          Para confirmar, escribe el nombre del usuario:
-        </p>
-      `,
-      input: 'text',
-      inputPlaceholder: usuario.full_name,
-      inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
-      showCancelButton: true,
-      confirmButtonText: 'Eliminar definitivamente',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626',
-      inputValidator: (v: string) =>
-        (v ?? '').trim().toLowerCase() === usuario.full_name.trim().toLowerCase()
+      description: `Esta acción no se puede deshacer. Se eliminarán el acceso y el perfil de ${usuario.full_name}. Los registros que haya creado se conservan, pero quedarán sin autor asignado.`,
+      fields: [{
+        name: 'confirmacion',
+        label: `Para confirmar, escribe el nombre del usuario`,
+        placeholder: usuario.full_name,
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Eliminar definitivamente',
+      validate: (data) =>
+        (data.confirmacion ?? '').trim().toLowerCase() === usuario.full_name.trim().toLowerCase()
           ? null
           : 'El nombre no coincide',
     })
-    if (!isConfirmed) return
+    if (!result) return
 
     try {
       const { data: session } = await supabase.auth.getSession()
