@@ -1,7 +1,7 @@
 import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -584,28 +584,49 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   async function retenerDeposito(r: ReservaAmenidad) {
     const amen = amenidades.find(a => a.id === r.amenidad_id)
     const tope = amen?.monto_deposito ?? null
-    const { value: form } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Retener depósito',
-      html:
-        `<p style="font-size:13px;color:var(--at-ink-3);margin:0 0 10px;text-align:left">Indica el monto que se retiene${tope != null ? ` (máximo ${moneda} ${tope.toFixed(2)})` : ''} y el motivo. Opcionalmente puedes generar un cargo a la unidad si la retención no cubre el daño.</p>` +
-        `<input id="swal-monto" type="number" min="0" step="0.01" max="${tope ?? ''}" class="swal2-input" placeholder="Monto retenido (${moneda})">` +
-        `<textarea id="swal-motivo" class="swal2-textarea" placeholder="Motivo de la retención"></textarea>` +
-        `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--at-ink-2);margin-top:6px;text-align:left"><input type="checkbox" id="swal-cargo"> Generar cargo a la unidad por el monto retenido</label>`,
-      showCancelButton: true,
-      confirmButtonText: 'Retener',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: 'var(--at-danger)',
-      preConfirm: () => {
-        const monto = (document.getElementById('swal-monto') as HTMLInputElement | null)?.value ?? ''
-        const motivo = (document.getElementById('swal-motivo') as HTMLTextAreaElement | null)?.value ?? ''
-        const cargo = (document.getElementById('swal-cargo') as HTMLInputElement | null)?.checked ?? false
-        if (!monto || Number(monto) <= 0) { Swal.showValidationMessage('Indica un monto mayor a 0.'); return false }
-        if (!motivo.trim()) { Swal.showValidationMessage('Indica un motivo.'); return false }
-        if (tope != null && Number(monto) > tope) { Swal.showValidationMessage(`El monto excede el depósito (${tope}).`); return false }
-        return { monto: Number(monto), motivo: motivo.trim(), cargo }
+      description: `Indica el monto que se retiene${tope != null ? ` (máximo ${moneda} ${tope.toFixed(2)})` : ''} y el motivo. Opcionalmente puedes generar un cargo a la unidad.`,
+      fields: [
+        {
+          name: 'monto',
+          label: `Monto retenido (${moneda})`,
+          type: 'number',
+          min: 0,
+          max: tope ?? undefined,
+          step: 0.01,
+          required: true,
+          autoFocus: true,
+        },
+        {
+          name: 'motivo',
+          label: 'Motivo de la retención',
+          control: 'textarea',
+          rows: 3,
+          required: true,
+        },
+        {
+          name: 'cargo',
+          label: 'Generar cargo a la unidad',
+          control: 'select',
+          options: [
+            { value: 'no', label: 'No, solo retener depósito' },
+            { value: 'si', label: 'Sí, generar cargo a la unidad' },
+          ],
+          initialValue: 'no',
+        },
+      ],
+      submitText: 'Retener',
+      validate: (data) => {
+        const monto = Number(data.monto)
+        if (!monto || monto <= 0) return 'Indica un monto mayor a 0.'
+        if (!data.motivo?.trim()) return 'Indica un motivo.'
+        if (tope != null && monto > tope) return `El monto excede el depósito (${tope}).`
+        return null
       },
     })
-    if (!form) return
+    if (!result) return
+    const form = { monto: Number(result.monto), motivo: result.motivo.trim(), cargo: result.cargo === 'si' }
     let cuotaId: string | null = null
     if (form.cargo) {
       const periodo = r.fecha.slice(0, 7)
@@ -702,18 +723,22 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function rechazarReserva(r: ReservaAmenidad) {
-    const { value: motivo } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Rechazar reserva',
-      input: 'textarea',
-      inputLabel: 'Motivo del rechazo',
-      inputPlaceholder: 'Ej. el salón está reservado para evento del condominio...',
-      showCancelButton: true,
-      confirmButtonText: 'Rechazar',
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonText: 'Cancelar',
-      inputValidator: v => (!v || !v.trim()) ? 'Indica un motivo.' : null,
+      fields: [{
+        name: 'motivo',
+        label: 'Motivo del rechazo',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Ej. el salón está reservado para evento del condominio...',
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Rechazar',
+      validate: (data) => data.motivo?.trim() ? null : 'Indica un motivo.',
     })
-    if (!motivo) return
+    if (!result) return
+    const motivo = result.motivo
     if (r.cuota_id) {
       await supabase.from('cuotas_condominio').delete().eq('id', r.cuota_id).eq('estado', 'pendiente')
     }
