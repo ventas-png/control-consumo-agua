@@ -110,6 +110,40 @@ describe('PromptDialog', () => {
     expect(result?.estado).toBe('pagado')
   })
 
+  it('checkbox control: serializa true/empty y dispara onChange', async () => {
+    render(<PromptDialogRoot />)
+    const promise = openPromptDialog({
+      title: 'Confirmar acción',
+      fields: [
+        { name: 'aceptar', label: 'Acepto los términos', control: 'checkbox', required: true },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Confirmar acción')).toBeTruthy())
+    const checkbox = screen.getByLabelText(/Acepto los términos/) as HTMLInputElement
+    expect(checkbox.tagName).toBe('INPUT')
+    expect(checkbox.type).toBe('checkbox')
+    expect(checkbox.checked).toBe(false)
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }))
+    const result = await promise
+    expect(result?.aceptar).toBe('true')
+  })
+
+  it('checkbox control: empty string cuando desmarcado', async () => {
+    render(<PromptDialogRoot />)
+    const promise = openPromptDialog({
+      title: 'Opciones',
+      fields: [
+        { name: 'subscribe', label: 'Suscribirme', control: 'checkbox' },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Opciones')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Aceptar' }))
+    const result = await promise
+    expect(result?.subscribe).toBe('')
+  })
+
   it('a11y baseline: dialog abierto sin violaciones', async () => {
     const { container } = render(<PromptDialogRoot />)
     void openPromptDialog({

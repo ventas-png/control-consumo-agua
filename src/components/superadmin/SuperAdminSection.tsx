@@ -157,13 +157,10 @@ export function SuperAdminSection() {
         },
         {
           name: 'activa',
-          label: 'Estado',
-          control: 'select',
-          options: [
-            { value: 'true', label: 'Activa' },
-            { value: 'false', label: 'Inactiva' },
-          ],
-          initialValue: empresa.activa ? 'true' : 'false',
+          label: 'Empresa activa',
+          control: 'checkbox',
+          helpText: 'Desmarca para desactivar la empresa (no podrá ingresar al sistema)',
+          initialValue: empresa.activa ? 'true' : '',
         },
       ],
       submitText: 'Guardar',
