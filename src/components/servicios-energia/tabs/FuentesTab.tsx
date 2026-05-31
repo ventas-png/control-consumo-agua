@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyecto, UserSession, ModoSuministroEnergia } from '../../../types'
-import Swal from 'sweetalert2'
 import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -55,118 +55,97 @@ export default function FuentesTab({
       return
     }
 
-    const proyectoOptions = proyectos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
-    const aguaOptions = fuentesAgua.map(f => `<option value="${f.id}">${f.nombre} (${f.tipo_agua})</option>`).join('')
-    const proveedorOptions = proveedoresEnergia.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
-    const tarifaOptions = tarifasEnergia.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('')
+    const fields: Array<Parameters<typeof openPromptDialog>[0]['fields'][number]> = [
+      { name: 'nombre', label: 'Nombre', placeholder: 'Bomba pozo norte', required: true, autoFocus: true },
+    ]
+    if (proyectos.length > 1) {
+      fields.push({
+        name: 'project_id',
+        label: 'Proyecto',
+        control: 'select',
+        required: true,
+        options: proyectos.map(p => ({ value: p.id, label: p.nombre })),
+      })
+    }
+    fields.push(
+      {
+        name: 'fuente_agua_id',
+        label: 'Fuente de agua',
+        control: 'select',
+        required: true,
+        options: fuentesAgua.map(f => ({ value: f.id, label: `${f.nombre} (${f.tipo_agua})` })),
+      },
+      {
+        name: 'modo_suministro',
+        label: 'Modo de suministro',
+        control: 'select',
+        required: true,
+        initialValue: 'red',
+        options: [
+          { value: 'red', label: '🔌 Red eléctrica' },
+          { value: 'solar_autonomo', label: '☀️ Solar autónomo' },
+          { value: 'hibrido', label: '🔌☀️ Híbrido (red + solar)' },
+        ],
+        helpText: 'Si seleccionas Solar autónomo, los campos de red eléctrica se ignoran. Y viceversa.',
+      },
+      {
+        name: 'proveedor_id',
+        label: 'Proveedor (solo modo red/híbrido)',
+        control: 'select',
+        options: [
+          { value: '', label: 'Sin proveedor' },
+          ...proveedoresEnergia.map(p => ({ value: p.id, label: p.nombre })),
+        ],
+      },
+      {
+        name: 'tarifa_id',
+        label: 'Tarifa (solo modo red/híbrido)',
+        control: 'select',
+        options: [
+          { value: '', label: 'Sin tarifa' },
+          ...tarifasEnergia.map(t => ({ value: t.id, label: t.nombre })),
+        ],
+      },
+      { name: 'numero_medidor', label: 'Nº medidor (solo red/híbrido)' },
+      { name: 'numero_cuenta', label: 'Nº cuenta NIS (solo red/híbrido)' },
+      { name: 'potencia_contratada_kw', label: 'Potencia contratada kW (solo red/híbrido)', type: 'number', step: 0.01, initialValue: '0' },
+      { name: 'capacidad_solar_kwp', label: 'Capacidad solar kWp (solo solar/híbrido)', type: 'number', step: 0.01, initialValue: '0' },
+    )
 
-    const { value: formValues } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Nueva Fuente de Energía',
-      html: `
-        <div style="text-align:left;max-height:480px;overflow-y:auto;padding-right:4px;">
-          <label style="display:block;margin:0.4rem 0 0.2rem;font-weight:bold;">Nombre *</label>
-          <input id="fe_nombre" placeholder="Bomba pozo norte" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-
-          ${proyectos.length > 1 ? `
-          <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Proyecto *</label>
-          <select id="fe_project" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            <option value="">Seleccionar proyecto</option>
-            ${proyectoOptions}
-          </select>
-          ` : `<input type="hidden" id="fe_project" value="${defaultProjectId ?? ''}" />`}
-
-          <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Fuente de agua *</label>
-          <select id="fe_agua" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            ${aguaOptions}
-          </select>
-
-          <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Modo de suministro *</label>
-          <select id="fe_modo" onchange="
-            const m=this.value;
-            document.getElementById('fe_red_block').style.display=(m==='red'||m==='hibrido')?'block':'none';
-            document.getElementById('fe_solar_block').style.display=(m==='solar_autonomo'||m==='hibrido')?'block':'none';
-          " style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            <option value="red">🔌 Red eléctrica</option>
-            <option value="solar_autonomo">☀️ Solar autónomo</option>
-            <option value="hibrido">🔌☀️ Híbrido (red + solar)</option>
-          </select>
-
-          <div id="fe_red_block" style="margin-top:0.75rem;">
-            <label style="display:block;margin-bottom:0.2rem;">Proveedor</label>
-            <select id="fe_proveedor" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-              <option value="">Sin proveedor</option>
-              ${proveedorOptions}
-            </select>
-            <label style="display:block;margin:0.5rem 0 0.2rem;">Tarifa</label>
-            <select id="fe_tarifa" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-              <option value="">Sin tarifa</option>
-              ${tarifaOptions}
-            </select>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.5rem;">
-              <div>
-                <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Nº medidor</label>
-                <input id="fe_medidor" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-              </div>
-              <div>
-                <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Nº cuenta (NIS)</label>
-                <input id="fe_cuenta" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-              </div>
-              <div>
-                <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Potencia contratada (kW)</label>
-                <input id="fe_potencia" type="number" step="0.01" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-              </div>
-            </div>
-          </div>
-
-          <div id="fe_solar_block" style="margin-top:0.75rem;display:none;">
-            <label style="display:block;margin-bottom:0.2rem;">Capacidad solar (kWp)</label>
-            <input id="fe_solar" type="number" step="0.01" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Crear',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('fe_nombre') as HTMLInputElement)?.value?.trim() ?? ''
-        const projectId = (document.getElementById('fe_project') as HTMLInputElement | HTMLSelectElement)?.value ?? ''
-        const fuenteAguaId = (document.getElementById('fe_agua') as HTMLSelectElement)?.value ?? ''
-        const modo = (document.getElementById('fe_modo') as HTMLSelectElement)?.value ?? 'red'
-
-        if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
-        if (!fuenteAguaId) { Swal.showValidationMessage('Debe seleccionar una fuente de agua'); return null }
-
-        const payload: Record<string, unknown> = {
-          nombre: sanitizeInput(nombre),
-          fuente_agua_id: fuenteAguaId,
-          modo_suministro: modo,
-          project_id: projectId,
-          company_id: companyId,
-          activo: true,
-        }
-
-        if (modo === 'red' || modo === 'hibrido') {
-          const prov = (document.getElementById('fe_proveedor') as HTMLSelectElement)?.value
-          const tar = (document.getElementById('fe_tarifa') as HTMLSelectElement)?.value
-          payload.proveedor_id = prov || null
-          payload.tarifa_id = tar || null
-          payload.numero_medidor = sanitizeInput((document.getElementById('fe_medidor') as HTMLInputElement)?.value ?? '') || null
-          payload.numero_cuenta = sanitizeInput((document.getElementById('fe_cuenta') as HTMLInputElement)?.value ?? '') || null
-          const pot = parseFloat((document.getElementById('fe_potencia') as HTMLInputElement)?.value ?? '0')
-          payload.potencia_contratada_kw = pot > 0 ? pot : null
-        }
-
-        if (modo === 'solar_autonomo' || modo === 'hibrido') {
-          const kwp = parseFloat((document.getElementById('fe_solar') as HTMLInputElement)?.value ?? '0')
-          payload.capacidad_solar_kwp = kwp > 0 ? kwp : null
-        }
-
-        return payload
+      fields,
+      submitText: 'Crear',
+      validate: (data) => {
+        if (!data.nombre?.trim()) return 'El nombre es requerido'
+        if (proyectos.length > 1 && !data.project_id) return 'Debe seleccionar un proyecto'
+        if (!data.fuente_agua_id) return 'Debe seleccionar una fuente de agua'
+        return null
       },
     })
 
-    if (!formValues) return
+    if (!result) return
+    const modo = result.modo_suministro
+    const formValues: Record<string, unknown> = {
+      nombre: sanitizeInput(result.nombre),
+      fuente_agua_id: result.fuente_agua_id,
+      modo_suministro: modo,
+      project_id: proyectos.length > 1 ? result.project_id : (defaultProjectId ?? ''),
+      company_id: companyId,
+      activo: true,
+    }
+    if (modo === 'red' || modo === 'hibrido') {
+      formValues.proveedor_id = result.proveedor_id || null
+      formValues.tarifa_id = result.tarifa_id || null
+      formValues.numero_medidor = sanitizeInput(result.numero_medidor) || null
+      formValues.numero_cuenta = sanitizeInput(result.numero_cuenta) || null
+      const pot = parseFloat(result.potencia_contratada_kw || '0')
+      formValues.potencia_contratada_kw = pot > 0 ? pot : null
+    }
+    if (modo === 'solar_autonomo' || modo === 'hibrido') {
+      const kwp = parseFloat(result.capacidad_solar_kwp || '0')
+      formValues.capacidad_solar_kwp = kwp > 0 ? kwp : null
+    }
 
     try {
       const { data, error } = await supabase.from('fuentes_energia').insert([formValues]).select().single()

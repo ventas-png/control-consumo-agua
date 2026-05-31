@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
-import Swal from 'sweetalert2'
 import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
 import { supabase } from '../../../lib/supabase'
@@ -53,99 +53,74 @@ export default function TarifasTab({
       return
     }
 
-    const proyectoOptions = proyectos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
-    const proveedorOptions = proveedoresEnergia.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
+    const fields: Array<Parameters<typeof openPromptDialog>[0]['fields'][number]> = [
+      { name: 'nombre', label: 'Nombre', placeholder: 'Tarifa BT1', required: true, autoFocus: true },
+    ]
+    if (proyectos.length > 1) {
+      fields.push({
+        name: 'project_id',
+        label: 'Proyecto',
+        control: 'select',
+        required: true,
+        options: proyectos.map(p => ({ value: p.id, label: p.nombre })),
+      })
+    }
+    fields.push(
+      {
+        name: 'proveedor_id',
+        label: 'Proveedor',
+        control: 'select',
+        required: true,
+        options: proveedoresEnergia.map(p => ({ value: p.id, label: p.nombre })),
+      },
+      { name: 'descripcion', label: 'Descripción', control: 'textarea', rows: 2 },
+      { name: 'precio_kwh_energia', label: 'Precio kWh energía', type: 'number', step: 0.000001, initialValue: '0' },
+      { name: 'precio_kw_potencia', label: 'Precio kW potencia', type: 'number', step: 0.0001, initialValue: '0' },
+      { name: 'cargo_fijo', label: `Cargo fijo (${moneda})`, type: 'number', step: 0.01, initialValue: '0' },
+      { name: 'alumbrado_publico', label: 'Alumbrado público', type: 'number', step: 0.0001, initialValue: '0' },
+      {
+        name: 'alumbrado_tipo',
+        label: 'Tipo alumbrado',
+        control: 'select',
+        initialValue: 'fijo',
+        options: [
+          { value: 'fijo', label: `Fijo (${moneda})` },
+          { value: 'porcentual', label: 'Porcentual (%)' },
+        ],
+      },
+      { name: 'iva_porcentaje', label: 'IVA (%)', type: 'number', step: 0.01, initialValue: '12' },
+      { name: 'precio_kwh_exportado', label: 'Precio kWh exportado', type: 'number', step: 0.000001, initialValue: '0' },
+    )
 
-    const { value: formValues } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Nueva Tarifa de Energía',
-      html: `
-        <div style="text-align:left;max-height:480px;overflow-y:auto;padding-right:4px;">
-          <label style="display:block;margin:0.4rem 0 0.2rem;font-weight:bold;">Nombre *</label>
-          <input id="t_nombre" placeholder="Tarifa BT1" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-
-          ${proyectos.length > 1 ? `
-          <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Proyecto *</label>
-          <select id="t_project" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            <option value="">Seleccionar proyecto</option>
-            ${proyectoOptions}
-          </select>
-          ` : `<input type="hidden" id="t_project" value="${defaultProjectId ?? ''}" />`}
-
-          <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Proveedor *</label>
-          <select id="t_proveedor" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-            ${proveedorOptions}
-          </select>
-
-          <label style="display:block;margin:0.75rem 0 0.2rem;">Descripción</label>
-          <textarea id="t_desc" rows="2" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;"></textarea>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.75rem;">
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Precio kWh energía</label>
-              <input id="t_kwh_e" type="number" step="0.000001" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Precio kW potencia</label>
-              <input id="t_kw_p" type="number" step="0.0001" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Cargo fijo (${moneda})</label>
-              <input id="t_fijo" type="number" step="0.01" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Alumbrado público</label>
-              <input id="t_alumbrado" type="number" step="0.0001" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Tipo alumbrado</label>
-              <select id="t_alumbrado_tipo" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
-                <option value="fijo">Fijo (${moneda})</option>
-                <option value="porcentual">Porcentual (%)</option>
-              </select>
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">IVA (%)</label>
-              <input id="t_iva" type="number" step="0.01" value="12" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:0.2rem;font-size:0.9rem;">Precio kWh exportado</label>
-              <input id="t_kwh_exp" type="number" step="0.000001" value="0" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
-            </div>
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'Crear',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('t_nombre') as HTMLInputElement)?.value?.trim() ?? ''
-        const projectId = (document.getElementById('t_project') as HTMLInputElement | HTMLSelectElement)?.value ?? ''
-        const proveedorId = (document.getElementById('t_proveedor') as HTMLSelectElement)?.value ?? ''
-
-        if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
-        if (!proveedorId) { Swal.showValidationMessage('Debe seleccionar un proveedor'); return null }
-
-        return {
-          nombre: sanitizeInput(nombre),
-          proveedor_id: proveedorId,
-          project_id: projectId,
-          company_id: companyId,
-          descripcion: sanitizeInput((document.getElementById('t_desc') as HTMLTextAreaElement)?.value ?? '') || null,
-          precio_kwh_energia: parseFloat((document.getElementById('t_kwh_e') as HTMLInputElement)?.value ?? '0'),
-          precio_kw_potencia: parseFloat((document.getElementById('t_kw_p') as HTMLInputElement)?.value ?? '0'),
-          cargo_fijo: parseFloat((document.getElementById('t_fijo') as HTMLInputElement)?.value ?? '0'),
-          alumbrado_publico: parseFloat((document.getElementById('t_alumbrado') as HTMLInputElement)?.value ?? '0'),
-          alumbrado_tipo: (document.getElementById('t_alumbrado_tipo') as HTMLSelectElement)?.value ?? 'fijo',
-          iva_porcentaje: parseFloat((document.getElementById('t_iva') as HTMLInputElement)?.value ?? '0'),
-          precio_kwh_exportado: parseFloat((document.getElementById('t_kwh_exp') as HTMLInputElement)?.value ?? '0'),
-          moneda,
-          activa: true,
-        }
+      fields,
+      submitText: 'Crear',
+      validate: (data) => {
+        if (!data.nombre?.trim()) return 'El nombre es requerido'
+        if (proyectos.length > 1 && !data.project_id) return 'Debe seleccionar un proyecto'
+        if (!data.proveedor_id) return 'Debe seleccionar un proveedor'
+        return null
       },
     })
 
-    if (!formValues) return
+    if (!result) return
+    const formValues = {
+      nombre: sanitizeInput(result.nombre),
+      proveedor_id: result.proveedor_id,
+      project_id: proyectos.length > 1 ? result.project_id : (defaultProjectId ?? ''),
+      company_id: companyId,
+      descripcion: sanitizeInput(result.descripcion) || null,
+      precio_kwh_energia: parseFloat(result.precio_kwh_energia || '0'),
+      precio_kw_potencia: parseFloat(result.precio_kw_potencia || '0'),
+      cargo_fijo: parseFloat(result.cargo_fijo || '0'),
+      alumbrado_publico: parseFloat(result.alumbrado_publico || '0'),
+      alumbrado_tipo: result.alumbrado_tipo,
+      iva_porcentaje: parseFloat(result.iva_porcentaje || '0'),
+      precio_kwh_exportado: parseFloat(result.precio_kwh_exportado || '0'),
+      moneda,
+      activa: true,
+    }
 
     try {
       const { data, error } = await supabase.from('tarifas_energia').insert([formValues]).select().single()
