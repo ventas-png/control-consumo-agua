@@ -38,8 +38,9 @@ export interface PromptFieldDef extends Omit<InputFieldProps, 'value' | 'onChang
   /** F3.4c: tipo de control. Default 'input' (InputField).
    *   'textarea' = caja multiline accesible
    *   'select' = dropdown con options[]
+   *   'checkbox' = boolean toggle accesible (F3.5)
    */
-  control?: 'input' | 'textarea' | 'select'
+  control?: 'input' | 'textarea' | 'select' | 'checkbox'
   /** Solo para control='select' */
   options?: Array<{ value: string; label: string }>
   /** Solo para control='textarea': filas iniciales */
@@ -162,6 +163,9 @@ function PromptDialogContent({ options }: { options: PromptDialogOptions }) {
                 }
                 if (field.control === 'select') {
                   return <SelectField key={field.name} def={field} value={val} onChange={setVal} />
+                }
+                if (field.control === 'checkbox') {
+                  return <CheckboxField key={field.name} def={field} value={val} onChange={setVal} />
                 }
                 return <InputField key={field.name} {...field} value={val} onChange={setVal} />
               })}
@@ -299,6 +303,60 @@ function TextareaField({ def, value, onChange }: { def: PromptFieldDef; value: s
       )}
       {def.error && (
         <p id={errorId} role="alert" style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>{def.error}</p>
+      )}
+    </div>
+  )
+}
+
+// F3.5: CheckboxField — control booleano accesible.
+// Internamente serializa el valor como 'true' | '' para mantener la firma
+// uniforme Record<string, string> de openPromptDialog.
+// Convencion: el caller convierte `result.field === 'true'` a boolean.
+function CheckboxField({ def, value, onChange }: { def: PromptFieldDef; value: string; onChange: (v: string) => void }) {
+  const reactId = useIdF3c()
+  const id = def.id ?? `field-${reactId}`
+  const helpId = def.helpText ? `${id}-help` : undefined
+  const errorId = def.error ? `${id}-error` : undefined
+  const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined
+  const checked = value === 'true'
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <label
+        htmlFor={id}
+        style={{
+          display: 'flex', alignItems: 'flex-start', gap: '10px',
+          cursor: def.disabled ? 'not-allowed' : 'pointer',
+          fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)',
+        }}
+      >
+        <input
+          id={id}
+          name={def.name}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked ? 'true' : '')}
+          disabled={def.disabled}
+          required={def.required}
+          aria-required={def.required || undefined}
+          aria-invalid={!!def.error || undefined}
+          aria-describedby={describedBy}
+          autoFocus={def.autoFocus}
+          style={{
+            width: '18px', height: '18px', cursor: 'inherit',
+            accentColor: 'var(--at-primary)', flexShrink: 0,
+            marginTop: '1px',
+          }}
+        />
+        <span style={{ lineHeight: 1.4 }}>
+          {def.label}
+          {def.required && <span aria-hidden="true" style={{ color: 'var(--at-danger)', marginLeft: '4px' }}>*</span>}
+        </span>
+      </label>
+      {def.helpText && !def.error && (
+        <p id={helpId} style={{ margin: '4px 0 0 28px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{def.helpText}</p>
+      )}
+      {def.error && (
+        <p id={errorId} role="alert" style={{ margin: '4px 0 0 28px', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>{def.error}</p>
       )}
     </div>
   )
