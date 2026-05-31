@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { notify } from '../../shared/Dialog'
 import { ConvenioCuotaCond, EstadoConvenioCuota, Unidad } from '../../../types'
 
@@ -73,7 +72,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
     const nuevasPagadas = c.cuotas_pagadas + 1
     const nuevoEstado: EstadoConvenioCuota = nuevasPagadas >= c.num_cuotas ? 'cumplido' : 'activo'
     await supabase.from('convenios_cuota_cond').update({ cuotas_pagadas: nuevasPagadas, estado: nuevoEstado }).eq('id', c.id)
-    Swal.fire({ icon: 'success', title: nuevoEstado === 'cumplido' ? '✅ Convenio cumplido' : 'Pago registrado', timer: 1500, showConfirmButton: false })
+    notify({ variant: 'success', title: nuevoEstado === 'cumplido' ? '✅ Convenio cumplido' : 'Pago registrado', duration: 1500 })
     onRefresh()
   }
 

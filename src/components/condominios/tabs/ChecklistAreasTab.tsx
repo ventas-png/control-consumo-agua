@@ -1,8 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ChecklistArea, ChecklistItem } from '../../../types'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 
 interface Props {
   checklists: ChecklistArea[]
@@ -105,7 +104,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   }
 
   const handleDelete = async (c: ChecklistArea) => {
-    const r = await Swal.fire({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
+    const r = await confirm({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('checklist_areas').delete().eq('id', c.id)
     if (selected?.id === c.id) setSelected(null)

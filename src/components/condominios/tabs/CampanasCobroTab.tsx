@@ -1,6 +1,5 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
 import { confirm } from '../../shared/Dialog'
 import { toast } from '../../../lib/toast'
 import { CampanaCobro, CanalCampana, EstadoCampana, CuotaCondominio, Unidad } from '../../../types'
@@ -71,11 +70,11 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
   }
 
   async function enviar(c: CampanaCobro) {
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: `¿Enviar campaña?`,
-      html: `<p style="font-size:13px">Se registrará el envío de <strong>${c.total_destinatarios}</strong> mensajes por <strong>${CANAL_CFG[c.canal].label}</strong>.</p>`,
-      icon: 'question', showCancelButton: true,
-      confirmButtonText: 'Enviar', cancelButtonText: 'Cancelar',
+      text: `Se registrará el envío de ${c.total_destinatarios} mensajes por ${CANAL_CFG[c.canal].label}.`,
+      icon: 'question',
+      confirmText: 'Enviar',
     })
     if (!isConfirmed) return
     await supabase.from('campanas_cobro').update({

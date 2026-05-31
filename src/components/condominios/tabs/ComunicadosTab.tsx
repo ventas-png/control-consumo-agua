@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 
 interface Props {
@@ -86,11 +85,11 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   }
 
   async function publicarEnPortal(c: ComunicadoCondominio) {
-    const r = await Swal.fire({
+    const r = await confirm({
       title: '¿Publicar en el portal del residente?',
-      html: `El comunicado <b>${c.titulo}</b> aparecerá como anuncio visible para todos los residentes en su portal.`,
-      icon: 'question', showCancelButton: true,
-      confirmButtonText: 'Publicar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-primary)',
+      text: `El comunicado ${c.titulo} aparecerá como anuncio visible para todos los residentes en su portal.`,
+      icon: 'question',
+      confirmText: 'Publicar',
     })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('anuncios_comunidad').insert({

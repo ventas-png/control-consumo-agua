@@ -1,6 +1,6 @@
 import { useState, useRef, type ChangeEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
@@ -139,12 +139,11 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       notify({ variant: 'warning', title: 'Sin filas válidas', text: 'Corrija los errores antes de importar.' })
       return
     }
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: `Importar ${validas.length} cuota${validas.length > 1 ? 's' : ''}`,
-      html: `<p style="font-size:13px;color:var(--at-ink-2)">${csvRows.length - validas.length > 0 ? `<strong>${csvRows.length - validas.length} fila(s) con errores serán omitidas.</strong><br>` : ''}Se insertarán ${validas.length} cuotas con estado <strong>pendiente</strong>.</p>`,
-      icon: 'question', showCancelButton: true,
-      confirmButtonText: '📥 Importar', cancelButtonText: 'Cancelar',
-      confirmButtonColor: 'var(--at-primary)',
+      text: `${csvRows.length - validas.length > 0 ? `${csvRows.length - validas.length} fila(s) con errores serán omitidas. ` : ''}Se insertarán ${validas.length} cuotas con estado pendiente.`,
+      icon: 'question',
+      confirmText: '📥 Importar',
     })
     if (!isConfirmed) return
     setImportando(true)
@@ -234,40 +233,34 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
     if (nuevoEstado === 'pagado') {
       const hoy = new Date().toISOString().slice(0, 10)
-      const { value: datos } = await Swal.fire({
+      const datos = await openPromptDialog({
         title: 'Registrar pago',
-        html: `
-          <div style="text-align:left;font-size:13px">
-            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Fecha de pago</label>
-            <input id="sw-fecha" type="date" class="swal2-input" value="${hoy}" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Método de pago</label>
-            <select id="sw-metodo" class="swal2-select" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia">Transferencia bancaria</option>
-              <option value="cheque">Cheque</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="deposito">Depósito</option>
-              <option value="otro">Otro</option>
-            </select>
-            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Referencia / No. transacción</label>
-            <input id="sw-ref" type="text" class="swal2-input" placeholder="Opcional" style="margin:0;width:100%;box-sizing:border-box">
-          </div>`,
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar pago',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: 'var(--at-success)',
-        preConfirm: () => ({
-          fecha_pago: (document.getElementById('sw-fecha') as HTMLInputElement).value,
-          metodo_pago: (document.getElementById('sw-metodo') as HTMLSelectElement).value,
-          referencia_pago: (document.getElementById('sw-ref') as HTMLInputElement).value || null,
-        }),
+        fields: [
+          { name: 'fecha_pago', label: 'Fecha de pago', type: 'date', initialValue: hoy, required: true, autoFocus: true },
+          {
+            name: 'metodo_pago',
+            label: 'Método de pago',
+            control: 'select',
+            initialValue: 'efectivo',
+            options: [
+              { value: 'efectivo', label: 'Efectivo' },
+              { value: 'transferencia', label: 'Transferencia bancaria' },
+              { value: 'cheque', label: 'Cheque' },
+              { value: 'tarjeta', label: 'Tarjeta' },
+              { value: 'deposito', label: 'Depósito' },
+              { value: 'otro', label: 'Otro' },
+            ],
+          },
+          { name: 'referencia_pago', label: 'Referencia / No. transacción', placeholder: 'Opcional' },
+        ],
+        submitText: 'Confirmar pago',
       })
       if (!datos) return
       const { error } = await supabase.from('cuotas_condominio').update({
         estado: 'pagado',
         fecha_pago: datos.fecha_pago,
         metodo_pago: datos.metodo_pago,
-        referencia_pago: datos.referencia_pago,
+        referencia_pago: datos.referencia_pago || null,
       }).eq('id', cuota.id)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       onRefresh()
@@ -285,36 +278,28 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     const totalMonto = items.reduce((s, c) => s + c.monto, 0)
     const hoy = new Date().toISOString().slice(0, 10)
 
-    const { value: datos } = await Swal.fire({
+    const datos = await openPromptDialog({
       title: `Registrar pago para ${ids.length} cuota${ids.length > 1 ? 's' : ''}`,
-      html: `
-        <div style="text-align:left;font-size:13px;margin-bottom:12px">
-          <span style="font-size:16px;font-weight:800;color:var(--at-success)">Total: ${moneda} ${totalMonto.toFixed(2)}</span>
-        </div>
-        <div style="text-align:left;font-size:13px">
-          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Fecha de pago</label>
-          <input id="sw-fecha" type="date" class="swal2-input" value="${hoy}" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Método de pago</label>
-          <select id="sw-metodo" class="swal2-select" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia bancaria</option>
-            <option value="cheque">Cheque</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="deposito">Depósito</option>
-            <option value="otro">Otro</option>
-          </select>
-          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Referencia / No. transacción</label>
-          <input id="sw-ref" type="text" class="swal2-input" placeholder="Opcional" style="margin:0;width:100%;box-sizing:border-box">
-        </div>`,
-      showCancelButton: true,
-      confirmButtonText: `✅ Confirmar ${ids.length} pago${ids.length > 1 ? 's' : ''}`,
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: 'var(--at-success)',
-      preConfirm: () => ({
-        fecha_pago: (document.getElementById('sw-fecha') as HTMLInputElement).value,
-        metodo_pago: (document.getElementById('sw-metodo') as HTMLSelectElement).value,
-        referencia_pago: (document.getElementById('sw-ref') as HTMLInputElement).value || null,
-      }),
+      description: `Total: ${moneda} ${totalMonto.toFixed(2)}`,
+      fields: [
+        { name: 'fecha_pago', label: 'Fecha de pago', type: 'date', initialValue: hoy, required: true, autoFocus: true },
+        {
+          name: 'metodo_pago',
+          label: 'Método de pago',
+          control: 'select',
+          initialValue: 'efectivo',
+          options: [
+            { value: 'efectivo', label: 'Efectivo' },
+            { value: 'transferencia', label: 'Transferencia bancaria' },
+            { value: 'cheque', label: 'Cheque' },
+            { value: 'tarjeta', label: 'Tarjeta' },
+            { value: 'deposito', label: 'Depósito' },
+            { value: 'otro', label: 'Otro' },
+          ],
+        },
+        { name: 'referencia_pago', label: 'Referencia / No. transacción', placeholder: 'Opcional' },
+      ],
+      submitText: `✅ Confirmar ${ids.length} pago${ids.length > 1 ? 's' : ''}`,
     })
     if (!datos) return
 
@@ -322,7 +307,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       estado: 'pagado',
       fecha_pago: datos.fecha_pago,
       metodo_pago: datos.metodo_pago,
-      referencia_pago: datos.referencia_pago,
+      referencia_pago: datos.referencia_pago || null,
     }).in('id', ids)
 
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -345,11 +330,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       notify({ variant: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', duration: 2000 })
       return
     }
-    const { isConfirmed } = await Swal.fire({
+    const { isConfirmed } = await confirm({
       title: `¿Marcar ${vencidas.length} cuota${vencidas.length > 1 ? 's' : ''} como morosas?`,
-      html: `<p style="font-size:13px;color:var(--at-ink-2)">Cuotas <strong>pendientes</strong> cuya fecha de vencimiento ya pasó.<br>Esta acción se puede revertir cambiando el estado individualmente.</p>`,
-      icon: 'warning', showCancelButton: true,
-      confirmButtonText: '⚡ Aplicar mora', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
+      text: 'Cuotas pendientes cuya fecha de vencimiento ya pasó. Esta acción se puede revertir cambiando el estado individualmente.',
+      icon: 'warning',
+      variant: 'danger',
+      confirmText: '⚡ Aplicar mora',
     })
     if (!isConfirmed) return
     const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
@@ -378,11 +364,11 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
-    const { value: descargar } = await Swal.fire({
-      icon: 'success', title: `Recibo ${numero} creado`,
+    const { isConfirmed: descargar } = await confirm({
+      icon: 'question', title: `Recibo ${numero} creado`,
       text: '¿Desea descargar el PDF ahora?',
-      showCancelButton: true, confirmButtonText: 'Descargar PDF', cancelButtonText: 'Cerrar',
-      timer: 8000,
+      confirmText: 'Descargar PDF',
+      cancelText: 'Cerrar',
     })
     if (descargar) {
       exportarPDFRecibo({
