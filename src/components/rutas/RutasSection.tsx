@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties, type DragEvent} from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { enviarNotificacionRuta, dispararRecordatorioRuta } from '../../lib/email'
@@ -284,12 +283,11 @@ export function RutasSection({
     setRecordandoId(ruta.id)
     try {
       const r = await dispararRecordatorioRuta(ruta.id)
-      Swal.fire({
-        icon: 'success',
+      notify({
+        variant: 'success',
         title: 'Recordatorio enviado',
         text: `Se notificó a ${r.notified} usuario(s)${r.emailed ? ` y se enviaron ${r.emailed} correo(s)` : ''}.`,
-        timer: 2600,
-        showConfirmButton: false,
+        duration: 2600,
       })
     } catch (err) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo enviar el recordatorio' })
@@ -449,11 +447,10 @@ export function RutasSection({
       await enviarNotificaciones(rutaGuardada)
     }
 
-    Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: editando ? 'Ruta actualizada' : 'Ruta guardada',
-      timer: 2000,
-      showConfirmButton: false,
+      duration: 2000,
     })
     cancelar()
   }
@@ -501,15 +498,12 @@ export function RutasSection({
   }
 
   async function handleEliminar(ruta: Ruta) {
-    const result = await Swal.fire({
+    const result = await confirm({
       title: `¿Eliminar "${ruta.nombre}"?`,
       text: 'Esta acción no se puede deshacer',
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Eliminar',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('rutas').delete().eq('id', ruta.id)

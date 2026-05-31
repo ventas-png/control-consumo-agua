@@ -86,7 +86,7 @@ export function CalidadSection({
       onFuentesUpdated(await recargarFuentes())
       setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' })
       setEditandoId(null)
-      Swal.fire({ icon: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', timer: 1500, showConfirmButton: false })
+      notify({ variant: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', duration: 1500 })
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la fuente: ' + (e instanceof Error ? e.message : '') })
     } finally {
@@ -163,7 +163,7 @@ export function CalidadSection({
       setAnalisisObs('')
       setParametroValues({})
       setReporteBase64(null); setReporteTipo(null); setReporteNombre(null)
-      Swal.fire({ icon: 'success', title: cumple_total ? '✅ Análisis guardado — CUMPLE' : '⚠️ Análisis guardado — NO CUMPLE', timer: 2000, showConfirmButton: false })
+      notify({ variant: 'success', title: cumple_total ? '✅ Análisis guardado — CUMPLE' : '⚠️ Análisis guardado — NO CUMPLE', duration: 2000 })
       setSubTab('historial')
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar: ' + (e instanceof Error ? e.message : '') })

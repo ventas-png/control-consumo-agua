@@ -1,6 +1,6 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../shared/Dialog'
+import { openPromptDialog } from '../shared/PromptDialog'
 import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
@@ -256,11 +256,10 @@ export function LecturasSection({
       return
     }
     if (tarifaExpirada) {
-      Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'Tarifa No Vigente',
         text: 'La tarifa del contador no está vigente. Por favor actualice la tarifa del contador antes de registrar lecturas.',
-        confirmButtonColor: 'var(--at-primary)',
       })
       return
     }
@@ -325,37 +324,40 @@ export function LecturasSection({
 
       if (pendientes.length > 0) {
         // Hay contadores pendientes en esta misma unidad — preguntar al operador
-        const listaHtml = pendientes
-          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:var(--at-ink-3);font-size:12px">(${c.tipo_agua})</span></li>`)
-          .join('')
+        const lista = pendientes
+          .map(c => `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''} (${c.tipo_agua})`)
+          .join(', ')
 
-        const pregunta = await Swal.fire({
+        const pregunta = await confirm({
           icon: 'question',
           title: 'Contadores pendientes',
-          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:var(--at-ink-2)">¿Desea registrarlos antes de continuar?</div>`,
-          showCancelButton: true,
-          confirmButtonColor: 'var(--at-primary)',
-          cancelButtonColor: 'var(--at-ink-3)',
-          confirmButtonText: 'Sí, registrar',
-          cancelButtonText: 'No, siguiente parada',
+          text: `Esta unidad tiene ${pendientes.length} contador${pendientes.length > 1 ? 'es' : ''} sin leer: ${lista}. ¿Desea registrarlos antes de continuar?`,
+          confirmText: 'Sí, registrar',
+          cancelText: 'No, siguiente parada',
         })
 
         if (pregunta.isConfirmed) {
           // Seleccionar el contador pendiente (auto si solo hay uno, selector si hay varios)
           let contadorElegidoId = pendientes[0].id
           if (pendientes.length > 1) {
-            const opciones = Object.fromEntries(
-              pendientes.map(c => [c.id, `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''}`])
-            )
-            const seleccion = await Swal.fire({
+            const options = pendientes.map(c => ({
+              value: c.id,
+              label: `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''}`,
+            }))
+            const seleccion = await openPromptDialog({
               title: 'Seleccione el contador',
-              input: 'select',
-              inputOptions: opciones,
-              inputValue: pendientes[0].id,
-              confirmButtonText: 'Seleccionar',
-              showCancelButton: false,
+              fields: [{
+                name: 'contador',
+                label: 'Contador',
+                control: 'select',
+                options,
+                initialValue: pendientes[0].id,
+                required: true,
+                autoFocus: true,
+              }],
+              submitText: 'Seleccionar',
             })
-            if (seleccion.value) contadorElegidoId = seleccion.value
+            if (seleccion?.contador) contadorElegidoId = seleccion.contador
           }
           // Quedarse en la misma unidad con el contador elegido
           setSelectedContadorId(contadorElegidoId)
