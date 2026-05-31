@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import Swal from 'sweetalert2'
+import { confirm, notify } from './components/shared/Dialog'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
@@ -134,15 +134,14 @@ async function handleGmailOAuthCallback(params: GmailOAuthParams): Promise<void>
   })
   if (res.ok) {
     const json = await res.json() as { email?: string }
-    void Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: '¡Cuenta de Google conectada!',
-      html: `Los correos se enviarán desde <strong>${json.email ?? 'tu cuenta de Google'}</strong>.`,
-      confirmButtonText: 'Entendido',
+      text: `Los correos se enviarán desde ${json.email ?? 'tu cuenta de Google'}.`,
     })
   } else {
     const err = await res.json() as { error?: string }
-    void Swal.fire({ icon: 'error', title: 'Error al conectar Google', text: err.error ?? 'Intenta nuevamente.' })
+    notify({ variant: 'error', title: 'Error al conectar Google', text: err.error ?? 'Intenta nuevamente.' })
   }
 }
 
@@ -256,12 +255,11 @@ export default function App() {
         .catch((err: unknown) => {
           console.error('Error loading data:', err)
           if (navigator.onLine) {
-            Swal.fire({
-              icon: 'error',
+            confirm({
               title: 'Error al cargar datos',
               text: 'No se pudieron cargar los datos. Intente recargar la página.',
-              confirmButtonText: 'Recargar',
-            }).then((r: { isConfirmed: boolean }) => r.isConfirmed && window.location.reload())
+              confirmText: 'Recargar',
+            }).then((r) => r.isConfirmed && window.location.reload())
           }
         })
     }

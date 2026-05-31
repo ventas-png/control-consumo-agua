@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
@@ -220,12 +219,11 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
 
     if (error) {
       if (error.code === '23505') {
-        Swal.fire({
-          icon: 'info',
+        notify({
+          variant: 'info',
           title: 'Cliente ya vinculado',
           text: `${clienteNombre} ya se encuentra vinculado a tu empresa.`,
-          timer: 3000,
-          showConfirmButton: true,
+          duration: 3000,
         })
       } else {
         notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo vincular el cliente.' })
@@ -249,12 +247,11 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       }
     }
 
-    Swal.fire({
-      icon: 'success',
+    notify({
+      variant: 'success',
       title: 'Cliente adicionado con éxito',
-      html: `<b>${sanitizeHTML(clienteNombre)}</b> ha sido adicionado con éxito en tu empresa.`,
-      timer: 3000,
-      showConfirmButton: true,
+      text: `${clienteNombre} ha sido adicionado con éxito en tu empresa.`,
+      duration: 3000,
     })
 
     cancelForm()
@@ -358,15 +355,12 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
   }
 
   async function handleEliminar(c: Cliente) {
-    const result = await Swal.fire({
+    const result = await confirm({
       title: '¿Quitar cliente de la empresa?',
-      html: `<b>${c.nombre}</b> será removido de esta empresa. El registro del cliente se mantendrá en la plataforma y podrá ser re-vinculado posteriormente.`,
+      text: `${c.nombre} será removido de esta empresa. El registro del cliente se mantendrá en la plataforma y podrá ser re-vinculado posteriormente.`,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, quitar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, quitar',
     })
     if (!result.isConfirmed) return
 

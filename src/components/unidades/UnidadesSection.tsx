@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -272,11 +271,10 @@ export function UnidadesSection({
         const currentCount = unidades.filter(u => u.project_id === form.project_id && u.tipo === form.tipo).length
         if (currentCount >= max) {
           const tipoLabel = TIPOS_UNIDAD.find(t => t.value === form.tipo)?.label ?? form.tipo
-          Swal.fire({
-            icon: 'warning',
+          notify({
+            variant: 'warning',
             title: 'Límite alcanzado',
             text: `Este proyecto tiene un máximo de ${max} unidad${max !== 1 ? 'es' : ''} de tipo "${tipoLabel}". Ya se han registrado ${currentCount}.`,
-            confirmButtonText: 'Entendido',
           })
           return
         }
@@ -385,11 +383,10 @@ export function UnidadesSection({
       const maxUnits = (empresaData as { max_units?: number } | null)?.max_units ?? 50
       const totalUnidades = unidadesCount ?? 0
       if (totalUnidades >= maxUnits) {
-        Swal.fire({
-          icon: 'warning',
+        notify({
+          variant: 'warning',
           title: 'Límite de unidades alcanzado',
-          html: `Tu empresa ha alcanzado el límite de <b>${maxUnits}</b> unidades.<br>Contacta al superadministrador para aumentar el cupo.`,
-          confirmButtonText: 'Entendido',
+          text: `Tu empresa ha alcanzado el límite de ${maxUnits} unidades. Contacta al superadministrador para aumentar el cupo.`,
         })
         setLoading(false)
         return
@@ -430,21 +427,18 @@ export function UnidadesSection({
 
   async function handleEliminar(u: Unidad) {
     const contadoresAsignados = contadores.filter(c => c.unidad_id === u.id).length
-    const html = contadoresAsignados > 0
-      ? `La unidad <b>${u.nombre}</b> tiene <b>${contadoresAsignados}</b> contador${contadoresAsignados !== 1 ? 'es' : ''} asociado${contadoresAsignados !== 1 ? 's' : ''}.<br>Los contadores quedarán sin unidad asignada.`
-      : `<b>${u.nombre}</b> será eliminada permanentemente.`
+    const detalle = contadoresAsignados > 0
+      ? `La unidad ${u.nombre} tiene ${contadoresAsignados} contador${contadoresAsignados !== 1 ? 'es' : ''} asociado${contadoresAsignados !== 1 ? 's' : ''}. Los contadores quedarán sin unidad asignada.`
+      : `${u.nombre} será eliminada permanentemente.`
 
-    const confirm = await Swal.fire({
+    const conf = await confirm({
       title: '¿Eliminar unidad?',
-      html,
+      text: detalle,
       icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-danger)',
-      cancelButtonColor: 'var(--at-ink-3)',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
+      variant: 'danger',
+      confirmText: 'Sí, eliminar',
     })
-    if (!confirm.isConfirmed) return
+    if (!conf.isConfirmed) return
 
     const { error } = await supabase.from('unidades').delete().eq('id', u.id)
     if (!error) {

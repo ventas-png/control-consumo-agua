@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import Swal from 'sweetalert2'
+import { notify } from '../components/shared/Dialog'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
@@ -369,7 +369,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // that would cause RLS to silently return empty arrays
       const hasSession = await ensureSupabaseSession()
       if (!hasSession) {
-        Swal.fire('Sesión expirada', 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'warning')
+        notify({ variant: 'warning', title: 'Sesión expirada', text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.' })
         setIsLoading(false)
         return
       }
@@ -417,13 +417,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         console.error('[useData] Persistent query errors after retry:', finalErrors)
         if (!dataLoaded && retryData.proyectos.length === 0 && retryData.clientes.length === 0) {
           // Only block the UI if we truly have no data at all
-          Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+          notify({ variant: 'warning', title: 'Modo Offline', text: 'No se pudo conectar a la base de datos.' })
         }
         // If data loaded but some queries still error, stay silent — data is visible in the UI
       }
     } catch (err) {
       console.error('[useData] Unexpected error in cargarDatos:', err)
-      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+      notify({ variant: 'warning', title: 'Modo Offline', text: 'No se pudo conectar a la base de datos.' })
     } finally {
       setIsLoading(false)
     }
