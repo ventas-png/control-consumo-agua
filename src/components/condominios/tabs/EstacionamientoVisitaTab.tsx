@@ -1,7 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { EstacionamientoVisita, TipoVehiculoVisita, Unidad } from '../../../types'
 
 interface Props {
@@ -79,12 +78,11 @@ export default function EstacionamientoVisitaTab({
   }
 
   async function registrarSalida(id: string, placa: string) {
-    const res = await Swal.fire({
+    const res = await confirm({
       title: `Registrar salida`,
       text: `¿Confirmar salida del vehículo ${placa}?`,
       icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, registrar',
+      confirmText: 'Sí, registrar',
     })
     if (!res.isConfirmed) return
     const { error } = await supabase
