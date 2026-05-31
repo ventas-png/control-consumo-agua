@@ -334,8 +334,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       r => r.amenidad_id === id && (r.estado === 'confirmada' || r.estado === 'pendiente')
     )
     if (reservasActivas.length > 0) {
-      Swal.fire({
-        icon: 'warning',
+      notify({
+        variant: 'warning',
         title: 'No se puede eliminar',
         text: `Esta amenidad tiene ${reservasActivas.length} reserva${reservasActivas.length !== 1 ? 's' : ''} activa${reservasActivas.length !== 1 ? 's' : ''}. Cancélalas primero.`,
       })
@@ -451,7 +451,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             ? `Reserva confirmada. Pago en sitio registrado.`
             : `Reserva confirmada. Cobrar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
         : 'Reserva confirmada'
-    Swal.fire({ icon: 'success', title: msg, timer: 2400, showConfirmButton: false })
+    notify({ variant: 'success', title: msg, duration: 2400 })
     onRefresh()
   }
 

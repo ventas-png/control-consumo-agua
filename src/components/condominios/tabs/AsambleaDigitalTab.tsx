@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { AsambleaDigital, Unidad } from '../../../types'
@@ -77,7 +76,8 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
 
   async function guardar() {
     if (!form.titulo.trim() || !form.fecha_hora) {
-      return Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Título y fecha son obligatorios.', confirmButtonColor: 'var(--at-primary)' })
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Título y fecha son obligatorios.' })
+      return
     }
     setSaving(true)
     const payload = {
@@ -94,14 +94,14 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
       ? await supabase.from('asambleas_digital').update(payload).eq('id', editId)
       : await supabase.from('asambleas_digital').insert({ ...payload, estado: 'programada', created_by: userId })
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm()
     onRefresh()
   }
 
   async function cambiarEstado(a: AsambleaDigital, nuevoEstado: EstadoA) {
     const { error } = await supabase.from('asambleas_digital').update({ estado: nuevoEstado }).eq('id', a.id)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -123,7 +123,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
     setSavingActa(true)
     const { error } = await supabase.from('asambleas_digital').update({ acta_url: actaTexto.trim() || null }).eq('id', actaAsamblea.id)
     setSavingActa(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Acta guardada', duration: 1500 })
     setSubTab('lista')
     onRefresh()

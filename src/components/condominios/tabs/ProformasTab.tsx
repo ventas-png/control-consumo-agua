@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import { confirm } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { Proforma, ContratoProveedor } from '../../../types'
 
 interface Props {
@@ -67,7 +66,8 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
 
   async function guardar() {
     if (!form.proveedor_nombre.trim() || !form.concepto.trim()) {
-      return Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Proveedor y concepto son obligatorios.', confirmButtonColor: 'var(--at-primary)' })
+      notify({ variant: 'warning', title: 'Faltan datos', text: 'Proveedor y concepto son obligatorios.' })
+      return
     }
     setSaving(true)
     const payload = {
@@ -83,7 +83,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
       ? await supabase.from('proformas_condominio').update(payload).eq('id', editId)
       : await supabase.from('proformas_condominio').insert({ ...payload, estado: 'borrador' })
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 
@@ -92,7 +92,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
     if (!cfg.next) return
     const nuevoEstado = cfg.next
     const { error } = await supabase.from('proformas_condominio').update({ estado: nuevoEstado }).eq('id', p.id)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (nuevoEstado === 'convertida_oc') {
       await supabase.from('ordenes_compra').insert({
         company_id: companyId, project_id: proyectoId,
@@ -103,7 +103,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
         estado: 'borrador',
         notas: `Proforma: ${p.id}`,
       })
-      Swal.fire({ icon: 'success', title: 'OC generada', text: 'Se creó una orden de compra en estado Borrador.', confirmButtonColor: 'var(--at-primary)' })
+      notify({ variant: 'success', title: 'OC generada', text: 'Se creó una orden de compra en estado Borrador.' })
     }
     onRefresh()
   }
