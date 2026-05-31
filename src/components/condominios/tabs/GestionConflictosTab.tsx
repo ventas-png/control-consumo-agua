@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import { confirm } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { InfraccionCondominio, SugerenciaCondominio, Unidad, EstadoInfraccion, EstadoSugerencia } from '../../../types'
 
 interface Props {
@@ -71,44 +71,60 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     const nuevoEstado = siguiente[inf.estado]
     if (!nuevoEstado) return
     const lbl = ESTADO_INF_CFG[nuevoEstado].label
-    const confirm = await Swal.fire({
-      title: `Cambiar a "${lbl}"`,
-      text: nuevoEstado === 'resuelta' ? 'Ingresa la resolución:' : '¿Confirmas el cambio de estado?',
-      input: nuevoEstado === 'resuelta' ? 'textarea' : undefined,
-      inputPlaceholder: 'Descripción de la resolución...',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-ink)',
-      confirmButtonText: 'Confirmar',
-      cancelButtonText: 'Cancelar',
-    })
-    if (!confirm.isConfirmed) return
+    let resolucion: string | undefined
+    if (nuevoEstado === 'resuelta') {
+      const result = await openPromptDialog({
+        title: `Cambiar a "${lbl}"`,
+        description: 'Ingresa la resolución:',
+        fields: [{
+          name: 'resolucion',
+          label: 'Resolución',
+          control: 'textarea',
+          rows: 4,
+          placeholder: 'Descripción de la resolución...',
+          required: true,
+          autoFocus: true,
+        }],
+        submitText: 'Confirmar',
+      })
+      if (!result) return
+      resolucion = result.resolucion
+    } else {
+      const conf = await confirm({ title: `Cambiar a "${lbl}"`, text: '¿Confirmas el cambio de estado?', confirmText: 'Confirmar' })
+      if (!conf.isConfirmed) return
+    }
     setResolviendo(inf.id)
     const update: Partial<InfraccionCondominio> = { estado: nuevoEstado }
-    if (nuevoEstado === 'resuelta') update.resolucion = confirm.value as string || null
+    if (resolucion !== undefined) update.resolucion = resolucion || null
     const { error } = await supabase.from('infracciones_condominio').update(update).eq('id', inf.id)
     setResolviendo(null)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function responderSugerencia(sug: SugerenciaCondominio) {
-    const { value: respuesta, isConfirmed } = await Swal.fire({
+    const result = await openPromptDialog({
       title: 'Responder sugerencia',
-      input: 'textarea',
-      inputPlaceholder: 'Escribe la respuesta...',
-      inputValue: sug.respuesta ?? '',
-      showCancelButton: true,
-      confirmButtonColor: 'var(--at-ink)',
-      confirmButtonText: 'Guardar respuesta',
-      cancelButtonText: 'Cancelar',
+      fields: [{
+        name: 'respuesta',
+        label: 'Respuesta',
+        control: 'textarea',
+        rows: 4,
+        placeholder: 'Escribe la respuesta...',
+        initialValue: sug.respuesta ?? '',
+        required: true,
+        autoFocus: true,
+      }],
+      submitText: 'Guardar respuesta',
     })
-    if (!isConfirmed) return
+    if (!result) return
+    const respuesta = result.respuesta
     setResolviendo(sug.id)
     const { error } = await supabase.from('sugerencias_condominio').update({
       respuesta, estado: 'respondida', fecha_respuesta: new Date().toISOString().slice(0, 10),
     }).eq('id', sug.id)
     setResolviendo(null)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -118,7 +134,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     setResolviendo(sug.id)
     const { error } = await supabase.from('sugerencias_condominio').update({ estado: 'archivada' }).eq('id', sug.id)
     setResolviendo(null)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 

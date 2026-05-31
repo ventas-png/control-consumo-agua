@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import Swal from 'sweetalert2'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { ImageUploader } from '../../shared/ImageUploader'
 import type {
@@ -300,11 +299,11 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingCA(false); return }
     }
     setSavingCA(false); setShowCA(false); cargar()
-    Swal.fire({ icon: 'success', title: editCA ? 'Contrato actualizado' : 'Contrato creado', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: editCA ? 'Contrato actualizado' : 'Contrato creado', duration: 1400 })
   }
 
   async function deleteCA(c: ContratoArrendamiento) {
-    const r = await Swal.fire({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await confirm({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
     setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
@@ -450,11 +449,11 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     }
     if (reservaId) await saveGuests(reservaId)
     setSavingSTR(false); resetSTRForm(); cargar()
-    Swal.fire({ icon: 'success', title: editSTR ? 'Reserva actualizada' : 'Reserva creada', timer: 1400, showConfirmButton: false })
+    notify({ variant: 'success', title: editSTR ? 'Reserva actualizada' : 'Reserva creada', duration: 1400 })
   }
 
   async function deleteSTR(r: ReservaSTR) {
-    const res = await Swal.fire({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await confirm({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('reservas_str').delete().eq('id', r.id)
     setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
