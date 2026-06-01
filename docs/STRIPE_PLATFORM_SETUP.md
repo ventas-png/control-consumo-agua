@@ -136,6 +136,65 @@ APP_URL=https://administratodo.app             # base URL para redirects de chec
 ALLOWED_ORIGINS=https://administratodo.app,... # CORS
 ```
 
+## F4.3.4 — Habilitar Stripe Tax (IVA automático LATAM)
+
+El código ya está listo para Stripe Tax. Para activar el cálculo automático
+de IVA en las facturas mensuales:
+
+### 1. Habilitar Stripe Tax en Dashboard
+
+1. Login en Stripe Dashboard → **Settings → Tax**.
+2. Click **Enable Stripe Tax** y completa el wizard:
+   - **Origin address** — dirección fiscal de AdministraTodo (Guatemala /
+     México / país de operación).
+   - **Default tax behavior** — recomendado `inclusive` para B2B LATAM
+     o `exclusive` si quieres mostrar IVA como línea aparte.
+   - **Tax categories** — asigna los Products (los 4 prices de tu plan)
+     a la categoría **SaaS – Electronic services**.
+3. Habilita los países/regiones donde tienes clientes (LATAM countries +
+   USA si aplica). Stripe Tax cobra ~0.5% por transacción.
+
+### 2. Verificar los Tax Registrations
+
+Para cada país donde quieras cobrar IVA, debes tener un **Tax Registration**
+en Stripe (representando tu obligación fiscal). Si NO tienes registro en
+ese país, Stripe Tax NO cobrará IVA al cliente de ese país.
+
+Por ejemplo, si solo tienes registro en Guatemala:
+- Cliente en GT → se le cobra 12% IVA Guatemala ✓
+- Cliente en MX → NO se le cobra IVA (Stripe asume que tú no tienes
+  obligación fiscal en MX) ✗
+
+### 3. Probar el flow
+
+1. Crea un company de prueba con `country = 'MX'` y `tax_id = 'XAXX010101000'`
+   (RFC genérico mexicano de prueba) desde **Empresa → Datos fiscales**.
+2. Inicia un checkout (Profile → Mi plan → Suscribirse).
+3. En el checkout de Stripe verifica que aparece la línea **IVA / VAT** y
+   que el `tax_id_collection` está habilitado (campo para que el cliente
+   capture su RFC si lo prefiere).
+4. Completa el pago. Verifica en `invoices` que `tax_amount_cents > 0` y
+   `country_billed` está poblado correctamente.
+
+### 4. Que no romperá si Stripe Tax NO está habilitado
+
+El código manda `automatic_tax: { enabled: true }` siempre, pero Stripe lo
+ignora si no has activado Tax en Dashboard. Los invoices entonces tendrán
+`tax_amount_cents = 0` y todo funciona como antes. Activar Stripe Tax es
+una decisión 100% operacional sin requerir code change.
+
+### 5. Schema agregado (migración `20260601000030_tax_handling_stripe_tax.sql`)
+
+- `companies.country` (ISO 3166-1 alpha-2)
+- `companies.tax_id`, `tax_id_type`, `address_*`
+- `invoices.subtotal_cents`, `tax_amount_cents`, `tax_id`, `tax_id_type`, `country_billed`
+
+El webhook `stripe-platform-webhook` lee `total_tax_amounts` y
+`customer_tax_ids` del Stripe Invoice cada que llega `invoice.paid` /
+`invoice.finalized`, y los persiste en estos campos.
+
+---
+
 ## Disociar Stripe Platform (Tier 1) de Stripe Tenant (Tier 2)
 
 Para evitar confusión:
