@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   residuos: RegistroResiduo[]
@@ -223,61 +224,113 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         </select>
       </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>♻️</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay registros de residuos</p>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-                {['Fecha', 'Tipo', 'Cantidad', 'Punto Acopio', 'Empresa', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '12px' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(r => {
-                const ti = tipoInfo(r.tipo_residuo)
-                const est = ESTADO_CONFIG[r.estado]
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: r.incidencia ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 600 }}>{r.fecha}</div>
-                      {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--at-danger)' }}>⚠ Incidencia</span>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '16px' }}>{ti.icon}</span>
-                      <div style={{ fontSize: '11px', color: ti.color, fontWeight: 600 }}>{ti.label}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.cantidad_kg != null ? `${r.cantidad_kg} kg` : '—'}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{r.punto_acopio ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{r.empresa_recolectora ?? '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit ? (
-                        <select value={r.estado} onChange={e => handleEstado(r.id, e.target.value as EstadoResiduo)}
-                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
-                          {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {canEdit && <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable<RegistroResiduo>
+        data={filtered}
+        columns={residuosColumns({ canEdit, tipoInfo, handleEstado, startEdit, handleDelete })}
+        rowKey={r => r.id}
+        searchableKeys={[
+          r => r.fecha,
+          r => r.punto_acopio ?? '',
+          r => r.empresa_recolectora ?? '',
+          r => r.notas ?? '',
+        ]}
+        searchPlaceholder="Buscar residuo, punto, empresa…"
+        rowStyle={r => r.incidencia ? { background: 'var(--at-warning-tint)' } : {}}
+        emptyState={
+          <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>♻️</div>
+            <p style={{ margin: 0, fontWeight: 600 }}>No hay registros de residuos</p>
+          </div>
+        }
+      />
     </div>
   )
+}
+
+function residuosColumns(opts: {
+  canEdit: boolean
+  tipoInfo: (t: TipoResiduo) => { value: TipoResiduo; label: string; icon: string; color: string }
+  handleEstado: (id: string, estado: EstadoResiduo) => void
+  startEdit: (r: RegistroResiduo) => void
+  handleDelete: (id: string) => void
+}): DataTableColumn<RegistroResiduo>[] {
+  const { canEdit, tipoInfo, handleEstado, startEdit, handleDelete } = opts
+  return [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      accessor: r => r.fecha,
+      render: r => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{r.fecha}</div>
+          {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--at-danger)' }}>⚠ Incidencia</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortable: true,
+      accessor: r => tipoInfo(r.tipo_residuo).label,
+      render: r => {
+        const ti = tipoInfo(r.tipo_residuo)
+        return (
+          <div>
+            <span style={{ fontSize: '16px' }}>{ti.icon}</span>
+            <div style={{ fontSize: '11px', color: ti.color, fontWeight: 600 }}>{ti.label}</div>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'cantidad_kg',
+      header: 'Cantidad',
+      sortable: true,
+      accessor: r => r.cantidad_kg ?? 0,
+      render: r => <span style={{ fontWeight: 600 }}>{r.cantidad_kg != null ? `${r.cantidad_kg} kg` : '—'}</span>,
+    },
+    {
+      key: 'punto_acopio',
+      header: 'Punto Acopio',
+      accessor: r => r.punto_acopio ?? '',
+      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.punto_acopio ?? '—'}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: 'empresa',
+      header: 'Empresa',
+      accessor: r => r.empresa_recolectora ?? '',
+      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.empresa_recolectora ?? '—'}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      accessor: r => r.estado,
+      render: r => {
+        const est = ESTADO_CONFIG[r.estado]
+        return canEdit ? (
+          <select value={r.estado} onChange={e => handleEstado(r.id, e.target.value as EstadoResiduo)}
+            aria-label="Cambiar estado"
+            style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
+            {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        ) : (
+          <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: r => (
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {canEdit && <button onClick={() => startEdit(r)} aria-label="Editar" style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+          {canEdit && <button onClick={() => handleDelete(r.id)} aria-label="Eliminar" style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+        </div>
+      ),
+    },
+  ]
 }

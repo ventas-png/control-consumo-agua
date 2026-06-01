@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { ReciboDigital, EstadoReciboDigital, CuotaCondominio, Unidad } from '../../../types'
 import { exportarPDFRecibo, exportarExcel } from '../exportUtils'
 
@@ -209,73 +210,137 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
       )}
 
       {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🧾</div>
-          Sin recibos digitales — genera el primero con el botón superior
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['N° Recibo', 'Unidad', 'Concepto', 'Monto', 'Fecha', 'Destinatario', 'Estado', 'Acciones'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(r => {
-                const ec = ESTADO_CFG[r.estado]
-                const unidad = unidades.find(u => u.id === r.unidad_id)
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', opacity: r.estado === 'anulado' ? 0.5 : 1 }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: 'var(--at-primary-hover)', fontFamily: 'monospace' }}>{r.numero_recibo}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.concepto}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{moneda} {r.monto.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.fecha_emision}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.destinatario_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button
-                          onClick={() => exportarPDFRecibo({
-                            numero_recibo: r.numero_recibo,
-                            concepto: r.concepto,
-                            monto: r.monto,
-                            fecha_emision: r.fecha_emision,
-                            unidadNombre: unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre,
-                            destinatario_nombre: r.destinatario_nombre,
-                            destinatario_email: r.destinatario_email,
-                            notas: r.notas,
-                          }, moneda, proyectoNombre)}
-                          style={{ padding: '3px 8px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
-                          📄 PDF
-                        </button>
-                        {canEdit && r.estado === 'generado' && (
-                          <>
-                            <button onClick={() => marcarEnviado(r.id)}
-                              style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
-                              ✉️ Enviado
-                            </button>
-                            <button onClick={() => anular(r.id)}
-                              style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
-                              ✕
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable<ReciboDigital>
+        data={lista}
+        columns={recibosColumns({ unidades, moneda, proyectoNombre, canEdit, marcarEnviado, anular })}
+        rowKey={r => r.id}
+        searchableKeys={[
+          r => r.numero_recibo,
+          r => unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '',
+          r => r.concepto,
+          r => r.destinatario_nombre ?? '',
+        ]}
+        searchPlaceholder="Buscar recibo, unidad, concepto…"
+        emptyState={
+          <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🧾</div>
+            Sin recibos digitales — genera el primero con el botón superior
+          </div>
+        }
+      />
     </div>
   )
+}
+
+function recibosColumns(opts: {
+  unidades: Unidad[]
+  moneda: string
+  proyectoNombre?: string
+  canEdit: boolean
+  marcarEnviado: (id: string) => void
+  anular: (id: string) => void
+}): DataTableColumn<ReciboDigital>[] {
+  const { unidades, moneda, proyectoNombre, canEdit, marcarEnviado, anular } = opts
+  return [
+    {
+      key: 'numero_recibo',
+      header: 'N° Recibo',
+      sortable: true,
+      accessor: r => r.numero_recibo,
+      render: r => (
+        <span style={{ fontWeight: 700, color: 'var(--at-primary-hover)', fontFamily: 'monospace' }}>{r.numero_recibo}</span>
+      ),
+    },
+    {
+      key: 'unidad',
+      header: 'Unidad',
+      sortable: true,
+      accessor: r => unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '',
+      render: r => (
+        <span style={{ fontWeight: 600 }}>
+          {unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      accessor: r => r.concepto,
+      render: r => (
+        <span style={{ color: 'var(--at-ink-2)', display: 'inline-block', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>{r.concepto}</span>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      accessor: r => r.monto,
+      render: r => <span style={{ fontWeight: 600 }}>{moneda} {r.monto.toFixed(2)}</span>,
+    },
+    {
+      key: 'fecha_emision',
+      header: 'Fecha',
+      sortable: true,
+      accessor: r => r.fecha_emision,
+      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.fecha_emision}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: 'destinatario',
+      header: 'Destinatario',
+      accessor: r => r.destinatario_nombre ?? '',
+      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.destinatario_nombre ?? '—'}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      accessor: r => r.estado,
+      render: r => {
+        const ec = ESTADO_CFG[r.estado]
+        return (
+          <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: 'Acciones',
+      render: r => (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            onClick={() => exportarPDFRecibo({
+              numero_recibo: r.numero_recibo,
+              concepto: r.concepto,
+              monto: r.monto,
+              fecha_emision: r.fecha_emision,
+              unidadNombre: unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre,
+              destinatario_nombre: r.destinatario_nombre,
+              destinatario_email: r.destinatario_email,
+              notas: r.notas,
+            }, moneda, proyectoNombre)}
+            aria-label="Descargar PDF"
+            style={{ padding: '3px 8px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
+            📄 PDF
+          </button>
+          {canEdit && r.estado === 'generado' && (
+            <>
+              <button onClick={() => marcarEnviado(r.id)}
+                aria-label="Marcar como enviado"
+                style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
+                ✉️ Enviado
+              </button>
+              <button onClick={() => anular(r.id)}
+                aria-label="Anular recibo"
+                style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ]
 }

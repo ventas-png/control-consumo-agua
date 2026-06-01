@@ -4,6 +4,7 @@ import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -252,89 +253,96 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛡️</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay pólizas registradas</p>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-                {['Póliza', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Vigencia', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '12px' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p => {
-                const ti = tipoInfo(p.tipo)
-                const est = ESTADO_CONFIG[p.estado]
-                const diasRestantes = p.fecha_vencimiento
-                  ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
-                  : null
-                return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{p.numero_poliza}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{p.aseguradora}</div>
-                      {p.agente_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Agente: {p.agente_nombre}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '18px' }}>{ti.icon}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{ti.label}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                      <div>{p.fecha_inicio}</div>
-                      <div>→ {p.fecha_vencimiento}</div>
-                      {diasRestantes !== null && p.estado === 'vigente' && (
-                        <div style={{ color: diasRestantes < 60 ? 'var(--at-warning)' : 'var(--at-success)', fontWeight: 600, fontSize: '11px' }}>
-                          {diasRestantes > 0 ? `${diasRestantes}d restantes` : 'Vencida'}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit ? (
-                        <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPoliza)}
-                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
-                          {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {p.estado !== 'cancelada' && (
-                          <button
-                            title="Notificar por WhatsApp"
-                            onClick={() => {
-                              const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
-                              const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
-                              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-                            }}
-                            style={{ padding: '4px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-success)' }}
-                          >💬</button>
-                        )}
-                        {p.documento_url && <SecureFileLink src={p.documento_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>}
-                        {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* F3.9: migrado a <DataTable> shared */}
+      <DataTable<PolizaSeguro>
+        data={filtered}
+        rowKey="id"
+        pageSize={20}
+        searchableKeys={['numero_poliza', 'aseguradora']}
+        searchPlaceholder="Buscar póliza o aseguradora..."
+        emptyState={{ icon: '🛡️', title: 'No hay pólizas registradas' }}
+        defaultSort={{ key: 'fecha_vencimiento', direction: 'asc' }}
+        columns={[
+          { key: 'numero_poliza', header: 'Póliza', sortable: true,
+            render: (p) => (
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{p.numero_poliza}</div>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{p.aseguradora}</div>
+                {p.agente_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Agente: {p.agente_nombre}</div>}
+              </div>
+            ),
+          },
+          { key: 'tipo', header: 'Tipo', sortable: true, hideOnMobile: true,
+            render: (p) => {
+              const ti = tipoInfo(p.tipo)
+              return (
+                <div>
+                  <span style={{ fontSize: '18px' }}>{ti.icon}</span>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{ti.label}</div>
+                </div>
+              )
+            },
+          },
+          { key: 'suma_asegurada', header: 'Suma Asegurada', align: 'right', sortable: true, hideOnMobile: true,
+            render: (p) => <span style={{ fontWeight: 600 }}>{p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—'}</span>,
+          },
+          { key: 'prima_anual', header: 'Prima Anual', align: 'right', sortable: true,
+            render: (p) => <span style={{ fontWeight: 600 }}>{p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—'}</span>,
+          },
+          { key: 'fecha_vencimiento', header: 'Vigencia', sortable: true,
+            render: (p) => {
+              const diasRestantes = p.fecha_vencimiento
+                ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
+                : null
+              return (
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                  <div>{p.fecha_inicio}</div>
+                  <div>→ {p.fecha_vencimiento}</div>
+                  {diasRestantes !== null && p.estado === 'vigente' && (
+                    <div style={{ color: diasRestantes < 60 ? 'var(--at-warning)' : 'var(--at-success)', fontWeight: 600, fontSize: '11px' }}>
+                      {diasRestantes > 0 ? `${diasRestantes}d restantes` : 'Vencida'}
+                    </div>
+                  )}
+                </div>
+              )
+            },
+          },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (p) => {
+              const est = ESTADO_CONFIG[p.estado]
+              return canEdit ? (
+                <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPoliza)}
+                  style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
+                  {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              ) : (
+                <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
+              )
+            },
+          },
+          { key: '__actions', header: '',
+            render: (p) => (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {p.estado !== 'cancelada' && (
+                  <button
+                    title="Notificar por WhatsApp"
+                    aria-label="Notificar por WhatsApp"
+                    onClick={() => {
+                      const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+                      const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
+                      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                    }}
+                    style={{ padding: '4px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-success)' }}
+                  >💬</button>
+                )}
+                {p.documento_url && <SecureFileLink src={p.documento_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>}
+                {canEdit && <button aria-label="Editar póliza" onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                {canEdit && <button aria-label="Eliminar póliza" onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
+              </div>
+            ),
+          },
+        ] satisfies DataTableColumn<PolizaSeguro>[]}
+      />
     </div>
   )
 }

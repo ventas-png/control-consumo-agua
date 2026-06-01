@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
 
 interface Props {
@@ -325,36 +326,18 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
             {/* Historial movimientos */}
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Últimos movimientos</div>
-            {movsDelSelected.length === 0
-              ? <div style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>Sin movimientos registrados</div>
-              : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--at-surface-2)' }}>
-                      {['Fecha', 'Tipo', 'Cantidad', 'Motivo', 'Área', 'Por'].map(h => (
-                        <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', fontSize: 12 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movsDelSelected.slice(0, 30).map(m => {
-                      const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
-                      return (
-                        <tr key={m.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                          <td style={{ padding: '7px 10px' }}>{m.fecha}</td>
-                          <td style={{ padding: '7px 10px' }}>
-                            <span style={{ padding: '2px 8px', borderRadius: 8, background: tipo?.color + '20', color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
-                          </td>
-                          <td style={{ padding: '7px 10px', fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.motivo || '—'}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.area_destino || '—'}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.realizado_por || '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
+            <DataTable<MovimientoSuministro>
+              data={movsDelSelected.slice(0, 30)}
+              columns={movimientosColumns(selected.unidad_medida)}
+              rowKey={m => m.id}
+              searchableKeys={[
+                m => m.motivo ?? '',
+                m => m.area_destino ?? '',
+                m => m.realizado_por ?? '',
+              ]}
+              searchPlaceholder="Buscar movimiento, motivo, área…"
+              emptyState={<div style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>Sin movimientos registrados</div>}
+            />
           </div>
         )}
 
@@ -366,4 +349,56 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       </div>
     </div>
   )
+}
+
+function movimientosColumns(unidadMedida: string): DataTableColumn<MovimientoSuministro>[] {
+  return [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      accessor: m => m.fecha,
+      render: m => m.fecha,
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortable: true,
+      accessor: m => m.tipo,
+      render: m => {
+        const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
+        return (
+          <span style={{ padding: '2px 8px', borderRadius: 8, background: tipo?.color + '20', color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
+        )
+      },
+    },
+    {
+      key: 'cantidad',
+      header: 'Cantidad',
+      sortable: true,
+      accessor: m => m.cantidad,
+      render: m => <span style={{ fontWeight: 600 }}>{m.cantidad} {unidadMedida}</span>,
+    },
+    {
+      key: 'motivo',
+      header: 'Motivo',
+      accessor: m => m.motivo ?? '',
+      render: m => m.motivo || '—',
+      hideOnMobile: true,
+    },
+    {
+      key: 'area_destino',
+      header: 'Área',
+      accessor: m => m.area_destino ?? '',
+      render: m => m.area_destino || '—',
+      hideOnMobile: true,
+    },
+    {
+      key: 'realizado_por',
+      header: 'Por',
+      accessor: m => m.realizado_por ?? '',
+      render: m => m.realizado_por || '—',
+      hideOnMobile: true,
+    },
+  ]
 }

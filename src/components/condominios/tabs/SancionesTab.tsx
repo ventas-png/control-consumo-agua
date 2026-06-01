@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   sanciones: SancionCondominio[]
@@ -165,61 +166,106 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No hay sanciones" />
-      ) : (
-        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Unidad', 'Concepto', 'Monto', 'Emisión', 'Vencimiento', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s, i) => {
-                const est = ESTADO[s.estado]
-                const vencida = s.estado === 'pendiente' && s.fecha_vencimiento && s.fecha_vencimiento < today
-                return (
-                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-2)' }}>{s.concepto}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {s.monto.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{s.fecha_emision}</td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
-                      {s.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: est?.bg, color: est?.color }}>
-                        {est?.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && s.estado === 'pendiente' && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => cambiarEstado(s.id, 'pagado', '¿Marcar como pagada?')}
-                            style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            Pagado
-                          </button>
-                          <button onClick={() => cambiarEstado(s.id, 'apelado')}
-                            style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                            Apelar
-                          </button>
-                          <button onClick={() => cambiarEstado(s.id, 'anulado', '¿Anular sanción?')}
-                            style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                            Anular
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable<SancionCondominio>
+        data={filtered}
+        columns={sancionesColumns({ moneda, canEdit, today, cambiarEstado })}
+        rowKey={s => s.id}
+        searchableKeys={[
+          s => s.unidad_nombre ?? '',
+          s => s.concepto,
+          s => s.observaciones ?? '',
+        ]}
+        searchPlaceholder="Buscar sanción, unidad, concepto…"
+        emptyState={<EmptyState icon="📋" title="No hay sanciones" />}
+      />
     </div>
   )
+}
+
+function sancionesColumns(opts: {
+  moneda: string
+  canEdit: boolean
+  today: string
+  cambiarEstado: (id: string, estado: string, msg?: string) => void
+}): DataTableColumn<SancionCondominio>[] {
+  const { moneda, canEdit, today, cambiarEstado } = opts
+  return [
+    {
+      key: 'unidad',
+      header: 'Unidad',
+      sortable: true,
+      accessor: s => s.unidad_nombre ?? '',
+      render: s => <span style={{ fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</span>,
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      accessor: s => s.concepto,
+      render: s => <span style={{ color: 'var(--at-ink-2)' }}>{s.concepto}</span>,
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      accessor: s => s.monto,
+      render: s => <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {s.monto.toFixed(2)}</span>,
+    },
+    {
+      key: 'fecha_emision',
+      header: 'Emisión',
+      sortable: true,
+      accessor: s => s.fecha_emision,
+      render: s => <span style={{ color: 'var(--at-ink-3)', fontSize: '12px' }}>{s.fecha_emision}</span>,
+      hideOnMobile: true,
+    },
+    {
+      key: 'fecha_vencimiento',
+      header: 'Vencimiento',
+      sortable: true,
+      accessor: s => s.fecha_vencimiento ?? '',
+      render: s => {
+        const vencida = s.estado === 'pendiente' && s.fecha_vencimiento && s.fecha_vencimiento < today
+        return (
+          <span style={{ fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+            {s.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
+          </span>
+        )
+      },
+      hideOnMobile: true,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      accessor: s => s.estado,
+      render: s => {
+        const est = ESTADO[s.estado]
+        return (
+          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: est?.bg, color: est?.color }}>
+            {est?.label}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: s => canEdit && s.estado === 'pendiente' ? (
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => cambiarEstado(s.id, 'pagado', '¿Marcar como pagada?')}
+            style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+            Pagado
+          </button>
+          <button onClick={() => cambiarEstado(s.id, 'apelado')}
+            style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+            Apelar
+          </button>
+          <button onClick={() => cambiarEstado(s.id, 'anulado', '¿Anular sanción?')}
+            style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+            Anular
+          </button>
+        </div>
+      ) : null,
+    },
+  ]
 }
