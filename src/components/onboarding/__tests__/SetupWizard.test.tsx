@@ -20,6 +20,8 @@ const USER: UserSession = {
   name: 'Admin Test',
   role: 'admin',
   company_id: 'c1',
+  login_time: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 86400000).toISOString(),
 }
 
 describe('SetupWizard', () => {
