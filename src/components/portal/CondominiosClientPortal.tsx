@@ -17,24 +17,29 @@ import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
 import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
+// F3.12: Portal residente ampliado (asambleas + transparencia)
+import { PortalAsambleasTab }     from '../condominios/tabs/PortalAsambleasTab'
+import { PortalTransparenciaTab } from '../condominios/tabs/PortalTransparenciaTab'
 
 interface Props {
   currentUser: UserSession
   onLogout: () => void
 }
 
-type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes' | 'anuncios' | 'rentas' | 'mudanza'
+type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes' | 'anuncios' | 'rentas' | 'mudanza' | 'asambleas' | 'transparencia'
 
 const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
-  { id: 'mi_unidad',  label: 'Mi Unidad',    icon: '🏠' },
-  { id: 'reservas',   label: 'Reservas',      icon: '🏊' },
-  { id: 'cuenta',     label: 'Mi Cuenta',     icon: '💳' },
-  { id: 'tickets',    label: 'Mantenimiento', icon: '🔧' },
-  { id: 'visitantes', label: 'Visitantes',    icon: '🚪' },
-  { id: 'paquetes',   label: 'Paquetería',    icon: '📦' },
-  { id: 'anuncios',   label: 'Anuncios',      icon: '📢' },
-  { id: 'rentas',     label: 'Rentas',        icon: '🏨' },
-  { id: 'mudanza',    label: 'Mudanzas',      icon: '🚛' },
+  { id: 'mi_unidad',     label: 'Mi Unidad',       icon: '🏠' },
+  { id: 'reservas',      label: 'Reservas',        icon: '🏊' },
+  { id: 'cuenta',        label: 'Mi Cuenta',       icon: '💳' },
+  { id: 'tickets',       label: 'Mantenimiento',   icon: '🔧' },
+  { id: 'visitantes',    label: 'Visitantes',      icon: '🚪' },
+  { id: 'paquetes',      label: 'Paquetería',      icon: '📦' },
+  { id: 'anuncios',      label: 'Anuncios',        icon: '📢' },
+  { id: 'asambleas',     label: 'Asambleas',       icon: '🏛️' },
+  { id: 'transparencia', label: 'Transparencia',   icon: '📊' },
+  { id: 'rentas',        label: 'Rentas',          icon: '🏨' },
+  { id: 'mudanza',       label: 'Mudanzas',        icon: '🚛' },
 ]
 
 const PORTAL_CSS = `
@@ -479,6 +484,18 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
                 clienteId={clienteId}
+              />
+            )}
+            {tab === 'asambleas' && (
+              <PortalAsambleasTab
+                unidadId={selectedUnidadId}
+                proyectoId={proyectoId}
+              />
+            )}
+            {tab === 'transparencia' && (
+              <PortalTransparenciaTab
+                proyectoId={proyectoId}
+                moneda={moneda}
               />
             )}
           </div>
