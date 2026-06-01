@@ -3,6 +3,7 @@ import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   contratos: ContratoArrendamiento[]
@@ -242,72 +243,74 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
         </div>
       )}
 
-      {/* Lista */}
-      {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>📄</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay contratos {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registrados'}</p>
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-                {['Arrendatario', 'Unidad', 'Renta/mes', 'Día pago', 'Período', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map(c => {
-                const ec = ESTADO_CONFIG[c.estado]
-                const vence30 = c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) && c.estado === 'activo'
-                return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{c.arrendatario_nombre}</div>
-                      {c.arrendatario_telefono && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{c.arrendatario_telefono}</div>}
-                    </td>
-                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.unidad_nombre || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto_renta.toFixed(2)}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</td>
-                    <td style={{ padding: '10px 14px', color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
-                      {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
-                      {vence30 && <span style={{ display: 'block', fontSize: '11px', color: 'var(--at-warning)' }}>⚠️ Por vencer</span>}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      {canEdit ? (
-                        <select value={c.estado} onChange={e => cambiarEstado(c.id, e.target.value as EstadoContrato)}
-                          style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ec.bg, color: ec.color }}>
-                          {(Object.entries(ESTADO_CONFIG) as [EstadoContrato, typeof ESTADO_CONFIG[EstadoContrato]][]).map(([v, cfg]) => (
-                            <option key={v} value={v}>{cfg.label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 14px', display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      {vence30 && (
-                        <button
-                          title="Notificar renovación por WhatsApp"
-                          onClick={() => {
-                            const msg = `📋 Aviso de vencimiento de contrato\nArrendatario: ${c.arrendatario_nombre}\nUnidad: ${c.unidad_nombre ?? ''}\nVencimiento: ${c.fecha_fin}\nPor favor comuníquese para coordinar la renovación.`
-                            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-                          }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-success)' }}
-                        >💬</button>
-                      )}
-                      {canEdit && <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-ink-3)' }}>✏️</button>}
-                      <button onClick={() => eliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-danger)' }}>🗑</button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Lista — F3.9: migrado a <DataTable> shared */}
+      <DataTable<ContratoArrendamiento>
+        data={filtrados}
+        rowKey="id"
+        pageSize={50}
+        emptyState={{ icon: '📄', title: `No hay contratos ${filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registrados'}` }}
+        columns={[
+          { key: 'arrendatario_nombre', header: 'Arrendatario', sortable: true,
+            render: (c) => (
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{c.arrendatario_nombre}</div>
+                {c.arrendatario_telefono && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{c.arrendatario_telefono}</div>}
+              </div>
+            ) },
+          { key: 'unidad_nombre', header: 'Unidad', sortable: true,
+            accessor: (c) => c.unidad_nombre ?? '',
+            render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>{c.unidad_nombre || '—'}</span> },
+          { key: 'monto_renta', header: 'Renta/mes', align: 'right', sortable: true,
+            render: (c) => <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto_renta.toFixed(2)}</span> },
+          { key: 'dia_pago', header: 'Día pago', align: 'center', sortable: true, hideOnMobile: true,
+            render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</span> },
+          { key: 'fecha_inicio', header: 'Período', sortable: true,
+            render: (c) => {
+              const vence30 = c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) && c.estado === 'activo'
+              return (
+                <span style={{ color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
+                  {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
+                  {vence30 && <span style={{ display: 'block', fontSize: 11, color: 'var(--at-warning)' }}>⚠️ Por vencer</span>}
+                </span>
+              )
+            } },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (c) => {
+              const ec = ESTADO_CONFIG[c.estado]
+              return canEdit ? (
+                <select value={c.estado} onChange={(e) => { e.stopPropagation(); cambiarEstado(c.id, e.target.value as EstadoContrato) }}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ padding: '4px 8px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, border: 'none', cursor: 'pointer', background: ec.bg, color: ec.color }}
+                  aria-label={`Estado de ${c.arrendatario_nombre}`}>
+                  {(Object.entries(ESTADO_CONFIG) as [EstadoContrato, typeof ESTADO_CONFIG[EstadoContrato]][]).map(([v, cfg]) => (
+                    <option key={v} value={v}>{cfg.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+              )
+            } },
+          { key: 'actions', header: '', align: 'right',
+            render: (c) => {
+              const vence30 = c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) && c.estado === 'activo'
+              return (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
+                  {vence30 && (
+                    <button title="Notificar renovación por WhatsApp" aria-label="Notificar renovación por WhatsApp"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const msg = `📋 Aviso de vencimiento de contrato\nArrendatario: ${c.arrendatario_nombre}\nUnidad: ${c.unidad_nombre ?? ''}\nVencimiento: ${c.fecha_fin}\nPor favor comuníquese para coordinar la renovación.`
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-success)' }}>💬</button>
+                  )}
+                  {canEdit && <button onClick={(e) => { e.stopPropagation(); startEdit(c) }} aria-label={`Editar ${c.arrendatario_nombre}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-ink-3)' }}>✏️</button>}
+                  <button onClick={(e) => { e.stopPropagation(); eliminar(c.id) }} aria-label={`Eliminar ${c.arrendatario_nombre}`} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--at-danger)' }}>🗑</button>
+                </div>
+              )
+            } },
+        ] satisfies DataTableColumn<ContratoArrendamiento>[]}
+      />
     </div>
   )
 }
