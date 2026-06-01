@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { confirm, notify } from './components/shared/Dialog'
+import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
@@ -226,6 +227,15 @@ export default function App() {
     const interval = setInterval(fetchUnreadComunicacion, 300_000)
     return () => clearInterval(interval)
   }, [fetchUnreadComunicacion])
+
+  // F4.1.2: promptUpgrade dispatcha este evento cuando el usuario elige "Ver
+  // planes" desde un CTA de limite alcanzado. Centralizamos aqui la navegacion
+  // porque solo App.tsx maneja activeSection (no hay router URL).
+  useEffect(() => {
+    const handler = () => setActiveSection('perfil')
+    window.addEventListener(OPEN_BILLING_EVENT, handler)
+    return () => window.removeEventListener(OPEN_BILLING_EVENT, handler)
+  }, [])
 
   // Set default section based on role after login
   useEffect(() => {

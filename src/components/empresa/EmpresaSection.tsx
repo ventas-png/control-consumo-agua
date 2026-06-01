@@ -14,6 +14,7 @@ import { AuditLogModal } from './AuditLogModal'
 import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
+import { promptUpgrade } from '../shared/promptUpgrade'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -295,11 +296,12 @@ export function EmpresaSection({ currentUser }: Props) {
   async function crearProyecto() {
     if (!empresa) return
     if (proyectos.length >= effectiveMaxProjects) {
-      notify({
-        variant: 'warning',
-        title: 'Límite alcanzado',
-        text: `Tu plan permite máximo ${effectiveMaxProjects} proyecto(s). Actualízalo desde Perfil → Mi plan para agregar más.`,
-        duration: 5000,
+      // F4.1.2: en lugar de un notify informativo, modal con CTA "Ver planes"
+      // que navega a Perfil → Mi plan con auto-scroll y plan picker abierto.
+      await promptUpgrade({
+        resource: 'project',
+        current: proyectos.length,
+        limit: effectiveMaxProjects,
       })
       return
     }
