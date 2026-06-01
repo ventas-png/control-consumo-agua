@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { confirm, notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EstacionamientoVisita, TipoVehiculoVisita, Unidad } from '../../../types'
 
 interface Props {
@@ -206,39 +207,35 @@ export default function EstacionamientoVisitaTab({
         </div>
       )}
 
-      {/* Historial */}
+      {/* Historial — F3.9: migrado a <DataTable> shared */}
       <div>
         <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14, color: 'var(--at-ink-2)' }}>📋 Historial del día</div>
-        {historial.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '24px 0', fontSize: 13 }}>Sin registros de salidas para esta fecha</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Espacio', 'Placa', 'Vehículo', 'Unidad', 'Visitante', 'Entrada', 'Salida', 'Duración'].map(h => (
-                  <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {historial.map(r => {
-                const unidad = unidades.find(u => u.id === r.unidad_visitada)
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '8px 10px' }}>{r.espacio}</td>
-                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.placa}</td>
-                    <td style={{ padding: '8px 10px' }}>{TIPOS_VEHICULO.find(t => t.value === r.tipo_vehiculo)?.label || r.tipo_vehiculo}</td>
-                    <td style={{ padding: '8px 10px' }}>{unidad?.nombre || '—'}</td>
-                    <td style={{ padding: '8px 10px' }}>{r.visitante_nombre || '—'}</td>
-                    <td style={{ padding: '8px 10px' }}>{new Date(r.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</td>
-                    <td style={{ padding: '8px 10px' }}>{r.hora_salida ? new Date(r.hora_salida).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ padding: '8px 10px', color: 'var(--at-accent)' }}>{r.hora_salida ? duracion(r.hora_entrada, r.hora_salida) : '—'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+        <DataTable<EstacionamientoVisita>
+          data={historial}
+          rowKey="id"
+          pageSize={20}
+          searchableKeys={['placa', 'visitante_nombre']}
+          searchPlaceholder="Buscar placa o visitante..."
+          emptyState={{ icon: '🅿️', title: 'Sin registros de salidas para esta fecha' }}
+          columns={[
+            { key: 'espacio', header: 'Espacio', sortable: true },
+            { key: 'placa', header: 'Placa', sortable: true, render: (r) => <span style={{ fontWeight: 600 }}>{r.placa}</span> },
+            { key: 'tipo_vehiculo', header: 'Vehículo', hideOnMobile: true,
+              render: (r) => TIPOS_VEHICULO.find(t => t.value === r.tipo_vehiculo)?.label || r.tipo_vehiculo,
+            },
+            { key: 'unidad', header: 'Unidad', accessor: (r) => unidades.find(u => u.id === r.unidad_visitada)?.nombre || '',
+              render: (r) => unidades.find(u => u.id === r.unidad_visitada)?.nombre || '—' },
+            { key: 'visitante_nombre', header: 'Visitante', hideOnMobile: true, render: (r) => r.visitante_nombre || '—' },
+            { key: 'hora_entrada', header: 'Entrada', sortable: true,
+              render: (r) => new Date(r.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) },
+            { key: 'hora_salida', header: 'Salida',
+              render: (r) => r.hora_salida ? new Date(r.hora_salida).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '—' },
+            { key: 'duracion', header: 'Duración',
+              render: (r) => r.hora_salida
+                ? <span style={{ color: 'var(--at-accent)' }}>{duracion(r.hora_entrada, r.hora_salida)}</span>
+                : '—' },
+          ] satisfies DataTableColumn<EstacionamientoVisita>[]}
+        />
       </div>
     </div>
   )

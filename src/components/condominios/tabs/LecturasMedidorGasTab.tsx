@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { LecturaMedidorGas, Unidad } from '../../../types'
 
 interface Props {
@@ -204,48 +205,45 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
         </div>
       )}
 
-      {/* Tabla de lecturas */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>Sin lecturas para los filtros seleccionados</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Unidad/Área', 'Período', 'Fecha', 'Lect. anterior', 'Lect. actual', 'Consumo', 'Costo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(l => {
-                const unidad = unidades.find(u => u.id === l.unidad_id)
-                return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? 'var(--at-danger-tint)' : 'var(--at-surface)' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>
-                      {l.alerta_fuga && <span style={{ color: 'var(--at-danger)', marginRight: 4 }}>🚨</span>}
-                      {unidad?.nombre ?? l.area ?? 'Área común'}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{l.periodo ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{l.fecha}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{l.lectura_anterior?.toFixed(3) ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{l.lectura_actual.toFixed(3)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-accent)', fontWeight: 600 }}>
-                      {l.consumo != null ? `${l.consumo.toFixed(3)} m³` : '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-success)', fontWeight: 600 }}>
-                      {l.costo_total != null ? `${moneda} ${l.costo_total.toFixed(2)}` : '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {l.observaciones && <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }} title={l.observaciones}>📝</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Tabla de lecturas — F3.9: migrado a <DataTable> shared */}
+      <DataTable<LecturaMedidorGas>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        searchableKeys={['area']}
+        searchPlaceholder="Buscar área..."
+        emptyState={{ icon: '🔥', title: 'Sin lecturas para los filtros seleccionados' }}
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        rowStyle={(l) => l.alerta_fuga ? { background: 'var(--at-danger-tint)' } : {}}
+        columns={[
+          { key: 'unidad', header: 'Unidad/Área', sortable: true,
+            accessor: (l) => unidades.find(u => u.id === l.unidad_id)?.nombre ?? l.area ?? '',
+            render: (l) => (
+              <span style={{ fontWeight: 600 }}>
+                {l.alerta_fuga && <span style={{ color: 'var(--at-danger)', marginRight: 4 }}>🚨</span>}
+                {unidades.find(u => u.id === l.unidad_id)?.nombre ?? l.area ?? 'Área común'}
+              </span>
+            ),
+          },
+          { key: 'periodo', header: 'Período', sortable: true, hideOnMobile: true, render: (l) => l.periodo ?? '—' },
+          { key: 'fecha', header: 'Fecha', sortable: true },
+          { key: 'lectura_anterior', header: 'Lect. ant.', align: 'right', hideOnMobile: true,
+            render: (l) => l.lectura_anterior?.toFixed(3) ?? '—' },
+          { key: 'lectura_actual', header: 'Lect. act.', align: 'right', render: (l) => l.lectura_actual.toFixed(3) },
+          { key: 'consumo', header: 'Consumo', align: 'right', sortable: true,
+            render: (l) => l.consumo != null
+              ? <span style={{ color: 'var(--at-accent)', fontWeight: 600 }}>{l.consumo.toFixed(3)} m³</span>
+              : '—' },
+          { key: 'costo_total', header: 'Costo', align: 'right', sortable: true,
+            render: (l) => l.costo_total != null
+              ? <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>{moneda} {l.costo_total.toFixed(2)}</span>
+              : '—' },
+          { key: 'observaciones', header: '', hideOnMobile: true,
+            render: (l) => l.observaciones
+              ? <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }} title={l.observaciones}>📝</span>
+              : null },
+        ] satisfies DataTableColumn<LecturaMedidorGas>[]}
+      />
     </div>
   )
 }

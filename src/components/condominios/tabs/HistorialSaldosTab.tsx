@@ -4,6 +4,7 @@ import { openPromptDialog } from '../../shared/PromptDialog'
 import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
 import { StatusBadge } from '../../shared/StatusBadge'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   historial: HistorialSaldoUnidad[]
@@ -122,49 +123,41 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
         )}
       </div>
 
-      {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-          Sin snapshots de saldo — usa "Generar snapshot" para el período actual
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Unidad', 'Período', 'Saldo anterior', 'Cargos', 'Pagos', 'Saldo final', 'Cuotas vencidas'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.sort((a, b) => b.periodo.localeCompare(a.periodo) || (unidades.find(u => u.id === a.unidad_id)?.nombre ?? '').localeCompare(unidades.find(u => u.id === b.unidad_id)?.nombre ?? '')).map(h => {
-                const unidad = unidades.find(u => u.id === h.unidad_id)
-                const deudor = h.saldo_final > 0
-                return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? 'var(--at-danger-tint)' : 'var(--at-surface)' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{h.periodo}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-danger)' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-success)' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: deudor ? 'var(--at-danger)' : 'var(--at-success)' }}>
-                      {moneda} {h.saldo_final.toFixed(2)}
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      {h.num_cuotas_vencidas > 0
-                        ? <StatusBadge tone="danger">{h.num_cuotas_vencidas}</StatusBadge>
-                        : <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>—</span>
-                      }
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Tabla — F3.9: migrado a <DataTable> shared */}
+      <DataTable<HistorialSaldoUnidad>
+        data={lista}
+        rowKey="id"
+        pageSize={30}
+        emptyState={{ icon: '📊', title: 'Sin snapshots de saldo', description: 'Usa "Generar snapshot" para el período actual.' }}
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        rowStyle={(h) => h.saldo_final > 0 ? { background: 'var(--at-danger-tint)' } : {}}
+        columns={[
+          { key: 'unidad', header: 'Unidad', sortable: true,
+            accessor: (h) => unidades.find(u => u.id === h.unidad_id)?.nombre ?? h.unidad_nombre ?? '',
+            render: (h) => <span style={{ fontWeight: 600 }}>{unidades.find(u => u.id === h.unidad_id)?.nombre ?? h.unidad_nombre ?? '—'}</span>,
+          },
+          { key: 'periodo', header: 'Período', sortable: true },
+          { key: 'saldo_anterior', header: 'Saldo anterior', align: 'right', hideOnMobile: true,
+            render: (h) => `${moneda} ${h.saldo_anterior.toFixed(2)}` },
+          { key: 'cargos_periodo', header: 'Cargos', align: 'right', hideOnMobile: true,
+            render: (h) => <span style={{ color: 'var(--at-danger)' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</span> },
+          { key: 'pagos_periodo', header: 'Pagos', align: 'right', hideOnMobile: true,
+            render: (h) => <span style={{ color: 'var(--at-success)' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</span> },
+          { key: 'saldo_final', header: 'Saldo final', align: 'right', sortable: true,
+            render: (h) => {
+              const deudor = h.saldo_final > 0
+              return <span style={{ fontWeight: 700, color: deudor ? 'var(--at-danger)' : 'var(--at-success)' }}>
+                {moneda} {h.saldo_final.toFixed(2)}
+              </span>
+            },
+          },
+          { key: 'num_cuotas_vencidas', header: 'Vencidas', align: 'center', sortable: true,
+            render: (h) => h.num_cuotas_vencidas > 0
+              ? <StatusBadge tone="danger">{h.num_cuotas_vencidas}</StatusBadge>
+              : <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>—</span>,
+          },
+        ] satisfies DataTableColumn<HistorialSaldoUnidad>[]}
+      />
     </div>
   )
 }
