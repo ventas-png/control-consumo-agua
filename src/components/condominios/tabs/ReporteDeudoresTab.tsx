@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -163,72 +164,46 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         </div>
       )}
 
-      {/* Tabla */}
-      {deudores.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>
-          No hay unidades con saldo pendiente. ¡Excelente nivel de cobro!
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                <th style={{ padding: '9px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Unidad</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-warning)', fontWeight: 600 }}>0–30 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-warning)', fontWeight: 600 }}>31–60 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-danger)', fontWeight: 600 }}>61–90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-danger-strong)', fontWeight: 600 }}>+90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-ink-2)', fontWeight: 700 }}>Total</th>
-                <th style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)', fontWeight: 600 }}>Cuotas</th>
-                <th style={{ padding: '9px 12px' }} />
-              </tr>
-            </thead>
-            <tbody>
-              {deudores.map((d, i) => (
-                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, background: d.t90plus > 0 ? 'var(--at-danger-tint)00' : undefined }}>
-                  <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{d.unidadNombre}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
-                    {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
-                    {d.t31_60 > 0 ? `${moneda} ${d.t31_60.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
-                    {d.t61_90 > 0 ? `${moneda} ${d.t61_90.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? 'var(--at-danger-strong)' : 'var(--at-ink-3)' }}>
-                    {d.t90plus > 0 ? `${moneda} ${d.t90plus.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--at-danger)' }}>
-                    {moneda} {d.total.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)' }}>{d.cuotasCount}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                    <button onClick={() => cartaCobro(d)}
-                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-primary)', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', cursor: 'pointer', fontWeight: 600 }}>
-                      🖨️ Carta
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
-                <td style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-warning)' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-warning)' }}>{moneda} {totales.t31_60.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totales.t61_90.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger-strong)' }}>{moneda} {totales.t90plus.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {totales.total.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-3)' }}>
-                  {deudores.reduce((s, d) => s + d.cuotasCount, 0)}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+      {/* Tabla — F3.9: migrado a <DataTable> shared (totales en KPIs arriba) */}
+      <DataTable<DeudorRow>
+        data={deudores}
+        rowKey="unidadId"
+        pageSize={50}
+        defaultSort={{ key: 'total', direction: 'desc' }}
+        emptyState={{ icon: '✅', title: 'No hay unidades con saldo pendiente', description: '¡Excelente nivel de cobro!' }}
+        rowStyle={(d) => d.t90plus > 0 ? { background: 'var(--at-danger-tint)' } : {}}
+        columns={[
+          { key: 'unidadNombre', header: 'Unidad', sortable: true,
+            render: (d) => <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{d.unidadNombre}</span> },
+          { key: 't0_30', header: '0–30 días', align: 'right', sortable: true, hideOnMobile: true,
+            render: (d) => <span style={{ color: d.t0_30 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
+              {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
+            </span> },
+          { key: 't31_60', header: '31–60 días', align: 'right', sortable: true, hideOnMobile: true,
+            render: (d) => <span style={{ color: d.t31_60 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
+              {d.t31_60 > 0 ? `${moneda} ${d.t31_60.toFixed(2)}` : '—'}
+            </span> },
+          { key: 't61_90', header: '61–90 días', align: 'right', sortable: true, hideOnMobile: true,
+            render: (d) => <span style={{ color: d.t61_90 > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+              {d.t61_90 > 0 ? `${moneda} ${d.t61_90.toFixed(2)}` : '—'}
+            </span> },
+          { key: 't90plus', header: '+90 días', align: 'right', sortable: true,
+            render: (d) => <span style={{ fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? 'var(--at-danger-strong)' : 'var(--at-ink-3)' }}>
+              {d.t90plus > 0 ? `${moneda} ${d.t90plus.toFixed(2)}` : '—'}
+            </span> },
+          { key: 'total', header: 'Total', align: 'right', sortable: true,
+            render: (d) => <span style={{ fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {d.total.toFixed(2)}</span> },
+          { key: 'cuotasCount', header: 'Cuotas', align: 'center', sortable: true, hideOnMobile: true,
+            render: (d) => <span style={{ color: 'var(--at-ink-3)' }}>{d.cuotasCount}</span> },
+          { key: 'actions', header: '', align: 'right',
+            render: (d) => (
+              <button onClick={(e) => { e.stopPropagation(); cartaCobro(d) }}
+                style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-primary)', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', cursor: 'pointer', fontWeight: 600 }}>
+                🖨️ Carta
+              </button>
+            ) },
+        ] satisfies DataTableColumn<DeudorRow>[]}
+      />
     </div>
   )
 }

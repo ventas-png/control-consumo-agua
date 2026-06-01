@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, ConciliacionCobrosLog } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -238,49 +239,49 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
 
       {subTab === 'historial' && (
         <div>
-          {conciliaciones.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>Sin conciliaciones registradas.</div>
-          ) : (
-            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: 'var(--at-surface-2)' }}>
-                    {['Fecha', 'Unidad', 'Concepto', 'Cuota', 'Recibido', 'Diferencia', 'Método', 'Ref.', 'Estado'].map(h => (
-                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {conciliaciones.map((c, i) => {
-                    const cuota = cuotas.find(q => q.id === c.cuota_id)
-                    const unidad = unidades.find(u => u.id === c.unidad_id)
-                    const diff = c.monto_recibido - c.monto_cuota
-                    return (
-                      <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined }}>
-                        <td style={{ padding: '8px 10px', color: 'var(--at-ink-2)' }}>{c.fecha_pago}</td>
-                        <td style={{ padding: '8px 10px' }}>{unidad?.nombre ?? '—'}</td>
-                        <td style={{ padding: '8px 10px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cuota?.concepto ?? '—'}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>{moneda} {c.monto_cuota.toFixed(2)}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>{moneda} {c.monto_recibido.toFixed(2)}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', color: Math.abs(diff) < 0.01 ? 'var(--at-success)' : diff > 0 ? 'var(--at-warning)' : 'var(--at-danger)', fontWeight: 600 }}>
-                          {Math.abs(diff) < 0.01 ? '✓' : diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>{c.metodo_pago}</td>
-                        <td style={{ padding: '8px 10px', color: 'var(--at-ink-3)', fontSize: 10 }}>{c.referencia_pago ?? '—'}</td>
-                        <td style={{ padding: '8px 10px' }}>
-                          <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                            background: c.estado === 'conciliado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
-                            color: c.estado === 'conciliado' ? 'var(--at-success)' : 'var(--at-warning)' }}>
-                            {c.estado}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* F3.9: migrado a <DataTable> shared */}
+          <DataTable<ConciliacionCobrosLog>
+            data={conciliaciones}
+            rowKey="id"
+            pageSize={50}
+            defaultSort={{ key: 'fecha_pago', direction: 'desc' }}
+            emptyState={{ icon: '📜', title: 'Sin conciliaciones registradas' }}
+            columns={[
+              { key: 'fecha_pago', header: 'Fecha', sortable: true,
+                render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>{c.fecha_pago}</span> },
+              { key: 'unidad_id', header: 'Unidad', sortable: true,
+                accessor: (c) => unidades.find(u => u.id === c.unidad_id)?.nombre ?? '',
+                render: (c) => unidades.find(u => u.id === c.unidad_id)?.nombre ?? '—' },
+              { key: 'concepto', header: 'Concepto', hideOnMobile: true,
+                accessor: (c) => cuotas.find(q => q.id === c.cuota_id)?.concepto ?? '',
+                render: (c) => <span style={{ display: 'inline-block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cuotas.find(q => q.id === c.cuota_id)?.concepto ?? '—'}</span> },
+              { key: 'monto_cuota', header: 'Cuota', align: 'right', sortable: true, hideOnMobile: true,
+                render: (c) => `${moneda} ${c.monto_cuota.toFixed(2)}` },
+              { key: 'monto_recibido', header: 'Recibido', align: 'right', sortable: true,
+                render: (c) => <span style={{ fontWeight: 600 }}>{moneda} {c.monto_recibido.toFixed(2)}</span> },
+              { key: 'diferencia', header: 'Diferencia', align: 'right', sortable: true,
+                accessor: (c) => c.monto_recibido - c.monto_cuota,
+                render: (c) => {
+                  const diff = c.monto_recibido - c.monto_cuota
+                  return <span style={{ color: Math.abs(diff) < 0.01 ? 'var(--at-success)' : diff > 0 ? 'var(--at-warning)' : 'var(--at-danger)', fontWeight: 600 }}>
+                    {Math.abs(diff) < 0.01 ? '✓' : diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
+                  </span>
+                } },
+              { key: 'metodo_pago', header: 'Método', sortable: true, hideOnMobile: true,
+                render: (c) => c.metodo_pago },
+              { key: 'referencia_pago', header: 'Ref.', hideOnMobile: true,
+                accessor: (c) => c.referencia_pago ?? '',
+                render: (c) => <span style={{ color: 'var(--at-ink-3)', fontSize: 10 }}>{c.referencia_pago ?? '—'}</span> },
+              { key: 'estado', header: 'Estado', sortable: true,
+                render: (c) => (
+                  <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
+                    background: c.estado === 'conciliado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                    color: c.estado === 'conciliado' ? 'var(--at-success)' : 'var(--at-warning)' }}>
+                    {c.estado}
+                  </span>
+                ) },
+            ] satisfies DataTableColumn<ConciliacionCobrosLog>[]}
+          />
         </div>
       )}
     </div>
