@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   suministros: SuministroCondominio[]
@@ -323,38 +324,35 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               </div>
             )}
 
-            {/* Historial movimientos */}
+            {/* Historial movimientos — F3.9: migrado a <DataTable> shared */}
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Últimos movimientos</div>
-            {movsDelSelected.length === 0
-              ? <div style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>Sin movimientos registrados</div>
-              : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--at-surface-2)' }}>
-                      {['Fecha', 'Tipo', 'Cantidad', 'Motivo', 'Área', 'Por'].map(h => (
-                        <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', fontSize: 12 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movsDelSelected.slice(0, 30).map(m => {
-                      const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
-                      return (
-                        <tr key={m.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                          <td style={{ padding: '7px 10px' }}>{m.fecha}</td>
-                          <td style={{ padding: '7px 10px' }}>
-                            <span style={{ padding: '2px 8px', borderRadius: 8, background: tipo?.color + '20', color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
-                          </td>
-                          <td style={{ padding: '7px 10px', fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.motivo || '—'}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.area_destino || '—'}</td>
-                          <td style={{ padding: '7px 10px' }}>{m.realizado_por || '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
+            <DataTable<MovimientoSuministro>
+              data={movsDelSelected.slice(0, 30)}
+              rowKey="id"
+              pageSize={30}
+              defaultSort={{ key: 'fecha', direction: 'desc' }}
+              emptyState={{ icon: '📋', title: 'Sin movimientos registrados' }}
+              columns={[
+                { key: 'fecha', header: 'Fecha', sortable: true,
+                  render: (m) => m.fecha },
+                { key: 'tipo', header: 'Tipo', sortable: true,
+                  render: (m) => {
+                    const tipo = TIPOS_MOV.find(t => t.value === m.tipo)
+                    return <span style={{ padding: '2px 8px', borderRadius: 8, background: (tipo?.color ?? 'var(--at-ink-3)') + '20', color: tipo?.color, fontSize: 11 }}>{tipo?.label}</span>
+                  } },
+                { key: 'cantidad', header: 'Cantidad', align: 'right', sortable: true,
+                  render: (m) => <span style={{ fontWeight: 600 }}>{m.cantidad} {selected.unidad_medida}</span> },
+                { key: 'motivo', header: 'Motivo', hideOnMobile: true,
+                  accessor: (m) => m.motivo ?? '',
+                  render: (m) => m.motivo || '—' },
+                { key: 'area_destino', header: 'Área', hideOnMobile: true,
+                  accessor: (m) => m.area_destino ?? '',
+                  render: (m) => m.area_destino || '—' },
+                { key: 'realizado_por', header: 'Por', hideOnMobile: true,
+                  accessor: (m) => m.realizado_por ?? '',
+                  render: (m) => m.realizado_por || '—' },
+              ] satisfies DataTableColumn<MovimientoSuministro>[]}
+            />
           </div>
         )}
 

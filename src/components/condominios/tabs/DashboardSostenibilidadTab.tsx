@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { GastoCondominio, Unidad } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -136,53 +137,44 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
         </div>
       </div>
 
-      {/* Tabla mensual */}
-      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-          <thead>
-            <tr style={{ background: 'var(--at-surface-2)' }}>
-              <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Mes</th>
-              {CAT_SOST.map(c => <th key={c} style={{ padding: '8px 10px', textAlign: 'right', color: CAT_CFG[c].color, fontWeight: 600 }}>{CAT_CFG[c].label}</th>)}
-              <th style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--at-ink-2)', fontWeight: 700 }}>Total</th>
-              <th style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--at-accent-hover)', fontWeight: 600 }}>por unidad</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...tendencia].reverse().map((t, i) => (
-              <tr key={t.ym} style={{ borderTop: '1px solid var(--at-chip)', background: i === 0 ? 'var(--at-warning-tint)' : undefined }}>
-                <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)', fontWeight: i === 0 ? 700 : 400 }}>{t.label}</td>
-                {CAT_SOST.map(c => (
-                  <td key={c} style={{ padding: '7px 10px', textAlign: 'right', color: t[c] as number > 0 ? CAT_CFG[c].color : 'var(--at-line-strong)' }}>
-                    {(t[c] as number) > 0 ? `${moneda} ${(t[c] as number).toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
-                  </td>
-                ))}
-                <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>
-                  {t.total > 0 ? `${moneda} ${t.total.toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
-                </td>
-                <td style={{ padding: '7px 12px', textAlign: 'right', color: 'var(--at-accent-hover)' }}>
-                  {t.total > 0 ? `${moneda} ${(t.total / unidadesActivas).toFixed(2)}` : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
-              <td style={{ padding: '8px 12px', fontWeight: 700 }}>12m Total</td>
-              {CAT_SOST.map(c => (
-                <td key={c} style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: CAT_CFG[c].color }}>
-                  {moneda} {totales12m[c].toLocaleString('es', { minimumFractionDigits: 2 })}
-                </td>
-              ))}
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--at-ink-2)' }}>
-                {moneda} {totalGeneral.toLocaleString('es', { minimumFractionDigits: 2 })}
-              </td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-accent-hover)' }}>
-                {moneda} {(totalGeneral / 12 / unidadesActivas).toFixed(2)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      {/* Tabla mensual — F3.9: migrado a <DataTable> shared (totales 12m en KPIs arriba) */}
+      <DataTable<TendenciaMes>
+        data={tendencia}
+        rowKey="ym"
+        pageSize={0}
+        defaultSort={{ key: 'ym', direction: 'desc' }}
+        emptyState={{ icon: '📊', title: 'Sin datos mensuales' }}
+        rowStyle={(t) => t.ym === tendencia[tendencia.length - 1].ym ? { background: 'var(--at-warning-tint)' } : {}}
+        columns={[
+          { key: 'ym', header: 'Mes', sortable: true,
+            accessor: (t) => t.ym,
+            render: (t) => {
+              const isCurrent = t.ym === tendencia[tendencia.length - 1].ym
+              return <span style={{ color: 'var(--at-ink-2)', fontWeight: isCurrent ? 700 : 400 }}>{t.label}</span>
+            } },
+          ...CAT_SOST.map(c => ({
+            key: c,
+            header: CAT_CFG[c].label,
+            align: 'right' as const,
+            sortable: true,
+            hideOnMobile: true,
+            render: (t: TendenciaMes) => (
+              <span style={{ color: (t[c] as number) > 0 ? CAT_CFG[c].color : 'var(--at-line-strong)' }}>
+                {(t[c] as number) > 0 ? `${moneda} ${(t[c] as number).toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
+              </span>
+            ),
+          })),
+          { key: 'total', header: 'Total', align: 'right', sortable: true,
+            render: (t) => <span style={{ fontWeight: 700, color: 'var(--at-ink-2)' }}>
+              {t.total > 0 ? `${moneda} ${t.total.toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
+            </span> },
+          { key: 'porUnidad', header: 'Por unidad', align: 'right', hideOnMobile: true,
+            accessor: (t) => t.total / unidadesActivas,
+            render: (t) => <span style={{ color: 'var(--at-accent-hover)' }}>
+              {t.total > 0 ? `${moneda} ${(t.total / unidadesActivas).toFixed(2)}` : '—'}
+            </span> },
+        ] satisfies DataTableColumn<TendenciaMes>[]}
+      />
 
       <div style={{ marginTop: 12, padding: '8px 14px', background: 'var(--at-success-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-success-strong)' }}>
         🌿 El índice CO₂ es una estimación simplificada basada en el gasto en servicios. Para datos de consumo real de agua y energía, consulta los módulos de Contadores y Servicios de Energía.
