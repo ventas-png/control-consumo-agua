@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
 import { BitacoraAccion, AccionBitacora } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   bitacora: BitacoraAccion[]
@@ -67,58 +68,76 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
         <span style={{ fontSize: 12, color: 'var(--at-ink-3)', alignSelf: 'center' }}>{lista.length} registros</span>
       </div>
 
-      {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-          Sin registros de auditoría
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Fecha/Hora', 'Usuario', 'Acción', 'Módulo', 'Registro', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: 11, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(b => {
-                const accionKey = b.accion as AccionBitacora
-                const cfg = ACCION_CFG[accionKey] ?? { label: b.accion, bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '•' }
-                return (
-                  <tr key={b.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
-                      {new Date(b.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{b.usuario_nombre}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: cfg.bg, color: cfg.color }}>
-                        {cfg.icon} {cfg.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>
-                      <span style={{ padding: '2px 7px', borderRadius: 6, background: 'var(--at-chip)', fontSize: 11 }}>{b.modulo}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {b.entidad_desc ?? b.entidad_id?.slice(0, 8) ?? '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {b.detalles && (
-                        <button onClick={() => {
-                          const pre = JSON.stringify(b.detalles, null, 2)
-                          notify({ variant: 'info', title: 'Detalles', text: pre, duration: 8000 })
-                        }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 13 }}>🔍</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Tabla — F3.9: migrado a <DataTable> shared */}
+      <DataTable<BitacoraAccion>
+        data={lista}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'created_at', direction: 'desc' }}
+        emptyState={{ icon: '📋', title: 'Sin registros de auditoría' }}
+        columns={[
+          {
+            key: 'created_at',
+            header: 'Fecha/Hora',
+            sortable: true,
+            render: (b) => (
+              <span style={{ color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>
+                {new Date(b.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            ),
+          },
+          {
+            key: 'usuario_nombre',
+            header: 'Usuario',
+            sortable: true,
+            render: (b) => <span style={{ fontWeight: 600 }}>{b.usuario_nombre}</span>,
+          },
+          {
+            key: 'accion',
+            header: 'Acción',
+            sortable: true,
+            render: (b) => {
+              const cfg = ACCION_CFG[b.accion as AccionBitacora] ?? { label: b.accion, bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '•' }
+              return (
+                <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: cfg.bg, color: cfg.color }}>
+                  {cfg.icon} {cfg.label}
+                </span>
+              )
+            },
+          },
+          {
+            key: 'modulo',
+            header: 'Módulo',
+            sortable: true,
+            render: (b) => (
+              <span style={{ padding: '2px 7px', borderRadius: 6, background: 'var(--at-chip)', fontSize: 11, color: 'var(--at-ink-2)' }}>{b.modulo}</span>
+            ),
+          },
+          {
+            key: 'entidad_desc',
+            header: 'Registro',
+            hideOnMobile: true,
+            accessor: (b) => b.entidad_desc ?? b.entidad_id ?? '',
+            render: (b) => (
+              <span style={{ color: 'var(--at-ink-2)', display: 'inline-block', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {b.entidad_desc ?? b.entidad_id?.slice(0, 8) ?? '—'}
+              </span>
+            ),
+          },
+          {
+            key: 'detalles',
+            header: '',
+            align: 'center',
+            render: (b) => b.detalles ? (
+              <button onClick={(e) => {
+                e.stopPropagation()
+                const pre = JSON.stringify(b.detalles, null, 2)
+                notify({ variant: 'info', title: 'Detalles', text: pre, duration: 8000 })
+              }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 13 }} aria-label="Ver detalles">🔍</button>
+            ) : null,
+          },
+        ] satisfies DataTableColumn<BitacoraAccion>[]}
+      />
     </div>
   )
 }

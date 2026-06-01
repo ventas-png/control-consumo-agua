@@ -1,9 +1,9 @@
 import { useState, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cierres: CierreMensual[]
@@ -170,61 +170,54 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
         </div>
       )}
 
-      {/* Table */}
-      {sorted.length === 0 ? (
-        <EmptyState icon="📋" title="No hay cierres mensuales registrados" />
-      ) : (
-        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Período','Cuotas emitidas','Cuotas cobradas','Gastos','Saldo','Morosas','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((c, i) => (
-                <tr key={c.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-success)', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-danger)' }}>{moneda} {c.total_gastos.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: c.saldo_periodo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
-                    {c.saldo_periodo >= 0 ? '+' : ''}{moneda} {c.saldo_periodo.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                      background: c.estado === 'cerrado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
-                      color: c.estado === 'cerrado' ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
-                      {c.estado === 'cerrado' ? '✓ Cerrado' : 'Borrador'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => exportarPDF(c)}
-                        style={{ padding: '3px 7px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }} title="Exportar PDF">
-                        📄
-                      </button>
-                      {canEdit && (
-                        <>
-                          <button onClick={() => toggleEstado(c)}
-                            style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: c.estado === 'cerrado' ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
-                          </button>
-                          <button onClick={() => handleDelete(c.id)}
-                            style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9: migrado a <DataTable> shared */}
+      <DataTable<CierreMensual>
+        data={sorted}
+        rowKey="id"
+        pageSize={50}
+        emptyState={{ icon: '📋', title: 'No hay cierres mensuales registrados' }}
+        columns={[
+          { key: 'periodo', header: 'Período', sortable: true,
+            render: (c) => <span style={{ fontWeight: 700 }}>{c.periodo}</span> },
+          { key: 'total_cuotas_emitidas', header: 'Cuotas emitidas', align: 'right', sortable: true, hideOnMobile: true,
+            render: (c) => <span style={{ color: 'var(--at-ink-3)' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</span> },
+          { key: 'total_cuotas_cobradas', header: 'Cuotas cobradas', align: 'right', sortable: true,
+            render: (c) => <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</span> },
+          { key: 'total_gastos', header: 'Gastos', align: 'right', sortable: true, hideOnMobile: true,
+            render: (c) => <span style={{ color: 'var(--at-danger)' }}>{moneda} {c.total_gastos.toFixed(2)}</span> },
+          { key: 'saldo_periodo', header: 'Saldo', align: 'right', sortable: true,
+            render: (c) => <span style={{ fontWeight: 700, color: c.saldo_periodo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
+              {c.saldo_periodo >= 0 ? '+' : ''}{moneda} {c.saldo_periodo.toFixed(2)}
+            </span> },
+          { key: 'unidades_morosas', header: 'Morosas', align: 'right', sortable: true,
+            render: (c) => <span style={{ color: c.unidades_morosas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</span> },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (c) => (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: c.estado === 'cerrado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                color: c.estado === 'cerrado' ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
+                {c.estado === 'cerrado' ? '✓ Cerrado' : 'Borrador'}
+              </span>
+            ) },
+          { key: 'actions', header: '', align: 'right',
+            render: (c) => (
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button onClick={(e) => { e.stopPropagation(); exportarPDF(c) }}
+                  style={{ padding: '3px 7px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }} title="Exportar PDF" aria-label="Exportar PDF">📄</button>
+                {canEdit && (
+                  <>
+                    <button onClick={(e) => { e.stopPropagation(); toggleEstado(c) }}
+                      style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: c.estado === 'cerrado' ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }} aria-label="Eliminar cierre"
+                      style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  </>
+                )}
+              </div>
+            ) },
+        ] satisfies DataTableColumn<CierreMensual>[]}
+      />
     </div>
   )
 }

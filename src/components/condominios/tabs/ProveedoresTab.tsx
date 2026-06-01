@@ -5,6 +5,7 @@ import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   contratos: ContratoProveedor[]
@@ -305,86 +306,87 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
         </select>
       </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay contratos</p>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-                {['Proveedor', 'Servicio', 'Contacto', 'Monto/mes', 'Vigencia', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '12px' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(c => {
-                const si = servicioInfo(c.servicio)
-                const vencido = isVencido(c)
-                return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.proveedor_nombre}</div>
-                      {c.descripcion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.descripcion.slice(0, 50)}{c.descripcion.length > 50 ? '…' : ''}</div>}
-                      {vencido && <span style={{ fontSize: '11px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>Expirado</span>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '18px' }}>{si.icon}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{si.label}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {c.proveedor_contacto && <div style={{ color: 'var(--at-ink-2)' }}>{c.proveedor_contacto}</div>}
-                      {c.proveedor_telefono && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📞 {c.proveedor_telefono}</div>}
-                      {c.proveedor_email && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>✉️ {c.proveedor_email}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>
-                      {c.monto_mensual != null ? `${moneda} ${c.monto_mensual.toFixed(2)}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
-                      <div>{c.fecha_inicio}</div>
-                      {c.fecha_fin && <div>→ {c.fecha_fin}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit ? (
-                        <select value={c.estado} onChange={e => handleEstado(c.id, e.target.value)}
-                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: ESTADO_COLORS[c.estado] ?? 'var(--at-ink-3)', background: 'var(--at-surface)', cursor: 'pointer' }}>
-                          <option value="activo">Activo</option>
-                          <option value="vencido">Vencido</option>
-                          <option value="terminado">Terminado</option>
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: 'var(--at-chip)', color: ESTADO_COLORS[c.estado] ?? 'var(--at-ink-3)' }}>
-                          {c.estado}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {c.documento_url && (
-                          <SecureFileLink src={c.documento_url}
-                            style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textDecoration: 'none', color: 'var(--at-ink-2)' }}>
-                            📄
-                          </SecureFileLink>
-                        )}
-                        {canEdit && (
-                          <button onClick={() => startEdit(c)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>✏️</button>
-                        )}
-                        {canEdit && (
-                          <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9: migrado a <DataTable> shared */}
+      <DataTable<ContratoProveedor>
+        data={filtered}
+        rowKey="id"
+        pageSize={50}
+        emptyState={{ icon: '📋', title: 'No hay contratos' }}
+        rowStyle={(c) => isVencido(c) ? { background: 'var(--at-warning-tint)' } : {}}
+        columns={[
+          { key: 'proveedor_nombre', header: 'Proveedor', sortable: true,
+            render: (c) => {
+              const vencido = isVencido(c)
+              return (
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.proveedor_nombre}</div>
+                  {c.descripcion && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{c.descripcion.slice(0, 50)}{c.descripcion.length > 50 ? '…' : ''}</div>}
+                  {vencido && <span style={{ fontSize: 11, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>Expirado</span>}
+                </div>
+              )
+            } },
+          { key: 'servicio', header: 'Servicio', sortable: true,
+            accessor: (c) => servicioInfo(c.servicio).label,
+            render: (c) => {
+              const si = servicioInfo(c.servicio)
+              return (
+                <div>
+                  <span style={{ fontSize: 18 }}>{si.icon}</span>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{si.label}</div>
+                </div>
+              )
+            } },
+          { key: 'contacto', header: 'Contacto', hideOnMobile: true,
+            accessor: (c) => c.proveedor_contacto ?? '',
+            render: (c) => (
+              <div>
+                {c.proveedor_contacto && <div style={{ color: 'var(--at-ink-2)' }}>{c.proveedor_contacto}</div>}
+                {c.proveedor_telefono && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📞 {c.proveedor_telefono}</div>}
+                {c.proveedor_email && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>✉️ {c.proveedor_email}</div>}
+              </div>
+            ) },
+          { key: 'monto_mensual', header: 'Monto/mes', align: 'right', sortable: true,
+            accessor: (c) => c.monto_mensual ?? 0,
+            render: (c) => <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.monto_mensual != null ? `${moneda} ${c.monto_mensual.toFixed(2)}` : '—'}</span> },
+          { key: 'fecha_inicio', header: 'Vigencia', sortable: true, hideOnMobile: true,
+            render: (c) => (
+              <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
+                <div>{c.fecha_inicio}</div>
+                {c.fecha_fin && <div>→ {c.fecha_fin}</div>}
+              </div>
+            ) },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (c) => canEdit ? (
+              <select value={c.estado} onChange={e => { e.stopPropagation(); handleEstado(c.id, e.target.value as EstadoContrato) }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: 6, fontSize: 12, fontWeight: 600, color: ESTADO_COLORS[c.estado] ?? 'var(--at-ink-3)', background: 'var(--at-surface)', cursor: 'pointer' }}
+                aria-label={`Estado de ${c.proveedor_nombre}`}>
+                <option value="activo">Activo</option>
+                <option value="vencido">Vencido</option>
+                <option value="terminado">Terminado</option>
+              </select>
+            ) : (
+              <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--at-chip)', color: ESTADO_COLORS[c.estado] ?? 'var(--at-ink-3)' }}>
+                {c.estado}
+              </span>
+            ) },
+          { key: 'actions', header: '', align: 'right',
+            render: (c) => (
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                {c.documento_url && (
+                  <SecureFileLink src={c.documento_url}
+                    style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>
+                )}
+                {canEdit && (
+                  <button onClick={(e) => { e.stopPropagation(); startEdit(c) }} aria-label={`Editar ${c.proveedor_nombre}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-ink-2)' }}>✏️</button>
+                )}
+                {canEdit && (
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }} aria-label={`Eliminar ${c.proveedor_nombre}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                )}
+              </div>
+            ) },
+        ] satisfies DataTableColumn<ContratoProveedor>[]}
+      />
     </div>
   )
 }

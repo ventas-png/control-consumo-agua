@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import { confirm } from '../../shared/Dialog'
 import type { CuotaCondominio, Unidad } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -106,55 +106,47 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
         ) : null
       })()}
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No hay cuotas para mostrar" />
-      ) : (
-        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Período', 'Unidad', 'Concepto', 'Vencimiento', 'Monto', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Monto' ? 'right' : 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => {
-                const es = ESTADO_STYLE[c.estado] ?? ESTADO_STYLE.pendiente
-                return (
-                  <tr key={c.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{c.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{c.concepto}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{c.fecha_vencimiento ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{moneda} {c.monto.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{c.estado}</span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && c.estado !== 'pagado' && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => marcarPagada(c.id)}
-                            style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            ✓ Pagada
-                          </button>
-                          {c.estado === 'pendiente' && (
-                            <button onClick={() => marcarMorosa(c.id)}
-                              style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                              Morosa
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9: migrado a <DataTable> shared */}
+      <DataTable<CuotaCondominio>
+        data={filtered}
+        rowKey="id"
+        pageSize={50}
+        emptyState={{ icon: '📋', title: 'No hay cuotas para mostrar' }}
+        columns={[
+          { key: 'periodo', header: 'Período', sortable: true,
+            render: (c) => <span style={{ fontWeight: 600 }}>{c.periodo}</span> },
+          { key: 'unidad_nombre', header: 'Unidad', sortable: true,
+            accessor: (c) => c.unidad_nombre ?? '',
+            render: (c) => <span style={{ color: 'var(--at-ink-3)' }}>{c.unidad_nombre ?? '—'}</span> },
+          { key: 'concepto', header: 'Concepto', sortable: true, hideOnMobile: true,
+            render: (c) => <span style={{ color: 'var(--at-ink-3)' }}>{c.concepto}</span> },
+          { key: 'fecha_vencimiento', header: 'Vencimiento', hideOnMobile: true, sortable: true,
+            accessor: (c) => c.fecha_vencimiento ?? '',
+            render: (c) => <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>{c.fecha_vencimiento ?? '—'}</span> },
+          { key: 'monto', header: 'Monto', align: 'right', sortable: true,
+            render: (c) => <span style={{ fontWeight: 700 }}>{moneda} {c.monto.toFixed(2)}</span> },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (c) => {
+              const es = ESTADO_STYLE[c.estado] ?? ESTADO_STYLE.pendiente
+              return <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{c.estado}</span>
+            } },
+          { key: 'actions', header: '', align: 'right',
+            render: (c) => (canEdit && c.estado !== 'pagado') ? (
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button onClick={(e) => { e.stopPropagation(); marcarPagada(c.id) }}
+                  style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  ✓ Pagada
+                </button>
+                {c.estado === 'pendiente' && (
+                  <button onClick={(e) => { e.stopPropagation(); marcarMorosa(c.id) }}
+                    style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>
+                    Morosa
+                  </button>
+                )}
+              </div>
+            ) : null },
+        ] satisfies DataTableColumn<CuotaCondominio>[]}
+      />
       <style>{`@media print { button { display: none !important; } }`}</style>
     </div>
   )

@@ -1,8 +1,8 @@
 import { useState, useEffect, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { MedidorUnidad, Unidad, Contador } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   medidores: MedidorUnidad[]
@@ -146,56 +146,52 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
         </div>
       )}
 
-      {/* Table */}
-      {loadingCtrs ? (
-        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)' }}>Cargando contadores…</div>
-      ) : medidores.length === 0 ? (
-        <EmptyState icon="📊" title="No hay medidores vinculados a unidades" />
-      ) : (
-        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Unidad','Contador','Tipo Agua',`Consumo ${mesFiltro}`,'Última lectura','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {medidores.map((m, i) => {
-                const ctr = contadorMap[m.contador_id]
-                const cons = consumoMap[m.contador_id]
-                return (
-                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', opacity: m.activo ? 1 : 0.5 }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{m.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px' }}>{ctr?.numero_serie ?? m.contador_id.slice(0,8)}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: cons ? 700 : 400, color: cons ? 'var(--at-accent)' : 'var(--at-ink-3)' }}>
-                      {cons ? `${cons.consumo_total.toFixed(2)} m³` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{cons?.ultima_lectura ?? '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: m.activo ? 'var(--at-success-tint)' : 'var(--at-chip)',
-                        color: m.activo ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
-                        {m.activo ? 'Activo' : 'Desvinculado'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && m.activo && (
-                        <button onClick={() => handleDesactivar(m.id)}
-                          style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                          Desvincular
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9: migrado a <DataTable> shared */}
+      <DataTable<MedidorUnidad>
+        data={medidores}
+        rowKey="id"
+        pageSize={50}
+        isLoading={loadingCtrs}
+        emptyState={{ icon: '📊', title: 'No hay medidores vinculados a unidades' }}
+        rowStyle={(m) => m.activo ? {} : { opacity: 0.5 }}
+        columns={[
+          { key: 'unidad_nombre', header: 'Unidad', sortable: true,
+            accessor: (m) => m.unidad_nombre ?? '',
+            render: (m) => <span style={{ fontWeight: 600 }}>{m.unidad_nombre ?? '—'}</span> },
+          { key: 'contador', header: 'Contador', sortable: true,
+            accessor: (m) => contadorMap[m.contador_id]?.numero_serie ?? m.contador_id,
+            render: (m) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{contadorMap[m.contador_id]?.numero_serie ?? m.contador_id.slice(0,8)}</span> },
+          { key: 'tipo_agua', header: 'Tipo Agua', hideOnMobile: true, sortable: true,
+            accessor: (m) => contadorMap[m.contador_id]?.tipo_agua ?? '',
+            render: (m) => <span style={{ color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{contadorMap[m.contador_id]?.tipo_agua ?? '—'}</span> },
+          { key: 'consumo', header: `Consumo ${mesFiltro}`, align: 'right', sortable: true,
+            accessor: (m) => consumoMap[m.contador_id]?.consumo_total ?? 0,
+            render: (m) => {
+              const cons = consumoMap[m.contador_id]
+              return <span style={{ fontWeight: cons ? 700 : 400, color: cons ? 'var(--at-accent)' : 'var(--at-ink-3)' }}>
+                {cons ? `${cons.consumo_total.toFixed(2)} m³` : '—'}
+              </span>
+            } },
+          { key: 'ultima_lectura', header: 'Última lectura', hideOnMobile: true, sortable: true,
+            accessor: (m) => consumoMap[m.contador_id]?.ultima_lectura ?? '',
+            render: (m) => <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>{consumoMap[m.contador_id]?.ultima_lectura ?? '—'}</span> },
+          { key: 'activo', header: 'Estado', sortable: true,
+            render: (m) => (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                background: m.activo ? 'var(--at-success-tint)' : 'var(--at-chip)',
+                color: m.activo ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
+                {m.activo ? 'Activo' : 'Desvinculado'}
+              </span>
+            ) },
+          { key: 'actions', header: '', align: 'right',
+            render: (m) => (canEdit && m.activo) ? (
+              <button onClick={(e) => { e.stopPropagation(); handleDesactivar(m.id) }}
+                style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>
+                Desvincular
+              </button>
+            ) : null },
+        ] satisfies DataTableColumn<MedidorUnidad>[]}
+      />
     </div>
   )
 }
