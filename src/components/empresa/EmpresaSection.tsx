@@ -11,6 +11,7 @@ import { GoogleEmailConfig } from './GoogleEmailConfig'
 import { RolPermisosModal } from './RolPermisosModal'
 import { CustomRoleEditor } from './CustomRoleEditor'
 import { AuditLogModal } from './AuditLogModal'
+import { FinancialAuditModal } from './FinancialAuditModal'
 import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
@@ -65,6 +66,7 @@ export function EmpresaSection({ currentUser }: Props) {
   const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
   const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
   const [showAuditLog, setShowAuditLog] = useState(false)
+  const [showFinancialAudit, setShowFinancialAudit] = useState(false)
 
   // Limites efectivos del plan (F2.13). Sobrescriben empresa.max_projects
   // legacy con el resultado de get_company_effective_limits que respeta
@@ -828,6 +830,19 @@ export function EmpresaSection({ currentUser }: Props) {
           <h2 style={{ color: 'var(--at-ink)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
+              onClick={() => setShowFinancialAudit(true)}
+              title="Trazabilidad financiera y de mantenimiento (audit_log generico de F2.7)"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '9px 14px', borderRadius: '8px',
+                border: '1px solid var(--at-line-strong)',
+                background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
+                cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              📊 Trazabilidad
+            </button>
+            <button
               onClick={() => setShowAuditLog(true)}
               title="Auditoría de roles y permisos"
               style={{
@@ -1053,6 +1068,9 @@ export function EmpresaSection({ currentUser }: Props) {
       )}
 
       {/* Modal de auditoría */}
+      {showFinancialAudit && (
+        <FinancialAuditModal onClose={() => setShowFinancialAudit(false)} />
+      )}
       {showAuditLog && (
         <AuditLogModal onClose={() => setShowAuditLog(false)} />
       )}
