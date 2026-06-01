@@ -386,9 +386,8 @@ export default function App() {
   return (
     <>
       {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
-          en la esquina superior derecha. Reemplaza paulatinamente Swal.fire
-          para success/warning/info no críticos. Confirmaciones destructivas
-          siguen usando Swal. */}
+          en la esquina superior derecha para success/warning/info no críticos.
+          Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
       <Toaster richColors position="top-right" closeButton />
 
       <style>{`

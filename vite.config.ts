@@ -145,7 +145,6 @@ export default defineConfig({
           'vendor-maps': ['leaflet'],
           'vendor-pdf': ['jspdf', 'jspdf-autotable'],
           'vendor-xlsx': ['exceljs'],
-          'vendor-ui': ['sweetalert2'],
           'vendor-observability': ['@sentry/react', 'posthog-js'],
         },
       },

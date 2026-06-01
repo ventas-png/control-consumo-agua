@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   PersonalCondominio, EstadoRevision,
@@ -45,14 +46,21 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
   async function revisar(tareaId: string, bloqueId: string, estado: EstadoRevision) {
     let comentario: string | null = null
     if (estado === 'rechazado') {
-      const { value } = await (window as Window & typeof globalThis & { Swal?: typeof import('sweetalert2')['default'] }).Swal?.fire?.({
+      const result = await openPromptDialog({
         title: '¿Por qué rechazas esta tarea?',
-        input: 'textarea', inputPlaceholder: 'Describe el motivo del rechazo...',
-        showCancelButton: true, confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar',
-        confirmButtonColor: 'var(--at-danger)',
-      }) ?? { value: undefined }
-      if (value === undefined) return
-      comentario = value as string || null
+        fields: [{
+          name: 'comentario',
+          label: 'Motivo del rechazo',
+          control: 'textarea',
+          rows: 4,
+          placeholder: 'Describe el motivo del rechazo...',
+          required: true,
+          autoFocus: true,
+        }],
+        submitText: 'Rechazar',
+      })
+      if (!result) return
+      comentario = result.comentario || null
     }
 
     const existing = revisionDeTarea(tareaId)

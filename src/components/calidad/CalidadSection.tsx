@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ChangeEvent} from 'react'
-import Swal from 'sweetalert2'
+import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -57,6 +57,7 @@ export function CalidadSection({
 
   // Historial filters
   const [filtroFuente, setFiltroFuente] = useState('')
+  const [detalleViewer, setDetalleViewer] = useState<RegistroCalidad | null>(null)
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
@@ -195,49 +196,7 @@ export function CalidadSection({
   })
 
   function verDetalle(r: RegistroCalidad) {
-    const fuente = r.fuentes_agua
-    const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
-    let filas = ''
-    if (tipologia) {
-      tipologia.parametros.forEach(p => {
-        const val = r.parametros[p.key]
-        const cumple = r.cumplimiento[p.key]
-        const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
-        const badge = cumple === null || val === undefined ? '<span style="color:var(--at-ink-3);">—</span>'
-          : cumple ? '<span style="color:var(--at-success-strong);font-weight:600;">✅ CUMPLE</span>'
-          : '<span style="color:var(--at-danger-strong);font-weight:600;">❌ NO CUMPLE</span>'
-        filas += `<tr style="border-bottom:1px solid var(--at-chip);${cumple === false ? 'background:#fff5f5;' : cumple === true ? 'background:var(--at-success-tint);' : ''}">
-          <td style="padding:8px;font-size:13px;">${p.label}</td>
-          <td style="padding:8px;font-size:13px;text-align:center;">${p.unidad || '—'}</td>
-          <td style="padding:8px;font-size:13px;text-align:center;">${val !== undefined ? val : '—'}</td>
-          <td style="padding:8px;font-size:13px;text-align:center;">${rango}</td>
-          <td style="padding:8px;text-align:center;">${badge}</td>
-        </tr>`
-      })
-    }
-    Swal.fire({
-      title: `Análisis — ${fuente ? sanitizeHTML(fuente.identificador) : ''}`,
-      html: `<div style="text-align:left;font-size:13px;margin-bottom:12px;">
-        <strong>Fecha:</strong> ${new Date(r.fecha).toLocaleString('es-GT')}<br>
-        <strong>Tipología:</strong> ${tipologia ? tipologia.label : fuente?.tipo_agua ?? ''}<br>
-        ${r.observaciones ? '<strong>Obs.:</strong> ' + sanitizeHTML(r.observaciones) + '<br>' : ''}
-        <strong>Resultado:</strong> ${r.cumple_total ? '<span style="color:var(--at-success-strong);font-weight:700;">✅ CUMPLE</span>' : '<span style="color:var(--at-danger-strong);font-weight:700;">❌ NO CUMPLE</span>'}
-      </div>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:var(--at-chip);">
-            <th scope="col" style="padding:8px;text-align:left;">Parámetro</th>
-            <th scope="col" style="padding:8px;text-align:center;">Unidad</th>
-            <th scope="col" style="padding:8px;text-align:center;">Valor</th>
-            <th scope="col" style="padding:8px;text-align:center;">Rango</th>
-            <th scope="col" style="padding:8px;text-align:center;">Estado</th>
-          </tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
-      </div>`,
-      width: '700px',
-      confirmButtonText: 'Cerrar',
-    })
+    setDetalleViewer(r)
   }
 
   function verReporte(r: RegistroCalidad) {
@@ -526,6 +485,105 @@ export function CalidadSection({
           </div>
         </div>
       )}
+
+      {/* F3.8: Modal accesible para ver detalle del analisis de calidad. */}
+      {/* Reemplaza Swal.fire({html: ...}) con HTML rico. Usa Radix Dialog */}
+      {/* para a11y completa (focus trap, ESC, role=dialog, aria-labelledby). */}
+      <RDialog.Root open={!!detalleViewer} onOpenChange={(open) => { if (!open) setDetalleViewer(null) }}>
+        <RDialog.Portal>
+          <RDialog.Overlay style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            zIndex: 9998, animation: 'at-dialog-overlay-in 120ms ease-out',
+          }} />
+          <RDialog.Content
+            style={{
+              position: 'fixed', top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'var(--at-surface)', borderRadius: '16px',
+              padding: '24px 28px', maxWidth: '760px', width: 'calc(100vw - 32px)',
+              maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)', zIndex: 9999,
+              animation: 'at-dialog-content-in 160ms ease-out',
+            }}
+          >
+            {detalleViewer && (() => {
+              const r = detalleViewer
+              const fuente = r.fuentes_agua
+              const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
+              return (
+                <>
+                  <RDialog.Title style={{ margin: '0 0 6px', fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
+                    Análisis — {fuente?.identificador ?? ''}
+                  </RDialog.Title>
+                  <RDialog.Description style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)' }}>
+                    {new Date(r.fecha).toLocaleString('es-GT')} · {tipologia?.label ?? fuente?.tipo_agua ?? ''}
+                  </RDialog.Description>
+                  <div style={{ margin: '12px 0' }}>
+                    {r.observaciones && (
+                      <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink-2)' }}>
+                        <strong>Observaciones:</strong> {r.observaciones}
+                      </p>
+                    )}
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: r.cumple_total ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
+                      Resultado: {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
+                    </p>
+                  </div>
+                  {tipologia && (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--at-chip)' }}>
+                            <th scope="col" style={{ padding: '8px', textAlign: 'left' }}>Parámetro</th>
+                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Unidad</th>
+                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Valor</th>
+                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Rango</th>
+                            <th scope="col" style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tipologia.parametros.map(p => {
+                            const val = r.parametros[p.key]
+                            const cumple = r.cumplimiento[p.key]
+                            const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
+                            const bg = cumple === false ? '#fff5f5' : cumple === true ? 'var(--at-success-tint)' : 'transparent'
+                            return (
+                              <tr key={p.key} style={{ borderBottom: '1px solid var(--at-chip)', background: bg }}>
+                                <td style={{ padding: '8px' }}>{p.label}</td>
+                                <td style={{ padding: '8px', textAlign: 'center' }}>{p.unidad || '—'}</td>
+                                <td style={{ padding: '8px', textAlign: 'center' }}>{val !== undefined ? val : '—'}</td>
+                                <td style={{ padding: '8px', textAlign: 'center' }}>{rango}</td>
+                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                  {cumple === null || val === undefined ? <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+                                    : cumple ? <span style={{ color: 'var(--at-success-strong)', fontWeight: 600 }}>✅ CUMPLE</span>
+                                    : <span style={{ color: 'var(--at-danger-strong)', fontWeight: 600 }}>❌ NO CUMPLE</span>}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                    <RDialog.Close asChild>
+                      <button
+                        type="button"
+                        style={{
+                          padding: '9px 18px', borderRadius: '10px', border: 'none',
+                          background: 'var(--at-primary)', color: 'white',
+                          fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        Cerrar
+                      </button>
+                    </RDialog.Close>
+                  </div>
+                </>
+              )
+            })()}
+          </RDialog.Content>
+        </RDialog.Portal>
+      </RDialog.Root>
     </div>
   )
 }

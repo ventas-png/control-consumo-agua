@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import Swal from 'sweetalert2'
 import { notify } from '../shared/Dialog'
 import { openTextPrompt, openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
@@ -167,154 +166,73 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function editarProyecto(proyecto: Proyecto) {
-    const monedasOpts = MONEDAS.map(m =>
-      `<option value="${m.simbolo}" ${proyecto.moneda === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
-    ).join('')
-    const monedasOptsCondominios = MONEDAS.map(m =>
-      `<option value="${m.simbolo}" ${(proyecto.moneda_condominios ?? proyecto.moneda) === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
-    ).join('')
+    const monedaOptions = MONEDAS.map(m => ({ value: m.simbolo, label: `${m.simbolo} — ${m.nombre}` }))
 
-    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--at-line);border-radius:8px;font-size:14px;color:var(--at-ink);background:#fff;outline:none;transition:border-color .15s'
-    const selStyle = `${inpStyle};cursor:pointer;appearance:auto`
-    const secTitle = (icon: string, text: string) =>
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:18px">${icon}</span><span style="font-size:13px;font-weight:700;color:var(--at-ink);letter-spacing:.01em">${text}</span></div>`
-    const lbl = (text: string, sub = '') =>
-      `<label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${text}${sub ? `<span style="font-weight:400;text-transform:none;color:var(--at-ink-3);margin-left:4px">${sub}</span>` : ''}</label>`
-
-    const tiposLimites = TIPOS_UNIDAD_LABELS.map(t => {
-      const val = (proyecto[t.key] as number | null) ?? ''
-      const icons: Record<string, string> = {
-        max_unidades_apartamento: '🏢', max_unidades_casa: '🏠',
-        max_unidades_bodega: '📦', max_unidades_local_comercial: '🏪',
-        max_unidades_oficina: '💼', max_unidades_parqueadero: '🚗',
-        max_unidades_otro: '📋',
-      }
-      return `
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--at-chip);border-radius:10px;padding:10px 12px">
-          <span style="font-size:18px;flex-shrink:0">${icons[t.key] ?? '📋'}</span>
-          <span style="font-size:13px;color:var(--at-ink-2);flex:1">${t.label}</span>
-          <input id="swal-${t.key}" type="number" min="0" step="1"
-            placeholder="∞"
-            value="${val}"
-            style="width:80px;padding:6px 8px;border:1.5px solid var(--at-line);border-radius:8px;font-size:14px;font-weight:700;text-align:center;color:var(--at-ink);background:var(--at-surface-2)" />
-        </div>`
-    }).join('')
-
-    const { value: formValues } = await Swal.fire({
-      title: '<span style="font-size:20px;font-weight:800;color:var(--at-ink)">Editar Proyecto</span>',
-      width: 620,
-      html: `
-        <div style="text-align:left;padding:0 2px;max-height:72vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px">
-
-          <!-- Info básica -->
-          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
-            ${secTitle('📋', 'Información del proyecto')}
-            ${lbl('Nombre', '(requerido)')}
-            <input id="swal-nombre" value="${proyecto.nombre}" style="${inpStyle};margin-bottom:12px" />
-            ${lbl('Descripción')}
-            <textarea id="swal-descripcion" style="${inpStyle};height:68px;resize:vertical;font-family:inherit">${proyecto.descripcion ?? ''}</textarea>
-          </div>
-
-          <!-- Ubicación -->
-          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
-            ${secTitle('📍', 'Ubicación')}
-            ${lbl('Dirección')}
-            <input id="swal-direccion" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="${inpStyle};margin-bottom:12px" />
-            <div style="display:flex;gap:8px;margin-bottom:10px">
-              <div style="flex:1">${lbl('Latitud')}<input id="swal-lat" placeholder="0.000000" value="${proyecto.latitud ?? ''}" style="${inpStyle}" /></div>
-              <div style="flex:1">${lbl('Longitud')}<input id="swal-lng" placeholder="0.000000" value="${proyecto.longitud ?? ''}" style="${inpStyle}" /></div>
-            </div>
-            <button id="swal-geolocate" type="button" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1.5px solid var(--at-primary);background:var(--at-primary-tint);color:var(--at-primary-hover);cursor:pointer">
-              📍 Usar mi ubicación actual
-            </button>
-          </div>
-
-          <!-- Configuración financiera y estado -->
-          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
-            ${secTitle('⚙️', 'Configuración')}
-            <div style="display:flex;flex-wrap:wrap;gap:12px">
-              <div style="flex:1;min-width:140px">
-                ${lbl('💧 Moneda Agua')}
-                <select id="swal-moneda" style="${selStyle}">${monedasOpts}</select>
-              </div>
-              <div style="flex:1;min-width:140px">
-                ${lbl('🏢 Moneda Condominios')}
-                <select id="swal-moneda-condominios" style="${selStyle}">${monedasOptsCondominios}</select>
-              </div>
-              <div style="flex:1;min-width:120px">
-                ${lbl('Estado')}
-                <select id="swal-estado" style="${selStyle}">
-                  <option value="activo"     ${proyecto.estado === 'activo'     ? 'selected' : ''}>✅ Activo</option>
-                  <option value="inactivo"   ${proyecto.estado === 'inactivo'   ? 'selected' : ''}>⏸ Inactivo</option>
-                  <option value="suspendido" ${proyecto.estado === 'suspendido' ? 'selected' : ''}>🚫 Suspendido</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Límite de unidades -->
-          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
-            ${secTitle('🏗️', 'Límite de unidades por tipo')}
-            <p style="font-size:12px;color:var(--at-ink-3);margin:0 0 12px">Dejar vacío = sin límite (∞)</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              ${tiposLimites}
-            </div>
-          </div>
-
-        </div>
-      `,
-      didOpen: () => {
-        document.getElementById('swal-geolocate')?.addEventListener('click', () => {
-          const btn = document.getElementById('swal-geolocate') as HTMLButtonElement
-          btn.textContent = 'Obteniendo ubicación...'
-          btn.disabled = true
-          navigator.geolocation.getCurrentPosition(
-            pos => {
-              (document.getElementById('swal-lat') as HTMLInputElement).value = pos.coords.latitude.toFixed(6)
-              ;(document.getElementById('swal-lng') as HTMLInputElement).value = pos.coords.longitude.toFixed(6)
-              btn.textContent = '✅ Ubicación capturada'
-            },
-            () => {
-              btn.textContent = '❌ No se pudo obtener la ubicación'
-              btn.disabled = false
-            }
-          )
-        })
+    const fields: Array<Parameters<typeof openPromptDialog>[0]['fields'][number]> = [
+      { name: 'nombre', label: 'Nombre', required: true, initialValue: proyecto.nombre, autoFocus: true },
+      { name: 'descripcion', label: 'Descripción', control: 'textarea', rows: 3, initialValue: proyecto.descripcion ?? '' },
+      { name: 'direccion', label: 'Dirección', placeholder: 'Ej: Calle 123 #45-67', initialValue: proyecto.direccion ?? '' },
+      { name: 'latitud', label: 'Latitud', placeholder: '0.000000', initialValue: proyecto.latitud != null ? String(proyecto.latitud) : '' },
+      { name: 'longitud', label: 'Longitud', placeholder: '0.000000', initialValue: proyecto.longitud != null ? String(proyecto.longitud) : '' },
+      { name: 'moneda', label: '💧 Moneda Agua', control: 'select', initialValue: proyecto.moneda, options: monedaOptions },
+      { name: 'moneda_condominios', label: '🏢 Moneda Condominios', control: 'select', initialValue: proyecto.moneda_condominios ?? proyecto.moneda, options: monedaOptions },
+      {
+        name: 'estado',
+        label: 'Estado',
+        control: 'select',
+        initialValue: proyecto.estado ?? 'activo',
+        options: [
+          { value: 'activo', label: '✅ Activo' },
+          { value: 'inactivo', label: '⏸ Inactivo' },
+          { value: 'suspendido', label: '🚫 Suspendido' },
+        ],
       },
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement).value.trim()
-        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
-        const latRaw = (document.getElementById('swal-lat') as HTMLInputElement).value.trim()
-        const lngRaw = (document.getElementById('swal-lng') as HTMLInputElement).value.trim()
-        const getLimit = (id: string): number | null => {
-          const v = (document.getElementById(id) as HTMLInputElement).value.trim()
-          if (!v) return null
-          const n = parseInt(v, 10)
-          return isNaN(n) || n < 0 ? null : n
-        }
-        return {
-          nombre,
-          descripcion: (document.getElementById('swal-descripcion') as HTMLTextAreaElement).value.trim() || null,
-          direccion: (document.getElementById('swal-direccion') as HTMLInputElement).value.trim() || null,
-          latitud: latRaw ? parseFloat(latRaw) : null,
-          longitud: lngRaw ? parseFloat(lngRaw) : null,
-          moneda: (document.getElementById('swal-moneda') as HTMLSelectElement).value,
-          moneda_condominios: (document.getElementById('swal-moneda-condominios') as HTMLSelectElement).value,
-          estado: (document.getElementById('swal-estado') as HTMLSelectElement).value,
-          max_unidades_apartamento:     getLimit('swal-max_unidades_apartamento'),
-          max_unidades_casa:            getLimit('swal-max_unidades_casa'),
-          max_unidades_bodega:          getLimit('swal-max_unidades_bodega'),
-          max_unidades_local_comercial: getLimit('swal-max_unidades_local_comercial'),
-          max_unidades_oficina:         getLimit('swal-max_unidades_oficina'),
-          max_unidades_parqueadero:     getLimit('swal-max_unidades_parqueadero'),
-          max_unidades_otro:            getLimit('swal-max_unidades_otro'),
-        }
-      },
+    ]
+    TIPOS_UNIDAD_LABELS.forEach(t => {
+      const val = proyecto[t.key] as number | null | undefined
+      fields.push({
+        name: t.key,
+        label: `${t.label} (límite)`,
+        type: 'number',
+        min: 0,
+        step: 1,
+        placeholder: '∞',
+        initialValue: val != null ? String(val) : '',
+        helpText: 'Dejar vacío = sin límite',
+      })
     })
-    if (!formValues) return
+
+    const result = await openPromptDialog({
+      title: 'Editar Proyecto',
+      fields,
+      submitText: 'Guardar',
+      validate: (data) => data.nombre?.trim() ? null : 'El nombre es obligatorio',
+    })
+
+    if (!result) return
+    const getLimit = (key: string): number | null => {
+      const v = (result[key] ?? '').trim()
+      if (!v) return null
+      const n = parseInt(v, 10)
+      return isNaN(n) || n < 0 ? null : n
+    }
+    const formValues = {
+      nombre: result.nombre.trim(),
+      descripcion: result.descripcion?.trim() || null,
+      direccion: result.direccion?.trim() || null,
+      latitud: result.latitud?.trim() ? parseFloat(result.latitud) : null,
+      longitud: result.longitud?.trim() ? parseFloat(result.longitud) : null,
+      moneda: result.moneda,
+      moneda_condominios: result.moneda_condominios,
+      estado: result.estado,
+      max_unidades_apartamento: getLimit('max_unidades_apartamento'),
+      max_unidades_casa: getLimit('max_unidades_casa'),
+      max_unidades_bodega: getLimit('max_unidades_bodega'),
+      max_unidades_local_comercial: getLimit('max_unidades_local_comercial'),
+      max_unidades_oficina: getLimit('max_unidades_oficina'),
+      max_unidades_parqueadero: getLimit('max_unidades_parqueadero'),
+      max_unidades_otro: getLimit('max_unidades_otro'),
+    }
     const { error } = await supabase.from('projects').update(formValues).eq('id', proyecto.id)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
