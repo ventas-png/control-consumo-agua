@@ -148,6 +148,17 @@ async function handleGmailOAuthCallback(params: GmailOAuthParams): Promise<void>
 }
 
 export default function App() {
+  // F3.13: ComponentShowcase dev route (/dev/components). Solo accesible
+  // si el usuario navega manualmente — no aparece en el sidebar.
+  if (typeof window !== 'undefined' && window.location.pathname === '/dev/components') {
+    const LazyShowcase = lazy(() => import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })))
+    return (
+      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+        <LazyShowcase />
+      </Suspense>
+    )
+  }
+
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
