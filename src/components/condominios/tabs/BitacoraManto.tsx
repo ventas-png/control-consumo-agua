@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { BitacoraManto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -228,7 +229,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay registros de mantenimiento.</div>
+            <EmptyState icon="📋" title="No hay registros de mantenimiento" />
           ) : filtered.map(r => {
             const ts = TURNO_STYLE[r.turno] ?? TURNO_STYLE['mañana']
             const tareasList = (r.tareas ?? []) as TareaItem[]
@@ -306,7 +307,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                 </div>
               )}
               {tareasList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Sin tareas registradas.</div>
+                <EmptyState icon="📋" title="Sin tareas registradas" />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tareasList.map((t, i) => (

@@ -1,4 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
 import { notify } from '../../shared/Dialog'
@@ -197,7 +198,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
         {/* Plans list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {planes.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay planes. Crea uno para comenzar.</div>
+            <EmptyState icon="📋" title="No hay planes. Crea uno para comenzar" />
           ) : (
             planes.map(p => {
               const st = getStatus(p)

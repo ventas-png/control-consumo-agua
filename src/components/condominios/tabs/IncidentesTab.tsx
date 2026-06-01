@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { IncidenteSeguridad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -172,7 +173,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin incidentes</div>
+            <EmptyState icon="📋" title="Sin incidentes" />
           )}
           {filtered.map(i => {
             const ts = TIPO_STYLE[i.tipo]

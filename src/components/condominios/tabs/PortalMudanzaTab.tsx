@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
@@ -330,7 +331,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
       {/* List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '14px' }}>Cargando…</div>
+        <EmptyState icon="📋" title="Cargando…" />
       ) : solicitudes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '10px' }}>🚛</div>

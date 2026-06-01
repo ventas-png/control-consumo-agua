@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ActaReunion, TipoActa } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -261,7 +262,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
       <div style={{ display: 'grid', gridTemplateColumns: viewed ? '1fr 380px' : '1fr', gap: '16px' }}>
         <div>
           {actas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay actas registradas.</div>
+            <EmptyState icon="📜" title="No hay actas registradas" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {actas.map(a => {

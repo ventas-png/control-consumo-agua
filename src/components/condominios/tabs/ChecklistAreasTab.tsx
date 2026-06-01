@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ChecklistArea, ChecklistItem } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
@@ -148,7 +149,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin registros</div>}
+          {filtered.length === 0 && <EmptyState icon="📋" title="Sin registros" />}
           {filtered.map(c => {
             const s = ESTADO_STYLE[c.estado]
             const pct = c.items.length > 0 ? Math.round(c.items.filter(i => i.ok).length / c.items.length * 100) : 0

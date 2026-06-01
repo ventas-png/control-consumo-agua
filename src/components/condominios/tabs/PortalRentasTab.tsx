@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { confirm, notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -563,7 +564,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '14px' }}>Cargando…</div>
+        <EmptyState icon="📋" title="Cargando…" />
       ) : subTab === 'arrendamiento' ? (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>

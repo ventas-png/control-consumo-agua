@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ObraMejora, EstadoObra } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -196,7 +197,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay obras registradas.</div>
+            <EmptyState icon="🏗️" title="No hay obras registradas" />
           ) : filtered.map(o => {
             const es = ESTADO_STYLE[o.estado]
             const progreso = o.progreso ?? 0

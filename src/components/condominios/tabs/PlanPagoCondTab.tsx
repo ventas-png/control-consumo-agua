@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { PlanPagoCond, CuotaPlanPago } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -219,7 +220,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
         {/* Plans list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay planes de pago.</div>
+            <EmptyState icon="💳" title="No hay planes de pago" />
           ) : filtered.map(p => {
             const unidad = unidades.find(u => u.id === p.unidad_id)
             const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.activo
@@ -265,7 +266,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
               Cuotas — {selected.concepto}
             </h3>
             {loadingCuotas ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Cargando…</div>
+              <EmptyState icon="📋" title="Cargando…" />
             ) : (
               <>
                 {/* Progress */}

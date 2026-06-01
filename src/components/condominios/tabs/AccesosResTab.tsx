@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { AccesoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -207,7 +208,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay accesos registrados.</div>
+        <EmptyState icon="🔑" title="No hay accesos registrados" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '10px' }}>
           {filtered.map(a => {

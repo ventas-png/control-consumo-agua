@@ -1,4 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { PersonalCondominio, ContactoEmergencia } from '../../../types'
 
@@ -112,7 +113,7 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
         loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>Cargando…</div>
         ) : filteredResidentes.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No se encontraron residentes.</div>
+          <EmptyState icon="📋" title="No se encontraron residentes" />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
             {filteredResidentes.map((r, i) => (
@@ -141,7 +142,7 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
       {/* Personal */}
       {activeTab === 'personal' && (
         filteredPersonal.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No se encontró personal.</div>
+          <EmptyState icon="📋" title="No se encontró personal" />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
             {filteredPersonal.map(p => (
@@ -173,7 +174,7 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
       {/* Emergencias */}
       {activeTab === 'emergencias' && (
         filteredEmergencias.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No se encontraron contactos de emergencia.</div>
+          <EmptyState icon="📋" title="No se encontraron contactos de emergencia" />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
             {filteredEmergencias.map(c => (

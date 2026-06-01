@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { LibroNovedad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -203,7 +204,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
       <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay entradas.</div>
+            <EmptyState icon="📋" title="No hay entradas" />
           ) : (
             filtered.map(n => {
               const tc = TURNO_COLORS[n.turno] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', icon: '📋' }

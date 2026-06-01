@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -193,7 +194,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay vehículos registrados.</div>
+        <EmptyState icon="📋" title="No hay vehículos registrados" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
           {filtered.map(v => {
