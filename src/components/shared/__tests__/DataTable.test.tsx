@@ -212,6 +212,55 @@ describe('DataTable — loading', () => {
   })
 })
 
+describe('DataTable — footer (totals row)', () => {
+  const footer = (
+    <tr>
+      <td>TOTAL</td>
+      <td style={{ textAlign: 'right' }}>93.5</td>
+      <td>—</td>
+    </tr>
+  )
+
+  it('renderiza el contenido del footer dentro de <tfoot>', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" footer={footer} />,
+    )
+    const tfoot = container.querySelector('tfoot')
+    expect(tfoot).not.toBeNull()
+    expect(within(tfoot as HTMLElement).getByText('TOTAL')).toBeDefined()
+    expect(within(tfoot as HTMLElement).getByText('93.5')).toBeDefined()
+  })
+
+  it('omite <tfoot> cuando no se pasa footer', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" />,
+    )
+    expect(container.querySelector('tfoot')).toBeNull()
+  })
+
+  it('omite <tfoot> en estado vacio', () => {
+    const { container } = render(
+      <DataTable data={[] as Row[]} columns={columns} rowKey="id" footer={footer} />,
+    )
+    expect(container.querySelector('tfoot')).toBeNull()
+  })
+
+  it('footer respeta colSpan para fusionar columnas', () => {
+    const colSpanFooter = (
+      <tr>
+        <td colSpan={2}>TOTALES</td>
+        <td>93.5</td>
+      </tr>
+    )
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" footer={colSpanFooter} />,
+    )
+    const totalCell = container.querySelector('tfoot td[colspan="2"]')
+    expect(totalCell).not.toBeNull()
+    expect(totalCell?.textContent).toBe('TOTALES')
+  })
+})
+
 describe('DataTable — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(

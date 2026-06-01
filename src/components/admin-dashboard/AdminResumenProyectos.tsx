@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { Registro, Contador, Proyecto, Unidad, TipoAgua } from '../../types'
+import { DataTable, type DataTableColumn } from '../shared/DataTable'
 
 interface Props {
   registros: Registro[]
@@ -97,25 +98,54 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
     ? `${fmtDate(fechaDesde)} — ${fmtDate(fechaHasta)}`
     : hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
 
-  const th = (color?: string, center = true) => ({
-    padding: '10px 12px',
-    textAlign: center ? ('center' as const) : ('left' as const),
-    fontWeight: 700,
-    color: color ?? 'var(--at-ink-2)',
-    borderBottom: '2px solid var(--at-line)',
-    whiteSpace: 'nowrap' as const,
-    fontSize: '12px',
-    background: 'var(--at-surface-2)',
-  })
+  const renderVal = (val: number | undefined, color?: string, decimals = 1) => (
+    <span style={{
+      fontWeight: val && val > 0 ? 600 : 400,
+      color: val && val > 0 ? (color ?? 'var(--at-ink)') : 'var(--at-line-strong)',
+    }}>
+      {val && val > 0 ? val.toFixed(decimals) : '—'}
+    </span>
+  )
 
-  const tdVal = (val: number | undefined, color?: string) => ({
-    padding: '10px 12px',
-    textAlign: 'center' as const,
-    borderBottom: '1px solid var(--at-chip)',
-    fontWeight: val && val > 0 ? 600 : 400,
-    color: val && val > 0 ? (color ?? 'var(--at-ink)') : 'var(--at-line-strong)',
-    fontSize: '12px',
-  })
+  const columns: DataTableColumn<Proyecto>[] = [
+    {
+      key: 'nombre', header: 'Proyecto', sortable: true,
+      accessor: p => p.nombre,
+      render: p => <span style={{ fontWeight: 600, color: 'var(--at-ink)', whiteSpace: 'nowrap' }}>{p.nombre}</span>,
+    },
+    {
+      key: 'totalM3', header: '💧 Total m³', sortable: true, align: 'center',
+      accessor: p => byProject.get(p.id)?.totalM3 ?? 0,
+      render: p => renderVal(byProject.get(p.id)?.totalM3, 'var(--at-primary)'),
+    },
+    ...activeTipos.map<DataTableColumn<Proyecto>>(tipo => {
+      const meta = TIPOLOGIA_META[tipo]
+      return {
+        key: `tipo-${tipo}`,
+        header: <span style={{ color: meta?.color }}>{meta?.icon} {meta?.label ?? tipo} m³</span>,
+        sortable: true,
+        align: 'center',
+        accessor: p => byProject.get(p.id)?.byTipo.get(tipo) ?? 0,
+        render: p => renderVal(byProject.get(p.id)?.byTipo.get(tipo), meta?.color),
+        hideOnMobile: true,
+      }
+    }),
+    {
+      key: 'totalMonto', header: `Recaudo ${moneda}`, sortable: true, align: 'center',
+      accessor: p => byProject.get(p.id)?.totalMonto ?? 0,
+      render: p => {
+        const v = byProject.get(p.id)?.totalMonto
+        return (
+          <span style={{
+            fontWeight: v && v > 0 ? 600 : 400,
+            color: v && v > 0 ? 'var(--at-success-strong)' : 'var(--at-line-strong)',
+          }}>
+            {v && v > 0 ? v.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+          </span>
+        )
+      },
+    },
+  ]
 
   return (
     <div style={{ marginBottom: '28px' }}>
@@ -130,81 +160,35 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
         📋 Consumo por Proyecto — {rangoLabel.charAt(0).toUpperCase() + rangoLabel.slice(1)}
       </h3>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr>
-              <th style={th(undefined, false)}>Proyecto</th>
-              <th style={th('var(--at-primary)')}>💧 Total m³</th>
-              {activeTipos.map(tipo => {
-                const meta = TIPOLOGIA_META[tipo]
-                return (
-                  <th key={tipo} style={th(meta?.color)}>
-                    {meta?.icon} {meta?.label ?? tipo} m³
-                  </th>
-                )
-              })}
-              <th style={th('var(--at-success-strong)')}>Recaudo {moneda}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {proyectosConDatos.map((p, i) => {
-              const ps = byProject.get(p.id)!
+      <DataTable<Proyecto>
+        data={proyectosConDatos}
+        columns={columns}
+        rowKey="id"
+        pageSize={0}
+        defaultSort={{ key: 'totalM3', direction: 'desc' }}
+        footer={
+          <tr>
+            <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-ink)', fontSize: '13px' }}>
+              Total
+            </td>
+            <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--at-primary)', fontSize: '13px' }}>
+              {totals.totalM3.toFixed(1)}
+            </td>
+            {activeTipos.map(tipo => {
+              const m3 = totals.byTipo.get(tipo)
+              const meta = TIPOLOGIA_META[tipo]
               return (
-                <tr
-                  key={p.id}
-                  style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
-                >
-                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
-                    {p.nombre}
-                  </td>
-                  <td style={tdVal(ps.totalM3, 'var(--at-primary)')}>
-                    {ps.totalM3 > 0 ? ps.totalM3.toFixed(1) : '—'}
-                  </td>
-                  {activeTipos.map(tipo => {
-                    const m3 = ps.byTipo.get(tipo)
-                    const meta = TIPOLOGIA_META[tipo]
-                    return (
-                      <td key={tipo} style={tdVal(m3, meta?.color)}>
-                        {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
-                      </td>
-                    )
-                  })}
-                  <td style={tdVal(ps.totalMonto, 'var(--at-success-strong)')}>
-                    {ps.totalMonto > 0
-                      ? ps.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      : '—'}
-                  </td>
-                </tr>
+                <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? 'var(--at-ink)', fontSize: '12px' }}>
+                  {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
+                </td>
               )
             })}
-
-            {/* Totals row */}
-            <tr style={{ background: 'var(--at-chip)', borderTop: '2px solid var(--at-line)' }}>
-              <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-ink)', fontSize: '13px' }}>
-                Total
-              </td>
-              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--at-primary)', fontSize: '13px' }}>
-                {totals.totalM3.toFixed(1)}
-              </td>
-              {activeTipos.map(tipo => {
-                const m3 = totals.byTipo.get(tipo)
-                const meta = TIPOLOGIA_META[tipo]
-                return (
-                  <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? 'var(--at-ink)', fontSize: '12px' }}>
-                    {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
-                  </td>
-                )
-              })}
-              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--at-success-strong)', fontSize: '13px' }}>
-                {totals.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--at-success-strong)', fontSize: '13px' }}>
+              {totals.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+          </tr>
+        }
+      />
     </div>
   )
 }
