@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { Pago, Cliente, Registro, FormaPago } from '../../types'
+import { DataTable, type DataTableColumn } from '../shared/DataTable'
 
 interface Props {
   pagos: Pago[]
@@ -90,61 +91,89 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         </span>
       </div>
 
-      {pagosFiltrados.length === 0 ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)', background: 'var(--at-surface)', borderRadius: '12px' }}>
-          No hay pagos registrados
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.07)' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
-                <tr>
-                  {['Fecha','Cliente','Monto','Forma de Pago','N° Documento','Referencia / Banco','Notas'].map(h => (
-                    <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pagosFiltrados.map(p => {
-                  const cliente = clientes.find(c => c.id === p.cliente_id)
-                  const mc = METODO_COLOR[p.metodo] ?? METODO_COLOR.otro
-                  return (
-                    <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', color: 'var(--at-ink-2)' }}>
-                        {new Date(p.created_at).toLocaleDateString('es-GT')}
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? '—'}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--at-success)', whiteSpace: 'nowrap' }}>
-                        {moneda} {p.monto.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: mc.bg, color: mc.color, whiteSpace: 'nowrap' }}>
-                          {formasPagoLabels[p.metodo] ?? p.metodo}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '13px', color: 'var(--at-ink)' }}>
-                        {p.numero_documento ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '14px 16px', color: 'var(--at-ink-2)', fontSize: '13px' }}>
-                        {p.referencia ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '14px 16px', color: 'var(--at-ink-3)', fontSize: '13px', maxWidth: '200px' }}>
-                        {p.notas ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Tabla — F3.9: migrado a <DataTable> shared */}
+      <DataTable<Pago>
+        data={pagosFiltrados}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        emptyState={{ icon: '💸', title: 'No hay pagos registrados' }}
+        columns={[
+          {
+            key: 'fecha', header: 'Fecha', sortable: true,
+            accessor: p => p.created_at,
+            render: p => (
+              <span style={{ whiteSpace: 'nowrap', color: 'var(--at-ink-2)' }}>
+                {new Date(p.created_at).toLocaleDateString('es-GT')}
+              </span>
+            ),
+          },
+          {
+            key: 'cliente', header: 'Cliente', sortable: true,
+            accessor: p => clientes.find(c => c.id === p.cliente_id)?.nombre ?? '',
+            render: p => {
+              const cliente = clientes.find(c => c.id === p.cliente_id)
+              return (
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? '—'}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
+                </div>
+              )
+            },
+          },
+          {
+            key: 'monto', header: 'Monto', sortable: true,
+            accessor: p => p.monto,
+            render: p => (
+              <span style={{ fontWeight: 700, color: 'var(--at-success)', whiteSpace: 'nowrap' }}>
+                {moneda} {p.monto.toFixed(2)}
+              </span>
+            ),
+          },
+          {
+            key: 'metodo', header: 'Forma de Pago', sortable: true,
+            accessor: p => p.metodo,
+            render: p => {
+              const mc = METODO_COLOR[p.metodo] ?? METODO_COLOR.otro
+              return (
+                <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: mc.bg, color: mc.color, whiteSpace: 'nowrap' }}>
+                  {formasPagoLabels[p.metodo] ?? p.metodo}
+                </span>
+              )
+            },
+          },
+          {
+            key: 'numero_documento', header: 'N° Documento',
+            accessor: p => p.numero_documento ?? '',
+            render: p => (
+              <span style={{ fontFamily: 'monospace', fontSize: '13px', color: 'var(--at-ink)' }}>
+                {p.numero_documento ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
+              </span>
+            ),
+            hideOnMobile: true,
+          },
+          {
+            key: 'referencia', header: 'Referencia / Banco',
+            accessor: p => p.referencia ?? '',
+            render: p => (
+              <span style={{ color: 'var(--at-ink-2)', fontSize: '13px' }}>
+                {p.referencia ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
+              </span>
+            ),
+            hideOnMobile: true,
+          },
+          {
+            key: 'notas', header: 'Notas',
+            accessor: p => p.notas ?? '',
+            render: p => (
+              <span style={{ color: 'var(--at-ink-3)', fontSize: '13px', display: 'inline-block', maxWidth: '200px', verticalAlign: 'middle' }}>
+                {p.notas ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
+              </span>
+            ),
+            hideOnMobile: true,
+          },
+        ] satisfies DataTableColumn<Pago>[]}
+      />
     </div>
   )
 }
