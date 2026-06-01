@@ -3,6 +3,7 @@ import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
+import { SystemHealthModal } from './SystemHealthModal'
 
 interface Empresa {
   id: string
@@ -27,6 +28,7 @@ export function SuperAdminSection() {
   const [editingMax, setEditingMax] = useState<Record<string, number>>({})
   const [editingMaxUnits, setEditingMaxUnits] = useState<Record<string, number>>({})
   const [maxUnitsSupported, setMaxUnitsSupported] = useState(false)
+  const [showHealth, setShowHealth] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -302,20 +304,35 @@ export function SuperAdminSection() {
             {empresas.length} empresa(s) registrada(s)
           </p>
         </div>
-        <button
-          onClick={() => void crearEmpresa()}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '10px 18px', borderRadius: '8px', border: 'none',
-            background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-            color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-          }}
-        >
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nueva Empresa
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowHealth(true)}
+            title="Verificar salud del sistema (edge function /health)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '10px 16px', borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
+              cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+            }}
+          >
+            🩺 Salud del sistema
+          </button>
+          <button
+            onClick={() => void crearEmpresa()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 18px', borderRadius: '8px', border: 'none',
+              background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+            }}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Nueva Empresa
+          </button>
+        </div>
       </div>
 
       {/* Lista de empresas */}
@@ -541,6 +558,8 @@ export function SuperAdminSection() {
       }}>
         <GoogleEmailConfig isSuperadmin={true} />
       </div>
+
+      {showHealth && <SystemHealthModal onClose={() => setShowHealth(false)} />}
     </div>
   )
 }
