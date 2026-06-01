@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
+import { promptUpgrade } from '../shared/promptUpgrade'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -375,7 +376,9 @@ export function UnidadesSection({
         return
       }
 
-      // Verificar límite de unidades de la empresa
+      // Verificar limite de unidades de la empresa. F4.1.2: si esta al limite,
+      // mostrar prompt con CTA "Ver planes" en lugar de un notify que solo
+      // dirigia al usuario a contactar al superadmin.
       const [{ data: empresaData }, { count: unidadesCount }] = await Promise.all([
         supabase.from('companies').select('max_units').eq('id', companyId).single(),
         supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
@@ -383,10 +386,10 @@ export function UnidadesSection({
       const maxUnits = (empresaData as { max_units?: number } | null)?.max_units ?? 50
       const totalUnidades = unidadesCount ?? 0
       if (totalUnidades >= maxUnits) {
-        notify({
-          variant: 'warning',
-          title: 'Límite de unidades alcanzado',
-          text: `Tu empresa ha alcanzado el límite de ${maxUnits} unidades. Contacta al superadministrador para aumentar el cupo.`,
+        await promptUpgrade({
+          resource: 'unit',
+          current: totalUnidades,
+          limit: maxUnits,
         })
         setLoading(false)
         return
