@@ -32,9 +32,9 @@ function FeedbackMsg({ fb }: { fb: FeedbackState }) {
   )
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Card({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <div style={{
+    <div id={id} style={{
       background: 'var(--at-surface)',
       borderRadius: '16px',
       padding: '24px',
@@ -362,6 +362,27 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     return () => { alive = false }
   }, [currentUser.company_id])
 
+  // F4.1.2: si llegamos aqui via promptUpgrade (CTA "Ver planes" desde un
+  // limite alcanzado en EmpresaSection / UnidadesSection), abrir el plan
+  // picker y hacer scroll al card. El flag se setea en sessionStorage por
+  // promptUpgrade.ts y se consume aqui en el primer mount.
+  useEffect(() => {
+    let flag: string | null = null
+    try {
+      flag = sessionStorage.getItem('at:open-billing-on-mount')
+      if (flag) sessionStorage.removeItem('at:open-billing-on-mount')
+    } catch {
+      // sessionStorage no disponible (private mode) — no-op
+    }
+    if (!flag) return
+    setShowPlanPicker(true)
+    // Esperar a que el card monte (subLoading → false) antes de scroll.
+    const t = setTimeout(() => {
+      document.getElementById('billing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [])
+
   // Detecta retornos del checkout via query param (?checkout=success|canceled)
   // y muestra feedback. Quita el param de la URL para que no se repita en refresh.
   useEffect(() => {
@@ -688,7 +709,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
 
         {/* Card — Plan & Suscripción (read-only en F2.11; F2.12 agrega Stripe portal) */}
         {currentUser.company_id && (
-          <Card title="Mi plan">
+          <Card title="Mi plan" id="billing-section">
             {subLoading ? (
               <div style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Cargando…</div>
             ) : !subscription ? (
