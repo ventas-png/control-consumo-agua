@@ -57,12 +57,15 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
     if (selectedProjectId) {
       const unidadesProyecto = unidades.filter(u => u.project_id === selectedProjectId)
+      // F4.1.3: filtrar soft-deleted en counts de cuotas y tickets (tablas
+      // con deleted_at desde F2.7). Excluir filas borradas de los KPIs del
+      // dashboard — la papelera se manejara aparte en F4.2.3.
       const [cuotasPendRes, cuotasMoraRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
-        mkBase('cuotas_condominio').eq('estado', 'pendiente'),
-        mkBase('cuotas_condominio').eq('estado', 'mora'),
+        mkBase('cuotas_condominio').is('deleted_at', null).eq('estado', 'pendiente'),
+        mkBase('cuotas_condominio').is('deleted_at', null).eq('estado', 'mora'),
         mkBase('visitantes').gte('hora_entrada', todayISO),
         supabase.from('tickets_mantenimiento').select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId).eq('project_id', selectedProjectId).neq('estado', 'cerrado'),
+          .eq('company_id', companyId).eq('project_id', selectedProjectId).neq('estado', 'cerrado').is('deleted_at', null),
         supabase.from('conversations').select('id', { count: 'exact', head: true })
           .eq('company_id', companyId).eq('service_type', 'condominios').eq('project_id', selectedProjectId)
           .in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
@@ -78,11 +81,13 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
       })
       setPerProject({})
     } else {
-      // All projects: lightweight row fetch + JS aggregation
+      // All projects: lightweight row fetch + JS aggregation. F4.1.3: filtrar
+      // soft-deleted en cuotas y tickets para que los KPIs por proyecto no
+      // incluyan filas borradas.
       const [cuotasRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
-        supabase.from('cuotas_condominio').select('project_id, estado').eq('company_id', companyId),
+        supabase.from('cuotas_condominio').select('project_id, estado').eq('company_id', companyId).is('deleted_at', null),
         supabase.from('visitantes').select('project_id').eq('company_id', companyId).gte('hora_entrada', todayISO),
-        supabase.from('tickets_mantenimiento').select('project_id, estado').eq('company_id', companyId).neq('estado', 'cerrado'),
+        supabase.from('tickets_mantenimiento').select('project_id, estado').eq('company_id', companyId).neq('estado', 'cerrado').is('deleted_at', null),
         supabase.from('conversations').select('project_id').eq('company_id', companyId)
           .eq('service_type', 'condominios').in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
       ])

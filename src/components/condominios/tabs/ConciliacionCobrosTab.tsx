@@ -75,8 +75,10 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
     if (montoRecibido >= cuota.monto - tolerancia) {
       await supabase.from('cuotas_condominio').update({ estado: 'pagado' }).eq('id', cuota.id)
     } else {
-      // Pago parcial: dejar en pendiente con nota
-      const { data: existing } = await supabase.from('cuotas_condominio').select('notas').eq('id', cuota.id).single()
+      // Pago parcial: dejar en pendiente con nota. F4.1.3: filtrar soft-deleted
+      // y usar maybeSingle para que el flow no rompa si la cuota fue borrada
+      // entre el render y el submit (edge case raro).
+      const { data: existing } = await supabase.from('cuotas_condominio').select('notas').eq('id', cuota.id).is('deleted_at', null).maybeSingle()
       const notaActual = (existing as { notas?: string } | null)?.notas ?? ''
       await supabase.from('cuotas_condominio').update({
         notas: `${notaActual}\nPago parcial: ${moneda} ${montoRecibido.toFixed(2)} (${form.fecha})`.trim()

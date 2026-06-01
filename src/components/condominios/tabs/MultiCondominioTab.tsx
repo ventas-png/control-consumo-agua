@@ -34,9 +34,11 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
     async function cargar() {
       setLoading(true)
       const resultado = await Promise.all(proyectosActivos.map(async p => {
+        // F4.1.3: filtrar soft-deleted en cuotas y tickets para que los
+        // dashboards multi-condominio reflejen solo filas activas.
         const [cuotasRes, ticketsRes, unidadesRes, visitantesRes] = await Promise.all([
-          supabase.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', p.id).eq('company_id', companyId),
-          supabase.from('tickets_mantenimiento').select('estado').eq('project_id', p.id).eq('company_id', companyId),
+          supabase.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', p.id).eq('company_id', companyId).is('deleted_at', null),
+          supabase.from('tickets_mantenimiento').select('estado').eq('project_id', p.id).eq('company_id', companyId).is('deleted_at', null),
           supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('project_id', p.id).eq('company_id', companyId),
           supabase.from('visitantes').select('id', { count: 'exact', head: true }).eq('project_id', p.id).eq('company_id', companyId).gte('hora_entrada', hoy),
         ])
