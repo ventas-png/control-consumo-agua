@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isRetriable } from '../_shared/emailRetryable.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -329,16 +330,38 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Verify the caller is authenticated
-    const authHeader = req.headers.get('authorization') ?? ''
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Auth: dos paths.
+    //   (A) Llamada normal del frontend con Bearer del usuario logueado.
+    //   (B) Reintento interno desde process-email-queue: header
+    //       x-internal-retry con CRON_SECRET valido + x-triggered-by con el
+    //       userId original. Skip auth.getUser (que rechazaria el
+    //       service_role token).
+    const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
+    const internalRetry = cronSecret.length > 0
+      && req.headers.get('x-internal-retry') === cronSecret
+    let userId: string
+
+    if (internalRetry) {
+      const tb = req.headers.get('x-triggered-by') ?? ''
+      if (!tb) {
+        return new Response(
+          JSON.stringify({ error: 'Internal retry missing x-triggered-by' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      userId = tb
+    } else {
+      const authHeader = req.headers.get('authorization') ?? ''
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      userId = user.id
     }
 
     const payload = await req.json() as EmailPayload
@@ -417,6 +440,12 @@ Deno.serve(async (req: Request) => {
     // Send + log. Log writes con service_role (bypassea RLS); fire-and-forget
     // si el log mismo falla — no queremos que un error de bitacora bloquee la
     // entrega del correo en si.
+    //
+    // Nueva politica (F2.15e): si el envio sincrono falla con error retriable
+    // (429, 5xx, network) enqueueamos en email_send_queue y respondemos
+    // success=true con status='queued'. El worker process-email-queue lo
+    // retoma con backoff exponencial. Errores permanentes (400, 403 token
+    // revoked) responden 500 — no tiene sentido reintentar.
     const typedConfig = config as EmailConfig
     try {
       await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
@@ -427,15 +456,45 @@ Deno.serve(async (req: Request) => {
         to_email,
         from_email: typedConfig.email,
         status: 'sent',
-        triggered_by: user.id,
+        triggered_by: userId,
       }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
 
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, status: 'sent' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } catch (sendErr) {
       const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr)
+      const retriable = isRetriable(errMsg)
+
+      // En llamadas internalRetry NO re-enqueueamos: la queue ya tiene el
+      // row, y update_email_attempt es el que decide reintentar o marcar
+      // failed_permanent. Devolver el error directo al worker.
+      if (retriable && !internalRetry) {
+        const { data: queueRow } = await supabase.rpc('enqueue_email', {
+          p_payload: payload,
+          p_company_id: is_superadmin ? null : company_id,
+          p_is_superadmin: !!is_superadmin,
+          p_triggered_by: userId,
+          p_first_error: errMsg.slice(0, 1000),
+        })
+        supabase.from('email_send_log').insert({
+          company_id: is_superadmin ? null : company_id,
+          is_superadmin: !!is_superadmin,
+          template_key,
+          to_email,
+          from_email: typedConfig.email,
+          status: 'pending_retry',
+          error_message: errMsg.slice(0, 1000),
+          triggered_by: userId,
+        }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
+
+        return new Response(
+          JSON.stringify({ success: true, status: 'queued', queue_id: queueRow ?? null }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       supabase.from('email_send_log').insert({
         company_id: is_superadmin ? null : company_id,
         is_superadmin: !!is_superadmin,
@@ -444,7 +503,7 @@ Deno.serve(async (req: Request) => {
         from_email: typedConfig.email,
         status: 'failed',
         error_message: errMsg.slice(0, 1000),
-        triggered_by: user.id,
+        triggered_by: userId,
       }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
       throw sendErr
     }
