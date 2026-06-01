@@ -1,5 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
+import { softDelete } from '../../../lib/softDelete'
 import type { FondoReserva } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -86,7 +87,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
   const handleDelete = async (m: FondoReserva) => {
     const r = await confirm({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('fondo_reserva_condominio').delete().eq('id', m.id)
+    await softDelete('fondo_reserva_condominio', { id: m.id })
     onRefresh()
   }
 

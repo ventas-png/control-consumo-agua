@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
+import { softDelete } from '../../../lib/softDelete'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
@@ -153,7 +154,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   async function eliminar(id: string) {
     const result = await confirm({ title: '¿Eliminar ticket?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await supabase.from('tickets_mantenimiento').delete().eq('id', id)
+    await softDelete('tickets_mantenimiento', { id })
     onRefresh()
   }
 

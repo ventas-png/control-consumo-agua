@@ -3,6 +3,7 @@ import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
+import { softDelete } from '../../../lib/softDelete'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -437,7 +438,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     setSaving(false)
     if (error) {
-      if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false })
@@ -461,7 +462,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
     if (reserva?.cuota_id) {
-      await supabase.from('cuotas_condominio').delete().eq('id', reserva.cuota_id).eq('estado', 'pendiente')
+      await softDelete('cuotas_condominio', { id: reserva.cuota_id, estado: 'pendiente' })
     }
     setSelectedReserva(null)
     onRefresh()
@@ -657,7 +658,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     }
     const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
     if (error) {
-      if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
@@ -716,7 +717,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       rechazada_motivo: null,
     }).eq('id', r.id)
     if (error) {
-      if (cuotaId && !r.cuota_id) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      if (cuotaId && !r.cuota_id) await softDelete('cuotas_condominio', { id: cuotaId })
       notify({ variant: 'error', title: 'Error', text: error.message }); return
     }
     onRefresh()
@@ -740,7 +741,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (!result) return
     const motivo = result.motivo
     if (r.cuota_id) {
-      await supabase.from('cuotas_condominio').delete().eq('id', r.cuota_id).eq('estado', 'pendiente')
+      await softDelete('cuotas_condominio', { id: r.cuota_id, estado: 'pendiente' })
     }
     await supabase.from('reservas_amenidades').update({
       estado: 'cancelada',
