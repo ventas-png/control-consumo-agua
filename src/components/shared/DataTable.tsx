@@ -77,6 +77,16 @@ export interface DataTableProps<T> {
 
   /** onClick por fila para hacerla interactiva. */
   onRowClick?: (row: T) => void
+
+  /**
+   * Footer/totales row. Renderiza dentro de `<tfoot>` y el consumer
+   * provee sus propios `<tr>`/`<td>` para tener libertad total de colSpan,
+   * alineación y estilos.
+   *
+   * Se renderiza siempre (incluso en estado vacío) si pasas algo; pasar
+   * `null`/`undefined` lo omite.
+   */
+  footer?: ReactNode
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -95,6 +105,7 @@ export function DataTable<T>({
   toolbar,
   rowStyle,
   onRowClick,
+  footer,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
@@ -327,6 +338,11 @@ export function DataTable<T>({
                   </tr>
                 ))}
               </tbody>
+              {footer && (
+                <tfoot style={{ background: 'var(--at-surface-2)', borderTop: '2px solid var(--at-line)' }}>
+                  {footer}
+                </tfoot>
+              )}
             </table>
           </div>
         )}

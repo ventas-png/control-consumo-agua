@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, RecargoMora, ConvenioCuotaCond, Unidad } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { exportarPDFEstadoCuenta } from '../exportUtils'
 
 interface Props {
@@ -20,6 +21,11 @@ interface Movimiento {
   cargo: number
   abono: number
   estado: string
+}
+
+interface MovimientoConSaldo extends Movimiento {
+  id: string
+  saldoAcum: number
 }
 
 const ESTADO_CFG: Record<string, { color: string; bg: string }> = {
@@ -89,6 +95,15 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
   const totalCargos = movimientos.reduce((s, m) => s + m.cargo, 0)
   const totalAbonos = movimientos.reduce((s, m) => s + m.abono, 0)
   const saldo = totalCargos - totalAbonos
+
+  // Pre-compute saldo acumulado por fila (orden cronológico).
+  const movimientosConSaldo: MovimientoConSaldo[] = useMemo(() => {
+    let acc = 0
+    return movimientos.map((m, i) => {
+      acc += m.cargo - m.abono
+      return { ...m, id: `mov-${i}-${m.fecha}`, saldoAcum: acc }
+    })
+  }, [movimientos])
 
   const cuotasUnidad = cuotas.filter(c => c.unidad_id === unidadId)
   const pendientes = cuotasUnidad.filter(c => c.estado === 'pendiente' || c.estado === 'moroso').length
@@ -188,56 +203,78 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
         ))}
       </div>
 
-      {/* Table */}
-      {movimientos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>
-          Sin movimientos para {unidad?.nombre} en {anio}.
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Fecha', 'Descripción', 'Cargo', 'Abono', 'Saldo acum.', 'Estado'].map(h => (
-                  <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Fecha' || h === 'Descripción' ? 'left' : 'right', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {movimientos.reduce<{ rows: JSX.Element[]; saldoAcum: number }>((acc, m, i) => {
-                acc.saldoAcum += m.cargo - m.abono
-                const sCfg = ESTADO_CFG[m.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)' }
-                acc.rows.push(
-                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined }}>
-                    <td style={{ padding: '9px 12px', color: 'var(--at-ink-3)' }}>{m.fecha}</td>
-                    <td style={{ padding: '9px 12px', color: 'var(--at-ink)' }}>{m.descripcion}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.cargo > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.abono > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>{m.abono > 0 ? `${moneda} ${m.abono.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, color: acc.saldoAcum > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
-                      {acc.saldoAcum > 0 ? `${moneda} ${acc.saldoAcum.toFixed(2)}` : '✓'}
-                    </td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: 10, fontWeight: 600 }}>{m.estado}</span>
-                    </td>
-                  </tr>
-                )
-                return acc
-              }, { rows: [], saldoAcum: 0 }).rows}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
-                <td colSpan={2} style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totalCargos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalAbonos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
-                  {saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9.1: migrado a <DataTable> shared con footer */}
+      <DataTable<MovimientoConSaldo>
+        data={movimientosConSaldo}
+        rowKey="id"
+        pageSize={0}
+        defaultSort={{ key: 'fecha', direction: 'asc' }}
+        emptyState={
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>
+            Sin movimientos para {unidad?.nombre} en {anio}.
+          </div>
+        }
+        columns={[
+          {
+            key: 'fecha', header: 'Fecha', sortable: true,
+            accessor: m => m.fecha,
+            render: m => <span style={{ color: 'var(--at-ink-3)' }}>{m.fecha}</span>,
+          },
+          {
+            key: 'descripcion', header: 'Descripción', sortable: true,
+            accessor: m => m.descripcion,
+            render: m => <span style={{ color: 'var(--at-ink)' }}>{m.descripcion}</span>,
+          },
+          {
+            key: 'cargo', header: 'Cargo', sortable: true, align: 'right',
+            accessor: m => m.cargo,
+            render: m => (
+              <span style={{ color: m.cargo > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+                {m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}
+              </span>
+            ),
+          },
+          {
+            key: 'abono', header: 'Abono', sortable: true, align: 'right',
+            accessor: m => m.abono,
+            render: m => (
+              <span style={{ color: m.abono > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
+                {m.abono > 0 ? `${moneda} ${m.abono.toFixed(2)}` : '—'}
+              </span>
+            ),
+          },
+          {
+            key: 'saldoAcum', header: 'Saldo acum.', align: 'right',
+            accessor: m => m.saldoAcum,
+            render: m => (
+              <span style={{ fontWeight: 600, color: m.saldoAcum > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
+                {m.saldoAcum > 0 ? `${moneda} ${m.saldoAcum.toFixed(2)}` : '✓'}
+              </span>
+            ),
+          },
+          {
+            key: 'estado', header: 'Estado', sortable: true, align: 'right',
+            accessor: m => m.estado,
+            render: m => {
+              const sCfg = ESTADO_CFG[m.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)' }
+              return (
+                <span style={{ padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: 10, fontWeight: 600 }}>{m.estado}</span>
+              )
+            },
+          },
+        ] satisfies DataTableColumn<MovimientoConSaldo>[]}
+        footer={
+          <tr>
+            <td colSpan={2} style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totalCargos.toFixed(2)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalAbonos.toFixed(2)}</td>
+            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
+              {saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`}
+            </td>
+            <td />
+          </tr>
+        }
+      />
     </div>
   )
 }
