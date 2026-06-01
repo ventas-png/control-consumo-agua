@@ -18,6 +18,7 @@ import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { promptUpgrade } from '../shared/promptUpgrade'
 import { PlanUsageCard } from './PlanUsageCard'
+import { COUNTRIES, countryByCode, countryName } from '../../lib/countries'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -52,6 +53,13 @@ interface EmpresaInfo {
   telefono: string | null
   max_projects: number
   logo_url: string | null
+  country: string | null
+  tax_id: string | null
+  tax_id_type: string | null
+  address_line1: string | null
+  address_city: string | null
+  address_state: string | null
+  address_postal_code: string | null
 }
 
 interface Props {
@@ -82,7 +90,7 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!currentUser.company_id) { setLoading(false); return }
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
-      supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
+      supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url, country, tax_id, tax_id_type, address_line1, address_city, address_state, address_postal_code').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, moneda_condominios, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
@@ -129,7 +137,7 @@ export function EmpresaSection({ currentUser }: Props) {
       title: 'Editar información de empresa',
       fields: [
         { name: 'nombre', label: 'Nombre de la empresa', required: true, initialValue: empresa.nombre },
-        { name: 'nit', label: 'NIT', initialValue: empresa.nit ?? '' },
+        { name: 'nit', label: 'NIT (legacy)', initialValue: empresa.nit ?? '' },
         { name: 'email', label: 'Email de contacto', type: 'email', autoComplete: 'email', initialValue: empresa.email ?? '' },
         { name: 'telefono', label: 'Teléfono', type: 'tel', autoComplete: 'tel', initialValue: empresa.telefono ?? '' },
       ],
@@ -148,6 +156,73 @@ export function EmpresaSection({ currentUser }: Props) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
+      void cargar()
+    }
+  }
+
+  // F4.3.4: datos fiscales para Stripe Tax. Se llaman directamente al renderizar
+  // un botón aparte (no se mezclan con los datos generales para mantener el
+  // diálogo enfocado y porque cambiar tax_id en producción requiere mas cuidado).
+  async function editarDatosFiscales() {
+    if (!empresa) return
+    const currentCountry = countryByCode(empresa.country)
+    const taxIdTypeOptions = currentCountry?.taxIdTypes ?? [{ value: 'other', label: 'Otro' }]
+    const initialTaxIdType = empresa.tax_id_type && taxIdTypeOptions.some(o => o.value === empresa.tax_id_type)
+      ? empresa.tax_id_type
+      : taxIdTypeOptions[0]?.value ?? 'other'
+
+    const formValues = await openPromptDialog({
+      title: 'Datos fiscales (Stripe Tax)',
+      submitText: 'Guardar',
+      fields: [
+        {
+          name: 'country', label: 'País', control: 'select',
+          initialValue: empresa.country ?? '',
+          options: [{ value: '', label: '— Seleccionar —' }, ...COUNTRIES.map(c => ({ value: c.code, label: `${c.code} — ${c.name}` }))],
+        },
+        {
+          name: 'tax_id_type', label: 'Tipo de identificación fiscal', control: 'select',
+          initialValue: initialTaxIdType,
+          options: taxIdTypeOptions,
+        },
+        { name: 'tax_id', label: 'Número fiscal (RFC/NIT/RUT/etc.)', initialValue: empresa.tax_id ?? '' },
+        { name: 'address_line1', label: 'Dirección', initialValue: empresa.address_line1 ?? '' },
+        { name: 'address_city', label: 'Ciudad', initialValue: empresa.address_city ?? '' },
+        { name: 'address_state', label: 'Estado / Provincia', initialValue: empresa.address_state ?? '' },
+        { name: 'address_postal_code', label: 'Código postal', initialValue: empresa.address_postal_code ?? '' },
+      ],
+    })
+    if (!formValues) return
+
+    // Cuando se elige país nuevo, validamos que tax_id_type es compatible.
+    // Si el usuario selecciona MX por ej, el tax_id_type debe ser mx_rfc.
+    const country = formValues.country.trim() || null
+    const selectedCountry = countryByCode(country ?? undefined)
+    let taxIdType: string | null = formValues.tax_id_type.trim() || null
+    if (selectedCountry && taxIdType && !selectedCountry.taxIdTypes.some(t => t.value === taxIdType)) {
+      // El tipo previo no aplica al país nuevo. Reset.
+      taxIdType = selectedCountry.taxIdTypes[0]?.value ?? null
+    }
+
+    const payload = {
+      country,
+      tax_id: formValues.tax_id.trim() || null,
+      tax_id_type: taxIdType,
+      address_line1: formValues.address_line1.trim() || null,
+      address_city: formValues.address_city.trim() || null,
+      address_state: formValues.address_state.trim() || null,
+      address_postal_code: formValues.address_postal_code.trim() || null,
+    }
+    const { error } = await supabase.from('companies').update(payload).eq('id', empresa.id)
+    if (error) {
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar los datos fiscales.' })
+    } else {
+      notify({
+        variant: 'success',
+        title: 'Datos fiscales actualizados',
+        text: 'Los próximos cobros usarán esta información para calcular IVA vía Stripe Tax.',
+        duration: 2200,
+      })
       void cargar()
     }
   }
@@ -635,6 +710,69 @@ export function EmpresaSection({ currentUser }: Props) {
               Editar información
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* F4.3.4: datos fiscales para Stripe Tax */}
+      <div style={{
+        background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '12px',
+        padding: '18px 22px', marginBottom: '24px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ color: 'var(--at-ink)', fontSize: '14px', fontWeight: 700, margin: '0 0 4px' }}>
+              🧾 Datos fiscales
+            </h2>
+            <p style={{ color: 'var(--at-ink-3)', fontSize: '12px', margin: '0 0 12px' }}>
+              País + identificación fiscal usados por Stripe Tax para calcular IVA en tu factura mensual.
+            </p>
+            {empresa?.country ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600, textTransform: 'uppercase' }}>País</div>
+                  <div style={{ fontSize: '13px', color: 'var(--at-ink)', fontWeight: 600 }}>
+                    {countryName(empresa.country)} ({empresa.country})
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600, textTransform: 'uppercase' }}>ID fiscal</div>
+                  <div style={{ fontSize: '13px', color: 'var(--at-ink)', fontFamily: 'monospace' }}>
+                    {empresa.tax_id ?? '—'}
+                    {empresa.tax_id_type && (
+                      <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--at-ink-3)', fontFamily: 'inherit' }}>
+                        ({empresa.tax_id_type})
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {empresa.address_line1 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600, textTransform: 'uppercase' }}>Dirección</div>
+                    <div style={{ fontSize: '13px', color: 'var(--at-ink-2)' }}>
+                      {[empresa.address_line1, empresa.address_city, empresa.address_state, empresa.address_postal_code].filter(Boolean).join(', ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)',
+                borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--at-warning-strong)',
+              }}>
+                ⚠️ Sin configurar — Stripe no podrá calcular IVA en tu próxima factura. Configúralos antes del siguiente cobro.
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => void editarDatosFiscales()}
+            style={{
+              padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+              border: '1px solid var(--at-line-strong)', background: 'var(--at-surface-2)',
+              color: 'var(--at-ink-2)', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            {empresa?.country ? 'Editar' : 'Configurar'}
+          </button>
         </div>
       </div>
 

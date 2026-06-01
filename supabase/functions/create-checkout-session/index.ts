@@ -196,15 +196,51 @@ Deno.serve(async (req: Request) => {
     if (!customerId) {
       const { data: company } = await supabase
         .from('companies')
-        .select('nombre, email')
+        .select('nombre, email, country, address_line1, address_city, address_state, address_postal_code, tax_id, tax_id_type')
         .eq('id', companyId)
         .single()
-      const customer = await stripe.customers.create({
+      const c = company as {
+        nombre: string
+        email: string | null
+        country: string | null
+        address_line1: string | null
+        address_city: string | null
+        address_state: string | null
+        address_postal_code: string | null
+        tax_id: string | null
+        tax_id_type: string | null
+      } | null
+
+      // F4.3.4: si la empresa ya tiene country + address, los pasamos al
+      // customer para que Stripe Tax pueda calcular IVA desde el primer
+      // checkout. tax_id se agrega aparte via stripe.customers.createTaxId.
+      const customerParams: Stripe.CustomerCreateParams = {
         email: (appUser as { email: string }).email,
-        name: (company as { nombre: string } | null)?.nombre ?? undefined,
+        name: c?.nombre ?? undefined,
         metadata: { company_id: companyId, user_id: user.id },
-      })
+      }
+      if (c?.country) {
+        customerParams.address = {
+          country: c.country,
+          ...(c.address_line1 ? { line1: c.address_line1 } : {}),
+          ...(c.address_city ? { city: c.address_city } : {}),
+          ...(c.address_state ? { state: c.address_state } : {}),
+          ...(c.address_postal_code ? { postal_code: c.address_postal_code } : {}),
+        }
+      }
+      const customer = await stripe.customers.create(customerParams)
       customerId = customer.id
+
+      if (c?.tax_id && c?.tax_id_type) {
+        try {
+          await stripe.customers.createTaxId(customerId, {
+            type: c.tax_id_type as Stripe.CustomerCreateTaxIdParams['type'],
+            value: c.tax_id,
+          })
+        } catch (taxErr) {
+          console.warn('[create-checkout-session] tax_id rechazado por Stripe:', taxErr instanceof Error ? taxErr.message : String(taxErr))
+        }
+      }
     }
 
     // 7. Preserve trial: si la sub tiene trial_end en el futuro, le decimos
@@ -232,7 +268,13 @@ Deno.serve(async (req: Request) => {
       cancel_url: `${appUrl}${returnPath}?checkout=canceled`,
       metadata: { company_id: companyId, plan_id: p.id, plan_code: planCode },
       allow_promotion_codes: true,
-      billing_address_collection: 'auto',
+      // F4.3.4: Stripe Tax integration. Requiere Stripe Tax habilitado en
+      // Dashboard → Settings → Tax. Si no esta habilitado, automatic_tax es
+      // ignorado por Stripe (no rompe el checkout).
+      automatic_tax: { enabled: true },
+      tax_id_collection: { enabled: true },
+      billing_address_collection: 'required',
+      customer_update: { address: 'auto', name: 'auto' },
     }, {
       idempotencyKey: `checkout-${companyId}-${user.id}-${Date.now()}`,
     })

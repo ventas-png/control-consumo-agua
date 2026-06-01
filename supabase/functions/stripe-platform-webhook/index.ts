@@ -159,10 +159,27 @@ async function upsertInvoiceFromStripe(
     return
   }
 
+  // F4.3.4: extraer tax desde Stripe Invoice. Cuando automatic_tax esta
+  // habilitado, total_tax_amounts contiene el desglose; usamos el total.
+  const taxAmount = Array.isArray(stripeInvoice.total_tax_amounts)
+    ? stripeInvoice.total_tax_amounts.reduce((s, t) => s + (t.amount ?? 0), 0)
+    : 0
+  // customer_tax_ids: array de { type, value } del customer al momento del
+  // cobro. Snapshot del primero (típicamente solo hay uno).
+  const taxIdEntry = Array.isArray(stripeInvoice.customer_tax_ids)
+    ? stripeInvoice.customer_tax_ids[0]
+    : null
+  const countryBilled = stripeInvoice.customer_address?.country ?? null
+
   const row = {
     subscription_id: (sub as { id: string }).id,
     company_id: (sub as { company_id: string }).company_id,
     amount_cents: stripeInvoice.amount_paid > 0 ? stripeInvoice.amount_paid : stripeInvoice.amount_due,
+    subtotal_cents: stripeInvoice.subtotal ?? null,
+    tax_amount_cents: taxAmount,
+    tax_id: taxIdEntry?.value ?? null,
+    tax_id_type: taxIdEntry?.type ?? null,
+    country_billed: countryBilled,
     currency: stripeInvoice.currency,
     status: mapInvoiceStatus(stripeInvoice.status),
     period_start: stripeInvoice.period_start
@@ -280,6 +297,40 @@ Deno.serve(async (req: Request) => {
           const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
           const stripeSub = await stripe.subscriptions.retrieve(subId)
           await upsertSubscriptionFromStripe(supabase, stripeSub)
+        }
+        break
+      }
+      case 'customer.updated': {
+        // F4.3.4: sync de address/tax_id desde Stripe (cuando el cliente edita
+        // sus datos via Stripe Customer Portal o checkout). Lo guardamos en
+        // companies para que el próximo checkout reuse esos datos.
+        const customer = event.data.object as Stripe.Customer
+        const companyId = customer.metadata?.company_id
+        if (!companyId) {
+          console.warn('[webhook] customer.updated sin company_id metadata:', customer.id)
+          break
+        }
+        // Stripe Customer trae tax_ids como sub-resource; los pedimos aparte.
+        let taxIdEntry: Stripe.TaxId | undefined
+        try {
+          const taxIds = await stripe.customers.listTaxIds(customer.id, { limit: 1 })
+          taxIdEntry = taxIds.data[0]
+        } catch (taxErr) {
+          console.warn('[webhook] no se pudo listar tax_ids:', taxErr instanceof Error ? taxErr.message : String(taxErr))
+        }
+        const addr = customer.address
+        const update: Record<string, string | null> = {}
+        if (addr?.country) update.country = addr.country
+        if (addr?.line1) update.address_line1 = addr.line1
+        if (addr?.city) update.address_city = addr.city
+        if (addr?.state) update.address_state = addr.state
+        if (addr?.postal_code) update.address_postal_code = addr.postal_code
+        if (taxIdEntry?.value) {
+          update.tax_id = taxIdEntry.value
+          update.tax_id_type = taxIdEntry.type
+        }
+        if (Object.keys(update).length > 0) {
+          await supabase.from('companies').update(update).eq('id', companyId)
         }
         break
       }
