@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import type { UserSession, Proyecto, Unidad, AppSection } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { DataTable, type DataTableColumn } from '../shared/DataTable'
 
 interface Props {
   currentUser: UserSession
@@ -199,52 +200,87 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
         </div>
       </div>
 
-      {/* Tabla por proyecto */}
+      {/* Tabla por proyecto — F3.9: migrado a <DataTable> shared */}
       {!selectedProjectId && proyectosActivos.length > 1 && Object.keys(perProject).length > 0 && (
         <div style={{ marginBottom: '32px' }}>
           <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Comparativa por Proyecto</h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: 'var(--at-surface-2)' }}>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-accent-hover)', borderBottom: '2px solid var(--at-line)' }}>🏠 Ocupación</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>💰 Pendientes</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-danger)', borderBottom: '2px solid var(--at-line)' }}>⚠️ Mora</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>👥 Visitantes hoy</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>🔧 Tickets</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>💬 Sin asignar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {proyectosActivos.map((p, i) => {
+          <DataTable<Proyecto>
+            data={proyectosActivos}
+            rowKey="id"
+            pageSize={0}
+            searchableKeys={['nombre']}
+            searchPlaceholder="Buscar proyecto…"
+            onRowClick={p => setSelectedProjectId(p.id)}
+            defaultSort={{ key: 'mora', direction: 'desc' }}
+            columns={[
+              {
+                key: 'nombre', header: 'Proyecto', sortable: true,
+                accessor: p => p.nombre,
+                render: p => {
                   const s = perProject[p.id] ?? EMPTY_STATS()
-                  const hasMora = s.cuotasMora > 0
                   return (
-                    <tr
-                      key={p.id}
-                      style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', cursor: 'pointer', transition: 'background 0.15s' }}
-                      onClick={() => setSelectedProjectId(p.id)}
-                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
-                    >
-                      <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
-                        {hasMora && <span style={{ color: 'var(--at-danger)', marginRight: 6 }}>●</span>}
-                        {p.nombre}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.cuotasPendientes}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{s.cuotasMora}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.visitantesHoy}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.ticketsAbiertos}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.comunSinAsignar}</td>
-                    </tr>
+                    <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>
+                      {s.cuotasMora > 0 && <span style={{ color: 'var(--at-danger)', marginRight: 6 }}>●</span>}
+                      {p.nombre}
+                    </span>
                   )
-                })}
-              </tbody>
-            </table>
-            <p style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: 8 }}>Haz clic en un proyecto para filtrar el panel</p>
-          </div>
+                },
+              },
+              {
+                key: 'ocupacion', header: '🏠 Ocupación', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).ocupadas,
+                render: p => {
+                  const s = perProject[p.id] ?? EMPTY_STATS()
+                  return <span style={{ color: 'var(--at-accent-hover)', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</span>
+                },
+              },
+              {
+                key: 'pendientes', header: '💰 Pendientes', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).cuotasPendientes,
+                render: p => {
+                  const v = (perProject[p.id] ?? EMPTY_STATS()).cuotasPendientes
+                  return <span style={{ fontWeight: v > 0 ? 700 : 400, color: v > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{v}</span>
+                },
+                hideOnMobile: true,
+              },
+              {
+                key: 'mora', header: '⚠️ Mora', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).cuotasMora,
+                render: p => {
+                  const v = (perProject[p.id] ?? EMPTY_STATS()).cuotasMora
+                  return <span style={{ fontWeight: v > 0 ? 700 : 400, color: v > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{v}</span>
+                },
+              },
+              {
+                key: 'visitantes', header: '👥 Visitantes hoy', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).visitantesHoy,
+                render: p => {
+                  const v = (perProject[p.id] ?? EMPTY_STATS()).visitantesHoy
+                  return <span style={{ fontWeight: v > 0 ? 700 : 400, color: v > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{v}</span>
+                },
+                hideOnMobile: true,
+              },
+              {
+                key: 'tickets', header: '🔧 Tickets', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).ticketsAbiertos,
+                render: p => {
+                  const v = (perProject[p.id] ?? EMPTY_STATS()).ticketsAbiertos
+                  return <span style={{ fontWeight: v > 0 ? 700 : 400, color: v > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{v}</span>
+                },
+                hideOnMobile: true,
+              },
+              {
+                key: 'sin_asignar', header: '💬 Sin asignar', sortable: true,
+                accessor: p => (perProject[p.id] ?? EMPTY_STATS()).comunSinAsignar,
+                render: p => {
+                  const v = (perProject[p.id] ?? EMPTY_STATS()).comunSinAsignar
+                  return <span style={{ fontWeight: v > 0 ? 700 : 400, color: v > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{v}</span>
+                },
+                hideOnMobile: true,
+              },
+            ] satisfies DataTableColumn<Proyecto>[]}
+          />
+          <p style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: 8 }}>Haz clic en un proyecto para filtrar el panel</p>
         </div>
       )}
     </div>

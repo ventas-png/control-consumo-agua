@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -250,55 +251,68 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             ))}
           </div>
 
-          {/* Tabla de gastos */}
-          {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧾</div>
-              <p style={{ margin: 0, fontWeight: 600 }}>No hay gastos registrados</p>
-            </div>
-          ) : (
-            <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: 'var(--at-surface-2)' }}>
-                    {['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((g, i) => {
-                    const cat = CAT_CONFIG[g.categoria]
-                    const est = ESTADO_CONFIG[g.estado]
-                    return (
-                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
-                        <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{g.fecha}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>
-                          {g.concepto}
-                          {g.proveedor_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 400 }}>{g.proveedor_nombre}</div>}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: cat.color }}>{cat.icon} {cat.label}</span>
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-ink)', whiteSpace: 'nowrap' }}>{moneda} {g.monto.toFixed(2)}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          {canEdit && (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={() => startEdit(g)} style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                              <button onClick={() => handleDelete(g.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Tabla de gastos — F3.9: migrado a <DataTable> shared */}
+          <DataTable<GastoCondominio>
+            data={filtered}
+            rowKey="id"
+            pageSize={50}
+            defaultSort={{ key: 'fecha', direction: 'desc' }}
+            searchableKeys={[
+              'concepto',
+              g => g.proveedor_nombre ?? '',
+              g => g.comprobante_num ?? '',
+            ]}
+            searchPlaceholder="Buscar gasto, proveedor, comprobante…"
+            emptyState={{ icon: '🧾', title: 'No hay gastos registrados' }}
+            columns={[
+              {
+                key: 'fecha', header: 'Fecha', sortable: true,
+                accessor: g => g.fecha,
+                render: g => <span style={{ color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{g.fecha}</span>,
+              },
+              {
+                key: 'concepto', header: 'Concepto', sortable: true,
+                accessor: g => g.concepto,
+                render: g => (
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{g.concepto}</div>
+                    {g.proveedor_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 400 }}>{g.proveedor_nombre}</div>}
+                  </div>
+                ),
+              },
+              {
+                key: 'categoria', header: 'Categoría', sortable: true,
+                accessor: g => g.categoria,
+                render: g => {
+                  const cat = CAT_CONFIG[g.categoria]
+                  return <span style={{ fontSize: '11px', fontWeight: 600, color: cat.color }}>{cat.icon} {cat.label}</span>
+                },
+                hideOnMobile: true,
+              },
+              {
+                key: 'monto', header: 'Monto', sortable: true,
+                accessor: g => g.monto,
+                render: g => <span style={{ fontWeight: 700, color: 'var(--at-ink)', whiteSpace: 'nowrap' }}>{moneda} {g.monto.toFixed(2)}</span>,
+              },
+              {
+                key: 'estado', header: 'Estado', sortable: true,
+                accessor: g => g.estado,
+                render: g => {
+                  const est = ESTADO_CONFIG[g.estado]
+                  return <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+                },
+              },
+              {
+                key: 'acciones', header: '',
+                render: g => canEdit ? (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={() => startEdit(g)} aria-label="Editar" style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => handleDelete(g.id)} aria-label="Eliminar" style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+                  </div>
+                ) : null,
+              },
+            ] satisfies DataTableColumn<GastoCondominio>[]}
+          />
         </div>
 
         {/* Panel de categorías */}
