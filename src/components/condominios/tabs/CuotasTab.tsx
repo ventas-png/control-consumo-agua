@@ -2,6 +2,7 @@ import { useState, useRef, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
+import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
 
@@ -319,7 +320,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   async function eliminar(id: string) {
     const result = await confirm({ title: '¿Eliminar cuota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await supabase.from('cuotas_condominio').delete().eq('id', id)
+    // F4.2.3: soft delete — la cuota se preserva con deleted_at, restaurable
+    // desde Empresa → Papelera. El audit_log captura el cambio automaticamente.
+    await softDelete('cuotas_condominio', id)
     onRefresh()
   }
 
