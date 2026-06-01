@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { confirm, notify } from './components/shared/Dialog'
 import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
+import { PresenceIndicator } from './components/shared/PresenceIndicator'
+import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
@@ -46,6 +48,32 @@ const ServiciosEnergiaSection = lazy(() => import('./components/servicios-energi
 const CondominiosSection = lazy(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
 const CondominiosDashboard = lazy(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
 
+
+// F4.4.2: muestra avatares de otros usuarios de la misma company viendo la
+// misma seccion. Se monta justo bajo el Topbar. Si no hay nadie mas, se
+// auto-oculta. Se inyecta el hook aqui (y no en App directo) para evitar
+// re-renders del arbol grande cuando llegan eventos Realtime cada 30s.
+function PresenceBar({ currentUser, activeSection }: { currentUser: UserSession; activeSection: AppSection }) {
+  const { others } = usePresence({
+    companyId: currentUser.company_id ?? null,
+    userId: currentUser.user_id,
+    section: activeSection,
+  })
+  if (others.length === 0) return null
+  return (
+    <div style={{
+      padding: '6px 16px',
+      borderBottom: '1px solid var(--at-line)',
+      background: 'var(--at-surface-2)',
+      display: 'flex', alignItems: 'center', gap: '10px',
+    }}>
+      <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>
+        Activos aquí:
+      </span>
+      <PresenceIndicator others={others} />
+    </div>
+  )
+}
 
 // Shown when a client has both servicio_agua and servicio_condominios active
 function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession; onLogout: () => void }) {
@@ -508,6 +536,7 @@ export default function App() {
           </div>
         )}
         <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} onNavigate={setActiveSection} sidebarOpen={sidebarOpen} />
+        <PresenceBar currentUser={currentUser} activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
