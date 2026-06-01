@@ -4,6 +4,7 @@ import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 import { SystemHealthModal } from './SystemHealthModal'
+import { SuperAdminMetricsCard } from './SuperAdminMetricsCard'
 
 interface Empresa {
   id: string
@@ -334,6 +335,9 @@ export function SuperAdminSection() {
           </button>
         </div>
       </div>
+
+      {/* F4.5.3: KPIs globales del SaaS (MRR, activas, churn, distribución por plan) */}
+      <SuperAdminMetricsCard />
 
       {/* Lista de empresas */}
       {empresas.length === 0 ? (
