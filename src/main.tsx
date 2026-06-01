@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { DialogProvider } from './components/shared/Dialog'
 import { PromptDialogRoot } from './components/shared/PromptDialog'
+import { I18nProvider } from './lib/i18n'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -29,11 +30,13 @@ if (savedTheme === 'dark' || savedTheme === 'light') {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary sectionName="root">
-      <DialogProvider>
-        <App />
-        <PwaUpdatePrompt />
-        <PromptDialogRoot />
-      </DialogProvider>
+      <I18nProvider>
+        <DialogProvider>
+          <App />
+          <PwaUpdatePrompt />
+          <PromptDialogRoot />
+        </DialogProvider>
+      </I18nProvider>
     </ErrorBoundary>
   </StrictMode>
 )
