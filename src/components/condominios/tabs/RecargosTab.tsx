@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   recargos: RecargoMora[]
@@ -267,51 +268,44 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
         </div>
       )}
 
-      {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>Sin recargos de mora registrados</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)' }}>
-                {['Unidad', 'Fecha', 'Tipo', 'Valor', 'Monto', 'Estado', 'Motivo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(r => {
-                const ec = ESTADO_CFG[r.estado]
-                const unidad = unidades.find(u => u.id === r.unidad_id)
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.fecha_aplicacion}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {r.monto_calculado.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)', fontSize: 12 }}>{r.motivo ?? '—'}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {canEdit && r.estado === 'pendiente' && (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={() => cambiarEstado(r, 'aplicado')}
-                            style={{ padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
-                          <button onClick={() => cambiarEstado(r, 'anulado')}
-                            style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Tabla — F3.9: migrado a <DataTable> shared */}
+      <DataTable<RecargoMora>
+        data={lista}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'fecha_aplicacion', direction: 'desc' }}
+        emptyState={{ icon: '💰', title: 'Sin recargos de mora registrados' }}
+        columns={[
+          { key: 'unidad_nombre', header: 'Unidad', sortable: true,
+            accessor: (r) => unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '',
+            render: (r) => <span style={{ fontWeight: 600 }}>{unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '—'}</span> },
+          { key: 'fecha_aplicacion', header: 'Fecha', sortable: true,
+            render: (r) => <span style={{ color: 'var(--at-ink-3)' }}>{r.fecha_aplicacion}</span> },
+          { key: 'tipo', header: 'Tipo', sortable: true, hideOnMobile: true,
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</span> },
+          { key: 'valor', header: 'Valor', sortable: true, hideOnMobile: true,
+            render: (r) => <span style={{ color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</span> },
+          { key: 'monto_calculado', header: 'Monto', align: 'right', sortable: true,
+            render: (r) => <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {r.monto_calculado.toFixed(2)}</span> },
+          { key: 'estado', header: 'Estado', sortable: true,
+            render: (r) => {
+              const ec = ESTADO_CFG[r.estado]
+              return <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+            } },
+          { key: 'motivo', header: 'Motivo', hideOnMobile: true,
+            accessor: (r) => r.motivo ?? '',
+            render: (r) => <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>{r.motivo ?? '—'}</span> },
+          { key: 'actions', header: '', align: 'right',
+            render: (r) => (canEdit && r.estado === 'pendiente') ? (
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button onClick={(e) => { e.stopPropagation(); cambiarEstado(r, 'aplicado') }}
+                  style={{ padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
+                <button onClick={(e) => { e.stopPropagation(); cambiarEstado(r, 'anulado') }}
+                  style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
+              </div>
+            ) : null },
+        ] satisfies DataTableColumn<RecargoMora>[]}
+      />
     </div>
   )
 }
