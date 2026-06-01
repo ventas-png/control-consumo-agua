@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import { confirm } from '../../shared/Dialog'
 import type { CuotaCondominio, Unidad } from '../../../types'
@@ -107,7 +108,7 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay cuotas para mostrar.</div>
+        <EmptyState icon="📋" title="No hay cuotas para mostrar" />
       ) : (
         <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>

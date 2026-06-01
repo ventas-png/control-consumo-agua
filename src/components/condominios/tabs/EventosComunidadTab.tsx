@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { EventoComunidad, RegistroAsistenteEvento } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -211,7 +212,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
         {/* Events list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay eventos.</div>
+            <EmptyState icon="📋" title="No hay eventos" />
           ) : filtered.map(ev => {
             const ts = TIPO_STYLE[ev.tipo] ?? TIPO_STYLE.otro
             const es = ESTADO_STYLE[ev.estado] ?? ESTADO_STYLE.programado
@@ -297,7 +298,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
               </div>
             )}
             {selectedAsistentes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Sin asistentes registrados.</div>
+              <EmptyState icon="📋" title="Sin asistentes registrados" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {selectedAsistentes.map(a => {

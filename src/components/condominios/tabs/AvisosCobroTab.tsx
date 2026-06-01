@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { AvisoCobro } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -254,7 +255,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay avisos de cobro.</div>
+        <EmptyState icon="📨" title="No hay avisos de cobro" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(a => {

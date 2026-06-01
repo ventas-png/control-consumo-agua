@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudResidente, TipoSolicitud, EstadoSolicitud, PrioridadSolicitud, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -192,7 +193,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay solicitudes que mostrar.</div>
+        <EmptyState icon="📋" title="No hay solicitudes que mostrar" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(s => {

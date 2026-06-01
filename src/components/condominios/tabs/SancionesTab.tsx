@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -165,7 +166,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay sanciones.</div>
+        <EmptyState icon="📋" title="No hay sanciones" />
       ) : (
         <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>

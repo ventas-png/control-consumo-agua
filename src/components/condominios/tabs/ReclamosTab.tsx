@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ReclamoCondominio } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -216,7 +217,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay reclamos registrados.</div>
+            <EmptyState icon="📋" title="No hay reclamos registrados" />
           ) : filtered.map(r => {
             const ts = TIPO_STYLE[r.tipo] ?? TIPO_STYLE.queja
             const es = ESTADO_STYLE[r.estado] ?? ESTADO_STYLE.recibido

@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -290,9 +291,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
         </div>
 
         {storedActivas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '13px' }}>
-            No hay alertas manuales {filtroEstado !== 'all' ? `con estado "${filtroEstado}"` : ''}.
-          </div>
+          <EmptyState icon="📋" title={`No hay alertas manuales ${filtroEstado !== 'all' ? `con estado "${filtroEstado}"` : ''}`} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {storedActivas.map(a => {

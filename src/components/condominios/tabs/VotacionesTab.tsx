@@ -1,4 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -187,7 +188,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {votaciones.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay votaciones. Crea una para comenzar.</div>
+            <EmptyState icon="📋" title="No hay votaciones. Crea una para comenzar" />
           ) : (
             votaciones.map(v => {
               const ec = ESTADO_COLORS[v.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' }

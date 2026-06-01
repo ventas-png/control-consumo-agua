@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { Encuesta, RespuestaEncuesta, EstadoEncuesta, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -303,7 +304,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
 
             {/* Lista de respuestas */}
             {encuestaRespuestas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Aún no hay respuestas</div>
+              <EmptyState icon="📋" title="Aún no hay respuestas" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Respuestas recibidas ({encuestaRespuestas.length})</div>

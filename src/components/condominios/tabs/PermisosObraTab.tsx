@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { PermisoObraUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -153,7 +154,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin permisos</div>
+            <EmptyState icon="📋" title="Sin permisos" />
           )}
           {filtered.map(p => {
             const ts = TIPO_STYLE[p.tipo_obra]

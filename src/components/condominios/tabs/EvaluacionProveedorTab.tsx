@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { EvaluacionProveedor, ContratoProveedor } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -189,7 +190,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
         /* Ranking view */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {ranking.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin evaluaciones.</div>
+            <EmptyState icon="⭐" title="Sin evaluaciones" />
           ) : ranking.map((r, i) => (
             <div key={r.nombre} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -225,7 +226,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
             <input style={{ ...inputStyle, maxWidth: '220px' }} value={filtroProveedor} onChange={e => setFiltroProveedor(e.target.value)} placeholder="Buscar proveedor…" />
           </div>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay evaluaciones.</div>
+            <EmptyState icon="⭐" title="No hay evaluaciones" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(e => (

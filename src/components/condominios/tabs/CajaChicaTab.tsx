@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { CajaChica, MovimientoCaja } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
@@ -145,7 +146,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
         {/* Cajas list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {cajas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay cajas chicas.</div>
+            <EmptyState icon="💵" title="No hay cajas chicas" />
           ) : cajas.map(c => {
             const movs = movimientos.filter(m => m.caja_id === c.id)
             const ing = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
@@ -252,7 +253,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             )}
 
             {selectedMovs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Sin movimientos.</div>
+              <EmptyState icon="📋" title="Sin movimientos" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {[...selectedMovs].sort((a, b) => b.fecha.localeCompare(a.fecha)).map(m => (

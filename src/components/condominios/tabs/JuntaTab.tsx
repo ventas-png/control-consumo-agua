@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { MiembroJunta, CargoJunta, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -173,7 +174,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
 
       {/* Active members */}
       {sortedActivos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay miembros activos registrados.</div>
+        <EmptyState icon="📋" title="No hay miembros activos registrados" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginBottom: '20px' }}>
           {sortedActivos.map(m => {

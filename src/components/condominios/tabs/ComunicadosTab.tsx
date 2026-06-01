@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -227,7 +228,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
         {/* List */}
         <div>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay comunicados.</div>
+            <EmptyState icon="📋" title="No hay comunicados" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(c => {

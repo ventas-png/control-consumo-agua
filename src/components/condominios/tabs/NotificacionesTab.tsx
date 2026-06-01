@@ -1,4 +1,5 @@
 import { useState, type CSSProperties} from 'react'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { ReglaNotificacion, EventoNotificacion, CanalNotificacion, DestinatarioNotificacion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -190,7 +191,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
 
       {/* Rules list */}
       {reglas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay reglas configuradas. Crea una para comenzar.</div>
+        <EmptyState icon="📋" title="No hay reglas configuradas. Crea una para comenzar" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {reglas.map(r => {
