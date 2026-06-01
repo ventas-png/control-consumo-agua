@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConsumoEnergiaArea } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   consumos: ConsumoEnergiaArea[]
@@ -217,58 +218,106 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
         </div>
       )}
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '36px', marginBottom: '8px' }}>📊</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin registros de consumo</p>
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1.5px solid var(--at-line)' }}>
-                {['Tipo', 'Área', 'Período', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Costo unit.', 'Total', 'Fecha', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(c => {
-                const ts = TIPO_STYLE[c.tipo]
-                const consumo = c.lectura_anterior != null ? c.lectura_actual - c.lectura_anterior : null
-                return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.icon} {ts.label}</span>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.area}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', textAlign: 'right' }}>{c.lectura_anterior != null ? c.lectura_anterior.toFixed(2) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>{c.lectura_actual.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-primary)' }}>
-                      {consumo != null ? `${consumo.toFixed(2)} ${c.unidad}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>
-                      {c.costo_unitario != null ? `${c.costo_unitario.toFixed(4)}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>
-                      {c.total_costo != null ? fmt(c.total_costo, moneda) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{c.fecha_lectura}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {canEdit && <button onClick={() => openEdit(c)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
-                        <button onClick={() => handleDelete(c)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Table — F3.9: migrado a <DataTable> shared */}
+      <DataTable<ConsumoEnergiaArea>
+        data={filtered}
+        rowKey="id"
+        pageSize={50}
+        searchableKeys={['area', 'periodo']}
+        searchPlaceholder="Buscar área o período..."
+        emptyState={{ icon: '📊', title: 'Sin registros de consumo' }}
+        defaultSort={{ key: 'fecha_lectura', direction: 'desc' }}
+        columns={[
+          {
+            key: 'tipo',
+            header: 'Tipo',
+            sortable: true,
+            render: (c) => {
+              const ts = TIPO_STYLE[c.tipo]
+              return (
+                <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: ts.bg, color: ts.color }}>
+                  {ts.icon} {ts.label}
+                </span>
+              )
+            },
+          },
+          { key: 'area', header: 'Área', sortable: true, render: (c) => <span style={{ fontWeight: 600 }}>{c.area}</span> },
+          { key: 'periodo', header: 'Período', sortable: true },
+          {
+            key: 'lectura_anterior',
+            header: 'Lect. Ant.',
+            align: 'right',
+            hideOnMobile: true,
+            render: (c) => c.lectura_anterior != null ? c.lectura_anterior.toFixed(2) : '—',
+          },
+          {
+            key: 'lectura_actual',
+            header: 'Lect. Act.',
+            align: 'right',
+            hideOnMobile: true,
+            render: (c) => <span style={{ fontWeight: 600 }}>{c.lectura_actual.toFixed(2)}</span>,
+          },
+          {
+            key: 'consumo',
+            header: 'Consumo',
+            align: 'right',
+            accessor: (c) => c.lectura_anterior != null ? c.lectura_actual - c.lectura_anterior : null,
+            render: (c) => {
+              const consumo = c.lectura_anterior != null ? c.lectura_actual - c.lectura_anterior : null
+              return consumo != null
+                ? <span style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{consumo.toFixed(2)} {c.unidad}</span>
+                : '—'
+            },
+          },
+          {
+            key: 'costo_unitario',
+            header: 'Costo unit.',
+            align: 'right',
+            hideOnMobile: true,
+            render: (c) => c.costo_unitario != null ? c.costo_unitario.toFixed(4) : '—',
+          },
+          {
+            key: 'total_costo',
+            header: 'Total',
+            align: 'right',
+            sortable: true,
+            render: (c) => c.total_costo != null
+              ? <span style={{ fontWeight: 700, color: 'var(--at-success)' }}>{fmt(c.total_costo, moneda)}</span>
+              : '—',
+          },
+          {
+            key: 'fecha_lectura',
+            header: 'Fecha',
+            sortable: true,
+            hideOnMobile: true,
+            render: (c) => <span style={{ whiteSpace: 'nowrap' }}>{c.fecha_lectura}</span>,
+          },
+          {
+            key: '__actions',
+            header: '',
+            render: (c) => (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {canEdit && (
+                  <button
+                    onClick={() => openEdit(c)}
+                    aria-label="Editar registro"
+                    style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                  >
+                    ✏️
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(c)}
+                  aria-label="Eliminar registro"
+                  style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}
+                >
+                  🗑
+                </button>
+              </div>
+            ),
+          },
+        ] satisfies DataTableColumn<ConsumoEnergiaArea>[]}
+      />
     </div>
   )
 }

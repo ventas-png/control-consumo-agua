@@ -1,8 +1,8 @@
 import { useState, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
 import { notify } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   correspondencia: CorrespondenciaCondominio[]
@@ -190,57 +190,75 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
 
       {/* Split view */}
       <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
-        {/* List */}
+        {/* List — F3.9: migrado a <DataTable> shared */}
         <div>
-          {filtered.length === 0 ? (
-            <EmptyState icon="📋" title="No hay correspondencia" />
-          ) : (
-            <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: 'var(--at-surface-2)' }}>
-                    {['Tipo', 'Asunto', 'Categoría', 'Fecha', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((c, i) => {
-                    const es = ESTADO_STYLE[c.estado]
-                    return (
-                      <tr key={c.id} onClick={() => setSelected(selected === c.id ? null : c.id)}
-                        style={{ background: selected === c.id ? 'var(--at-primary-tint)' : i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer' }}>
-                        <td style={{ padding: '9px 12px' }}>
-                          <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
-                          {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
-                        </td>
-                        <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{c.asunto}</td>
-                        <td style={{ padding: '9px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{CAT_LABELS[c.categoria]}</td>
-                        <td style={{ padding: '9px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{c.fecha}</td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>{c.estado}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>
-                          {canEdit && c.estado === 'pendiente' && (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
-                                style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                                Atender
-                              </button>
-                              <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
-                                style={{ padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-                                Archivar
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable<CorrespondenciaCondominio>
+            data={filtered}
+            rowKey="id"
+            searchableKeys={['asunto']}
+            searchPlaceholder="Buscar asunto..."
+            emptyState={{ icon: '📨', title: 'No hay correspondencia' }}
+            defaultSort={{ key: 'fecha', direction: 'desc' }}
+            onRowClick={(c) => setSelected(selected === c.id ? null : c.id)}
+            rowStyle={(c) => selected === c.id ? { background: 'var(--at-primary-tint)' } : {}}
+            columns={[
+              {
+                key: 'tipo',
+                header: 'Tipo',
+                sortable: true,
+                render: (c) => (
+                  <>
+                    <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
+                    {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
+                  </>
+                ),
+              },
+              {
+                key: 'asunto',
+                header: 'Asunto',
+                sortable: true,
+                render: (c) => <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.asunto}</span>,
+              },
+              {
+                key: 'categoria',
+                header: 'Categoría',
+                hideOnMobile: true,
+                render: (c) => CAT_LABELS[c.categoria],
+              },
+              { key: 'fecha', header: 'Fecha', sortable: true },
+              {
+                key: 'estado',
+                header: 'Estado',
+                sortable: true,
+                render: (c) => {
+                  const es = ESTADO_STYLE[c.estado]
+                  return (
+                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>
+                      {c.estado}
+                    </span>
+                  )
+                },
+              },
+              {
+                key: '__actions',
+                header: '',
+                render: (c) => (
+                  canEdit && c.estado === 'pendiente' ? (
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
+                        style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        Atender
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
+                        style={{ padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                        Archivar
+                      </button>
+                    </div>
+                  ) : null
+                ),
+              },
+            ] satisfies DataTableColumn<CorrespondenciaCondominio>[]}
+          />
         </div>
 
         {/* Detail */}
