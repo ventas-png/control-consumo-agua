@@ -125,6 +125,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         // cuotas: últimos 2 años + cap 500. Cubre pendientes vigentes y pagadas
         // recientes; deuda muy antigua igual está incluida hasta el cap.
         supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
+          .is('deleted_at', null)
           .gte('fecha_vencimiento', HACE_DOS_ANOS)
           .order('fecha_vencimiento', { ascending: false })
           .limit(500),
@@ -132,6 +133,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
         // tickets: últimos 90 días + cap 200. Tickets viejos cerrados rara vez se consultan.
         supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
+          .is('deleted_at', null)
           .gte('created_at', NOVENTA_DIAS_ATRAS)
           .order('created_at', { ascending: false })
           .limit(200),

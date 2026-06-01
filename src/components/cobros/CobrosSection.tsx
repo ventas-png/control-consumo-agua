@@ -77,6 +77,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
       supabase
         .from('pagos')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('convenios_pago')
