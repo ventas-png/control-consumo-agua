@@ -16,6 +16,7 @@ import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey 
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { promptUpgrade } from '../shared/promptUpgrade'
+import { PlanUsageCard } from './PlanUsageCard'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -633,6 +634,11 @@ export function EmpresaSection({ currentUser }: Props) {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* F4.2.2: card de uso del plan con barras de proyectos y unidades */}
+      <div style={{ marginBottom: '24px' }}>
+        <PlanUsageCard companyId={currentUser.company_id ?? null} />
       </div>
 
       {/* Proyectos */}
