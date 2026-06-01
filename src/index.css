@@ -328,6 +328,48 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── Mobile Layout (< 768px): sidebar off-canvas + backdrop ─────────────── */
+/* F3.10: panel admin responsive. Antes el sidebar quedaba sticky a 256px
+ * en mobile bloqueando todo el viewport. Ahora se oculta off-canvas y se
+ * activa via .open (controlado por sidebarOpen en App.tsx). */
+@media (max-width: 767px) {
+  .app-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: 280px !important;
+    min-width: 280px !important;
+    transform: translateX(-100%);
+    z-index: 200;
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
+  }
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+  .app-backdrop {
+    display: block !important;
+  }
+  /* Main content takes full width when sidebar is off-canvas */
+  .app-main {
+    padding: 12px !important;
+    width: 100% !important;
+  }
+  /* Tablas: scroll horizontal con indicador */
+  .table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+  /* Esconde columnas marcadas como secundarias en mobile */
+  .table-col-secondary {
+    display: none !important;
+  }
+  /* Header de admin: stack vertical en mobile */
+  .app-topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
 /* ─── Placeholder Contrast Fix ──────────────────────────────────────────── */
 ::placeholder {
   color: #64748b;
