@@ -31,6 +31,7 @@ export function NavTabs({ activeSection, userRole, onSelect }: Props) {
     <div
       role="tablist"
       aria-label="Secciones del módulo de agua"
+      className="tab-strip-scrollable"
       style={{ display: 'flex', gap: '8px', background: 'var(--at-surface)', padding: '8px', borderRadius: '12px', marginBottom: '20px', overflowX: 'auto' }}
     >
       {visibleTabs.map(tab => {

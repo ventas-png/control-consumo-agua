@@ -306,7 +306,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
+      <div className="tab-strip-scrollable" style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             padding: '10px 20px', fontSize: '14px', fontWeight: activeTab === tab.id ? 700 : 500,

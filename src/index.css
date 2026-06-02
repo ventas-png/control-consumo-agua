@@ -285,6 +285,45 @@ button:focus:not(:focus-visible) {
   box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
 }
 
+/* ─── Tab strip scroll indicator (mobile) ────────────────────────────────
+ * Pattern analogo a .table-scroll-wrapper pero para nav strips (display:
+ * flex con overflow horizontal). En mobile, sin esto, el usuario no sabe
+ * que hay mas tabs a la derecha. Agrega un gradiente lateral sutil que
+ * desaparece al llegar al final del scroll.
+ *
+ * Activacion solo en ≤640px (mismo breakpoint que table-scroll). El caller
+ * solo agrega className="tab-strip-scrollable" — no requiere wrapper extra
+ * ni cambios de layout. El position:relative se aplica automaticamente. */
+.tab-strip-scrollable {
+  position: relative;
+  /* Touch scroll suave en iOS para el momentum */
+  -webkit-overflow-scrolling: touch;
+  /* Snap tabs al borde izquierdo para que el usuario aterrize en un tab
+   * completo en lugar de a la mitad despues de un swipe. */
+  scroll-snap-type: x proximity;
+}
+.tab-strip-scrollable > * {
+  scroll-snap-align: start;
+}
+.tab-strip-scrollable::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  background: linear-gradient(to left,
+    color-mix(in srgb, var(--at-surface) 90%, transparent),
+    transparent);
+  pointer-events: none;
+  display: none;
+}
+@media (max-width: 640px) {
+  .tab-strip-scrollable::after {
+    display: block;
+  }
+}
+
 @media (max-width: 640px) {
   .table-col-secondary {
     display: none !important;

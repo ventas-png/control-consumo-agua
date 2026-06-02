@@ -945,7 +945,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         </div>
 
         {/* Barra de secciones (nivel 1) */}
-        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }}>
+        <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }}>
           {visibleSections.map(sec => {
             const activa = activeSection === sec.id
             return (

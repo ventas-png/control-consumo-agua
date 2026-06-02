@@ -340,7 +340,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         </div>
 
         {/* Tab navigation */}
-        <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
+        <div className="tab-strip-scrollable" style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
           {PORTAL_TABS.map(t => (
             <button
               key={t.id}

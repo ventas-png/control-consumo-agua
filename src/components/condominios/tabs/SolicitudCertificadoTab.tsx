@@ -215,7 +215,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
               </div>
 
               {/* Línea de tiempo */}
-              <div style={{ display: 'flex', gap: 0, marginBottom: 20, overflowX: 'auto' }}>
+              <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 0, marginBottom: 20, overflowX: 'auto' }}>
                 {FLUJO.map((f, i) => {
                   const e = ESTADOS.find(es => es.value === f)!
                   const actual = selected.estado === f
