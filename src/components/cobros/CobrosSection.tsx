@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, UserRole, UserSession, Pago, ConvenioPago, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { useBulkSelection } from '../../hooks/useBulkSelection'
+import { SelectionToolbar, type BulkAction } from '../shared/SelectionToolbar'
 import { PagoModal } from './PagoModal'
 import { ConvenioModal } from './ConvenioModal'
 import { PagosHistorial } from './PagosHistorial'
@@ -66,7 +68,6 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
   const [pagos, setPagos] = useState<Pago[]>([])
   const [convenios, setConvenios] = useState<ConvenioPago[]>([])
   const [loadingPagos, setLoadingPagos] = useState(false)
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [verificando, setVerificando] = useState<string | null>(null)
 
   const canEdit = userRole !== 'viewer'
@@ -121,41 +122,49 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
   const totalPendiente = registrosFiltrados.reduce((acc, r) => acc + getSaldo(r), 0)
   const countMora = registrosPendientes.filter(r => r.estado === 'mora').length
 
-  function toggleRow(id: string) {
-    setSelectedRows(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
+  const bulk = useBulkSelection(registrosFiltrados, r => r.id)
 
-  function toggleAll() {
-    if (selectedRows.size === registrosFiltrados.length) {
-      setSelectedRows(new Set())
-    } else {
-      setSelectedRows(new Set(registrosFiltrados.map(r => r.id)))
-    }
-  }
+  const saldoSeleccionado = useMemo(
+    () => bulk.selectedItems.reduce((acc, r) => acc + getSaldo(r), 0),
+    [bulk.selectedItems],
+  )
 
   async function marcarMora() {
-    if (selectedRows.size === 0) return
-    const ids = [...selectedRows]
+    if (!bulk.hasSelection) return
+    const ids = bulk.selectedItems.map(r => r.id)
     const { error } = await supabase
       .from('registros')
       .update({ estado: 'mora' })
       .in('id', ids)
     if (!error) {
       ids.forEach(id => onEstadoUpdated(id, 'mora'))
-      setSelectedRows(new Set())
+      bulk.clear()
       notify({ variant: 'success', title: `${ids.length} registro(s) marcados en mora`, duration: 1500 })
     }
   }
 
   function abrirConvenioGrupal() {
-    const seleccionados = registrosFiltrados.filter(r => selectedRows.has(r.id))
-    if (seleccionados.length === 0) return
-    setConvenioModal(seleccionados)
+    if (!bulk.hasSelection) return
+    setConvenioModal(bulk.selectedItems)
   }
+
+  const bulkActions: BulkAction[] = useMemo(() => [
+    {
+      id: 'marcar-mora',
+      label: 'Marcar mora',
+      icon: '⚠️',
+      variant: 'danger',
+      onClick: marcarMora,
+    },
+    {
+      id: 'crear-convenio',
+      label: 'Crear convenio',
+      icon: '🤝',
+      variant: 'primary',
+      onClick: abrirConvenioGrupal,
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [bulk.selectedItems])
 
   async function handleVerificarPago(pagoId: string, aprobar: boolean) {
     setVerificando(pagoId)
@@ -333,23 +342,25 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
               <option value="mora">En mora</option>
             </select>
 
-            {selectedRows.size > 0 && canEdit && (
-              <>
-                <button onClick={marcarMora} style={{
-                  padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 600, fontSize: '13px',
-                }}>
-                  ⚠️ Marcar mora ({selectedRows.size})
-                </button>
-                <button onClick={abrirConvenioGrupal} style={{
-                  padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', fontWeight: 600, fontSize: '13px',
-                }}>
-                  🤝 Crear convenio ({selectedRows.size})
-                </button>
-              </>
-            )}
           </div>
+
+          {/* Bulk actions toolbar (sticky) */}
+          {canEdit && (
+            <SelectionToolbar
+              count={bulk.count}
+              actions={bulkActions}
+              onClear={bulk.clear}
+              entityLabel={{ one: 'cargo', many: 'cargos' }}
+              leftSlot={
+                <>
+                  Saldo seleccionado:{' '}
+                  <strong style={{ color: 'var(--at-ink)' }}>
+                    {moneda} {saldoSeleccionado.toFixed(2)}
+                  </strong>
+                </>
+              }
+            />
+          )}
 
           {/* Tabla */}
           <div style={{ background: 'var(--at-surface)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
@@ -359,8 +370,13 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                   <tr>
                     {canEdit && (
                       <th scope="col" style={{ padding: '14px 16px', textAlign: 'center', width: '44px' }}>
-                        <input type="checkbox" checked={selectedRows.size === registrosFiltrados.length && registrosFiltrados.length > 0}
-                          onChange={toggleAll} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                        <input
+                          type="checkbox"
+                          aria-label={bulk.isAllSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                          checked={bulk.isAllSelected}
+                          onChange={bulk.toggleAll}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
                       </th>
                     )}
                     {[
@@ -388,13 +404,18 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                     const saldo = getSaldo(r)
                     const isMora = r.estado === 'mora'
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: selectedRows.has(r.id) ? 'var(--at-primary-tint)' : undefined }}
-                        onMouseEnter={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
-                        onMouseLeave={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
+                        onMouseEnter={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
+                        onMouseLeave={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
                         {canEdit && (
                           <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                            <input type="checkbox" checked={selectedRows.has(r.id)} onChange={() => toggleRow(r.id)}
-                              style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                            <input
+                              type="checkbox"
+                              aria-label={`Seleccionar fila ${cliente?.nombre ?? r.cliente_nombre ?? r.id}`}
+                              checked={bulk.isSelected(r.id)}
+                              onChange={() => bulk.toggle(r.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                            />
                           </td>
                         )}
                         <td style={{ padding: '14px 16px' }}>
@@ -631,7 +652,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
           onClose={() => setConvenioModal(null)}
           onSuccess={() => {
             setConvenioModal(null)
-            setSelectedRows(new Set())
+            bulk.clear()
             void cargarPagosYConvenios()
           }}
         />

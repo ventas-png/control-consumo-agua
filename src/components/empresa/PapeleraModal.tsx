@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, Fragment, type CSSProperties } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment, type CSSProperties } from 'react'
 import { supabase } from '../../lib/supabase'
 import { confirm, notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
+import { useBulkSelection } from '../../hooks/useBulkSelection'
+import { SelectionToolbar, type BulkAction } from '../shared/SelectionToolbar'
 
 // ============================================================================
 // PapeleraModal — F4.2.3: UI de Papelera para soft-deleted recovery.
@@ -18,10 +20,11 @@ import { EditModal } from '../shared/EditModal'
 // Permisos: RLS de cada tabla restringe ya la visibilidad por tenant. UPDATE
 // solo lo pueden ejecutar admin/owner del tenant (gating en EmpresaSection).
 //
-// Scope MVP:
+// Scope:
 //   - Filtro por tabla (4 valores)
 //   - Paginacion 25 rows/pagina
-//   - Restore individual (no bulk en este PR)
+//   - Restore individual (boton inline por fila)
+//   - Bulk restore (checkbox columna + SelectionToolbar sticky bottom)
 //   - Resolucion deleted_by → full_name
 //   - JSON viewer del row entero (para que el admin valide antes de restaurar)
 
@@ -67,10 +70,13 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
   const [page, setPage] = useState(0)
   const pageSize = 25
 
+  const bulk = useBulkSelection(rows, r => r.id)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     setExpanded(new Set())
+    bulk.clear()
     try {
       const orderCol = ORDER_COLUMNS[table]
       const { data, error: err } = await supabase
@@ -98,6 +104,7 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
     } finally {
       setLoading(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table, page])
 
   useEffect(() => { void load() }, [load])
@@ -123,6 +130,42 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
     notify({ variant: 'success', title: 'Restaurado', duration: 1500 })
     void load()
   }
+
+  async function restaurarBulk() {
+    if (!bulk.hasSelection) return
+    const ids = bulk.selectedItems.map(r => r.id)
+    const tableLabel = TABLE_LABELS[table]
+    const result = await confirm({
+      icon: 'question',
+      title: `¿Restaurar ${ids.length} registros?`,
+      text: `Va a restaurar ${ids.length} registros de ${tableLabel}. Volverán a aparecer en la lista activa y en los KPIs.`,
+      confirmText: 'Restaurar todos',
+      cancelText: 'Cancelar',
+    })
+    if (!result.isConfirmed) return
+    const { error: err } = await supabase
+      .from(table)
+      .update({ deleted_at: null, deleted_by: null })
+      .in('id', ids)
+    if (err) {
+      notify({ variant: 'error', title: 'Error', text: err.message })
+      return
+    }
+    notify({ variant: 'success', title: `${ids.length} registros restaurados`, duration: 1500 })
+    bulk.clear()
+    void load()
+  }
+
+  const bulkActions: BulkAction[] = useMemo(() => [
+    {
+      id: 'restore',
+      label: 'Restaurar',
+      icon: '↩',
+      variant: 'primary',
+      onClick: restaurarBulk,
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [bulk.selectedItems, table])
 
   function toggleExpand(id: string) {
     setExpanded(prev => {
@@ -189,6 +232,15 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <th style={{ ...thStyle, width: '34px' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={bulk.isAllSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                    checked={bulk.isAllSelected}
+                    onChange={bulk.toggleAll}
+                    style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                  />
+                </th>
                 <th style={thStyle}>Borrado</th>
                 <th style={thStyle}>Por</th>
                 <th style={thStyle}>ID</th>
@@ -202,7 +254,16 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
                 const isExpanded = expanded.has(r.id)
                 return (
                   <Fragment key={r.id}>
-                    <tr style={{ borderTop: '1px solid var(--at-chip)' }}>
+                    <tr style={{ borderTop: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}>
+                      <td style={tdStyle}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Seleccionar fila ${r.id.slice(0, 8)}`}
+                          checked={bulk.isSelected(r.id)}
+                          onChange={() => bulk.toggle(r.id)}
+                          style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                        />
+                      </td>
                       <td style={tdStyle}>{formatDate(r.deleted_at)}</td>
                       <td style={tdStyle}>{actor}</td>
                       <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '11px', color: 'var(--at-ink-3)' }}>
@@ -229,7 +290,7 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
                     </tr>
                     {isExpanded && (
                       <tr id={`row-detail-${r.id}`}>
-                        <td colSpan={5} style={{ padding: '8px 12px 16px', background: 'var(--at-surface-2)' }}>
+                        <td colSpan={6} style={{ padding: '8px 12px 16px', background: 'var(--at-surface-2)' }}>
                           <pre style={diffPreStyle}>{JSON.stringify(r, null, 2)}</pre>
                         </td>
                       </tr>
@@ -240,6 +301,14 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
             </tbody>
           </table>
         )}
+
+        <SelectionToolbar
+          count={bulk.count}
+          actions={bulkActions}
+          onClear={bulk.clear}
+          entityLabel={{ one: 'registro', many: 'registros' }}
+          leftSlot={<>Tabla: <strong style={{ color: 'var(--at-ink)' }}>{TABLE_LABELS[table]}</strong></>}
+        />
       </div>
     </EditModal>
   )
