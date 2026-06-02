@@ -1,7 +1,8 @@
-import { useState, type CSSProperties} from 'react'
+import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateEmail } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
+import { EditModal } from '../shared/EditModal'
 
 interface Props {
   onClose: () => void
@@ -42,75 +43,68 @@ export function PasswordResetModal({ onClose }: Props) {
     }
   }
 
-  const overlayStyle: CSSProperties = {
-    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-    background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backdropFilter: 'blur(4px)',
-  }
-
   return (
-    <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--at-surface)', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Recuperar Contraseña</h3>
-          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-        </div>
-
-        {!sent ? (
-          <>
-            <p style={{ color: 'var(--at-ink-3)', marginBottom: '16px' }}>
-              Ingresa tu correo electrónico para recibir instrucciones de recuperación.
-            </p>
-            <div style={{ marginBottom: '16px' }}>
-              <label htmlFor="reset-email" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
-                Correo Electrónico
-              </label>
-              <input
-                id="reset-email"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="tu@correo.com"
-                style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
-              />
-              {emailError && (
-                <p style={{ color: 'var(--at-danger)', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={handleRequest}
-                disabled={loading}
-                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                {loading ? 'Enviando...' : 'Enviar Enlace'}
-              </button>
-              <button
-                onClick={onClose}
-                style={{ flex: 1, padding: '12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ padding: '20px', background: 'var(--at-success-tint)', borderRadius: '8px', marginBottom: '16px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
-              ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
-            </div>
-            <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>
-              Hemos enviado instrucciones de recuperación a tu correo.
-            </p>
-            <button
-              onClick={onClose}
-              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Entendido
-            </button>
+    <EditModal
+      title="Recuperar Contraseña"
+      size="sm"
+      onClose={onClose}
+      footer={!sent ? (
+        <>
+          <button
+            onClick={onClose}
+            style={{ padding: '10px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleRequest}
+            disabled={loading}
+            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? 'Enviando...' : 'Enviar Enlace'}
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={onClose}
+          style={{ padding: '10px 32px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+        >
+          Entendido
+        </button>
+      )}
+    >
+      {!sent ? (
+        <>
+          <p style={{ color: 'var(--at-ink-3)', marginBottom: '16px' }}>
+            Ingresa tu correo electrónico para recibir instrucciones de recuperación.
+          </p>
+          <div>
+            <label htmlFor="reset-email" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
+              Correo Electrónico
+            </label>
+            <input
+              id="reset-email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="tu@correo.com"
+              style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
+            />
+            {emailError && (
+              <p style={{ color: 'var(--at-danger)', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </>
+      ) : (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ padding: '20px', background: 'var(--at-success-tint)', borderRadius: '8px', marginBottom: '16px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
+            ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
+          </div>
+          <p style={{ color: 'var(--at-ink-3)' }}>
+            Hemos enviado instrucciones de recuperación a tu correo.
+          </p>
+        </div>
+      )}
+    </EditModal>
   )
 }

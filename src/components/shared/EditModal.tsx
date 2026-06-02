@@ -1,22 +1,71 @@
 import { useEffect, useRef, useCallback, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
+export type EditModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
+
+const SIZE_WIDTHS: Record<EditModalSize, string> = {
+  sm: '480px',
+  md: '760px', // legacy default (mantener para retro-compat)
+  lg: '880px',
+  xl: '1100px',
+  full: '95vw',
+}
+
 interface EditModalProps {
   title: string
   onClose: () => void
   children: ReactNode
+
+  /** Subtítulo opcional bajo el título (texto descriptivo o metadata). */
+  subtitle?: ReactNode
+
+  /** Acciones en el header (ej. filtros, botón refresh) entre título y close. */
+  headerActions?: ReactNode
+
+  /**
+   * Footer pegajoso con acciones (típicamente Cancelar/Guardar).
+   * Se renderiza con `borderTop` y separado del body scrollable.
+   */
+  footer?: ReactNode
+
+  /** Tamaño predefinido. Si se pasa `maxWidth`, este tiene prioridad. */
+  size?: EditModalSize
+
+  /** Override manual del ancho máximo (compatibilidad con uso previo). */
   maxWidth?: string
+
+  /** Si true, body sin padding (para layouts custom: mapas, tablas full-width). */
+  noPadding?: boolean
+
+  /** Default true: cerrar al click en backdrop. */
+  closeOnBackdropClick?: boolean
+
+  /** Default true: cerrar al presionar Escape. */
+  closeOnEscape?: boolean
 }
 
-export function EditModal({ title, onClose, children, maxWidth = '760px' }: EditModalProps) {
+export function EditModal({
+  title,
+  onClose,
+  children,
+  subtitle,
+  headerActions,
+  footer,
+  size = 'md',
+  maxWidth,
+  noPadding = false,
+  closeOnBackdropClick = true,
+  closeOnEscape = true,
+}: EditModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!closeOnEscape) return
     function handleKeyDown(e: globalThis.KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [onClose, closeOnEscape])
 
   // Focus trap: keep Tab cycling within the modal
   const handleFocusTrap = useCallback((e: ReactKeyboardEvent) => {
@@ -33,6 +82,8 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
       if (document.activeElement === last) { e.preventDefault(); first.focus() }
     }
   }, [])
+
+  const resolvedMaxWidth = maxWidth ?? SIZE_WIDTHS[size]
 
   return (
     <div
@@ -51,14 +102,17 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
         zIndex: 1000,
         padding: '12px',
       }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onClick={e => {
+        if (!closeOnBackdropClick) return
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div
         style={{
           background: 'var(--at-surface)',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: `min(${maxWidth}, 95vw)`,
+          maxWidth: `min(${resolvedMaxWidth}, 95vw)`,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -74,11 +128,24 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
             padding: '16px 20px 14px',
             borderBottom: '1px solid var(--at-line)',
             flexShrink: 0,
+            gap: '12px',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
-            {title}
-          </h2>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
+              {title}
+            </h2>
+            {subtitle && (
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                {subtitle}
+              </div>
+            )}
+          </div>
+          {headerActions && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {headerActions}
+            </div>
+          )}
           <button
             onClick={onClose}
             aria-label="Cerrar modal"
@@ -96,6 +163,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}
             title="Cerrar (Esc)"
           >
@@ -104,9 +172,27 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
         </div>
 
         {/* Scrollable body */}
-        <div style={{ overflowY: 'auto', padding: '20px', flex: 1 }}>
+        <div style={{ overflowY: 'auto', padding: noPadding ? 0 : '20px', flex: 1 }}>
           {children}
         </div>
+
+        {/* Sticky footer */}
+        {footer && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '8px',
+              padding: '14px 20px',
+              borderTop: '1px solid var(--at-line)',
+              flexShrink: 0,
+              background: 'var(--at-surface)',
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   )
