@@ -6,7 +6,7 @@ import { PapeleraModal } from '../PapeleraModal'
 const mockState: { rows: unknown[]; users: unknown[]; updateError: { message: string } | null } = {
   rows: [], users: [], updateError: null,
 }
-const updateCalls: Array<{ table: string; payload: unknown; id: string }> = []
+const updateCalls: Array<{ table: string; payload: unknown; id?: string; ids?: string[] }> = []
 
 vi.mock('../../../lib/supabase', () => {
   function selectChain(table: string) {
@@ -24,6 +24,10 @@ vi.mock('../../../lib/supabase', () => {
     return {
       eq: (_col: string, val: string) => {
         updateCalls.push({ table, payload: (updateChain as unknown as { lastPayload?: unknown }).lastPayload, id: val })
+        return Promise.resolve({ error: mockState.updateError })
+      },
+      in: (_col: string, vals: string[]) => {
+        updateCalls.push({ table, payload: (updateChain as unknown as { lastPayload?: unknown }).lastPayload, ids: vals })
         return Promise.resolve({ error: mockState.updateError })
       },
     }
@@ -121,5 +125,57 @@ describe('PapeleraModal', () => {
     expect(call.id).toBe('33333333-3333-3333-3333-333333333333')
     expect((call.payload as { deleted_at: string | null; deleted_by: string | null }).deleted_at).toBeNull()
     expect((call.payload as { deleted_at: string | null; deleted_by: string | null }).deleted_by).toBeNull()
+  })
+
+  it('seleccionar checkbox de fila muestra SelectionToolbar con count', async () => {
+    mockState.rows = [
+      { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', deleted_at: '2026-06-01T12:00:00Z', deleted_by: null },
+      { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', deleted_at: '2026-06-01T13:00:00Z', deleted_by: null },
+    ]
+    render(<DialogProvider><PapeleraModal onClose={() => {}} /></DialogProvider>)
+    const checkboxes = await screen.findAllByRole('checkbox')
+    // [0] master, [1] fila1, [2] fila2
+    fireEvent.click(checkboxes[1])
+    await waitFor(() => expect(screen.getByRole('toolbar')).toBeTruthy())
+    const toolbar = screen.getByRole('toolbar')
+    expect(toolbar.getAttribute('aria-label')).toContain('1 registro seleccionado')
+  })
+
+  it('bulk restore dispara update.in con todos los ids seleccionados', async () => {
+    mockState.rows = [
+      { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', deleted_at: '2026-06-01T12:00:00Z', deleted_by: null },
+      { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', deleted_at: '2026-06-01T13:00:00Z', deleted_by: null },
+    ]
+    render(<DialogProvider><PapeleraModal onClose={() => {}} defaultTable="pagos" /></DialogProvider>)
+    const checkboxes = await screen.findAllByRole('checkbox')
+    fireEvent.click(checkboxes[0]) // master → select all
+    await waitFor(() => expect(screen.getByRole('toolbar').getAttribute('aria-label')).toContain('2 registros'))
+
+    // El toolbar tiene action "Restaurar" con icono ↩
+    const toolbarRestoreBtn = screen.getAllByRole('button', { name: 'Restaurar' })[0]
+    fireEvent.click(toolbarRestoreBtn)
+
+    await waitFor(() => expect(screen.getByText(/¿Restaurar 2 registros\?/)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar todos' }))
+
+    await waitFor(() => expect(updateCalls.some(c => c.ids)).toBe(true))
+    const bulkCall = updateCalls.find(c => c.ids)!
+    expect(bulkCall.table).toBe('pagos')
+    expect(bulkCall.ids).toEqual([
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    ])
+  })
+
+  it('botón "Limpiar selección" vacía el toolbar', async () => {
+    mockState.rows = [
+      { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', deleted_at: '2026-06-01T12:00:00Z', deleted_by: null },
+    ]
+    render(<DialogProvider><PapeleraModal onClose={() => {}} /></DialogProvider>)
+    const checkboxes = await screen.findAllByRole('checkbox')
+    fireEvent.click(checkboxes[1])
+    await waitFor(() => expect(screen.getByRole('toolbar')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar selección' }))
+    await waitFor(() => expect(screen.queryByRole('toolbar')).toBeNull())
   })
 })
