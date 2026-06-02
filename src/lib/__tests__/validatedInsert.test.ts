@@ -10,6 +10,7 @@ vi.mock('../supabase', () => ({
 
 import {
   validatedInsert,
+  validatedInsertMany,
   validatedUpdate,
   isValidationError,
   VALIDATION_FAILED_CODE,
@@ -138,6 +139,57 @@ describe('validatedInsert', () => {
     expect(isValidationError(null)).toBe(false)
     expect(isValidationError(undefined)).toBe(false)
     expect(isValidationError('error')).toBe(false)
+  })
+})
+
+describe('validatedInsertMany', () => {
+  it('valida y manda array completo a Supabase cuando todas las filas pasan', async () => {
+    const mock = makeMockClient()
+    const { error } = await validatedInsertMany(
+      'usuarios',
+      schema,
+      [
+        { nombre: 'Juan', edad: 30 },
+        { nombre: 'Ana', edad: '25' }, // coerce
+      ],
+      { client: mock.client },
+    )
+    expect(error).toBeNull()
+    expect(mock.insertFn).toHaveBeenCalledWith([
+      { nombre: 'Juan', edad: 30 },
+      { nombre: 'Ana', edad: 25 },
+    ])
+  })
+
+  it('si CUALQUIER fila falla validación, aborta el batch (atómico) sin tocar DB', async () => {
+    const mock = makeMockClient()
+    const { data, error } = await validatedInsertMany(
+      'usuarios',
+      schema,
+      [
+        { nombre: 'Juan', edad: 30 },
+        { nombre: '', edad: -1 }, // fila inválida
+        { nombre: 'Ana', edad: 25 },
+      ],
+      { client: mock.client },
+    )
+    expect(data).toBeNull()
+    expect(isValidationError(error)).toBe(true)
+    if (isValidationError(error)) {
+      // Hay errores en el árbol — sea como formErrors o fieldErrors
+      // (Zod los reporta como issues con path `[1, 'nombre']` etc.).
+      const totalErrors =
+        error.formErrors.length + Object.values(error.fieldErrors).flat().length
+      expect(totalErrors).toBeGreaterThan(0)
+    }
+    expect(mock.insertFn).not.toHaveBeenCalled()
+  })
+
+  it('array vacío pasa validación y no manda nada a la DB', async () => {
+    const mock = makeMockClient({ insertResult: { data: [], error: null } })
+    const { error } = await validatedInsertMany('usuarios', schema, [], { client: mock.client })
+    expect(error).toBeNull()
+    expect(mock.insertFn).toHaveBeenCalledWith([])
   })
 })
 
