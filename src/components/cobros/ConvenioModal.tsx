@@ -1,5 +1,6 @@
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
+import { EditModal } from '../shared/EditModal'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -74,106 +75,101 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, padding: '16px',
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: 'var(--at-surface)', borderRadius: '16px', padding: '32px',
-        width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>🤝 Crear Convenio de Pago</h2>
-          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>✕</button>
+    <EditModal
+      title="🤝 Crear Convenio de Pago"
+      size="sm"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} style={{
+            padding: '11px 18px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
+            background: 'var(--at-surface)', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+          }}>
+            Cancelar
+          </button>
+          <button type="submit" form="convenio-form" disabled={saving} style={{
+            padding: '11px 22px', borderRadius: '8px', border: 'none',
+            background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))',
+            color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
+            {saving ? '⏳ Creando...' : '🤝 Crear Convenio'}
+          </button>
+        </>
+      }
+    >
+      {/* Resumen de cargos */}
+      <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+        <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '8px' }}>{cliente?.nombre}</div>
+        <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+          {registros.length} cargo{registros.length !== 1 ? 's' : ''} incluido{registros.length !== 1 ? 's' : ''}
         </div>
-
-        {/* Resumen de cargos */}
-        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '8px' }}>{cliente?.nombre}</div>
-          <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            {registros.length} cargo{registros.length !== 1 ? 's' : ''} incluido{registros.length !== 1 ? 's' : ''}
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-accent)' }}>
-            Total: {moneda} {totalCargos.toFixed(2)}
-          </div>
+        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-accent)' }}>
+          Total: {moneda} {totalCargos.toFixed(2)}
         </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-              Número de Convenio *
-            </label>
-            <input
-              type="text" value={numeroConvenio} onChange={e => setNumeroConvenio(e.target.value)}
-              required
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-              Descripción del convenio
-            </label>
-            <input
-              type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)}
-              placeholder="Ej: Acuerdo de pago en 3 cuotas mensuales"
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-                Cuotas Pactadas
-              </label>
-              <input
-                type="number" min="1" value={cuotasPactadas} onChange={e => setCuotasPactadas(e.target.value)}
-                placeholder="Ej: 3"
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-                Fecha de Vencimiento
-              </label>
-              <input
-                type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)}
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-              Notas / Condiciones
-            </label>
-            <textarea
-              value={notas} onChange={e => setNotas(e.target.value)}
-              placeholder="Condiciones especiales, acuerdos adicionales..."
-              rows={3}
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button type="button" onClick={onClose} style={{
-              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
-              background: 'var(--at-surface)', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-            }}>
-              Cancelar
-            </button>
-            <button type="submit" disabled={saving} style={{
-              flex: 2, padding: '13px', borderRadius: '8px', border: 'none',
-              background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))',
-              color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
-            }}>
-              {saving ? '⏳ Creando...' : '🤝 Crear Convenio'}
-            </button>
-          </div>
-        </form>
       </div>
-    </div>
+
+      <form id="convenio-form" onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '16px' }}>
+          <label htmlFor="conv-numero" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+            Número de Convenio *
+          </label>
+          <input
+            id="conv-numero"
+            type="text" value={numeroConvenio} onChange={e => setNumeroConvenio(e.target.value)}
+            required
+            style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label htmlFor="conv-descripcion" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+            Descripción del convenio
+          </label>
+          <input
+            id="conv-descripcion"
+            type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)}
+            placeholder="Ej: Acuerdo de pago en 3 cuotas mensuales"
+            style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+          <div>
+            <label htmlFor="conv-cuotas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+              Cuotas Pactadas
+            </label>
+            <input
+              id="conv-cuotas"
+              type="number" min="1" value={cuotasPactadas} onChange={e => setCuotasPactadas(e.target.value)}
+              placeholder="Ej: 3"
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div>
+            <label htmlFor="conv-vencimiento" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+              Fecha de Vencimiento
+            </label>
+            <input
+              id="conv-vencimiento"
+              type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="conv-notas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+            Notas / Condiciones
+          </label>
+          <textarea
+            id="conv-notas"
+            value={notas} onChange={e => setNotas(e.target.value)}
+            placeholder="Condiciones especiales, acuerdos adicionales..."
+            rows={3}
+            style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+        </div>
+      </form>
+    </EditModal>
   )
 }

@@ -57,7 +57,7 @@ describe('PapeleraModal', () => {
   it('renderiza header y selector de tabla', async () => {
     render(<DialogProvider><PapeleraModal onClose={() => {}} /></DialogProvider>)
     await waitFor(() => expect(screen.getByText(/Papelera — recuperar borrados/)).toBeTruthy())
-    expect(screen.getByText('Tabla')).toBeTruthy()
+    expect(screen.getByLabelText(/Seleccionar tabla/)).toBeTruthy()
   })
 
   it('muestra estado vacio cuando no hay rows', async () => {
@@ -82,8 +82,8 @@ describe('PapeleraModal', () => {
   it('llama onClose al hacer click en X', async () => {
     const onClose = vi.fn()
     render(<DialogProvider><PapeleraModal onClose={onClose} /></DialogProvider>)
-    await waitFor(() => expect(screen.getByLabelText('Cerrar')).toBeTruthy())
-    fireEvent.click(screen.getByLabelText('Cerrar'))
+    await waitFor(() => expect(screen.getByLabelText('Cerrar modal')).toBeTruthy())
+    fireEvent.click(screen.getByLabelText('Cerrar modal'))
     expect(onClose).toHaveBeenCalled()
   })
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
+import { EditModal } from '../shared/EditModal'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
@@ -54,110 +55,108 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
     })
   }
 
+  const disabled = sending || !clienteId || !subject.trim() || !firstMessage.trim()
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-      zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
-    }}>
-      <div style={{
-        background: 'var(--at-surface)', borderRadius: '14px', width: '100%', maxWidth: '520px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', maxHeight: '90vh',
-      }}>
-        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>Nueva Conversación</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '20px', lineHeight: 1, padding: '2px' }}>×</button>
-        </div>
-
-        <div style={{ padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>
-              Cliente *
-            </label>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, código o email…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setClienteId('') }}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
-            />
-            {search && !selectedCliente && (
-              <div style={{ border: '1px solid var(--at-line)', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', background: 'var(--at-surface)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-                {filtered.length === 0 ? (
-                  <div style={{ padding: '12px', fontSize: '12.5px', color: 'var(--at-ink-3)', textAlign: 'center' }}>Sin resultados</div>
-                ) : filtered.map(c => (
-                  <button key={c.id} onClick={() => { setClienteId(c.id); setSearch(c.nombre) }}
-                    style={{ width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--at-chip)', background: 'var(--at-surface)', cursor: 'pointer', fontSize: '13px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.nombre}</span>
-                    <span style={{ color: 'var(--at-ink-3)', fontSize: '11.5px', marginLeft: '8px' }}>#{c.codigo}</span>
-                    {c.email && <span style={{ color: 'var(--at-ink-3)', fontSize: '11.5px', marginLeft: '6px' }}>· {c.email}</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-            {selectedCliente && (
-              <div style={{ marginTop: '5px', padding: '6px 10px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', fontSize: '12.5px', color: 'var(--at-success-strong)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>✓ {selectedCliente.nombre} <span style={{ opacity: 0.7 }}>#{selectedCliente.codigo}</span></span>
-                <button onClick={() => { setClienteId(''); setSearch('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '14px' }}>×</button>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Asunto *</label>
-            <input
-              type="text"
-              placeholder="Ej: Revisión de medidor, Acuerdo de pago…"
-              value={subject}
-              onChange={e => setSubject(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Categoría</label>
-              <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
-                  <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Prioridad</label>
-              <select value={priority} onChange={e => setPriority(e.target.value as ConversationPriority)}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="baja">Baja</option>
-                <option value="media">Media</option>
-                <option value="alta">Alta</option>
-                <option value="urgente">Urgente</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Mensaje inicial *</label>
-            <textarea
-              value={firstMessage}
-              onChange={e => setFirstMessage(e.target.value)}
-              placeholder="Escribe el primer mensaje para el cliente…"
-              rows={4}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+    <EditModal
+      title="Nueva Conversación"
+      size="sm"
+      maxWidth="520px"
+      onClose={onClose}
+      footer={
+        <>
           <button onClick={onClose} disabled={sending}
             style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
             Cancelar
           </button>
-          <button onClick={handleSubmit} disabled={sending || !clienteId || !subject.trim() || !firstMessage.trim()}
-            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: (!clienteId || !subject.trim() || !firstMessage.trim()) ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.14s' }}>
+          <button onClick={handleSubmit} disabled={disabled}
+            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: disabled ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'background 0.14s' }}>
             {sending ? 'Enviando…' : 'Iniciar conversación'}
           </button>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div>
+          <label htmlFor="nueva-conv-cliente" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>
+            Cliente *
+          </label>
+          <input
+            id="nueva-conv-cliente"
+            type="text"
+            placeholder="Buscar por nombre, código o email…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setClienteId('') }}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+          />
+          {search && !selectedCliente && (
+            <div style={{ border: '1px solid var(--at-line)', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', background: 'var(--at-surface)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+              {filtered.length === 0 ? (
+                <div style={{ padding: '12px', fontSize: '12.5px', color: 'var(--at-ink-3)', textAlign: 'center' }}>Sin resultados</div>
+              ) : filtered.map(c => (
+                <button key={c.id} onClick={() => { setClienteId(c.id); setSearch(c.nombre) }}
+                  style={{ width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--at-chip)', background: 'var(--at-surface)', cursor: 'pointer', fontSize: '13px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.nombre}</span>
+                  <span style={{ color: 'var(--at-ink-3)', fontSize: '11.5px', marginLeft: '8px' }}>#{c.codigo}</span>
+                  {c.email && <span style={{ color: 'var(--at-ink-3)', fontSize: '11.5px', marginLeft: '6px' }}>· {c.email}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedCliente && (
+            <div style={{ marginTop: '5px', padding: '6px 10px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', fontSize: '12.5px', color: 'var(--at-success-strong)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>✓ {selectedCliente.nombre} <span style={{ opacity: 0.7 }}>#{selectedCliente.codigo}</span></span>
+              <button onClick={() => { setClienteId(''); setSearch('') }} aria-label="Limpiar selección" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '14px' }}>×</button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="nueva-conv-asunto" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Asunto *</label>
+          <input
+            id="nueva-conv-asunto"
+            type="text"
+            placeholder="Ej: Revisión de medidor, Acuerdo de pago…"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div>
+            <label htmlFor="nueva-conv-categoria" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Categoría</label>
+            <select id="nueva-conv-categoria" value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+              {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
+                <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="nueva-conv-prioridad" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Prioridad</label>
+            <select id="nueva-conv-prioridad" value={priority} onChange={e => setPriority(e.target.value as ConversationPriority)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+              <option value="baja">Baja</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+              <option value="urgente">Urgente</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="nueva-conv-mensaje" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Mensaje inicial *</label>
+          <textarea
+            id="nueva-conv-mensaje"
+            value={firstMessage}
+            onChange={e => setFirstMessage(e.target.value)}
+            placeholder="Escribe el primer mensaje para el cliente…"
+            rows={4}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
         </div>
       </div>
-    </div>
+    </EditModal>
   )
 }
