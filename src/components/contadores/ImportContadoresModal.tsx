@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { notify } from '../shared/Dialog'
 import type { Contador, TipoAgua, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { validatedInsertMany } from '../../lib/validatedInsert'
+import { contadorInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -220,9 +222,17 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
             activo: true,
           }
         })
-        const { data, error } = await supabase.from('contadores').insert(payload).select()
+        // agua:C6 — batch insert con pre-validación Zod por fila.
+        // `.passthrough()` preserva los campos físicos del medidor que no
+        // están en el schema input (medida, material, válvulas, etc.).
+        const { data, error } = await validatedInsertMany(
+          'contadores',
+          contadorInputSchema.passthrough(),
+          payload,
+          { returning: true },
+        )
         if (error) return { ok: 0, error: error.message }
-        if (data) insertedRef.current.push(...(data as Contador[]))
+        if (data) insertedRef.current.push(...(data as unknown as Contador[]))
         return { ok: batch.length }
       }}
       onClose={onClose}
