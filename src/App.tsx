@@ -13,21 +13,29 @@ import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
-import { LandingPage } from './components/landing/LandingPage'
 import { BrandLogo } from './components/shared/BrandLogo'
-import { PasswordResetModal } from './components/auth/PasswordResetModal'
-import { PasswordResetPage } from './components/auth/PasswordResetPage'
-import { RegisterScreen } from './components/auth/RegisterScreen'
-import { SignupCompanyScreen } from './components/auth/SignupCompanyScreen'
-import OAuthOnboardingScreen from './components/auth/OAuthOnboardingScreen'
-import { CustomerPortal } from './components/portal/CustomerPortal'
-import { CondominiosClientPortal } from './components/portal/CondominiosClientPortal'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard, AccessDenied } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
 import { SinProyectoAsignado } from './components/condominios/SinProyectoAsignado'
+
+// Auth + landing flow — lazy para que NO entre al bundle principal de la app
+// autenticada (donde el ~99% del tiempo de uso ocurre). En primer load el
+// usuario sin sesion paga el coste de descargar Landing/Register/etc, pero
+// el usuario autenticado nunca los carga.
+const LandingPage = lazy(() => import('./components/landing/LandingPage').then(m => ({ default: m.LandingPage })))
+const PasswordResetModal = lazy(() => import('./components/auth/PasswordResetModal').then(m => ({ default: m.PasswordResetModal })))
+const PasswordResetPage = lazy(() => import('./components/auth/PasswordResetPage').then(m => ({ default: m.PasswordResetPage })))
+const RegisterScreen = lazy(() => import('./components/auth/RegisterScreen').then(m => ({ default: m.RegisterScreen })))
+const SignupCompanyScreen = lazy(() => import('./components/auth/SignupCompanyScreen').then(m => ({ default: m.SignupCompanyScreen })))
+const OAuthOnboardingScreen = lazy(() => import('./components/auth/OAuthOnboardingScreen'))
+
+// Cliente-role portals — solo se cargan para usuarios con role='cliente'.
+// La inmensa mayoria son admins/staff que nunca tocan estos componentes.
+const CustomerPortal = lazy(() => import('./components/portal/CustomerPortal').then(m => ({ default: m.CustomerPortal })))
+const CondominiosClientPortal = lazy(() => import('./components/portal/CondominiosClientPortal').then(m => ({ default: m.CondominiosClientPortal })))
 
 const ClientesSection = lazy(() => import('./components/clientes/ClientesSection').then(m => ({ default: m.ClientesSection })))
 const LecturasSection = lazy(() => import('./components/lecturas/LecturasSection').then(m => ({ default: m.LecturasSection })))
@@ -50,6 +58,28 @@ const ServiciosEnergiaSection = lazy(() => import('./components/servicios-energi
 const CondominiosSection = lazy(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
 const CondominiosDashboard = lazy(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
 
+
+// Splash compartido entre el initial-load y los Suspense fallbacks de las
+// pantallas de auth lazy. Mismo visual que cuando `loading=true` del useAuth.
+function AuthSplash() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-primary) 55%, var(--at-primary-2) 100%)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
+        <div style={{ filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.35))' }}>
+          <BrandLogo size={64} />
+        </div>
+        <div style={{
+          width: '40px', height: '40px',
+          border: '3px solid rgba(255,255,255,0.25)',
+          borderTop: '3px solid white',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
 
 // F4.4.2: muestra avatares de otros usuarios de la misma company viendo la
 // misma seccion. Se monta justo bajo el Topbar. Si no hay nadie mas, se
@@ -323,17 +353,23 @@ export default function App() {
 
   // Password recovery via Supabase native flow (PASSWORD_RECOVERY event)
   if (isPasswordRecovery || resetToken) {
-    return <PasswordResetPage onBack={() => window.location.replace(window.location.pathname)} />
+    return (
+      <Suspense fallback={<AuthSplash />}>
+        <PasswordResetPage onBack={() => window.location.replace(window.location.pathname)} />
+      </Suspense>
+    )
   }
 
   // Google OAuth user without app_users profile — needs to complete onboarding
   if (needsOnboarding && pendingOAuthUser) {
     return (
-      <OAuthOnboardingScreen
-        googleUser={pendingOAuthUser}
-        onSuccess={completeOnboarding}
-        onCancel={() => window.location.replace(window.location.pathname)}
-      />
+      <Suspense fallback={<AuthSplash />}>
+        <OAuthOnboardingScreen
+          googleUser={pendingOAuthUser}
+          onSuccess={completeOnboarding}
+          onCancel={() => window.location.replace(window.location.pathname)}
+        />
+      </Suspense>
     )
   }
 
@@ -364,30 +400,34 @@ export default function App() {
   if (!currentUser) {
     if (showRegister) {
       return (
-        <RegisterScreen
-          onBack={() => setShowRegister(false)}
-          onRegistered={async (email, password) => {
-            setShowRegister(false)
-            await login(email, password)
-          }}
-        />
+        <Suspense fallback={<AuthSplash />}>
+          <RegisterScreen
+            onBack={() => setShowRegister(false)}
+            onRegistered={async (email, password) => {
+              setShowRegister(false)
+              await login(email, password)
+            }}
+          />
+        </Suspense>
       )
     }
     if (showSignupCompany) {
       return (
-        <SignupCompanyScreen
-          onBack={() => setShowSignupCompany(false)}
-          onSignedUp={() => {
-            // El usuario debe confirmar email antes de poder iniciar sesion.
-            // Volvemos al landing para que use el form de login normal cuando
-            // tenga confirmado el correo.
-            setShowSignupCompany(false)
-          }}
-        />
+        <Suspense fallback={<AuthSplash />}>
+          <SignupCompanyScreen
+            onBack={() => setShowSignupCompany(false)}
+            onSignedUp={() => {
+              // El usuario debe confirmar email antes de poder iniciar sesion.
+              // Volvemos al landing para que use el form de login normal cuando
+              // tenga confirmado el correo.
+              setShowSignupCompany(false)
+            }}
+          />
+        </Suspense>
       )
     }
     return (
-      <>
+      <Suspense fallback={<AuthSplash />}>
         <LandingPage
           onLogin={login}
           onLoginWithGoogle={loginWithGoogle}
@@ -401,7 +441,7 @@ export default function App() {
         {showPasswordReset && (
           <PasswordResetModal onClose={() => setShowPasswordReset(false)} />
         )}
-      </>
+      </Suspense>
     )
   }
 
@@ -410,12 +450,24 @@ export default function App() {
     const tieneCondominios = !!currentUser.servicio_condominios
     const tieneAgua = currentUser.servicio_agua !== false
     if (tieneCondominios && tieneAgua) {
-      return <DualServicePortal currentUser={currentUser} onLogout={handleLogout} />
+      return (
+        <Suspense fallback={<AuthSplash />}>
+          <DualServicePortal currentUser={currentUser} onLogout={handleLogout} />
+        </Suspense>
+      )
     }
     if (tieneCondominios) {
-      return <CondominiosClientPortal currentUser={currentUser} onLogout={handleLogout} />
+      return (
+        <Suspense fallback={<AuthSplash />}>
+          <CondominiosClientPortal currentUser={currentUser} onLogout={handleLogout} />
+        </Suspense>
+      )
     }
-    return <CustomerPortal currentUser={currentUser} onLogout={handleLogout} />
+    return (
+      <Suspense fallback={<AuthSplash />}>
+        <CustomerPortal currentUser={currentUser} onLogout={handleLogout} />
+      </Suspense>
+    )
   }
 
   // Banner: rutas pendientes asignadas al usuario actual
