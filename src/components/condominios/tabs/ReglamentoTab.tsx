@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
 import { Button } from '../../shared/Button'
+import { EmptyState } from '../../shared/EmptyState'
 import { ArticuloReglamento, CategoriaReglamento } from '../../../types'
 
 interface Props {
@@ -129,7 +130,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
           </label>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin artículos</div>}
+        {lista.length === 0 && <EmptyState icon="📜" compact title="Sin artículos" />}
 
         {Object.entries(porCapitulo).map(([cap, items]) => (
           <div key={cap}>

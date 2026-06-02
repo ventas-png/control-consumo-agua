@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Visitante, Unidad } from '../../../types'
+import { EmptyState } from '../../shared/EmptyState'
 
 interface Props {
   visitantes: Visitante[]
@@ -80,7 +81,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
       </div>
 
       {visitantes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>Sin registros de visitantes.</div>
+        <EmptyState icon="👥" compact title="Sin registros de visitantes" />
       ) : (
         <>
           {/* KPIs */}
