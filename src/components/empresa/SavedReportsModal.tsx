@@ -4,6 +4,7 @@ import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { exportData, type ExportColumn } from '../../lib/exportData'
 import { sendReportByEmail } from '../../lib/sendReportEmail'
+import { nextRunFor, formatNextRun } from '../../lib/scheduleHelpers'
 
 // ============================================================================
 // SavedReportsModal — F4.5.1 MVP: Reportes guardados con ejecucion manual.
@@ -32,6 +33,16 @@ type SourceTable =
 
 type ScheduleKind = 'manual' | 'monthly_day1' | 'weekly_monday'
 type Format = 'xlsx' | 'csv' | 'pdf'
+
+interface ReportRun {
+  id: number
+  triggered_by: 'manual' | 'scheduled' | 'api'
+  triggered_at: string
+  rows_count: number | null
+  format: string | null
+  status: 'success' | 'failed'
+  error_msg: string | null
+}
 
 interface ReportTemplate {
   id: string
@@ -106,6 +117,10 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState<string | null>(null)
+  // F4.5.1c5: histórico de runs por template (lazy fetch on expand)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [runs, setRuns] = useState<Record<string, ReportRun[]>>({})
+  const [runsLoading, setRunsLoading] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -182,6 +197,29 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     if (err) { notify({ variant: 'error', title: 'Error', text: err.message }); return }
     notify({ variant: 'success', title: 'Eliminado', duration: 1500 })
     void load()
+  }
+
+  // F4.5.1c5: toggle expand + lazy fetch últimas 5 runs
+  async function handleExpand(t: ReportTemplate) {
+    if (expandedId === t.id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(t.id)
+    if (runs[t.id]) return
+    setRunsLoading(t.id)
+    const { data, error: err } = await supabase
+      .from('report_runs')
+      .select('id, triggered_by, triggered_at, rows_count, format, status, error_msg')
+      .eq('template_id', t.id)
+      .order('triggered_at', { ascending: false })
+      .limit(5)
+    setRunsLoading(null)
+    if (err) {
+      notify({ variant: 'error', title: 'Error', text: err.message })
+      return
+    }
+    setRuns(prev => ({ ...prev, [t.id]: (data ?? []) as ReportRun[] }))
   }
 
   async function handleRun(t: ReportTemplate) {
@@ -396,7 +434,28 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
                           {formatRelativeDays(t.last_run_at)}
                         </span></>
                       )}
+                      {(() => {
+                        const next = nextRunFor(t.schedule_kind, t.last_run_at)
+                        return next ? (
+                          <> · ⏭ <span title={`Próxima ejecución: ${next.toLocaleString('es-GT')}`}>
+                            {formatNextRun(next)}
+                          </span></>
+                        ) : null
+                      })()}
                     </div>
+                    <button
+                      onClick={() => void handleExpand(t)}
+                      aria-expanded={expandedId === t.id}
+                      aria-controls={`runs-history-${t.id}`}
+                      style={{
+                        marginTop: '4px',
+                        padding: 0, background: 'none', border: 'none',
+                        color: 'var(--at-primary)', fontSize: '11px',
+                        cursor: 'pointer', fontWeight: 600,
+                      }}
+                    >
+                      {expandedId === t.id ? '▾ Ocultar historial' : '▸ Ver historial (últimas 5)'}
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
@@ -430,6 +489,52 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
                       🗑
                     </button>
                   </div>
+                  {expandedId === t.id && (
+                    <div id={`runs-history-${t.id}`} style={{ flexBasis: '100%', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--at-line)' }}>
+                      {runsLoading === t.id ? (
+                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando historial…</div>
+                      ) : (runs[t.id] ?? []).length === 0 ? (
+                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Sin ejecuciones registradas.</div>
+                      ) : (
+                        <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ color: 'var(--at-ink-3)', textAlign: 'left' }}>
+                              <th style={{ padding: '4px 6px' }}>Fecha</th>
+                              <th style={{ padding: '4px 6px' }}>Origen</th>
+                              <th style={{ padding: '4px 6px' }}>Estado</th>
+                              <th style={{ padding: '4px 6px', textAlign: 'right' }}>Filas</th>
+                              <th style={{ padding: '4px 6px' }}>Formato</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(runs[t.id] ?? []).map(r => (
+                              <tr key={r.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
+                                <td style={{ padding: '4px 6px', color: 'var(--at-ink-2)' }}>
+                                  {new Date(r.triggered_at).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })}
+                                </td>
+                                <td style={{ padding: '4px 6px', color: 'var(--at-ink-3)' }}>
+                                  {r.triggered_by === 'scheduled' ? '⏰ Auto' : r.triggered_by === 'manual' ? '👤 Manual' : '🔌 API'}
+                                </td>
+                                <td style={{ padding: '4px 6px' }}>
+                                  <span style={{
+                                    fontSize: '10px', fontWeight: 700,
+                                    color: r.status === 'success' ? 'var(--at-success)' : 'var(--at-danger)',
+                                  }}>
+                                    {r.status === 'success' ? '✓ OK' : '✗ Falló'}
+                                  </span>
+                                  {r.error_msg && (
+                                    <span title={r.error_msg} style={{ marginLeft: '6px', color: 'var(--at-ink-3)' }}>ℹ</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--at-ink-2)' }}>{r.rows_count ?? '—'}</td>
+                                <td style={{ padding: '4px 6px', color: 'var(--at-ink-3)' }}>{r.format?.toUpperCase() ?? '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -470,6 +575,7 @@ const emptyStateStyle: CSSProperties = {
 }
 const cardStyle: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: '12px',
+  flexWrap: 'wrap',
   padding: '12px 14px', borderRadius: '10px',
   border: '1px solid var(--at-line)', background: 'var(--at-surface-2)',
 }
