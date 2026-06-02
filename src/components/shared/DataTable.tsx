@@ -101,6 +101,28 @@ export interface DataTableProps<T> {
    */
   expandedContent?: (row: T) => ReactNode | null | undefined
   isRowExpanded?: (row: T) => boolean
+
+  /**
+   * Modo de paginación.
+   * - `'client'` (default): DataTable maneja filter/sort/pagination sobre
+   *   el `data` completo.
+   * - `'server'`: el consumer ya paginó/filtró/ordenó. DataTable solo
+   *   renderiza `data` (1 página) y dispara `onPageChange` al navegar.
+   */
+  paginationMode?: 'client' | 'server'
+
+  /** Página actual (0-indexed) en modo server. */
+  currentPage?: number
+
+  /** Handler de navegación en modo server. */
+  onPageChange?: (page: number) => void
+
+  /**
+   * Total de filas en el dataset completo (modo server). Si se omite,
+   * se usa heurística `hasMore = data.length === pageSize` (botón Siguiente
+   * habilitado mientras la página esté llena).
+   */
+  totalRows?: number
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -122,7 +144,12 @@ export function DataTable<T>({
   footer,
   expandedContent,
   isRowExpanded,
+  paginationMode = 'client',
+  currentPage,
+  onPageChange,
+  totalRows,
 }: DataTableProps<T>) {
+  const isServer = paginationMode === 'server'
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
     defaultSort ?? null
@@ -135,8 +162,9 @@ export function DataTable<T>({
     return (row as Record<string, unknown>)[col.key] as string | number | boolean | null | undefined
   }
 
-  // ── Filtrado ─────────────────────────────────────────────────────────────
+  // ── Filtrado (solo modo client) ─────────────────────────────────────────
   const filtered = useMemo(() => {
+    if (isServer) return data
     let result = data
     if (search && searchableKeys && searchableKeys.length > 0) {
       const needle = search.toLowerCase().trim()
@@ -151,10 +179,11 @@ export function DataTable<T>({
       )
     }
     return result
-  }, [data, search, searchableKeys])
+  }, [data, search, searchableKeys, isServer])
 
-  // ── Sort ────────────────────────────────────────────────────────────────
+  // ── Sort (solo modo client) ─────────────────────────────────────────────
   const sorted = useMemo(() => {
+    if (isServer) return filtered
     if (!sortConfig) return filtered
     const col = columns.find(c => c.key === sortConfig.key)
     if (!col) return filtered
@@ -173,19 +202,29 @@ export function DataTable<T>({
     })
     return copy
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, sortConfig, columns])
+  }, [filtered, sortConfig, columns, isServer])
 
   // ── Paginación ──────────────────────────────────────────────────────────
+  // Modo server: `data` ya viene paginado, no slicemos. Modo client: paginamos.
   const paginated = useMemo(() => {
+    if (isServer) return sorted
     if (pageSize <= 0) return sorted
     const start = page * pageSize
     return sorted.slice(start, start + pageSize)
-  }, [sorted, page, pageSize])
+  }, [sorted, page, pageSize, isServer])
 
-  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1
+  // Modo server: el consumer controla la página. Modo client: estado interno.
+  const effectivePage = isServer ? (currentPage ?? 0) : page
+  const totalPages = isServer
+    ? (totalRows != null && pageSize > 0 ? Math.max(1, Math.ceil(totalRows / pageSize)) : 0)
+    : (pageSize > 0 ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1)
+  // Heurística cuando totalRows no se pasa en modo server.
+  const hasMore = isServer
+    ? (totalRows != null ? effectivePage < totalPages - 1 : data.length === pageSize)
+    : effectivePage < totalPages - 1
 
-  // Reset page si quedó fuera de rango (ej. al cambiar filtro).
-  if (page > 0 && page >= totalPages) {
+  // Reset page si quedó fuera de rango en modo client (ej. al cambiar filtro).
+  if (!isServer && page > 0 && page >= totalPages) {
     setPage(0)
   }
 
@@ -399,23 +438,40 @@ export function DataTable<T>({
             }}
           >
             <div>
-              {sorted.length} {sorted.length === 1 ? 'resultado' : 'resultados'}
-              {data.length !== sorted.length && ` (de ${data.length})`}
+              {isServer
+                ? `${paginated.length} ${paginated.length === 1 ? 'evento' : 'eventos'}${totalRows != null ? ` (de ${totalRows})` : ''}`
+                : (
+                  <>
+                    {sorted.length} {sorted.length === 1 ? 'resultado' : 'resultados'}
+                    {data.length !== sorted.length && ` (de ${data.length})`}
+                  </>
+                )}
             </div>
-            {pageSize > 0 && totalPages > 1 && (
+            {pageSize > 0 && (totalPages > 1 || isServer) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  style={paginationBtnStyle(page === 0)}
+                  onClick={() => {
+                    const next = Math.max(0, effectivePage - 1)
+                    if (isServer) onPageChange?.(next)
+                    else setPage(next)
+                  }}
+                  disabled={effectivePage === 0}
+                  style={paginationBtnStyle(effectivePage === 0)}
                 >
                   ← Anterior
                 </button>
-                <span>Página {page + 1} de {totalPages}</span>
+                <span>
+                  Página {effectivePage + 1}
+                  {totalPages > 0 && ` de ${totalPages}`}
+                </span>
                 <button
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  style={paginationBtnStyle(page >= totalPages - 1)}
+                  onClick={() => {
+                    const next = effectivePage + 1
+                    if (isServer) onPageChange?.(next)
+                    else setPage(p => Math.min(totalPages - 1, p + 1))
+                  }}
+                  disabled={!hasMore}
+                  style={paginationBtnStyle(!hasMore)}
                 >
                   Siguiente →
                 </button>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { DataTable, type DataTableColumn } from '../shared/DataTable'
 
 interface Props {
   onClose: () => void
@@ -85,7 +86,57 @@ export function AuditLogModal({ onClose }: Props) {
 
   useEffect(() => { void load() }, [load])
 
-  const hasMore = rows.length === pageSize
+  const columns: DataTableColumn<AuditRow>[] = [
+    {
+      key: 'occurred_at', header: 'Fecha',
+      accessor: r => r.occurred_at,
+      render: r => <span style={{ color: 'var(--at-ink-2)' }}>{formatDate(r.occurred_at)}</span>,
+    },
+    {
+      key: 'actor', header: 'Actor',
+      accessor: r => r.actor_id ? users[r.actor_id] ?? '—' : 'Sistema',
+      render: r => r.actor_id ? users[r.actor_id] ?? '—' : 'Sistema',
+    },
+    {
+      key: 'action', header: 'Acción',
+      accessor: r => r.action,
+      render: r => {
+        const a = ACTION_LABELS[r.action] ?? { label: r.action, color: 'var(--at-ink-3)' }
+        return (
+          <span style={{
+            fontSize: '11px', fontWeight: 600, color: a.color,
+            background: a.color + '14', padding: '2px 8px', borderRadius: '999px',
+          }}>{a.label}</span>
+        )
+      },
+    },
+    {
+      key: 'target', header: 'Objetivo',
+      render: r => {
+        const targetUser = r.target_user_id
+          ? users[r.target_user_id] ?? null
+          : (typeof r.details?.full_name === 'string' ? r.details.full_name : null)
+        const targetRole = r.target_role_id ? roles[r.target_role_id] : null
+        return (
+          <>
+            {targetUser && <div style={{ color: 'var(--at-ink)' }}>👤 {targetUser}</div>}
+            {targetRole && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: targetUser ? '3px' : 0 }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: targetRole.color }} />
+                <span style={{ color: 'var(--at-ink-2)' }}>{targetRole.name}</span>
+              </div>
+            )}
+            {!targetUser && !targetRole && <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
+          </>
+        )
+      },
+    },
+    {
+      key: 'details', header: 'Detalles',
+      render: r => <DetailsCell details={r.details} />,
+      hideOnMobile: true,
+    },
+  ]
 
   return (
     <div
@@ -137,96 +188,23 @@ export function AuditLogModal({ onClose }: Props) {
           </select>
         </div>
 
-        {/* Body */}
+        {/* Body — F3.9.3: migrado a <DataTable> shared en modo server */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>Cargando…</div>
-          ) : error ? (
+          {error ? (
             <div style={{ textAlign: 'center', color: 'var(--at-danger)', marginTop: '40px', fontSize: '13px' }}>{error}</div>
-          ) : rows.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>
-              {filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.'}
-            </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={th}>Fecha</th>
-                  <th style={th}>Actor</th>
-                  <th style={th}>Acción</th>
-                  <th style={th}>Objetivo</th>
-                  <th style={th}>Detalles</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => {
-                  const a = ACTION_LABELS[r.action] ?? { label: r.action, color: 'var(--at-ink-3)' }
-                  const actor = r.actor_id ? users[r.actor_id] ?? '—' : 'Sistema'
-                  // For deletions the user row is gone (target_user_id is null),
-                  // so fall back to the name captured in details.
-                  const targetUser = r.target_user_id
-                    ? users[r.target_user_id] ?? null
-                    : (typeof r.details?.full_name === 'string' ? r.details.full_name : null)
-                  const targetRole = r.target_role_id ? roles[r.target_role_id] : null
-                  return (
-                    <tr key={r.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
-                      <td style={td}>{formatDate(r.occurred_at)}</td>
-                      <td style={td}>{actor}</td>
-                      <td style={td}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 600, color: a.color,
-                          background: a.color + '14', padding: '2px 8px', borderRadius: '999px',
-                        }}>{a.label}</span>
-                      </td>
-                      <td style={td}>
-                        {targetUser && <div style={{ color: 'var(--at-ink)' }}>👤 {targetUser}</div>}
-                        {targetRole && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: targetUser ? '3px' : 0 }}>
-                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: targetRole.color }} />
-                            <span style={{ color: 'var(--at-ink-2)' }}>{targetRole.name}</span>
-                          </div>
-                        )}
-                        {!targetUser && !targetRole && <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
-                      </td>
-                      <td style={td}>
-                        <DetailsCell details={r.details} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <DataTable<AuditRow>
+              data={rows}
+              columns={columns}
+              rowKey="id"
+              isLoading={loading}
+              paginationMode="server"
+              currentPage={page}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              emptyState={{ title: filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.' }}
+            />
           )}
-        </div>
-
-        {/* Pagination */}
-        <div style={{
-          padding: '12px 24px', borderTop: '1px solid var(--at-line)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
-            Página {page + 1} · {rows.length} eventos
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-              style={{
-                ...pageBtn,
-                cursor: page === 0 ? 'not-allowed' : 'pointer',
-                opacity: page === 0 ? 0.4 : 1,
-              }}
-            >← Anterior</button>
-            <button
-              onClick={() => setPage(p => p + 1)}
-              disabled={!hasMore}
-              style={{
-                ...pageBtn,
-                cursor: !hasMore ? 'not-allowed' : 'pointer',
-                opacity: !hasMore ? 0.4 : 1,
-              }}
-            >Siguiente →</button>
-          </div>
         </div>
       </div>
     </div>
@@ -256,9 +234,3 @@ function formatDate(iso: string): string {
   })
 }
 
-const th: React.CSSProperties = { padding: '8px 6px', fontSize: '10px', fontWeight: 700 }
-const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top', color: 'var(--at-ink-2)' }
-const pageBtn: React.CSSProperties = {
-  padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
-  background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '12px', fontWeight: 600,
-}
