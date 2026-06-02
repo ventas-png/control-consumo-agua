@@ -1,11 +1,14 @@
 /**
  * UpgradeCTA — banner mostrado cuando un usuario intenta acceder a una
- * funcionalidad bloqueada por su plan actual. Linkea a la pagina de upgrade.
+ * funcionalidad bloqueada por su plan actual. Click "Actualizar" abre
+ * Stripe Checkout directamente (plat:P36d) o invoca `onUpgrade` custom.
  */
 
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button } from './Button'
 import { useFeatureFlags } from '../../lib/featureFlags'
+import { supabase } from '../../lib/supabase'
+import { notify } from './Dialog'
 
 interface Props {
   /** Nombre legible de la feature ('Asambleas digitales', 'Cobranza judicial'). */
@@ -14,7 +17,11 @@ interface Props {
   description?: ReactNode
   /** Tier minimo requerido (default 'Bundle Completo'). */
   requiredPlan?: string
-  /** Handler al hacer click en "Actualizar plan". Si no se pasa, va a /empresa. */
+  /** Plan code para Stripe Checkout (default 'bundle'). */
+  targetPlanCode?: 'agua_only' | 'condominios_only' | 'bundle'
+  /** Billing cycle para Stripe Checkout. */
+  billingCycle?: 'monthly' | 'yearly'
+  /** Handler custom al hacer click. Override del flujo Stripe. */
   onUpgrade?: () => void
 }
 
@@ -22,17 +29,48 @@ export function UpgradeCTA({
   feature,
   description,
   requiredPlan = 'Bundle Completo',
+  targetPlanCode = 'bundle',
+  billingCycle = 'monthly',
   onUpgrade,
 }: Props) {
   const { planName } = useFeatureFlags()
+  const [loading, setLoading] = useState(false)
 
-  function handleClick() {
+  async function handleClick() {
     if (onUpgrade) {
       onUpgrade()
       return
     }
-    // Default: scroll to empresa / billing section
-    window.location.hash = '#empresa'
+
+    setLoading(true)
+    try {
+      // plat:P36d — invoca edge function que crea Stripe Checkout session
+      // y devuelve la URL. Redirigimos al usuario alli para completar el pago.
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          plan_code: targetPlanCode,
+          billing_cycle: billingCycle,
+          return_path: window.location.pathname + window.location.hash,
+        },
+      })
+
+      if (error) throw error
+
+      const checkoutUrl = (data as { url?: string })?.url
+      if (!checkoutUrl) {
+        throw new Error('No se obtuvo URL de checkout')
+      }
+
+      window.location.href = checkoutUrl
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al abrir checkout'
+      notify({
+        variant: 'error',
+        title: 'No se pudo abrir el checkout',
+        text: `${msg}. Intenta de nuevo o contacta a soporte.`,
+      })
+      setLoading(false)
+    }
   }
 
   return (
@@ -61,7 +99,13 @@ export function UpgradeCTA({
       <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--at-ink-3)' }}>
         Tu plan actual: <strong>{planName ?? '—'}</strong> · Requiere: <strong>{requiredPlan}</strong>
       </p>
-      <Button variant="gradient-primary" onClick={handleClick} iconLeft="✨">
+      <Button
+        variant="gradient-primary"
+        onClick={handleClick}
+        loading={loading}
+        loadingText="Abriendo checkout…"
+        iconLeft={!loading ? '✨' : undefined}
+      >
         Actualizar plan
       </Button>
     </div>
