@@ -370,7 +370,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
               {/* Desglose por proyecto cuando se ven todos */}
               {!selectedProjectId && data.proyectos.length > 1 && Object.keys(perProjectStats).length > 0 && (
-                <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                <div className="table-scroll-wrapper" style={{ marginTop: '20px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: 'var(--at-surface-2)' }}>
