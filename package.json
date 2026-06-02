@@ -29,6 +29,7 @@
     "posthog-js": "^1.376.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.30.4",
     "sonner": "^1.7.4"
   },
   "devDependencies": {
