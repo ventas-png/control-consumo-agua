@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button } from '../../shared/Button'
+import { FilterChips, type FilterChipOption } from '../../shared/FilterChips'
 import {
   CuotaCondominio, Visitante, TicketMantenimiento, ReservaAmenidad,
   AnuncioComunidad, ConciliacionCobrosLog, FondoReservaMovimiento, Unidad,
@@ -174,24 +175,27 @@ export default function BitacoraActividadTab({
         {eventos.length.toLocaleString('es')} eventos registrados en el sistema
       </div>
 
-      {/* Filtros de tipo */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-        <button onClick={() => { setFiltro('todos'); setPagina(0) }}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
-            background: filtro === 'todos' ? 'var(--at-ink)' : 'var(--at-surface-2)', color: filtro === 'todos' ? 'white' : 'var(--at-ink-2)', fontWeight: filtro === 'todos' ? 700 : 400 }}>
-          Todos ({eventos.length})
-        </button>
-        {TODOS.map(t => {
-          const cfg = TIPO_CFG[t]
-          const activo = filtro === t
-          return (
-            <button key={t} onClick={() => { setFiltro(t); setPagina(0) }}
-              style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
-                background: activo ? cfg.color : cfg.bg, color: activo ? 'white' : cfg.color, fontWeight: activo ? 700 : 400 }}>
-              {cfg.icon} {cfg.label} ({conteosPorTipo[t]})
-            </button>
-          )
-        })}
+      {/* Filtros de tipo — F3.20: migrado a <FilterChips> shared */}
+      <div style={{ marginBottom: 10 }}>
+        <FilterChips<TipoEvento | 'todos'>
+          ariaLabel="Filtrar por tipo de evento"
+          value={filtro}
+          onChange={v => { setFiltro(v); setPagina(0) }}
+          options={[
+            { value: 'todos', label: 'Todos', count: eventos.length },
+            ...TODOS.map<FilterChipOption<TipoEvento | 'todos'>>(t => {
+              const cfg = TIPO_CFG[t]
+              return {
+                value: t,
+                label: cfg.label,
+                icon: cfg.icon,
+                count: conteosPorTipo[t],
+                color: cfg.color,
+                bg: cfg.bg,
+              }
+            }),
+          ]}
+        />
       </div>
 
       {/* Búsqueda */}
