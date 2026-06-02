@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 import { CommandPalette, type CommandItem } from '../shared/CommandPalette'
+// plat:P36 — Feature flags por plan
+import { FeatureGate } from '../../lib/featureFlags'
+import { UpgradeCTA } from '../shared/UpgradeCTA'
 import { EmptyState } from '../shared/EmptyState'
 import type {
   UserSession, Proyecto, Unidad,
@@ -1523,7 +1526,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'campanas_cobro' && <CampanasCobroTab campanas={campanasCobro} cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cierre_anual' && <CierreAnualTab cierres={cierresAnuales} cuotas={cuotas} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'kpis_financieros' && <KpisFinancierosTab cuotas={cuotas} gastos={gastos} historialSaldos={historialSaldos} recargosMora={recargosMora} unidades={unidadesProyecto} moneda={moneda} />}
-        {activeTab === 'cobranza_judicial' && <CobranzaJudicialTab cobranzas={cobranzaJudicial} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'cobranza_judicial' && (
+          <FeatureGate
+            feature="cobranza_judicial"
+            fallback={<UpgradeCTA feature="Cobranza Judicial" description="Gestiona procesos de cobranza judicial con seguimiento de etapas, abogados asignados y costos legales." requiredPlan="Solo Agua, Solo Condominios o Bundle" />}
+          >
+            <CobranzaJudicialTab cobranzas={cobranzaJudicial} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />
+          </FeatureGate>
+        )}
         {activeTab === 'recibos_digitales' && <RecibosDigitalesTab recibos={recibosDigitales} cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} proyectoNombre={proyectoActual?.nombre} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'informe_mensual' && <InformeMensualTab informes={informesMensuales} cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} incidentes={incidentes} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'buzon_sugerencias' && <BuzonSugerenciasTab sugerencias={sugerencias} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
@@ -1531,13 +1541,41 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'capacitacion_personal' && <CapacitacionPersonalTab capacitaciones={capacitaciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'proyectos_cond' && <ProyectosCondominioTab proyectos={proyectosCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'metricas_servicio' && <MetricasServicioTab tickets={tickets} sugerencias={sugerencias} visitantes={visitantes} cuotas={cuotas} moneda={moneda} />}
-        {activeTab === 'analisis_cartera' && <AnalisisCarteraTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'analisis_cartera' && (
+          <FeatureGate
+            feature="analisis_cartera"
+            fallback={<UpgradeCTA feature="Análisis de Cartera" description="Analytics avanzados de mora por antigüedad, predicción de cobro y segmentación de unidades morosas." requiredPlan="Solo Agua o Bundle" />}
+          >
+            <AnalisisCarteraTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} />
+          </FeatureGate>
+        )}
         {activeTab === 'integracion_agua' && <IntegracionAguaTab unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'centro_costos' && <CentroCostosTab gastos={gastos} cuotas={cuotas} moneda={moneda} />}
         {activeTab === 'manual_residente' && <ManualResidenteTab articulos={articulosManual} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
-        {activeTab === 'exportacion' && <ExportacionTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
-        {activeTab === 'multi_condominio' && <MultiCondominioTab proyectos={proyectosActivos} companyId={cid} moneda={moneda} />}
-        {activeTab === 'automatizaciones' && <AutomatizacionesTab automatizaciones={automatizaciones} cuotas={cuotas} tickets={tickets} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'exportacion' && (
+          <FeatureGate
+            feature="exportacion_avanzada"
+            fallback={<UpgradeCTA feature="Exportación Avanzada" description="Exporta cuotas, gastos, tickets y visitantes en PDF/XLSX/CSV con plantillas personalizables." requiredPlan="cualquier plan activo" />}
+          >
+            <ExportacionTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />
+          </FeatureGate>
+        )}
+        {activeTab === 'multi_condominio' && (
+          <FeatureGate
+            feature="multi_proyecto"
+            fallback={<UpgradeCTA feature="Multi-Condominio" description="Administra múltiples proyectos desde un solo dashboard. Compara métricas, consolida reportes y gestiona usuarios entre condominios." requiredPlan="Bundle Completo" />}
+          >
+            <MultiCondominioTab proyectos={proyectosActivos} companyId={cid} moneda={moneda} />
+          </FeatureGate>
+        )}
+        {activeTab === 'automatizaciones' && (
+          <FeatureGate
+            feature="automation"
+            fallback={<UpgradeCTA feature="Automatizaciones" description="Workflows automáticos para generación de cuotas, notificaciones, recordatorios de mora y escalamientos por SLA." requiredPlan="Enterprise (contacta ventas)" />}
+          >
+            <AutomatizacionesTab automatizaciones={automatizaciones} cuotas={cuotas} tickets={tickets} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />
+          </FeatureGate>
+        )}
         {activeTab === 'scoring_unidades' && <ScoringUnidadesTab cuotas={cuotas} infracciones={infracciones} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
         {activeTab === 'panel_turno' && <PanelTurnoTab visitantes={visitantes} tickets={tickets} tareasCond={tareasCond} reservas={reservas} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} cuotas={cuotas} />}
         {activeTab === 'plantillas_mensaje' && <PlantillasMensajeTab plantillas={plantillasMensaje} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
