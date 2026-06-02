@@ -848,3 +848,18 @@ export const TAB_REGISTRY: TabDef[] = [
 export const TAB_BY_ID: Record<CondominioTab, TabDef> = Object.fromEntries(
   TAB_REGISTRY.map(def => [def.id, def])
 ) as Record<CondominioTab, TabDef>
+
+// ── URL <-> tab helpers (cond:A1 sub-rutas) ─────────────────────────────────
+// `panel` vive en `/condominios` (sin segmento) porque `/condominios/panel`
+// está reservado para `CondominiosDashboard` (selector de proyecto). El resto
+// de los tabs viaja como `/condominios/<id>`.
+export function tabToPath(tab: CondominioTab): string {
+  if (tab === 'panel') return '/condominios'
+  return `/condominios/${tab}`
+}
+
+// Convierte el param de URL en un tab válido. Tabs desconocidos caen en 'panel'.
+export function pathParamToTab(tab: string | undefined): CondominioTab {
+  if (!tab) return 'panel'
+  return TAB_BY_ID[tab as CondominioTab] ? (tab as CondominioTab) : 'panel'
+}
