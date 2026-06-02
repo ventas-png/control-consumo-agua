@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { exportData, type ExportColumn } from '../../lib/exportData'
+import { sendReportByEmail } from '../../lib/sendReportEmail'
 
 // ============================================================================
 // SavedReportsModal — F4.5.1 MVP: Reportes guardados con ejecucion manual.
@@ -234,6 +235,102 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     }
   }
 
+  // F4.5.1d: edita recipients del template (textarea separado por coma o newline)
+  async function handleEditRecipients(t: ReportTemplate) {
+    const result = await openPromptDialog({
+      title: `Destinatarios — ${t.name}`,
+      fields: [
+        {
+          name: 'recipients',
+          label: 'Emails (uno por línea o separados por coma)',
+          control: 'textarea',
+          initialValue: t.recipients.join('\n'),
+          placeholder: 'admin@empresa.com\nfinanzas@empresa.com',
+        },
+      ],
+      submitText: 'Guardar',
+    })
+    if (!result) return
+    const emails = result.recipients
+      .split(/[,\n]/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e.length > 0)
+    const invalid = emails.filter(e => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    if (invalid.length > 0) {
+      notify({ variant: 'error', title: 'Emails inválidos', text: invalid.join(', ') })
+      return
+    }
+    const { error: err } = await supabase
+      .from('report_templates')
+      .update({ recipients: emails })
+      .eq('id', t.id)
+    if (err) { notify({ variant: 'error', title: 'Error', text: err.message }); return }
+    notify({ variant: 'success', title: `${emails.length} destinatario${emails.length === 1 ? '' : 's'}`, duration: 1500 })
+    void load()
+  }
+
+  // F4.5.1d: envía el reporte por email a los recipients del template
+  async function handleSendEmail(t: ReportTemplate) {
+    if (t.recipients.length === 0) {
+      notify({ variant: 'warning', title: 'Sin destinatarios', text: 'Configura emails primero con el botón 👥.' })
+      return
+    }
+    const conf = await confirm({
+      icon: 'question',
+      title: `¿Enviar reporte por email?`,
+      text: `Se enviará "${t.name}" a ${t.recipients.length} destinatario${t.recipients.length === 1 ? '' : 's'}.`,
+      confirmText: 'Enviar',
+    })
+    if (!conf.isConfirmed) return
+
+    setRunning(t.id)
+    let status: 'success' | 'failed' = 'success'
+    let errorMsg: string | null = null
+    let rowsCount = 0
+    try {
+      let q = supabase.from(t.source_table).select('*').eq('company_id', companyId)
+      q = q.is('deleted_at', null)
+      for (const [k, v] of Object.entries(t.filters)) {
+        if (v !== null && v !== '' && v !== undefined) q = q.eq(k, v)
+      }
+      const { data, error: err } = await q
+      if (err) throw err
+      const rows = (data ?? []) as Array<Record<string, unknown>>
+      rowsCount = rows.length
+
+      const exportColumns: ExportColumn<Record<string, unknown>>[] = t.columns.map(c => ({
+        header: c.header, accessor: c.accessor,
+      }))
+      const result = await sendReportByEmail({
+        companyId, templateId: t.id, templateName: t.name,
+        sourceTable: t.source_table,
+        format: t.default_format,
+        data: rows, columns: exportColumns,
+        recipients: t.recipients,
+      })
+      if (!result.success) throw new Error(result.error ?? 'Envío falló')
+      notify({
+        variant: 'success',
+        title: 'Encolado',
+        text: `${result.enqueued} email${result.enqueued === 1 ? '' : 's'} en cola`,
+        duration: 2000,
+      })
+    } catch (e: unknown) {
+      status = 'failed'
+      errorMsg = e instanceof Error ? e.message : String(e)
+      notify({ variant: 'error', title: 'Error', text: errorMsg })
+    } finally {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('report_runs').insert({
+        template_id: t.id, company_id: companyId,
+        triggered_by: 'manual', rows_count: rowsCount,
+        format: t.default_format, status, error_msg: errorMsg,
+        actor_id: user?.id ?? null,
+      })
+      setRunning(null)
+    }
+  }
+
   return (
     <div
       style={overlayStyle}
@@ -292,7 +389,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
                       <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t.description}</div>
                     )}
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
-                      {t.columns.length} columna{t.columns.length === 1 ? '' : 's'} · {Object.keys(t.filters).length} filtro{Object.keys(t.filters).length === 1 ? '' : 's'}
+                      {t.columns.length} columna{t.columns.length === 1 ? '' : 's'} · {Object.keys(t.filters).length} filtro{Object.keys(t.filters).length === 1 ? '' : 's'} · {t.recipients.length} 📧
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
@@ -300,8 +397,24 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
                       onClick={() => void handleRun(t)}
                       disabled={running === t.id}
                       style={runBtnStyle(running === t.id)}
+                      title="Descargar localmente"
                     >
                       {running === t.id ? '⏳…' : '▶ Ejecutar'}
+                    </button>
+                    <button
+                      onClick={() => void handleSendEmail(t)}
+                      disabled={running === t.id || t.recipients.length === 0}
+                      style={runBtnStyle(running === t.id || t.recipients.length === 0)}
+                      title={t.recipients.length === 0 ? 'Configura destinatarios primero (botón 👥)' : `Enviar por email a ${t.recipients.length} destinatario(s)`}
+                    >
+                      📧 Email
+                    </button>
+                    <button
+                      onClick={() => void handleEditRecipients(t)}
+                      title="Editar destinatarios de email"
+                      style={dangerBtnStyle}
+                    >
+                      👥
                     </button>
                     <button
                       onClick={() => void handleDelete(t)}
