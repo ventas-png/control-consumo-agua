@@ -836,6 +836,11 @@ export default function App() {
                 />
               </ErrorBoundary>
             } />
+            {/* cond:A1 sub-rutas: `/condominios/panel` es el selector de
+                proyecto (CondominiosDashboard). Cualquier otro segmento se
+                interpreta como un tab del registry; tabs desconocidos caen
+                a 'panel'. `/condominios` (sin segmento) entra al tab por
+                defecto del registry. */}
             <Route path="/condominios/panel" element={
               condominiosSinProyecto ? <SinProyectoAsignado /> : (
                 <CondominiosDashboard
@@ -846,24 +851,10 @@ export default function App() {
                 />
               )
             } />
-            <Route path="/condominios/visitantes" element={
+            <Route path="/condominios/:tab" element={
               condominiosSinProyecto ? <SinProyectoAsignado /> : (
                 <ErrorBoundary sectionName="condominios">
-                  <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="visitantes" />
-                </ErrorBoundary>
-              )
-            } />
-            <Route path="/condominios/cuotas" element={
-              condominiosSinProyecto ? <SinProyectoAsignado /> : (
-                <ErrorBoundary sectionName="condominios">
-                  <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="cuotas" />
-                </ErrorBoundary>
-              )
-            } />
-            <Route path="/condominios/mantenimiento" element={
-              condominiosSinProyecto ? <SinProyectoAsignado /> : (
-                <ErrorBoundary sectionName="condominios">
-                  <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="mantenimiento" />
+                  <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} />
                 </ErrorBoundary>
               )
             } />

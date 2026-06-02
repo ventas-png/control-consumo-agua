@@ -51,7 +51,8 @@ import type {
 // cond:A1 — Registry de tabs. Los 191 lazy() + el switch de 180 ramas
 // viven ahora en tabRegistry.tsx (declarativo, type-checked, agregar/
 // quitar tab no toca este archivo).
-import { TAB_REGISTRY, TAB_BY_ID, type CondominioTab, type CondominiosTabContext } from './tabRegistry'
+import { useParams, useNavigate } from 'react-router-dom'
+import { TAB_REGISTRY, TAB_BY_ID, tabToPath, pathParamToTab, type CondominioTab, type CondominiosTabContext } from './tabRegistry'
 // Overlay: se renderiza encima del tab activo cuando hay un ticket seleccionado.
 // No es un tab del registry porque no aparece en la nav; vive aquí.
 const ComentariosTicketTab = lazy(() => import('./tabs/ComentariosTicketTab'))
@@ -142,10 +143,9 @@ interface Props {
   currentUser: UserSession
   canCreate: (section: string) => boolean
   canEdit: (section: string) => boolean
-  initialTab?: CondominioTab
 }
 
-export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit, initialTab }: Props) {
+export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
   const visibleSections = useMemo(() =>
     SECTIONS
       .map(sec => ({
@@ -156,7 +156,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     [currentUser]
   )
 
-  const [activeTab, setActiveTab] = useState<CondominioTab>(initialTab ?? 'panel')
+  // cond:A1 sub-rutas: el tab activo vive en la URL, no en useState. Refresh
+  // mantiene el tab, deep-link a `/condominios/cuotas` funciona, atrás del
+  // navegador navega entre tabs. La sección (grouping de la nav 2 niveles)
+  // sí queda como state visual local.
+  const { tab: tabParam } = useParams<{ tab?: string }>()
+  const activeTab: CondominioTab = pathParamToTab(tabParam)
+  const navigate = useNavigate()
+  const setActiveTab = useCallback((next: CondominioTab) => navigate(tabToPath(next)), [navigate])
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 768
