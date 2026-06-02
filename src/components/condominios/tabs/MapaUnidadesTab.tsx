@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, Unidad, ContratoArrendamiento } from '../../../types'
 import { Button } from '../../shared/Button'
+import { EmptyState } from '../../shared/EmptyState'
 
 interface Props {
   unidades: Unidad[]
@@ -58,12 +59,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
   const popInfo = popover ? infos.find(i => i.unidad.id === popover) : null
 
   if (unidades.length === 0) {
-    return (
-      <div style={{ padding: 16, textAlign: 'center', color: 'var(--at-ink-3)', paddingTop: 60 }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>🗺️</div>
-        No hay unidades en este proyecto
-      </div>
-    )
+    return <EmptyState icon="🗺️" title="No hay unidades en este proyecto" />
   }
 
   return (

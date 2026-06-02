@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { requireUser } from '../_shared/auth.ts'
 
 // Generic identity error — same message for all failure modes to prevent enumeration
 const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI y fecha de nacimiento.'
@@ -25,22 +26,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Step 1: Verify the caller has a valid Supabase JWT
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return err('No autorizado.')
-    }
-    const token = authHeader.replace('Bearer ', '')
+    // F.infra:I1b — JWT validation via shared helper.
+    // El user viene del JWT validado; el client del helper no se usa porque
+    // todas las queries downstream necesitan service_role (bypass de RLS para
+    // buscar el cliente y crear el app_users record).
+    const auth = await requireUser(req, corsHeaders)
+    if ('response' in auth) return auth.response
+    const oauthUser = auth.user
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
-
-    const { data: { user: oauthUser }, error: authError } = await adminClient.auth.getUser(token)
-    if (authError || !oauthUser) {
-      return err('No autorizado.')
-    }
 
     // Email comes from the verified JWT — cannot be tampered by the client
     const email = oauthUser.email

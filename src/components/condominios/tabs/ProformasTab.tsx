@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { confirm, notify } from '../../shared/Dialog'
+import { EmptyState } from '../../shared/EmptyState'
 import { Proforma, ContratoProveedor } from '../../../types'
 
 interface Props {
@@ -201,9 +202,11 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
 
       {/* List */}
       {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>
-          {filtroEstado ? `No hay proformas con estado "${ESTADO_CFG[filtroEstado].label}".` : 'No hay proformas registradas.'}
-        </div>
+        <EmptyState
+          icon="📋"
+          compact
+          title={filtroEstado ? `Sin proformas en "${ESTADO_CFG[filtroEstado].label}"` : 'No hay proformas registradas'}
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtradas.map(p => {
