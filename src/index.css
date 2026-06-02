@@ -250,19 +250,39 @@ button:focus:not(:focus-visible) {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
-/* Fade hint indicating more content to scroll */
+/* Fade hint indicating more content to scroll.
+ * Por defecto oculto (desktop ya muestra todo). Se activa en mobile via el
+ * @media query mas abajo. Usa color-mix con var(--at-surface) para que en
+ * dark mode el gradiente no sea blanco brillante sino el color de fondo. */
 .table-scroll-wrapper::after {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  width: 24px;
-  background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+  width: 28px;
+  background: linear-gradient(to left,
+    color-mix(in srgb, var(--at-surface) 95%, transparent),
+    transparent);
   pointer-events: none;
   display: none;
+}
+
+/* Sticky first column: en mobile (donde la tabla scrollea horizontal) la
+ * primera columna se queda pegada al borde izquierdo. Conserva el contexto
+ * de identificacion de fila mientras el usuario explora las columnas. El
+ * background-color de la celda se setea inline en DataTable para que no se
+ * vea transparente sobre el scroll. */
+.table-col-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  /* Sombra a la derecha para indicar que es columna pinned. Solo aparece
+   * cuando hay scroll horizontal real. */
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.08);
 }
 
 @media (max-width: 640px) {
@@ -270,10 +290,8 @@ button:focus:not(:focus-visible) {
     display: none !important;
   }
 
-  /* Ensure tables don't overflow container */
-  .table-scroll-wrapper {
-    position: relative;
-  }
+  /* Activar el indicador de scroll a la derecha solo en mobile, donde es
+   * mas probable que la tabla exceda el viewport. */
   .table-scroll-wrapper::after {
     display: block;
   }
