@@ -83,4 +83,97 @@ describe('CommandPalette', () => {
     expect(screen.getByText('General')).toBeTruthy()
     expect(screen.getByText('Cobranza')).toBeTruthy()
   })
+
+  describe('recientes', () => {
+    it('muestra heading "Recientes" cuando hay recentIds y query vacia', async () => {
+      render(<CommandPalette items={ITEMS} recentIds={['cuotas']} shortcut="ctrl" />)
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      expect(screen.getByText('Recientes')).toBeTruthy()
+      expect(screen.getByText('Todos')).toBeTruthy()
+    })
+
+    it('NO muestra headings cuando recentIds esta vacio', async () => {
+      render(<CommandPalette items={ITEMS} recentIds={[]} shortcut="ctrl" />)
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      expect(screen.queryByText('Recientes')).toBeNull()
+      expect(screen.queryByText('Todos')).toBeNull()
+    })
+
+    it('NO muestra headings cuando query tiene texto', async () => {
+      render(<CommandPalette items={ITEMS} recentIds={['cuotas']} shortcut="ctrl" />)
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      fireEvent.change(screen.getByLabelText('Buscar'), { target: { value: 'cuo' } })
+      expect(screen.queryByText('Recientes')).toBeNull()
+      expect(screen.queryByText('Todos')).toBeNull()
+    })
+
+    it('items recientes aparecen al tope en orden de recentIds', async () => {
+      render(
+        <CommandPalette
+          items={ITEMS}
+          recentIds={['mascotas', 'visitantes']}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      const options = screen.getAllByRole('option')
+      // [0] Mascotas (recent), [1] Visitantes (recent), [2] Panel, [3] Cuotas
+      expect(options[0].textContent).toContain('Mascotas')
+      expect(options[1].textContent).toContain('Visitantes')
+      expect(options[2].textContent).toContain('Panel')
+    })
+
+    it('ignora recentIds que no matcheen items actuales', async () => {
+      render(
+        <CommandPalette
+          items={ITEMS}
+          recentIds={['no-existe', 'cuotas']}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      // Solo "cuotas" es valido — debe ser el unico recent
+      const options = screen.getAllByRole('option')
+      expect(options[0].textContent).toContain('Cuotas')
+      expect(screen.getByText('Recientes')).toBeTruthy()
+    })
+
+    it('onItemSelected dispara al hacer Enter', async () => {
+      const onItemSelected = vi.fn()
+      const onSelect = vi.fn()
+      render(
+        <CommandPalette
+          items={[{ id: 'panel', label: 'Panel', onSelect }]}
+          onItemSelected={onItemSelected}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      fireEvent.keyDown(screen.getByLabelText('Buscar'), { key: 'Enter' })
+      expect(onSelect).toHaveBeenCalled()
+      expect(onItemSelected).toHaveBeenCalled()
+      expect(onItemSelected.mock.calls[0][0].id).toBe('panel')
+    })
+
+    it('onItemSelected dispara al hacer click', async () => {
+      const onItemSelected = vi.fn()
+      render(
+        <CommandPalette
+          items={[{ id: 'cuotas', label: 'Cuotas', onSelect: vi.fn() }]}
+          onItemSelected={onItemSelected}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      fireEvent.click(screen.getByText('Cuotas'))
+      expect(onItemSelected).toHaveBeenCalled()
+    })
+  })
 })

@@ -23,6 +23,7 @@ import { SinProyectoAsignado } from './components/condominios/SinProyectoAsignad
 import { CommandPalette } from './components/shared/CommandPalette'
 import { KeyboardShortcutsHelp } from './components/shared/KeyboardShortcutsHelp'
 import { useRegisteredCommands } from './lib/commandRegistry'
+import { useRecentItems } from './hooks/useRecentItems'
 import { buildNavCommands, NAV_COMMANDS } from './lib/navigationCommands'
 import { useKeyboardShortcuts, type ShortcutBinding } from './hooks/useKeyboardShortcuts'
 
@@ -250,6 +251,13 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const registeredCommands = useRegisteredCommands()
+  // F-recents: ultimos 5 items navegados desde el palette. Persistido en
+  // localStorage por user — la key es generica porque solo hay un palette
+  // global y la app cambia de usuario via logout (que recarga la pagina).
+  const { recent: recentCommandIds, push: pushRecent } = useRecentItems(
+    'aquacontrol:palette:recents:v1',
+    { maxItems: 5 },
+  )
 
   const navCommands = currentUser
     ? buildNavCommands(currentUser, canViewModule, (s) => navigate(sectionToPath(s)))
@@ -550,6 +558,8 @@ export default function App() {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         placeholder="Buscar sección o tab…"
+        recentIds={recentCommandIds}
+        onItemSelected={(item) => pushRecent(item.id)}
       />
       <KeyboardShortcutsHelp
         open={helpOpen}
