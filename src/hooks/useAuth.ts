@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
+import { measureSLO, reportSLOError } from '../lib/slo'
 
 function getStoredSession(): UserSession | null {
   try {
@@ -553,15 +554,18 @@ export function useAuth() {
       // signInWithPassword has no built-in timeout — wrap it so a stalled
       // network connection doesn't keep "Autenticando..." on screen forever.
       // 20 s covers Supabase free-tier cold starts (~15-20 s).
-      const authResult = await Promise.race([
-        supabase.auth.signInWithPassword({
-          email: cleanEmail.toLowerCase(),
-          password,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('auth_timeout')), 20000)
-        ),
-      ])
+      // infra:I3 — measureSLO emite breach si excede 2s p95.
+      const authResult = await measureSLO('login.complete', () =>
+        Promise.race([
+          supabase.auth.signInWithPassword({
+            email: cleanEmail.toLowerCase(),
+            password,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('auth_timeout')), 20000)
+          ),
+        ])
+      )
       const { data, error } = authResult
 
       if (error || !data?.session || !data?.user) {
@@ -572,6 +576,18 @@ export function useAuth() {
         }).catch(console.error)
 
         const msg = (error?.message ?? '').toLowerCase()
+        // infra:I3 — solo reportar al SLO error rate los fallos INESPERADOS;
+        // credenciales malas y email no confirmado son fallos legítimos
+        // del usuario, no de la plataforma.
+        const isUserError = msg.includes('invalid login credentials') ||
+          msg.includes('invalid_credentials') ||
+          msg.includes('email not confirmed') ||
+          msg.includes('password') && msg.includes('compromised') ||
+          msg.includes('too many')
+        if (!isUserError) {
+          reportSLOError('login.error_rate', { reason: error?.message ?? 'unknown' })
+        }
+
         if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) return 'Email o contraseña incorrectos'
         if (msg.includes('email not confirmed')) return 'Email no confirmado'
         if (msg.includes('password') && msg.includes('compromised')) return 'Contraseña comprometida. Debe cambiar su contraseña antes de ingresar.'
