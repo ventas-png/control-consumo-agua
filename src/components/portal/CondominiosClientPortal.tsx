@@ -20,6 +20,9 @@ import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
 // F3.12: Portal residente ampliado (asambleas + transparencia)
 import { PortalAsambleasTab }     from '../condominios/tabs/PortalAsambleasTab'
 import { PortalTransparenciaTab } from '../condominios/tabs/PortalTransparenciaTab'
+// plat:P36: gating por plan
+import { FeatureGate } from '../../lib/featureFlags'
+import { UpgradeCTA } from '../shared/UpgradeCTA'
 
 interface Props {
   currentUser: UserSession
@@ -487,16 +490,38 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               />
             )}
             {tab === 'asambleas' && (
-              <PortalAsambleasTab
-                unidadId={selectedUnidadId}
-                proyectoId={proyectoId}
-              />
+              <FeatureGate
+                feature="asambleas_digitales"
+                fallback={
+                  <UpgradeCTA
+                    feature="Asambleas digitales"
+                    description="Vota digitalmente en asambleas del condominio, consulta resultados en tiempo real y accede al histórico de actas."
+                    requiredPlan="Solo Condominios o Bundle Completo"
+                  />
+                }
+              >
+                <PortalAsambleasTab
+                  unidadId={selectedUnidadId}
+                  proyectoId={proyectoId}
+                />
+              </FeatureGate>
             )}
             {tab === 'transparencia' && (
-              <PortalTransparenciaTab
-                proyectoId={proyectoId}
-                moneda={moneda}
-              />
+              <FeatureGate
+                feature="transparencia_financiera"
+                fallback={
+                  <UpgradeCTA
+                    feature="Transparencia financiera"
+                    description="Consulta el presupuesto, gastos por categoría y fondo de reserva del condominio en tiempo real."
+                    requiredPlan="Solo Condominios o Bundle Completo"
+                  />
+                }
+              >
+                <PortalTransparenciaTab
+                  proyectoId={proyectoId}
+                  moneda={moneda}
+                />
+              </FeatureGate>
             )}
           </div>
         )}

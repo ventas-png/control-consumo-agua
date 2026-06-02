@@ -8,6 +8,7 @@ import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { DialogProvider } from './components/shared/Dialog'
 import { PromptDialogRoot } from './components/shared/PromptDialog'
 import { I18nProvider } from './lib/i18n'
+import { FeatureFlagsProvider } from './lib/featureFlags'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -31,11 +32,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary sectionName="root">
       <I18nProvider>
-        <DialogProvider>
-          <App />
-          <PwaUpdatePrompt />
-          <PromptDialogRoot />
-        </DialogProvider>
+        <FeatureFlagsProvider>
+          <DialogProvider>
+            <App />
+            <PwaUpdatePrompt />
+            <PromptDialogRoot />
+          </DialogProvider>
+        </FeatureFlagsProvider>
       </I18nProvider>
     </ErrorBoundary>
   </StrictMode>
