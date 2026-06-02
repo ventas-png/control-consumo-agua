@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -128,7 +130,8 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
       notas: `Consumo agua: ${r.consumo_ultimo} m³ × ${moneda} ${tarifaNum}/m³`,
     }))
 
-    const { error } = await supabase.from('cuotas_condominio').insert(inserts)
+    // cond:C2 — batch insert con pre-validación Zod por fila.
+    const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, inserts)
     setGenerando(false)
 
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }

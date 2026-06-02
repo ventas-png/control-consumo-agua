@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog } from '../../../types'
 
 interface Props {
@@ -93,7 +95,8 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
       }
     })
 
-    const { error } = await supabase.from('cuotas_condominio').insert(rows)
+    // cond:C2 — batch insert con pre-validación Zod por fila.
+    const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, rows)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setGenerando(false); return }
 
     // Log de auditoría

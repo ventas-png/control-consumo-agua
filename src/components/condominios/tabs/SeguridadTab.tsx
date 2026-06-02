@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsert } from '../../../lib/validatedInsert'
+import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import type {
@@ -312,7 +314,8 @@ export function SeguridadTab({
     if (!regForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del visitante.' }); return }
     if (!regForm.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setRegSaving(true)
-    const { error } = await supabase.from('visitantes').insert({
+    // cond:C2 — pre-validación Zod en boundary de persistencia.
+    const { error } = await validatedInsert('visitantes', visitanteInputSchema, {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: regForm.unidad_id,

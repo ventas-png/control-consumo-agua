@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsert } from '../../../lib/validatedInsert'
+import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { Visitante, Unidad } from '../../../types'
 
 interface Props {
@@ -71,7 +73,8 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   async function guardarPreAutorizacion() {
     if (!qrGenerado) return
     setRegistrando(true)
-    const { error } = await supabase.from('visitantes').insert({
+    // cond:C2 — pre-validación Zod.
+    const { error } = await validatedInsert('visitantes', visitanteInputSchema, {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: qrGenerado.unidadId,
