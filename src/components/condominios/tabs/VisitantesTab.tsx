@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
-import { validatedInsert } from '../../../lib/validatedInsert'
+import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../../shared/ImageUploader'
@@ -408,7 +408,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         reserva_str_id: strCtx?.reservaId ?? null,
         solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
       }))
-      const { error: ae } = await supabase.from('visitantes').insert(acompRows)
+      // cond:C2 — batch insert (acompañantes) con pre-validación Zod por fila.
+      const { error: ae } = await validatedInsertMany('visitantes', visitanteInputSchema, acompRows)
       if (ae) {
         setSaving(false)
         notify({ variant: 'warning', title: 'Visitante registrado', text: `Acompañantes no guardados: ${ae.message}` })

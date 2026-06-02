@@ -1,5 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { PlantillaCuota, PeriodicidadPlantilla, RubroConfig, Unidad } from '../../../types'
@@ -172,7 +174,8 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       }
     })
 
-    const { error } = await supabase.from('cuotas_condominio').insert(rows)
+    // cond:C2 — batch insert con pre-validación Zod por fila.
+    const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, rows)
     setGenerando(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} cuotas generadas`, text: `Período ${periodo}`, duration: 2000 })

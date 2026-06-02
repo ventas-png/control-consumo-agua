@@ -5,7 +5,7 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
 import { supabase } from '../../../lib/supabase'
-import { validatedInsert } from '../../../lib/validatedInsert'
+import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
@@ -169,7 +169,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       notas: r.rawNotas || null,
       estado: 'pendiente' as EstadoCuota,
     }))
-    const { error } = await supabase.from('cuotas_condominio').insert(inserts)
+    // cond:C2 — batch insert (CSV import) con pre-validación Zod por fila.
+    const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, inserts)
     setImportando(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${validas.length} cuotas importadas`, duration: 1800 })

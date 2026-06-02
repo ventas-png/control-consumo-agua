@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
+import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { toast } from '../../../lib/toast'
 import { ImageUploader } from '../../shared/ImageUploader'
 import type { Visitante } from '../../../types'
@@ -84,7 +85,8 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
     if (!form.nombre.trim()) { toast.error('Ingrese el nombre del visitante.'); return }
     setSaving(true)
     const horaEntrada = new Date().toISOString()
-    const { data, error } = await supabase.from('visitantes').insert({
+    // cond:C2 — pre-validación Zod (boundary portal residente).
+    const { data, error } = await validatedInsert('visitantes', visitanteInputSchema, {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: unidadId,
@@ -100,11 +102,12 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
       hora_entrada: horaEntrada,
       es_menor: form.es_menor,
       fecha_nacimiento: form.es_menor && form.fecha_nacimiento ? form.fecha_nacimiento : null,
-    }).select('id').single()
+    }, { returning: true })
 
     if (error) { setSaving(false); toast.error(error.message); return }
 
-    if (acompanantes.length > 0 && data) {
+    const insertedVisitante = data?.[0] as { id?: string } | undefined
+    if (acompanantes.length > 0 && insertedVisitante) {
       const acompRows = acompanantes.map(a => ({
         company_id: companyId,
         project_id: proyectoId,
@@ -120,9 +123,10 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
         hora_entrada: horaEntrada,
         es_menor: a.es_menor,
         fecha_nacimiento: a.es_menor && a.fecha_nacimiento ? a.fecha_nacimiento : null,
-        visitante_principal_id: data.id,
+        visitante_principal_id: insertedVisitante.id,
       }))
-      const { error: ae } = await supabase.from('visitantes').insert(acompRows)
+      // cond:C2 — batch insert (acompañantes) con validación por fila.
+      const { error: ae } = await validatedInsertMany('visitantes', visitanteInputSchema, acompRows)
       if (ae) {
         setSaving(false)
         toast.error('Visitante pre-autorizado, pero acompañantes no se guardaron', { description: ae.message })
