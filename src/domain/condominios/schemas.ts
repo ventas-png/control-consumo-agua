@@ -50,6 +50,9 @@ export const cuotaInputSchema = z
     estado: estadoCuota,
     notas: optionalString,
   })
+  // passthrough: preserva campos system-side (id, created_at, etc.) que no
+  // están en el schema input pero pertenecen a la fila completa de DB.
+  .passthrough()
   .superRefine((data, ctx) => {
     // Regla de negocio: cuotas que NO son 'CAM' deben tener unidad_id.
     // CAM (Cuota de Administración Mensual / general) es la única cuota
@@ -83,6 +86,9 @@ export const visitanteInputSchema = z
     es_menor: z.boolean().optional(),
     fecha_nacimiento: optionalYmd,
   })
+  // passthrough: preserva campos system-side (id, created_at, etc.) que no
+  // están en el schema input pero pertenecen a la fila completa de DB.
+  .passthrough()
   .superRefine((data, ctx) => {
     // Regla: si vino hora_salida, debe ser >= hora_entrada.
     if (data.hora_salida) {
@@ -132,6 +138,9 @@ export const amenidadInputSchema = z
     reglamento: optionalString,
     activo: z.boolean(),
   })
+  // passthrough: preserva campos system-side (id, created_at, etc.) que no
+  // están en el schema input pero pertenecen a la fila completa de DB.
+  .passthrough()
   .superRefine((data, ctx) => {
     // Regla: si requiere depósito, monto_deposito debe ser > 0.
     if (data.requiere_deposito && (!data.monto_deposito || data.monto_deposito <= 0)) {

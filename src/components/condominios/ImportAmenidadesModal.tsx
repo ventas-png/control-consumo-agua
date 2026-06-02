@@ -1,4 +1,5 @@
-import { supabase } from '../../lib/supabase'
+import { validatedInsertMany } from '../../lib/validatedInsert'
+import { amenidadInputSchema } from '../../domain/condominios/schemas'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -148,7 +149,13 @@ export function ImportAmenidadesModal({ proyectoId, companyId, onClose, onImport
           company_id: companyId,
           activo: true,
         }))
-        const { error } = await supabase.from('amenidades').insert(payload)
+        // cond:C2 — batch insert con pre-validación Zod por fila. El schema
+        // ya viene con `.passthrough()` para preservar campos system-side.
+        const { error } = await validatedInsertMany(
+          'amenidades',
+          amenidadInputSchema,
+          payload,
+        )
         return error
           ? { ok: 0, error: error.message }
           : { ok: batch.length }

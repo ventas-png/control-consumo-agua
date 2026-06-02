@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../../shared/Dialog'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsert } from '../../../lib/validatedInsert'
+import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -341,7 +343,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad a visitar.' }); return }
     setSaving(true)
     const horaEntrada = new Date().toISOString()
-    const { data, error } = await supabase.from('visitantes').insert({
+    // cond:C2 — pre-validación Zod en boundary de persistencia. El schema
+    // ya viene con `.passthrough()` para preservar campos system-side
+    // (foto_*, registrado_por, qr_token, etc.).
+    const { data, error } = await validatedInsert('visitantes', visitanteInputSchema, {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: form.unidad_id,
@@ -359,14 +364,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       fecha_nacimiento: formEsMenor && formFechaNacimiento ? formFechaNacimiento : null,
       reserva_str_id: strCtx?.reservaId ?? null,
       solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
-    }).select('id').single()
+    }, { returning: true })
 
     if (error) { setSaving(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
+    // `validatedInsert` con returning retorna array; antes `.single()` daba objeto.
+    const insertedVisitante = data?.[0] as { id?: string } | undefined
+
     // Link pre-registered guest slot to this entry
-    if (strCtx?.huespedId && data?.id) {
+    if (strCtx?.huespedId && insertedVisitante?.id) {
       await supabase.from('huespedes_str')
-        .update({ visitante_id: data.id })
+        .update({ visitante_id: insertedVisitante.id })
         .eq('id', strCtx.huespedId)
     }
 
@@ -396,7 +404,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         hora_entrada: horaEntrada,
         es_menor: a.es_menor,
         fecha_nacimiento: a.es_menor && a.fecha_nacimiento ? a.fecha_nacimiento : null,
-        visitante_principal_id: data.id,
+        visitante_principal_id: insertedVisitante?.id,
         reserva_str_id: strCtx?.reservaId ?? null,
         solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
       }))
