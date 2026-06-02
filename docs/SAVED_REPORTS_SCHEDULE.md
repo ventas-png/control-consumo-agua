@@ -1,85 +1,104 @@
-# Reportes guardados — schedule mensual/semanal (F4.5.1c)
+# Reportes guardados — schedule mensual/semanal (F4.5.1c-real)
 
-## Estado actual
+## Estado actual ✅
 
-La migración `20260603000000_saved_reports_cron_schedule.sql` deja:
+Todo el código y la infraestructura está deployada:
 
-- ✅ Columna `report_templates.last_run_at` para rastrear última ejecución.
-- ✅ Función SQL `claim_due_scheduled_reports(p_schedule_kind)` — devuelve los templates que deben correr hoy según schedule y `last_run_at`.
-- ✅ Función SQL `dispatch_scheduled_reports(p_schedule_kind)` — invocada por `pg_cron`. Por defecto **solo loguea** vía `RAISE NOTICE`; no hace el envío real.
-- ✅ 2 cron jobs activos en `pg_cron`:
-  - `reports-monthly-day1` → `0 9 1 * *` (día 1 de cada mes, 09:00 UTC)
+- ✅ Columna `report_templates.last_run_at`
+- ✅ Función SQL `claim_due_scheduled_reports(p_schedule_kind)` — selecciona templates due
+- ✅ Función SQL `dispatch_scheduled_reports(p_schedule_kind)` — invocada por `pg_cron`; lee secrets del vault y hace POST a la edge function
+- ✅ Edge function `process-scheduled-reports` (ACTIVE en Supabase) — recibe `{template_id}`, ejecuta query, genera CSV, sube a Storage, encola emails, registra en `report_runs`, marca `last_run_at`
+- ✅ 2 cron jobs activos:
+  - `reports-monthly-day1` → `0 9 1 * *` (día 1 cada mes, 09:00 UTC)
   - `reports-weekly-monday` → `0 9 * * 1` (cada lunes, 09:00 UTC)
 
-## Activar el envío real (pasos operacionales)
+## Lo único que falta — 1 paso manual (vault secrets)
 
-Para que los cron jobs **realmente** envíen los reportes por email, hay que:
-
-### 1. Crear edge function `process-scheduled-reports`
-
-Esa función recibe `{template_id}` por POST, ejecuta el reporte, sube el archivo a `report-attachments`, y encola los emails en `email_send_queue` (igual que el flow manual de F4.5.1d).
-
-Plantilla aproximada (Deno):
-
-```ts
-Deno.serve(async (req) => {
-  const { template_id } = await req.json()
-  // 1. Lee template (SELECT * FROM report_templates WHERE id = ?)
-  // 2. SELECT data del source_table con filters aplicados
-  // 3. Serializa CSV (o XLSX si la lib esta disponible en Deno)
-  // 4. Sube a bucket report-attachments
-  // 5. Crea signed URL
-  // 6. INSERT email_send_queue por cada recipient
-  // 7. UPDATE report_templates SET last_run_at = now() WHERE id = ?
-  // 8. INSERT report_runs (triggered_by='scheduled', status='success', ...)
-})
-```
-
-### 2. Configurar Supabase Vault con los secrets
+`dispatch_scheduled_reports()` está en modo **safe fallback**: si los secrets del vault no existen, retorna 0 con `NOTICE` y no rompe el cron. Para activar el envío real:
 
 ```sql
-SELECT vault.create_secret('https://<proyecto>.supabase.co/functions/v1', 'edge_function_url');
-SELECT vault.create_secret('<service_role_key>', 'service_role_key');
+SELECT vault.create_secret(
+  'https://nnsqmeigtgewatameexo.supabase.co/functions/v1',
+  'edge_function_url'
+);
+
+SELECT vault.create_secret(
+  '<service_role_key>',
+  'service_role_key'
+);
 ```
 
-### 3. Descomentar la invocación HTTP en `dispatch_scheduled_reports()`
+> Reemplaza `<service_role_key>` con el valor real del **Service Role Key** (Supabase Dashboard → Settings → API → `service_role` secret).
 
-Editar `supabase/migrations/20260603000000_saved_reports_cron_schedule.sql` y quitar los `--` antes de las líneas de `v_function_url`, `v_service_key`, y `PERFORM net.http_post(...)`.
-
-Luego volver a aplicar via `mcp__supabase__apply_migration` o `supabase db push`.
-
-### 4. Verificar los logs del cron
+### Verificar que los secrets estén creados
 
 ```sql
-SELECT * FROM cron.job_run_details
+SELECT name FROM vault.decrypted_secrets
+WHERE name IN ('edge_function_url', 'service_role_key');
+-- Debe retornar 2 rows.
+```
+
+### Smoke test manual
+
+Tras crear los secrets:
+
+```sql
+SELECT public.dispatch_scheduled_reports('monthly_day1');
+-- Si hay templates con schedule_kind='monthly_day1' y last_run_at < hoy,
+-- retornará la cantidad encontrada y disparará pg_net.http_post.
+```
+
+Para inspeccionar el resultado del POST:
+
+```sql
+SELECT id, created, status_code, content_type, content
+FROM net._http_response
+ORDER BY created DESC
+LIMIT 5;
+```
+
+## Flow end-to-end (una vez activado)
+
+1. `pg_cron` corre `reports-monthly-day1` el día 1 a las 09:00 UTC
+2. Ejecuta `SELECT public.dispatch_scheduled_reports('monthly_day1')`
+3. `claim_due_scheduled_reports` retorna templates due (con recipients, no corridos hoy)
+4. Por cada template: `net.http_post` a `process-scheduled-reports` con `template_id`
+5. Edge function:
+   - SELECT data + filters + `deleted_at IS NULL`
+   - Serializa CSV con BOM UTF-8
+   - Upload a `report-attachments/{company_id}/{template_id}/{timestamp}.csv`
+   - Crea signed URL (24h)
+   - INSERT N rows en `email_send_queue` (template_key=`saved_report_delivery`)
+   - UPDATE `report_templates.last_run_at`
+   - INSERT en `report_runs` (triggered_by=`scheduled`)
+6. Worker `process-email-queue` (F2.15e) procesa los emails con retry+backoff
+7. Recipient recibe email con CTA "Descargar reporte" (link signed válido 24h)
+
+## Monitoreo
+
+```sql
+-- Últimas ejecuciones del cron
+SELECT jobname, status, start_time, end_time, return_message
+FROM cron.job_run_details
 WHERE jobname IN ('reports-monthly-day1', 'reports-weekly-monday')
-ORDER BY start_time DESC
-LIMIT 10;
+ORDER BY start_time DESC LIMIT 10;
+
+-- Últimos runs scheduled de reportes
+SELECT template_id, triggered_at, rows_count, format, status, error_msg
+FROM report_runs
+WHERE triggered_by = 'scheduled'
+ORDER BY triggered_at DESC LIMIT 20;
 ```
 
-## Diseño
+## Limitaciones del MVP
 
-| Decisión | Por qué |
-|---|---|
-| `last_run_at` en `report_templates` (no en `report_runs`) | Permite filtro O(log n) con índice parcial sin LEFT JOIN |
-| Filter `last_run_at IS NULL OR < date_trunc('day', now())` | Idempotente: si el cron corre 2 veces el mismo día por error, solo procesa una vez |
-| Excluir templates sin recipients | Sin sentido enviar un email sin destinatarios |
-| `SECURITY DEFINER` en las funciones | Permite ejecución desde cron (rol superadmin) sin que RLS bloquee |
-| Por defecto loguea via `RAISE NOTICE` | Despliegue seguro: la migration no rompe si vault no está configurado. El operador activa el envío real cuando esté listo |
-| Timezone UTC | Consistente, evita ambigüedad de horario verano. El operador puede ajustar el `cron` schedule si necesita timezone local |
+- **Solo CSV** server-side. XLSX/PDF requieren libs Deno pesadas que disparan cold start. Para esos formatos el admin usa el botón "📧 Email" del frontend (F4.5.1d) que sí soporta XLSX/CSV/PDF.
+- **Timezone UTC**. El operador puede ajustar el `cron schedule` a timezone local si necesita (ej. `0 14 1 * *` = 09:00 hora de Guatemala = UTC-5 + 09 = 14 UTC).
+- **No reintenta automáticamente** si la edge function falla — el siguiente día (cron) intentará de nuevo porque `last_run_at` no se actualiza si falla. Para retry inmediato, manual POST a la edge function.
 
-## Smoke test (cuando no hay templates schedule)
+## Out of scope (futuro)
 
-```sql
-SELECT public.dispatch_scheduled_reports('monthly_day1');  -- → 0
-SELECT public.dispatch_scheduled_reports('weekly_monday'); -- → 0
-```
-
-Cuando haya templates con `schedule_kind='monthly_day1'`, el siguiente día 1 a las 09:00 UTC verás registros en `cron.job_run_details` y NOTICE en logs.
-
-## Out of scope (futuras iteraciones)
-
-- **F4.5.1c2** — Edge function `process-scheduled-reports` real (genera + envía)
-- **F4.5.1c3** — Soporte de timezones por company (cada tenant elige su horario)
-- **F4.5.1c4** — Schedule customizable (cron expression libre, no solo monthly/weekly)
-- **F4.5.1c5** — UI en SavedReportsModal para ver `last_run_at` + "Próxima ejecución"
+- Timezone por company (cada tenant elige su horario)
+- Schedule customizable (cron expression libre, no solo monthly/weekly)
+- UI en SavedReportsModal para ver "Próxima ejecución" + log de runs scheduled vs manual
+- Soporte XLSX server-side (usar lib `sheetjs` Deno port)
