@@ -52,6 +52,14 @@ export interface DataTableProps<T> {
    * de fila (nombre, codigo) no debe perderse al desplazarse.
    */
   stickyFirstColumn?: boolean
+  /**
+   * Si true, en phones ≤480px la tabla se re-renderiza como una lista de
+   * cards (un card por fila), con el header de cada columna mostrado como
+   * label dentro de la celda. Aplica la clase `.table-cards-on-mobile`
+   * y agrega `data-label` a cada `<td>`. Util para tablas con muchas
+   * columnas donde el scroll horizontal es incomodo.
+   */
+  mobileCardLayout?: boolean
   /** Cómo obtener el React key de una fila. */
   rowKey: keyof T | ((row: T) => string)
 
@@ -137,6 +145,7 @@ export function DataTable<T>({
   data,
   columns,
   stickyFirstColumn = false,
+  mobileCardLayout = false,
   rowKey,
   searchableKeys,
   searchPlaceholder = 'Buscar…',
@@ -338,7 +347,10 @@ export function DataTable<T>({
           )
         ) : (
           <div className="table-scroll-wrapper">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+            <table
+              className={mobileCardLayout ? 'table-cards-on-mobile' : undefined}
+              style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}
+            >
               <thead>
                 <tr style={{ background: 'var(--at-surface-2)' }}>
                   {columns.map((col, colIdx) => {
@@ -399,9 +411,16 @@ export function DataTable<T>({
                     >
                       {columns.map((col, colIdx) => {
                         const isStickyCol = stickyFirstColumn && colIdx === 0
+                        // data-label se usa por el CSS .table-cards-on-mobile
+                        // para mostrar el header como label de la celda en
+                        // phones. Si col.header no es string, fallback al key.
+                        const labelStr = mobileCardLayout
+                          ? (typeof col.header === 'string' ? col.header : col.key)
+                          : undefined
                         return (
                           <td
                             key={col.key}
+                            data-label={labelStr}
                             className={[
                               col.hideOnMobile ? 'table-col-secondary' : '',
                               isStickyCol ? 'table-col-sticky' : '',
