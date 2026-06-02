@@ -6,6 +6,7 @@ import { CommandPalette, type CommandItem } from '../shared/CommandPalette'
 // plat:P36 — Feature flags por plan
 import { FeatureGate } from '../../lib/featureFlags'
 import { UpgradeCTA } from '../shared/UpgradeCTA'
+import { EmptyState } from '../shared/EmptyState'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -1209,11 +1210,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
   if (proyectosActivos.length === 0) {
     return (
-      <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏢</div>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay proyectos activos</p>
-        <p style={{ fontSize: '13px' }}>Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.</p>
-      </div>
+      <EmptyState
+        icon="🏢"
+        title="No hay proyectos activos"
+        description='Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.'
+      />
     )
   }
 
