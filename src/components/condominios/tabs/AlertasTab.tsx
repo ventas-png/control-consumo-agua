@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { FilterChips } from '../../shared/FilterChips'
 
 interface Props {
   alertas: AlertaCondominio[]
@@ -277,17 +278,17 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
           <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             📌 Alertas manuales ({alertas.length})
           </h3>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['activa', 'resuelta', 'ignorada', 'all'] as const).map(e => (
-              <button key={e} onClick={() => setFiltroEstado(e)}
-                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-                  background: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-surface)',
-                  color: filtroEstado === e ? 'white' : 'var(--at-ink-3)',
-                  borderColor: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-line)' }}>
-                {e === 'all' ? 'Todas' : e.charAt(0).toUpperCase() + e.slice(1)}
-              </button>
-            ))}
-          </div>
+          <FilterChips<'activa' | 'resuelta' | 'ignorada' | 'all'>
+            ariaLabel="Filtrar por estado"
+            value={filtroEstado}
+            onChange={setFiltroEstado}
+            options={[
+              { value: 'activa', label: 'Activa' },
+              { value: 'resuelta', label: 'Resuelta' },
+              { value: 'ignorada', label: 'Ignorada' },
+              { value: 'all', label: 'Todas' },
+            ]}
+          />
         </div>
 
         {storedActivas.length === 0 ? (

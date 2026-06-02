@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { FilterChips } from '../../shared/FilterChips'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -227,28 +228,35 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             </div>
           )}
 
-          {/* Filtros */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            {(['todos', ...Object.keys(CAT_CONFIG)] as const).map(c => (
-              <button key={c} onClick={() => setFiltroCat(c as CategoriaGasto | 'todos')}
-                style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                  borderColor: filtroCat === c ? 'var(--at-primary)' : 'var(--at-line)',
-                  background: filtroCat === c ? 'var(--at-primary-soft)' : 'var(--at-surface)',
-                  color: filtroCat === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
-                {c === 'todos' ? `Todos (${gastos.length})` : `${CAT_CONFIG[c as CategoriaGasto].icon} ${CAT_CONFIG[c as CategoriaGasto].label}`}
-              </button>
-            ))}
+          {/* Filtros — F3.20: migrado a <FilterChips> shared */}
+          <div style={{ marginBottom: '12px' }}>
+            <FilterChips<CategoriaGasto | 'todos'>
+              ariaLabel="Filtrar por categoría"
+              value={filtroCat}
+              onChange={setFiltroCat}
+              options={[
+                { value: 'todos', label: 'Todos', count: gastos.length, color: 'var(--at-primary)' },
+                ...(Object.keys(CAT_CONFIG) as CategoriaGasto[]).map(c => ({
+                  value: c,
+                  label: CAT_CONFIG[c].label,
+                  icon: CAT_CONFIG[c].icon,
+                  color: 'var(--at-primary)',
+                })),
+              ]}
+            />
           </div>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-            {(['todos', 'pendiente', 'pagado', 'anulado'] as const).map(e => (
-              <button key={e} onClick={() => setFiltroEstado(e)}
-                style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                  borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-                  background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
-                  color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
-                {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e as EstadoGasto].label}
-              </button>
-            ))}
+          <div style={{ marginBottom: '16px' }}>
+            <FilterChips<EstadoGasto | 'todos'>
+              ariaLabel="Filtrar por estado"
+              value={filtroEstado}
+              onChange={setFiltroEstado}
+              options={[
+                { value: 'todos', label: 'Todos', color: 'var(--at-primary)' },
+                { value: 'pendiente', label: ESTADO_CONFIG.pendiente.label, color: 'var(--at-primary)' },
+                { value: 'pagado', label: ESTADO_CONFIG.pagado.label, color: 'var(--at-primary)' },
+                { value: 'anulado', label: ESTADO_CONFIG.anulado.label, color: 'var(--at-primary)' },
+              ]}
+            />
           </div>
 
           {/* Tabla de gastos — F3.9: migrado a <DataTable> shared */}
