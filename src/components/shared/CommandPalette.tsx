@@ -31,6 +31,17 @@ export interface CommandPaletteProps {
   shortcut?: 'meta' | 'ctrl'
   /** Tecla. Default 'k'. */
   shortcutKey?: string
+  /**
+   * Si true, el palette NO registra su keyboard listener global y queda
+   * controlado externamente via `open` + `onOpenChange`. Util cuando se
+   * monta como hijo de otro palette que ya tiene el shortcut, o cuando
+   * el caller quiere abrirlo desde un boton/evento custom.
+   */
+  disableShortcut?: boolean
+  /** Modo controlado: estado open viene del caller. */
+  open?: boolean
+  /** Modo controlado: callback de cambio de estado. */
+  onOpenChange?: (open: boolean) => void
 }
 
 /** Normaliza un string para fuzzy match (lowercase, sin acentos). */
@@ -64,8 +75,22 @@ export function CommandPalette({
   placeholder = 'Buscar tab o acción...',
   shortcut,
   shortcutKey = 'k',
+  disableShortcut = false,
+  open: openProp,
+  onOpenChange,
 }: CommandPaletteProps) {
-  const [open, setOpen] = useState(false)
+  const [openInternal, setOpenInternal] = useState(false)
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : openInternal
+  const setOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next
+    if (isControlled) {
+      onOpenChange?.(value)
+    } else {
+      setOpenInternal(value)
+    }
+  }
+
   const [query, setQuery] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
@@ -77,18 +102,32 @@ export function CommandPalette({
   )
   const usedShortcut = shortcut ?? (isMac ? 'meta' : 'ctrl')
 
-  // Global keyboard listener
+  // Refs para evitar stale closure en el listener global (open/onOpenChange
+  // pueden cambiar entre renders; el listener solo se re-attachea cuando
+  // cambian el shortcut o el flag de disable).
+  const openRef = useRef(open)
+  openRef.current = open
+  const onOpenChangeRef = useRef(onOpenChange)
+  onOpenChangeRef.current = onOpenChange
+
+  // Global keyboard listener — solo cuando no esta deshabilitado.
   useEffect(() => {
+    if (disableShortcut) return
     function onKey(e: KeyboardEvent) {
       const modifier = usedShortcut === 'meta' ? e.metaKey : e.ctrlKey
       if (modifier && e.key.toLowerCase() === shortcutKey.toLowerCase()) {
         e.preventDefault()
-        setOpen(o => !o)
+        const next = !openRef.current
+        if (isControlled) {
+          onOpenChangeRef.current?.(next)
+        } else {
+          setOpenInternal(next)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [usedShortcut, shortcutKey])
+  }, [usedShortcut, shortcutKey, disableShortcut, isControlled])
 
   // Items filtrados + ordenados por score
   const filtered = useMemo(() => {
@@ -140,7 +179,7 @@ export function CommandPalette({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={(o) => setOpen(o)}>
       <Dialog.Portal>
         <Dialog.Overlay style={{
           position: 'fixed', inset: 0,
