@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { EditModal } from '../shared/EditModal'
 
 interface Usuario {
   id: string
@@ -88,69 +89,17 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-      }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        style={{
-          background: 'var(--at-ink)', borderRadius: '16px', padding: '28px',
-          width: '480px', maxWidth: '95vw', boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-        }}
-      >
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ color: 'var(--at-chip)', fontSize: '18px', fontWeight: 700, margin: 0 }}>
-            Asignar Acceso a Proyectos
-          </h2>
-          <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', marginTop: '6px' }}>
-            {usuario.full_name} · {roleLabel[usuario.role] ?? usuario.role}
-          </p>
-        </div>
-
-        {loading ? (
-          <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>Cargando...</div>
-        ) : proyectos.length === 0 ? (
-          <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>
-            No hay proyectos en esta empresa.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
-            {proyectos.map(p => {
-              const checked = asignados.has(p.id)
-              return (
-                <label
-                  key={p.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '12px 16px', borderRadius: '10px', cursor: 'pointer',
-                    background: checked ? 'rgba(27, 59, 54,0.12)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${checked ? 'var(--at-primary)' : 'transparent'}`,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleProyecto(p.id)}
-                    style={{ accentColor: 'var(--at-primary)', width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <span style={{ color: checked ? 'var(--at-accent-2)' : 'var(--at-line-strong)', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
-                    {p.nombre}
-                  </span>
-                </label>
-              )
-            })}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+    <EditModal
+      title="Asignar Acceso a Proyectos"
+      subtitle={`${usuario.full_name} · ${roleLabel[usuario.role] ?? usuario.role}`}
+      size="sm"
+      onClose={onClose}
+      footer={
+        <>
           <button
             onClick={onClose}
             style={{
-              padding: '9px 18px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+              padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
               background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '14px',
             }}
           >
@@ -168,8 +117,44 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
           >
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
+        </>
+      }
+    >
+      {loading ? (
+        <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>Cargando...</div>
+      ) : proyectos.length === 0 ? (
+        <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>
+          No hay proyectos en esta empresa.
         </div>
-      </div>
-    </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {proyectos.map(p => {
+            const checked = asignados.has(p.id)
+            return (
+              <label
+                key={p.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '12px 16px', borderRadius: '10px', cursor: 'pointer',
+                  background: checked ? 'var(--at-primary-soft)' : 'var(--at-surface-2)',
+                  border: `1px solid ${checked ? 'var(--at-primary)' : 'transparent'}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleProyecto(p.id)}
+                  style={{ accentColor: 'var(--at-primary)', width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <span style={{ color: 'var(--at-ink)', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
+                  {p.nombre}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      )}
+    </EditModal>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
+import { EditModal } from '../shared/EditModal'
 
 interface Props {
   onClose: () => void
@@ -139,43 +140,18 @@ export function AuditLogModal({ onClose }: Props) {
   ]
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9000,
-        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '16px',
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{
-        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '880px',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
-        display: 'flex', flexDirection: 'column', maxHeight: '90vh',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '20px 24px 14px', borderBottom: '1px solid var(--at-line)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>Auditoría de roles y permisos</div>
-            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-              Cambios recientes ordenados por fecha (más recientes primero)
-            </div>
-          </div>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',
-            color: 'var(--at-ink-3)', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
-          }}>×</button>
-        </div>
-
-        {/* Filters */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--at-line)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Filtrar acción:</span>
+    <EditModal
+      title="Auditoría de roles y permisos"
+      subtitle="Cambios recientes ordenados por fecha (más recientes primero)"
+      size="lg"
+      onClose={onClose}
+      headerActions={
+        <>
+          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Filtrar:</span>
           <select
             value={filterAction}
             onChange={e => { setFilterAction(e.target.value); setPage(0) }}
+            aria-label="Filtrar por acción"
             style={{
               padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
               fontSize: '12px', color: 'var(--at-ink)', background: 'var(--at-surface)',
@@ -186,28 +162,25 @@ export function AuditLogModal({ onClose }: Props) {
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-        </div>
-
-        {/* Body — F3.9.3: migrado a <DataTable> shared en modo server */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px' }}>
-          {error ? (
-            <div style={{ textAlign: 'center', color: 'var(--at-danger)', marginTop: '40px', fontSize: '13px' }}>{error}</div>
-          ) : (
-            <DataTable<AuditRow>
-              data={rows}
-              columns={columns}
-              rowKey="id"
-              isLoading={loading}
-              paginationMode="server"
-              currentPage={page}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              emptyState={{ title: filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.' }}
-            />
-          )}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {error ? (
+        <div style={{ textAlign: 'center', color: 'var(--at-danger)', padding: '40px', fontSize: '13px' }}>{error}</div>
+      ) : (
+        <DataTable<AuditRow>
+          data={rows}
+          columns={columns}
+          rowKey="id"
+          isLoading={loading}
+          paginationMode="server"
+          currentPage={page}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          emptyState={{ title: filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.' }}
+        />
+      )}
+    </EditModal>
   )
 }
 
