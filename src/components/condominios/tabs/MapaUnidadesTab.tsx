@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, Unidad, ContratoArrendamiento } from '../../../types'
+import { Button } from '../../shared/Button'
 
 interface Props {
   unidades: Unidad[]
@@ -84,7 +85,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
       {filtro && (
         <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Filtrando: <strong>{ESTADO_CFG[filtro].label}</strong> ({filtradas.length} unidades)</span>
-          <button onClick={() => setFiltro('')} style={{ fontSize: 11, padding: '2px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>✕ Limpiar</button>
+          <Button variant="secondary" size="sm" onClick={() => setFiltro('')} style={{ padding: '2px 8px', fontSize: 11 }}>✕ Limpiar</Button>
         </div>
       )}
 

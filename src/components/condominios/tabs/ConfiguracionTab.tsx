@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConfiguracionCondominio } from '../../../types'
 import { toast } from '../../../lib/toast'
+import { Button } from '../../shared/Button'
 
 interface Props {
   configuracion: ConfiguracionCondominio[]
@@ -110,10 +111,15 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Configuración del Condominio</h2>
         {canEdit && dirty.size > 0 && (
-          <button onClick={handleSaveAll} disabled={saving === 'all'}
-            style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            {saving === 'all' ? 'Guardando…' : `💾 Guardar todo (${dirty.size})`}
-          </button>
+          <Button
+            size="sm"
+            onClick={handleSaveAll}
+            loading={saving === 'all'}
+            loadingText="Guardando…"
+            iconLeft={saving !== 'all' ? '💾' : undefined}
+          >
+            Guardar todo ({dirty.size})
+          </Button>
         )}
       </div>
 
@@ -131,10 +137,15 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)' }}>{schema.label}</label>
                     {canEdit && isDirty && (
-                      <button onClick={() => handleSave(schema.clave)} disabled={!!saving}
-                        style={{ padding: '2px 8px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        {isSaving ? '…' : '✓ Guardar'}
-                      </button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSave(schema.clave)}
+                        disabled={!!saving}
+                        loading={isSaving}
+                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                      >
+                        ✓ Guardar
+                      </Button>
                     )}
                   </div>
                   {schema.tipo === 'texto_largo' ? (

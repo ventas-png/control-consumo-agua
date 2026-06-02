@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
+import { Button } from '../../shared/Button'
 import { ArticuloReglamento, CategoriaReglamento } from '../../../types'
 
 interface Props {
@@ -112,10 +113,9 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Reglamento ({lista.length})</span>
             {canCreate && (
-              <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              <Button size="sm" onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--at-accent)', border: 'none' }}>
                 + Artículo
-              </button>
+              </Button>
             )}
           </div>
           <input style={{ ...inp, marginBottom: 6 }} placeholder="Buscar…" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
@@ -196,14 +196,18 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear'}`}
-              </button>
-              <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              <Button
+                variant="success"
+                onClick={guardar}
+                loading={saving}
+                loadingText="Guardando…"
+                iconLeft={!saving ? '✅' : undefined}
+              >
+                {editando ? 'Actualizar' : 'Crear'}
+              </Button>
+              <Button variant="ghost" onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}>
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -226,14 +230,17 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    <Button variant="secondary" size="sm" onClick={() => iniciarEdicion(selected)} style={{ padding: '6px 12px', fontSize: 12 }}>
                       ✏️ Editar
-                    </button>
-                    <button onClick={() => toggleVigente(selected)}
-                      style={{ padding: '6px 12px', background: selected.vigente ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', color: selected.vigente ? 'var(--at-danger)' : 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    </Button>
+                    <Button
+                      variant={selected.vigente ? 'outline-danger' : 'success'}
+                      size="sm"
+                      onClick={() => toggleVigente(selected)}
+                      style={{ padding: '6px 12px', fontSize: 12, border: 'none', background: selected.vigente ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', color: selected.vigente ? 'var(--at-danger)' : 'var(--at-success)' }}
+                    >
                       {selected.vigente ? 'Derogar' : 'Restablecer'}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
