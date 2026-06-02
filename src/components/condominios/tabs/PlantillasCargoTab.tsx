@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
+import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { PlantillaTareaCargo, AreaCondominio } from '../../../types'
 
@@ -171,11 +172,11 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
       </div>
 
       {plantillas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '56px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
-          <p style={{ fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Sin plantillas</p>
-          <p style={{ fontSize: '13px' }}>Crea tareas predefinidas por cargo para asignar rápidamente al crear bloques de turno.</p>
-        </div>
+        <EmptyState
+          icon="📋"
+          title="Sin plantillas"
+          description="Crea tareas predefinidas por cargo para asignar rápidamente al crear bloques de turno."
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {cargosPorGrupo.map(([cargo, tareas]) => (

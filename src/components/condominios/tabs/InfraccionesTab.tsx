@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { toast } from '../../../lib/toast'
+import { EmptyState } from '../../shared/EmptyState'
 import { confirm } from '../../shared/Dialog'
 import type { InfraccionCondominio, Unidad, TipoInfraccion, EstadoInfraccion } from '../../../types'
 
@@ -175,10 +176,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
 
       {/* Lista */}
       {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚖️</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay infracciones registradas</p>
-        </div>
+        <EmptyState icon="⚖️" title="No hay infracciones registradas" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtradas.map(i => {

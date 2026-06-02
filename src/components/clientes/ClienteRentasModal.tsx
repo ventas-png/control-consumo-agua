@@ -6,6 +6,7 @@ import type {
   EstadoContrato, EstadoSTR, PlataformaSTR,
 } from '../../types'
 import { EditModal } from '../shared/EditModal'
+import { EmptyState } from '../shared/EmptyState'
 
 interface Props {
   cliente: Cliente
@@ -549,11 +550,12 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                   )}
 
                   {contratos.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
-                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
-                      <div style={{ fontWeight: 600 }}>Sin contratos de arrendamiento</div>
-                      {canEdit && <div style={{ fontSize: '13px', marginTop: '4px' }}>Agrega el primer contrato con el botón de arriba</div>}
-                    </div>
+                    <EmptyState
+                      icon="📄"
+                      compact
+                      title="Sin contratos de arrendamiento"
+                      description={canEdit ? 'Agrega el primer contrato con el botón de arriba.' : undefined}
+                    />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {contratos.map(c => {
@@ -806,11 +808,12 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                   )}
 
                   {reservas.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
-                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏨</div>
-                      <div style={{ fontWeight: 600 }}>Sin reservas STR registradas</div>
-                      {canEdit && <div style={{ fontSize: '13px', marginTop: '4px' }}>Agrega la primera reserva con el botón de arriba</div>}
-                    </div>
+                    <EmptyState
+                      icon="🏨"
+                      compact
+                      title="Sin reservas STR registradas"
+                      description={canEdit ? 'Agrega la primera reserva con el botón de arriba.' : undefined}
+                    />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {reservas.map(r => {
