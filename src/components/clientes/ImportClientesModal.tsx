@@ -2,6 +2,8 @@ import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent}
 import { notify } from '../shared/Dialog'
 import type { Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { validatedInsertMany } from '../../lib/validatedInsert'
+import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
@@ -311,9 +313,14 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         }
       })
 
-      // Insert without .select() to avoid RETURNING + SELECT RLS conflict
-      // (SELECT policy requires company_clientes link which doesn't exist yet)
-      const { error } = await supabase.from('clientes').insert(lote)
+      // agua:C6 — batch insert con pre-validación Zod por fila. Si cualquier
+      // fila falla shape (e.g. email malformado, código vacío), aborta el
+      // lote sin tocar DB y muestra fieldErrors granular al usuario.
+      // `.passthrough()` para preservar `id` generado y otros campos
+      // system-side que no están en el schema de input.
+      // Sin `.select()` para evitar conflicto RETURNING + SELECT RLS
+      // (SELECT policy requiere company_clientes link que aún no existe).
+      const { error } = await validatedInsertMany('clientes', clienteInputSchema.passthrough(), lote)
       if (!error) {
         // Link to company now that the clients exist
         if (companyId) {

@@ -115,6 +115,31 @@ export async function validatedInsert<TSchema extends z.ZodTypeAny>(
   }
 }
 
+// Variante para batch insert: valida CADA item del array contra el schema.
+// Si cualquier item falla, retorna error sin tocar la DB (atómico). El
+// `fieldErrors` de un fallo incluye el índice del item entre brackets,
+// e.g. `{ "0.nombre": ["..."] }` para identificar la fila problemática.
+export async function validatedInsertMany<TSchema extends z.ZodTypeAny>(
+  table: string,
+  schema: TSchema,
+  payloads: unknown[],
+  options: ValidatedInsertOptions = {},
+): Promise<ValidatedInsertResult<z.infer<TSchema>[]>> {
+  const arraySchema = z.array(schema)
+  const parsed = arraySchema.safeParse(payloads)
+  if (!parsed.success) {
+    return { data: null, error: buildValidationError(parsed.error) }
+  }
+  const client = options.client ?? defaultClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const query = (client.from(table) as any).insert(parsed.data)
+  const result = options.returning ? await query.select() : await query
+  return {
+    data: (result.data ?? null) as z.infer<TSchema>[] | null,
+    error: result.error,
+  }
+}
+
 // Versión para `update`. Acepta un schema parcial (Partial<input>) — usar
 // `schema.partial()` del lado del caller si la entrada no es completa.
 export interface ValidatedUpdateOptions extends ValidatedInsertOptions {

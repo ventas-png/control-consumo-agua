@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 
 import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { validatedInsert } from '../../lib/validatedInsert'
+import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
@@ -330,7 +332,15 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
       const clienteId = crypto.randomUUID()
-      const { error } = await supabase.from('clientes').insert({ ...payload, id: clienteId })
+      // agua:C6 — pre-validación Zod en boundary de persistencia. La
+      // validación de UX (más estricta, con mensajes custom) ya corrió arriba
+      // en `errors[]`; ésta es defense in depth contra payloads malformados.
+      // `.passthrough()` preserva el `id` generado (campo no-input del schema).
+      const { error } = await validatedInsert(
+        'clientes',
+        clienteInputSchema.passthrough(),
+        { ...payload, id: clienteId },
+      )
 
       if (!error) {
         // Link new client to company first so SELECT RLS policy passes
