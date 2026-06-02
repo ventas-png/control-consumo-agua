@@ -176,4 +176,95 @@ describe('CommandPalette', () => {
       expect(onItemSelected).toHaveBeenCalled()
     })
   })
+
+  describe('favoritos / pin', () => {
+    it('muestra heading "Favoritos" cuando hay pinnedIds y query vacia', async () => {
+      render(
+        <CommandPalette items={ITEMS} pinnedIds={['cuotas']} shortcut="ctrl" />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      expect(screen.getByText('Favoritos')).toBeTruthy()
+      expect(screen.getByText('Todos')).toBeTruthy()
+    })
+
+    it('orden: Favoritos > Recientes > Todos (sin duplicar items)', async () => {
+      render(
+        <CommandPalette
+          items={ITEMS}
+          pinnedIds={['cuotas']}
+          recentIds={['cuotas', 'visitantes']} // cuotas debe aparecer solo en Favoritos
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      const options = screen.getAllByRole('option')
+      // [0] Cuotas (pinned), [1] Visitantes (recent, no pinned), [2] Panel, [3] Mascotas
+      expect(options[0].textContent).toContain('Cuotas')
+      expect(options[1].textContent).toContain('Visitantes')
+      // cuotas no aparece de nuevo en otros buckets
+      const cuotasCount = options.filter(o => o.textContent?.includes('Cuotas')).length
+      expect(cuotasCount).toBe(1)
+    })
+
+    it('star button aparece cuando onTogglePin se provee', async () => {
+      const onTogglePin = vi.fn()
+      render(
+        <CommandPalette items={ITEMS} onTogglePin={onTogglePin} shortcut="ctrl" />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      // Hay un star button por item (4 items)
+      const starButtons = screen.getAllByRole('button', { name: /favoritos/ })
+      expect(starButtons.length).toBe(4)
+    })
+
+    it('star button NO aparece si onTogglePin no se provee', async () => {
+      render(<CommandPalette items={ITEMS} shortcut="ctrl" />)
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      expect(screen.queryAllByRole('button', { name: /favoritos/ }).length).toBe(0)
+    })
+
+    it('click en star dispara onTogglePin sin disparar onSelect del item', async () => {
+      const onTogglePin = vi.fn()
+      const onSelect = vi.fn()
+      render(
+        <CommandPalette
+          items={[{ id: 'panel', label: 'Panel', onSelect }]}
+          onTogglePin={onTogglePin}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      const star = screen.getByRole('button', { name: /Agregar Panel a favoritos/ })
+      fireEvent.click(star)
+      expect(onTogglePin).toHaveBeenCalledWith('panel')
+      expect(onSelect).not.toHaveBeenCalled()
+    })
+
+    it('star muestra estado pinned correcto (filled vs outline)', async () => {
+      render(
+        <CommandPalette
+          items={[
+            { id: 'a', label: 'A', onSelect: vi.fn() },
+            { id: 'b', label: 'B', onSelect: vi.fn() },
+          ]}
+          pinnedIds={['a']}
+          onTogglePin={vi.fn()}
+          shortcut="ctrl"
+        />
+      )
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+      await waitFor(() => expect(screen.getByLabelText('Buscar')).toBeTruthy())
+      const starA = screen.getByRole('button', { name: /Quitar A de favoritos/ })
+      const starB = screen.getByRole('button', { name: /Agregar B a favoritos/ })
+      expect(starA.textContent).toBe('★')
+      expect(starB.textContent).toBe('☆')
+      expect(starA.getAttribute('aria-pressed')).toBe('true')
+      expect(starB.getAttribute('aria-pressed')).toBe('false')
+    })
+  })
 })

@@ -24,6 +24,7 @@ import { CommandPalette } from './components/shared/CommandPalette'
 import { KeyboardShortcutsHelp } from './components/shared/KeyboardShortcutsHelp'
 import { useRegisteredCommands } from './lib/commandRegistry'
 import { useRecentItems } from './hooks/useRecentItems'
+import { usePinnedItems } from './hooks/usePinnedItems'
 import { buildNavCommands, NAV_COMMANDS } from './lib/navigationCommands'
 import { useKeyboardShortcuts, type ShortcutBinding } from './hooks/useKeyboardShortcuts'
 
@@ -257,6 +258,10 @@ export default function App() {
   const { recent: recentCommandIds, push: pushRecent } = useRecentItems(
     'aquacontrol:palette:recents:v1',
     { maxItems: 5 },
+  )
+  const { pinned: pinnedCommandIds, togglePin: togglePinCommand } = usePinnedItems(
+    'aquacontrol:palette:pinned:v1',
+    { maxItems: 3 },
   )
 
   const navCommands = currentUser
@@ -560,6 +565,8 @@ export default function App() {
         placeholder="Buscar sección o tab…"
         recentIds={recentCommandIds}
         onItemSelected={(item) => pushRecent(item.id)}
+        pinnedIds={pinnedCommandIds}
+        onTogglePin={togglePinCommand}
       />
       <KeyboardShortcutsHelp
         open={helpOpen}
