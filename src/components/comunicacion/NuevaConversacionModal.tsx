@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
@@ -55,8 +56,6 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
     })
   }
 
-  const disabled = sending || !clienteId || !subject.trim() || !firstMessage.trim()
-
   return (
     <EditModal
       title="Nueva Conversación"
@@ -65,14 +64,19 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} disabled={sending}
-            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={sending}>
             Cancelar
-          </button>
-          <button onClick={handleSubmit} disabled={disabled}
-            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: disabled ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', transition: 'background 0.14s' }}>
-            {sending ? 'Enviando…' : 'Iniciar conversación'}
-          </button>
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!clienteId || !subject.trim() || !firstMessage.trim()}
+            loading={sending}
+            loadingText="Enviando…"
+          >
+            Iniciar conversación
+          </Button>
         </>
       }
     >

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateEmail } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 
 interface Props {
   onClose: () => void
@@ -50,27 +51,18 @@ export function PasswordResetModal({ onClose }: Props) {
       onClose={onClose}
       footer={!sent ? (
         <>
-          <button
-            onClick={onClose}
-            style={{ padding: '10px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            Cancelar
-          </button>
-          <button
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button
+            variant="gradient-primary"
             onClick={handleRequest}
-            disabled={loading}
-            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+            loading={loading}
+            loadingText="Enviando..."
           >
-            {loading ? 'Enviando...' : 'Enviar Enlace'}
-          </button>
+            Enviar Enlace
+          </Button>
         </>
       ) : (
-        <button
-          onClick={onClose}
-          style={{ padding: '10px 32px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-        >
-          Entendido
-        </button>
+        <Button variant="gradient-primary" onClick={onClose}>Entendido</Button>
       )}
     >
       {!sent ? (

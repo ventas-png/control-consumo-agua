@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
@@ -30,8 +31,6 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
     })
   }
 
-  const disabled = sending || !subject.trim() || !firstMessage.trim()
-
   return (
     <EditModal
       title="Nueva discusión de equipo"
@@ -40,14 +39,19 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} disabled={sending}
-            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '13px', cursor: 'pointer' }}>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={sending}>
             Cancelar
-          </button>
-          <button onClick={handleSubmit} disabled={disabled}
-            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: disabled ? 'var(--at-ink-3)' : 'var(--at-accent-hover)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer' }}>
-            {sending ? 'Creando…' : 'Crear discusión'}
-          </button>
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!subject.trim() || !firstMessage.trim()}
+            loading={sending}
+            loadingText="Creando…"
+          >
+            Crear discusión
+          </Button>
         </>
       }
     >

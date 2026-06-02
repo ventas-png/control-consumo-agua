@@ -1,6 +1,7 @@
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -81,19 +82,17 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} style={{
-            padding: '11px 18px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
-            background: 'var(--at-surface)', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-          }}>
-            Cancelar
-          </button>
-          <button type="submit" form="convenio-form" disabled={saving} style={{
-            padding: '11px 22px', borderRadius: '8px', border: 'none',
-            background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))',
-            color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
-          }}>
-            {saving ? '⏳ Creando...' : '🤝 Crear Convenio'}
-          </button>
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button
+            type="submit"
+            form="convenio-form"
+            variant="gradient-accent"
+            loading={saving}
+            loadingText="Creando..."
+            iconLeft={!saving ? '🤝' : undefined}
+          >
+            Crear Convenio
+          </Button>
         </>
       }
     >
