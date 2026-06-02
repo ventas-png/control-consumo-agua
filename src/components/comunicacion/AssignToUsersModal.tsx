@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ConversationAssignment } from '../../types'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 
 interface Props {
   teamUsers: { id: string; full_name: string; role: string }[]
@@ -47,18 +48,16 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose}
-            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            style={{
-              padding: '8px 16px', border: 'none', borderRadius: '8px',
-              background: 'var(--at-accent-hover)', color: 'white', fontSize: '13px', fontWeight: 600,
-              cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-            }}>
-            {saving ? 'Guardando…' : 'Guardar asignaciones'}
-          </button>
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSave}
+            loading={saving}
+            loadingText="Guardando…"
+          >
+            Guardar asignaciones
+          </Button>
         </>
       }
     >

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { EditModal } from '../shared/EditModal'
+import { Button } from '../shared/Button'
 
 interface Usuario {
   id: string
@@ -96,27 +97,15 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
       onClose={onClose}
       footer={
         <>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
-              background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '14px',
-            }}
-          >
-            Cancelar
-          </button>
-          <button
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button
+            variant="gradient-primary"
             onClick={() => void guardar()}
-            disabled={saving}
-            style={{
-              padding: '9px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-              color: 'white', cursor: saving ? 'not-allowed' : 'pointer',
-              fontSize: '14px', fontWeight: 600,
-            }}
+            loading={saving}
+            loadingText="Guardando..."
           >
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
+            Guardar
+          </Button>
         </>
       }
     >
