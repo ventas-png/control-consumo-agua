@@ -20,6 +20,11 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard, AccessDenied } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
 import { SinProyectoAsignado } from './components/condominios/SinProyectoAsignado'
+import { CommandPalette } from './components/shared/CommandPalette'
+import { KeyboardShortcutsHelp } from './components/shared/KeyboardShortcutsHelp'
+import { useRegisteredCommands } from './lib/commandRegistry'
+import { buildNavCommands, NAV_COMMANDS } from './lib/navigationCommands'
+import { useKeyboardShortcuts, type ShortcutBinding } from './hooks/useKeyboardShortcuts'
 
 // Auth + landing flow — lazy para que NO entre al bundle principal de la app
 // autenticada (donde el ~99% del tiempo de uso ocurre). En primer load el
@@ -237,6 +242,45 @@ export default function App() {
   } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
+
+  // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
+  // Los hooks se llaman incondicionalmente (Rules of Hooks). Si no hay
+  // usuario, los bindings quedan vacios y nada se dispara. El palette y el
+  // modal se renderizan solo dentro del bloque autenticado.
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const registeredCommands = useRegisteredCommands()
+
+  const navCommands = currentUser
+    ? buildNavCommands(currentUser, canViewModule, (s) => navigate(sectionToPath(s)))
+    : []
+  const allCommands = [...navCommands, ...registeredCommands]
+
+  // Vim-style shortcuts: 'g X' navega a la seccion correspondiente. Solo se
+  // crean para las secciones donde NAV_COMMANDS define un shortcut y el
+  // usuario tiene acceso (mismo filtro que buildNavCommands).
+  const shortcutBindings: ShortcutBinding[] = currentUser
+    ? [
+        ...NAV_COMMANDS
+          .filter(d => d.shortcut)
+          .filter(d => !d.roles || d.roles.includes(currentUser.role))
+          .filter(d => !d.module || canViewModule(d.module))
+          .map(d => ({
+            sequence: d.shortcut!,
+            description: `Ir a ${d.label}`,
+            category: 'Navegacion',
+            handler: () => navigate(sectionToPath(d.id)),
+          })),
+        {
+          sequence: '?',
+          description: 'Mostrar atajos de teclado',
+          category: 'Ayuda',
+          handler: () => setHelpOpen(true),
+        },
+      ]
+    : []
+
+  useKeyboardShortcuts(shortcutBindings)
 
   // Identify the signed-in user for analytics + error monitoring (both no-op
   // when their env vars are absent).
@@ -497,6 +541,21 @@ export default function App() {
           en la esquina superior derecha para success/warning/info no críticos.
           Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
       <Toaster richColors position="top-right" closeButton />
+
+      {/* Global CommandPalette (Cmd+K / Ctrl+K) — agrega secciones top-level
+          mas los comandos registrados por componentes hijos (ej: tabs de
+          condominios via commandRegistry). */}
+      <CommandPalette
+        items={allCommands}
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        placeholder="Buscar sección o tab…"
+      />
+      <KeyboardShortcutsHelp
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        bindings={shortcutBindings}
+      />
 
       <style>{`
         @media (max-width: 767px) {

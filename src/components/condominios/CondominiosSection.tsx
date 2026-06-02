@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
-import { CommandPalette, type CommandItem } from '../shared/CommandPalette'
+import { type CommandItem } from '../shared/CommandPalette'
+import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
 import type {
   UserSession, Proyecto, Unidad,
@@ -915,10 +916,15 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     })
   }, [currentUser])
 
+  // Registra los tabs de Condominios en el palette global (App.tsx). El
+  // CommandPalette en App.tsx renderiza todos los items registrados + las
+  // secciones top-level. Al desmontar, los tabs se desregistran.
+  useEffect(() => {
+    return registerCommands(commandItems)
+  }, [commandItems])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* F3.14: Command palette global (Cmd+K / Ctrl+K) */}
-      <CommandPalette items={commandItems} placeholder="Buscar tab de condominios..." />
       {/* Header */}
       <div style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
