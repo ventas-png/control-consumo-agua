@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getUserOrNull } from '../_shared/auth.ts'
 
 // Event types allowed without a valid JWT (fired before login completes)
 const PRE_AUTH_EVENTS = new Set([
@@ -81,19 +82,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Try to verify JWT — required for post-auth events
-    const authHeader = req.headers.get('authorization')
-    let verifiedUserId: string | null = null
-
-    if (authHeader) {
-      const callerClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      )
-      const { data: { user } } = await callerClient.auth.getUser()
-      if (user) verifiedUserId = user.id
-    }
+    // F.infra:I1 — JWT validation via shared helper. log-security-event acepta
+    // requests sin JWT solo para PRE_AUTH_EVENTS (failed_login, etc).
+    const auth = await getUserOrNull(req, corsHeaders)
+    const verifiedUserId = auth?.user.id ?? null
 
     // Post-auth events require a valid JWT
     if (!PRE_AUTH_EVENTS.has(event_type) && !verifiedUserId) {

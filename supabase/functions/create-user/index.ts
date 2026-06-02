@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { requireUser } from '../_shared/auth.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -62,26 +63,10 @@ Deno.serve(async (req) => {
   if (originError) return originError
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Client with caller's JWT to verify identity and role
-    const callerClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser()
-    if (callerError || !caller) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    // F.infra:I1 — JWT validation via shared helper.
+    const auth = await requireUser(req, corsHeaders)
+    if ('response' in auth) return auth.response
+    const { user: caller, client: callerClient } = auth
 
     const { data: callerProfile } = await callerClient
       .from('app_users')
