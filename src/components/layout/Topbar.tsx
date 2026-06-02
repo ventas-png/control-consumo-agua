@@ -102,7 +102,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, s
       {/* ── Left: hamburger + page title ───────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
-          className="app-hamburger"
+          className="app-hamburger btn-touch"
           onClick={onMenuToggle}
           aria-label={sidebarOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
           aria-controls="app-sidebar"
@@ -112,8 +112,8 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, s
             display: 'none',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '38px',
-            height: '38px',
+            width: '44px',
+            height: '44px',
             border: '1px solid var(--at-line)',
             background: 'var(--at-surface-2)',
             borderRadius: '9px',
@@ -196,6 +196,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, s
           onClick={cycle}
           aria-label="Cambiar tema"
           title={`Tema: ${themeLabel} (clic para cambiar)`}
+          className="btn-touch"
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: '34px', height: '34px', flexShrink: 0,
@@ -210,8 +211,10 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, s
         {/* Divider */}
         <div style={{ width: '1px', height: '24px', background: 'var(--at-line)' }} />
 
-        {/* User chip */}
+        {/* User chip — en phones ≤380px se oculta el texto (clase
+            app-user-chip-text) y queda solo el avatar para ahorrar ancho. */}
         <div
+          className="app-user-chip"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -240,7 +243,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, s
           >
             {getInitials(currentUser.name)}
           </div>
-          <div>
+          <div className="app-user-chip-text">
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)', lineHeight: '1.25' }}>
               {currentUser.name.split(' ')[0]}
             </div>

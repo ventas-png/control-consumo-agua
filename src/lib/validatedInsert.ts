@@ -140,6 +140,7 @@ export async function validatedInsertMany<TSchema extends z.ZodTypeAny>(
   }
 }
 
+
 // Versión para `update`. Acepta un schema parcial (Partial<input>) — usar
 // `schema.partial()` del lado del caller si la entrada no es completa.
 export interface ValidatedUpdateOptions extends ValidatedInsertOptions {

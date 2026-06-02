@@ -416,6 +416,68 @@ describe('DataTable — server pagination mode', () => {
   })
 })
 
+describe('DataTable — mobile responsive', () => {
+  it('aplica clase table-col-secondary a celdas con hideOnMobile=true', () => {
+    const cols: DataTableColumn<Row>[] = [
+      { key: 'nombre', header: 'Nombre' },
+      { key: 'consumo', header: 'Consumo', hideOnMobile: true },
+      { key: 'estado', header: 'Estado' },
+    ]
+    const { container } = render(<DataTable data={rows} columns={cols} rowKey="id" pageSize={0} />)
+    const hiddenCells = container.querySelectorAll('.table-col-secondary')
+    // 1 header + 4 row cells = 5
+    expect(hiddenCells.length).toBe(5)
+  })
+
+  it('NO aplica table-col-secondary cuando hideOnMobile es false/undefined', () => {
+    const { container } = render(<DataTable data={rows} columns={columns} rowKey="id" pageSize={0} />)
+    expect(container.querySelectorAll('.table-col-secondary').length).toBe(0)
+  })
+
+  it('stickyFirstColumn aplica clase table-col-sticky solo a la primera columna', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" stickyFirstColumn pageSize={0} />
+    )
+    const stickyCells = container.querySelectorAll('.table-col-sticky')
+    // 1 header + 4 rows = 5 celdas en la primera columna
+    expect(stickyCells.length).toBe(5)
+    // La primera columna es 'Nombre'
+    const firstHeader = container.querySelector('th.table-col-sticky')
+    expect(firstHeader?.textContent).toContain('Nombre')
+  })
+
+  it('stickyFirstColumn no afecta la segunda columna', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" stickyFirstColumn pageSize={0} />
+    )
+    const allHeaders = container.querySelectorAll('th')
+    expect(allHeaders[0].classList.contains('table-col-sticky')).toBe(true)
+    expect(allHeaders[1].classList.contains('table-col-sticky')).toBe(false)
+    expect(allHeaders[2].classList.contains('table-col-sticky')).toBe(false)
+  })
+
+  it('combina hideOnMobile + stickyFirstColumn en classNames diferentes', () => {
+    const cols: DataTableColumn<Row>[] = [
+      { key: 'nombre', header: 'Nombre' },
+      { key: 'consumo', header: 'Consumo', hideOnMobile: true },
+      { key: 'estado', header: 'Estado' },
+    ]
+    const { container } = render(
+      <DataTable data={rows} columns={cols} rowKey="id" stickyFirstColumn pageSize={0} />
+    )
+    const headers = container.querySelectorAll('th')
+    expect(headers[0].className).toContain('table-col-sticky')
+    expect(headers[0].className).not.toContain('table-col-secondary')
+    expect(headers[1].className).toContain('table-col-secondary')
+    expect(headers[1].className).not.toContain('table-col-sticky')
+  })
+
+  it('usa .table-scroll-wrapper para overflow horizontal', () => {
+    const { container } = render(<DataTable data={rows} columns={columns} rowKey="id" pageSize={0} />)
+    expect(container.querySelector('.table-scroll-wrapper')).toBeTruthy()
+  })
+})
+
 describe('DataTable — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(
