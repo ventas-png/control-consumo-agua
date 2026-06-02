@@ -327,6 +327,95 @@ describe('DataTable — expandedContent (row expansion)', () => {
   })
 })
 
+describe('DataTable — server pagination mode', () => {
+  it('no filtra ni ordena en server mode (data es lo que se renderiza)', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        paginationMode="server"
+        currentPage={0}
+        onPageChange={() => {}}
+        searchableKeys={['nombre']}
+      />,
+    )
+    // Aunque hay search input, escribir no debe filtrar (server lo hace).
+    fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'Ana' } })
+    // Las 4 filas siguen renderizadas (DataTable no las filtra)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
+  })
+
+  it('llama onPageChange al hacer click en Siguiente (heuristica hasMore)', () => {
+    const onPageChange = vi.fn()
+    // pageSize=4, data.length=4 → hasMore = true (asume hay mas)
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        paginationMode="server"
+        currentPage={0}
+        pageSize={4}
+        onPageChange={onPageChange}
+      />,
+    )
+    fireEvent.click(screen.getByText(/Siguiente/))
+    expect(onPageChange).toHaveBeenCalledWith(1)
+  })
+
+  it('deshabilita Siguiente cuando data.length < pageSize (sin totalRows)', () => {
+    // pageSize=10, data.length=4 → hasMore = false
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        paginationMode="server"
+        currentPage={0}
+        pageSize={10}
+        onPageChange={() => {}}
+      />,
+    )
+    const sigBtn = screen.getByText(/Siguiente/).closest('button')!
+    expect(sigBtn.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('usa totalRows para calcular totalPages cuando se provee', () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        paginationMode="server"
+        currentPage={0}
+        pageSize={4}
+        totalRows={20}
+        onPageChange={() => {}}
+      />,
+    )
+    expect(screen.getByText(/Página 1 de 5/)).toBeDefined()
+    expect(screen.getByText(/4 eventos \(de 20\)/)).toBeDefined()
+  })
+
+  it('deshabilita Anterior cuando currentPage = 0', () => {
+    render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        paginationMode="server"
+        currentPage={0}
+        pageSize={4}
+        totalRows={20}
+        onPageChange={() => {}}
+      />,
+    )
+    const antBtn = screen.getByText(/Anterior/).closest('button')!
+    expect(antBtn.hasAttribute('disabled')).toBe(true)
+  })
+})
+
 describe('DataTable — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(
