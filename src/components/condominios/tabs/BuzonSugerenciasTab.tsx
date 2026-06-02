@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify } from '../../shared/Dialog'
+import { EmptyState } from '../../shared/EmptyState'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { SugerenciaCondominio, CategoriaSugerencia, EstadoSugerencia, Unidad } from '../../../types'
 
@@ -182,10 +183,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
 
       {/* Lista + Detalle */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
-          Sin sugerencias registradas
-        </div>
+        <EmptyState icon="💬" compact title="Sin sugerencias registradas" />
       ) : (
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
