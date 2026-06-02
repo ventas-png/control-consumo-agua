@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import { notify, confirm } from '../../shared/Dialog'
+import { Button } from '../../shared/Button'
 import { ArticuloManual, SeccionManual } from '../../../types'
 
 interface Props {
@@ -95,10 +96,13 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
           )}
         </div>
         {canCreate && (
-          <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+          <Button
+            variant={mostrarForm ? 'secondary' : 'primary'}
+            size="sm"
+            onClick={() => setMostrarForm(!mostrarForm)}
+          >
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo artículo'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -127,10 +131,15 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                 onChange={e => setForm(p => ({ ...p, contenido: e.target.value }))} placeholder="Redacta el contenido del artículo…" />
             </div>
           </div>
-          <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {saving ? 'Guardando…' : '✅ Publicar'}
-          </button>
+          <Button
+            size="sm"
+            onClick={guardar}
+            loading={saving}
+            loadingText="Guardando…"
+            iconLeft={!saving ? '✅' : undefined}
+          >
+            Publicar
+          </Button>
         </div>
       )}
 
@@ -162,12 +171,10 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                         <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>#{a.orden}</span>
                         {canEdit && (
                           <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <button onClick={() => toggleActivo(a.id, a.activo)}
-                              style={{ padding: '3px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-ink-3)' }}>
+                            <Button variant="ghost" size="sm" onClick={() => toggleActivo(a.id, a.activo)} style={{ padding: '3px 8px', fontSize: 10 }}>
                               {a.activo ? 'Ocultar' : 'Mostrar'}
-                            </button>
-                            <button onClick={() => eliminar(a.id)}
-                              style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-danger)' }}>✕</button>
+                            </Button>
+                            <Button variant="outline-danger" size="sm" onClick={() => eliminar(a.id)} style={{ padding: '3px 8px', fontSize: 10, border: 'none', background: 'var(--at-danger-tint)' }} aria-label="Eliminar">✕</Button>
                           </div>
                         )}
                         <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{expandido === a.id ? '▲' : '▼'}</span>

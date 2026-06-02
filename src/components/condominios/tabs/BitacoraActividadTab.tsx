@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Button } from '../../shared/Button'
 import {
   CuotaCondominio, Visitante, TicketMantenimiento, ReservaAmenidad,
   AnuncioComunidad, ConciliacionCobrosLog, FondoReservaMovimiento, Unidad,
@@ -243,15 +244,13 @@ export default function BitacoraActividadTab({
       {/* Paginación */}
       {paginas > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagina === 0}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: pagina === 0 ? 'not-allowed' : 'pointer', background: 'var(--at-surface)', opacity: pagina === 0 ? 0.4 : 1 }}>
+          <Button variant="secondary" size="sm" onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagina === 0} style={{ padding: '4px 12px', fontSize: 12 }}>
             ‹ Ant.
-          </button>
+          </Button>
           <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Pág. {pagina + 1} / {paginas} · {filtrados.length} eventos</span>
-          <button onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))} disabled={pagina === paginas - 1}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: pagina === paginas - 1 ? 'not-allowed' : 'pointer', background: 'var(--at-surface)', opacity: pagina === paginas - 1 ? 0.4 : 1 }}>
+          <Button variant="secondary" size="sm" onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))} disabled={pagina === paginas - 1} style={{ padding: '4px 12px', fontSize: 12 }}>
             Sig. ›
-          </button>
+          </Button>
         </div>
       )}
     </div>
