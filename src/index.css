@@ -298,10 +298,31 @@ button:focus:not(:focus-visible) {
     font-size: 12px !important;
   }
 
-  /* Ensure all buttons have a minimum touch target */
+  /* Touch target standard (Apple HIG / Material): 44x44 minimum para que
+   * el dedo pueda apuntar sin overshoot. Aplicar via clase .btn-touch o
+   * via selectores genericos en este bloque. */
   .btn-touch {
-    min-height: 40px !important;
-    min-width: 40px !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* Form inputs: altura minima 44px para teclado movil + tap comfort.
+   * Reduce el "font size 16px" requerido por iOS para que NO haga
+   * autozoom al focusear (Safari hace zoom si el input es <16px). */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="search"],
+  input[type="url"],
+  input[type="date"],
+  input[type="month"],
+  input[type="time"],
+  textarea,
+  select {
+    min-height: 44px;
+    font-size: 16px;
   }
 
   /* One-column grid for form fields that use two-col on desktop */
@@ -336,11 +357,18 @@ button:focus:not(:focus-visible) {
   .app-sidebar {
     position: fixed !important;
     top: 0; left: 0; bottom: 0;
-    width: 280px !important;
-    min-width: 280px !important;
+    /* En telefonos muy angostos (≤360px), el sidebar fijo a 280px ocuparia
+     * casi todo el viewport sin dejar ver el backdrop. Usar min() para
+     * limitar a 85vw asegura que siempre quede un margen visible. */
+    width: min(280px, 85vw) !important;
+    min-width: min(280px, 85vw) !important;
     transform: translateX(-100%);
     z-index: 200;
     box-shadow: 0 0 30px rgba(0,0,0,0.3);
+    /* iOS safe-area: notch en iPhone X+ corta el contenido si no usamos
+     * env(safe-area-inset-*) en padding. */
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
   .app-sidebar.open {
     transform: translateX(0);
@@ -353,6 +381,12 @@ button:focus:not(:focus-visible) {
     padding: 12px !important;
     width: 100% !important;
   }
+  /* iOS safe-area en topbar (notch) y main (home indicator). */
+  .app-topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: env(safe-area-inset-top, 0);
+  }
   /* Tablas: scroll horizontal con indicador */
   .table-scroll-wrapper {
     overflow-x: auto;
@@ -363,10 +397,19 @@ button:focus:not(:focus-visible) {
   .table-col-secondary {
     display: none !important;
   }
-  /* Header de admin: stack vertical en mobile */
-  .app-topbar {
-    flex-wrap: wrap;
-    gap: 8px;
+}
+
+/* ─── Hide non-essential user-chip text on very narrow phones ─────────── */
+@media (max-width: 380px) {
+  /* En phones extra-narrow, el user-chip de la topbar ocupa demasiado.
+   * Ocultar el texto y mostrar solo el avatar (que ya tiene iniciales). */
+  .app-user-chip-text {
+    display: none !important;
+  }
+  .app-user-chip {
+    padding: 4px !important;
+    background: transparent !important;
+    border: none !important;
   }
 }
 

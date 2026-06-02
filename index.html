@@ -2,7 +2,9 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover habilita env(safe-area-inset-*) para layouts
+         responsive en iPhone X+ (notch / Dynamic Island) y home indicator. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
       X-Frame-Options, X-XSS-Protection y Referrer-Policy se entregan como
       headers HTTP desde vercel.json. Como <meta> son ignorados por los
