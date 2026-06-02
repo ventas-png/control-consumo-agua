@@ -47,6 +47,7 @@ interface ReportTemplate {
   default_format: Format
   created_by: string | null
   created_at: string
+  last_run_at: string | null
 }
 
 const SOURCE_LABELS: Record<SourceTable, string> = {
@@ -112,7 +113,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     try {
       const { data, error: err } = await supabase
         .from('report_templates')
-        .select('id, company_id, project_id, name, description, source_table, columns, filters, schedule_kind, recipients, default_format, created_by, created_at')
+        .select('id, company_id, project_id, name, description, source_table, columns, filters, schedule_kind, recipients, default_format, created_by, created_at, last_run_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
       if (err) throw err
@@ -390,6 +391,11 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
                     )}
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
                       {t.columns.length} columna{t.columns.length === 1 ? '' : 's'} · {Object.keys(t.filters).length} filtro{Object.keys(t.filters).length === 1 ? '' : 's'} · {t.recipients.length} 📧
+                      {t.last_run_at && (
+                        <> · ⏱ <span title={`Última ejecución: ${new Date(t.last_run_at).toLocaleString('es-GT')}`}>
+                          {formatRelativeDays(t.last_run_at)}
+                        </span></>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
@@ -485,4 +491,16 @@ const dangerBtnStyle: CSSProperties = {
   padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--at-line)',
   background: 'var(--at-surface)', color: 'var(--at-danger)',
   fontSize: '14px', cursor: 'pointer',
+}
+
+// F4.5.1c: muestra "hoy", "ayer", "hace N días" para last_run_at.
+function formatRelativeDays(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  if (days < 0) return 'futuro'
+  if (days === 0) return 'hoy'
+  if (days === 1) return 'ayer'
+  if (days < 30) return `hace ${days}d`
+  if (days < 365) return `hace ${Math.floor(days / 30)}mes`
+  return `hace ${Math.floor(days / 365)}a`
 }
