@@ -245,6 +245,12 @@ Lista corta de lo que **no se puede saltar** antes del primer cliente que paga.
 
 Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior, se marca aquí + en el documento de critique correspondiente.
 
+> ⚠️ **Tracker activo movido.** Esta sección refleja el cierre de los lotes 1-4 (quick wins, hasta ~PR #174,
+> 2026-05-27). Desde entonces se mergearon ~130 PRs hasta el **#298** (Fases F2 seguridad, F3 UX/a11y, F4 SaaS ops,
+> router, split de tipos, Zod, mobile, billing Stripe). El estado consolidado al día de hoy y la separación del
+> trabajo pendiente en **tracks paralelos** viven ahora en **[`ESTADO_Y_TRACKS_PARALELOS_2026-06-02.md`](./ESTADO_Y_TRACKS_PARALELOS_2026-06-02.md)**.
+> Lo de abajo se conserva como registro histórico del arranque.
+
 ### Hallazgos resueltos
 
 | ID | Hallazgo | PR | Notas |
@@ -274,15 +280,19 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 
 ### Métricas de avance (post-merge a main)
 
-| Concepto | Antes | Final (post 7 merges, 2026-05-27) |
-|----------|-------|-----------------------------------|
-| Hallazgos totales      | 219 | **222** (+`I39`, `I40`, `I41`, `I42` descubiertos durante implementación) |
-| Resueltos             | 0   | **14** (`I3, I10, I11, I27, I32, I34, I35, I37, I38, I39, I40, I41, I42, cond:C9 arranque`) |
-| Docs/falsos positivos | 0   | **3** (`I30, I36, com:N22`) |
-| Parciales activos     | 0   | **7** (`I15, I7, I8, I33, com:N20, cond:A10, agua:C11+cond:C14`) |
-| Deferidos             | 0   | 1 (`agua:B10` — sidebar colapsable requiere rediseño) |
-| % progreso (resueltos) | 0%  | **6.3%** (14/222) |
-| % cobertura del lote 1+2+3+4 | 0% | **~98%** (todo lo planeado mergeado a main) |
+| Concepto | Lotes 1-4 (2026-05-27) | **Al #298 (2026-06-02)** |
+|----------|------------------------|--------------------------|
+| Hallazgos totales      | 222 | **222** (220 base + `I39`-`I42`) |
+| Resueltos             | 14  | **≈48** (+ Fases F2/F3 completas, billing, MFA, RLS por unidad, PWA, reporting) |
+| Parciales activos     | 7   | **≈18** (DataTable, i18n, caché, paginación, registry sidebar, orquestador notif…) |
+| Docs/falsos positivos | 3   | 3 (`I30, I36, com:N22`) |
+| Deferidos             | 1   | 1 (`agua:B10`) |
+| % avance por fase | — | **F1 ~95% · F2 ~90% · F3 ~80% · F4 ~40% · F5 ~15%** |
+
+> El detalle ✅/⏳/❌ por dominio (agua, condominios, plataforma, servicios, comunicación, infra) y los **8 tracks
+> paralelos** están en [`ESTADO_Y_TRACKS_PARALELOS_2026-06-02.md`](./ESTADO_Y_TRACKS_PARALELOS_2026-06-02.md).
+> Verificación en vivo (Supabase): `billing_plans`/`subscriptions`/`invoices`, `audit_log`, `email_send_queue`,
+> `report_templates`, RLS habilitado en ~190 tablas, advisors de seguridad **0 ERROR** / 58 WARN (hardening).
 
 ### Orden de merge ejecutado — TODOS LOS PRs EN `main` ✅
 
