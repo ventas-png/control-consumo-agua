@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Fragment, type CSSProperties } from 'react'
 import { supabase } from '../../lib/supabase'
 import { confirm, notify } from '../shared/Dialog'
+import { EditModal } from '../shared/EditModal'
 
 // ============================================================================
 // PapeleraModal — F4.2.3: UI de Papelera para soft-deleted recovery.
@@ -134,109 +135,29 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
   const hasMore = rows.length === pageSize
 
   return (
-    <div
-      style={overlayStyle}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={modalStyle} role="dialog" aria-labelledby="papelera-title">
-        {/* Header */}
-        <div style={headerStyle}>
-          <div>
-            <div id="papelera-title" style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>
-              🗑️ Papelera — recuperar borrados
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-              Rows marcados como `deleted_at` aun preservados. Restaurar los devuelve a la lista activa.
-            </div>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar" style={closeBtnStyle}>×</button>
-        </div>
-
-        {/* Filtros */}
-        <div style={filtersStyle}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>
-            Tabla
-            <select
-              value={table}
-              onChange={e => { setTable(e.target.value as SoftTable); setPage(0) }}
-              style={selectStyle}
-            >
-              {TABLES.map(t => (
-                <option key={t} value={t}>{TABLE_LABELS[t]}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px' }}>
-          {loading ? (
-            <div style={emptyStateStyle}>Cargando…</div>
-          ) : error ? (
-            <div style={{ ...emptyStateStyle, color: 'var(--at-danger)' }}>{error}</div>
-          ) : rows.length === 0 ? (
-            <div style={emptyStateStyle}>
-              Sin registros borrados en {TABLE_LABELS[table].toLowerCase()}.
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={thStyle}>Borrado</th>
-                  <th style={thStyle}>Por</th>
-                  <th style={thStyle}>ID</th>
-                  <th style={thStyle} aria-label="Detalles" />
-                  <th style={thStyle} aria-label="Acciones" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => {
-                  const actor = r.deleted_by ? users[r.deleted_by] ?? `${r.deleted_by.slice(0, 8)}…` : 'Sistema'
-                  const isExpanded = expanded.has(r.id)
-                  return (
-                    <Fragment key={r.id}>
-                      <tr style={{ borderTop: '1px solid var(--at-chip)' }}>
-                        <td style={tdStyle}>{formatDate(r.deleted_at)}</td>
-                        <td style={tdStyle}>{actor}</td>
-                        <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '11px', color: 'var(--at-ink-3)' }}>
-                          {r.id.slice(0, 8)}…
-                        </td>
-                        <td style={tdStyle}>
-                          <button
-                            onClick={() => toggleExpand(r.id)}
-                            aria-expanded={isExpanded}
-                            aria-controls={`row-detail-${r.id}`}
-                            style={expandBtnStyle}
-                          >
-                            {isExpanded ? 'Ocultar' : 'Ver fila'}
-                          </button>
-                        </td>
-                        <td style={tdStyle}>
-                          <button
-                            onClick={() => void restaurar(r.id)}
-                            style={restoreBtnStyle}
-                          >
-                            ↩ Restaurar
-                          </button>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr id={`row-detail-${r.id}`}>
-                          <td colSpan={5} style={{ padding: '8px 12px 16px', background: 'var(--at-surface-2)' }}>
-                            <pre style={diffPreStyle}>{JSON.stringify(r, null, 2)}</pre>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Pagination */}
-        <div style={paginationStyle}>
+    <EditModal
+      title="🗑️ Papelera — recuperar borrados"
+      subtitle="Rows marcados como `deleted_at` aún preservados. Restaurar los devuelve a la lista activa."
+      size="lg"
+      onClose={onClose}
+      noPadding
+      headerActions={
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>
+          Tabla:
+          <select
+            value={table}
+            onChange={e => { setTable(e.target.value as SoftTable); setPage(0) }}
+            aria-label="Seleccionar tabla"
+            style={selectStyle}
+          >
+            {TABLES.map(t => (
+              <option key={t} value={t}>{TABLE_LABELS[t]}</option>
+            ))}
+          </select>
+        </label>
+      }
+      footer={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
             Página {page + 1} · {rows.length} registros
           </div>
@@ -253,8 +174,74 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
             >Siguiente →</button>
           </div>
         </div>
+      }
+    >
+      <div style={{ padding: '8px 24px' }}>
+        {loading ? (
+          <div style={emptyStateStyle}>Cargando…</div>
+        ) : error ? (
+          <div style={{ ...emptyStateStyle, color: 'var(--at-danger)' }}>{error}</div>
+        ) : rows.length === 0 ? (
+          <div style={emptyStateStyle}>
+            Sin registros borrados en {TABLE_LABELS[table].toLowerCase()}.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <th style={thStyle}>Borrado</th>
+                <th style={thStyle}>Por</th>
+                <th style={thStyle}>ID</th>
+                <th style={thStyle} aria-label="Detalles" />
+                <th style={thStyle} aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const actor = r.deleted_by ? users[r.deleted_by] ?? `${r.deleted_by.slice(0, 8)}…` : 'Sistema'
+                const isExpanded = expanded.has(r.id)
+                return (
+                  <Fragment key={r.id}>
+                    <tr style={{ borderTop: '1px solid var(--at-chip)' }}>
+                      <td style={tdStyle}>{formatDate(r.deleted_at)}</td>
+                      <td style={tdStyle}>{actor}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '11px', color: 'var(--at-ink-3)' }}>
+                        {r.id.slice(0, 8)}…
+                      </td>
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => toggleExpand(r.id)}
+                          aria-expanded={isExpanded}
+                          aria-controls={`row-detail-${r.id}`}
+                          style={expandBtnStyle}
+                        >
+                          {isExpanded ? 'Ocultar' : 'Ver fila'}
+                        </button>
+                      </td>
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => void restaurar(r.id)}
+                          style={restoreBtnStyle}
+                        >
+                          ↩ Restaurar
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr id={`row-detail-${r.id}`}>
+                        <td colSpan={5} style={{ padding: '8px 12px 16px', background: 'var(--at-surface-2)' }}>
+                          <pre style={diffPreStyle}>{JSON.stringify(r, null, 2)}</pre>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
-    </div>
+    </EditModal>
   )
 }
 
@@ -267,29 +254,6 @@ function formatDate(iso: string): string {
 }
 
 // ───── Styles ─────
-const overlayStyle: CSSProperties = {
-  position: 'fixed', inset: 0, zIndex: 9000,
-  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  padding: '16px',
-}
-const modalStyle: CSSProperties = {
-  background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '880px',
-  boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
-  display: 'flex', flexDirection: 'column', maxHeight: '90vh',
-}
-const headerStyle: CSSProperties = {
-  padding: '20px 24px 14px', borderBottom: '1px solid var(--at-line)',
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-}
-const closeBtnStyle: CSSProperties = {
-  background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',
-  color: 'var(--at-ink-3)', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
-}
-const filtersStyle: CSSProperties = {
-  padding: '12px 24px', borderBottom: '1px solid var(--at-line)',
-  display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap',
-}
 const selectStyle: CSSProperties = {
   padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
   fontSize: '12px', color: 'var(--at-ink)', background: 'var(--at-surface)', minWidth: '200px',
@@ -308,10 +272,6 @@ const restoreBtnStyle: CSSProperties = {
   padding: '4px 12px', borderRadius: '6px', border: 'none',
   background: 'linear-gradient(135deg, var(--at-success), var(--at-success))',
   color: 'white', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-}
-const paginationStyle: CSSProperties = {
-  padding: '12px 24px', borderTop: '1px solid var(--at-line)',
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 }
 const pageBtnStyle: CSSProperties = {
   padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',

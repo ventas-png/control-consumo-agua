@@ -1,5 +1,6 @@
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
+import { EditModal } from '../shared/EditModal'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -88,22 +89,30 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, padding: '16px',
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: 'var(--at-surface)', borderRadius: '16px', padding: '32px',
-        width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>💰 Aplicar Pago</h2>
-          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--at-ink-3)', padding: '4px' }}>✕</button>
-        </div>
-
-        {/* Info del cargo */}
+    <EditModal
+      title="💰 Aplicar Pago"
+      size="sm"
+      maxWidth="520px"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} style={{
+            padding: '11px 18px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
+            background: 'var(--at-surface)', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+          }}>
+            Cancelar
+          </button>
+          <button type="submit" form="pago-form" disabled={saving} style={{
+            padding: '11px 22px', borderRadius: '8px', border: 'none',
+            background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
+            color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
+          }}>
+            {saving ? '⏳ Guardando...' : '💰 Confirmar Pago'}
+          </button>
+        </>
+      }
+    >
+      {/* Info del cargo */}
         <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '8px' }}>
             {cliente?.nombre ?? registro.cliente_nombre}
@@ -124,8 +133,8 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Tipo de aplicación */}
+      <form id="pago-form" onSubmit={handleSubmit}>
+        {/* Tipo de aplicación */}
           <div style={{ marginBottom: '18px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Tipo de Aplicación
@@ -234,23 +243,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button type="button" onClick={onClose} style={{
-              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
-              background: 'var(--at-surface)', color: 'var(--at-ink-3)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-            }}>
-              Cancelar
-            </button>
-            <button type="submit" disabled={saving} style={{
-              flex: 2, padding: '13px', borderRadius: '8px', border: 'none',
-              background: saving ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
-              color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
-            }}>
-              {saving ? '⏳ Guardando...' : '💰 Confirmar Pago'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </EditModal>
   )
 }
