@@ -96,8 +96,20 @@ ON CONFLICT (company_id, template_key) DO UPDATE
       is_active = true,
       updated_at = now();
 
-COMMENT ON POLICY "report_attachments_select" ON storage.objects IS
-  'F4.5.1d — usuario puede leer reportes de su company. Path prefix = company_id.';
-
-COMMENT ON POLICY "report_attachments_insert" ON storage.objects IS
-  'F4.5.1d — admin/owner puede subir reportes a la carpeta de su company.';
+-- COMMENT ON POLICY ON storage.objects requiere ownership de la tabla, que
+-- el rol de Supabase Preview no tiene. Envuelto en DO block tolerant para no
+-- romper preview branches (es metadata; en prod ya esta aplicada via service
+-- role).
+DO $$
+BEGIN
+  EXECUTE $cmt$
+    COMMENT ON POLICY "report_attachments_select" ON storage.objects IS
+      'F4.5.1d — usuario puede leer reportes de su company. Path prefix = company_id.';
+  $cmt$;
+  EXECUTE $cmt$
+    COMMENT ON POLICY "report_attachments_insert" ON storage.objects IS
+      'F4.5.1d — admin/owner puede subir reportes a la carpeta de su company.';
+  $cmt$;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'COMMENT ON POLICY storage.objects skipped (no ownership en este rol)';
+END $$;
