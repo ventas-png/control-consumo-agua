@@ -2,6 +2,8 @@ import { useState, useRef, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
+import { useBulkSelection } from '../../../hooks/useBulkSelection'
 import { supabase } from '../../../lib/supabase'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
@@ -55,7 +57,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   const [importando, setImportando] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCuota | 'todos'>('todos')
-  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [expandidasRubros, setExpandidasRubros] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     unidad_id: '',
@@ -71,6 +72,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     : cuotas.filter(c => c.estado === filtroEstado)
 
   const cuotasPagables = cuotasFiltradas.filter(c => c.estado !== 'pagado')
+
+  // Bulk selection — solo cuotas pagables son seleccionables (pagadas se excluyen)
+  const bulk = useBulkSelection(cuotasPagables, c => c.id)
+  const seleccionadas = bulk.selected
+  const toggleSeleccion = bulk.toggle
+  const toggleTodas = bulk.toggleAll
 
   const totales = {
     pendiente: cuotas.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.monto, 0),
@@ -171,22 +178,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   function resetForm() {
     setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: new Date().toISOString().slice(0, 7), fecha_vencimiento: '', notas: '' })
     setShowForm(false)
-  }
-
-  function toggleSeleccion(id: string) {
-    setSeleccionadas(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }
-
-  function toggleTodas() {
-    if (seleccionadas.size === cuotasPagables.length) {
-      setSeleccionadas(new Set())
-    } else {
-      setSeleccionadas(new Set(cuotasPagables.map(c => c.id)))
-    }
   }
 
   function toggleRubros(id: string) {
@@ -314,7 +305,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${ids.length} cuotas marcadas como pagadas`, text: `Total: ${moneda} ${totalMonto.toFixed(2)}`, duration: 2000 })
-    setSeleccionadas(new Set())
+    bulk.clear()
     onRefresh()
   }
 
@@ -396,12 +387,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>{cuotas.length} cuotas registradas</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {canEdit && seleccionadas.size > 0 && (
-            <button onClick={pagoMasivo}
-              style={{ padding: '10px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
-              ✅ Pagar {seleccionadas.size} · {moneda} {montoSeleccionado.toFixed(2)}
-            </button>
-          )}
           <button
             onClick={() => exportarExcel(`cuotas-${new Date().toISOString().slice(0,10)}`, [{
               name: 'Cuotas',
@@ -436,7 +421,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       {/* Resumen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {([['pendiente', 'var(--at-primary)', 'var(--at-primary-tint)'], ['moroso', 'var(--at-danger)', 'var(--at-danger-tint)'], ['pagado', 'var(--at-success)', 'var(--at-success-tint)']] as const).map(([estado, color, bg]) => (
-          <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); setSeleccionadas(new Set()) }}
+          <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); bulk.clear() }}
             style={{ padding: '14px', background: filtroEstado === estado ? bg : 'var(--at-surface)', border: `1.5px solid ${filtroEstado === estado ? color : 'var(--at-line)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color }}>{moneda} {totales[estado].toFixed(2)}</div>
             <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px', textTransform: 'capitalize' }}>{cuotas.filter(c => c.estado === estado).length} cuotas {estado}s</div>
@@ -710,6 +695,33 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             ),
           },
         ] satisfies DataTableColumn<CuotaCondominio>[]}
+      />
+
+      {/* Bulk actions toolbar — aparece cuando hay >=1 cuotas seleccionadas */}
+      <SelectionToolbar
+        count={bulk.count}
+        onClear={bulk.clear}
+        entityLabel={{ one: 'cuota', many: 'cuotas' }}
+        leftSlot={`Total: ${moneda} ${montoSeleccionado.toFixed(2)}`}
+        actions={[
+          ...(canEdit ? [{
+            id: 'pagar',
+            label: `Pagar ${bulk.count}`,
+            icon: '✅',
+            variant: 'primary',
+            onClick: () => void pagoMasivo(),
+          } satisfies BulkAction] : []),
+          {
+            id: 'exportar',
+            label: 'Exportar',
+            icon: '📊',
+            onClick: () => exportarExcel(`cuotas-seleccion-${new Date().toISOString().slice(0, 10)}`, [{
+              name: 'Cuotas',
+              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado'],
+              rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
+            }]),
+          },
+        ]}
       />
     </div>
   )
