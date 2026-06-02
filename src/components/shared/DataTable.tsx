@@ -87,6 +87,20 @@ export interface DataTableProps<T> {
    * `null`/`undefined` lo omite.
    */
   footer?: ReactNode
+
+  /**
+   * Row expansion (controlado). Cuando `isRowExpanded(row)` retorna true,
+   * DataTable inserta una fila adicional inmediatamente debajo con el
+   * contenido de `expandedContent(row)` envuelto en un `<td colSpan>`.
+   *
+   * Si `expandedContent` retorna `null`/`undefined`, no se renderiza la fila
+   * (útil para filas que no tienen detalle aunque estén "expandidas").
+   *
+   * El consumer maneja el estado y el toggle (típicamente con un botón
+   * en una columna). DataTable solo renderiza.
+   */
+  expandedContent?: (row: T) => ReactNode | null | undefined
+  isRowExpanded?: (row: T) => boolean
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -106,6 +120,8 @@ export function DataTable<T>({
   rowStyle,
   onRowClick,
   footer,
+  expandedContent,
+  isRowExpanded,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
@@ -310,33 +326,53 @@ export function DataTable<T>({
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((row, idx) => (
-                  <tr
-                    key={getRowKey(row, idx)}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    style={{
-                      borderBottom: '1px solid var(--at-chip)',
-                      cursor: onRowClick ? 'pointer' : 'default',
-                      transition: 'background 0.12s',
-                      ...(rowStyle ? rowStyle(row) : {}),
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-surface-2)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '' }}
-                  >
-                    {columns.map(col => (
-                      <td
-                        key={col.key}
-                        style={{
-                          padding: '10px 14px',
-                          textAlign: col.align ?? 'left',
-                          color: 'var(--at-ink)',
-                        }}
-                      >
-                        {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
+                {paginated.flatMap((row, idx) => {
+                  const expanded = isRowExpanded?.(row) ?? false
+                  const expandContent = expanded ? expandedContent?.(row) : null
+                  const rowKey = getRowKey(row, idx)
+                  const mainRow = (
+                    <tr
+                      key={rowKey}
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      style={{
+                        borderBottom: expandContent ? 'none' : '1px solid var(--at-chip)',
+                        cursor: onRowClick ? 'pointer' : 'default',
+                        transition: 'background 0.12s',
+                        ...(rowStyle ? rowStyle(row) : {}),
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-surface-2)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '' }}
+                    >
+                      {columns.map(col => (
+                        <td
+                          key={col.key}
+                          style={{
+                            padding: '10px 14px',
+                            textAlign: col.align ?? 'left',
+                            color: 'var(--at-ink)',
+                          }}
+                        >
+                          {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                  if (!expandContent) return [mainRow]
+                  return [
+                    mainRow,
+                    <tr
+                      key={`${rowKey}-expanded`}
+                      style={{
+                        borderBottom: '1px solid var(--at-chip)',
+                        background: 'var(--at-surface-2)',
+                      }}
+                    >
+                      <td colSpan={columns.length} style={{ padding: '0 14px 12px' }}>
+                        {expandContent}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                    </tr>,
+                  ]
+                })}
               </tbody>
               {footer && (
                 <tfoot style={{ background: 'var(--at-surface-2)', borderTop: '2px solid var(--at-line)' }}>

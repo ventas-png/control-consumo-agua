@@ -261,6 +261,72 @@ describe('DataTable — footer (totals row)', () => {
   })
 })
 
+describe('DataTable — expandedContent (row expansion)', () => {
+  it('no renderiza expand-row si isRowExpanded retorna false', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        isRowExpanded={() => false}
+        expandedContent={r => <div>Detalle de {r.nombre}</div>}
+      />,
+    )
+    expect(container.textContent).not.toContain('Detalle de Ana Pérez')
+    // 4 filas normales + 0 expand
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
+  })
+
+  it('renderiza una fila adicional con colSpan cuando isRowExpanded es true', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        isRowExpanded={r => r.id === '1'}
+        expandedContent={r => <div>Detalle de {r.nombre}</div>}
+      />,
+    )
+    expect(container.textContent).toContain('Detalle de Ana Pérez')
+    // 4 filas normales + 1 expand = 5
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
+    // El colSpan debe coincidir con número de columnas
+    const expandCell = container.querySelector(`td[colspan="${columns.length}"]`)
+    expect(expandCell).not.toBeNull()
+  })
+
+  it('omite expand-row si expandedContent retorna null', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        isRowExpanded={() => true}
+        expandedContent={() => null}
+      />,
+    )
+    // Aunque todas están "expandidas", null evita la fila
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
+  })
+
+  it('expand-row coexiste con sort/search sin romper', () => {
+    const { container } = render(
+      <DataTable
+        data={rows}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={['nombre']}
+        isRowExpanded={r => r.id === '3'}
+        expandedContent={r => <div>Det {r.nombre}</div>}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'María' } })
+    // Solo "María Sol" pasa el filtro + su expand-row = 2 filas
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2)
+    expect(container.textContent).toContain('Det María Sol')
+  })
+})
+
 describe('DataTable — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(

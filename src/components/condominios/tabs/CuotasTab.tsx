@@ -1,6 +1,7 @@
 import { useState, useRef, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { supabase } from '../../../lib/supabase'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
@@ -557,133 +558,159 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       )}
 
       {/* Lista */}
-      {cuotasFiltradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>💳</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
-        </div>
-      ) : (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
-            <thead>
-              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-                {canEdit && (
-                  <th style={{ padding: '10px 14px', width: 36 }}>
-                    <input type="checkbox"
-                      checked={cuotasPagables.length > 0 && seleccionadas.size === cuotasPagables.length}
-                      onChange={toggleTodas}
-                      title="Seleccionar todas las pagables"
-                    />
-                  </th>
+      {/* F3.9.2: migrado a <DataTable> shared con expandedContent */}
+      <DataTable<CuotaCondominio>
+        data={cuotasFiltradas}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        searchableKeys={[
+          c => c.unidad_nombre ?? '',
+          c => c.concepto,
+          c => c.periodo,
+        ]}
+        searchPlaceholder="Buscar unidad, concepto, período…"
+        emptyState={
+          <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>💳</div>
+            <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
+          </div>
+        }
+        rowStyle={c => seleccionadas.has(c.id) ? { background: 'var(--at-success-tint)' } : {}}
+        isRowExpanded={c => expandidasRubros.has(c.id)}
+        expandedContent={c => {
+          const rubrosDetalle = c.rubros_detalle as RubroDetalle[] | null | undefined
+          if (!rubrosDetalle || rubrosDetalle.length === 0) return null
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', marginLeft: 34, background: 'var(--at-primary-tint)', borderRadius: 8, border: '1px solid var(--at-accent-soft-2)' }}>
+              {rubrosDetalle.map((rd, ri) => (
+                <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--at-ink-2)' }}>
+                  <span>
+                    {rd.nombre}
+                    <span style={{ marginLeft: 6, color: 'var(--at-ink-3)', fontSize: 11 }}>
+                      ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${moneda} ${rd.valor}/m²` : `alíc. ${rd.valor.toLocaleString('es')}`})
+                    </span>
+                  </span>
+                  <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
+                </div>
+              ))}
+            </div>
+          )
+        }}
+        columns={[
+          ...(canEdit ? [{
+            key: 'select',
+            header: (
+              <input type="checkbox"
+                checked={cuotasPagables.length > 0 && seleccionadas.size === cuotasPagables.length}
+                onChange={toggleTodas}
+                aria-label="Seleccionar todas las pagables"
+              />
+            ),
+            width: 36,
+            render: (c: CuotaCondominio) => c.estado !== 'pagado' ? (
+              <input type="checkbox" checked={seleccionadas.has(c.id)} onChange={() => toggleSeleccion(c.id)} aria-label="Seleccionar cuota" />
+            ) : null,
+          }] : []),
+          {
+            key: 'unidad', header: 'Unidad', sortable: true,
+            accessor: c => c.unidad_nombre ?? '',
+            render: c => (
+              <span style={{ color: 'var(--at-ink-2)' }}>
+                {c.unidad_nombre || <span style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>General</span>}
+              </span>
+            ),
+          },
+          {
+            key: 'concepto', header: 'Concepto', sortable: true,
+            accessor: c => c.concepto,
+            render: c => <span style={{ color: 'var(--at-ink-2)' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</span>,
+          },
+          {
+            key: 'periodo', header: 'Período', sortable: true,
+            accessor: c => c.periodo,
+            render: c => <span style={{ color: 'var(--at-ink-2)' }}>{c.periodo}</span>,
+          },
+          {
+            key: 'monto', header: 'Monto', sortable: true,
+            accessor: c => c.monto,
+            render: c => (
+              <>
+                <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
+                {c.estado === 'pagado' && c.metodo_pago && (
+                  <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '1px' }}>
+                    {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
+                  </div>
                 )}
-                {['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Rubros', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cuotasFiltradas.flatMap(c => {
-                const esPagable = c.estado !== 'pagado'
-                const seleccionada = seleccionadas.has(c.id)
-                const rubrosDetalle = c.rubros_detalle as RubroDetalle[] | null | undefined
-                const tieneRubros = rubrosDetalle && rubrosDetalle.length > 0
-                const expandido = expandidasRubros.has(c.id)
-                const hoy = new Date().toISOString().slice(0, 10)
-                const colCount = canEdit ? 9 : 8
-
-                const mainRow = (
-                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid var(--at-chip)', background: seleccionada ? 'var(--at-success-tint)' : undefined }}>
-                    {canEdit && (
-                      <td style={{ padding: '10px 14px' }}>
-                        {esPagable && (
-                          <input type="checkbox" checked={seleccionada} onChange={() => toggleSeleccion(c.id)} />
-                        )}
-                      </td>
-                    )}
-                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.unidad_nombre || <span style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>General</span>}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</td>
-                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
-                      {c.estado === 'pagado' && c.metodo_pago && (
-                        <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '1px' }}>
-                          {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>
-                      {c.fecha_vencimiento || '—'}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      {canEdit ? (
-                        <select value={c.estado} onChange={e => cambiarEstado(c, e.target.value as EstadoCuota)}
-                          style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="pagado">Pagado</option>
-                          <option value="moroso">Moroso</option>
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                          {c.estado}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      {tieneRubros ? (
-                        <button onClick={() => toggleRubros(c.id)}
-                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--at-accent-soft)', borderRadius: '6px', cursor: 'pointer', background: expandido ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>
-                          {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
-                        </button>
-                      ) : <span style={{ color: 'var(--at-line-strong)', fontSize: 11 }}>—</span>}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {(c.estado === 'pendiente' || c.estado === 'moroso') && (
-                          <button onClick={() => whatsappRecordatorio(c)} title="Recordatorio por WhatsApp"
-                            style={{ background: 'var(--at-success-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
-                            💬
-                          </button>
-                        )}
-                        {c.estado === 'pagado' && canCreate && (
-                          <button onClick={() => crearRecibo(c)} title="Crear recibo digital"
-                            style={{ background: 'var(--at-primary-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-primary)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
-                            🧾
-                          </button>
-                        )}
-                        <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-
-                if (!expandido || !tieneRubros) return [mainRow]
-
-                const detalleRow = (
-                  <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid var(--at-chip)', background: '#f8faff' }}>
-                    <td colSpan={colCount} style={{ padding: '0 14px 10px 48px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: 'var(--at-primary-tint)', borderRadius: 8, border: '1px solid var(--at-accent-soft-2)' }}>
-                        {rubrosDetalle!.map((rd, ri) => (
-                          <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--at-ink-2)' }}>
-                            <span>
-                              {rd.nombre}
-                              <span style={{ marginLeft: 6, color: 'var(--at-ink-3)', fontSize: 11 }}>
-                                ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${moneda} ${rd.valor}/m²` : `alíc. ${rd.valor.toLocaleString('es')}`})
-                              </span>
-                            </span>
-                            <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                )
-
-                return [mainRow, detalleRow]
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </>
+            ),
+          },
+          {
+            key: 'vencimiento', header: 'Vencimiento', sortable: true,
+            accessor: c => c.fecha_vencimiento ?? '',
+            render: c => {
+              const hoy = new Date().toISOString().slice(0, 10)
+              const vencida = c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado'
+              return <span style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{c.fecha_vencimiento || '—'}</span>
+            },
+            hideOnMobile: true,
+          },
+          {
+            key: 'estado', header: 'Estado', sortable: true,
+            accessor: c => c.estado,
+            render: c => canEdit ? (
+              <select value={c.estado} onChange={e => cambiarEstado(c, e.target.value as EstadoCuota)}
+                aria-label="Cambiar estado"
+                style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
+                <option value="pendiente">Pendiente</option>
+                <option value="pagado">Pagado</option>
+                <option value="moroso">Moroso</option>
+              </select>
+            ) : (
+              <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
+                {c.estado}
+              </span>
+            ),
+          },
+          {
+            key: 'rubros', header: 'Rubros',
+            render: c => {
+              const rubrosDetalle = c.rubros_detalle as RubroDetalle[] | null | undefined
+              const tieneRubros = rubrosDetalle && rubrosDetalle.length > 0
+              const expandido = expandidasRubros.has(c.id)
+              return tieneRubros ? (
+                <button onClick={() => toggleRubros(c.id)}
+                  aria-label={expandido ? 'Colapsar rubros' : 'Expandir rubros'}
+                  aria-expanded={expandido}
+                  style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--at-accent-soft)', borderRadius: '6px', cursor: 'pointer', background: expandido ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>
+                  {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
+                </button>
+              ) : <span style={{ color: 'var(--at-line-strong)', fontSize: 11 }}>—</span>
+            },
+            hideOnMobile: true,
+          },
+          {
+            key: 'acciones', header: '',
+            render: c => (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {(c.estado === 'pendiente' || c.estado === 'moroso') && (
+                  <button onClick={() => whatsappRecordatorio(c)} aria-label="Recordatorio por WhatsApp"
+                    style={{ background: 'var(--at-success-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                    💬
+                  </button>
+                )}
+                {c.estado === 'pagado' && canCreate && (
+                  <button onClick={() => crearRecibo(c)} aria-label="Crear recibo digital"
+                    style={{ background: 'var(--at-primary-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-primary)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                    🧾
+                  </button>
+                )}
+                <button onClick={() => eliminar(c.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+              </div>
+            ),
+          },
+        ] satisfies DataTableColumn<CuotaCondominio>[]}
+      />
     </div>
   )
 }
