@@ -256,7 +256,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
         </div>
 
         {/* Tabs de navegación */}
-        <div style={{
+        <div className="tab-strip-scrollable" style={{
           display: 'flex',
           gap: '12px',
           borderBottom: '2px solid var(--at-line)',
