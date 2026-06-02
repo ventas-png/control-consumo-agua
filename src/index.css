@@ -357,6 +357,75 @@ button:focus:not(:focus-visible) {
   .login-right-panel {
     padding: 32px 20px !important;
   }
+
+  /* ─── Table-as-cards pattern (opt-in) ───────────────────────────────────
+   * Cuando una tabla tiene la clase .table-cards-on-mobile, se reestructura
+   * visualmente como una lista de cards en phones angostos (≤480px). Cada
+   * <tr> queda como un card; cada <td> como una fila con etiqueta a la
+   * izquierda (desde el atributo data-label) y valor a la derecha.
+   *
+   * Requisitos para el caller:
+   *   1. Agregar className="table-cards-on-mobile" a la <table>.
+   *   2. Cada <td> debe tener data-label="Header" para que se renderice
+   *      la etiqueta. DataTable lo hace automaticamente desde columns[i].
+   *   3. Columnas con clase .table-col-secondary se ocultan (ya existente
+   *      desde phase 2) — util para esconder columnas redundantes en este
+   *      layout (ej: ID, secondary timestamps).
+   *
+   * El scroll horizontal se desactiva implicitamente: el contenedor sigue
+   * siendo .table-scroll-wrapper, pero la tabla ya no excede ancho. */
+  .table-cards-on-mobile {
+    display: block;
+    width: 100%;
+  }
+  .table-cards-on-mobile thead {
+    /* Headers no se muestran — cada celda lleva su label via data-label. */
+    display: none;
+  }
+  .table-cards-on-mobile tbody {
+    display: block;
+    width: 100%;
+  }
+  .table-cards-on-mobile tbody tr {
+    display: block;
+    background: var(--at-surface);
+    border: 1px solid var(--at-line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  .table-cards-on-mobile tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0 !important;
+    border: none !important;
+    font-size: 13px !important;
+    text-align: right;
+  }
+  .table-cards-on-mobile tbody td:not(:last-child) {
+    border-bottom: 1px solid var(--at-chip) !important;
+  }
+  .table-cards-on-mobile tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--at-ink-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    text-align: left;
+  }
+  /* Cuando no hay data-label (ej: celda de acciones), centrar el contenido. */
+  .table-cards-on-mobile tbody td:not([data-label])::before {
+    content: none;
+  }
+  .table-cards-on-mobile tbody td:not([data-label]) {
+    justify-content: center;
+    padding-top: 10px !important;
+  }
 }
 
 /* ─── Tablet Layout (768px - 1024px) ────────────────────────────────────── */

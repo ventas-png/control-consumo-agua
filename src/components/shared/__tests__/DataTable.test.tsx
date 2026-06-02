@@ -476,6 +476,49 @@ describe('DataTable — mobile responsive', () => {
     const { container } = render(<DataTable data={rows} columns={columns} rowKey="id" pageSize={0} />)
     expect(container.querySelector('.table-scroll-wrapper')).toBeTruthy()
   })
+
+  it('mobileCardLayout=true agrega la clase .table-cards-on-mobile al <table>', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" mobileCardLayout pageSize={0} />
+    )
+    expect(container.querySelector('table.table-cards-on-mobile')).toBeTruthy()
+  })
+
+  it('mobileCardLayout=false (default) NO aplica la clase', () => {
+    const { container } = render(<DataTable data={rows} columns={columns} rowKey="id" pageSize={0} />)
+    expect(container.querySelector('table.table-cards-on-mobile')).toBeNull()
+  })
+
+  it('mobileCardLayout agrega data-label a cada <td> con el header como string', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" mobileCardLayout pageSize={0} />
+    )
+    const firstRowCells = container.querySelectorAll('tbody tr:first-child td')
+    expect(firstRowCells[0].getAttribute('data-label')).toBe('Nombre')
+    expect(firstRowCells[1].getAttribute('data-label')).toBe('Consumo')
+    expect(firstRowCells[2].getAttribute('data-label')).toBe('Estado')
+  })
+
+  it('mobileCardLayout NO agrega data-label cuando esta off', () => {
+    const { container } = render(
+      <DataTable data={rows} columns={columns} rowKey="id" pageSize={0} />
+    )
+    const firstCell = container.querySelector('tbody tr:first-child td')
+    expect(firstCell?.hasAttribute('data-label')).toBe(false)
+  })
+
+  it('mobileCardLayout fallback a col.key cuando header no es string', () => {
+    const cols: DataTableColumn<Row>[] = [
+      { key: 'nombre', header: <span>Nombre rico</span> }, // ReactNode, no string
+      { key: 'estado', header: 'Estado' },
+    ]
+    const { container } = render(
+      <DataTable data={rows} columns={cols} rowKey="id" mobileCardLayout pageSize={0} />
+    )
+    const firstRowCells = container.querySelectorAll('tbody tr:first-child td')
+    expect(firstRowCells[0].getAttribute('data-label')).toBe('nombre') // fallback al key
+    expect(firstRowCells[1].getAttribute('data-label')).toBe('Estado')
+  })
 })
 
 describe('DataTable — a11y baseline', () => {
