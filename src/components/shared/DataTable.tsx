@@ -46,6 +46,12 @@ export interface DataTableProps<T> {
   data: T[]
   /** Definición de columnas. */
   columns: DataTableColumn<T>[]
+  /**
+   * Si true, la primera columna queda pegada al borde izquierdo durante el
+   * scroll horizontal (mobile). Util para tablas anchas donde el identificador
+   * de fila (nombre, codigo) no debe perderse al desplazarse.
+   */
+  stickyFirstColumn?: boolean
   /** Cómo obtener el React key de una fila. */
   rowKey: keyof T | ((row: T) => string)
 
@@ -130,6 +136,7 @@ export interface DataTableProps<T> {
 export function DataTable<T>({
   data,
   columns,
+  stickyFirstColumn = false,
   rowKey,
   searchableKeys,
   searchPlaceholder = 'Buscar…',
@@ -330,17 +337,22 @@ export function DataTable<T>({
             emptyState ?? <EmptyState title="No hay datos para mostrar" />
           )
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-scroll-wrapper">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
               <thead>
                 <tr style={{ background: 'var(--at-surface-2)' }}>
-                  {columns.map(col => {
+                  {columns.map((col, colIdx) => {
                     const isSorted = sortConfig?.key === col.key
                     const arrow = !isSorted ? '' : sortConfig.direction === 'asc' ? ' ↑' : ' ↓'
+                    const isStickyCol = stickyFirstColumn && colIdx === 0
                     return (
                       <th
                         key={col.key}
                         scope="col"
+                        className={[
+                          col.hideOnMobile ? 'table-col-secondary' : '',
+                          isStickyCol ? 'table-col-sticky' : '',
+                        ].filter(Boolean).join(' ') || undefined}
                         aria-sort={!col.sortable ? 'none' : isSorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
                         onClick={() => handleHeaderClick(col)}
                         style={{
@@ -356,6 +368,9 @@ export function DataTable<T>({
                           userSelect: col.sortable ? 'none' : 'auto',
                           width: col.width,
                           whiteSpace: 'nowrap',
+                          // background sobreescrito por la clase sticky para que
+                          // los headers no queden transparentes encima del scroll.
+                          background: isStickyCol ? 'var(--at-surface-2)' : undefined,
                         }}
                       >
                         {col.header}{arrow}
@@ -382,18 +397,30 @@ export function DataTable<T>({
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-surface-2)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = '' }}
                     >
-                      {columns.map(col => (
-                        <td
-                          key={col.key}
-                          style={{
-                            padding: '10px 14px',
-                            textAlign: col.align ?? 'left',
-                            color: 'var(--at-ink)',
-                          }}
-                        >
-                          {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
-                        </td>
-                      ))}
+                      {columns.map((col, colIdx) => {
+                        const isStickyCol = stickyFirstColumn && colIdx === 0
+                        return (
+                          <td
+                            key={col.key}
+                            className={[
+                              col.hideOnMobile ? 'table-col-secondary' : '',
+                              isStickyCol ? 'table-col-sticky' : '',
+                            ].filter(Boolean).join(' ') || undefined}
+                            style={{
+                              padding: '10px 14px',
+                              textAlign: col.align ?? 'left',
+                              color: 'var(--at-ink)',
+                              // background hereda del tr (var(--at-surface) o
+                              // surface-2 hover). En sticky-col forzamos surface
+                              // para que el contenido no se vea transparente
+                              // sobre el scroll.
+                              background: isStickyCol ? 'var(--at-surface)' : undefined,
+                            }}
+                          >
+                            {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                   if (!expandContent) return [mainRow]
