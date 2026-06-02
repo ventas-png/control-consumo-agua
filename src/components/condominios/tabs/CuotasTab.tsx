@@ -5,6 +5,8 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
 import { supabase } from '../../../lib/supabase'
+import { validatedInsert } from '../../../lib/validatedInsert'
+import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
@@ -203,7 +205,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       notify({ variant: 'error', title: 'Error', text: 'Seleccione el período.' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('cuotas_condominio').insert({
+    // cond:C2 — pre-validación Zod. La regla "concepto != CAM requiere
+    // unidad_id" la atrapa el schema antes del round trip a DB.
+    const { error } = await validatedInsert('cuotas_condominio', cuotaInputSchema, {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: form.unidad_id || null,
