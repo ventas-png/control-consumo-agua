@@ -567,7 +567,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <p style={{ fontSize: '13px', color: 'var(--at-success-strong)', background: 'var(--at-success-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-success-border)' }}>
                         ✅ Estos {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} serán agregados a tu empresa al confirmar.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: 'var(--at-surface-2)' }}>
@@ -606,7 +606,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <p style={{ fontSize: '13px', color: 'var(--at-primary-hover)', background: 'var(--at-primary-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
                         🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: 'var(--at-surface-2)' }}>
@@ -644,7 +644,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <p style={{ fontSize: '13px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-warning-border)' }}>
                         ⚠️ Estas {conErrores.length} fila{conErrores.length !== 1 ? 's' : ''} contienen errores y no serán importadas. Descárgalas para revisarlas y corregirlas.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
+                      <div className="table-scroll-wrapper" style={{ border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: 'var(--at-surface-2)' }}>

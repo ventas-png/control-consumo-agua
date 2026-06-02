@@ -886,7 +886,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {Object.keys(tipoAguaMap).length > 0 && (
           <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
             <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '14px' }}>Desglose por Tipo de Agua</div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: 'var(--at-surface-2)' }}>
@@ -1335,7 +1335,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                 No hay lecturas registradas para este contador.
                               </div>
                             ) : (
-                              <div style={{ overflowX: 'auto' }}>
+                              <div className="table-scroll-wrapper">
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                   <thead>
                                     <tr style={{ background: 'var(--at-surface-2)' }}>

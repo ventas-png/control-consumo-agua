@@ -278,7 +278,7 @@ export function CalidadSection({
 
           <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>Fuentes Registradas</div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead><tr style={{ background: 'var(--at-chip)' }}>
                   {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
@@ -446,7 +446,7 @@ export function CalidadSection({
               📄 Exportar PDF
             </button>
           </div>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-scroll-wrapper">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead><tr style={{ background: 'var(--at-chip)' }}>
                 {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
@@ -529,7 +529,7 @@ export function CalidadSection({
                     </p>
                   </div>
                   {tipologia && (
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="table-scroll-wrapper">
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                         <thead>
                           <tr style={{ background: 'var(--at-chip)' }}>

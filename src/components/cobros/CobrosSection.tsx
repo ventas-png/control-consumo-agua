@@ -364,7 +364,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
 
           {/* Tabla */}
           <div style={{ background: 'var(--at-surface)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                   <tr>
