@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment, type ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 
 // F3.14: Command palette (Cmd+K / Ctrl+K) para búsqueda global de tabs.
@@ -42,6 +42,19 @@ export interface CommandPaletteProps {
   open?: boolean
   /** Modo controlado: callback de cambio de estado. */
   onOpenChange?: (open: boolean) => void
+  /**
+   * Lista de ids "recientes" — el palette los muestra al tope (bajo un
+   * heading "Recientes") cuando el input de busqueda esta vacio. El orden
+   * de este array se preserva (mas reciente primero). Los ids que no
+   * matcheen items actuales se ignoran silenciosamente. Default vacio.
+   */
+  recentIds?: string[]
+  /**
+   * Callback cuando el usuario selecciona un item (via click o Enter).
+   * Se ejecuta DESPUES del `item.onSelect()` propio. El caller lo usa
+   * tipicamente para registrar el id en el storage de recientes.
+   */
+  onItemSelected?: (item: CommandItem) => void
 }
 
 /** Normaliza un string para fuzzy match (lowercase, sin acentos). */
@@ -78,6 +91,8 @@ export function CommandPalette({
   disableShortcut = false,
   open: openProp,
   onOpenChange,
+  recentIds,
+  onItemSelected,
 }: CommandPaletteProps) {
   const [openInternal, setOpenInternal] = useState(false)
   const isControlled = openProp !== undefined
@@ -129,14 +144,35 @@ export function CommandPalette({
     return () => window.removeEventListener('keydown', onKey)
   }, [usedShortcut, shortcutKey, disableShortcut, isControlled])
 
-  // Items filtrados + ordenados por score
+  // Items filtrados + ordenados por score.
+  // Cuando query esta vacia Y hay recientes, se devuelven dos listas:
+  // recientes primero (en su orden), luego el resto. Si query tiene texto,
+  // se ignora la lista de recientes y se filtra/sortea con fuzzy normal.
   const filtered = useMemo(() => {
-    const scored = items
-      .map(item => ({ item, score: score(item, query) }))
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-    return scored.map(x => x.item)
-  }, [items, query])
+    if (query) {
+      const scored = items
+        .map(item => ({ item, score: score(item, query) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+      return scored.map(x => x.item)
+    }
+    // Sin query: recientes al frente (preservando orden de recentIds), luego
+    // el resto de los items en su orden original.
+    if (!recentIds || recentIds.length === 0) return items
+    const byId = new Map(items.map(it => [it.id, it]))
+    const recents = recentIds.map(id => byId.get(id)).filter((x): x is CommandItem => Boolean(x))
+    const recentSet = new Set(recents.map(r => r.id))
+    const rest = items.filter(it => !recentSet.has(it.id))
+    return [...recents, ...rest]
+  }, [items, query, recentIds])
+
+  // Conteo de "recientes" al inicio de filtered (para dibujar el heading).
+  const recentCount = useMemo(() => {
+    if (query) return 0
+    if (!recentIds || recentIds.length === 0) return 0
+    const ids = new Set(items.map(i => i.id))
+    return recentIds.filter(id => ids.has(id)).length
+  }, [items, query, recentIds])
 
   // Reset selection cuando cambia query
   useEffect(() => { setSelectedIdx(0) }, [query])
@@ -168,6 +204,7 @@ export function CommandPalette({
       const item = filtered[selectedIdx]
       if (item) {
         item.onSelect()
+        onItemSelected?.(item)
         setOpen(false)
       }
     }
@@ -175,6 +212,7 @@ export function CommandPalette({
 
   function handleSelect(item: CommandItem) {
     item.onSelect()
+    onItemSelected?.(item)
     setOpen(false)
   }
 
@@ -252,9 +290,16 @@ export function CommandPalette({
             ) : (
               filtered.map((item, idx) => {
                 const isSelected = idx === selectedIdx
+                // Headings: "Recientes" antes del primer item de la zona
+                // de recientes; "Todos" antes del primer item fuera.
+                // Solo se dibujan cuando query esta vacia y hay recientes.
+                const showRecentHeading = !query && recentCount > 0 && idx === 0
+                const showAllHeading = !query && recentCount > 0 && idx === recentCount
                 return (
+                  <Fragment key={item.id}>
+                    {showRecentHeading && <SectionHeading label="Recientes" icon="🕘" />}
+                    {showAllHeading && <SectionHeading label="Todos" />}
                   <button
-                    key={item.id}
                     id={`cmdk-item-${item.id}`}
                     data-idx={idx}
                     role="option"
@@ -288,6 +333,7 @@ export function CommandPalette({
                       </span>
                     )}
                   </button>
+                  </Fragment>
                 )
               })
             )}
@@ -314,4 +360,26 @@ const kbdStyle: React.CSSProperties = {
   color: 'var(--at-ink-3)', fontFamily: 'inherit',
   background: 'var(--at-surface-2)',
   marginRight: '4px',
+}
+
+function SectionHeading({ label, icon }: { label: string; icon?: string }) {
+  return (
+    <div
+      role="presentation"
+      style={{
+        padding: '8px 14px 4px',
+        fontSize: '11px',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        color: 'var(--at-ink-3)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+      }}
+    >
+      {icon && <span aria-hidden="true">{icon}</span>}
+      <span>{label}</span>
+    </div>
+  )
 }
