@@ -55,6 +55,20 @@ export interface CommandPaletteProps {
    * tipicamente para registrar el id en el storage de recientes.
    */
   onItemSelected?: (item: CommandItem) => void
+  /**
+   * Lista de ids "favoritos" — el palette los muestra al tope (bajo un
+   * heading "Favoritos") cuando el input de busqueda esta vacio, antes
+   * de "Recientes". El orden se preserva. Los ids que no matcheen items
+   * actuales se ignoran silenciosamente. Default vacio.
+   */
+  pinnedIds?: string[]
+  /**
+   * Si esta presente, cada item muestra un star icon clickable. Click
+   * dispara este callback con el id. NO dispara `item.onSelect()` ni
+   * cierra el palette — el caller es responsable de actualizar `pinnedIds`
+   * (tipicamente via un hook usePinnedItems).
+   */
+  onTogglePin?: (id: string) => void
 }
 
 /** Normaliza un string para fuzzy match (lowercase, sin acentos). */
@@ -93,6 +107,8 @@ export function CommandPalette({
   onOpenChange,
   recentIds,
   onItemSelected,
+  pinnedIds,
+  onTogglePin,
 }: CommandPaletteProps) {
   const [openInternal, setOpenInternal] = useState(false)
   const isControlled = openProp !== undefined
@@ -144,10 +160,10 @@ export function CommandPalette({
     return () => window.removeEventListener('keydown', onKey)
   }, [usedShortcut, shortcutKey, disableShortcut, isControlled])
 
-  // Items filtrados + ordenados por score.
-  // Cuando query esta vacia Y hay recientes, se devuelven dos listas:
-  // recientes primero (en su orden), luego el resto. Si query tiene texto,
-  // se ignora la lista de recientes y se filtra/sortea con fuzzy normal.
+  // Items filtrados + ordenados.
+  // Sin query: pinned → recientes (sin pinned) → resto (sin pinned ni
+  // recientes), preservando orden interno de cada bucket.
+  // Con query: fuzzy normal (ignora pinned y recientes).
   const filtered = useMemo(() => {
     if (query) {
       const scored = items
@@ -156,23 +172,29 @@ export function CommandPalette({
         .sort((a, b) => b.score - a.score)
       return scored.map(x => x.item)
     }
-    // Sin query: recientes al frente (preservando orden de recentIds), luego
-    // el resto de los items en su orden original.
-    if (!recentIds || recentIds.length === 0) return items
     const byId = new Map(items.map(it => [it.id, it]))
-    const recents = recentIds.map(id => byId.get(id)).filter((x): x is CommandItem => Boolean(x))
-    const recentSet = new Set(recents.map(r => r.id))
-    const rest = items.filter(it => !recentSet.has(it.id))
-    return [...recents, ...rest]
-  }, [items, query, recentIds])
+    const pinned = (pinnedIds ?? [])
+      .map(id => byId.get(id))
+      .filter((x): x is CommandItem => Boolean(x))
+    const pinnedSet = new Set(pinned.map(p => p.id))
+    const recents = (recentIds ?? [])
+      .map(id => byId.get(id))
+      .filter((x): x is CommandItem => Boolean(x))
+      .filter(r => !pinnedSet.has(r.id))
+    const taken = new Set([...pinnedSet, ...recents.map(r => r.id)])
+    const rest = items.filter(it => !taken.has(it.id))
+    return [...pinned, ...recents, ...rest]
+  }, [items, query, recentIds, pinnedIds])
 
-  // Conteo de "recientes" al inicio de filtered (para dibujar el heading).
-  const recentCount = useMemo(() => {
-    if (query) return 0
-    if (!recentIds || recentIds.length === 0) return 0
+  // Conteos por bucket (para dibujar headings en los bordes).
+  const { pinnedCount, recentCount } = useMemo(() => {
+    if (query) return { pinnedCount: 0, recentCount: 0 }
     const ids = new Set(items.map(i => i.id))
-    return recentIds.filter(id => ids.has(id)).length
-  }, [items, query, recentIds])
+    const pc = (pinnedIds ?? []).filter(id => ids.has(id)).length
+    const pinnedSet = new Set(pinnedIds ?? [])
+    const rc = (recentIds ?? []).filter(id => ids.has(id) && !pinnedSet.has(id)).length
+    return { pinnedCount: pc, recentCount: rc }
+  }, [items, query, recentIds, pinnedIds])
 
   // Reset selection cuando cambia query
   useEffect(() => { setSelectedIdx(0) }, [query])
@@ -290,13 +312,17 @@ export function CommandPalette({
             ) : (
               filtered.map((item, idx) => {
                 const isSelected = idx === selectedIdx
-                // Headings: "Recientes" antes del primer item de la zona
-                // de recientes; "Todos" antes del primer item fuera.
-                // Solo se dibujan cuando query esta vacia y hay recientes.
-                const showRecentHeading = !query && recentCount > 0 && idx === 0
-                const showAllHeading = !query && recentCount > 0 && idx === recentCount
+                // Headings se dibujan en los bordes de cada bucket cuando
+                // hay items en el. Solo aplica con query vacia.
+                const showPinnedHeading = !query && pinnedCount > 0 && idx === 0
+                const showRecentHeading = !query && recentCount > 0 && idx === pinnedCount
+                const showAllHeading = !query && (pinnedCount > 0 || recentCount > 0)
+                  && idx === pinnedCount + recentCount
+                const pinnedIdsSet = pinnedIds ?? []
+                const itemIsPinned = pinnedIdsSet.includes(item.id)
                 return (
                   <Fragment key={item.id}>
+                    {showPinnedHeading && <SectionHeading label="Favoritos" icon="⭐" />}
                     {showRecentHeading && <SectionHeading label="Recientes" icon="🕘" />}
                     {showAllHeading && <SectionHeading label="Todos" />}
                   <button
@@ -330,6 +356,38 @@ export function CommandPalette({
                         fontWeight: 500,
                       }}>
                         {item.group}
+                      </span>
+                    )}
+                    {onTogglePin && (
+                      <span
+                        role="button"
+                        aria-label={itemIsPinned ? `Quitar ${item.label} de favoritos` : `Agregar ${item.label} a favoritos`}
+                        aria-pressed={itemIsPinned}
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onTogglePin(item.id)
+                        }}
+                        onKeyDown={(e) => {
+                          // Activacion via teclado sin disparar el handler del button padre.
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onTogglePin(item.id)
+                          }
+                        }}
+                        style={{
+                          fontSize: '14px',
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          color: itemIsPinned ? 'var(--at-warning-strong)' : 'var(--at-ink-3)',
+                          opacity: itemIsPinned ? 1 : 0.6,
+                          lineHeight: 1,
+                          userSelect: 'none',
+                        }}
+                      >
+                        {itemIsPinned ? '★' : '☆'}
                       </span>
                     )}
                   </button>
