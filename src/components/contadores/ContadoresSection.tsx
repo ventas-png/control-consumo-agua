@@ -2,6 +2,8 @@ import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { validatedInsert } from '../../lib/validatedInsert'
+import { contadorInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
 import { DataTable, type DataTableColumn } from '../shared'
@@ -252,9 +254,13 @@ export function ContadoresSection({
         return
       }
 
-      const { data, error } = await supabase
-        .from('contadores')
-        .insert({
+      // agua:C6 — pre-validación Zod en boundary de persistencia.
+      // `.passthrough()` preserva los campos físicos del medidor (medida,
+      // material, válvula, etc.) que no están en el schema de input.
+      const { data, error } = await validatedInsert(
+        'contadores',
+        contadorInputSchema.passthrough(),
+        {
           numero_serie,
           tipo_agua: form.tipo_agua,
           descripcion: form.descripcion || null,
@@ -280,12 +286,15 @@ export function ContadoresSection({
           garantia_instalacion_vence: form.garantia_instalacion_vence || null,
           project_id: projectId,
           company_id: companyId,
-        })
-        .select()
-        .single()
+        },
+        { returning: true },
+      )
 
-      if (!error && data) {
-        onContadorAdded(data as Contador)
+      const insertedContador = data?.[0]
+      if (!error && insertedContador) {
+        // El schema infiere shape sin `id` (system-generated); el row real
+        // viene completo desde Supabase via .select(). Cast vía unknown.
+        onContadorAdded(insertedContador as unknown as Contador)
         cancelForm()
         notify({ variant: 'success', title: 'Contador creado', duration: 1800 })
       } else {
