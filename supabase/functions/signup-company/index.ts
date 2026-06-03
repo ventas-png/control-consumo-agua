@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimit, getClientIp } from '../_shared/rateLimit.ts'
+import { validatePayload, type SignupPayload } from './validate.ts'
 
 // ============================================================================
 // signup-company — onboarding self-service publico (plat:P5, F2.10)
@@ -58,38 +59,6 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
       JSON.stringify({ error: 'Origin not allowed' }),
       { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  }
-  return null
-}
-
-interface SignupPayload {
-  email?: string
-  password?: string
-  full_name?: string
-  company_name?: string
-  phone?: string
-  // Modulo inicial elegido en el formulario para personalizar el dashboard
-  servicio_agua?: boolean
-  servicio_condominios?: boolean
-}
-
-function validatePayload(p: SignupPayload): string | null {
-  if (!p.email || typeof p.email !== 'string') return 'Email es requerido'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)) return 'Formato de email invalido'
-  if (!p.password || typeof p.password !== 'string') return 'Contrasena es requerida'
-  if (p.password.length < 8) return 'La contrasena debe tener al menos 8 caracteres'
-  // Validacion basica de fortaleza: al menos una letra y un numero
-  if (!/[a-zA-Z]/.test(p.password) || !/[0-9]/.test(p.password)) {
-    return 'La contrasena debe contener al menos una letra y un numero'
-  }
-  if (!p.full_name || typeof p.full_name !== 'string' || p.full_name.trim().length < 2) {
-    return 'Nombre completo es requerido'
-  }
-  if (!p.company_name || typeof p.company_name !== 'string' || p.company_name.trim().length < 2) {
-    return 'Nombre de la empresa es requerido'
-  }
-  if (p.servicio_agua !== true && p.servicio_condominios !== true) {
-    return 'Selecciona al menos un servicio (agua o condominios)'
   }
   return null
 }
