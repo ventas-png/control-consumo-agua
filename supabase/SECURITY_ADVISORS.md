@@ -46,7 +46,7 @@ el `company_id` (salvo donde se indica).
 | `registro-fotos` | `registros/${cliente_id}_${ts}` | ❌ pendiente |
 | `condominios-media` | `${unidad/proyecto}/…` | ❌ pendiente |
 | `mudanza-docs` | `${unidad_id}/…` | ❌ pendiente |
-| `project-logos` | `${project_id}/…` | ❌ pendiente (scope vía `projects.company_id`) |
+| `project-logos` | `${project_id}/…` | ✅ WRITE scopeado (`20260603170000`) vía `projects.company_id`; READ amplio |
 | `conv-attachments` | varía | ⚠️ READ amplio (INSERT sí valida company/cliente) |
 
 **Fase 1 (hecha):** `company-logos` WRITE scopeado por `get_my_company_id()` (o
@@ -66,8 +66,9 @@ registros.project_id → projects.company_id` (misma lógica de roles que `pagos
 
 **Fases siguientes (tracked en #335, aún no en prod):**
 1. Scopear READ/WRITE por company en los buckets restantes. Donde el id del path resuelve a
-   company vía tabla de dominio (`project-logos`→`projects`) se usa policy-join sin migrar
-   datos. Donde el id está embebido de forma frágil (`registro-fotos`: `${cliente_id}_${ts}`)
+   company vía tabla de dominio (`condominios-media`/`mudanza-docs`→`unidades`/`projects`) se
+   usa policy-join sin migrar datos. Donde el id está embebido de forma frágil (`registro-fotos`:
+   `${cliente_id}_${ts}`)
    hay que normalizar la convención de path y migrar objetos.
 2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
    (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
