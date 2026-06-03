@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Contador, Ruta, Tarifa, UserSession } from './types'
+import type { AppSection, Contador, Ruta, Tarifa, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery, useContadoresQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -232,13 +232,12 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, unidades, proyectos,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, proyectos,
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
     setFuentesAgua, setRegistrosCalidad,
-    addUnidad, updateUnidad, deleteUnidad,
     addProveedorEnergia, updateProveedorEnergia, deleteProveedorEnergia,
     addTarifaEnergia, updateTarifaEnergia, deleteTarifaEnergia,
     addFuenteEnergia, updateFuenteEnergia, deleteFuenteEnergia,
@@ -265,6 +264,19 @@ export default function App() {
   }, [dataQueryClient, dataCompanyId])
   const deleteContador = useCallback((id: string) => {
     dataQueryClient.setQueryData<Contador[]>(aguaKeys.contadores(dataCompanyId), (old = []) => old.filter(c => c.id !== id))
+  }, [dataQueryClient, dataCompanyId])
+  // T7: `unidades` migran a la capa de datos (scope company, orden por nombre).
+  // También va ANTES del useMemo de rutas (es entrada del filtro). addUnidad
+  // reordena por nombre al insertar, igual que el setData del antiguo useData.
+  const { data: unidades = [] } = useUnidadesQuery(dataCompanyId)
+  const addUnidad = useCallback((unidad: Unidad) => {
+    dataQueryClient.setQueryData<Unidad[]>(aguaKeys.unidades(dataCompanyId), (old = []) => [...old, unidad].sort((a, b) => a.nombre.localeCompare(b.nombre)))
+  }, [dataQueryClient, dataCompanyId])
+  const updateUnidad = useCallback((id: string, partial: Partial<Unidad>) => {
+    dataQueryClient.setQueryData<Unidad[]>(aguaKeys.unidades(dataCompanyId), (old = []) => old.map(u => (u.id === id ? { ...u, ...partial } : u)))
+  }, [dataQueryClient, dataCompanyId])
+  const deleteUnidad = useCallback((id: string) => {
+    dataQueryClient.setQueryData<Unidad[]>(aguaKeys.unidades(dataCompanyId), (old = []) => old.filter(u => u.id !== id))
   }, [dataQueryClient, dataCompanyId])
   const { data: rutasRaw = [] } = useRutasQuery(dataCompanyId)
   const rutas = useMemo(
