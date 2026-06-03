@@ -40,8 +40,11 @@ begin
 end;
 $$;
 
--- El trigger dispara sin necesidad de EXECUTE; revocamos el grant implícito a PUBLIC.
-revoke execute on function public.pagos_backfill_project_id() from public;
+-- El trigger dispara sin necesidad de EXECUTE; revocamos el grant a anon/authenticated/PUBLIC.
+-- (Supabase concede EXECUTE a anon/authenticated por DEFAULT PRIVILEGES, no solo vía PUBLIC,
+--  así que hay que revocarles explícito) → no se expone una función SECURITY DEFINER a
+--  anon/authenticated (advisor 0028/0029). service_role la conserva (ya es de confianza).
+revoke execute on function public.pagos_backfill_project_id() from public, anon, authenticated;
 
 drop trigger if exists trg_pagos_backfill_project_id on public.pagos;
 create trigger trg_pagos_backfill_project_id
