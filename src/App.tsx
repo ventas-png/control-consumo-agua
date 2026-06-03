@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { confirm, notify } from './components/shared/Dialog'
 import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
@@ -11,6 +11,10 @@ import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
+import { useQueryClient } from '@tanstack/react-query'
+import { useRutasQuery } from './domain/agua/queries'
+import { aguaKeys } from './domain/agua/keys'
+import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { BrandLogo } from './components/shared/BrandLogo'
@@ -228,12 +232,12 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
-    setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
+    setFuentesAgua, setRegistrosCalidad,
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
@@ -244,6 +248,38 @@ export default function App() {
   } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
+
+  // ── T7: las rutas (agua) viven en la capa de datos (TanStack Query), ya no en
+  // useData. El filtrado por acceso a proyecto (que antes hacía useData) se
+  // aplica aquí sobre la lista cruda; `proyectos` ya viene acotado a los
+  // proyectos accesibles del usuario. Los nombres (`rutas`, `addRuta`,
+  // `updateRuta`, `deleteRuta`) se conservan para no tocar a los consumidores.
+  const rutasQueryClient = useQueryClient()
+  const rutasCompanyId = currentUser?.company_id
+  const { data: rutasRaw = [] } = useRutasQuery(rutasCompanyId)
+  const rutas = useMemo(
+    () => filterRutasByProjectAccess({
+      rutas: rutasRaw,
+      contadores,
+      unidades,
+      registros,
+      accessibleProjectIds: new Set(proyectos.map(p => p.id)),
+      userId: currentUser?.user_id ?? '',
+    }),
+    [rutasRaw, contadores, unidades, registros, proyectos, currentUser?.user_id],
+  )
+  // Mutaciones optimistas sobre el caché de rutas (espejan addRuta/updateRuta/
+  // deleteRuta del antiguo useData). RutasSection sigue haciendo el INSERT/
+  // UPDATE/DELETE en Supabase y luego llama a estos callbacks.
+  const addRuta = useCallback((ruta: Ruta) => {
+    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => [ruta, ...old])
+  }, [rutasQueryClient, rutasCompanyId])
+  const updateRuta = useCallback((id: string, partial: Partial<Ruta>) => {
+    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => old.map(r => (r.id === id ? { ...r, ...partial } : r)))
+  }, [rutasQueryClient, rutasCompanyId])
+  const deleteRuta = useCallback((id: string) => {
+    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => old.filter(r => r.id !== id))
+  }, [rutasQueryClient, rutasCompanyId])
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
   // Los hooks se llaman incondicionalmente (Rules of Hooks). Si no hay

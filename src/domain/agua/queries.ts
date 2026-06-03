@@ -65,6 +65,7 @@ export function useRutasQuery(companyId?: string) {
           .order('created_at', { ascending: false })
           .abortSignal(signal),
       )) ?? [],
+    enabled: !!companyId,
   })
 }
 
