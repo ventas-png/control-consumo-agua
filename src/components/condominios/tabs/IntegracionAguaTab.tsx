@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { useState, useMemo } from 'react'
+import { useMedidoresAguaPorProyectoQuery } from '../../../domain/agua/queries'
 import { validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { Unidad } from '../../../types'
@@ -25,8 +25,29 @@ interface ResumenMedidor {
 }
 
 export default function IntegracionAguaTab({ unidades, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
-  const [resumen, setResumen] = useState<ResumenMedidor[]>([])
-  const [loading, setLoading] = useState(true)
+  // Capa de datos (T7): lectura dependiente (contadores → registros) vía
+  // TanStack Query. El resumen se arma en un useMemo para que el prop `unidades`
+  // (fallback de nombre) no entre en la query key ni dispare refetch.
+  const { data, isLoading: loading } = useMedidoresAguaPorProyectoQuery(companyId, proyectoId)
+  const resumen = useMemo<ResumenMedidor[]>(() => {
+    const contadores = data?.contadores ?? []
+    const registros = data?.registros ?? []
+    return contadores.map(c => {
+      const regs = registros.filter(r => r.contador_id === c.id)
+      const ultima = regs[0]
+      const unidad = unidades.find(u => u.id === c.unidad_id)
+      const nombre = c.unidades?.nombre ?? unidad?.nombre ?? 'Sin unidad'
+      return {
+        contador_id: c.id,
+        numero_medidor: c.numero_medidor,
+        unidad_id: c.unidad_id ?? null,
+        unidad_nombre: nombre,
+        ultima_lectura: ultima ? ultima.lectura_actual : null,
+        consumo_ultimo: ultima ? ultima.consumo : null,
+        fecha_lectura: ultima ? ultima.fecha : null,
+      }
+    })
+  }, [data, unidades])
 
   // Generación de cuotas
   const [tarifa, setTarifa] = useState('')
@@ -35,49 +56,6 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [generando, setGenerando] = useState(false)
   const [showGenerar, setShowGenerar] = useState(false)
-
-  useEffect(() => {
-    async function cargar() {
-      setLoading(true)
-
-      const { data: contadores } = await supabase
-        .from('contadores')
-        .select('id, numero_medidor, unidad_id, unidades(nombre)')
-        .eq('project_id', proyectoId)
-        .eq('company_id', companyId)
-        .order('numero_medidor')
-
-      if (!contadores || contadores.length === 0) { setLoading(false); return }
-
-      const ids = (contadores as Record<string, unknown>[]).map(c => c.id as string)
-
-      const { data: registros } = await supabase
-        .from('registros')
-        .select('contador_id, lectura_actual, consumo, fecha')
-        .in('contador_id', ids)
-        .order('fecha', { ascending: false })
-
-      const lista: ResumenMedidor[] = (contadores as Record<string, unknown>[]).map(c => {
-        const regs = ((registros ?? []) as Record<string, unknown>[]).filter(r => r.contador_id === c.id)
-        const ultima = regs[0] as Record<string, unknown> | undefined
-        const unidad = unidades.find(u => u.id === (c.unidad_id as string))
-        const nombre = (c.unidades as { nombre: string } | null)?.nombre ?? unidad?.nombre ?? 'Sin unidad'
-        return {
-          contador_id: c.id as string,
-          numero_medidor: c.numero_medidor as string,
-          unidad_id: (c.unidad_id as string) ?? null,
-          unidad_nombre: nombre,
-          ultima_lectura: ultima ? (ultima.lectura_actual as number) : null,
-          consumo_ultimo: ultima ? (ultima.consumo as number) : null,
-          fecha_lectura: ultima ? (ultima.fecha as string) : null,
-        }
-      })
-
-      setResumen(lista)
-      setLoading(false)
-    }
-    cargar()
-  }, [proyectoId, companyId, unidades])
 
   const totalConsumo = resumen.reduce((s, r) => s + (r.consumo_ultimo ?? 0), 0)
   const sinLectura = resumen.filter(r => !r.fecha_lectura).length

@@ -172,3 +172,66 @@ export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId:
     enabled: !!companyId && !!proyectoId,
   })
 }
+
+/** Contador con su unidad embebida — proyección para el resumen de medidores. */
+export interface MedidorContador {
+  id: string
+  numero_medidor: string
+  unidad_id: string | null
+  unidades: { nombre: string } | null
+}
+
+/** Registro mínimo para derivar la última lectura por contador. */
+export interface MedidorRegistro {
+  contador_id: string
+  lectura_actual: number | null
+  consumo: number | null
+  fecha: string
+}
+
+export interface MedidoresAguaData {
+  contadores: MedidorContador[]
+  registros: MedidorRegistro[]
+}
+
+/**
+ * Datos crudos para el resumen de medidores de agua de un proyecto. Lectura
+ * DEPENDIENTE: contadores (con unidad embebida) → sus registros (orden fecha
+ * desc, para tomar la última lectura). El consumidor arma el `ResumenMedidor` en
+ * un useMemo — incluyendo el fallback de nombre por el prop `unidades` — para que
+ * ese prop no entre en la query key ni dispare refetch.
+ */
+export function useMedidoresAguaPorProyectoQuery(companyId: string, proyectoId: string) {
+  return useQuery({
+    queryKey: aguaKeys.medidoresAguaPorProyecto(companyId, proyectoId),
+    queryFn: async (): Promise<MedidoresAguaData> => {
+      // supabase-js infiere el embed `unidades(nombre)` como array (no conoce la
+      // cardinalidad sin tipos generados), pero PostgREST devuelve un objeto en
+      // una relación to-one. Dejamos inferir y normalizamos el tipo aquí.
+      const contadores =
+        ((await runQuery((signal) =>
+          supabase
+            .from('contadores')
+            .select('id, numero_medidor, unidad_id, unidades(nombre)')
+            .eq('project_id', proyectoId)
+            .eq('company_id', companyId)
+            .order('numero_medidor')
+            .abortSignal(signal),
+        )) ?? []) as unknown as MedidorContador[]
+      if (contadores.length === 0) return { contadores: [], registros: [] }
+
+      const registros =
+        (await runQuery<MedidorRegistro[]>((signal) =>
+          supabase
+            .from('registros')
+            .select('contador_id, lectura_actual, consumo, fecha')
+            .in('contador_id', contadores.map((c) => c.id))
+            .order('fecha', { ascending: false })
+            .abortSignal(signal),
+        )) ?? []
+
+      return { contadores, registros }
+    },
+    enabled: !!companyId && !!proyectoId,
+  })
+}
