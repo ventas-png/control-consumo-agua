@@ -97,6 +97,7 @@ export function useRegistrosQuery(companyId?: string) {
           .limit(5000)
           .abortSignal(signal),
       )) ?? [],
+    enabled: !!companyId,
   })
 }
 

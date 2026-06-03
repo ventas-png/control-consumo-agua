@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Registro, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -62,14 +62,12 @@ function saveCache(userId: string | undefined, payload: AppData): void {
 }
 
 interface AppData {
-  registros: Registro[]
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
 }
 
 const INITIAL_DATA: AppData = {
-  registros: [],
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
@@ -111,33 +109,16 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     const PER_QUERY_TIMEOUT_MS = 15_000
     const signal = () => AbortSignal.timeout(PER_QUERY_TIMEOUT_MS)
 
-    // registros: RLS policy (registros_select) scopes company_owner to their company's
-    // registros via projects + company_clientes. Limit to most-recent 5000 to avoid
-    // PostgREST timeouts on companies with large history; dashboard filters by date
-    // range so older readings are never needed for KPIs.
-    //
-    // IMPORTANT: never select `foto` here. It is base64 (up to 15 MB per row) and
-    // TOAST-stored — including it inflates the payload to tens of MB and trips the
-    // PostgREST statement_timeout on companies with photographed readings. The
-    // dashboard/lecturas/historial/cobros views never read `foto`; only
-    // CustomerPortal needs it and it fetches its own slice scoped by cliente_id.
-    const REGISTROS_LIST_COLS = 'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
-    const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
-
     return Promise.allSettled([
-      registrosQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [regRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
-    if (regRes.status === 'fulfilled' && regRes.value.data) {
-      next.registros = regRes.value.data as Registro[]
-    }
     if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
       next.proyectos = proyectoRes.value.data as Proyecto[]
       const p = proyectoRes.value.data[0]
@@ -196,7 +177,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
   }
 
   const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
-    const [regRes] = results
+    const [proyectoRes] = results
     const errs: string[] = []
     // Collect both fulfilled-with-error AND rejected (AbortError, network failure, etc.).
     // Previously only the fulfilled branch was checked, so per-query timeouts
@@ -213,8 +194,8 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
       if (value && value.error) return `${label}: ${value.error.message}`
       return null
     }
-    const checks: Array<[string, typeof regRes]> = [
-      ['registros', regRes],
+    const checks: Array<[string, typeof proyectoRes]> = [
+      ['proyectos', proyectoRes],
     ]
     for (const [label, res] of checks) {
       const err = errorFrom(label, res)
@@ -264,7 +245,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
 
       // If some core data DID load, stay silent on subsequent retries —
       // the app is usable and showing an "Offline" modal would be disruptive.
-      const dataLoaded = freshData.proyectos.length > 0 || freshData.registros.length > 0
+      const dataLoaded = freshData.proyectos.length > 0
 
       // Single retry after a brief backoff (per-query timeouts make the
       // older double-retry redundant; what failed once will likely fail again
@@ -293,30 +274,9 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     }
   }, [])
 
-  const addRegistro = useCallback((registro: Registro) => {
-    setData(prev => ({ ...prev, registros: [...prev.registros, registro] }))
-  }, [])
-
-  const updateRegistroEstado = useCallback((id: string, estado: Registro['estado']) => {
-    setData(prev => ({
-      ...prev,
-      registros: prev.registros.map(r => (r.id === id ? { ...r, estado } : r)),
-    }))
-  }, [])
-
-  const deleteRegistro = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      registros: prev.registros.filter(r => r.id !== id),
-    }))
-  }, [])
-
   return {
     ...data,
     isLoading,
     cargarDatos,
-    addRegistro,
-    updateRegistroEstado,
-    deleteRegistro,
   }
 }
