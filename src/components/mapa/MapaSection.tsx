@@ -20,6 +20,7 @@ const ESTADOS: { key: EstadoBucket; label: string; tint: string; color: string }
 // la pinta con el <MapView> genérico (motor Leaflet reutilizable por dominio).
 export function MapaSection({ clientes, registros }: Props) {
   const [visibles, setVisibles] = useState<Set<EstadoBucket>>(() => new Set(['mora', 'pendiente', 'pagado']))
+  const [heatOn, setHeatOn] = useState(false) // serv:S18 — modo mapa de calor
   const layers = useMemo(
     () => [buildMedidoresLayer(clientes, registros, visibles)],
     [clientes, registros, visibles],
@@ -63,9 +64,29 @@ export function MapaSection({ clientes, registros }: Props) {
               </button>
             )
           })}
+          {/* serv:S18 — toggle de mapa de calor por consumo (m³). */}
+          <button
+            onClick={() => setHeatOn(v => !v)}
+            aria-pressed={heatOn}
+            title="Mapa de calor por consumo (m³)"
+            style={{
+              marginLeft: '4px',
+              padding: '4px 12px',
+              background: heatOn ? 'var(--at-danger-tint)' : 'var(--at-surface-2)',
+              color: heatOn ? 'var(--at-danger-strong)' : 'var(--at-ink-3)',
+              border: `1px solid ${heatOn ? 'transparent' : 'var(--at-line)'}`,
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              opacity: heatOn ? 1 : 0.7,
+            }}
+          >
+            🔥 Calor
+          </button>
         </div>
       </div>
-      <MapView layers={layers} cluster style={{ flex: 1, width: '100%' }} />
+      <MapView layers={layers} cluster={!heatOn} heat={heatOn} style={{ flex: 1, width: '100%' }} />
     </div>
   )
 }

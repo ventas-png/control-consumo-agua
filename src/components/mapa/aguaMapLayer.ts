@@ -46,6 +46,8 @@ export function buildMedidoresLayer(
       lat,
       lng,
       color,
+      // serv:S18 — peso para el mapa de calor: consumo de la última lectura.
+      weight: ultima.consumo ?? 0,
       popupHtml:
         `<strong>${cliente.nombre}</strong><br>` +
         `Estado: <b style="color:${color}">${ultima.estado.toUpperCase()}</b><br>` +

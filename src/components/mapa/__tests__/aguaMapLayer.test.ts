@@ -34,10 +34,11 @@ describe('buildMedidoresLayer (serv:S13)', () => {
       [registro({ cliente_id: 'c1', fecha: '2026-05-01', estado: 'mora', consumo: 12, gps: { lat: 14.6, lng: -90.5 } })],
     )
     expect(layer.markers).toHaveLength(1)
-    expect(layer.markers[0]).toMatchObject({ id: 'c1', lat: 14.6, lng: -90.5, color: 'red' })
+    // serv:S18 — weight = consumo de la última lectura (para el mapa de calor).
+    expect(layer.markers[0]).toMatchObject({ id: 'c1', lat: 14.6, lng: -90.5, color: 'red', weight: 12 })
   })
 
-  it('usa la ÚLTIMA lectura por fecha para posición y estado', () => {
+  it('usa la ÚLTIMA lectura por fecha para posición, estado y weight', () => {
     const layer = buildMedidoresLayer(
       [cliente('c1', 'Casa 1')],
       [
@@ -46,7 +47,7 @@ describe('buildMedidoresLayer (serv:S13)', () => {
       ],
     )
     expect(layer.markers).toHaveLength(1)
-    expect(layer.markers[0]).toMatchObject({ lat: 2, lng: 2, color: 'green' })
+    expect(layer.markers[0]).toMatchObject({ lat: 2, lng: 2, color: 'green', weight: 9 })
   })
 
   it('omite clientes sin lecturas o sin GPS', () => {
