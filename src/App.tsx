@@ -984,7 +984,12 @@ export default function App() {
             <Route path="/mapa" element={
               <ErrorBoundary sectionName="mapa">
                 {canViewModule('mapa') ? (
-                  <MapaSection clientes={clientes} registros={registros} />
+                  <MapaSection
+                    clientes={clientes}
+                    registros={registros}
+                    companyId={currentUser.company_id}
+                    canConfigurar={currentUser.role === 'company_owner' || currentUser.role === 'super_admin'}
+                  />
                 ) : <AccessDenied />}
               </ErrorBoundary>
             } />
