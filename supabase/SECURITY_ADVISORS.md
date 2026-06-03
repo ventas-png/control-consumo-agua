@@ -30,3 +30,36 @@ query del propio rol. Revocar su `EXECUTE` a `anon` rompería la evaluación de 
 en cualquier tabla accesible por `anon` (error de permisos en la función en vez de devolver
 0 filas). Pendiente: **análisis de accesibilidad-`anon` por tabla** antes de cualquier
 cambio (PR futuro de T5).
+
+## Storage — aislamiento cross-tenant (`infra:I14`)
+
+**Hallazgo:** varias policies de `storage.objects` chequean solo `bucket_id` para el rol
+`authenticated`, sin scoping por company/path → un usuario logueado puede listar/leer/
+escribir/borrar archivos de **otros tenants**. Causa raíz: el primer segmento del path no es
+el `company_id` (salvo donde se indica).
+
+| Bucket | Path de subida | Estado |
+|---|---|---|
+| `report-attachments` | `${company_id}/…` | ✅ ya scopeado (modelo a seguir) |
+| `company-logos` | `${company_id}/…` | ✅ WRITE scopeado en fase 1 (`20260603150000`); READ amplio (logo no sensible) |
+| `pagos-comprobantes` | `comprobantes/${user_id}/…` | ❌ pendiente (PII financiera) |
+| `registro-fotos` | `registros/${cliente_id}_${ts}` | ❌ pendiente |
+| `condominios-media` | `${unidad/proyecto}/…` | ❌ pendiente |
+| `mudanza-docs` | `${unidad_id}/…` | ❌ pendiente |
+| `project-logos` | `${project_id}/…` | ❌ pendiente (scope vía `projects.company_id`) |
+| `conv-attachments` | varía | ⚠️ READ amplio (INSERT sí valida company/cliente) |
+
+**Fase 1 (hecha):** `company-logos` WRITE scopeado por `get_my_company_id()` (o
+`is_super_admin()`); `file_size_limit` en `conv-attachments` (10 MiB) y `report-attachments`
+(25 MiB).
+
+**Fases siguientes (tracked en #335, aún no en prod):**
+1. Scopear READ/WRITE por company en cada bucket. Donde el id del path resuelve a company vía
+   tabla de dominio (`pagos-comprobantes`→`app_users`, `project-logos`→`projects`) se usa
+   policy-join sin migrar datos. Donde el id está embebido de forma frágil (`registro-fotos`:
+   `${cliente_id}_${ts}`) hay que normalizar la convención de path y migrar objetos.
+2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
+   (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
+
+> Validar cada fase en Supabase Preview antes de prod: los paths existentes deben matchear la
+> policy nueva, o los archivos quedan inaccesibles.
