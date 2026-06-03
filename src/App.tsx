@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Ruta, Tarifa, UserSession } from './types'
+import type { AppSection, Contador, Ruta, Tarifa, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery, useContadoresQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -232,13 +232,12 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, contadores, unidades, proyectos,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
     setFuentesAgua, setRegistrosCalidad,
-    addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
     addProveedorEnergia, updateProveedorEnergia, deleteProveedorEnergia,
     addTarifaEnergia, updateTarifaEnergia, deleteTarifaEnergia,
@@ -255,6 +254,18 @@ export default function App() {
   // `updateRuta`, `deleteRuta`) se conservan para no tocar a los consumidores.
   const dataQueryClient = useQueryClient()
   const dataCompanyId = currentUser?.company_id
+  // T7: `contadores` migran a la capa de datos (scope company). Va ANTES del
+  // useMemo de rutas porque ese filtro usa `contadores` como entrada.
+  const { data: contadores = [] } = useContadoresQuery(dataCompanyId)
+  const addContador = useCallback((contador: Contador) => {
+    dataQueryClient.setQueryData<Contador[]>(aguaKeys.contadores(dataCompanyId), (old = []) => [contador, ...old])
+  }, [dataQueryClient, dataCompanyId])
+  const updateContador = useCallback((id: string, partial: Partial<Contador>) => {
+    dataQueryClient.setQueryData<Contador[]>(aguaKeys.contadores(dataCompanyId), (old = []) => old.map(c => (c.id === id ? { ...c, ...partial } : c)))
+  }, [dataQueryClient, dataCompanyId])
+  const deleteContador = useCallback((id: string) => {
+    dataQueryClient.setQueryData<Contador[]>(aguaKeys.contadores(dataCompanyId), (old = []) => old.filter(c => c.id !== id))
+  }, [dataQueryClient, dataCompanyId])
   const { data: rutasRaw = [] } = useRutasQuery(dataCompanyId)
   const rutas = useMemo(
     () => filterRutasByProjectAccess({

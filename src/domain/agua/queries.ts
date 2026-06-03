@@ -84,6 +84,21 @@ export function useTarifasQuery(companyId?: string) {
   })
 }
 
+// `contadores` (medidores) de agua, lista completa del tenant (scope company:
+// RLS + filtro defensivo). Distinta de useContadoresPorProyectoQuery (scoped).
+export function useContadoresQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.contadores(companyId),
+    queryFn: async () =>
+      (await runQuery<Contador[]>((signal) => {
+        let q = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? [],
+    enabled: !!companyId,
+  })
+}
+
 // ── Lecturas con scope (parametrizadas) ─────────────────────────────────────
 // Ejemplo de hooks por-proyecto: los consume MedidoresUnidadTab (módulo
 // Condominios) sobre tablas de agua → la capa de datos se comparte entre
