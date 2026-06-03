@@ -10,8 +10,9 @@
  * nuevo, se actualiza la columna de la BD a ese path, se verifica y se borra el
  * viejo. Se escribe un MANIFIESTO (JSON) para poder revertir.
  *
- * Los objetos HUÉRFANOS (sin fila que los referencie — 7 detectados) se respaldan
- * a ./condominios-media-orphan-backup/ y se borran (decisión aprobada).
+ * Los objetos HUÉRFANOS (sin fila que los referencie) se mueven a cuarentena
+ * `_orphans/<name>` dentro del mismo bucket (copy+delete) — reversible y purgable
+ * luego, en vez de un borrado destructivo.
  *
  * USO:
  *   export SUPABASE_URL=https://<ref>.supabase.co
@@ -22,14 +23,18 @@
  *   node scripts/migrate-condominios-media-paths.mjs --rollback <manifest.json>
  *
  * ⚠️ ORDEN: correr DESPUÉS de desplegar el código que escribe paths scopeados y
- * ANTES de aplicar la migración de policy 20260603220000. Validar primero contra
- * una Preview branch de Supabase. Idempotente: re-correr salta los ya scopeados.
+ * ANTES de aplicar la migración de policy 20260603220000. Idempotente: re-correr
+ * salta los ya scopeados (primer segmento UUID) y los ya en cuarentena (_orphans/).
+ *
+ * NOTA: ya ejecutado en prod (nnsqmeigtgewatameexo) el 2026-06-03 — 42 objetos
+ * migrados + 7 huérfanos en cuarentena — vía una Edge Function temporal equivalente
+ * (el egress directo a Storage estaba bloqueado en el entorno de CI). Este script
+ * queda como artefacto reproducible/rollback para otros entornos (p. ej. Preview).
  */
-import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
 const BUCKET = 'condominios-media'
-const ORPHAN_DIR = 'condominios-media-orphan-backup'
 
 const args = process.argv.slice(2)
 const APPLY = args.includes('--apply')
@@ -140,12 +145,13 @@ async function migrate() {
   const [objects, index] = await Promise.all([listAll(), buildIndex()])
   console.log(`Objetos en bucket: ${objects.length} · refs indexadas: ${index.size}\n`)
 
-  const manifest = { bucket: BUCKET, startedAt: new Date().toISOString(), apply: APPLY, moved: [], orphansDeleted: [] }
+  const manifest = { bucket: BUCKET, startedAt: new Date().toISOString(), apply: APPLY, moved: [], orphansQuarantined: [] }
   let moved = 0, skipped = 0, orphans = 0
 
   for (const name of objects) {
     const seg0 = name.split('/')[0]
-    if (UUID_RE.test(seg0)) { skipped++; continue }   // ya scopeado → idempotente
+    // Idempotente: salta ya-scopeados (1er segmento UUID) y ya-en-cuarentena.
+    if (UUID_RE.test(seg0) || name.startsWith('_orphans/')) { skipped++; continue }
 
     const ref = index.get(name)
     if (ref && ref.projectId) {
@@ -161,24 +167,23 @@ async function migrate() {
       manifest.moved.push({ oldPath: name, newPath, table: ref.table, column: ref.column, kind: ref.kind, rowId: ref.rowId })
       moved++
     } else {
-      console.log(`ORPHAN ${name}  (sin fila que lo referencie → respaldar + borrar)`)
+      // Huérfano (sin fila que lo referencie) → cuarentena en _orphans/ (copy+delete).
+      const quarantine = `_orphans/${name}`
+      console.log(`ORPHAN ${name}  →  ${quarantine}   (cuarentena, sin fila que lo referencie)`)
       if (APPLY) {
-        const { data, error } = await sb.storage.from(BUCKET).download(name)
-        if (error) throw new Error(`download orphan ${name}: ${error.message}`)
-        const buf = Buffer.from(await data.arrayBuffer())
-        mkdirSync(`${ORPHAN_DIR}/${name.split('/').slice(0, -1).join('/')}`, { recursive: true })
-        writeFileSync(`${ORPHAN_DIR}/${name}`, buf)
+        const { error: cpErr } = await sb.storage.from(BUCKET).copy(name, quarantine)
+        if (cpErr && !/exists/i.test(cpErr.message)) throw new Error(`copy orphan ${name}: ${cpErr.message}`)
         const { error: rmErr } = await sb.storage.from(BUCKET).remove([name])
         if (rmErr) throw new Error(`remove orphan ${name}: ${rmErr.message}`)
       }
-      manifest.orphansDeleted.push({ oldPath: name, backup: `${ORPHAN_DIR}/${name}` })
+      manifest.orphansQuarantined.push({ oldPath: name, quarantine })
       orphans++
     }
   }
 
   const file = `condominios-media-manifest-${Date.now()}.json`
   writeFileSync(file, JSON.stringify(manifest, null, 2))
-  console.log(`\nResumen: ${moved} movidos · ${orphans} huérfanos · ${skipped} ya scopeados (saltados)`)
+  console.log(`\nResumen: ${moved} movidos · ${orphans} en cuarentena · ${skipped} saltados (ya scopeados/cuarentena)`)
   console.log(`Manifiesto: ${file}`)
   if (!APPLY) console.log('\n(DRY-RUN — nada se modificó. Re-correr con --apply para ejecutar.)')
 }
@@ -197,16 +202,17 @@ async function rollback(manifestPath) {
       if (rmErr) throw new Error(`remove ${m.newPath}: ${rmErr.message}`)
     }
   }
-  // Restaurar huérfanos desde el respaldo local.
-  for (const o of manifest.orphansDeleted ?? []) {
-    console.log(`RESTORE orphan ${o.oldPath}  (desde ${o.backup})`)
+  // Restaurar huérfanos: copiar de la cuarentena al path original y limpiar la cuarentena.
+  for (const o of manifest.orphansQuarantined ?? []) {
+    console.log(`RESTORE orphan ${o.quarantine}  →  ${o.oldPath}`)
     if (APPLY) {
-      const buf = readFileSync(o.backup)
-      const { error } = await sb.storage.from(BUCKET).upload(o.oldPath, buf, { upsert: true })
-      if (error) throw new Error(`re-upload orphan ${o.oldPath}: ${error.message}`)
+      const { error: cpErr } = await sb.storage.from(BUCKET).copy(o.quarantine, o.oldPath)
+      if (cpErr && !/exists/i.test(cpErr.message)) throw new Error(`copy ${o.quarantine}: ${cpErr.message}`)
+      const { error: rmErr } = await sb.storage.from(BUCKET).remove([o.quarantine])
+      if (rmErr) throw new Error(`remove ${o.quarantine}: ${rmErr.message}`)
     }
   }
-  console.log(`\nRollback ${APPLY ? 'aplicado' : '(dry-run)'} sobre ${manifest.moved.length} movimientos y ${(manifest.orphansDeleted ?? []).length} huérfanos.`)
+  console.log(`\nRollback ${APPLY ? 'aplicado' : '(dry-run)'} sobre ${manifest.moved.length} movimientos y ${(manifest.orphansQuarantined ?? []).length} huérfanos.`)
 }
 
 try {

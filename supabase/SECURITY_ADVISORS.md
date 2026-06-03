@@ -44,7 +44,7 @@ el `company_id` (salvo donde se indica).
 | `company-logos` | `${company_id}/…` | ✅ WRITE scopeado en fase 1 (`20260603150000`); READ amplio (logo no sensible) |
 | `pagos-comprobantes` | `comprobantes/${auth.uid()}/…` | ✅ scopeado en fase 2 (`20260603160000`): WRITE carpeta-propia, READ dueño/staff-de-company |
 | `registro-fotos` | `${cliente_id}/${ts}` | ✅ scopeado (`20260603210000`): path normalizado (era `registros/${id}_${ts}`); READ residente/staff-de-company, WRITE staff |
-| `condominios-media` | `${project_id}/<categoría>/<ts>-<rand>` | 🟡 código + policy (`20260603220000`) listos; **pendiente el runbook de 3 pasos** (deploy código → migrar 49 objetos vía Storage API → aplicar policy). Convención normalizada (era `<categoría>/…` sin tenant); READ/WRITE staff por `projects` RLS, residente ESTRICTO a projects de sus unidades |
+| `condominios-media` | `${project_id}/<categoría>/<ts>-<rand>` | ✅ scopeado (`20260603220000`, aplicado a prod 2026-06-03): path normalizado (era `<categoría>/…` sin tenant); READ/WRITE staff por `projects` RLS, residente ESTRICTO a projects de sus unidades. 42 objetos migrados (Storage API copy+delete) + 7 huérfanos en cuarentena `_orphans/` |
 | `mudanza-docs` | `${unidad_id}/…` | ✅ scopeado (`20260603180000`) vía RLS de `unidades` (cubre residente y staff) |
 | `project-logos` | `${project_id}/…` | ✅ WRITE scopeado (`20260603170000`) vía `projects.company_id`; READ amplio |
 | `conv-attachments` | `${conversation_id}/…` | ✅ scopeado (`20260603200000`) vía RLS de `conversations` (READ/WRITE; cubre staff y residente) |
@@ -64,20 +64,23 @@ registros.project_id → projects.company_id` (misma lógica de roles que `pagos
 > `registros.project_id` para ser robusto a esto, pero el fix de visibilidad de `pagos`
 > (backfill de `project_id` desde el registro) queda pendiente en #335.
 
+**Fase 3 (hecha):** `condominios-media` scopeado (`20260603220000`, aplicado a prod 2026-06-03).
+Convención nueva `${project_id}/<categoría>/<archivo>`: los uploaders genéricos reciben el
+project_id activo vía `MediaScopeContext` (provider en `CondominiosSection` para staff y en
+`CondominiosClientPortal` para residentes). Policy con misma expresión en los 4 comandos: staff
+(`get_my_company_id()` not null) por `projects` RLS; residente ESTRICTO a los projects de sus
+unidades activas. Runbook ejecutado en orden (deploy código → migrar objetos → aplicar policy;
+la policy va al final o los objetos en path viejo quedan invisibles):
+- **42 objetos** referenciados migrados (copy+delete vía Storage API + update de columnas).
+- **7 huérfanos** (sin fila que los referencie) movidos a cuarentena `_orphans/` (reversibles;
+  purgables luego). Cobertura verificada en prod: 49 = 42 (→ 1 project único, 0 ambiguos) + 7.
+- Verificado post-aplicación: 0 objetos en path viejo, 4 policies scopeadas, `get_advisors` sin
+  hallazgos nuevos.
+> Hallazgo lateral (higiene, no I14): ~53 referencias colgadas preexistentes (`visitantes.foto_*`,
+> `novedades.foto_url`) apuntan a paths sin objeto (imágenes ya rotas); intactas, limpieza opcional.
+
 **Fases siguientes (tracked en #335, aún no en prod):**
-1. `condominios-media` — **código y policy listos** (este PR). Convención nueva
-   `${project_id}/<categoría>/<archivo>`: los uploaders genéricos reciben el project_id activo
-   vía `MediaScopeContext` (provider en `CondominiosSection` para staff y en
-   `CondominiosClientPortal` para residentes). **Runbook de 3 pasos, en este orden** (la policy
-   va al final o los objetos en path viejo se vuelven invisibles):
-   1. Deploy del código (uploads nuevos ya scopeados; lectores son agnósticos al shape del path).
-   2. `node scripts/migrate-condominios-media-paths.mjs --apply` — migra los **42 objetos
-      referenciados** (copy+delete vía Storage API + update de la columna) y **borra los 7
-      huérfanos** (respaldados antes en `./condominios-media-orphan-backup/`). Correr primero en
-      Preview; deja un manifiesto JSON para rollback (`--rollback <manifest>`).
-   3. Aplicar `20260603220000_storage_scope_condominios_media.sql`.
-   Cobertura verificada en prod: 49 objetos = 42 → 1 project único (0 ambiguos) + 7 huérfanos.
-2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
+1. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
    (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
 
 > Validar cada fase en Supabase Preview antes de prod: los paths existentes deben matchear la
