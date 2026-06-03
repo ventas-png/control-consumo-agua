@@ -42,7 +42,7 @@ el `company_id` (salvo donde se indica).
 |---|---|---|
 | `report-attachments` | `${company_id}/…` | ✅ ya scopeado (modelo a seguir) |
 | `company-logos` | `${company_id}/…` | ✅ WRITE scopeado en fase 1 (`20260603150000`); READ amplio (logo no sensible) |
-| `pagos-comprobantes` | `comprobantes/${user_id}/…` | ❌ pendiente (PII financiera) |
+| `pagos-comprobantes` | `comprobantes/${auth.uid()}/…` | ✅ scopeado en fase 2 (`20260603160000`): WRITE carpeta-propia, READ dueño/staff-de-company |
 | `registro-fotos` | `registros/${cliente_id}_${ts}` | ❌ pendiente |
 | `condominios-media` | `${unidad/proyecto}/…` | ❌ pendiente |
 | `mudanza-docs` | `${unidad_id}/…` | ❌ pendiente |
@@ -53,11 +53,22 @@ el `company_id` (salvo donde se indica).
 `is_super_admin()`); `file_size_limit` en `conv-attachments` (10 MiB) y `report-attachments`
 (25 MiB).
 
+**Fase 2 (hecha):** `pagos-comprobantes` scopeado (`20260603160000`). El path es
+`comprobantes/${auth.uid()}/…` (único uploader = portal residente; lector = gestor de cobros).
+WRITE (insert/update/delete) → solo carpeta propia o `super_admin`; READ → dueño OR
+`super_admin` OR staff de la company dueña del registro, vía `pagos.registro_id →
+registros.project_id → projects.company_id` (misma lógica de roles que `pagos_select`).
+> ⚠️ Hallazgo lateral: `PagoManualModal` (portal) inserta `pagos.project_id = null` y no hay
+> trigger de backfill → los pagos creados desde el portal **no son visibles** para el gestor
+> vía `pagos_select` (que filtra por `project_id`). El READ del comprobante se mapea por
+> `registros.project_id` para ser robusto a esto, pero el fix de visibilidad de `pagos`
+> (backfill de `project_id` desde el registro) queda pendiente en #335.
+
 **Fases siguientes (tracked en #335, aún no en prod):**
-1. Scopear READ/WRITE por company en cada bucket. Donde el id del path resuelve a company vía
-   tabla de dominio (`pagos-comprobantes`→`app_users`, `project-logos`→`projects`) se usa
-   policy-join sin migrar datos. Donde el id está embebido de forma frágil (`registro-fotos`:
-   `${cliente_id}_${ts}`) hay que normalizar la convención de path y migrar objetos.
+1. Scopear READ/WRITE por company en los buckets restantes. Donde el id del path resuelve a
+   company vía tabla de dominio (`project-logos`→`projects`) se usa policy-join sin migrar
+   datos. Donde el id está embebido de forma frágil (`registro-fotos`: `${cliente_id}_${ts}`)
+   hay que normalizar la convención de path y migrar objetos.
 2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
    (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
 
