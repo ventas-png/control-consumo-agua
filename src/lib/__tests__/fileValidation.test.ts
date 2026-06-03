@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   detectFileType, validateFileMagic,
-  sanitizeUploadFilename, buildUploadPath,
+  sanitizeUploadFilename, buildUploadPath, resolveUploadContentType,
 } from '../fileValidation'
 
 // Build a File whose first bytes match a magic signature.
@@ -108,5 +108,23 @@ describe('buildUploadPath', () => {
   it('antepone project_id/categoría como primer segmento (scoping cross-tenant)', () => {
     const p = buildUploadPath('11111111-2222-3333-4444-555555555555/amenidades', 'foto.png', 'jpg')
     expect(p).toMatch(/^11111111-2222-3333-4444-555555555555\/amenidades\/\d{13}-[a-z0-9]{6}-foto\.jpg$/)
+  })
+})
+
+describe('resolveUploadContentType', () => {
+  it('refina el contenedor OOXML (application/zip) al mime de office por extensión', () => {
+    expect(resolveUploadContentType('application/zip', 'contrato.docx')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    expect(resolveUploadContentType('application/zip', 'reporte.xlsx')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  })
+  it('refina el contenedor OLE2 (application/x-cfb) a doc/xls por extensión', () => {
+    expect(resolveUploadContentType('application/x-cfb', 'acta.doc')).toBe('application/msword')
+    expect(resolveUploadContentType('application/x-cfb', 'libro.xls')).toBe('application/vnd.ms-excel')
+  })
+  it('deja pasar pdf e imágenes sin cambio', () => {
+    expect(resolveUploadContentType('application/pdf', 'poliza.pdf')).toBe('application/pdf')
+    expect(resolveUploadContentType('image/jpeg', 'foto.jpg')).toBe('image/jpeg')
+  })
+  it('un zip que no es office se mantiene como application/zip (lo rechaza el bucket)', () => {
+    expect(resolveUploadContentType('application/zip', 'data.zip')).toBe('application/zip')
   })
 })
