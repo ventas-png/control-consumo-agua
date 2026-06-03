@@ -177,16 +177,6 @@ const NAV: NavEntry[] = [
         ),
       },
       {
-        id: 'servicios_energia',
-        label: 'Energía',
-        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        ),
-      },
-      {
         id: 'mapa',
         label: 'Mapa',
         roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
@@ -208,7 +198,29 @@ const NAV: NavEntry[] = [
       },
     ],
   },
-  // ── Grupo 3: Manejo Condominios ──────────────────────────────────────────────
+  // ── Grupo 3: Servicios ───────────────────────────────────────────────────────
+  // serv:S1 — Energía es un módulo de 1er nivel, ya no un sub-tab de "Manejo Agua".
+  // A nivel de facturación/RBAC sigue en la línea de agua: `servicios_energia`
+  // permanece en WATER_MODULE_KEYS (permisos `agua.*` + gating `servicio_agua`).
+  // La separación total de línea de servicio corresponde a serv:S29.
+  {
+    kind: 'group',
+    id: 'servicios',
+    label: 'Servicios',
+    tabs: [
+      {
+        id: 'servicios_energia',
+        label: 'Energía',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  // ── Grupo 4: Manejo Condominios ──────────────────────────────────────────────
   {
     kind: 'group',
     id: 'condominios_grp',

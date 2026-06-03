@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { type EnergyTab, energiaTabToPath, pathParamToEnergiaTab } from './energiaTabs'
 import type {
   FuenteAgua,
   ProveedorEnergia,
@@ -40,7 +41,7 @@ interface ServiciosEnergiaSectionProps {
   onFacturaDeleted: (id: string) => void
 }
 
-type EnergyTab = 'proveedores' | 'tarifas' | 'fuentes' | 'facturas' | 'dashboard'
+// `EnergyTab` + helpers de routing de tabs viven en ./energiaTabs (serv:S1).
 
 export default function ServiciosEnergiaSection({
   fuentesAgua,
@@ -66,7 +67,10 @@ export default function ServiciosEnergiaSection({
   onFacturaUpdated,
   onFacturaDeleted,
 }: ServiciosEnergiaSectionProps) {
-  const [activeTab, setActiveTab] = useState<EnergyTab>('proveedores')
+  const { tab: tabParam } = useParams<{ tab?: string }>()
+  const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
+  const navigate = useNavigate()
+  const setActiveTab = (next: EnergyTab) => navigate(energiaTabToPath(next))
 
   const tabs: { id: EnergyTab; label: string; icon: string }[] = [
     { id: 'proveedores', label: 'Proveedores', icon: '🏢' },
