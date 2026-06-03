@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
+import { CalidadTendencia } from './CalidadTendencia'
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
@@ -473,6 +474,8 @@ export function CalidadSection({
               📄 Exportar PDF
             </button>
           </div>
+          {/* serv:S25 — tendencia de cumplimiento de los análisis filtrados. */}
+          <CalidadTendencia registros={historialFiltrado} />
           <div className="table-scroll-wrapper">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead><tr style={{ background: 'var(--at-chip)' }}>
