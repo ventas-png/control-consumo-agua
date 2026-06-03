@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
+import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../lib/fileValidation'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useMediaScope } from './MediaScopeContext'
 
@@ -63,8 +63,10 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
     const { data, error: upErr } = await supabase.storage
       .from('condominios-media')
       .upload(path, file, {
-        // Use the magic-detected type — ignores any client-spoofed file.type
-        contentType: magicCheck.detected,
+        // Magic-detected type (ignores client-spoofed file.type), refined from the
+        // generic office container (zip/cfb) to the precise mime via extension so
+        // it matches the bucket's allowed_mime_types.
+        contentType: resolveUploadContentType(magicCheck.detected, file.name),
         upsert: false,
       })
     setProgress(80)

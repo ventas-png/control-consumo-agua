@@ -111,3 +111,34 @@ export function buildUploadPath(folder: string, originalName: string, forcedExt?
   const safeFolder = folder.replace(/[^\w/-]+/g, '-').replace(/\/{2,}/g, '/').replace(/^\/+|\/+$/g, '')
   return `${safeFolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${finalName}`
 }
+
+// Magic-byte detection can't tell apart the office subtypes: a .docx and .xlsx
+// are both ZIP containers (detected as `application/zip`), and .doc/.xls are both
+// OLE2 (`application/x-cfb`). Storage buckets restrict uploads by the *specific*
+// office mime, so uploading the generic container mime gets rejected by
+// `allowed_mime_types`. Refine the generic family to the precise mime using the
+// (user-provided) file extension; non-office types pass through unchanged.
+const OOXML_BY_EXT: Record<string, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+}
+const OLE2_BY_EXT: Record<string, string> = {
+  doc: 'application/msword',
+  xls: 'application/vnd.ms-excel',
+  ppt: 'application/vnd.ms-powerpoint',
+}
+
+/**
+ * Maps a magic-detected mime to the precise content-type to store. Office
+ * containers (`application/zip` for OOXML, `application/x-cfb` for OLE2) are
+ * refined to their specific mime via the filename extension so the upload
+ * matches the bucket's `allowed_mime_types`. Everything else is returned as-is
+ * (so a real `.zip` stays `application/zip` and gets rejected where not allowed).
+ */
+export function resolveUploadContentType(detected: string, filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (detected === 'application/zip' && OOXML_BY_EXT[ext]) return OOXML_BY_EXT[ext]
+  if (detected === 'application/x-cfb' && OLE2_BY_EXT[ext]) return OLE2_BY_EXT[ext]
+  return detected
+}

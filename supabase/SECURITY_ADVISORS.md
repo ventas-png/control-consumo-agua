@@ -86,14 +86,18 @@ la policy va al final o los objetos en path viejo quedan invisibles):
 `mimeFor()` a `text/csv` bare); `conv-attachments` → `[image/*, application/pdf, xlsx, xls, docx,
 doc, text/csv]` (matchea el `accept` del chat; usa `file.type` del browser, sin el problema de
 magic-bytes). El resto de buckets ya tenía la lista seteada.
-> Hallazgo lateral (pendiente, no en este PR): `FileUploader` (bucket `condominios-media`) sube
-> con el mime **magic-detectado** (`application/zip` para docx/xlsx, `application/x-cfb` para
-> doc/xls), que **no** está en el `allowed_mime_types` de `condominios-media` → las subidas de
-> documentos Office por ese componente podrían rechazarse. Verificar y, si aplica, mapear el
-> detected→mime real o ajustar la lista. (No afecta a `conv-attachments`, que usa `file.type`.)
+
+**Fase 5 (hecha):** fix del mime de office en `FileUploader` (bucket `condominios-media`). Subía
+con el mime **magic-detectado** del contenedor (`application/zip` para docx/xlsx, `application/x-cfb`
+para doc/xls), que **no** está en el `allowed_mime_types` → las subidas de documentos Office se
+rechazaban (verificado: el bucket tenía 0 objetos Office). Se agregó `resolveUploadContentType()`
+en `fileValidation.ts` que refina el contenedor genérico al mime de office preciso por extensión
+(manteniendo la validación magic-byte); un `.zip` real sigue como `application/zip` (rechazado donde
+no esté permitido). No afectaba a `conv-attachments` (usa `file.type`) ni a `mudanza-docs`
+(`PortalMudanzaTab` valida categoría `image`).
 
 **Fases siguientes (tracked en #335):**
-- (ninguna pendiente de I14 storage; ver hallazgo lateral de `FileUploader` arriba.)
+- (ninguna pendiente de I14 storage.)
 
 > Validar cada fase en Supabase Preview antes de prod: los paths existentes deben matchear la
 > policy nueva, o los archivos quedan inaccesibles.
