@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Cliente, Registro, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -85,7 +85,6 @@ function saveCache(userId: string | undefined, payload: AppData): void {
 interface AppData {
   clientes: Cliente[]
   registros: Registro[]
-  empresa: Empresa
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
@@ -94,7 +93,6 @@ interface AppData {
 const INITIAL_DATA: AppData = {
   clientes: [],
   registros: [],
-  empresa: {},
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
@@ -154,14 +152,13 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     return Promise.allSettled([
       clientesQ.abortSignal(signal()),
       registrosQ.abortSignal(signal()),
-      supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -169,9 +166,6 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     }
     if (regRes.status === 'fulfilled' && regRes.value.data) {
       next.registros = regRes.value.data as Registro[]
-    }
-    if (empRes.status === 'fulfilled' && empRes.value.data?.length) {
-      next.empresa = empRes.value.data[0] as Empresa
     }
     if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
       next.proyectos = proyectoRes.value.data as Proyecto[]
