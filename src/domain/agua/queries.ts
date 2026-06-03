@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador, Tarifa } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -92,6 +92,22 @@ export function useContadoresQuery(companyId?: string) {
     queryFn: async () =>
       (await runQuery<Contador[]>((signal) => {
         let q = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `unidades` de agua, lista del tenant ordenada por nombre (scope company: RLS +
+// filtro defensivo). El orden por nombre espeja useData (y la inserción optimista
+// en App reordena al agregar).
+export function useUnidadesQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.unidades(companyId),
+    queryFn: async () =>
+      (await runQuery<Unidad[]>((signal) => {
+        let q = supabase.from('unidades').select('*').order('nombre', { ascending: true })
         if (companyId) q = q.eq('company_id', companyId)
         return q.abortSignal(signal)
       })) ?? [],
