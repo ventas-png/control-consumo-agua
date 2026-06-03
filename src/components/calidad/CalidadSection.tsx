@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
@@ -8,6 +8,7 @@ import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
 import { registrosCalidadToCSV } from '../../lib/calidadCSV'
+import { ultimaMuestraPorFuente, estadoMuestreo, MUESTREO_META } from './muestreo'
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
@@ -45,8 +46,11 @@ export function CalidadSection({
 
   // Fuentes form state
   const [editandoId, setEditandoId] = useState<string | null>(null)
-  const [fuenteForm, setFuenteForm] = useState({ identificador: '', nombre: '', tipo_agua: '' as TipoAgua | '', descripcion: '' })
+  const [fuenteForm, setFuenteForm] = useState({ identificador: '', nombre: '', tipo_agua: '' as TipoAgua | '', descripcion: '', frecuencia_muestreo_dias: '' })
   const [savingFuente, setSavingFuente] = useState(false)
+  // serv:S26 — última muestra por fuente (deriva el estado de muestreo en la lista).
+  const ultimaMuestra = useMemo(() => ultimaMuestraPorFuente(registrosCalidad), [registrosCalidad])
+  const hoyISO = new Date().toISOString().slice(0, 10)
 
   // Análisis form state
   const [analisisFuenteId, setAnalisisFuenteId] = useState('')
@@ -71,6 +75,11 @@ export function CalidadSection({
     if (!fuenteForm.identificador.trim()) return notify({ variant: 'warning', title: 'Atención', text: 'El identificador es obligatorio.' })
     if (!fuenteForm.nombre.trim() || fuenteForm.nombre.length < 2) return notify({ variant: 'warning', title: 'Atención', text: 'El nombre es obligatorio (mín. 2 caracteres).' })
     if (!fuenteForm.tipo_agua) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione la tipología de agua.' })
+    // serv:S26 — frecuencia de muestreo opcional: si se indica, entero de días positivo.
+    const freqRaw = fuenteForm.frecuencia_muestreo_dias.trim()
+    if (freqRaw !== '' && (!/^\d+$/.test(freqRaw) || Number(freqRaw) < 1 || Number(freqRaw) > 3650)) {
+      return notify({ variant: 'warning', title: 'Atención', text: 'La frecuencia de muestreo debe ser un número de días entre 1 y 3650.' })
+    }
 
     setSavingFuente(true)
     try {
@@ -79,6 +88,7 @@ export function CalidadSection({
         nombre: sanitizeInput(fuenteForm.nombre),
         tipo_agua: fuenteForm.tipo_agua,
         descripcion: sanitizeInput(fuenteForm.descripcion),
+        frecuencia_muestreo_dias: freqRaw === '' ? null : Number(freqRaw),
       }
       if (editandoId) {
         const { error } = await supabase.from('fuentes_agua').update(payload).eq('id', editandoId)
@@ -88,7 +98,7 @@ export function CalidadSection({
         if (error) throw error
       }
       onFuentesUpdated(await recargarFuentes())
-      setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' })
+      setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
       setEditandoId(null)
       notify({ variant: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', duration: 1500 })
     } catch (e) {
@@ -100,7 +110,7 @@ export function CalidadSection({
 
   function editarFuente(f: FuenteAgua) {
     setEditandoId(f.id)
-    setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '' })
+    setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '', frecuencia_muestreo_dias: f.frecuencia_muestreo_dias != null ? String(f.frecuencia_muestreo_dias) : '' })
     setSubTab('fuentes')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -281,12 +291,17 @@ export function CalidadSection({
                 <label style={labelStyle}>Descripción adicional</label>
                 <input type="text" value={fuenteForm.descripcion} onChange={e => setFuenteForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Ubicación, observaciones..." maxLength={200} style={inputStyle} />
               </div>
+              {/* serv:S26 — frecuencia de muestreo (opcional): base del estado de muestreo. */}
+              <div>
+                <label style={labelStyle}>Frecuencia de muestreo (días)</label>
+                <input type="number" min={1} max={3650} value={fuenteForm.frecuencia_muestreo_dias} onChange={e => setFuenteForm(p => ({ ...p, frecuencia_muestreo_dias: e.target.value }))} placeholder="Ej: 30 — opcional" style={inputStyle} />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={guardarFuente} disabled={savingFuente} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 {savingFuente ? 'Guardando...' : `💾 ${editandoId ? 'Actualizar Fuente' : 'Guardar Fuente'}`}
               </button>
-              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 ✕ Cancelar
               </button>
             </div>
@@ -297,7 +312,7 @@ export function CalidadSection({
             <div className="table-scroll-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead><tr style={{ background: 'var(--at-chip)' }}>
-                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
+                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Muestreo', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {fuentesAgua.map(f => {
@@ -308,6 +323,21 @@ export function CalidadSection({
                         <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{sanitizeHTML(f.identificador)}</td>
                         <td style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
                         <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
+                        {/* serv:S26 — estado de muestreo: frecuencia vs. última muestra registrada. */}
+                        <td style={{ padding: '10px' }}>
+                          {(() => {
+                            const m = estadoMuestreo(ultimaMuestra.get(f.id) ?? null, f.frecuencia_muestreo_dias, hoyISO)
+                            const meta = MUESTREO_META[m.estado]
+                            const title = m.estado === 'sin_programa' ? 'Defina una frecuencia de muestreo para esta fuente'
+                              : m.estado === 'sin_muestras' ? 'Con programa, pero aún sin análisis registrados'
+                              : m.proximaFecha ? `Próximo muestreo: ${m.proximaFecha}${m.dias != null ? (m.dias < 0 ? ` (vencido hace ${-m.dias} d)` : ` (en ${m.dias} d)`) : ''}` : ''
+                            return (
+                              <span title={title} style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, background: meta.tint, color: meta.color }}>
+                                {meta.label}
+                              </span>
+                            )
+                          })()}
+                        </td>
                         <td style={{ padding: '10px' }}>
                           <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, background: f.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: f.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
                             {f.activo ? 'Activa' : 'Inactiva'}
@@ -324,7 +354,7 @@ export function CalidadSection({
                       </tr>
                     )
                   })}
-                  {fuentesAgua.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin fuentes registradas</td></tr>}
+                  {fuentesAgua.length === 0 && <tr><td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin fuentes registradas</td></tr>}
                 </tbody>
               </table>
             </div>
