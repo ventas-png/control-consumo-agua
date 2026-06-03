@@ -47,7 +47,7 @@ el `company_id` (salvo donde se indica).
 | `condominios-media` | `<categoría>/<ts>-<rand>` (sin id de tenant) | ❌ requiere normalizar path + migrar (49 objetos) — como `registro-fotos` |
 | `mudanza-docs` | `${unidad_id}/…` | ✅ scopeado (`20260603180000`) vía RLS de `unidades` (cubre residente y staff) |
 | `project-logos` | `${project_id}/…` | ✅ WRITE scopeado (`20260603170000`) vía `projects.company_id`; READ amplio |
-| `conv-attachments` | varía | ⚠️ READ amplio (INSERT sí valida company/cliente) |
+| `conv-attachments` | `${conversation_id}/…` | ✅ scopeado (`20260603200000`) vía RLS de `conversations` (READ/WRITE; cubre staff y residente) |
 
 **Fase 1 (hecha):** `company-logos` WRITE scopeado por `get_my_company_id()` (o
 `is_super_admin()`); `file_size_limit` en `conv-attachments` (10 MiB) y `report-attachments`
