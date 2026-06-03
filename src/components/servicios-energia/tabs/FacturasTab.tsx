@@ -128,6 +128,7 @@ export default function FacturasTab({
         <FacturaEnergiaModal
           factura={editingFactura || {}}
           fuentesEnergia={fuentesEnergia}
+          facturasEnergia={facturasEnergia}
           tarifasEnergia={tarifasEnergia}
           proveedoresEnergia={proveedoresEnergia}
           moneda={moneda}
