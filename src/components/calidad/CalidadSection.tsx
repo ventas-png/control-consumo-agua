@@ -5,6 +5,7 @@ import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
+import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
@@ -112,17 +113,23 @@ export function CalidadSection({
   const fuenteSeleccionada = fuentesAgua.find(f => f.id === analisisFuenteId)
   const tipologiaActual = fuenteSeleccionada ? TIPOLOGIAS_CALIDAD[fuenteSeleccionada.tipo_agua] : null
 
-  function cumplimientoEnVivo(): { cumple: number; noCumple: number; pendiente: number; total: number } {
-    if (!tipologiaActual) return { cumple: 0, noCumple: 0, pendiente: 0, total: 0 }
-    let cumple = 0, noCumple = 0, pendiente = 0
+  // serv:S20 — resumen en vivo por severidad (no solo binario ok/no-ok).
+  function cumplimientoEnVivo(): { cumple: number; noCumple: number; pendiente: number; total: number; leve: number; moderado: number; critico: number; invalido: number } {
+    const vacio = { cumple: 0, noCumple: 0, pendiente: 0, total: 0, leve: 0, moderado: 0, critico: 0, invalido: 0 }
+    if (!tipologiaActual) return vacio
+    let cumple = 0, pendiente = 0, leve = 0, moderado = 0, critico = 0, invalido = 0
     tipologiaActual.parametros.forEach(p => {
       const val = parametroValues[p.key]
       if (!val || val.trim() === '') { pendiente++; return }
-      const num = parseFloat(val)
-      const ok = p.min === p.max && p.min === 0 ? num === 0 : num >= p.min && num <= p.max
-      if (ok) cumple++; else noCumple++
+      if (!validarValorParametro(val).valido) { invalido++; return }
+      const sev = severidadParametro(p, val)
+      if (sev === 'ok') cumple++
+      else if (sev === 'leve') leve++
+      else if (sev === 'moderado') moderado++
+      else if (sev === 'critico') critico++
     })
-    return { cumple, noCumple, pendiente, total: cumple + noCumple }
+    const noCumple = leve + moderado + critico
+    return { cumple, noCumple, pendiente, total: cumple + noCumple, leve, moderado, critico, invalido }
   }
 
   async function guardarAnalisis() {
@@ -132,10 +139,17 @@ export function CalidadSection({
 
     const parametros: Record<string, number> = {}
     let algunoIngresado = false
-    tipologiaActual.parametros.forEach(p => {
+    // serv:S20 — valida cada muestra antes de guardar (numérica, no negativa).
+    for (const p of tipologiaActual.parametros) {
       const v = parametroValues[p.key]
-      if (v && v.trim() !== '') { parametros[p.key] = parseFloat(v); algunoIngresado = true }
-    })
+      if (!v || v.trim() === '') continue
+      const val = validarValorParametro(v)
+      if (!val.valido) {
+        return notify({ variant: 'warning', title: 'Valor inválido', text: `${p.label}: ${val.motivo}` })
+      }
+      parametros[p.key] = parseFloat(v)
+      algunoIngresado = true
+    }
     if (!algunoIngresado) return notify({ variant: 'warning', title: 'Atención', text: 'Ingrese al menos un valor de parámetro.' })
 
     const { cumplimiento, cumple_total } = calcularCumplimiento(fuenteSeleccionada.tipo_agua, parametros)
@@ -342,9 +356,11 @@ export function CalidadSection({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                 {tipologiaActual.parametros.map(p => {
                   const val = parametroValues[p.key] ?? ''
-                  const num = parseFloat(val)
-                  const ok = val.trim() === '' ? null : (p.min === p.max && p.min === 0 ? num === 0 : num >= p.min && num <= p.max)
+                  // serv:S20 — validación de muestra + severidad graduada.
+                  const validacion = validarValorParametro(val)
+                  const sev = severidadParametro(p, val)
                   const rango = p.min === p.max && p.min === 0 ? 'Ausencia (= 0)' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
+                  const borderColor = !validacion.valido ? 'var(--at-danger)' : sev ? SEVERIDAD_META[sev].border : 'var(--at-line)'
                   return (
                     <div key={p.key}>
                       <label style={{ ...labelStyle, fontSize: '13px' }}>
@@ -355,8 +371,13 @@ export function CalidadSection({
                         type="number" step="any" value={val}
                         onChange={e => setParametroValues(prev => ({ ...prev, [p.key]: e.target.value }))}
                         placeholder="Ingrese valor"
-                        style={{ ...inputStyle, borderColor: ok === null ? 'var(--at-line)' : ok ? 'var(--at-success)' : 'var(--at-danger)' }}
+                        style={{ ...inputStyle, borderColor }}
                       />
+                      {!validacion.valido ? (
+                        <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 600, color: 'var(--at-danger-strong)' }}>⚠ {validacion.motivo}</span>
+                      ) : sev && sev !== 'ok' ? (
+                        <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 700, color: SEVERIDAD_META[sev].color, background: SEVERIDAD_META[sev].tint, padding: '1px 8px', borderRadius: 999 }}>{SEVERIDAD_META[sev].label}</span>
+                      ) : null}
                     </div>
                   )
                 })}
@@ -364,11 +385,17 @@ export function CalidadSection({
 
               <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)' }}>
                 <div style={{ fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>Resumen de Cumplimiento</div>
-                {cvl.total === 0
+                {(cvl.total === 0 && cvl.invalido === 0)
                   ? <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
-                  : <span style={{ background: cvl.noCumple === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: cvl.noCumple === 0 ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
-                    {cvl.noCumple === 0 ? '✅ CUMPLE' : '❌ NO CUMPLE'} — {cvl.cumple}/{cvl.total + cvl.pendiente} parámetros OK{cvl.pendiente > 0 ? `, ${cvl.pendiente} pendiente(s)` : ''}
-                  </span>
+                  : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                      <span style={{ background: (cvl.noCumple === 0 && cvl.invalido === 0) ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: (cvl.noCumple === 0 && cvl.invalido === 0) ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
+                        {(cvl.noCumple === 0 && cvl.invalido === 0) ? '✅ CUMPLE' : '❌ NO CUMPLE'} — {cvl.cumple}/{cvl.total + cvl.pendiente + cvl.invalido} OK{cvl.pendiente > 0 ? `, ${cvl.pendiente} pend.` : ''}
+                      </span>
+                      {cvl.critico > 0 && <span style={{ background: SEVERIDAD_META.critico.tint, color: SEVERIDAD_META.critico.color, padding: '4px 10px', borderRadius: 999, fontWeight: 700, fontSize: '12px' }}>{cvl.critico} crítico{cvl.critico > 1 ? 's' : ''}</span>}
+                      {cvl.moderado > 0 && <span style={{ background: SEVERIDAD_META.moderado.tint, color: SEVERIDAD_META.moderado.color, padding: '4px 10px', borderRadius: 999, fontWeight: 700, fontSize: '12px' }}>{cvl.moderado} moderado{cvl.moderado > 1 ? 's' : ''}</span>}
+                      {cvl.leve > 0 && <span style={{ background: SEVERIDAD_META.leve.tint, color: SEVERIDAD_META.leve.color, padding: '4px 10px', borderRadius: 999, fontWeight: 700, fontSize: '12px' }}>{cvl.leve} leve{cvl.leve > 1 ? 's' : ''}</span>}
+                      {cvl.invalido > 0 && <span style={{ background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', padding: '4px 10px', borderRadius: 999, fontWeight: 700, fontSize: '12px' }}>{cvl.invalido} inválido{cvl.invalido > 1 ? 's' : ''}</span>}
+                    </div>
                 }
               </div>
             </div>
