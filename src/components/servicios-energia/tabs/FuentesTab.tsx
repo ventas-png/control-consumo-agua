@@ -50,11 +50,6 @@ export default function FuentesTab({
       return
     }
 
-    if (fuentesAgua.length === 0) {
-      notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos una fuente de agua antes de crear una fuente de energía' })
-      return
-    }
-
     const fields: Array<Parameters<typeof openPromptDialog>[0]['fields'][number]> = [
       { name: 'nombre', label: 'Nombre', placeholder: 'Bomba pozo norte', required: true, autoFocus: true },
     ]
@@ -69,11 +64,16 @@ export default function FuentesTab({
     }
     fields.push(
       {
+        // serv:S2 — Energía es servicio de 1er nivel: el vínculo con una fuente
+        // de agua es opcional (puede no alimentar ningún pozo).
         name: 'fuente_agua_id',
-        label: 'Fuente de agua',
+        label: 'Fuente de agua asociada (opcional)',
         control: 'select',
-        required: true,
-        options: fuentesAgua.map(f => ({ value: f.id, label: `${f.nombre} (${f.tipo_agua})` })),
+        options: [
+          { value: '', label: 'Sin fuente de agua asociada' },
+          ...fuentesAgua.map(f => ({ value: f.id, label: `${f.nombre} (${f.tipo_agua})` })),
+        ],
+        helpText: 'Vincula esta energía a una fuente de agua (p. ej. bombeo de pozo). Déjalo vacío si es un servicio energético independiente.',
       },
       {
         name: 'modo_suministro',
@@ -119,7 +119,6 @@ export default function FuentesTab({
       validate: (data) => {
         if (!data.nombre?.trim()) return 'El nombre es requerido'
         if (proyectos.length > 1 && !data.project_id) return 'Debe seleccionar un proyecto'
-        if (!data.fuente_agua_id) return 'Debe seleccionar una fuente de agua'
         return null
       },
     })
@@ -128,7 +127,7 @@ export default function FuentesTab({
     const modo = result.modo_suministro
     const formValues: Record<string, unknown> = {
       nombre: sanitizeInput(result.nombre),
-      fuente_agua_id: result.fuente_agua_id,
+      fuente_agua_id: result.fuente_agua_id || null,
       modo_suministro: modo,
       project_id: proyectos.length > 1 ? result.project_id : (defaultProjectId ?? ''),
       company_id: companyId,

@@ -1,6 +1,7 @@
 // agua:A6 — Tipos del módulo de Servicios Energéticos (proveedores, tarifas,
-// fuentes, facturas). Asociado al módulo Agua porque la generación eléctrica
-// alimenta las fuentes de agua (bombeo).
+// fuentes, facturas).
+// serv:S2 — Energía es un servicio de 1er nivel: su vínculo con una fuente de
+// agua (bombeo) es OPCIONAL, no una dependencia dura del módulo Agua.
 
 // ── Módulo de Servicios Energéticos ────────────────────────────────────────
 
@@ -43,7 +44,10 @@ export interface FuenteEnergia {
   id: string;
   project_id: string;
   company_id: string;
-  fuente_agua_id: string;
+  // serv:S2 — opcional: vínculo informativo con la fuente de agua que esta
+  // energía alimenta (p. ej. bombeo de pozo). null = servicio energético
+  // independiente (solar de áreas comunes, acometida administrativa, etc.).
+  fuente_agua_id?: string;
   nombre: string;
   modo_suministro: ModoSuministroEnergia;
   proveedor_id?: string;
