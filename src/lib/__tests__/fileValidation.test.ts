@@ -102,4 +102,11 @@ describe('buildUploadPath', () => {
     expect(p).toMatch(/foto\.jpg$/)
     expect(p).not.toContain('.png')
   })
+  // infra:I14 — condominios-media uploaders pass `${project_id}/<categoría>` as
+  // the folder so the object path starts with the tenant's project_id (the first
+  // path segment the storage RLS policy scopes on).
+  it('antepone project_id/categoría como primer segmento (scoping cross-tenant)', () => {
+    const p = buildUploadPath('11111111-2222-3333-4444-555555555555/amenidades', 'foto.png', 'jpg')
+    expect(p).toMatch(/^11111111-2222-3333-4444-555555555555\/amenidades\/\d{13}-[a-z0-9]{6}-foto\.jpg$/)
+  })
 })

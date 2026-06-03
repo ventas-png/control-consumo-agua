@@ -17,6 +17,7 @@ import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
 import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
+import { MediaScopeProvider }  from '../shared/MediaScopeContext'
 // F3.12: Portal residente ampliado (asambleas + transparencia)
 import { PortalAsambleasTab }     from '../condominios/tabs/PortalAsambleasTab'
 import { PortalTransparenciaTab } from '../condominios/tabs/PortalTransparenciaTab'
@@ -276,6 +277,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   ]
 
   return (
+    /* infra:I14 — provides the resident's unit project_id to condominios-media uploaders. */
+    <MediaScopeProvider projectId={proyectoId}>
     <div style={{ minHeight: '100vh', background: 'var(--at-accent-tint-2)' }}>
       <style>{PORTAL_CSS}</style>
 
@@ -556,6 +559,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         </EditModal>
       )}
     </div>
+    </MediaScopeProvider>
   )
 }
 

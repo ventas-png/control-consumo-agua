@@ -30,3 +30,7 @@ npm-debug.log*
 
 # Supabase CLI cache
 supabase/.temp/
+
+# infra:I14 condominios-media migration runtime artifacts (may contain object bytes)
+condominios-media-orphan-backup/
+condominios-media-manifest-*.json

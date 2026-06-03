@@ -107,7 +107,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     }
     setEntregaSaving(true)
     try {
-      const path = buildUploadPath('paquetes-firmas', 'firma.png', 'png')
+      const path = buildUploadPath(`${proyectoId}/paquetes-firmas`, 'firma.png', 'png')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
       if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
       const { error } = await supabase.from('paquetes_recibidos').update({
