@@ -14,6 +14,7 @@ describe('aguaKeys', () => {
     expect(aguaKeys.contadores('c1')).toEqual(['agua', 'contadores', 'c1'])
     expect(aguaKeys.unidades('c1')).toEqual(['agua', 'unidades', 'c1'])
     expect(aguaKeys.proveedoresEnergia('c1')).toEqual(['agua', 'proveedores-energia', 'c1'])
+    expect(aguaKeys.tarifasEnergia('c1')).toEqual(['agua', 'tarifas-energia', 'c1'])
   })
 
   it('normaliza companyId ausente a null para que la key sea estable', () => {
