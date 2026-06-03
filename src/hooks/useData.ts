@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -88,7 +88,6 @@ interface AppData {
   empresa: Empresa
   fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
-  contadores: Contador[]
   unidades: Unidad[]
   proyectos: Proyecto[]
   moneda: string
@@ -105,7 +104,6 @@ const INITIAL_DATA: AppData = {
   empresa: {},
   fuentesAgua: [],
   registrosCalidad: [],
-  contadores: [],
   unidades: [],
   proyectos: [],
   moneda: 'Q',
@@ -156,7 +154,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // RLS is the primary enforcement, these are secondary safeguards.
     // NOTE: Supabase query builder is immutable — .eq() returns a new builder,
     // so we must reassign (use let) to actually apply the filter.
-    let contadoresQ = supabase.from('contadores').select('*').order('created_at', { ascending: false })
     let unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
     let fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
     let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
@@ -180,7 +177,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
 
     if (cid) {
-      contadoresQ      = contadoresQ.eq('company_id', cid)
       unidadesQ        = unidadesQ.eq('company_id', cid)
       fuentesQ         = fuentesQ.eq('company_id', cid)
       rcalQ            = rcalQ.eq('company_id', cid)
@@ -196,7 +192,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
       fuentesQ.abortSignal(signal()),
       rcalQ.abortSignal(signal()),
-      contadoresQ.abortSignal(signal()),
       unidadesQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
       proveedoresEnergiaQ.abortSignal(signal()),
@@ -208,7 +203,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, contadoresRes, unidadesRes, proyectoRes, proveedoresEnergiaRes, tarifasEnergiaRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, fuaRes, rcalRes, unidadesRes, proyectoRes, proveedoresEnergiaRes, tarifasEnergiaRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -225,9 +220,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
     if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
       next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
-    }
-    if (contadoresRes.status === 'fulfilled' && contadoresRes.value.data) {
-      next.contadores = contadoresRes.value.data as Contador[]
     }
     if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
       next.unidades = unidadesRes.value.data as Unidad[]
@@ -302,7 +294,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   }
 
   const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
-    const [clRes, regRes, , , , contadoresRes, unidadesRes] = results
+    const [clRes, regRes, , , , unidadesRes] = results
     const errs: string[] = []
     // Collect both fulfilled-with-error AND rejected (AbortError, network failure, etc.).
     // Previously only the fulfilled branch was checked, so per-query timeouts
@@ -322,7 +314,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const checks: Array<[string, typeof clRes]> = [
       ['clientes', clRes],
       ['registros', regRes],
-      ['contadores', contadoresRes],
       ['unidades', unidadesRes],
     ]
     for (const [label, res] of checks) {
@@ -459,21 +450,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
   }, [])
 
-  const addContador = useCallback((contador: Contador) => {
-    setData(prev => ({ ...prev, contadores: [contador, ...prev.contadores] }))
-  }, [])
-
-  const updateContador = useCallback((id: string, partial: Partial<Contador>) => {
-    setData(prev => ({
-      ...prev,
-      contadores: prev.contadores.map(c => (c.id === id ? { ...c, ...partial } : c)),
-    }))
-  }, [])
-
-  const deleteContador = useCallback((id: string) => {
-    setData(prev => ({ ...prev, contadores: prev.contadores.filter(c => c.id !== id) }))
-  }, [])
-
   const addUnidad = useCallback((unidad: Unidad) => {
     setData(prev => ({ ...prev, unidades: [...prev.unidades, unidad].sort((a, b) => a.nombre.localeCompare(b.nombre)) }))
   }, [])
@@ -567,9 +543,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     setRegistrosCalidad,
     recargarFuentesAgua,
     recargarRegistrosCalidad,
-    addContador,
-    updateContador,
-    deleteContador,
     addUnidad,
     updateUnidad,
     deleteUnidad,
