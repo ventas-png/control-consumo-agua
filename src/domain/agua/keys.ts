@@ -18,4 +18,6 @@ export const aguaKeys = {
     [...aguaKeys.all, 'contadores', 'por-proyecto', companyId, proyectoId] as const,
   consumoPorProyecto: (proyectoId: string, mes: string) =>
     [...aguaKeys.all, 'registros', 'consumo-por-proyecto', proyectoId, mes] as const,
+  consumoMensualPorProyecto: (proyectoId: string) =>
+    [...aguaKeys.all, 'registros', 'consumo-mensual-por-proyecto', proyectoId] as const,
 } as const

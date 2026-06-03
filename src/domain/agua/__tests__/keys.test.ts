@@ -28,6 +28,9 @@ describe('aguaKeys', () => {
     expect(aguaKeys.consumoPorProyecto('p1', '2026-06')).toEqual([
       'agua', 'registros', 'consumo-por-proyecto', 'p1', '2026-06',
     ])
+    expect(aguaKeys.consumoMensualPorProyecto('p1')).toEqual([
+      'agua', 'registros', 'consumo-mensual-por-proyecto', 'p1',
+    ])
   })
 
   it('cambiar un parámetro del scope produce una key distinta (cache aislado)', () => {
