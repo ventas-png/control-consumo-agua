@@ -96,10 +96,12 @@ export default function FacturaEnergiaModal({
       }
 
       // serv:S6 — valida kWh no negativos + secuencialidad del período.
+      // serv:S12 — + rechaza numero_factura duplicado dentro de la empresa.
       const validacion = validarFacturaEnergia(
         {
           id: factura?.id,
           fuente_energia_id: dataToSave.fuente_energia_id,
+          numero_factura: dataToSave.numero_factura,
           periodo_inicio: dataToSave.periodo_inicio,
           periodo_fin: dataToSave.periodo_fin,
           kwh_consumidos: dataToSave.kwh_consumidos,

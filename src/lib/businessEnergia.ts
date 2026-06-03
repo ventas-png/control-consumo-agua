@@ -83,6 +83,7 @@ export function calcularFacturaEnergia(input: CalculoFacturaInput): CalculoFactu
 export interface FacturaValidable {
   id?: string
   fuente_energia_id?: string
+  numero_factura?: string
   periodo_inicio?: string
   periodo_fin?: string
   kwh_consumidos?: number
@@ -128,6 +129,19 @@ export function validarFacturaEnergia(
         valido: false,
         motivo: `El período inicia (${factura.periodo_inicio}) antes del fin del último registrado para la fuente (${ultimoFin}).`,
       }
+    }
+  }
+
+  // serv:S12 — numero_factura no debe duplicarse dentro de la empresa (la lista
+  // facturasExistentes ya viene scopeada por empresa). Excluye la factura en
+  // edición y sólo aplica cuando el número viene con valor (es opcional).
+  if (factura.numero_factura && factura.numero_factura.trim()) {
+    const num = factura.numero_factura.trim()
+    const duplicada = facturasExistentes.some(
+      f => f.id !== factura.id && (f.numero_factura ?? '').trim() === num,
+    )
+    if (duplicada) {
+      return { valido: false, motivo: `Ya existe una factura con el número “${num}”.` }
     }
   }
 
