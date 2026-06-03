@@ -6,6 +6,10 @@
 export interface Empresa {
   id?: string;
   nombre?: string;
+  // serv:S16 — centro/zoom por defecto del mapa por tenant (null = default app).
+  center_lat?: number | null;
+  center_lng?: number | null;
+  zoom_default?: number | null;
 }
 
 export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente' | 'collector';

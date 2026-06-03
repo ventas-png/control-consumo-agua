@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { clusterByGrid, type PixelPoint } from './mapClustering'
 import { heatStyle } from './heatScale'
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from './mapCenter'
 
 // serv:S13 — Mapa genérico reutilizable (agua/condominios/energía): extrae el
 // "motor" de Leaflet detrás de una API declarativa por capas.
@@ -14,9 +15,8 @@ const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 // serv:S19 (atribución OSM) cubierta por default.
 const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors'
 
-// Ciudad de Guatemala — centro por defecto cuando no hay markers a los que ajustar.
-const DEFAULT_CENTER: [number, number] = [14.6349, -90.5069]
-const DEFAULT_ZOOM = 13
+// serv:S16 — DEFAULT_CENTER/DEFAULT_ZOOM (Ciudad de Guatemala) viven en mapCenter.ts
+// para compartirse con MapaSection y la lógica pura de resolución del centro.
 const DEFAULT_PIN_COLOR = '#2563eb'
 const CLUSTER_CELL_PX = 60
 
@@ -58,6 +58,8 @@ export interface MapViewProps {
   onMapClick?: (coords: LatLng) => void
   /** serv:S15 — marcador de ubicación elegida (arrastrable). */
   selected?: LatLng | null
+  /** serv:S16 — notifica el centro/zoom actual del mapa (en cada moveend). */
+  onViewChange?: (center: [number, number], zoom: number) => void
   className?: string
   /** El contenedor debe tener una altura definida para que Leaflet renderice. */
   style?: CSSProperties
@@ -147,6 +149,7 @@ export function MapView({
   heat = false,
   onMapClick,
   selected,
+  onViewChange,
   className,
   style,
 }: MapViewProps) {
@@ -158,6 +161,9 @@ export function MapView({
   // handler de click una sola vez.
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
+  // serv:S16 — onViewChange también puede cambiar por render; lo leemos por ref.
+  const onViewChangeRef = useRef(onViewChange)
+  onViewChangeRef.current = onViewChange
 
   // Ciclo de vida del mapa: se crea una vez y se destruye al desmontar.
   useEffect(() => {
@@ -167,6 +173,11 @@ export function MapView({
     markersGroup.current = L.featureGroup().addTo(map)
     map.on('click', (e: L.LeafletMouseEvent) => {
       onMapClickRef.current?.({ lat: e.latlng.lat, lng: e.latlng.lng })
+    })
+    // serv:S16 — reporta el centro/zoom tras cada pan o zoom (para "Fijar centro").
+    map.on('moveend', () => {
+      const c = map.getCenter()
+      onViewChangeRef.current?.([c.lat, c.lng], map.getZoom())
     })
     mapInstance.current = map
     return () => {
