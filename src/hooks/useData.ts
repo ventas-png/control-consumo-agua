@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Proyecto, MaxUnidadesPorTipo, FacturaEnergia } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -91,7 +91,6 @@ interface AppData {
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
-  facturasEnergia: FacturaEnergia[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -103,7 +102,6 @@ const INITIAL_DATA: AppData = {
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
-  facturasEnergia: [],
 }
 
 const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
@@ -148,7 +146,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // so we must reassign (use let) to actually apply the filter.
     let fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
     let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
-    let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
     // registros: RLS policy (registros_select) scopes company_owner to their company's
@@ -167,7 +164,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (cid) {
       fuentesQ         = fuentesQ.eq('company_id', cid)
       rcalQ            = rcalQ.eq('company_id', cid)
-      facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
     }
 
     return Promise.allSettled([
@@ -177,13 +173,12 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       fuentesQ.abortSignal(signal()),
       rcalQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
-      facturasEnergiaQ.abortSignal(signal()),
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, proyectoRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, fuaRes, rcalRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -214,9 +209,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         parqueadero:     p.max_unidades_parqueadero ?? null,
         otro:            p.max_unidades_otro ?? null,
       }
-    }
-    if (facturasEnergiaRes.status === 'fulfilled' && facturasEnergiaRes.value.data) {
-      next.facturasEnergia = facturasEnergiaRes.value.data as FacturaEnergia[]
     }
     return next
   }
@@ -417,22 +409,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
   }, [])
 
-  // ─ Facturas Energía ────────────────────────────────────────────
-  const addFacturaEnergia = useCallback((factura: FacturaEnergia) => {
-    setData(prev => ({ ...prev, facturasEnergia: [factura, ...prev.facturasEnergia] }))
-  }, [])
-
-  const updateFacturaEnergia = useCallback((id: string, partial: Partial<FacturaEnergia>) => {
-    setData(prev => ({
-      ...prev,
-      facturasEnergia: prev.facturasEnergia.map(f => (f.id === id ? { ...f, ...partial } : f)),
-    }))
-  }, [])
-
-  const deleteFacturaEnergia = useCallback((id: string) => {
-    setData(prev => ({ ...prev, facturasEnergia: prev.facturasEnergia.filter(f => f.id !== id) }))
-  }, [])
-
   return {
     ...data,
     isLoading,
@@ -447,8 +423,5 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     setRegistrosCalidad,
     recargarFuentesAgua,
     recargarRegistrosCalidad,
-    addFacturaEnergia,
-    updateFacturaEnergia,
-    deleteFacturaEnergia,
   }
 }
