@@ -105,7 +105,10 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
 function mimeFor(format: ExportFormat): string {
   if (format === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   if (format === 'pdf')  return 'application/pdf'
-  return 'text/csv;charset=utf-8'
+  // Bare `text/csv` (sin `;charset=utf-8`) para que matchee el allowed_mime_types
+  // del bucket report-attachments. El BOM va en los bytes del blob (exportData),
+  // así que Excel sigue detectando UTF-8 sin el parámetro de charset.
+  return 'text/csv'
 }
 
 // Captura del blob: exportData() dispara download via createObjectURL + anchor
