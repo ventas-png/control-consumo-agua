@@ -42,9 +42,9 @@ rollback, tests de edge functions) y **refactor arquitectónico** (TanStack + go
 ## 2. Ledger por dominio (✅ hecho · ⏳ parcial · ❌ pendiente)
 
 ### Agua (`agua:*`)
-- ✅ A1 router · A6 split tipos · C1 validación lectura · C6 Zod/validatedInsert · C9 auditoría · C10 soft-delete · B1 a11y · B5 SweetAlert2 · B8 PWA · B12 empty states · D4 tagging
-- ⏳ B2/B3/B4 responsive (mobile 1-3C) · B9 design system · B13 i18n · D1 caché (SWR) · D2 paginación · D3 code-split
-- ❌ A2 god-components · A3 props drilling · A4 TanStack/useData(652L) · A5 enums dup · A8 prefetch · A9 useAuth · C3 lenguaje dominio · **C4 Factura estados/mora/IVA** · C5 agregado Tenant · C7 tests · C8 unificar businessEnergia · D5 dashboards · D6/D8 budgets/RUM · D9 compresión img · D10 EXPLAIN
+- ✅ A1 router · **A4 TanStack/useData → capa de datos (`useData.ts` eliminado; `proyectos` fue la última colección)** · A6 split tipos · C1 validación lectura · C6 Zod/validatedInsert · C9 auditoría · C10 soft-delete · B1 a11y · B5 SweetAlert2 · B8 PWA · B12 empty states · D4 tagging
+- ⏳ B2/B3/B4 responsive (mobile 1-3C) · B9 design system · B13 i18n · D1 caché (TanStack en memoria + refetch-on-focus listos; falta persistencia offline) · D2 paginación · D3 code-split
+- ❌ A2 god-components · A3 props drilling · A5 enums dup · A8 prefetch · A9 useAuth · C3 lenguaje dominio · **C4 Factura estados/mora/IVA** · C5 agregado Tenant · C7 tests · C8 unificar businessEnergia · D5 dashboards · D6/D8 budgets/RUM · D9 compresión img · D10 EXPLAIN
 
 ### Condominios (`cond:*`)
 - ✅ A1 registry+router · C1 RLS por unidad · C2 CHECK+Zod · C9 split tipos · C11 audit · C13 soft-delete · B1 búsqueda/⌘K · B3 a11y · B7 SetupWizard · B8 empty states · B9 portal residente · D4 tagging

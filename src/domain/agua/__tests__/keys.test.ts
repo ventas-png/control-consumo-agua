@@ -6,6 +6,14 @@ describe('aguaKeys', () => {
     expect(aguaKeys.all).toEqual(['agua'])
   })
 
+  it('proyectos scopea por companyId', () => {
+    expect(aguaKeys.proyectos('c1')).toEqual(['agua', 'proyectos', 'c1'])
+  })
+
+  it('proyectoAssignments scopea por userId (no por empresa)', () => {
+    expect(aguaKeys.proyectoAssignments('u1')).toEqual(['agua', 'proyecto-assignments', 'u1'])
+  })
+
   it('fuentesAgua scopea por companyId', () => {
     expect(aguaKeys.fuentesAgua('c1')).toEqual(['agua', 'fuentes-agua', 'c1'])
   })

@@ -9,8 +9,9 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad, Empresa } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad, Empresa, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { isProjectExempt } from '../../lib/proyectosAccess'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
 
@@ -19,6 +20,39 @@ import { aguaKeys } from './keys'
 // de PostgREST. Espeja REGISTROS_LIST_COLS de useData.
 const REGISTROS_LIST_COLS =
   'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
+
+// `projects` (proyectos del tenant). RLS los scopea por empresa; orden por nombre
+// igual que useData. Es la ÚLTIMA colección que vivía en useData → cierra
+// `agua:A4`. El hook devuelve el set CRUDO que RLS permite; el filtrado fino por
+// asignación de proyecto (filterProyectosByAssignment) y la derivación de
+// moneda/maxUnidades (deriveProyectoConfig) se aplican en el consumidor (App),
+// igual que rutas usa filterRutasByProjectAccess.
+export function useProyectosQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.proyectos(companyId),
+    queryFn: async () =>
+      (await runQuery<Proyecto[]>((signal) =>
+        supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal),
+      )) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `user_project_assignments` del usuario → ids de proyecto a los que tiene acceso.
+// Solo se consulta para roles NO exentos: los exentos ven todos los proyectos, así
+// que el fetch sería inútil (espeja el guard de filterDataByAssignment, que ni
+// llamaba a Supabase para ellos). Mientras carga, filterProyectosByAssignment hace
+// fail-closed (ningún proyecto) para usuarios restringidos.
+export function useProyectoAssignmentsQuery(userId?: string, role?: string, assignedRoleIds?: string[]) {
+  return useQuery({
+    queryKey: aguaKeys.proyectoAssignments(userId),
+    queryFn: async () =>
+      (await runQuery<{ project_id: string }[]>((signal) =>
+        supabase.from('user_project_assignments').select('project_id').eq('user_id', userId!).abortSignal(signal),
+      ))?.map((a) => a.project_id) ?? [],
+    enabled: !!userId && !isProjectExempt(role, assignedRoleIds),
+  })
+}
 
 // `fuentes_agua` del tenant (scope company). Lista completa; el portal de calidad
 // la reemplaza vía setFuentesAgua (setQueryData) tras editar.

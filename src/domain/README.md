@@ -1,11 +1,12 @@
 # `src/domain` — Capa de datos por dominio (Track T7)
 
 Esta carpeta es la **capa de datos** de la app: encapsula el acceso a Supabase
-detrás de hooks tipados de **TanStack Query**, por dominio. Reemplaza
-gradualmente al monolito `src/hooks/useData.ts` (652 L, 16 colecciones en un solo
-objeto) y al `fetch + useState/useEffect` disperso en componentes.
+detrás de hooks tipados de **TanStack Query**, por dominio. **Reemplazó por
+completo** al monolito `src/hooks/useData.ts` (652 L, 16 colecciones en un solo
+objeto), eliminado al migrar su última colección — `proyectos` — y al
+`fetch + useState/useEffect` disperso en componentes.
 
-> Hallazgos que cierra: `agua:A4`, `cond:A3`, `cond:A4`, `plat:P25`, `serv:S4`.
+> Hallazgos que cierra: `agua:A4` (✅ `useData.ts` eliminado), `cond:A3`, `cond:A4`, `plat:P25`, `serv:S4`.
 
 ## Estructura
 
@@ -65,7 +66,12 @@ afectada(s) — `queryClient.invalidateQueries({ queryKey: aguaKeys.clientes(cid
    misma entidad en dos sitios a la vez** mientras `useData` siga viva (evita
    doble fetch / estados divergentes).
 3. **Vaciar `useData`:** cuando todas las entidades de un dominio tengan su hook
-   y sus consumidores migrados, se retira esa porción de `useData`.
+   y sus consumidores migrados, se retira esa porción de `useData`. ✅ **Completado
+   para agua:** `proyectos` fue la última colección; `useData.ts` se eliminó. El
+   filtrado por asignación de proyecto y la derivación de moneda/maxUnidades viven
+   ahora en `src/lib/proyectosAccess.ts` (puro, testeado) y se aplican en `App`
+   sobre `useProyectosQuery` + `useProyectoAssignmentsQuery`, igual que rutas usa
+   `filterRutasByProjectAccess`.
 
 Cada track de dominio (T1 Servicios, T2 Comunicación, T4 Facturación…) crea su
 propia carpeta `src/domain/<dominio>/` siguiendo esta convención, sin tocar las
