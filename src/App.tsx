@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { confirm, notify } from './components/shared/Dialog'
+import { notify } from './components/shared/Dialog'
 import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
@@ -10,11 +10,11 @@ import type { AppSection, Cliente, Contador, Empresa, FacturaEnergia, FuenteAgua
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
-import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery, useClientesQuery, useRegistrosQuery } from './domain/agua/queries'
+import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery, useClientesQuery, useRegistrosQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
+import { filterProyectosByAssignment, deriveProyectoConfig } from './lib/proyectosAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { BrandLogo } from './components/shared/BrandLogo'
@@ -231,13 +231,6 @@ export default function App() {
   }
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
-  const {
-    proyectos,
-    moneda, maxUnidadesPorTipo,
-    isLoading: dataLoading,
-    cargarDatos,
-  } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
-
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 
   // ── T7: las rutas (agua) viven en la capa de datos (TanStack Query), ya no en
@@ -247,6 +240,33 @@ export default function App() {
   // `updateRuta`, `deleteRuta`) se conservan para no tocar a los consumidores.
   const dataQueryClient = useQueryClient()
   const dataCompanyId = currentUser?.company_id
+  // T7 · agua:A4 — `proyectos` (última colección que vivía en useData) migran a la
+  // capa de datos. La query devuelve la lista CRUDA que RLS acota por empresa; el
+  // filtrado fino por asignación de proyecto (lo que hacía filterDataByAssignment)
+  // y la derivación de moneda/maxUnidades se aplican aquí, igual que rutas usa
+  // filterRutasByProjectAccess. Va ANTES del useMemo de rutas porque ese filtro usa
+  // `proyectos` accesibles para construir su accessibleProjectIds.
+  const { data: proyectosRaw = [], isLoading: dataLoading } = useProyectosQuery(dataCompanyId)
+  const { data: projectAssignments } = useProyectoAssignmentsQuery(
+    currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids,
+  )
+  const { proyectos, moneda, maxUnidadesPorTipo } = useMemo(() => {
+    const accesibles = filterProyectosByAssignment({
+      proyectos: proyectosRaw,
+      userId: currentUser?.user_id,
+      role: currentUser?.role,
+      assignedRoleIds: currentUser?.assigned_role_ids,
+      assignments: projectAssignments,
+    })
+    return { proyectos: accesibles, ...deriveProyectoConfig(accesibles, proyectosRaw) }
+  }, [proyectosRaw, projectAssignments, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids])
+  // Refresco manual (reemplaza el `cargarDatos` de useData): invalida todo el
+  // dominio agua para que registros/proyectos/etc. se vuelvan a traer. Lo usa
+  // AdminClientDashboard tras agregar una lectura (onDataRefresh).
+  const refrescarDatos = useCallback(
+    () => dataQueryClient.invalidateQueries({ queryKey: aguaKeys.all }),
+    [dataQueryClient],
+  )
   // T7: `contadores` migran a la capa de datos (scope company). Va ANTES del
   // useMemo de rutas porque ese filtro usa `contadores` como entrada.
   const { data: contadores = [] } = useContadoresQuery(dataCompanyId)
@@ -484,7 +504,6 @@ export default function App() {
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   // Legacy: kept for backward compatibility with old reset links already sent
   const [resetToken] = useState<string | null>(getResetToken)
-  const [dataLoaded, setDataLoaded] = useState(false)
 
   // Handle Gmail OAuth callback when Google redirects back to the app
   useEffect(() => {
@@ -543,23 +562,11 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.user_id, currentUser?.role])
 
-  // Load data after login (skip for cliente — portal loads its own data)
-  useEffect(() => {
-    if (currentUser && !dataLoaded && currentUser.role !== 'cliente') {
-      cargarDatos()
-        .then(() => setDataLoaded(true))
-        .catch((err: unknown) => {
-          console.error('Error loading data:', err)
-          if (navigator.onLine) {
-            confirm({
-              title: 'Error al cargar datos',
-              text: 'No se pudieron cargar los datos. Intente recargar la página.',
-              confirmText: 'Recargar',
-            }).then((r) => r.isConfirmed && window.location.reload())
-          }
-        })
-    }
-  }, [currentUser, dataLoaded, cargarDatos])
+  // T7 · agua:A4 — La carga de datos tras login ya no es imperativa: cada hook de
+  // la capa de datos (useProyectosQuery, useRegistrosQuery, …) se dispara solo vía
+  // su `enabled: !!companyId` cuando currentUser resuelve, y revalida on-focus. Los
+  // errores se manejan por query (retry + estados de error por sección) en lugar
+  // del antiguo prompt global de "recargar".
 
   // Password recovery via Supabase native flow (PASSWORD_RECOVERY event)
   if (isPasswordRecovery || resetToken) {
@@ -975,7 +982,7 @@ export default function App() {
                   }}
                   moneda={moneda}
                   isLoading={dataLoading}
-                  onDataRefresh={cargarDatos}
+                  onDataRefresh={refrescarDatos}
                   onNavigateSection={navigateSection}
                 />
                 </RoleGuard>

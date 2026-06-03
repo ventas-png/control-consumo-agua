@@ -9,6 +9,10 @@
 //     (`undefined` rompería la igualdad estructural entre renders).
 export const aguaKeys = {
   all: ['agua'] as const,
+  proyectos: (companyId?: string) => [...aguaKeys.all, 'proyectos', companyId ?? null] as const,
+  // Asignaciones de proyecto del usuario (user_project_assignments). Scope por
+  // usuario, no por empresa: define qué proyectos ve un rol restringido.
+  proyectoAssignments: (userId?: string) => [...aguaKeys.all, 'proyecto-assignments', userId ?? null] as const,
   fuentesAgua: (companyId?: string) => [...aguaKeys.all, 'fuentes-agua', companyId ?? null] as const,
   registrosCalidad: (companyId?: string) => [...aguaKeys.all, 'registros-calidad', companyId ?? null] as const,
   empresa: (companyId?: string) => [...aguaKeys.all, 'empresa', companyId ?? null] as const,
