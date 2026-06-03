@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -65,6 +65,21 @@ export function useRutasQuery(companyId?: string) {
           .order('created_at', { ascending: false })
           .abortSignal(signal),
       )) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `tarifas` de agua, scope por empresa (RLS + filtro defensivo por company_id,
+// igual que useData). Lista completa del tenant.
+export function useTarifasQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.tarifas(companyId),
+    queryFn: async () =>
+      (await runQuery<Tarifa[]>((signal) => {
+        let q = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? [],
     enabled: !!companyId,
   })
 }
