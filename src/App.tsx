@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Ruta, UserSession } from './types'
+import type { AppSection, Ruta, Tarifa, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -232,13 +232,12 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, tarifas, contadores, unidades, proyectos,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
     setFuentesAgua, setRegistrosCalidad,
-    addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
     addProveedorEnergia, updateProveedorEnergia, deleteProveedorEnergia,
@@ -254,9 +253,9 @@ export default function App() {
   // aplica aquí sobre la lista cruda; `proyectos` ya viene acotado a los
   // proyectos accesibles del usuario. Los nombres (`rutas`, `addRuta`,
   // `updateRuta`, `deleteRuta`) se conservan para no tocar a los consumidores.
-  const rutasQueryClient = useQueryClient()
-  const rutasCompanyId = currentUser?.company_id
-  const { data: rutasRaw = [] } = useRutasQuery(rutasCompanyId)
+  const dataQueryClient = useQueryClient()
+  const dataCompanyId = currentUser?.company_id
+  const { data: rutasRaw = [] } = useRutasQuery(dataCompanyId)
   const rutas = useMemo(
     () => filterRutasByProjectAccess({
       rutas: rutasRaw,
@@ -272,14 +271,28 @@ export default function App() {
   // deleteRuta del antiguo useData). RutasSection sigue haciendo el INSERT/
   // UPDATE/DELETE en Supabase y luego llama a estos callbacks.
   const addRuta = useCallback((ruta: Ruta) => {
-    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => [ruta, ...old])
-  }, [rutasQueryClient, rutasCompanyId])
+    dataQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(dataCompanyId), (old = []) => [ruta, ...old])
+  }, [dataQueryClient, dataCompanyId])
   const updateRuta = useCallback((id: string, partial: Partial<Ruta>) => {
-    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => old.map(r => (r.id === id ? { ...r, ...partial } : r)))
-  }, [rutasQueryClient, rutasCompanyId])
+    dataQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(dataCompanyId), (old = []) => old.map(r => (r.id === id ? { ...r, ...partial } : r)))
+  }, [dataQueryClient, dataCompanyId])
   const deleteRuta = useCallback((id: string) => {
-    rutasQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(rutasCompanyId), (old = []) => old.filter(r => r.id !== id))
-  }, [rutasQueryClient, rutasCompanyId])
+    dataQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(dataCompanyId), (old = []) => old.filter(r => r.id !== id))
+  }, [dataQueryClient, dataCompanyId])
+
+  // T7: `tarifas` también migran a la capa de datos (scope company, sin filtro
+  // por proyecto). Se conservan los nombres para no tocar TarifasSection ni el
+  // resto de consumidores.
+  const { data: tarifas = [] } = useTarifasQuery(dataCompanyId)
+  const addTarifa = useCallback((tarifa: Tarifa) => {
+    dataQueryClient.setQueryData<Tarifa[]>(aguaKeys.tarifas(dataCompanyId), (old = []) => [tarifa, ...old])
+  }, [dataQueryClient, dataCompanyId])
+  const updateTarifa = useCallback((id: string, partial: Partial<Tarifa>) => {
+    dataQueryClient.setQueryData<Tarifa[]>(aguaKeys.tarifas(dataCompanyId), (old = []) => old.map(t => (t.id === id ? { ...t, ...partial } : t)))
+  }, [dataQueryClient, dataCompanyId])
+  const deleteTarifa = useCallback((id: string) => {
+    dataQueryClient.setQueryData<Tarifa[]>(aguaKeys.tarifas(dataCompanyId), (old = []) => old.filter(t => t.id !== id))
+  }, [dataQueryClient, dataCompanyId])
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
   // Los hooks se llaman incondicionalmente (Rules of Hooks). Si no hay

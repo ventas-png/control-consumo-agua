@@ -10,6 +10,7 @@ describe('aguaKeys', () => {
     expect(aguaKeys.clientes('c1')).toEqual(['agua', 'clientes', 'c1'])
     expect(aguaKeys.registros('c1')).toEqual(['agua', 'registros', 'c1'])
     expect(aguaKeys.rutas('c1')).toEqual(['agua', 'rutas', 'c1'])
+    expect(aguaKeys.tarifas('c1')).toEqual(['agua', 'tarifas', 'c1'])
   })
 
   it('normaliza companyId ausente a null para que la key sea estable', () => {
