@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Registro, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -22,27 +22,6 @@ const CACHE_KEY_PREFIX = 'aquacontrol_data_v3_'
 // instant render instead of an empty skeleton while fetch is pending.
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000
 
-// Strip PII fields from clientes before persisting. localStorage is plain-text
-// and accessible to any script on the origin — never persist emails, phones,
-// addresses, DPI numbers, etc. Sensitive fields are re-hydrated when the
-// fresh fetch completes.
-function sanitizeForCache(payload: AppData): AppData {
-  return {
-    ...payload,
-    clientes: payload.clientes.map(c => ({
-      ...c,
-      email: undefined,
-      telefono: undefined,
-      whatsapp: undefined,
-      telefono_alterno: undefined,
-      cui_dui: undefined,
-      numero_facturacion: undefined,
-      direccion: undefined,
-      fecha_nacimiento: undefined,
-    })),
-  }
-}
-
 function cacheKey(userId?: string): string | null {
   if (!userId) return null
   return `${CACHE_KEY_PREFIX}${userId}`
@@ -63,7 +42,7 @@ function loadCache(userId?: string): AppData | null {
 function saveCache(userId: string | undefined, payload: AppData): void {
   const key = cacheKey(userId)
   if (!key) return
-  const serialized = JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })
+  const serialized = JSON.stringify({ ts: Date.now(), payload })
   try {
     localStorage.setItem(key, serialized)
   } catch (err) {
@@ -83,7 +62,6 @@ function saveCache(userId: string | undefined, payload: AppData): void {
 }
 
 interface AppData {
-  clientes: Cliente[]
   registros: Registro[]
   proyectos: Proyecto[]
   moneda: string
@@ -91,7 +69,6 @@ interface AppData {
 }
 
 const INITIAL_DATA: AppData = {
-  clientes: [],
   registros: [],
   proyectos: [],
   moneda: 'Q',
@@ -134,8 +111,6 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     const PER_QUERY_TIMEOUT_MS = 15_000
     const signal = () => AbortSignal.timeout(PER_QUERY_TIMEOUT_MS)
 
-    // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
-    const clientesQ = supabase.from('clientes').select('*')
     // registros: RLS policy (registros_select) scopes company_owner to their company's
     // registros via projects + company_clientes. Limit to most-recent 5000 to avoid
     // PostgREST timeouts on companies with large history; dashboard filters by date
@@ -150,7 +125,6 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
 
     return Promise.allSettled([
-      clientesQ.abortSignal(signal()),
       registrosQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
     ])
@@ -158,12 +132,9 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [regRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
-    if (clRes.status === 'fulfilled' && clRes.value.data) {
-      next.clientes = clRes.value.data as Cliente[]
-    }
     if (regRes.status === 'fulfilled' && regRes.value.data) {
       next.registros = regRes.value.data as Registro[]
     }
@@ -225,7 +196,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
   }
 
   const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
-    const [clRes, regRes] = results
+    const [regRes] = results
     const errs: string[] = []
     // Collect both fulfilled-with-error AND rejected (AbortError, network failure, etc.).
     // Previously only the fulfilled branch was checked, so per-query timeouts
@@ -242,8 +213,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
       if (value && value.error) return `${label}: ${value.error.message}`
       return null
     }
-    const checks: Array<[string, typeof clRes]> = [
-      ['clientes', clRes],
+    const checks: Array<[string, typeof regRes]> = [
       ['registros', regRes],
     ]
     for (const [label, res] of checks) {
@@ -294,7 +264,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
 
       // If some core data DID load, stay silent on subsequent retries —
       // the app is usable and showing an "Offline" modal would be disruptive.
-      const dataLoaded = freshData.proyectos.length > 0 || freshData.clientes.length > 0 || freshData.registros.length > 0
+      const dataLoaded = freshData.proyectos.length > 0 || freshData.registros.length > 0
 
       // Single retry after a brief backoff (per-query timeouts make the
       // older double-retry redundant; what failed once will likely fail again
@@ -309,7 +279,7 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
         saveCache(userIdRef.current, retryData)
       } else {
         console.error('[useData] Persistent query errors after retry:', finalErrors)
-        if (!dataLoaded && retryData.proyectos.length === 0 && retryData.clientes.length === 0) {
+        if (!dataLoaded && retryData.proyectos.length === 0) {
           // Only block the UI if we truly have no data at all
           notify({ variant: 'warning', title: 'Modo Offline', text: 'No se pudo conectar a la base de datos.' })
         }
@@ -321,21 +291,6 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     } finally {
       setIsLoading(false)
     }
-  }, [])
-
-  const addCliente = useCallback((cliente: Cliente) => {
-    setData(prev => ({ ...prev, clientes: [...prev.clientes, cliente] }))
-  }, [])
-
-  const updateCliente = useCallback((id: string, partial: Partial<Cliente>) => {
-    setData(prev => ({
-      ...prev,
-      clientes: prev.clientes.map(c => (c.id === id ? { ...c, ...partial } : c)),
-    }))
-  }, [])
-
-  const deleteCliente = useCallback((id: string) => {
-    setData(prev => ({ ...prev, clientes: prev.clientes.filter(c => c.id !== id) }))
   }, [])
 
   const addRegistro = useCallback((registro: Registro) => {
@@ -360,9 +315,6 @@ export function useData(_companyId?: string, userId?: string, userRole?: string,
     ...data,
     isLoading,
     cargarDatos,
-    addCliente,
-    updateCliente,
-    deleteCliente,
     addRegistro,
     updateRegistroEstado,
     deleteRegistro,

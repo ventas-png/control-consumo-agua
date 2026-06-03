@@ -78,6 +78,7 @@ export function useClientesQuery(companyId?: string) {
       (await runQuery<Cliente[]>((signal) =>
         supabase.from('clientes').select('*').abortSignal(signal),
       )) ?? [],
+    enabled: !!companyId,
   })
 }
 
