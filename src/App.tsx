@@ -548,6 +548,38 @@ export default function App() {
     proyectos.filter(p => p.estado === 'activo').length === 0
 
   // Authenticated app
+  // serv:S1 — Energía como módulo de 1er nivel con sub-rutas /energia/<tab>.
+  // El mismo elemento sirve a `/energia` (tab por defecto) y `/energia/:tab`
+  // (deep-link), evitando duplicar el bloque de props.
+  const energiaSection = (
+    <ErrorBoundary sectionName="servicios_energia">
+      <ServiciosEnergiaSection
+        fuentesAgua={fuentesAgua}
+        proveedoresEnergia={proveedoresEnergia}
+        tarifasEnergia={tarifasEnergia}
+        fuentesEnergia={fuentesEnergia}
+        facturasEnergia={facturasEnergia}
+        proyectos={proyectos}
+        currentUser={currentUser}
+        moneda={moneda}
+        canCreate={canCreate('servicios_energia')}
+        canEdit={canEdit('servicios_energia')}
+        onProveedorAdded={addProveedorEnergia}
+        onProveedorUpdated={updateProveedorEnergia}
+        onProveedorDeleted={deleteProveedorEnergia}
+        onTarifaAdded={addTarifaEnergia}
+        onTarifaUpdated={updateTarifaEnergia}
+        onTarifaDeleted={deleteTarifaEnergia}
+        onFuenteAdded={addFuenteEnergia}
+        onFuenteUpdated={updateFuenteEnergia}
+        onFuenteDeleted={deleteFuenteEnergia}
+        onFacturaAdded={addFacturaEnergia}
+        onFacturaUpdated={updateFacturaEnergia}
+        onFacturaDeleted={deleteFacturaEnergia}
+      />
+    </ErrorBoundary>
+  )
+
   return (
     <>
       {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
@@ -936,34 +968,10 @@ export default function App() {
                 />
               </ErrorBoundary>
             } />
-            <Route path="/energia" element={
-              <ErrorBoundary sectionName="servicios_energia">
-                <ServiciosEnergiaSection
-                  fuentesAgua={fuentesAgua}
-                  proveedoresEnergia={proveedoresEnergia}
-                  tarifasEnergia={tarifasEnergia}
-                  fuentesEnergia={fuentesEnergia}
-                  facturasEnergia={facturasEnergia}
-                  proyectos={proyectos}
-                  currentUser={currentUser}
-                  moneda={moneda}
-                  canCreate={canCreate('servicios_energia')}
-                  canEdit={canEdit('servicios_energia')}
-                  onProveedorAdded={addProveedorEnergia}
-                  onProveedorUpdated={updateProveedorEnergia}
-                  onProveedorDeleted={deleteProveedorEnergia}
-                  onTarifaAdded={addTarifaEnergia}
-                  onTarifaUpdated={updateTarifaEnergia}
-                  onTarifaDeleted={deleteTarifaEnergia}
-                  onFuenteAdded={addFuenteEnergia}
-                  onFuenteUpdated={updateFuenteEnergia}
-                  onFuenteDeleted={deleteFuenteEnergia}
-                  onFacturaAdded={addFacturaEnergia}
-                  onFacturaUpdated={updateFacturaEnergia}
-                  onFacturaDeleted={deleteFacturaEnergia}
-                />
-              </ErrorBoundary>
-            } />
+            {/* serv:S1 — Energía 1er nivel: `/energia` (tab por defecto) +
+                `/energia/:tab` deep-linkable. Mismo elemento (energiaSection). */}
+            <Route path="/energia" element={energiaSection} />
+            <Route path="/energia/:tab" element={energiaSection} />
             {/* cond:A1 sub-rutas: `/condominios/panel` es el selector de
                 proyecto (CondominiosDashboard). Cualquier otro segmento se
                 interpreta como un tab del registry; tabs desconocidos caen
