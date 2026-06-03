@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { useMediaScope } from './MediaScopeContext'
 
 const ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 20 * 1024 * 1024
@@ -29,6 +30,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const projectId = useMediaScope()
 
   // The DB value may be a legacy publicUrl (full https://...) or a bare path
   // after the S6 migration. useSignedUrl handles both transparently.
@@ -40,6 +42,9 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
 
   async function uploadFile(file: File) {
     setError(null)
+    // infra:I14 — uploads must be scoped by project_id (first path segment) so
+    // storage RLS isolates tenants; an unscoped path would be rejected anyway.
+    if (!projectId) { setError('No se pudo determinar el proyecto. Recargá la página e intentá de nuevo.'); return }
     if (file.size > MAX_BYTES) { setError(`El archivo excede el límite de 20 MB.`); return }
 
     // Verify the file's actual content matches a supported document/image type.
@@ -52,7 +57,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
     setUploading(true)
     setProgress(10)
 
-    const path = buildUploadPath(folder, file.name)
+    const path = buildUploadPath(`${projectId}/${folder}`, file.name)
 
     setProgress(30)
     const { data, error: upErr } = await supabase.storage

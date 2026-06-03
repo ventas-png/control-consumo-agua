@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 import { SecureImage } from './SecureImage'
+import { useMediaScope } from './MediaScopeContext'
 
 const MAX_DIMENSION = 1280
 const QUALITY = 0.82
@@ -47,9 +48,14 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const sessionUploadsRef = useRef<Set<string>>(new Set())
+  const projectId = useMediaScope()
 
   async function handleFile(file: File) {
     setError(null)
+    // infra:I14 — uploads must be scoped by project_id (first path segment) so
+    // storage RLS isolates tenants. Without it the path would be unscoped and
+    // the storage policy would reject the insert; fail loudly here instead.
+    if (!projectId) { setError('No se pudo determinar el proyecto. Recargá la página e intentá de nuevo.'); return }
     if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB`); return }
     // Magic-byte validation defends against payloads renamed to .png/.jpg.
     const magicCheck = await validateFileMagic(file, 'image')
@@ -59,7 +65,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       const blob = await compressImage(file)
       // We always re-encode to JPEG via canvas (compressImage), so forcing
       // .jpg + image/jpeg is safe regardless of input format.
-      const path = buildUploadPath(folder, file.name, 'jpg')
+      const path = buildUploadPath(`${projectId}/${folder}`, file.name, 'jpg')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
       if (upErr) { setError(upErr.message); return }
       // S6 phase 2: persist the bare path; SecureImage signs at render time.
@@ -150,9 +156,12 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const projectId = useMediaScope()
 
   async function handleFiles(files: FileList) {
     setError(null)
+    // infra:I14 — scope uploads by project_id (see ImageUploader.handleFile).
+    if (!projectId) { setError('No se pudo determinar el proyecto. Recargá la página e intentá de nuevo.'); return }
     const toUpload = Array.from(files).slice(0, maxFiles - values.length)
     if (toUpload.length === 0) { setError(`Máximo ${maxFiles} fotos`); return }
     for (const file of toUpload) {
@@ -165,7 +174,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       const newUrls: string[] = []
       for (const file of toUpload) {
         const blob = await compressImage(file)
-        const path = buildUploadPath(folder, file.name, 'jpg')
+        const path = buildUploadPath(`${projectId}/${folder}`, file.name, 'jpg')
         const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg' })
         if (upErr) { setError(upErr.message); break }
         // S6 phase 2: persist the bare path; SecureImage signs at render time.

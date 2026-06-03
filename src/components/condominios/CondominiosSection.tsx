@@ -5,6 +5,7 @@ import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
+import { MediaScopeProvider } from '../shared/MediaScopeContext'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -1032,6 +1033,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}
+        <MediaScopeProvider projectId={selectedProyectoId}>
         <Suspense fallback={<TabFallback />}>
         {TAB_BY_ID[activeTab]?.render(tabCtx)}
         {ticketSeleccionado && (
@@ -1046,6 +1049,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           />
         )}
         </Suspense>
+        </MediaScopeProvider>
         </div>
       </div>
     </div>

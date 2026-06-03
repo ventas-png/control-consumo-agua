@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { codigoRetiroQrUrl } from '../../../lib/paquetes'
 import { MultiImageUploader } from '../../shared/ImageUploader'
+import { useMediaScope } from '../../shared/MediaScopeContext'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
 import { SignaturePad } from '../../shared/SignaturePad'
@@ -37,6 +38,7 @@ const labelStyle = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)'
 
 export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRefresh }: Props) {
   const [vista, setVista] = useState<'recibidos' | 'salidas'>('recibidos')
+  const projectId = useMediaScope()
 
   // Firmar recepción (entrantes)
   const [firmando, setFirmando] = useState<PaqueteRecibido | null>(null)
@@ -65,9 +67,11 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
 
   async function handleFirma(file: File) {
     if (!firmando) return
+    // infra:I14 — scope the signature object by project_id (resident's unit project).
+    if (!projectId) { notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto. Recargá la página.' }); return }
     setSaving(true)
     try {
-      const path = buildUploadPath('paquetes-firmas', 'firma.png', 'png')
+      const path = buildUploadPath(`${projectId}/paquetes-firmas`, 'firma.png', 'png')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
       if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
       const { error } = await supabase.rpc('paquete_firmar_recepcion', { p_paquete_id: firmando.id, p_firma_path: path, p_nombre: nombre.trim() })
