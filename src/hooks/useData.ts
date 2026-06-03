@@ -1,9 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
-import { filterRutasByProjectAccess } from '../lib/rutasAccess'
 
 async function ensureSupabaseSession(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -89,7 +88,6 @@ interface AppData {
   empresa: Empresa
   fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
-  rutas: Ruta[]
   tarifas: Tarifa[]
   contadores: Contador[]
   unidades: Unidad[]
@@ -108,7 +106,6 @@ const INITIAL_DATA: AppData = {
   empresa: {},
   fuentesAgua: [],
   registrosCalidad: [],
-  rutas: [],
   tarifas: [],
   contadores: [],
   unidades: [],
@@ -203,7 +200,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
       fuentesQ.abortSignal(signal()),
       rcalQ.abortSignal(signal()),
-      supabase.from('rutas').select('*').order('created_at', { ascending: false }).abortSignal(signal()),
       tarifasQ.abortSignal(signal()),
       contadoresQ.abortSignal(signal()),
       unidadesQ.abortSignal(signal()),
@@ -217,7 +213,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes, proveedoresEnergiaRes, tarifasEnergiaRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, fuaRes, rcalRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes, proveedoresEnergiaRes, tarifasEnergiaRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -234,9 +230,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
     if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
       next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
-    }
-    if (rutasRes.status === 'fulfilled' && rutasRes.value.data) {
-      next.rutas = rutasRes.value.data as Ruta[]
     }
     if (tarifasRes.status === 'fulfilled' && tarifasRes.value.data) {
       next.tarifas = tarifasRes.value.data as Tarifa[]
@@ -292,27 +285,15 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const allowed = new Set((assignments ?? []).map((a: { project_id: string }) => a.project_id))
     const filteredProyectos = appData.proyectos.filter(p => allowed.has(p.id))
 
-    // Routes are not project-scoped in RLS (the rutas table has no project_id),
-    // so filter them here against the projects the user can actually see.
-    const accessible = new Set(filteredProyectos.map(p => p.id))
-    const filteredRutas = filterRutasByProjectAccess({
-      rutas: appData.rutas,
-      contadores: appData.contadores,
-      unidades: appData.unidades,
-      registros: appData.registros,
-      accessibleProjectIds: accessible,
-      userId: uid,
-    })
-
+    // Las rutas (agua) viven ahora en la capa de datos (TanStack Query); su
+    // filtrado por acceso a proyecto se aplica en App con useRutasQuery.
     const proyectosChanged = filteredProyectos.length !== appData.proyectos.length
-    const rutasChanged = filteredRutas.length !== appData.rutas.length
-    if (!proyectosChanged && !rutasChanged) return appData
+    if (!proyectosChanged) return appData
 
     const first = filteredProyectos[0]
     return {
       ...appData,
       proyectos: filteredProyectos,
-      rutas: filteredRutas,
       moneda: proyectosChanged ? (first?.moneda ?? appData.moneda) : appData.moneda,
       maxUnidadesPorTipo: proyectosChanged
         ? (first ? {
@@ -329,7 +310,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   }
 
   const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
-    const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
+    const [clRes, regRes, , , , , contadoresRes, unidadesRes] = results
     const errs: string[] = []
     // Collect both fulfilled-with-error AND rejected (AbortError, network failure, etc.).
     // Previously only the fulfilled branch was checked, so per-query timeouts
@@ -486,21 +467,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
   }, [])
 
-  const addRuta = useCallback((ruta: Ruta) => {
-    setData(prev => ({ ...prev, rutas: [ruta, ...prev.rutas] }))
-  }, [])
-
-  const updateRuta = useCallback((id: string, partial: Partial<Ruta>) => {
-    setData(prev => ({
-      ...prev,
-      rutas: prev.rutas.map(r => (r.id === id ? { ...r, ...partial } : r)),
-    }))
-  }, [])
-
-  const deleteRuta = useCallback((id: string) => {
-    setData(prev => ({ ...prev, rutas: prev.rutas.filter(r => r.id !== id) }))
-  }, [])
-
   const addTarifa = useCallback((tarifa: Tarifa) => {
     setData(prev => ({ ...prev, tarifas: [tarifa, ...prev.tarifas] }))
   }, [])
@@ -624,9 +590,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     setRegistrosCalidad,
     recargarFuentesAgua,
     recargarRegistrosCalidad,
-    addRuta,
-    updateRuta,
-    deleteRuta,
     addTarifa,
     updateTarifa,
     deleteTarifa,
