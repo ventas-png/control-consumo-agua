@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Proyecto, MaxUnidadesPorTipo, FuenteEnergia, FacturaEnergia } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Proyecto, MaxUnidadesPorTipo, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -91,7 +91,6 @@ interface AppData {
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
-  fuentesEnergia: FuenteEnergia[]
   facturasEnergia: FacturaEnergia[]
 }
 
@@ -104,7 +103,6 @@ const INITIAL_DATA: AppData = {
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
-  fuentesEnergia: [],
   facturasEnergia: [],
 }
 
@@ -150,7 +148,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // so we must reassign (use let) to actually apply the filter.
     let fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
     let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
-    let fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
     let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
@@ -170,7 +167,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (cid) {
       fuentesQ         = fuentesQ.eq('company_id', cid)
       rcalQ            = rcalQ.eq('company_id', cid)
-      fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
       facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
     }
 
@@ -181,14 +177,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       fuentesQ.abortSignal(signal()),
       rcalQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
-      fuentesEnergiaQ.abortSignal(signal()),
       facturasEnergiaQ.abortSignal(signal()),
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, proyectoRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, fuaRes, rcalRes, proyectoRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -219,9 +214,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         parqueadero:     p.max_unidades_parqueadero ?? null,
         otro:            p.max_unidades_otro ?? null,
       }
-    }
-    if (fuentesEnergiaRes.status === 'fulfilled' && fuentesEnergiaRes.value.data) {
-      next.fuentesEnergia = fuentesEnergiaRes.value.data as FuenteEnergia[]
     }
     if (facturasEnergiaRes.status === 'fulfilled' && facturasEnergiaRes.value.data) {
       next.facturasEnergia = facturasEnergiaRes.value.data as FacturaEnergia[]
@@ -425,22 +417,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
   }, [])
 
-  // ─ Fuentes Energía ──────────────────────────────────────────────
-  const addFuenteEnergia = useCallback((fuente: FuenteEnergia) => {
-    setData(prev => ({ ...prev, fuentesEnergia: [fuente, ...prev.fuentesEnergia] }))
-  }, [])
-
-  const updateFuenteEnergia = useCallback((id: string, partial: Partial<FuenteEnergia>) => {
-    setData(prev => ({
-      ...prev,
-      fuentesEnergia: prev.fuentesEnergia.map(f => (f.id === id ? { ...f, ...partial } : f)),
-    }))
-  }, [])
-
-  const deleteFuenteEnergia = useCallback((id: string) => {
-    setData(prev => ({ ...prev, fuentesEnergia: prev.fuentesEnergia.filter(f => f.id !== id) }))
-  }, [])
-
   // ─ Facturas Energía ────────────────────────────────────────────
   const addFacturaEnergia = useCallback((factura: FacturaEnergia) => {
     setData(prev => ({ ...prev, facturasEnergia: [factura, ...prev.facturasEnergia] }))
@@ -471,9 +447,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     setRegistrosCalidad,
     recargarFuentesAgua,
     recargarRegistrosCalidad,
-    addFuenteEnergia,
-    updateFuenteEnergia,
-    deleteFuenteEnergia,
     addFacturaEnergia,
     updateFacturaEnergia,
     deleteFacturaEnergia,

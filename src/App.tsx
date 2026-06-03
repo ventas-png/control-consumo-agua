@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Contador, ProveedorEnergia, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
+import type { AppSection, Contador, FuenteEnergia, ProveedorEnergia, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -234,11 +234,10 @@ export default function App() {
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, proyectos,
     moneda, maxUnidadesPorTipo,
-    fuentesEnergia, facturasEnergia,
+    facturasEnergia,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
     setFuentesAgua, setRegistrosCalidad,
-    addFuenteEnergia, updateFuenteEnergia, deleteFuenteEnergia,
     addFacturaEnergia, updateFacturaEnergia, deleteFacturaEnergia,
   } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
 
@@ -336,6 +335,17 @@ export default function App() {
   }, [dataQueryClient, dataCompanyId])
   const deleteTarifaEnergia = useCallback((id: string) => {
     dataQueryClient.setQueryData<TarifaEnergia[]>(aguaKeys.tarifasEnergia(dataCompanyId), (old = []) => old.filter(t => t.id !== id))
+  }, [dataQueryClient, dataCompanyId])
+  // T7: `fuentesEnergia` migran a la capa de datos (scope company). Energía.
+  const { data: fuentesEnergia = [] } = useFuentesEnergiaQuery(dataCompanyId)
+  const addFuenteEnergia = useCallback((fuente: FuenteEnergia) => {
+    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => [fuente, ...old])
+  }, [dataQueryClient, dataCompanyId])
+  const updateFuenteEnergia = useCallback((id: string, partial: Partial<FuenteEnergia>) => {
+    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => old.map(f => (f.id === id ? { ...f, ...partial } : f)))
+  }, [dataQueryClient, dataCompanyId])
+  const deleteFuenteEnergia = useCallback((id: string) => {
+    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => old.filter(f => f.id !== id))
   }, [dataQueryClient, dataCompanyId])
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
