@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Contador, FacturaEnergia, FuenteAgua, FuenteEnergia, ProveedorEnergia, RegistroCalidad, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
+import type { AppSection, Contador, Empresa, FacturaEnergia, FuenteAgua, FuenteEnergia, ProveedorEnergia, RegistroCalidad, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery, useRegistrosCalidadQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -232,7 +232,7 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, proyectos,
+    clientes, registros, proyectos,
     moneda, maxUnidadesPorTipo,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
@@ -368,6 +368,9 @@ export default function App() {
   const setRegistrosCalidad = useCallback((registros: RegistroCalidad[]) => {
     dataQueryClient.setQueryData<RegistroCalidad[]>(aguaKeys.registrosCalidad(dataCompanyId), registros)
   }, [dataQueryClient, dataCompanyId])
+  // T7: `empresa` (objeto único del tenant) migra a la capa de datos. Read-only en
+  // App (useData no exponía setter); default {} igual que el INITIAL_DATA previo.
+  const { data: empresa = {} as Empresa } = useEmpresaQuery(dataCompanyId)
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
   // Los hooks se llaman incondicionalmente (Rules of Hooks). Si no hay
