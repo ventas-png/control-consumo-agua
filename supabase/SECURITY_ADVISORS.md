@@ -44,8 +44,8 @@ el `company_id` (salvo donde se indica).
 | `company-logos` | `${company_id}/…` | ✅ WRITE scopeado en fase 1 (`20260603150000`); READ amplio (logo no sensible) |
 | `pagos-comprobantes` | `comprobantes/${auth.uid()}/…` | ✅ scopeado en fase 2 (`20260603160000`): WRITE carpeta-propia, READ dueño/staff-de-company |
 | `registro-fotos` | `registros/${cliente_id}_${ts}` | ❌ pendiente |
-| `condominios-media` | `${unidad/proyecto}/…` | ❌ pendiente |
-| `mudanza-docs` | `${unidad_id}/…` | ❌ pendiente |
+| `condominios-media` | `<categoría>/<ts>-<rand>` (sin id de tenant) | ❌ requiere normalizar path + migrar (49 objetos) — como `registro-fotos` |
+| `mudanza-docs` | `${unidad_id}/…` | ✅ scopeado (`20260603180000`) vía RLS de `unidades` (cubre residente y staff) |
 | `project-logos` | `${project_id}/…` | ✅ WRITE scopeado (`20260603170000`) vía `projects.company_id`; READ amplio |
 | `conv-attachments` | varía | ⚠️ READ amplio (INSERT sí valida company/cliente) |
 
@@ -65,11 +65,13 @@ registros.project_id → projects.company_id` (misma lógica de roles que `pagos
 > (backfill de `project_id` desde el registro) queda pendiente en #335.
 
 **Fases siguientes (tracked en #335, aún no en prod):**
-1. Scopear READ/WRITE por company en los buckets restantes. Donde el id del path resuelve a
-   company vía tabla de dominio (`condominios-media`/`mudanza-docs`→`unidades`/`projects`) se
-   usa policy-join sin migrar datos. Donde el id está embebido de forma frágil (`registro-fotos`:
-   `${cliente_id}_${ts}`)
-   hay que normalizar la convención de path y migrar objetos.
+1. Buckets restantes: `conv-attachments` necesita cerrar el READ amplio (el INSERT ya valida
+   company/cliente). `condominios-media` (path `<categoría>/<archivo>`, 49 objetos, usado por
+   amenidades/paquetería/firmas/uploaders genéricos) y `registro-fotos`
+   (`registros/${cliente_id}_${ts}`) **no tienen id de tenant utilizable en el path** → requieren
+   normalizar la convención y migrar objetos antes de scopear. (Ya no quedan buckets con
+   policy-join directo: los que lo permitían — `company-logos`, `project-logos`,
+   `pagos-comprobantes`, `mudanza-docs` — ya están hechos.)
 2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
    (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
 
