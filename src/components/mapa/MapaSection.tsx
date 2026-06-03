@@ -23,7 +23,7 @@ export function MapaSection({ clientes, registros }: Props) {
           <span style={{ padding: '4px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🟢 Pagado</span>
         </div>
       </div>
-      <MapView layers={layers} style={{ flex: 1, width: '100%' }} />
+      <MapView layers={layers} cluster style={{ flex: 1, width: '100%' }} />
     </div>
   )
 }
