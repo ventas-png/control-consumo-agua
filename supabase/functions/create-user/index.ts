@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireUser } from '../_shared/auth.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -127,6 +128,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Rate limit por admin caller: máx 30 altas de usuario/hora. Evita creación masiva
+    // si una sesión admin es comprometida o abusada (infra:I2, server-side).
+    const rl = await enforceRateLimit(adminClient, {
+      subject: caller.id,
+      action: 'create_user',
+      max: 30,
+      message: 'Demasiadas creaciones de usuario en poco tiempo. Espera unos minutos.',
+    }, corsHeaders)
+    if (rl) return rl
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
