@@ -70,7 +70,9 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       let fotoPath: string | null = null
       if (preview) {
         const timestamp = Date.now()
-        const path = `registros/${selectedClienteId}_${timestamp}`
+        // Path normalizado: `${cliente_id}/...` (antes `registros/${id}_${ts}`) para que la
+        // RLS de storage scopee por carpeta-de-cliente sin parsear ids embebidos (infra:I14).
+        const path = `${selectedClienteId}/${timestamp}`
         const { error: uploadError } = await supabase.storage
           .from('registro-fotos')
           .upload(path, preview.image, { contentType: preview.image.type })

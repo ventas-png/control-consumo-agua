@@ -43,8 +43,8 @@ el `company_id` (salvo donde se indica).
 | `report-attachments` | `${company_id}/…` | ✅ ya scopeado (modelo a seguir) |
 | `company-logos` | `${company_id}/…` | ✅ WRITE scopeado en fase 1 (`20260603150000`); READ amplio (logo no sensible) |
 | `pagos-comprobantes` | `comprobantes/${auth.uid()}/…` | ✅ scopeado en fase 2 (`20260603160000`): WRITE carpeta-propia, READ dueño/staff-de-company |
-| `registro-fotos` | `registros/${cliente_id}_${ts}` | ❌ pendiente |
-| `condominios-media` | `<categoría>/<ts>-<rand>` (sin id de tenant) | ❌ requiere normalizar path + migrar (49 objetos) — como `registro-fotos` |
+| `registro-fotos` | `${cliente_id}/${ts}` | ✅ scopeado (`20260603210000`): path normalizado (era `registros/${id}_${ts}`); READ residente/staff-de-company, WRITE staff |
+| `condominios-media` | `<categoría>/<ts>-<rand>` (sin id de tenant) | ❌ requiere normalizar path + migrar 49 objetos |
 | `mudanza-docs` | `${unidad_id}/…` | ✅ scopeado (`20260603180000`) vía RLS de `unidades` (cubre residente y staff) |
 | `project-logos` | `${project_id}/…` | ✅ WRITE scopeado (`20260603170000`) vía `projects.company_id`; READ amplio |
 | `conv-attachments` | `${conversation_id}/…` | ✅ scopeado (`20260603200000`) vía RLS de `conversations` (READ/WRITE; cubre staff y residente) |
@@ -65,13 +65,11 @@ registros.project_id → projects.company_id` (misma lógica de roles que `pagos
 > (backfill de `project_id` desde el registro) queda pendiente en #335.
 
 **Fases siguientes (tracked en #335, aún no en prod):**
-1. Buckets restantes: `conv-attachments` necesita cerrar el READ amplio (el INSERT ya valida
-   company/cliente). `condominios-media` (path `<categoría>/<archivo>`, 49 objetos, usado por
-   amenidades/paquetería/firmas/uploaders genéricos) y `registro-fotos`
-   (`registros/${cliente_id}_${ts}`) **no tienen id de tenant utilizable en el path** → requieren
-   normalizar la convención y migrar objetos antes de scopear. (Ya no quedan buckets con
-   policy-join directo: los que lo permitían — `company-logos`, `project-logos`,
-   `pagos-comprobantes`, `mudanza-docs` — ya están hechos.)
+1. `condominios-media` — único bucket de scoping que falta. Path `<categoría>/<archivo>` **sin
+   id de tenant** (49 objetos, usado por amenidades/paquetería/firmas/uploaders genéricos) →
+   requiere normalizar la convención **+ migrar los 49 objetos vía storage API (copy+delete, no
+   SQL)** antes de scopear. Es el de mayor esfuerzo. (El resto ya está hecho: `registro-fotos`
+   normalizó path sin migración porque tenía 0 objetos.)
 2. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
    (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
 
