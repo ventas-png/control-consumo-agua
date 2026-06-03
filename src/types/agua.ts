@@ -100,6 +100,8 @@ export interface FuenteAgua {
   descripcion?: string;
   activo: boolean;
   created_at: string;
+  // serv:S26 — días entre muestreos esperados de calidad (null = sin programa).
+  frecuencia_muestreo_dias?: number | null;
 }
 
 export interface RegistroCalidad {
