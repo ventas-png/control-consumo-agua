@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, RegistroCalidad, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Cliente, Registro, Empresa, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -86,7 +86,6 @@ interface AppData {
   clientes: Cliente[]
   registros: Registro[]
   empresa: Empresa
-  registrosCalidad: RegistroCalidad[]
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
@@ -96,7 +95,6 @@ const INITIAL_DATA: AppData = {
   clientes: [],
   registros: [],
   empresa: {},
-  registrosCalidad: [],
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
@@ -112,7 +110,10 @@ const RESTRICTED_COND_ROLE_IDS = new Set<string>(
     .map(([, v]) => v)
 )
 
-export function useData(companyId?: string, userId?: string, userRole?: string, assignedRoleIds?: string[]) {
+// `_companyId` ya no se usa aquí: las entidades scopeadas por empresa migraron a
+// la capa de datos (TanStack Query). Se conserva la posición del parámetro para no
+// romper a los llamadores (App lo pasa posicional).
+export function useData(_companyId?: string, userId?: string, userRole?: string, assignedRoleIds?: string[]) {
   const [data, setData] = useState<AppData>(() => loadCache(userId) ?? INITIAL_DATA)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -120,14 +121,11 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   const userIdRef = useRef(userId)
   const userRoleRef = useRef(userRole)
   const assignedRoleIdsRef = useRef(assignedRoleIds)
-  const companyIdRef = useRef(companyId)
   userIdRef.current = userId
   userRoleRef.current = userRole
   assignedRoleIdsRef.current = assignedRoleIds
-  companyIdRef.current = companyId
 
   const fetchAllData = async () => {
-    const cid = companyIdRef.current
     // Per-query timeout (15 s). A single slow query no longer kills the entire
     // batch — each query races independently. Faster queries return immediately
     // while slow ones eventually fail in isolation and we keep their cached
@@ -138,11 +136,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const PER_QUERY_TIMEOUT_MS = 15_000
     const signal = () => AbortSignal.timeout(PER_QUERY_TIMEOUT_MS)
 
-    // Defense-in-depth: add company_id filters where columns exist.
-    // RLS is the primary enforcement, these are secondary safeguards.
-    // NOTE: Supabase query builder is immutable — .eq() returns a new builder,
-    // so we must reassign (use let) to actually apply the filter.
-    let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
     // registros: RLS policy (registros_select) scopes company_owner to their company's
@@ -158,22 +151,17 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const REGISTROS_LIST_COLS = 'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
     const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
 
-    if (cid) {
-      rcalQ            = rcalQ.eq('company_id', cid)
-    }
-
     return Promise.allSettled([
       clientesQ.abortSignal(signal()),
       registrosQ.abortSignal(signal()),
       supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
-      rcalQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, rcalRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -184,9 +172,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
     if (empRes.status === 'fulfilled' && empRes.value.data?.length) {
       next.empresa = empRes.value.data[0] as Empresa
-    }
-    if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
-      next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
     }
     if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
       next.proyectos = proyectoRes.value.data as Proyecto[]
@@ -377,18 +362,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }))
   }, [])
 
-  const setRegistrosCalidad = useCallback((registros: RegistroCalidad[]) => {
-    setData(prev => ({ ...prev, registrosCalidad: registros }))
-  }, [])
-
-  const recargarRegistrosCalidad = useCallback(async () => {
-    const { data: rcal } = await supabase
-      .from('registros_calidad')
-      .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
-      .order('fecha', { ascending: false })
-    if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
-  }, [])
-
   return {
     ...data,
     isLoading,
@@ -399,7 +372,5 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     addRegistro,
     updateRegistroEstado,
     deleteRegistro,
-    setRegistrosCalidad,
-    recargarRegistrosCalidad,
   }
 }

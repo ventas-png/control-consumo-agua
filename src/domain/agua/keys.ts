@@ -10,6 +10,7 @@
 export const aguaKeys = {
   all: ['agua'] as const,
   fuentesAgua: (companyId?: string) => [...aguaKeys.all, 'fuentes-agua', companyId ?? null] as const,
+  registrosCalidad: (companyId?: string) => [...aguaKeys.all, 'registros-calidad', companyId ?? null] as const,
   clientes: (companyId?: string) => [...aguaKeys.all, 'clientes', companyId ?? null] as const,
   registros: (companyId?: string) => [...aguaKeys.all, 'registros', companyId ?? null] as const,
   rutas: (companyId?: string) => [...aguaKeys.all, 'rutas', companyId ?? null] as const,
