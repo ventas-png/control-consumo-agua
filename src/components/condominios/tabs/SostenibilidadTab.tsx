@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
 import type { RegistroResiduo, TipoResiduo } from '../../../types'
+import { useConsumoMensualPorProyectoQuery } from '../../../domain/agua/queries'
 
 interface Props {
   residuos: RegistroResiduo[]
   proyectoId: string
   companyId: string
 }
-
-interface AguaMes { mes: string; m3: number }
 
 const TIPO_RECICLABLE: Set<TipoResiduo> = new Set(['reciclable', 'electronico'])
 
@@ -23,42 +20,10 @@ function mesLabel(ym: string) {
 }
 
 export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
-  const [aguaMeses, setAguaMeses] = useState<AguaMes[]>([])
-  const [loadingAgua, setLoadingAgua] = useState(false)
-
-  useEffect(() => {
-    if (!proyectoId || !companyId) return
-    setLoadingAgua(true)
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
-    sixMonthsAgo.setDate(1)
-    const desde = sixMonthsAgo.toISOString().slice(0, 10)
-
-    supabase
-      .from('contadores')
-      .select('id')
-      .eq('project_id', proyectoId)
-      .then(({ data: contadores }) => {
-        const ids = (contadores ?? []).map(c => c.id)
-        if (ids.length === 0) { setLoadingAgua(false); return }
-        return supabase
-          .from('registros')
-          .select('consumo_m3, fecha_lectura')
-          .in('contador_id', ids)
-          .gte('fecha_lectura', desde)
-          .order('fecha_lectura')
-      })
-      .then(res => {
-        if (!res) return
-        const byMes: Record<string, number> = {}
-        for (const r of (res.data ?? [])) {
-          const mes = (r.fecha_lectura as string).slice(0, 7)
-          byMes[mes] = (byMes[mes] ?? 0) + (r.consumo_m3 ?? 0)
-        }
-        setAguaMeses(Object.entries(byMes).map(([mes, m3]) => ({ mes, m3 })).sort((a, b) => a.mes.localeCompare(b.mes)))
-        setLoadingAgua(false)
-      })
-  }, [proyectoId, companyId])
+  // Capa de datos (T7): consumo mensual de agua vía TanStack Query. Reemplaza el
+  // useEffect + fetch dependiente (contadores → registros) por un hook que hace
+  // los dos pasos y agrega por mes; revalida solo al cambiar proyecto/empresa.
+  const { data: aguaMeses = [], isLoading: loadingAgua } = useConsumoMensualPorProyectoQuery(companyId, proyectoId)
 
   // ── Métricas residuos ──
   const totalKg = residuos.reduce((s, r) => s + (r.cantidad_kg ?? 0), 0)
