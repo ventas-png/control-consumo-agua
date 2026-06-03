@@ -9,6 +9,10 @@ pendiente en **secciones paralelizables** para trabajar sin colisiones.
 > Reemplaza como *tracker activo* a la sección 7 del `DESIGN_CRITIQUE_INDEX_2026-05-26.md` (que quedó
 > congelada en 14 resueltos / 6.3% al 2026-05-27). Desde entonces se mergearon ~130 PRs hasta el #298.
 
+> **Actualización 2026-06-03 — Track T1 (Servicios):** **17/29 hallazgos cerrados** (PRs #323–#367) +
+> los 5 sub-issues 🔴 cerrados (#308–#312). Detalle en **§2 (Servicios)** y **§3 (T1, con bitácora de
+> hallazgos del camino)**. Resto de tracks (T2–T8) sin cambios en este corte.
+
 ---
 
 ## 1. Resumen ejecutivo
@@ -56,9 +60,9 @@ rollback, tests de edge functions) y **refactor arquitectónico** (TanStack + go
 - ⏳ P14 superadmin (KPIs sí, paginación no) · P37 pricing page · P8 audit negocio
 - ❌ **P3 invitaciones** · P9 sesiones activas (tabla existe, falta UI) · P10 SSO/SAML · P11 notif. de seguridad · P12 refactor EmpresaSection · P13 refactor useAuth(779L) · P15 tests auth/RBAC · P16 rate-limit server · P17 OAuth flexible · P18 locale/tz/currency · P19 perfil usuario · P20 branding/config tenant · P21-P32 (docs RBAC, clone roles, dedup `app_users.role`…) · P28 white-label · **P33/P34/P35 TOS/DPA/GDPR**
 
-### Servicios — Energía/Calidad/Mapa (`serv:*`) — **casi intacto**
-- ⏳ (transversal) algo de a11y tocó forms de energía
-- ❌ **S1/S2 promover Energía a 1er nivel + desacoplar de agua** · S3/S4/S5 refactor · S6 validación kwh · S7 tramos · S8 GPS/foto · S9 RLS colector · S10 tests · S11 FEL/CFDI/DIAN · S12 dup factura · **S13 `<MapView>` genérico** · S14 clustering · S15 interacción · S16 coords · S17 filtros · S18 heatmap · S19 atribución · **S20 validaciones Calidad** · S21 props · **S22 cumplimiento en Postgres** · S23 tipologías en DB · S24 base64 · S25 históricos · S26 muestreos · S27 export · S28 IoT · **S29 arquitectura "servicio medido"**
+### Servicios — Energía/Calidad/Mapa (`serv:*`) — **T1 ~59% (17/29 cerrados)**
+- ✅ **S1 Energía 1er nivel** (#326) · **S2 desacople `fuente_agua_id`** (#323) · S6 validación kwh/período (#341) · **S12 anti-dup nº factura** (#367) · **S13 `<MapView>` genérico** (#329) · S14 clustering (#338) · S15 interacción + LocationPicker (#338) · S16 centro/zoom por tenant (#361) · S17 filtros mapa (#346) · S18 heatmap (#358) · S19 atribución OSM (en `MapView`, sin PR aparte) · **S20 validaciones Calidad** (#333) · S21 props (ya resuelto, sin PR) · **S22 cumplimiento en Postgres** (#331) · S25 históricos/tendencia (#348) · S26 programa de muestreo (#365) · S27 export CSV (#354)
+- ❌ S3/S4/S5 refactor ServiciosEnergia (**S4 toca capa de datos → coordinar T7**) · S7 tramos escalonados · S8 GPS/foto por lectura (**`LocationPicker` ya listo; falta cablear en `lecturas/` → T7**) · S9 RLS colector · S10 tests (→ T8) · S11 FEL/CFDI/DIAN (→ T4 fiscal) · **S23 TIPOLOGIAS_CALIDAD a DB** (debe actualizar la función Postgres de S22) · S24 reporte fuera de base64 (storage/edge fn) · S28 IoT · **S29 arquitectura "servicio medido"** (plugin)
 
 ### Comunicación (`com:*`)
 - ✅ N1 EmailJS fuera + cola de reintentos
@@ -86,6 +90,12 @@ colisiones. Prioridad **balance en paralelo** (cada track ordena su backlog por 
 - **Objetivo:** Energía como módulo de 1er nivel (rutas propias + desacople de `fuente_agua_id`),
   `<MapView layers={[]}/>` genérico, validaciones reguladas de Calidad calculadas en Postgres.
 - **Dependencias:** ninguna dura · coordinar `businessEnergia.ts` con T4. **Colisión: baja.**
+- **Avance (2026-06-03):** **17/29 cerrados** — los 5 🔴 (S1/S2/S13/S20/S22) + S6/S12/S14/S15/S16/S17/S18/S19/S21/S25/S26/S27. Sub-issues 🔴 #308–#312 cerrados. **Pendientes:** S3-S5, S7-S11, S23, S24, S28, S29.
+- **Bitácora de hallazgos (lo encontrado en el camino):**
+  - **Dualidad `empresa` (tabla legacy single-row) vs `companies` (multi-tenant):** el mapa recibe `empresa` legacy vía `useData` (T7), pero la RLS multi-tenant + `EmpresaSection` viven en `companies`. **S16 lee/escribe el centro en `companies` por `company_id` directo** para no tocar la capa de datos de T7. → Deuda: unificar `empresa`/`companies`.
+  - **S19 y S21 ya estaban cubiertos** (atribución OSM venía en `MapView`; `CalidadSection` ya usa props + lifta al padre) → cerrados **sin PR**, sin fabricar no-ops.
+  - **`businessEnergia.ts` aditivo:** S6/S12 extienden `validarFacturaEnergia`; **no** tocan `calcularFacturaEnergia` (compartido con T4).
+  - **Follow-ups server-side detectados:** S12 admitiría un índice único parcial en DB (`unique (company_id, numero_factura)`); **S23 obliga a que la función de cumplimiento de S22 lea los umbrales desde la tabla** (hoy embebidos 1:1 cliente+Postgres).
 
 #### T2 · Comunicación (orquestación multicanal)
 - **Hallazgos:** `com:N2–N29` (foco 🔴 N2, N3, N4, N5, N6, N12).
@@ -162,6 +172,9 @@ Ola B (coordinada):    T7 Capa de datos ──► T4 Facturación · T6 UX/DataT
 
 - **Migraciones:** reservar rangos de timestamp por track + patrones idempotentes ya establecidos
   (`DROP POLICY IF EXISTS`, `ADD COLUMN IF NOT EXISTS` — lecciones `infra:I40/I41/I42`). Validar en Supabase Preview.
+  **Lección (T1 #361):** `schema_migrations` keya por **versión** (`YYYYMMDDHHMMSS`); con tracks en paralelo, dos
+  archivos con el mismo timestamp chocan (`duplicate key … schema_migrations_pkey`). T5 avanza en **horas redondas**
+  (`…200000/210000/220000`), así que T1 usa **offset `:30`** (`…213000/223000`) para esquivar esa banda.
 - **Archivos compartidos** (`business.ts`, `useData.ts`, `useAuth.ts`, `App.tsx`, `shared/`, `i18n.tsx`):
   propiedad de los tracks **transversales** (T7/T6/T4). Los tracks de dominio tocan **solo su carpeta** y su
   `src/types/<dominio>.ts` (ya split → colisión baja).
