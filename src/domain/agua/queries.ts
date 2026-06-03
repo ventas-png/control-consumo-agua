@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -151,6 +151,20 @@ export function useFuentesEnergiaQuery(companyId?: string) {
     queryFn: async () =>
       (await runQuery<FuenteEnergia[]>((signal) => {
         let q = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `facturas_energia` del tenant (scope company, orden por periodo_fin). Energía.
+export function useFacturasEnergiaQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.facturasEnergia(companyId),
+    queryFn: async () =>
+      (await runQuery<FacturaEnergia[]>((signal) => {
+        let q = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
         return q.abortSignal(signal)
       })) ?? [],

@@ -18,6 +18,7 @@ export const aguaKeys = {
   proveedoresEnergia: (companyId?: string) => [...aguaKeys.all, 'proveedores-energia', companyId ?? null] as const,
   tarifasEnergia: (companyId?: string) => [...aguaKeys.all, 'tarifas-energia', companyId ?? null] as const,
   fuentesEnergia: (companyId?: string) => [...aguaKeys.all, 'fuentes-energia', companyId ?? null] as const,
+  facturasEnergia: (companyId?: string) => [...aguaKeys.all, 'facturas-energia', companyId ?? null] as const,
   // Lecturas con scope (parametrizadas). El scope completo forma parte de la key
   // para que cada combinación (proyecto, mes) tenga su propia entrada en caché.
   contadoresPorProyecto: (companyId: string, proyectoId: string) =>
