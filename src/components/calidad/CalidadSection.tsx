@@ -7,6 +7,7 @@ import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
+import { registrosCalidadToCSV } from '../../lib/calidadCSV'
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
@@ -466,12 +467,22 @@ export function CalidadSection({
               </select>
             </div>
           </div>
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button onClick={async () => {
               const { exportarPDFCalidad } = await import('../../lib/pdf')
               exportarPDFCalidad(historialFiltrado, empresa)
             }} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               📄 Exportar PDF
+            </button>
+            {/* serv:S27 — export CSV del historial filtrado (reportes regulatorios). */}
+            <button onClick={() => {
+              const csv = registrosCalidadToCSV(historialFiltrado)
+              const a = document.createElement('a')
+              a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+              a.download = `historial_calidad_${new Date().toISOString().slice(0, 10)}.csv`
+              a.click()
+            }} disabled={historialFiltrado.length === 0} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: historialFiltrado.length === 0 ? 'not-allowed' : 'pointer', opacity: historialFiltrado.length === 0 ? 0.5 : 1 }}>
+              📊 Exportar CSV
             </button>
           </div>
           {/* serv:S25 — tendencia de cumplimiento de los análisis filtrados. */}
