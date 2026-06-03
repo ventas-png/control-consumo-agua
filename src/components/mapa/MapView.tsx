@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { clusterByGrid, type PixelPoint } from './mapClustering'
+import { heatStyle } from './heatScale'
 
 // serv:S13 — Mapa genérico reutilizable (agua/condominios/energía): extrae el
 // "motor" de Leaflet detrás de una API declarativa por capas.
@@ -34,6 +35,8 @@ export interface MapMarker {
   popupHtml?: string
   /** Texto del tooltip al pasar el cursor. */
   tooltip?: string
+  /** serv:S18 — intensidad para el modo "mapa de calor" (p. ej. consumo). */
+  weight?: number
 }
 
 export interface MapLayer {
@@ -49,6 +52,8 @@ export interface MapViewProps {
   fitToMarkers?: boolean
   /** serv:S14 — agrupa pines cercanos en clusters (con conteo). Default: false. */
   cluster?: boolean
+  /** serv:S18 — modo "mapa de calor": círculos graduados por `weight`. Default: false. */
+  heat?: boolean
   /** serv:S15 — click en el mapa (o arrastre del marcador `selected`). */
   onMapClick?: (coords: LatLng) => void
   /** serv:S15 — marcador de ubicación elegida (arrastrable). */
@@ -93,6 +98,23 @@ function addSingleMarker(group: L.FeatureGroup, m: MapMarker) {
   group.addLayer(marker)
 }
 
+// serv:S18 — pinta los markers como círculos de calor graduados por `weight`,
+// normalizando contra el rango del propio dataset (azul = bajo → rojo = alto).
+// Los translúcidos se superponen, así que las zonas densas se ven más cálidas.
+function addHeatPoints(group: L.FeatureGroup, markers: MapMarker[]) {
+  if (!markers.length) return
+  const weights = markers.map(m => m.weight ?? 0)
+  const min = Math.min(...weights)
+  const max = Math.max(...weights)
+  for (const m of markers) {
+    const { color, radius, fillOpacity } = heatStyle(m.weight ?? 0, min, max)
+    const circle = L.circleMarker([m.lat, m.lng], { radius, stroke: false, fillColor: color, fillOpacity })
+    if (m.popupHtml) circle.bindPopup(m.popupHtml)
+    if (m.tooltip) circle.bindTooltip(m.tooltip)
+    group.addLayer(circle)
+  }
+}
+
 interface MarkerCluster {
   markers: MapMarker[]
   lat: number
@@ -122,6 +144,7 @@ export function MapView({
   zoom = DEFAULT_ZOOM,
   fitToMarkers = true,
   cluster = false,
+  heat = false,
   onMapClick,
   selected,
   className,
@@ -166,6 +189,11 @@ export function MapView({
 
     const render = () => {
       group.clearLayers()
+      // serv:S18 — el modo calor tiene prioridad sobre el clustering.
+      if (heat) {
+        addHeatPoints(group, allMarkers)
+        return
+      }
       if (!cluster) {
         for (const m of allMarkers) addSingleMarker(group, m)
         return
@@ -192,11 +220,11 @@ export function MapView({
       if (b.isValid()) map.fitBounds(b, { padding: [50, 50] })
     }
 
-    if (cluster) {
+    if (cluster && !heat) {
       map.on('zoomend', render)
       return () => { map.off('zoomend', render) }
     }
-  }, [layers, fitToMarkers, cluster])
+  }, [layers, fitToMarkers, cluster, heat])
 
   // serv:S15 — marcador de ubicación elegida (arrastrable). Vive fuera del
   // featureGroup de datos para no verse afectado por el clustering.
