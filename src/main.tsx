@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import './components/shared/shared.css'
 import App from './App'
+import { queryClient } from './domain/queryClient'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { DialogProvider } from './components/shared/Dialog'
@@ -32,17 +34,19 @@ if (savedTheme === 'dark' || savedTheme === 'light') {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary sectionName="root">
-      <I18nProvider>
-        <FeatureFlagsProvider>
-          <DialogProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-            <PwaUpdatePrompt />
-            <PromptDialogRoot />
-          </DialogProvider>
-        </FeatureFlagsProvider>
-      </I18nProvider>
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider>
+          <FeatureFlagsProvider>
+            <DialogProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+              <PwaUpdatePrompt />
+              <PromptDialogRoot />
+            </DialogProvider>
+          </FeatureFlagsProvider>
+        </I18nProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>
 )
