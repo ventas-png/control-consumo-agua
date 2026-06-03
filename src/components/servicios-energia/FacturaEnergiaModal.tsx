@@ -1,12 +1,13 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../types'
 import { notify } from '../shared/Dialog'
-import { calcularFacturaEnergia } from '../../lib/businessEnergia'
+import { calcularFacturaEnergia, validarFacturaEnergia } from '../../lib/businessEnergia'
 import { sanitizeInput } from '../../lib/validation'
 
 interface FacturaEnergiaModalProps {
   factura: Partial<FacturaEnergia> | null
   fuentesEnergia: FuenteEnergia[]
+  facturasEnergia: FacturaEnergia[]
   tarifasEnergia: TarifaEnergia[]
   proveedoresEnergia: ProveedorEnergia[]
   moneda: string
@@ -18,6 +19,7 @@ interface FacturaEnergiaModalProps {
 export default function FacturaEnergiaModal({
   factura,
   fuentesEnergia,
+  facturasEnergia,
   tarifasEnergia,
   proveedoresEnergia: _proveedoresEnergia,
   moneda,
@@ -91,6 +93,24 @@ export default function FacturaEnergiaModal({
         monto_credito_exportacion: parseFloat(String(formData.monto_credito_exportacion || 0)),
         monto_otros: parseFloat(String(formData.monto_otros || 0)),
         monto_total: parseFloat(String(formData.monto_total || 0)),
+      }
+
+      // serv:S6 — valida kWh no negativos + secuencialidad del período.
+      const validacion = validarFacturaEnergia(
+        {
+          id: factura?.id,
+          fuente_energia_id: dataToSave.fuente_energia_id,
+          periodo_inicio: dataToSave.periodo_inicio,
+          periodo_fin: dataToSave.periodo_fin,
+          kwh_consumidos: dataToSave.kwh_consumidos,
+          kwh_generados: dataToSave.kwh_generados,
+          kwh_exportados: dataToSave.kwh_exportados,
+          kw_demanda_max: dataToSave.kw_demanda_max,
+        },
+        facturasEnergia,
+      )
+      if (!validacion.valido) {
+        throw new Error(validacion.motivo)
       }
 
       await onSave(dataToSave)
