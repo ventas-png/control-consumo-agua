@@ -6,13 +6,13 @@ import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Contador, FacturaEnergia, FuenteEnergia, ProveedorEnergia, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
+import type { AppSection, Contador, FacturaEnergia, FuenteAgua, FuenteEnergia, ProveedorEnergia, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery } from './domain/agua/queries'
+import { useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
@@ -232,11 +232,11 @@ export default function App() {
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, proyectos,
+    clientes, registros, empresa, registrosCalidad, proyectos,
     moneda, maxUnidadesPorTipo,
     isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
-    setFuentesAgua, setRegistrosCalidad,
+    setRegistrosCalidad,
   } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
@@ -355,6 +355,13 @@ export default function App() {
   }, [dataQueryClient, dataCompanyId])
   const deleteFacturaEnergia = useCallback((id: string) => {
     dataQueryClient.setQueryData<FacturaEnergia[]>(aguaKeys.facturasEnergia(dataCompanyId), (old = []) => old.filter(f => f.id !== id))
+  }, [dataQueryClient, dataCompanyId])
+  // T7: `fuentesAgua` migran a la capa de datos. setFuentesAgua reemplaza la lista
+  // en caché (lo usa CalidadSection vía onFuentesUpdated). recargarFuentesAgua del
+  // useData previo no se usaba en App, así que se elimina.
+  const { data: fuentesAgua = [] } = useFuentesAguaQuery(dataCompanyId)
+  const setFuentesAgua = useCallback((fuentes: FuenteAgua[]) => {
+    dataQueryClient.setQueryData<FuenteAgua[]>(aguaKeys.fuentesAgua(dataCompanyId), fuentes)
   }, [dataQueryClient, dataCompanyId])
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────

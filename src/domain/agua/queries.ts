@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -20,9 +20,22 @@ import { aguaKeys } from './keys'
 const REGISTROS_LIST_COLS =
   'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
 
-// `clientes` no tiene columna company_id — el scoping por tenant lo hace RLS vía
-// la junction company_clientes. Por eso aquí NO filtramos por company_id (igual
-// que useData); el companyId solo entra en la query key para aislar el caché.
+// `fuentes_agua` del tenant (scope company). Lista completa; el portal de calidad
+// la reemplaza vía setFuentesAgua (setQueryData) tras editar.
+export function useFuentesAguaQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.fuentesAgua(companyId),
+    queryFn: async () =>
+      (await runQuery<FuenteAgua[]>((signal) => {
+        let q = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `clientes` — RLS por company vía junction company_clientes (sin company_id directo).
 export function useClientesQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.clientes(companyId),

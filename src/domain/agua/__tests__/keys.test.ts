@@ -6,6 +6,10 @@ describe('aguaKeys', () => {
     expect(aguaKeys.all).toEqual(['agua'])
   })
 
+  it('fuentesAgua scopea por companyId', () => {
+    expect(aguaKeys.fuentesAgua('c1')).toEqual(['agua', 'fuentes-agua', 'c1'])
+  })
+
   it('incluye el companyId en el scope de cada entidad', () => {
     expect(aguaKeys.clientes('c1')).toEqual(['agua', 'clientes', 'c1'])
     expect(aguaKeys.registros('c1')).toEqual(['agua', 'registros', 'c1'])

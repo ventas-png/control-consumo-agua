@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { notify } from '../components/shared/Dialog'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Cliente, Registro, Empresa, RegistroCalidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
@@ -86,7 +86,6 @@ interface AppData {
   clientes: Cliente[]
   registros: Registro[]
   empresa: Empresa
-  fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
   proyectos: Proyecto[]
   moneda: string
@@ -97,7 +96,6 @@ const INITIAL_DATA: AppData = {
   clientes: [],
   registros: [],
   empresa: {},
-  fuentesAgua: [],
   registrosCalidad: [],
   proyectos: [],
   moneda: 'Q',
@@ -144,7 +142,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // RLS is the primary enforcement, these are secondary safeguards.
     // NOTE: Supabase query builder is immutable — .eq() returns a new builder,
     // so we must reassign (use let) to actually apply the filter.
-    let fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
     let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
@@ -162,7 +159,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
 
     if (cid) {
-      fuentesQ         = fuentesQ.eq('company_id', cid)
       rcalQ            = rcalQ.eq('company_id', cid)
     }
 
@@ -170,7 +166,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       clientesQ.abortSignal(signal()),
       registrosQ.abortSignal(signal()),
       supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
-      fuentesQ.abortSignal(signal()),
       rcalQ.abortSignal(signal()),
       supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
     ])
@@ -178,7 +173,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, rcalRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -189,9 +184,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
     if (empRes.status === 'fulfilled' && empRes.value.data?.length) {
       next.empresa = empRes.value.data[0] as Empresa
-    }
-    if (fuaRes.status === 'fulfilled' && fuaRes.value.data) {
-      next.fuentesAgua = fuaRes.value.data as FuenteAgua[]
     }
     if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
       next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
@@ -385,20 +377,8 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }))
   }, [])
 
-  const setFuentesAgua = useCallback((fuentes: FuenteAgua[]) => {
-    setData(prev => ({ ...prev, fuentesAgua: fuentes }))
-  }, [])
-
   const setRegistrosCalidad = useCallback((registros: RegistroCalidad[]) => {
     setData(prev => ({ ...prev, registrosCalidad: registros }))
-  }, [])
-
-  const recargarFuentesAgua = useCallback(async () => {
-    const { data: fua } = await supabase
-      .from('fuentes_agua')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (fua) setData(prev => ({ ...prev, fuentesAgua: fua as FuenteAgua[] }))
   }, [])
 
   const recargarRegistrosCalidad = useCallback(async () => {
@@ -419,9 +399,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     addRegistro,
     updateRegistroEstado,
     deleteRegistro,
-    setFuentesAgua,
     setRegistrosCalidad,
-    recargarFuentesAgua,
     recargarRegistrosCalidad,
   }
 }
