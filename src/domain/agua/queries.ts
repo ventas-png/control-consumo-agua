@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta } from '../../types'
+import type { Cliente, Registro, Ruta, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -65,5 +65,59 @@ export function useRutasQuery(companyId?: string) {
           .order('created_at', { ascending: false })
           .abortSignal(signal),
       )) ?? [],
+  })
+}
+
+// ── Lecturas con scope (parametrizadas) ─────────────────────────────────────
+// Ejemplo de hooks por-proyecto: los consume MedidoresUnidadTab (módulo
+// Condominios) sobre tablas de agua → la capa de datos se comparte entre
+// dominios. `enabled` replica el early-return del useEffect original (no dispara
+// hasta tener los identificadores de scope).
+
+/** Contadores activos de un proyecto (scope company + proyecto). */
+export function useContadoresPorProyectoQuery(companyId: string, proyectoId: string) {
+  return useQuery({
+    queryKey: aguaKeys.contadoresPorProyecto(companyId, proyectoId),
+    queryFn: async () =>
+      (await runQuery<Contador[]>((signal) =>
+        supabase
+          .from('contadores')
+          .select('*')
+          .eq('project_id', proyectoId)
+          .eq('company_id', companyId)
+          .eq('activo', true)
+          .order('numero_serie')
+          .abortSignal(signal),
+      )) ?? [],
+    enabled: !!companyId && !!proyectoId,
+  })
+}
+
+/** Fila mínima de consumo — proyección de `registros` para agregación por contador. */
+export interface ConsumoRow {
+  contador_id: string | null
+  consumo: number
+  fecha: string
+}
+
+/**
+ * Consumo (proyección) de un proyecto dentro de un mes `YYYY-MM`. RLS scopea por
+ * company; aquí filtramos por proyecto + rango de fechas (igual que el fetch
+ * original). El consumidor agrega por contador.
+ */
+export function useConsumoPorProyectoQuery(proyectoId: string, mes: string) {
+  return useQuery({
+    queryKey: aguaKeys.consumoPorProyecto(proyectoId, mes),
+    queryFn: async () =>
+      (await runQuery<ConsumoRow[]>((signal) =>
+        supabase
+          .from('registros')
+          .select('contador_id, consumo, fecha')
+          .eq('project_id', proyectoId)
+          .gte('fecha', `${mes}-01`)
+          .lte('fecha', `${mes}-31`)
+          .abortSignal(signal),
+      )) ?? [],
+    enabled: !!proyectoId,
   })
 }

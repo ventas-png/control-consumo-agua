@@ -1,8 +1,9 @@
-import { useState, useEffect, type CSSProperties} from 'react'
+import { useState, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
-import type { MedidorUnidad, Unidad, Contador } from '../../../types'
+import type { MedidorUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { useContadoresPorProyectoQuery, useConsumoPorProyectoQuery } from '../../../domain/agua/queries'
 
 interface Props {
   medidores: MedidorUnidad[]
@@ -22,37 +23,33 @@ interface ConsumoResumen {
 }
 
 export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
-  const [contadores, setContadores] = useState<Contador[]>([])
-  const [consumos, setConsumos] = useState<ConsumoResumen[]>([])
-  const [loadingCtrs, setLoadingCtrs] = useState(true)
   const [selectedUnidad, setSelectedUnidad] = useState('')
   const [selectedContador, setSelectedContador] = useState('')
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
   const [mesFiltro, setMesFiltro] = useState(new Date().toISOString().slice(0, 7))
 
-  useEffect(() => {
-    if (!proyectoId || !companyId) return
-    setLoadingCtrs(true)
-    Promise.all([
-      supabase.from('contadores').select('*').eq('project_id', proyectoId).eq('company_id', companyId).eq('activo', true).order('numero_serie'),
-      supabase.from('registros').select('contador_id, consumo, fecha').eq('project_id', proyectoId).gte('fecha', `${mesFiltro}-01`).lte('fecha', `${mesFiltro}-31`),
-    ]).then(([ctrsRes, regRes]) => {
-      setContadores((ctrsRes.data ?? []) as Contador[])
-      const map: Record<string, ConsumoResumen> = {}
-      for (const r of (regRes.data ?? []) as { contador_id: string; consumo: number; fecha: string }[]) {
-        if (!r.contador_id) continue
-        if (!map[r.contador_id]) map[r.contador_id] = { contador_id: r.contador_id, consumo_total: 0, num_registros: 0, ultima_lectura: null }
-        map[r.contador_id].consumo_total += r.consumo
-        map[r.contador_id].num_registros += 1
-        if (!map[r.contador_id].ultima_lectura || r.fecha > map[r.contador_id].ultima_lectura!) {
-          map[r.contador_id].ultima_lectura = r.fecha
-        }
+  // Capa de datos (T7): lecturas con scope vía TanStack Query. Reemplaza el
+  // useEffect + Promise.all + useState manual. Comparte caché entre vistas que
+  // pidan el mismo (proyecto, mes) y revalida solo al cambiar proyecto o mes.
+  const { data: contadores = [], isLoading: loadingContadores } = useContadoresPorProyectoQuery(companyId, proyectoId)
+  const { data: consumoRows = [], isLoading: loadingConsumo } = useConsumoPorProyectoQuery(proyectoId, mesFiltro)
+  const loadingCtrs = loadingContadores || loadingConsumo
+
+  // Agrega el consumo por contador (mismo loop que antes, ahora derivado de la query).
+  const consumos = useMemo<ConsumoResumen[]>(() => {
+    const map: Record<string, ConsumoResumen> = {}
+    for (const r of consumoRows) {
+      if (!r.contador_id) continue
+      if (!map[r.contador_id]) map[r.contador_id] = { contador_id: r.contador_id, consumo_total: 0, num_registros: 0, ultima_lectura: null }
+      map[r.contador_id].consumo_total += r.consumo
+      map[r.contador_id].num_registros += 1
+      if (!map[r.contador_id].ultima_lectura || r.fecha > map[r.contador_id].ultima_lectura!) {
+        map[r.contador_id].ultima_lectura = r.fecha
       }
-      setConsumos(Object.values(map))
-      setLoadingCtrs(false)
-    })
-  }, [proyectoId, companyId, mesFiltro])
+    }
+    return Object.values(map)
+  }, [consumoRows])
 
   const vinculados = new Set(medidores.map(m => `${m.unidad_id}:${m.contador_id}`))
   const contadorMap = Object.fromEntries(contadores.map(c => [c.id, c]))

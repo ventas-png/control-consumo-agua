@@ -20,4 +20,19 @@ describe('aguaKeys', () => {
     expect(aguaKeys.clientes('c1').slice(0, 1)).toEqual([...aguaKeys.all])
     expect(aguaKeys.registros('c1').slice(0, 1)).toEqual([...aguaKeys.all])
   })
+
+  it('las keys con scope incluyen todos los parámetros del scope', () => {
+    expect(aguaKeys.contadoresPorProyecto('c1', 'p1')).toEqual([
+      'agua', 'contadores', 'por-proyecto', 'c1', 'p1',
+    ])
+    expect(aguaKeys.consumoPorProyecto('p1', '2026-06')).toEqual([
+      'agua', 'registros', 'consumo-por-proyecto', 'p1', '2026-06',
+    ])
+  })
+
+  it('cambiar un parámetro del scope produce una key distinta (cache aislado)', () => {
+    expect(aguaKeys.consumoPorProyecto('p1', '2026-06')).not.toEqual(
+      aguaKeys.consumoPorProyecto('p1', '2026-07'),
+    )
+  })
 })
