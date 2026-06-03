@@ -9,7 +9,7 @@
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
 import { useQuery } from '@tanstack/react-query'
-import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua } from '../../types'
+import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -31,6 +31,26 @@ export function useFuentesAguaQuery(companyId?: string) {
         if (companyId) q = q.eq('company_id', companyId)
         return q.abortSignal(signal)
       })) ?? [],
+    enabled: !!companyId,
+  })
+}
+
+// `registros_calidad` del tenant (scope company), con la fuente embebida. El portal
+// de calidad reemplaza la lista vía setRegistrosCalidad (setQueryData) tras editar.
+// supabase-js infiere el embed como array; se normaliza con un cast (igual que en
+// MedidoresUnidadTab).
+export function useRegistrosCalidadQuery(companyId?: string) {
+  return useQuery({
+    queryKey: aguaKeys.registrosCalidad(companyId),
+    queryFn: async () =>
+      ((await runQuery((signal) => {
+        let q = supabase
+          .from('registros_calidad')
+          .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
+          .order('fecha', { ascending: false })
+        if (companyId) q = q.eq('company_id', companyId)
+        return q.abortSignal(signal)
+      })) ?? []) as unknown as RegistroCalidad[],
     enabled: !!companyId,
   })
 }
