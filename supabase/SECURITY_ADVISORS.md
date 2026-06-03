@@ -76,12 +76,24 @@ la policy va al final o los objetos en path viejo quedan invisibles):
   purgables luego). Cobertura verificada en prod: 49 = 42 (→ 1 project único, 0 ambiguos) + 7.
 - Verificado post-aplicación: 0 objetos en path viejo, 4 policies scopeadas, `get_advisors` sin
   hallazgos nuevos.
-> Hallazgo lateral (higiene, no I14): ~53 referencias colgadas preexistentes (`visitantes.foto_*`,
-> `novedades.foto_url`) apuntan a paths sin objeto (imágenes ya rotas); intactas, limpieza opcional.
+- Limpieza posterior (2026-06-03): purgados los 7 huérfanos de `_orphans/`; y de las refs de BD
+  que quedaron en path viejo, **44 eran duplicados** (varias filas → mismo objeto) que la
+  migración por-path no actualizó → **re-apuntadas** a la ruta scopeada (imágenes recuperadas);
+  **9 genuinamente colgadas** (sin objeto) → `NULL`. Estado final: todas las refs `scoped`.
 
-**Fases siguientes (tracked en #335, aún no en prod):**
-1. `allowed_mime_types` por bucket — requiere normalizar primero los content-types de subida
-   (p. ej. `mimeFor()` emite `text/csv;charset=utf-8`).
+**Fase 4 (hecha):** `allowed_mime_types` en los 2 buckets que faltaban
+(`20260603230000`): `report-attachments` → `[text/csv, application/pdf, xlsx]` (y se normalizó
+`mimeFor()` a `text/csv` bare); `conv-attachments` → `[image/*, application/pdf, xlsx, xls, docx,
+doc, text/csv]` (matchea el `accept` del chat; usa `file.type` del browser, sin el problema de
+magic-bytes). El resto de buckets ya tenía la lista seteada.
+> Hallazgo lateral (pendiente, no en este PR): `FileUploader` (bucket `condominios-media`) sube
+> con el mime **magic-detectado** (`application/zip` para docx/xlsx, `application/x-cfb` para
+> doc/xls), que **no** está en el `allowed_mime_types` de `condominios-media` → las subidas de
+> documentos Office por ese componente podrían rechazarse. Verificar y, si aplica, mapear el
+> detected→mime real o ajustar la lista. (No afecta a `conv-attachments`, que usa `file.type`.)
+
+**Fases siguientes (tracked en #335):**
+- (ninguna pendiente de I14 storage; ver hallazgo lateral de `FileUploader` arriba.)
 
 > Validar cada fase en Supabase Preview antes de prod: los paths existentes deben matchear la
 > policy nueva, o los archivos quedan inaccesibles.
