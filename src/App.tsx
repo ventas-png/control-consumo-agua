@@ -8,6 +8,7 @@ import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
 import type { AppSection, Cliente, Contador, Empresa, FacturaEnergia, FuenteAgua, FuenteEnergia, ProveedorEnergia, Registro, RegistroCalidad, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
+import { lazyWithPreload } from './lib/lazyWithPreload'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useQueryClient } from '@tanstack/react-query'
@@ -50,26 +51,61 @@ const OAuthOnboardingScreen = lazy(() => import('./components/auth/OAuthOnboardi
 const CustomerPortal = lazy(() => import('./components/portal/CustomerPortal').then(m => ({ default: m.CustomerPortal })))
 const CondominiosClientPortal = lazy(() => import('./components/portal/CondominiosClientPortal').then(m => ({ default: m.CondominiosClientPortal })))
 
-const ClientesSection = lazy(() => import('./components/clientes/ClientesSection').then(m => ({ default: m.ClientesSection })))
-const LecturasSection = lazy(() => import('./components/lecturas/LecturasSection').then(m => ({ default: m.LecturasSection })))
-const HistorialSection = lazy(() => import('./components/historial/HistorialSection').then(m => ({ default: m.HistorialSection })))
-const DashboardSection = lazy(() => import('./components/dashboard/DashboardSection').then(m => ({ default: m.DashboardSection })))
-const AdminClientDashboard = lazy(() => import('./components/admin-dashboard/AdminClientDashboard').then(m => ({ default: m.AdminClientDashboard })))
-const MapaSection = lazy(() => import('./components/mapa/MapaSection').then(m => ({ default: m.MapaSection })))
-const CalidadSection = lazy(() => import('./components/calidad/CalidadSection').then(m => ({ default: m.CalidadSection })))
-const RutasSection = lazy(() => import('./components/rutas/RutasSection').then(m => ({ default: m.RutasSection })))
-const ConfiguracionSection = lazy(() => import('./components/configuracion/ConfiguracionSection').then(m => ({ default: m.ConfiguracionSection })))
-const PerfilSection = lazy(() => import('./components/perfil/PerfilSection').then(m => ({ default: m.PerfilSection })))
-const EmpresaSection = lazy(() => import('./components/empresa/EmpresaSection').then(m => ({ default: m.EmpresaSection })))
-const SuperAdminSection = lazy(() => import('./components/superadmin/SuperAdminSection').then(m => ({ default: m.SuperAdminSection })))
-const TarifasSection = lazy(() => import('./components/tarifas/TarifasSection').then(m => ({ default: m.TarifasSection })))
-const ContadoresSection = lazy(() => import('./components/contadores/ContadoresSection').then(m => ({ default: m.ContadoresSection })))
-const UnidadesSection = lazy(() => import('./components/unidades/UnidadesSection').then(m => ({ default: m.UnidadesSection })))
-const CobrosSection = lazy(() => import('./components/cobros/CobrosSection').then(m => ({ default: m.CobrosSection })))
-const ComunicacionSection = lazy(() => import('./components/comunicacion/ComunicacionSection').then(m => ({ default: m.ComunicacionSection })))
-const ServiciosEnergiaSection = lazy(() => import('./components/servicios-energia/ServiciosEnergiaSection'))
-const CondominiosSection = lazy(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
-const CondominiosDashboard = lazy(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
+// agua:A8 — secciones navegables vía sidebar usan lazyWithPreload para poder
+// prefetch del chunk al hacer hover/focus sobre su item (ver SECTION_PRELOADERS).
+const ClientesSection = lazyWithPreload(() => import('./components/clientes/ClientesSection').then(m => ({ default: m.ClientesSection })))
+const LecturasSection = lazyWithPreload(() => import('./components/lecturas/LecturasSection').then(m => ({ default: m.LecturasSection })))
+const HistorialSection = lazyWithPreload(() => import('./components/historial/HistorialSection').then(m => ({ default: m.HistorialSection })))
+const DashboardSection = lazyWithPreload(() => import('./components/dashboard/DashboardSection').then(m => ({ default: m.DashboardSection })))
+const AdminClientDashboard = lazyWithPreload(() => import('./components/admin-dashboard/AdminClientDashboard').then(m => ({ default: m.AdminClientDashboard })))
+const MapaSection = lazyWithPreload(() => import('./components/mapa/MapaSection').then(m => ({ default: m.MapaSection })))
+const CalidadSection = lazyWithPreload(() => import('./components/calidad/CalidadSection').then(m => ({ default: m.CalidadSection })))
+const RutasSection = lazyWithPreload(() => import('./components/rutas/RutasSection').then(m => ({ default: m.RutasSection })))
+const ConfiguracionSection = lazyWithPreload(() => import('./components/configuracion/ConfiguracionSection').then(m => ({ default: m.ConfiguracionSection })))
+const PerfilSection = lazyWithPreload(() => import('./components/perfil/PerfilSection').then(m => ({ default: m.PerfilSection })))
+const EmpresaSection = lazyWithPreload(() => import('./components/empresa/EmpresaSection').then(m => ({ default: m.EmpresaSection })))
+const SuperAdminSection = lazyWithPreload(() => import('./components/superadmin/SuperAdminSection').then(m => ({ default: m.SuperAdminSection })))
+const TarifasSection = lazyWithPreload(() => import('./components/tarifas/TarifasSection').then(m => ({ default: m.TarifasSection })))
+const ContadoresSection = lazyWithPreload(() => import('./components/contadores/ContadoresSection').then(m => ({ default: m.ContadoresSection })))
+const UnidadesSection = lazyWithPreload(() => import('./components/unidades/UnidadesSection').then(m => ({ default: m.UnidadesSection })))
+const CobrosSection = lazyWithPreload(() => import('./components/cobros/CobrosSection').then(m => ({ default: m.CobrosSection })))
+const ComunicacionSection = lazyWithPreload(() => import('./components/comunicacion/ComunicacionSection').then(m => ({ default: m.ComunicacionSection })))
+const ServiciosEnergiaSection = lazyWithPreload(() => import('./components/servicios-energia/ServiciosEnergiaSection'))
+const CondominiosSection = lazyWithPreload(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
+const CondominiosDashboard = lazyWithPreload(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
+
+// agua:A8 — mapa AppSection → preload del chunk de su sección. Lo consume el
+// Sidebar en hover/focus de cada item para descargar el código por anticipado.
+// Las sub-rutas de condominios comparten el chunk de CondominiosSection.
+const SECTION_PRELOADERS: Partial<Record<AppSection, () => void>> = {
+  clientes: () => { ClientesSection.preload() },
+  lecturas: () => { LecturasSection.preload() },
+  tabla: () => { HistorialSection.preload() },
+  dashboard: () => { DashboardSection.preload() },
+  admin_dashboard: () => { AdminClientDashboard.preload() },
+  cobros: () => { CobrosSection.preload() },
+  mapa: () => { MapaSection.preload() },
+  rutas: () => { RutasSection.preload() },
+  tarifas: () => { TarifasSection.preload() },
+  unidades: () => { UnidadesSection.preload() },
+  contadores: () => { ContadoresSection.preload() },
+  calidad: () => { CalidadSection.preload() },
+  configuracion: () => { ConfiguracionSection.preload() },
+  perfil: () => { PerfilSection.preload() },
+  empresa_proyectos: () => { EmpresaSection.preload() },
+  superadmin_empresas: () => { SuperAdminSection.preload() },
+  comunicacion: () => { ComunicacionSection.preload() },
+  servicios_energia: () => { ServiciosEnergiaSection.preload() },
+  condominios: () => { CondominiosSection.preload() },
+  condominios_dashboard: () => { CondominiosDashboard.preload() },
+  condominios_visitantes: () => { CondominiosSection.preload() },
+  condominios_cuotas: () => { CondominiosSection.preload() },
+  condominios_mantenimiento: () => { CondominiosSection.preload() },
+}
+
+function prefetchSection(section: AppSection): void {
+  SECTION_PRELOADERS[section]?.()
+}
 
 
 // Splash compartido entre el initial-load y los Suspense fallbacks de las
@@ -812,6 +848,7 @@ export default function App() {
         currentUser={currentUser}
         canViewModule={canViewModule}
         onSelect={(section) => { navigateSection(section); setSidebarOpen(false) }}
+        onPrefetch={prefetchSection}
         onLogout={handleLogout}
         isOpen={sidebarOpen}
         unreadComunicacion={unreadComunicacion}

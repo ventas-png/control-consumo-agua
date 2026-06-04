@@ -301,6 +301,9 @@ interface Props {
   currentUser: UserSession
   canViewModule: (moduleKey: string) => boolean
   onSelect: (section: AppSection) => void
+  // agua:A8 — prefetch del chunk de una sección al mostrar intención de navegar
+  // (hover/focus de su item), para que el código ya esté en caché al hacer click.
+  onPrefetch?: (section: AppSection) => void
   onLogout: () => void
   isOpen: boolean
   unreadComunicacion?: number
@@ -356,7 +359,7 @@ function findActiveGroupId(activeSection: AppSection): string | null {
   return null
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
+export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onPrefetch, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
@@ -413,8 +416,9 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
         aria-label={`Ir a ${tab.label}`}
         aria-current={isActive ? 'page' : undefined}
         onClick={() => onSelect(tab.id)}
-        onMouseEnter={() => setHoveredTab(tab.id)}
+        onMouseEnter={() => { setHoveredTab(tab.id); onPrefetch?.(tab.id) }}
         onMouseLeave={() => setHoveredTab(null)}
+        onFocus={() => onPrefetch?.(tab.id)}
         style={{
           width: '100%',
           display: 'flex',
@@ -605,8 +609,9 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
         {/* Profile button */}
         <button
           onClick={() => onSelect('perfil')}
-          onMouseEnter={() => setHoveredProfile(true)}
+          onMouseEnter={() => { setHoveredProfile(true); onPrefetch?.('perfil') }}
           onMouseLeave={() => setHoveredProfile(false)}
+          onFocus={() => onPrefetch?.('perfil')}
           style={{
             width: '100%',
             display: 'flex',
