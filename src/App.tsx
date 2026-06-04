@@ -748,32 +748,30 @@ export default function App() {
   // El mismo elemento sirve a `/energia` (tab por defecto) y `/energia/:tab`
   // (deep-link), evitando duplicar el bloque de props.
   const energiaSection = (
-    <ErrorBoundary sectionName="servicios_energia">
-      <ServiciosEnergiaSection
-        fuentesAgua={fuentesAgua}
-        proveedoresEnergia={proveedoresEnergia}
-        tarifasEnergia={tarifasEnergia}
-        fuentesEnergia={fuentesEnergia}
-        facturasEnergia={facturasEnergia}
-        proyectos={proyectos}
-        currentUser={currentUser}
-        moneda={moneda}
-        canCreate={canCreate('servicios_energia')}
-        canEdit={canEdit('servicios_energia')}
-        onProveedorAdded={addProveedorEnergia}
-        onProveedorUpdated={updateProveedorEnergia}
-        onProveedorDeleted={deleteProveedorEnergia}
-        onTarifaAdded={addTarifaEnergia}
-        onTarifaUpdated={updateTarifaEnergia}
-        onTarifaDeleted={deleteTarifaEnergia}
-        onFuenteAdded={addFuenteEnergia}
-        onFuenteUpdated={updateFuenteEnergia}
-        onFuenteDeleted={deleteFuenteEnergia}
-        onFacturaAdded={addFacturaEnergia}
-        onFacturaUpdated={updateFacturaEnergia}
-        onFacturaDeleted={deleteFacturaEnergia}
-      />
-    </ErrorBoundary>
+    <ServiciosEnergiaSection
+      fuentesAgua={fuentesAgua}
+      proveedoresEnergia={proveedoresEnergia}
+      tarifasEnergia={tarifasEnergia}
+      fuentesEnergia={fuentesEnergia}
+      facturasEnergia={facturasEnergia}
+      proyectos={proyectos}
+      currentUser={currentUser}
+      moneda={moneda}
+      canCreate={canCreate('servicios_energia')}
+      canEdit={canEdit('servicios_energia')}
+      onProveedorAdded={addProveedorEnergia}
+      onProveedorUpdated={updateProveedorEnergia}
+      onProveedorDeleted={deleteProveedorEnergia}
+      onTarifaAdded={addTarifaEnergia}
+      onTarifaUpdated={updateTarifaEnergia}
+      onTarifaDeleted={deleteTarifaEnergia}
+      onFuenteAdded={addFuenteEnergia}
+      onFuenteUpdated={updateFuenteEnergia}
+      onFuenteDeleted={deleteFuenteEnergia}
+      onFacturaAdded={addFacturaEnergia}
+      onFacturaUpdated={updateFacturaEnergia}
+      onFacturaDeleted={deleteFacturaEnergia}
+    />
   )
 
   return (
@@ -903,78 +901,76 @@ export default function App() {
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
+          {/* agua:A7 — un único ErrorBoundary alrededor del switch en vez de
+              repetirlo en cada rama (solo se monta una sección a la vez). La
+              `key` por sección lo remonta al navegar, preservando el reset
+              automático que antes daba el desmontaje del boundary por ruta. */}
+          <ErrorBoundary key={activeSection} sectionName={activeSection}>
           <Routes>
             <Route path="/clientes" element={
-              <ErrorBoundary sectionName="clientes">
-                {canViewModule('clientes') ? (
-                  <ClientesSection
-                    clientes={clientes}
-                    unidades={unidades}
-                    userRole={currentUser.role}
-                    userId={currentUser.user_id}
-                    currentUser={currentUser}
-                    companyId={currentUser.company_id}
-                    onClienteAdded={addCliente}
-                    onClienteUpdated={updateCliente}
-                    onClienteDeleted={deleteCliente}
-                    canCreate={canCreate('clientes')}
-                    canEdit={canEdit('clientes')}
-                    canChangeStatus={canChangeStatus('clientes')}
-                  />
-                ) : (
-                  <AccessDenied />
-                )}
-              </ErrorBoundary>
+              canViewModule('clientes') ? (
+                <ClientesSection
+                  clientes={clientes}
+                  unidades={unidades}
+                  userRole={currentUser.role}
+                  userId={currentUser.user_id}
+                  currentUser={currentUser}
+                  companyId={currentUser.company_id}
+                  onClienteAdded={addCliente}
+                  onClienteUpdated={updateCliente}
+                  onClienteDeleted={deleteCliente}
+                  canCreate={canCreate('clientes')}
+                  canEdit={canEdit('clientes')}
+                  canChangeStatus={canChangeStatus('clientes')}
+                />
+              ) : (
+                <AccessDenied />
+              )
             } />
             <Route path="/lecturas" element={
-              <ErrorBoundary sectionName="lecturas">
-                {canViewModule('lecturas') ? (
-                  <LecturasSection
-                    clientes={clientes}
-                    unidades={unidades}
-                    contadores={contadores}
-                    registros={registros}
-                    tarifas={tarifas}
-                    userRole={currentUser.role}
-                    currentUser={currentUser}
-                    proyectos={proyectos}
-                    moneda={moneda}
-                    onRegistroAdded={addRegistro}
-                    rutaActiva={rutaActivaParaLecturas}
-                    onClearRuta={() => setRutaActivaParaLecturas(null)}
-                    onRutaCompletada={id => {
-                      // Las rutas recurrentes no se marcan como completadas: cada
-                      // ocurrencia se completa por separado y la ruta sigue activa.
-                      const r = rutas.find(x => x.id === id)
-                      if (!r || (r.frecuencia ?? 'unica') === 'unica') updateRuta(id, { completada: true })
-                    }}
-                    canCreate={canCreate('lecturas')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('lecturas') ? (
+                <LecturasSection
+                  clientes={clientes}
+                  unidades={unidades}
+                  contadores={contadores}
+                  registros={registros}
+                  tarifas={tarifas}
+                  userRole={currentUser.role}
+                  currentUser={currentUser}
+                  proyectos={proyectos}
+                  moneda={moneda}
+                  onRegistroAdded={addRegistro}
+                  rutaActiva={rutaActivaParaLecturas}
+                  onClearRuta={() => setRutaActivaParaLecturas(null)}
+                  onRutaCompletada={id => {
+                    // Las rutas recurrentes no se marcan como completadas: cada
+                    // ocurrencia se completa por separado y la ruta sigue activa.
+                    const r = rutas.find(x => x.id === id)
+                    if (!r || (r.frecuencia ?? 'unica') === 'unica') updateRuta(id, { completada: true })
+                  }}
+                  canCreate={canCreate('lecturas')}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/historial" element={
-              <ErrorBoundary sectionName="historial">
-                {canViewModule('tabla') ? (
-                  <HistorialSection
-                    registros={registros}
-                    clientes={clientes}
-                    proyectos={proyectos}
-                    unidades={unidades}
-                    contadores={contadores}
-                    userRole={currentUser.role}
-                    moneda={moneda}
-                    onEstadoUpdated={updateRegistroEstado}
-                    onRegistroDeleted={deleteRegistro}
-                    canEdit={canEdit('tabla')}
-                    canChangeStatus={canChangeStatus('tabla')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('tabla') ? (
+                <HistorialSection
+                  registros={registros}
+                  clientes={clientes}
+                  proyectos={proyectos}
+                  unidades={unidades}
+                  contadores={contadores}
+                  userRole={currentUser.role}
+                  moneda={moneda}
+                  onEstadoUpdated={updateRegistroEstado}
+                  onRegistroDeleted={deleteRegistro}
+                  canEdit={canEdit('tabla')}
+                  canChangeStatus={canChangeStatus('tabla')}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/cobros" element={
-              <ErrorBoundary sectionName="cobros">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
+              <RoleGuard userRole={currentUser.role} allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
                 <CobrosSection
                   registros={registros}
                   clientes={clientes}
@@ -991,19 +987,15 @@ export default function App() {
                   canEdit={canEdit('cobros')}
                   canChangeStatus={canChangeStatus('cobros')}
                 />
-                </RoleGuard>
-              </ErrorBoundary>
+              </RoleGuard>
             } />
             <Route path="/dashboard" element={
-              <ErrorBoundary sectionName="dashboard">
-                {canViewModule('dashboard') ? (
-                  <DashboardSection registros={registros} moneda={moneda} isLoading={dataLoading} />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('dashboard') ? (
+                <DashboardSection registros={registros} moneda={moneda} isLoading={dataLoading} />
+              ) : <AccessDenied />
             } />
             <Route path="/admin-dashboard" element={
-              <ErrorBoundary sectionName="admin_dashboard">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
                 <AdminClientDashboard
                   currentUser={currentUser}
                   data={{
@@ -1022,153 +1014,130 @@ export default function App() {
                   onDataRefresh={refrescarDatos}
                   onNavigateSection={navigateSection}
                 />
-                </RoleGuard>
-              </ErrorBoundary>
+              </RoleGuard>
             } />
             <Route path="/mapa" element={
-              <ErrorBoundary sectionName="mapa">
-                {canViewModule('mapa') ? (
-                  <MapaSection
-                    clientes={clientes}
-                    registros={registros}
-                    companyId={currentUser.company_id}
-                    canConfigurar={currentUser.role === 'company_owner' || currentUser.role === 'super_admin'}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('mapa') ? (
+                <MapaSection
+                  clientes={clientes}
+                  registros={registros}
+                  companyId={currentUser.company_id}
+                  canConfigurar={currentUser.role === 'company_owner' || currentUser.role === 'super_admin'}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/rutas" element={
-              <ErrorBoundary sectionName="rutas">
-                {canViewModule('rutas') ? (
-                  <RutasSection
-                    clientes={clientes}
-                    contadores={contadores}
-                    unidades={unidades}
-                    proyectos={proyectos}
-                    rutas={rutas}
-                    userRole={currentUser.role}
-                    companyId={currentUser.company_id}
-                    onRutaAdded={addRuta}
-                    onRutaUpdated={updateRuta}
-                    onRutaDeleted={deleteRuta}
-                    onEjecutarRuta={onEjecutarRuta}
-                    canCreate={canCreate('rutas')}
-                    canEdit={canEdit('rutas')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('rutas') ? (
+                <RutasSection
+                  clientes={clientes}
+                  contadores={contadores}
+                  unidades={unidades}
+                  proyectos={proyectos}
+                  rutas={rutas}
+                  userRole={currentUser.role}
+                  companyId={currentUser.company_id}
+                  onRutaAdded={addRuta}
+                  onRutaUpdated={updateRuta}
+                  onRutaDeleted={deleteRuta}
+                  onEjecutarRuta={onEjecutarRuta}
+                  canCreate={canCreate('rutas')}
+                  canEdit={canEdit('rutas')}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/calidad" element={
-              <ErrorBoundary sectionName="calidad">
-                {canViewModule('calidad') ? (
-                  <CalidadSection
-                    fuentesAgua={fuentesAgua}
-                    registrosCalidad={registrosCalidad}
-                    empresa={empresa}
-                    userId={currentUser.user_id}
-                    onFuentesUpdated={setFuentesAgua}
-                    onRegistrosCalidadUpdated={setRegistrosCalidad}
-                    canCreate={canCreate('calidad')}
-                    canEdit={canEdit('calidad')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('calidad') ? (
+                <CalidadSection
+                  fuentesAgua={fuentesAgua}
+                  registrosCalidad={registrosCalidad}
+                  empresa={empresa}
+                  userId={currentUser.user_id}
+                  onFuentesUpdated={setFuentesAgua}
+                  onRegistrosCalidadUpdated={setRegistrosCalidad}
+                  canCreate={canCreate('calidad')}
+                  canEdit={canEdit('calidad')}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/configuracion" element={
-              <ErrorBoundary sectionName="configuracion">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
+              <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
                 <ConfiguracionSection onLogout={handleLogout} />
-                </RoleGuard>
-              </ErrorBoundary>
+              </RoleGuard>
             } />
             <Route path="/perfil" element={
-              <ErrorBoundary sectionName="perfil">
-                <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
-              </ErrorBoundary>
+              <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
             } />
             <Route path="/empresa" element={
-              <ErrorBoundary sectionName="empresa">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
                 <EmpresaSection currentUser={currentUser} />
-                </RoleGuard>
-              </ErrorBoundary>
+              </RoleGuard>
             } />
             <Route path="/tarifas" element={
-              <ErrorBoundary sectionName="tarifas">
-                {canViewModule('tarifas') ? (
-                  <TarifasSection
-                    tarifas={tarifas}
-                    proyectos={proyectos}
-                    userRole={currentUser.role}
-                    currentUser={currentUser}
-                    moneda={moneda}
-                    onTarifaAdded={addTarifa}
-                    onTarifaUpdated={updateTarifa}
-                    onTarifaDeleted={deleteTarifa}
-                    canCreate={canCreate('tarifas')}
-                    canEdit={canEdit('tarifas')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
+              canViewModule('tarifas') ? (
+                <TarifasSection
+                  tarifas={tarifas}
+                  proyectos={proyectos}
+                  userRole={currentUser.role}
+                  currentUser={currentUser}
+                  moneda={moneda}
+                  onTarifaAdded={addTarifa}
+                  onTarifaUpdated={updateTarifa}
+                  onTarifaDeleted={deleteTarifa}
+                  canCreate={canCreate('tarifas')}
+                  canEdit={canEdit('tarifas')}
+                />
+              ) : <AccessDenied />
             } />
             <Route path="/unidades" element={
-              <ErrorBoundary sectionName="unidades">
-                {canViewModule('unidades') ? (
-                  <UnidadesSection
-                    unidades={unidades}
-                    contadores={contadores}
-                    clientes={clientes}
-                    proyectos={proyectos}
-                    userRole={currentUser.role}
-                    currentUser={currentUser}
-                    maxUnidadesPorTipo={maxUnidadesPorTipo}
-                    onUnidadAdded={addUnidad}
-                    onUnidadUpdated={updateUnidad}
-                    onUnidadDeleted={deleteUnidad}
-                    onContadorUpdated={updateContador}
-                    canCreate={canCreate('unidades')}
-                    canEdit={canEdit('unidades')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
-            } />
-            <Route path="/contadores" element={
-              <ErrorBoundary sectionName="contadores">
-                {canViewModule('contadores') ? (
-                  <ContadoresSection
-                    contadores={contadores}
-                    tarifas={tarifas}
-                    unidades={unidades}
-                    userRole={currentUser.role}
-                    currentUser={currentUser}
-                    moneda={moneda}
-                    onContadorAdded={addContador}
-                    onContadorUpdated={updateContador}
-                    onContadorDeleted={deleteContador}
-                    canCreate={canCreate('contadores')}
-                    canEdit={canEdit('contadores')}
-                  />
-                ) : <AccessDenied />}
-              </ErrorBoundary>
-            } />
-            <Route path="/superadmin" element={
-              <ErrorBoundary sectionName="superadmin">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
-                <SuperAdminSection />
-                </RoleGuard>
-              </ErrorBoundary>
-            } />
-            <Route path="/comunicacion" element={
-              <ErrorBoundary sectionName="comunicacion">
-                <ComunicacionSection
-                  currentUser={currentUser}
+              canViewModule('unidades') ? (
+                <UnidadesSection
+                  unidades={unidades}
+                  contadores={contadores}
                   clientes={clientes}
                   proyectos={proyectos}
-                  unidades={unidades}
-                  canCreate={canCreate('comunicacion')}
-                  canEdit={canEdit('comunicacion')}
+                  userRole={currentUser.role}
+                  currentUser={currentUser}
+                  maxUnidadesPorTipo={maxUnidadesPorTipo}
+                  onUnidadAdded={addUnidad}
+                  onUnidadUpdated={updateUnidad}
+                  onUnidadDeleted={deleteUnidad}
+                  onContadorUpdated={updateContador}
+                  canCreate={canCreate('unidades')}
+                  canEdit={canEdit('unidades')}
                 />
-              </ErrorBoundary>
+              ) : <AccessDenied />
+            } />
+            <Route path="/contadores" element={
+              canViewModule('contadores') ? (
+                <ContadoresSection
+                  contadores={contadores}
+                  tarifas={tarifas}
+                  unidades={unidades}
+                  userRole={currentUser.role}
+                  currentUser={currentUser}
+                  moneda={moneda}
+                  onContadorAdded={addContador}
+                  onContadorUpdated={updateContador}
+                  onContadorDeleted={deleteContador}
+                  canCreate={canCreate('contadores')}
+                  canEdit={canEdit('contadores')}
+                />
+              ) : <AccessDenied />
+            } />
+            <Route path="/superadmin" element={
+              <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
+                <SuperAdminSection />
+              </RoleGuard>
+            } />
+            <Route path="/comunicacion" element={
+              <ComunicacionSection
+                currentUser={currentUser}
+                clientes={clientes}
+                proyectos={proyectos}
+                unidades={unidades}
+                canCreate={canCreate('comunicacion')}
+                canEdit={canEdit('comunicacion')}
+              />
             } />
             {/* serv:S1 — Energía 1er nivel: `/energia` (tab por defecto) +
                 `/energia/:tab` deep-linkable. Mismo elemento (energiaSection). */}
@@ -1191,22 +1160,18 @@ export default function App() {
             } />
             <Route path="/condominios/:tab" element={
               condominiosSinProyecto ? <SinProyectoAsignado /> : (
-                <ErrorBoundary sectionName="condominios">
-                  <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} />
-                </ErrorBoundary>
+                <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} />
               )
             } />
             <Route path="/condominios" element={
               condominiosSinProyecto ? <SinProyectoAsignado /> : (
-                <ErrorBoundary sectionName="condominios">
-                  <CondominiosSection
-                    proyectos={proyectos}
-                    unidades={unidades}
-                    currentUser={currentUser}
-                    canCreate={canCreate}
-                    canEdit={canEdit}
-                  />
-                </ErrorBoundary>
+                <CondominiosSection
+                  proyectos={proyectos}
+                  unidades={unidades}
+                  currentUser={currentUser}
+                  canCreate={canCreate}
+                  canEdit={canEdit}
+                />
               )
             } />
             {/* `/` y rutas no reconocidas: el efecto de default-by-role replaces a la
@@ -1214,6 +1179,7 @@ export default function App() {
             <Route path="/" element={null} />
             <Route path="*" element={<Navigate to={sectionToPath('clientes')} replace />} />
           </Routes>
+          </ErrorBoundary>
           </Suspense>
         </main>
       </div>
