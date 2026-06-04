@@ -1,5 +1,9 @@
 # Estado consolidado + Tracks paralelos
 
+> ⏭️ **Corte superado.** El estado vivo, el *delta* verificado contra `main` (#375) y las **reservas de banda de
+> migración** para el trabajo en paralelo están en [`ESTADO_Y_TRACKS_PARALELOS_2026-06-04.md`](./ESTADO_Y_TRACKS_PARALELOS_2026-06-04.md).
+> Este documento se conserva como referencia del **ledger por dominio** (§2) y el **detalle de los 8 tracks** (§3).
+
 **Fecha:** 2026-06-02
 **Base:** `main` @ #298 (`46b5b5a`)
 **Punto de partida:** PR #166 — paquete de *design critiques* (220 hallazgos) hacia SaaS multi-tenant.
