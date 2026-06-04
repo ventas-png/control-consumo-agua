@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import { promptUpgrade } from '../shared/promptUpgrade'
-import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
+import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
@@ -17,14 +17,11 @@ interface Props {
   contadores: Contador[]
   clientes: Cliente[]
   proyectos: Proyecto[]
-  userRole: UserRole
   maxUnidadesPorTipo?: MaxUnidadesPorTipo | null
   onUnidadAdded: (unidad: Unidad) => void
   onUnidadUpdated: (id: string, partial: Partial<Unidad>) => void
   onUnidadDeleted: (id: string) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
-  canCreate?: boolean
-  canEdit?: boolean
 }
 
 const TIPOS_UNIDAD: { value: TipoUnidad; label: string; icon: string }[] = [
@@ -121,14 +118,11 @@ export function UnidadesSection({
   contadores,
   clientes,
   proyectos,
-  userRole,
   maxUnidadesPorTipo,
   onUnidadAdded,
   onUnidadUpdated,
   onUnidadDeleted,
   onContadorUpdated,
-  canCreate: _canCreate = true,
-  canEdit: _canEdit = true,
 }: Props) {
   const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -183,7 +177,7 @@ export function UnidadesSection({
     }
   }, [filterProyecto, proyectos, maxUnidadesPorTipo])
 
-  const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
+  const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
 
   function startCreate() {
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })

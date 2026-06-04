@@ -1,7 +1,8 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
+import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -12,14 +13,12 @@ interface Props {
   contadores: Contador[]
   registros: Registro[]
   tarifas: Tarifa[]
-  userRole: UserRole
   proyectos?: Proyecto[]
   moneda?: string
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
   onRutaCompletada?: (rutaId: string) => void
-  canCreate?: boolean
 }
 
 export function LecturasSection({
@@ -28,15 +27,14 @@ export function LecturasSection({
   contadores,
   registros,
   tarifas,
-  userRole: _userRole,
   proyectos = [],
   moneda = 'Q',
   onRegistroAdded,
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
-  canCreate = true,
 }: Props) {
+  const canCreate = usePermissionsContext().canCreate('lecturas')
   // Derive project_id from selected unidad/contador, then fall back to single-project context
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
