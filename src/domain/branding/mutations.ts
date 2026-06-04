@@ -10,6 +10,8 @@ export interface GuardarBrandingVars {
   companyId: string
   /** Hex #rrggbb, o null para restablecer el tema por defecto. */
   primaryColor: string | null
+  /** Hex #rrggbb de acento, o null para restablecer. */
+  accentColor: string | null
 }
 
 export function useGuardarBrandingMutation() {
@@ -18,7 +20,10 @@ export function useGuardarBrandingMutation() {
     mutationFn: async (vars: GuardarBrandingVars) => {
       const { error } = await supabase
         .from('company_branding')
-        .upsert({ company_id: vars.companyId, primary_color: vars.primaryColor }, { onConflict: 'company_id' })
+        .upsert(
+          { company_id: vars.companyId, primary_color: vars.primaryColor, accent_color: vars.accentColor },
+          { onConflict: 'company_id' },
+        )
       if (error) throw error
     },
     onSuccess: (_data, vars) => {
