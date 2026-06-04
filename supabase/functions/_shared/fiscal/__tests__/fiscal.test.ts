@@ -102,6 +102,18 @@ describe('getFiscalProvider', () => {
     expect(p.nombre).toBe('facturama')
     await expect(p.timbrar(dteEjemplo())).rejects.toBeInstanceOf(PacNoConfiguradoError)
   })
+
+  it("proveedor 'ainnova' en FEL → AinnovaProvider (adapter real), no el stub genérico", () => {
+    const p = getFiscalProvider('fel_gt', { proveedor: 'ainnova', companyId: 'c1' })
+    expect(p.nombre).toBe('ainnova')
+  })
+
+  it("'ainnova' solo aplica en FEL: en cfdi_mx cae al stub MX (PacNoConfiguradoError)", async () => {
+    // Ainnova es certificador FEL (GT); en CFDI no es válido, se resuelve el stub MX
+    // (que sí lanza PacNoConfiguradoError, no el adapter real de Ainnova).
+    const p = getFiscalProvider('cfdi_mx', { proveedor: 'ainnova' })
+    await expect(p.timbrar(dteEjemplo())).rejects.toBeInstanceOf(PacNoConfiguradoError)
+  })
 })
 
 // Espejo: smoke test de que la lógica replicada en el edge se comporta igual que

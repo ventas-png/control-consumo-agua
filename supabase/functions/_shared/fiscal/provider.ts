@@ -40,19 +40,41 @@ export interface FiscalProvider {
   consultarEstado(uuidFiscal: string): Promise<ResultadoTimbrado>
 }
 
+/** Ambiente del PAC: 'sandbox' (pruebas) o 'prod' (timbrado con valor fiscal). */
+export type AmbientePac = 'sandbox' | 'prod'
+
 /**
- * Config mínima que el resolver pasa al provider. Las CREDENCIALES del PAC NO
- * van aquí en texto plano: cuando se integre un PAC real, el provider las leerá
- * de Vault / una tabla de secretos con RLS service-role-only (igual que
- * company_payment_secrets), tomando solo el `companyId` como llave de búsqueda.
+ * Credenciales del PAC resueltas desde la bóveda `fiscal_pac_secrets`, separadas
+ * por ambiente. Objeto OPACO: cada provider interpreta las llaves que su PAC
+ * exige (usuario/clave/token/NIT/certificado…). NUNCA se loguea ni se devuelve al
+ * cliente. El SandboxProvider y los stubs lo ignoran.
+ */
+export interface CredencialesPacPorAmbiente {
+  sandbox?: Record<string, unknown> | null
+  prod?: Record<string, unknown> | null
+}
+
+/**
+ * Config que el resolver pasa al provider. Las CREDENCIALES del PAC NO se leen
+ * aquí dentro: el CALLER (edge con service_role) las carga de la bóveda
+ * `fiscal_pac_secrets` (deny-all bajo RLS) y las inyecta en `credenciales`,
+ * manteniendo este módulo libre de supabase-js (puro/testeable, `deno check`
+ * limpio). El provider lee SOLO el ambiente activo (`credenciales[ambiente]`).
  */
 export interface FiscalProviderConfig {
-  /** Tenant dueño del comprobante (llave para buscar credenciales en Vault). */
+  /** Tenant dueño del comprobante (llave con la que el caller buscó las creds). */
   companyId?: string | null
-  /** Nombre del proveedor configurado en companies.proveedor_timbrado. */
+  /** Nombre del proveedor configurado en companies/projects.proveedor_timbrado. */
   proveedor?: string | null
-  /** Régimen del tenant (companies.regimen_fiscal). */
+  /** Régimen del tenant (companies/projects.regimen_fiscal). */
   regimen?: RegimenFiscal
+  /** Ambiente a usar (endpoint + credenciales). Default 'sandbox'. */
+  ambiente?: AmbientePac
+  /**
+   * Credenciales del PAC YA RESUELTAS por el caller desde la bóveda (por ambiente).
+   * `null`/ausente = el caller no las cargó (provider real → error claro).
+   */
+  credenciales?: CredencialesPacPorAmbiente | null
 }
 
 /** Error tipado cuando el régimen real no tiene PAC configurado todavía. */

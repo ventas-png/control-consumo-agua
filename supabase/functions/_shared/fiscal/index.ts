@@ -9,7 +9,15 @@
 export * from './types.ts'
 export * from './stateMachine.ts'
 export * from './provider.ts'
+export * from './felGtDte.ts'
 export { SandboxProvider } from './sandboxProvider.ts'
 export { FelGtProvider } from './felGtProvider.ts'
 export { CfdiMxProvider } from './cfdiMxProvider.ts'
+export {
+  AinnovaProvider,
+  AINNOVA,
+  AINNOVA_ENDPOINTS,
+  AinnovaCredencialesError,
+  AinnovaContratoNoConfirmadoError,
+} from './ainnovaProvider.ts'
 export { getFiscalProvider } from './getFiscalProvider.ts'
