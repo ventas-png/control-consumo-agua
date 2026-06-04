@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
+import { FacturacionConfigSection } from './FacturacionConfigSection'
 
 interface Props {
   tarifas: Tarifa[]
@@ -60,6 +61,8 @@ export function TarifasSection({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  // Sub-vista: tabla de tarifas vs. configuración de facturación (IVA/mora, T4).
+  const [view, setView] = useState<'tarifas' | 'facturacion'>('tarifas')
 
   const canCreate = perms.canCreate('tarifas') && currentUser.role !== 'viewer'
   const canEdit = perms.canEdit('tarifas') && currentUser.role !== 'viewer'
@@ -255,6 +258,29 @@ export function TarifasSection({
 
   return (
     <div>
+      {/* Sub-tabs: tarifas vs. configuración de facturación (IVA / mora). */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px' }}>
+        {([['tarifas', '💧 Tarifas'], ['facturacion', '🧾 Facturación (IVA / Mora)']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setView(id)}
+            style={{
+              padding: '10px 20px', fontSize: '14px', fontWeight: view === id ? 700 : 500,
+              color: view === id ? 'var(--at-primary)' : 'var(--at-ink-3)',
+              background: 'transparent', border: 'none',
+              borderBottom: view === id ? '3px solid var(--at-primary)' : '3px solid transparent',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'facturacion' ? (
+        <FacturacionConfigSection proyectos={proyectos} moneda={moneda} />
+      ) : (
+      <>
       {/* Header + search */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -665,6 +691,8 @@ export function TarifasSection({
           {filtered.length} tarifa{filtered.length !== 1 ? 's' : ''} {search ? 'encontradas' : 'registradas'}
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

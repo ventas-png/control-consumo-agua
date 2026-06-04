@@ -1,16 +1,25 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { notify } from '../shared/Dialog'
+import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, Pago, ConvenioPago, FormaPago } from '../../types'
 import { useSession } from '../shared/SessionContext'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
 import { SelectionToolbar, type BulkAction } from '../shared/SelectionToolbar'
 import { PagoModal } from './PagoModal'
 import { ConvenioModal } from './ConvenioModal'
 import { PagosHistorial } from './PagosHistorial'
+import { useQueryClient } from '@tanstack/react-query'
+import { FacturaEstadoBadge } from './facturaUi'
+import { useFacturasQuery, useReglasMoraQuery, type FacturaRow } from '../../domain/facturacion/queries'
+import { facturacionKeys } from '../../domain/facturacion/keys'
+import {
+  useEmitirFacturaMutation,
+  useAnularFacturaMutation,
+  useIvaTasaDefaultQuery,
+} from '../../domain/facturacion/mutations'
 
 // Pequeño wrapper para firmar el link al comprobante (bucket pagos-comprobantes
 // es privado tras S6 follow-up). Tipo y label se pasan como props.
@@ -68,6 +77,83 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const [verificando, setVerificando] = useState<string | null>(null)
 
   const canEdit = currentUser.role !== 'viewer'
+  const companyId = currentUser.company_id
+  const qc = useQueryClient()
+
+  // T4 · agua:C4 — proyección de Factura (estado/IVA/mora) sobre `registros`. La
+  // tabla recibe `Registro[]` por props (sin campos de facturación); aquí leemos
+  // esos campos vía la capa de datos T4 y los cruzamos por id. Las reglas de mora
+  // del tenant dan los días de vencimiento al emitir.
+  const { data: facturas = [] } = useFacturasQuery(companyId)
+  const { data: reglasMora = [] } = useReglasMoraQuery(companyId)
+  // Tasa de IVA del tenant (companies.iva_tasa_default) para el snapshot al emitir.
+  const { data: ivaTasaDefault } = useIvaTasaDefaultQuery(companyId)
+  const facturaById = useMemo(() => {
+    const m = new Map<string, FacturaRow>()
+    for (const f of facturas) m.set(f.id, f)
+    return m
+  }, [facturas])
+
+  const emitirMut = useEmitirFacturaMutation(companyId)
+  const anularMut = useAnularFacturaMutation(companyId)
+  const [accionFacturaId, setAccionFacturaId] = useState<string | null>(null)
+
+  // Días de vencimiento por defecto: de la regla de mora del proyecto si existe,
+  // si no 30. (El cálculo de mora en sí lo hace el cron con la misma regla.)
+  const diasVencimientoPara = useCallback(
+    (projectId?: string | null) => {
+      const regla =
+        reglasMora.find(r => r.project_id === projectId) ?? reglasMora[0]
+      return regla?.dias_vencimiento ?? 30
+    },
+    [reglasMora],
+  )
+
+  async function handleEmitir(r: Registro) {
+    const factura = facturaById.get(r.id)
+    setAccionFacturaId(r.id)
+    try {
+      await emitirMut.mutateAsync({
+        factura: {
+          id: r.id,
+          factura_estado: factura?.factura_estado ?? r.estado,
+          monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
+          mora_monto: factura?.mora_monto,
+        },
+        // Snapshot ya persistido > tasa del tenant > default GT (en business.ts).
+        ivaTasa: factura?.iva_tasa ?? ivaTasaDefault,
+        diasVencimiento: diasVencimientoPara(r.project_id),
+      })
+      notify({ variant: 'success', title: '📤 Factura emitida', duration: 1800 })
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo emitir', text: (err as Error).message })
+    } finally {
+      setAccionFacturaId(null)
+    }
+  }
+
+  async function handleAnular(r: Registro) {
+    const { isConfirmed } = await confirm({
+      title: '¿Anular factura?',
+      text: 'La factura quedará anulada (estado terminal). Esta acción no se puede revertir.',
+      icon: 'warning',
+      variant: 'danger',
+      confirmText: 'Sí, anular',
+    })
+    if (!isConfirmed) return
+    const factura = facturaById.get(r.id)
+    setAccionFacturaId(r.id)
+    try {
+      await anularMut.mutateAsync({
+        factura: { id: r.id, factura_estado: factura?.factura_estado ?? r.estado },
+      })
+      notify({ variant: 'success', title: '🚫 Factura anulada', duration: 1800 })
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo anular', text: (err as Error).message })
+    } finally {
+      setAccionFacturaId(null)
+    }
+  }
 
   const cargarPagosYConvenios = useCallback(async () => {
     setLoadingPagos(true)
@@ -383,6 +469,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                       { label: 'Abonado', secondary: true },
                       { label: 'Saldo', secondary: false },
                       { label: 'Estado', secondary: false },
+                      { label: 'Factura', secondary: true },
                       { label: 'Acciones', secondary: false },
                     ].map(({ label: h, secondary }) => (
                       <th scope="col" key={h} className={secondary ? 'table-col-secondary' : undefined} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>{h}</th>
@@ -391,7 +478,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                 </thead>
                 <tbody>
                   {registrosFiltrados.length === 0 ? (
-                    <tr><td colSpan={canEdit ? 8 : 7} style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
+                    <tr><td colSpan={canEdit ? 9 : 8} style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
                       No hay cargos pendientes
                     </td></tr>
                   ) : registrosFiltrados.map(r => {
@@ -400,6 +487,12 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                     const abonado = r.monto_pagado ?? 0
                     const saldo = getSaldo(r)
                     const isMora = r.estado === 'mora'
+                    // Estado de Factura (T4): de la proyección si existe, si no el legacy.
+                    const estadoFactura = facturaById.get(r.id)?.factura_estado ?? r.estado
+                    const puedeEmitir = puedeTransicionarFactura(estadoFactura, 'emitir').ok
+                    const puedeAnular = puedeTransicionarFactura(estadoFactura, 'anular').ok
+                    const puedePagar = puedeTransicionarFactura(estadoFactura, 'pagar').ok
+                    const procesando = accionFacturaId === r.id
                     return (
                       <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
                         onMouseEnter={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
@@ -440,15 +533,43 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                             {isMora ? '⚠ Mora' : '⏳ Pendiente'}
                           </span>
                         </td>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px' }}>
+                          <FacturaEstadoBadge estado={estadoFactura} />
+                        </td>
                         <td style={{ padding: '14px 16px' }}>
                           {canEdit && (
-                            <button onClick={() => setPagoModal(r)} style={{
-                              padding: '8px 14px', minHeight: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                              background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white',
-                              fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
-                            }}>
-                              💰 Aplicar Pago
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {/* Emitir: solo cuando la factura está pendiente. */}
+                              {puedeEmitir && (
+                                <button onClick={() => void handleEmitir(r)} disabled={procesando} title="Emitir factura (fija vencimiento e IVA)" style={{
+                                  padding: '8px 12px', minHeight: '36px', borderRadius: '8px', border: '1.5px solid var(--at-primary)', cursor: procesando ? 'not-allowed' : 'pointer',
+                                  background: 'var(--at-surface)', color: 'var(--at-primary-hover)', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1,
+                                }}>
+                                  📤 Emitir
+                                </button>
+                              )}
+                              {/* Registrar pago: abre el modal de pago (gated por puedePagar
+                                  para facturas emitidas; los registros legacy sin emitir
+                                  siguen siendo cobrables por el flujo existente). */}
+                              {(puedePagar || !puedeEmitir) && (
+                                <button onClick={() => setPagoModal(r)} style={{
+                                  padding: '8px 14px', minHeight: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                  background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white',
+                                  fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
+                                }}>
+                                  💰 Aplicar Pago
+                                </button>
+                              )}
+                              {/* Anular: pendiente|emitida|vencida → anulada (terminal). */}
+                              {puedeAnular && (
+                                <button onClick={() => void handleAnular(r)} disabled={procesando} title="Anular factura" style={{
+                                  padding: '8px 12px', minHeight: '36px', borderRadius: '8px', border: '1.5px solid var(--at-danger)', cursor: procesando ? 'not-allowed' : 'pointer',
+                                  background: 'var(--at-surface)', color: 'var(--at-danger)', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1,
+                                }}>
+                                  🚫 Anular
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -629,10 +750,13 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
           moneda={moneda}
           currentUserId={currentUser.user_id}
           formasPagoLabels={FORMA_PAGO_LABELS}
+          factura={facturaById.get(pagoModal.id)}
           onClose={() => setPagoModal(null)}
           onSuccess={(registroId, nuevoEstado, montoPagado) => {
             onEstadoUpdated(registroId, nuevoEstado)
             if (onRegistroUpdated) onRegistroUpdated(registroId, { monto_pagado: montoPagado })
+            // Refresca la proyección de Factura (estado/abonado) tras el pago.
+            void qc.invalidateQueries({ queryKey: facturacionKeys.facturas(companyId) })
             setPagoModal(null)
             void cargarPagosYConvenios()
           }}

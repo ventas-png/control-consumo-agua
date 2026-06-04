@@ -4,7 +4,9 @@ import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
+import { FacturaEstadoBadge, FacturaDesglose } from './facturaUi'
+import type { FacturaRow } from '../../domain/facturacion/queries'
 
 interface Props {
   registro: Registro
@@ -12,12 +14,18 @@ interface Props {
   moneda: string
   currentUserId: string
   formasPagoLabels: Record<FormaPago, string>
+  /** Proyección de Factura (estado/IVA/mora) del registro, si está disponible. */
+  factura?: FacturaRow
   onClose: () => void
   onSuccess: (registroId: string, nuevoEstado: Registro['estado'], montoPagado: number) => void
 }
 
-export function PagoModal({ registro, cliente, moneda, currentUserId, formasPagoLabels, onClose, onSuccess }: Props) {
-  const total = registro.monto_calculado ?? calcularTotalPagar(registro.consumo, registro.tarifa_aplicada, registro.canon_aplicado ?? 20).total
+export function PagoModal({ registro, cliente, moneda, currentUserId, formasPagoLabels, factura, onClose, onSuccess }: Props) {
+  // Si hay snapshot de Factura (emitida), el total a cobrar incluye IVA + mora;
+  // si no, se cae al cargo base como antes (registros legacy sin emitir).
+  const total = factura?.total_a_pagar
+    ?? registro.monto_calculado
+    ?? calcularTotalPagar(registro.consumo, registro.tarifa_aplicada, registro.canon_aplicado ?? 20).total
   const abonado = registro.monto_pagado ?? 0
   const saldo = Math.max(0, total - abonado)
 
@@ -65,11 +73,19 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
       // Actualizar estado de registro si se pagó completo
       const nuevoEstado: Registro['estado'] = esPagoCompleto ? 'pagado' : 'pendiente'
-      const { error: regError } = await supabase.from('registros').update({
+      const update: Record<string, unknown> = {
         monto_pagado: nuevoAbonado,
         estado: nuevoEstado,
         fecha_pago: esPagoCompleto ? new Date().toISOString().split('T')[0] : null,
-      }).eq('id', registro.id)
+      }
+      // T4 · agua:C4 — si el pago liquida una factura emitida/vencida, también
+      // transiciona la máquina de estados de la Factura a 'pagada'. La validez de
+      // la transición la decide business.ts (no se duplica aquí).
+      if (esPagoCompleto && factura && puedeTransicionarFactura(factura.factura_estado, 'pagar').ok) {
+        update.factura_estado = 'pagada'
+        update.pagada_at = new Date().toISOString()
+      }
+      const { error: regError } = await supabase.from('registros').update(update).eq('id', registro.id)
 
       if (regError) throw regError
 
@@ -113,12 +129,21 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
     >
       {/* Info del cargo */}
         <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)', marginBottom: '8px' }}>
-            {cliente?.nombre ?? registro.cliente_nombre}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)' }}>
+              {cliente?.nombre ?? registro.cliente_nombre}
+            </div>
+            {factura && <FacturaEstadoBadge estado={factura.factura_estado} />}
           </div>
+          {/* Desglose subtotal + IVA + mora = total (cuando la factura tiene snapshot). */}
+          {factura && (factura.iva_monto != null || factura.mora_monto != null || factura.total_a_pagar != null) && (
+            <div style={{ marginBottom: '12px' }}>
+              <FacturaDesglose factura={factura} moneda={moneda} />
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
-              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Cargo total</div>
+              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Total a pagar</div>
               <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {total.toFixed(2)}</div>
             </div>
             <div>
