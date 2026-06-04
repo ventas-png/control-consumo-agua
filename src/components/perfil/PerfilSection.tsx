@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { logSecurityEvent } from '../../lib/security'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 
 interface Props {
@@ -173,6 +174,10 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     } else {
       setPwFb({ type: 'success', msg: 'Contraseña actualizada correctamente' })
       setPwCurrent(''); setPwNew(''); setPwConfirm('')
+      // plat:P11 — audita el cambio de contraseña del usuario autenticado. El
+      // edge fija el user_id desde el JWT; el trigger de security_logs dispara
+      // la notificación de seguridad "tu contraseña fue cambiada".
+      void logSecurityEvent('password_changed', {})
     }
     setPwLoading(false)
   }
