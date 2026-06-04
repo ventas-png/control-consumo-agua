@@ -23,6 +23,8 @@ import { EmpresaProyectosSection } from './EmpresaProyectosSection'
 import { EmpresaUsuariosSection } from './EmpresaUsuariosSection'
 import { empresaKeys } from '../../domain/empresa/keys'
 import { useEmpresaSectionDataQuery } from '../../domain/empresa/queries'
+import { CompanyBrandingSection } from './CompanyBrandingSection'
+import { isExemptPlatformRole } from '../../lib/permissions'
 
 interface Props {
   currentUser: UserSession
@@ -118,6 +120,18 @@ export function EmpresaSection({ currentUser }: Props) {
           boxShadow: '0 2px 12px rgba(0,0,0,.04)',
         }}>
           <GoogleEmailConfig companyId={companyId} />
+        </div>
+      )}
+
+      {/* Marca / White-label (plat:P20) */}
+      {companyId && (
+        <div style={{
+          background: 'var(--at-surface)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid var(--at-line)',
+          marginTop: '24px',
+        }}>
+          <CompanyBrandingSection companyId={companyId} canEdit={isExemptPlatformRole(currentUser.role)} />
         </div>
       )}
     </div>
