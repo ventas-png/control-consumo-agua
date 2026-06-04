@@ -3,6 +3,7 @@ import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
+import { SesionesActivas } from './SesionesActivas'
 
 interface Props {
   currentUser: UserSession
@@ -690,6 +691,11 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
               <FeedbackMsg fb={mfaFb} />
             </>
           )}
+        </Card>
+
+        {/* Card 2c — Sesiones activas (plat:P9) */}
+        <Card title="Sesiones activas">
+          <SesionesActivas />
         </Card>
 
         {/* Card 3 — Correo */}
