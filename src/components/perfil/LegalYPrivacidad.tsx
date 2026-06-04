@@ -1,7 +1,8 @@
 import { type CSSProperties } from 'react'
 import { useLegalStatusQuery, type LegalDocStatus } from '../../domain/legal/queries'
-import { useAceptarLegalMutation } from '../../domain/legal/mutations'
+import { useAceptarLegalMutation, useExportMyDataMutation } from '../../domain/legal/mutations'
 import { resumirEstadoLegal } from '../../lib/legalStatus'
+import { descargarJson, nombreArchivoExport } from '../../lib/descargaArchivo'
 
 // plat:P33/P34 — Documentos legales (Términos, Privacidad, DPA): estado de
 // aceptación del usuario y acción para aceptar la versión vigente. Se monta
@@ -31,6 +32,16 @@ function rowStyle(pendiente: boolean): CSSProperties {
 export function LegalYPrivacidad() {
   const { data: docs = [], isLoading, isError, refetch } = useLegalStatusQuery()
   const aceptar = useAceptarLegalMutation()
+  const exportar = useExportMyDataMutation()
+
+  async function handleExportar() {
+    try {
+      const data = await exportar.mutateAsync()
+      descargarJson(data, nombreArchivoExport())
+    } catch {
+      /* el estado de error se muestra en la sección de export */
+    }
+  }
 
   if (isLoading) return <div style={hintStyle}>Cargando documentos…</div>
   if (isError) {
@@ -92,6 +103,29 @@ export function LegalYPrivacidad() {
           No se pudo registrar la aceptación. Intenta de nuevo.
         </div>
       )}
+
+      {/* plat:P35 — derecho de acceso/portabilidad (GDPR): descarga de datos */}
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--at-chip)' }}>
+        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--at-ink)', marginBottom: '4px' }}>
+          Mis datos (GDPR)
+        </div>
+        <p style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginTop: 0, marginBottom: '12px', lineHeight: 1.5 }}>
+          Descarga una copia de tus datos personales (perfil, aceptaciones, notificaciones,
+          eventos de seguridad y sesiones) en formato JSON.
+        </p>
+        <button
+          onClick={() => void handleExportar()}
+          disabled={exportar.isPending}
+          style={{ border: '1px solid var(--at-line)', background: 'var(--at-surface-2)', color: 'var(--at-ink)', fontWeight: 600, fontSize: '13px', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}
+        >
+          {exportar.isPending ? 'Preparando…' : 'Descargar mis datos (JSON)'}
+        </button>
+        {exportar.isError && (
+          <div style={{ fontSize: '12px', color: 'var(--at-danger)', marginTop: '8px' }}>
+            No se pudo generar el export. Intenta de nuevo.
+          </div>
+        )}
+      </div>
     </div>
   )
 }

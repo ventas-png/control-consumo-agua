@@ -24,3 +24,18 @@ export function useAceptarLegalMutation() {
     },
   })
 }
+
+/**
+ * plat:P35 (GDPR) — genera el export de datos del titular vía la RPC
+ * export_my_data (acotada por auth.uid()). Devuelve el jsonb; el componente
+ * dispara la descarga. Sin invalidación: es solo lectura on-demand.
+ */
+export function useExportMyDataMutation() {
+  return useMutation({
+    mutationFn: async (): Promise<unknown> => {
+      const { data, error } = await supabase.rpc('export_my_data')
+      if (error) throw error
+      return data
+    },
+  })
+}
