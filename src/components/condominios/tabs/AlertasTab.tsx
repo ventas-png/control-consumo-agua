@@ -1,9 +1,8 @@
 import { useState, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
-import { FilterChips } from '../../shared/FilterChips'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   alertas: AlertaCondominio[]
@@ -272,74 +271,97 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
         </div>
       )}
 
-      {/* Manual stored alerts */}
+      {/* Manual stored alerts — cond:B2: migrado a <DataTable> shared */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            📌 Alertas manuales ({alertas.length})
-          </h3>
-          <FilterChips<'activa' | 'resuelta' | 'ignorada' | 'all'>
-            ariaLabel="Filtrar por estado"
-            value={filtroEstado}
-            onChange={setFiltroEstado}
-            options={[
+        <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          📌 Alertas manuales ({alertas.length})
+        </h3>
+        <DataTable<AlertaCondominio>
+          data={storedActivas}
+          rowKey="id"
+          pageSize={50}
+          defaultSort={{ key: 'fecha_alerta', direction: 'asc' }}
+          searchPlaceholder="Buscar título, descripción…"
+          searchableKeys={['titulo', a => a.descripcion ?? '']}
+          rowStyle={a => a.estado !== 'activa' ? { background: 'var(--at-surface-2)' } : {}}
+          filters={[{
+            key: 'estado',
+            label: 'Estado',
+            value: filtroEstado,
+            onChange: v => setFiltroEstado(v as 'activa' | 'resuelta' | 'ignorada' | 'all'),
+            options: [
               { value: 'activa', label: 'Activa' },
               { value: 'resuelta', label: 'Resuelta' },
               { value: 'ignorada', label: 'Ignorada' },
               { value: 'all', label: 'Todas' },
-            ]}
-          />
-        </div>
-
-        {storedActivas.length === 0 ? (
-          <EmptyState icon="📋" title={`No hay alertas manuales ${filtroEstado !== 'all' ? `con estado "${filtroEstado}"` : ''}`} />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {storedActivas.map(a => {
-              const t = TIPO_LABELS[a.tipo]
-              const d = daysUntil(a.fecha_alerta)
-              return (
-                <div key={a.id} style={{ background: a.estado !== 'activa' ? 'var(--at-surface-2)' : t.bg, border: `1.5px solid ${a.estado !== 'activa' ? 'var(--at-line)' : t.color + '40'}`, borderRadius: '10px', padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: a.estado !== 'activa' ? 'var(--at-line-strong)' : t.color, flexShrink: 0, marginTop: '5px' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: a.estado !== 'activa' ? 'var(--at-ink-3)' : 'var(--at-ink)', textDecoration: a.estado === 'ignorada' ? 'line-through' : 'none' }}>
-                        {a.titulo}
-                      </div>
-                      {a.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{a.descripcion}</div>}
-                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
-                        {a.fecha_alerta} {a.estado === 'activa' && d <= 7 && d > 0 ? `— ⚠️ ${d} día(s)` : a.estado === 'activa' && d <= 0 ? '— ⛔ Vencida' : ''}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: a.estado !== 'activa' ? 'var(--at-ink-3)' : t.color, background: 'var(--at-surface)', padding: '3px 8px', borderRadius: '20px', border: '1px solid var(--at-line)' }}>
-                        {t.label}
-                      </span>
-                      {canEdit && a.estado === 'activa' && (
-                        <>
-                          <button onClick={() => handleEstado(a.id, 'resuelta')}
-                            style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            ✓ Resolver
-                          </button>
-                          <button onClick={() => handleEstado(a.id, 'ignorada')}
-                            style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>
-                            Ignorar
-                          </button>
-                        </>
-                      )}
-                      {canEdit && (
-                        <button onClick={() => handleDelete(a.id)}
-                          style={{ padding: '4px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>
-                          🗑️
-                        </button>
-                      )}
-                    </div>
+            ],
+          }]}
+          emptyState={{ icon: '📋', title: `No hay alertas manuales ${filtroEstado !== 'all' ? `con estado "${filtroEstado}"` : ''}` }}
+          columns={[
+            {
+              key: 'tipo', header: 'Tipo', sortable: true,
+              accessor: a => TIPO_LABELS[a.tipo].label,
+              render: a => {
+                const t = TIPO_LABELS[a.tipo]
+                return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: a.estado !== 'activa' ? 'var(--at-line-strong)' : t.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: a.estado !== 'activa' ? 'var(--at-ink-3)' : t.color, background: 'var(--at-surface)', padding: '3px 8px', borderRadius: '20px', border: '1px solid var(--at-line)' }}>
+                      {t.label}
+                    </span>
+                  </span>
+                )
+              },
+            },
+            {
+              key: 'titulo', header: 'Título', sortable: true,
+              render: a => (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: a.estado !== 'activa' ? 'var(--at-ink-3)' : 'var(--at-ink)', textDecoration: a.estado === 'ignorada' ? 'line-through' : 'none' }}>
+                    {a.titulo}
                   </div>
+                  {a.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{a.descripcion}</div>}
                 </div>
-              )
-            })}
-          </div>
-        )}
+              ),
+            },
+            {
+              key: 'fecha_alerta', header: 'Fecha', sortable: true, hideOnMobile: true,
+              render: a => {
+                const d = daysUntil(a.fecha_alerta)
+                return (
+                  <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
+                    {a.fecha_alerta} {a.estado === 'activa' && d <= 7 && d > 0 ? `— ⚠️ ${d} día(s)` : a.estado === 'activa' && d <= 0 ? '— ⛔ Vencida' : ''}
+                  </span>
+                )
+              },
+            },
+            {
+              key: 'actions', header: '', align: 'right',
+              render: a => (
+                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {canEdit && a.estado === 'activa' && (
+                    <>
+                      <button onClick={() => handleEstado(a.id, 'resuelta')}
+                        style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        ✓ Resolver
+                      </button>
+                      <button onClick={() => handleEstado(a.id, 'ignorada')}
+                        style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>
+                        Ignorar
+                      </button>
+                    </>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => handleDelete(a.id)} aria-label="Eliminar alerta"
+                      style={{ padding: '4px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              ),
+            },
+          ] satisfies DataTableColumn<AlertaCondominio>[]}
+        />
       </div>
     </div>
   )

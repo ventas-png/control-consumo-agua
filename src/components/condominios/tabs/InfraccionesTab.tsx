@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { toast } from '../../../lib/toast'
-import { EmptyState } from '../../shared/EmptyState'
 import { confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import type { InfraccionCondominio, Unidad, TipoInfraccion, EstadoInfraccion } from '../../../types'
 
 interface Props {
@@ -107,20 +107,6 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
         )}
       </div>
 
-      {/* Filtro estado */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => setFiltroEstado('todos')}
-          style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
-          Todas ({infracciones.length})
-        </button>
-        {(Object.entries(ESTADO_CONFIG) as [EstadoInfraccion, typeof ESTADO_CONFIG[EstadoInfraccion]][]).map(([e, cfg]) => (
-          <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? cfg.color : 'var(--at-line)', background: filtroEstado === e ? cfg.bg : 'var(--at-surface)', color: filtroEstado === e ? cfg.color : 'var(--at-ink-3)' }}>
-            {cfg.label} ({infracciones.filter(i => i.estado === e).length})
-          </button>
-        ))}
-      </div>
-
       {/* Form */}
       {showForm && (
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
@@ -174,55 +160,99 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
         </div>
       )}
 
-      {/* Lista */}
-      {filtradas.length === 0 ? (
-        <EmptyState icon="⚖️" title="No hay infracciones registradas" />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filtradas.map(i => {
-            const tipo = TIPO_CONFIG[i.tipo]
-            const estado = ESTADO_CONFIG[i.estado]
-            const hoy = new Date().toISOString().slice(0, 10)
-            const vencida = i.fecha_limite_descargo && i.fecha_limite_descargo < hoy && i.estado === 'en_descargo'
-            return (
-              <div key={i.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '14px', padding: '16px 18px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>{tipo.icon}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink-2)' }}>{tipo.label}</span>
-                      {i.unidad_nombre && <span style={{ fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600 }}>📍 {i.unidad_nombre}</span>}
-                      {i.monto_multa && <span style={{ fontSize: '12.5px', color: 'var(--at-danger)', fontWeight: 700 }}>💰 {moneda} {i.monto_multa.toFixed(2)}</span>}
-                      {vencida && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>Descargo vencido</span>}
-                    </div>
-                    <p style={{ margin: '0 0 6px', fontSize: '13.5px', color: 'var(--at-ink-2)' }}>{i.descripcion}</p>
-                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <span>📅 {i.fecha_infraccion}</span>
-                      {i.fecha_limite_descargo && <span>Límite descargo: {i.fecha_limite_descargo}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', flexShrink: 0 }}>
-                    {canEdit ? (
-                      <select value={i.estado} onChange={e => cambiarEstado(i.id, e.target.value as EstadoInfraccion)}
-                        style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', background: estado.bg, color: estado.color }}>
-                        {(Object.entries(ESTADO_CONFIG) as [EstadoInfraccion, typeof ESTADO_CONFIG[EstadoInfraccion]][]).map(([v, c]) => (
-                          <option key={v} value={v}>{c.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: estado.bg, color: estado.color }}>{estado.label}</span>
-                    )}
-                    {!['resuelta', 'anulada'].includes(i.estado) && (
-                      <button onClick={() => notificarWA(i)} title="Notificar por WhatsApp" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '15px', padding: '2px 4px' }}>💬</button>
-                    )}
-                    <button onClick={() => eliminar(i.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
-                  </div>
+      {/* Lista — cond:B2: migrado a <DataTable> shared */}
+      <DataTable<InfraccionCondominio>
+        data={filtradas}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'fecha_infraccion', direction: 'desc' }}
+        searchPlaceholder="Buscar descripción, unidad…"
+        searchableKeys={['descripcion', i => i.unidad_nombre ?? '']}
+        filters={[{
+          key: 'estado',
+          label: 'Estado',
+          value: filtroEstado,
+          onChange: v => setFiltroEstado(v as EstadoInfraccion | 'todos'),
+          options: [
+            { value: 'todos', label: `Todas (${infracciones.length})` },
+            ...(Object.entries(ESTADO_CONFIG) as [EstadoInfraccion, typeof ESTADO_CONFIG[EstadoInfraccion]][])
+              .map(([e, cfg]) => ({ value: e, label: `${cfg.label} (${infracciones.filter(i => i.estado === e).length})` })),
+          ],
+        }]}
+        emptyState={{ icon: '⚖️', title: 'No hay infracciones registradas' }}
+        columns={[
+          {
+            key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: i => TIPO_CONFIG[i.tipo].label,
+            render: i => (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--at-ink-2)' }}>
+                <span style={{ fontSize: '20px' }}>{TIPO_CONFIG[i.tipo].icon}</span>
+                {TIPO_CONFIG[i.tipo].label}
+              </span>
+            ),
+          },
+          {
+            key: 'unidad', header: 'Unidad', sortable: true,
+            accessor: i => i.unidad_nombre ?? '',
+            render: i => i.unidad_nombre
+              ? <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>📍 {i.unidad_nombre}</span>
+              : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+          },
+          {
+            key: 'descripcion', header: 'Descripción', sortable: true, hideOnMobile: true,
+            render: i => <span style={{ color: 'var(--at-ink-2)' }}>{i.descripcion}</span>,
+          },
+          {
+            key: 'monto_multa', header: 'Multa', sortable: true, align: 'right',
+            accessor: i => i.monto_multa ?? 0,
+            render: i => i.monto_multa
+              ? <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}>{moneda} {i.monto_multa.toFixed(2)}</span>
+              : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+          },
+          {
+            key: 'fecha_infraccion', header: 'Fecha', sortable: true, hideOnMobile: true,
+            render: i => {
+              const hoy = new Date().toISOString().slice(0, 10)
+              const vencida = i.fecha_limite_descargo && i.fecha_limite_descargo < hoy && i.estado === 'en_descargo'
+              return (
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                  <div>📅 {i.fecha_infraccion}</div>
+                  {i.fecha_limite_descargo && <div>Límite descargo: {i.fecha_limite_descargo}</div>}
+                  {vencida && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>Descargo vencido</span>}
                 </div>
+              )
+            },
+          },
+          {
+            key: 'estado', header: 'Estado', sortable: true,
+            render: i => {
+              const estado = ESTADO_CONFIG[i.estado]
+              return canEdit ? (
+                <select value={i.estado} onChange={e => cambiarEstado(i.id, e.target.value as EstadoInfraccion)}
+                  aria-label={`Estado de infracción ${i.unidad_nombre ?? ''}`}
+                  style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, border: 'none', cursor: 'pointer', background: estado.bg, color: estado.color }}>
+                  {(Object.entries(ESTADO_CONFIG) as [EstadoInfraccion, typeof ESTADO_CONFIG[EstadoInfraccion]][]).map(([v, c]) => (
+                    <option key={v} value={v}>{c.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: estado.bg, color: estado.color }}>{estado.label}</span>
+              )
+            },
+          },
+          {
+            key: 'actions', header: '', align: 'right',
+            render: i => (
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                {!['resuelta', 'anulada'].includes(i.estado) && (
+                  <button onClick={() => notificarWA(i)} title="Notificar por WhatsApp" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '15px', padding: '2px 4px' }}>💬</button>
+                )}
+                <button onClick={() => eliminar(i.id)} aria-label="Eliminar infracción" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
               </div>
-            )
-          })}
-        </div>
-      )}
+            ),
+          },
+        ] satisfies DataTableColumn<InfraccionCondominio>[]}
+      />
     </div>
   )
 }
