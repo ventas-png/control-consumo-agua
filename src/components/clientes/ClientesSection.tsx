@@ -7,6 +7,9 @@ import { supabase } from '../../lib/supabase'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
+import { useRegimenFiscalQuery } from '../../domain/fiscal/mutations'
+import { validarReceptorFiscal } from './receptorFiscal'
+import { USO_CFDI_OPCIONES } from './usoCfdi'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
 import { DataTable, type DataTableColumn } from '../shared'
@@ -39,6 +42,11 @@ const EMPTY_FORM = {
   fecha_nacimiento: '',
   // Facturación
   numero_facturacion: '',
+  // serv:S11 — Datos fiscales del receptor (FEL/CFDI). Columnas en `clientes`.
+  nit: '',          // Guatemala (FEL). 'CF' = Consumidor Final.
+  rfc: '',          // México (CFDI).
+  nombre_fiscal: '', // Razón social (ambos regímenes).
+  uso_cfdi: '',      // México (CFDI), catálogo c_UsoCFDI.
   // Contacto adicional
   telefono_alterno: '',
 }
@@ -58,6 +66,13 @@ const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' 
 export function ClientesSection({ clientes, unidades = [], userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const currentUser = useSession()
   const perms = usePermissionsContext()
+  // serv:S11 — régimen fiscal del tenant: decide qué campos del receptor mostrar
+  // (NIT en GT vs RFC + Uso CFDI en MX) y qué validador aplicar. 'ninguno' (o sin
+  // company) oculta la sección fiscal (el tenant no emite comprobante fiscal).
+  const { data: regimenFiscal = 'ninguno' } = useRegimenFiscalQuery(companyId)
+  const esFEL = regimenFiscal === 'fel_gt'
+  const esCFDI = regimenFiscal === 'cfdi_mx'
+  const muestraFiscal = esFEL || esCFDI
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -131,6 +146,13 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
   }
 
   function startEdit(c: Cliente) {
+    // serv:S11 — los campos fiscales del receptor (nit/rfc/nombre_fiscal/uso_cfdi)
+    // existen como columnas de `clientes` (#387) pero aún no están en el tipo
+    // compartido `Cliente` (lo edita otro PR); se leen vía cast a runtime.
+    const cf = c as Cliente & {
+      nit?: string | null; rfc?: string | null
+      nombre_fiscal?: string | null; uso_cfdi?: string | null
+    }
     setForm({
       nombre: c.nombre,
       codigo: c.codigo,
@@ -143,6 +165,10 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       cui_dui: c.cui_dui ?? '',
       fecha_nacimiento: c.fecha_nacimiento ?? '',
       numero_facturacion: c.numero_facturacion ?? '',
+      nit: cf.nit ?? '',
+      rfc: cf.rfc ?? '',
+      nombre_fiscal: cf.nombre_fiscal ?? '',
+      uso_cfdi: cf.uso_cfdi ?? '',
       telefono_alterno: c.telefono_alterno ?? '',
     })
     setEditingId(c.id)
@@ -279,12 +305,21 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     const whatsapp = sanitizeInput(form.whatsapp)
     const telefono_alterno = sanitizeInput(form.telefono_alterno)
 
+    // serv:S11 — datos fiscales del receptor (FEL/CFDI).
+    const nit = sanitizeInput(form.nit).trim()
+    const rfc = sanitizeInput(form.rfc).trim()
+    const nombre_fiscal = sanitizeInput(form.nombre_fiscal).trim()
+    const uso_cfdi = sanitizeInput(form.uso_cfdi).trim()
+
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
     if (!codigo || codigo.length < 3) errors.push('Código debe tener al menos 3 caracteres')
     if (email && !validateEmail(email)) errors.push('Formato de email inválido')
     if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono principal: formato inválido (use 8 dígitos o +código+número, ej. +15551234567)')
     if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (use 8 dígitos o +código+número, ej. +15551234567)')
+    // Formato del identificador tributario del receptor (NIT GT / RFC MX). Helper
+    // puro que reusa los validadores de businessFiscal.ts; opcional salvo formato.
+    errors.push(...validarReceptorFiscal(regimenFiscal, { nit, rfc }))
 
     if (errors.length > 0) {
       notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
@@ -305,6 +340,14 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       cui_dui: sanitizeInput(form.cui_dui) || null,
       fecha_nacimiento: form.fecha_nacimiento || null,
       numero_facturacion: sanitizeInput(form.numero_facturacion) || null,
+      // serv:S11 — datos fiscales del receptor. nombre_fiscal aplica a ambos
+      // regímenes; nit (GT) / rfc + uso_cfdi (MX) son específicos. Se guardan como
+      // null si vacíos. `validatedInsert` usa el schema con `.passthrough()`, así
+      // que estos campos extra pasan sin tocar `domain/agua/schemas.ts`.
+      nombre_fiscal: nombre_fiscal || null,
+      nit: nit || null,
+      rfc: rfc || null,
+      uso_cfdi: uso_cfdi || null,
       telefono_alterno: telefono_alterno || null,
     }
 
@@ -1006,6 +1049,72 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
               </div>
             </div>
           </div>
+
+          {/* serv:S11 — Datos fiscales del receptor (Facturación Electrónica).
+              Solo cuando el tenant tiene régimen fiscal: NIT (FEL/GT) vs RFC + Uso
+              CFDI (CFDI/MX). nombre_fiscal (razón social) aplica a ambos. */}
+          {muestraFiscal && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={sectionHeaderStyle}>
+                Datos Fiscales del Receptor {esFEL ? '(FEL · Guatemala)' : '(CFDI · México)'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                <div>
+                  <label htmlFor="cli-nombre-fiscal" style={labelStyle}>Nombre / Razón Social Fiscal</label>
+                  <input
+                    id="cli-nombre-fiscal"
+                    style={inputStyle}
+                    value={form.nombre_fiscal}
+                    onChange={e => setForm(f => ({ ...f, nombre_fiscal: e.target.value }))}
+                    placeholder="Razón social tal como aparece ante el SAT"
+                    maxLength={300}
+                  />
+                </div>
+                {esFEL && (
+                  <div>
+                    <label htmlFor="cli-fiscal-nit" style={labelStyle}>NIT (Guatemala)</label>
+                    <input
+                      id="cli-fiscal-nit"
+                      style={inputStyle}
+                      value={form.nit}
+                      onChange={e => setForm(f => ({ ...f, nit: e.target.value }))}
+                      placeholder="Ej. 12345678-9 o CF (Consumidor Final)"
+                      maxLength={20}
+                    />
+                  </div>
+                )}
+                {esCFDI && (
+                  <>
+                    <div>
+                      <label htmlFor="cli-fiscal-rfc" style={labelStyle}>RFC (México)</label>
+                      <input
+                        id="cli-fiscal-rfc"
+                        style={inputStyle}
+                        value={form.rfc}
+                        onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))}
+                        placeholder="Ej. XAXX010101000"
+                        maxLength={13}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="cli-fiscal-uso-cfdi" style={labelStyle}>Uso del CFDI</label>
+                      <select
+                        id="cli-fiscal-uso-cfdi"
+                        style={inputStyle}
+                        value={form.uso_cfdi}
+                        onChange={e => setForm(f => ({ ...f, uso_cfdi: e.target.value }))}
+                      >
+                        <option value="">— Seleccione —</option>
+                        {USO_CFDI_OPCIONES.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
