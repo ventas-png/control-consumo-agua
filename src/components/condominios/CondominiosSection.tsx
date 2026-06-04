@@ -6,6 +6,8 @@ import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
 import { MediaScopeProvider } from '../shared/MediaScopeContext'
+import { ActiveCondominioProvider, useActiveCondominio } from './ActiveCondominioContext'
+import { CondominioContextBar } from './CondominioContextBar'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -147,7 +149,22 @@ interface Props {
   canEdit: (section: string) => boolean
 }
 
-export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+/**
+ * cond:B5/B6 — Shell de la sección: monta el provider del condominio activo
+ * (estado global + persistencia + filtrado por rol) alrededor del cuerpo real.
+ * Se monta aquí (no en App.tsx, que es de T7) porque el contexto solo lo
+ * consume la sección de condominios. La lista `proyectos` ya viene filtrada por
+ * rol desde App.tsx; el provider la acota a los activos y resuelve el activo.
+ */
+export function CondominiosSection(props: Props) {
+  return (
+    <ActiveCondominioProvider proyectos={props.proyectos} companyId={props.currentUser.company_id ?? ''}>
+      <CondominiosSectionInner {...props} />
+    </ActiveCondominioProvider>
+  )
+}
+
+function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
   const visibleSections = useMemo(() =>
     SECTIONS
       .map(sec => ({
@@ -170,7 +187,13 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 768
   )
-  const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
+  // cond:B5/B6 — El condominio activo vive ahora en ActiveCondominioContext
+  // (estado global persistido + filtrado por rol). `selectedProyectoId` se
+  // mantiene como alias local para no tocar las ~190 referencias aguas abajo
+  // (cargarDatos, unidadesProyecto, tabCtx, MediaScopeProvider). Cambiar de
+  // condominio en el switcher actualiza el contexto → `cargarDatos` depende de
+  // este id y refetchea solo, sin recarga de página.
+  const { activeProjectId: selectedProyectoId, proyectosActivos } = useActiveCondominio()
   const [loading, setLoading] = useState(false)
 
   // Fase 1
@@ -353,13 +376,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [fondoReservaMovs, setFondoReservaMovs] = useState<FondoReservaMovimiento[]>([])
   const [configCondominio, setConfigCondominio] = useState<ConfigCondominio | null>(null)
 
-  const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
-
-  useEffect(() => {
-    if (proyectosActivos.length > 0 && !selectedProyectoId) {
-      setSelectedProyectoId(proyectosActivos[0].id)
-    }
-  }, [proyectosActivos.length])
+  // `proyectosActivos` y el id activo (con su default/persistencia) los provee
+  // ActiveCondominioContext; ya no se derivan ni se inicializan aquí.
 
   const cargarDatos = useCallback(async () => {
     if (!selectedProyectoId || !currentUser.company_id) return
@@ -933,16 +951,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
             <span style={{ fontSize: '20px' }}>🏢</span>
             <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>Condominios</h1>
           </div>
-          {proyectosActivos.length > 1 && (
-            <select value={selectedProyectoId} onChange={e => setSelectedProyectoId(e.target.value)}
-              style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', fontWeight: 500 }}>
-              {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          )}
-          {proyectosActivos.length === 1 && (
-            <span style={{ fontSize: '14px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{proyectoActual?.nombre}</span>
-          )}
-          {loading && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando...</span>}
+          {/* cond:B5/B6 — banner de contexto activo + switcher (sin recarga) */}
+          <CondominioContextBar loading={loading} />
         </div>
 
         {/* Barra de secciones (nivel 1) */}
