@@ -6,7 +6,9 @@ import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
 import { FacturaEstadoBadge, FacturaDesglose } from './facturaUi'
+import { TimbradoEstadoBadge, TimbradoDatos } from './fiscalUi'
 import type { FacturaRow } from '../../domain/facturacion/queries'
+import type { DocumentoFiscal } from '../../types/fiscal'
 
 interface Props {
   registro: Registro
@@ -16,11 +18,13 @@ interface Props {
   formasPagoLabels: Record<FormaPago, string>
   /** Proyección de Factura (estado/IVA/mora) del registro, si está disponible. */
   factura?: FacturaRow
+  /** Último comprobante fiscal del registro (estatus de timbrado), si existe. */
+  documentoFiscal?: DocumentoFiscal | null
   onClose: () => void
   onSuccess: (registroId: string, nuevoEstado: Registro['estado'], montoPagado: number) => void
 }
 
-export function PagoModal({ registro, cliente, moneda, currentUserId, formasPagoLabels, factura, onClose, onSuccess }: Props) {
+export function PagoModal({ registro, cliente, moneda, currentUserId, formasPagoLabels, factura, documentoFiscal, onClose, onSuccess }: Props) {
   // Si hay snapshot de Factura (emitida), el total a cobrar incluye IVA + mora;
   // si no, se cae al cargo base como antes (registros legacy sin emitir).
   const total = factura?.total_a_pagar
@@ -133,8 +137,16 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)' }}>
               {cliente?.nombre ?? registro.cliente_nombre}
             </div>
-            {factura && <FacturaEstadoBadge estado={factura.factura_estado} />}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {factura && <FacturaEstadoBadge estado={factura.factura_estado} />}
+              {/* serv:S11 — estatus de timbrado del comprobante (si existe). */}
+              <TimbradoEstadoBadge estado={documentoFiscal?.estado} />
+            </div>
           </div>
+          {/* serv:S11 — datos del comprobante timbrado (UUID/serie/número). */}
+          {documentoFiscal && (
+            <TimbradoDatos documento={documentoFiscal} style={{ marginBottom: '12px' }} />
+          )}
           {/* Desglose subtotal + IVA + mora = total (cuando la factura tiene snapshot). */}
           {factura && (factura.iva_monto != null || factura.mora_monto != null || factura.total_a_pagar != null) && (
             <div style={{ marginBottom: '12px' }}>

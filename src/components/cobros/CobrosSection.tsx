@@ -13,6 +13,7 @@ import { ConvenioModal } from './ConvenioModal'
 import { PagosHistorial } from './PagosHistorial'
 import { useQueryClient } from '@tanstack/react-query'
 import { FacturaEstadoBadge } from './facturaUi'
+import { TimbradoEstadoBadge } from './fiscalUi'
 import { useFacturasQuery, useReglasMoraQuery, type FacturaRow } from '../../domain/facturacion/queries'
 import { facturacionKeys } from '../../domain/facturacion/keys'
 import {
@@ -20,6 +21,10 @@ import {
   useAnularFacturaMutation,
   useIvaTasaDefaultQuery,
 } from '../../domain/facturacion/mutations'
+import { useDocumentosFiscalesQuery } from '../../domain/fiscal/queries'
+import { useTimbrarDocumentoMutation, puedeDispararTimbrado } from '../../domain/fiscal/mutations'
+import { normalizarEstadoFactura } from '../../lib/business'
+import type { DocumentoFiscal } from '../../types/fiscal'
 
 // Pequeño wrapper para firmar el link al comprobante (bucket pagos-comprobantes
 // es privado tras S6 follow-up). Tipo y label se pasan como props.
@@ -97,6 +102,45 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const emitirMut = useEmitirFacturaMutation(companyId)
   const anularMut = useAnularFacturaMutation(companyId)
   const [accionFacturaId, setAccionFacturaId] = useState<string | null>(null)
+
+  // serv:S11 · estatus de timbrado. Documentos fiscales del tenant indexados por
+  // registro_id; como la query ordena por created_at desc, el PRIMERO que veamos
+  // de cada registro es el ÚLTIMO comprobante (el que manda para el badge/gate).
+  const { data: documentosFiscales = [] } = useDocumentosFiscalesQuery(companyId)
+  const docFiscalByRegistro = useMemo(() => {
+    const m = new Map<string, DocumentoFiscal>()
+    for (const d of documentosFiscales) {
+      if (d.registro_id && !m.has(d.registro_id)) m.set(d.registro_id, d)
+    }
+    return m
+  }, [documentosFiscales])
+  const timbrarMut = useTimbrarDocumentoMutation(companyId)
+  const [timbrandoId, setTimbrandoId] = useState<string | null>(null)
+
+  async function handleTimbrar(r: Registro) {
+    const doc = docFiscalByRegistro.get(r.id)
+    setTimbrandoId(r.id)
+    try {
+      const res = await timbrarMut.mutateAsync({
+        registroId: r.id,
+        estadoUltimoDoc: doc?.estado ?? null,
+      })
+      notify({
+        variant: 'success',
+        title: '🧾 Comprobante timbrado',
+        text: res.uuid_fiscal
+          ? `UUID: ${res.uuid_fiscal}`
+          : res.numero
+            ? `No. ${[res.serie, res.numero].filter(Boolean).join('-')}`
+            : 'Timbrado correctamente (sandbox)',
+        duration: 2400,
+      })
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo timbrar', text: (err as Error).message })
+    } finally {
+      setTimbrandoId(null)
+    }
+  }
 
   // Días de vencimiento por defecto: de la regla de mora del proyecto si existe,
   // si no 30. (El cálculo de mora en sí lo hace el cron con la misma regla.)
@@ -493,6 +537,18 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                     const puedeAnular = puedeTransicionarFactura(estadoFactura, 'anular').ok
                     const puedePagar = puedeTransicionarFactura(estadoFactura, 'pagar').ok
                     const procesando = accionFacturaId === r.id
+                    // serv:S11 — estatus de timbrado del comprobante de esta factura.
+                    const docFiscal = docFiscalByRegistro.get(r.id)
+                    // Timbrar tiene sentido sobre una factura YA emitida (emitida/
+                    // vencida/pagada), y solo si el último comprobante lo permite
+                    // (sin documento o rechazado → reintento). El gate real lo
+                    // revalida el edge.
+                    const facturaEmitida = ['emitida', 'vencida', 'pagada'].includes(
+                      normalizarEstadoFactura(estadoFactura),
+                    )
+                    const puedeTimbrarFactura =
+                      facturaEmitida && puedeDispararTimbrado(docFiscal?.estado)
+                    const timbrando = timbrandoId === r.id
                     return (
                       <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
                         onMouseEnter={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
@@ -534,7 +590,11 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                           </span>
                         </td>
                         <td className="table-col-secondary" style={{ padding: '14px 16px' }}>
-                          <FacturaEstadoBadge estado={estadoFactura} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                            <FacturaEstadoBadge estado={estadoFactura} />
+                            {/* serv:S11 — estatus de timbrado (solo si ya hay comprobante). */}
+                            <TimbradoEstadoBadge estado={docFiscal?.estado} />
+                          </div>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           {canEdit && (
@@ -567,6 +627,18 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                                   background: 'var(--at-surface)', color: 'var(--at-danger)', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1,
                                 }}>
                                   🚫 Anular
+                                </button>
+                              )}
+                              {/* serv:S11 — Timbrar (FEL/CFDI): gated a facturas emitidas
+                                  cuyo último comprobante no esté ya timbrado/en vuelo.
+                                  Corre contra el Sandbox vía el edge timbrar-documento. */}
+                              {puedeTimbrarFactura && (
+                                <button onClick={() => void handleTimbrar(r)} disabled={timbrando}
+                                  title={docFiscal?.estado === 'rechazado' ? 'Reintentar timbrado (sandbox)' : 'Timbrar comprobante fiscal (sandbox)'} style={{
+                                  padding: '8px 12px', minHeight: '36px', borderRadius: '8px', border: '1.5px solid var(--at-success-strong)', cursor: timbrando ? 'not-allowed' : 'pointer',
+                                  background: 'var(--at-surface)', color: 'var(--at-success-strong)', fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', opacity: timbrando ? 0.6 : 1,
+                                }}>
+                                  {timbrando ? '⏳ Timbrando…' : docFiscal?.estado === 'rechazado' ? '🔁 Reintentar' : '🧾 Timbrar'}
                                 </button>
                               )}
                             </div>
@@ -751,6 +823,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
           currentUserId={currentUser.user_id}
           formasPagoLabels={FORMA_PAGO_LABELS}
           factura={facturaById.get(pagoModal.id)}
+          documentoFiscal={docFiscalByRegistro.get(pagoModal.id) ?? null}
           onClose={() => setPagoModal(null)}
           onSuccess={(registroId, nuevoEstado, montoPagado) => {
             onEstadoUpdated(registroId, nuevoEstado)
