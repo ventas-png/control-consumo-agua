@@ -66,3 +66,25 @@ verify_jwt = false
 # devuelve el secreto; al guardar resetea estado_conexion a 'desconocido'.
 [functions.fiscal-save-credentials]
 verify_jwt = false
+
+# Cobros pluggable — crear un cobro con el payfac EFECTIVO del tenant (sandbox/
+# qpaypro/...), provider-agnostic. Valida el token a mano (service_role o JWT de
+# un usuario del tenant), resuelve el payfac efectivo, carga credenciales de la
+# boveda y llama provider.crearCobro(). No pasa datos de tarjeta por el servidor.
+[functions.create-charge]
+verify_jwt = false
+
+# Cobros pluggable — "probar conexion" al payfac. Resuelve la config de pago
+# efectiva (override locacion<->empresa), carga credenciales del ambiente y pingea
+# via el adapter (sandbox ok; qpaypro valida credenciales). Guarda el estatus en
+# payfac_secrets. verify_jwt=false: valida el token a mano. NUNCA expone el secreto.
+[functions.payfac-test-connection]
+verify_jwt = false
+
+# Cobros pluggable — guardar credenciales del payfac en la boveda payfac_secrets
+# (deny-all bajo RLS). El cliente NO escribe directo: invoca este edge, que con
+# service_role hace el upsert por (company_id, project_id) con merge por ambiente.
+# verify_jwt=false: valida el token a mano (service_role o JWT admin/owner). NUNCA
+# devuelve el secreto; al guardar resetea estado_conexion a 'desconocido'.
+[functions.payfac-save-credentials]
+verify_jwt = false
