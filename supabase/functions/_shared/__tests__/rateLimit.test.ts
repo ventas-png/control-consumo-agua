@@ -4,7 +4,7 @@
 // Igual que emailRetryable.test.ts, corre bajo vitest (no Deno) y trata el módulo como TS.
 
 import { describe, it, expect } from 'vitest'
-import { getClientIp, enforceRateLimit, type RpcClient } from '../rateLimit.ts'
+import { getClientIp, enforceRateLimit, enforceRateLimits, type RpcClient } from '../rateLimit.ts'
 
 const mkReq = (headers: Record<string, string>) => new Request('https://x.test', { headers })
 
@@ -42,6 +42,16 @@ describe('enforceRateLimit', () => {
     expect(res!.headers.get('Access-Control-Allow-Origin')).toBe('https://x.test')
   })
 
+  it('el 429 incluye Retry-After = windowSeconds (default 3600)', async () => {
+    const res = await enforceRateLimit(clientReturning(false), { subject: 's', action: 'a', max: 1 }, cors)
+    expect(res!.headers.get('Retry-After')).toBe('3600')
+  })
+
+  it('el 429 refleja Retry-After del windowSeconds custom', async () => {
+    const res = await enforceRateLimit(clientReturning(false), { subject: 's', action: 'a', max: 1, windowSeconds: 60 }, cors)
+    expect(res!.headers.get('Retry-After')).toBe('60')
+  })
+
   it('fail-open (null) ante error de infra (data null)', async () => {
     const res = await enforceRateLimit(clientReturning(null), { subject: 'x', action: 'y', max: 1 }, cors)
     expect(res).toBeNull()
@@ -64,5 +74,51 @@ describe('enforceRateLimit', () => {
     }
     await enforceRateLimit(client, { subject: 's', action: 'a', max: 1 }, cors)
     expect(captured?.p_window).toBe('3600 seconds')
+  })
+})
+
+describe('enforceRateLimits (multi-dimensión)', () => {
+  const cors = { 'Access-Control-Allow-Origin': 'https://x.test' }
+
+  it('permite (null) cuando todos los límites pasan', async () => {
+    const subjects: string[] = []
+    const client: RpcClient = {
+      rpc: (_fn, args) => { subjects.push(args.p_subject as string); return Promise.resolve({ data: true, error: null }) },
+    }
+    const res = await enforceRateLimits(client, [
+      { subject: 'ip:1.1.1.1', action: 'signup_company', max: 5 },
+      { subject: 'email:a@b.com', action: 'signup_company:email', max: 3 },
+    ], cors)
+    expect(res).toBeNull()
+    expect(subjects).toEqual(['ip:1.1.1.1', 'email:a@b.com']) // ambos evaluados
+  })
+
+  it('corto-circuita en el primer límite excedido (no toca los siguientes)', async () => {
+    const subjects: string[] = []
+    // El primer límite (IP) devuelve false → debe parar antes de registrar el de email.
+    const client: RpcClient = {
+      rpc: (_fn, args) => {
+        subjects.push(args.p_subject as string)
+        const blocked = args.p_subject === 'ip:1.1.1.1'
+        return Promise.resolve({ data: !blocked, error: null })
+      },
+    }
+    const res = await enforceRateLimits(client, [
+      { subject: 'ip:1.1.1.1', action: 'signup_company', max: 5 },
+      { subject: 'email:a@b.com', action: 'signup_company:email', max: 3 },
+    ], cors)
+    expect(res!.status).toBe(429)
+    expect(subjects).toEqual(['ip:1.1.1.1']) // el de email NO se evaluó → no se quema
+  })
+
+  it('dispara el 429 del segundo límite si el primero pasa pero el segundo no', async () => {
+    const client: RpcClient = {
+      rpc: (_fn, args) => Promise.resolve({ data: args.p_subject !== 'email:a@b.com', error: null }),
+    }
+    const res = await enforceRateLimits(client, [
+      { subject: 'ip:1.1.1.1', action: 'signup_company', max: 5 },
+      { subject: 'email:a@b.com', action: 'signup_company:email', max: 3 },
+    ], cors)
+    expect(res!.status).toBe(429)
   })
 })

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? ''
@@ -52,6 +53,16 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Rate limit server-side (infra:I2). El caller está autenticado, pero topamos el inicio
+    // de OAuth por usuario e IP: evita generación masiva de state tokens / consent loops
+    // (abuso o bug de reintentos) hacia el endpoint de Google. `supabase` es service_role,
+    // que es el único rol al que `rate_limit_hit` está concedido.
+    const rlInitiate = await enforceRateLimits(supabase, [
+      { subject: user.id, action: 'google_oauth_initiate', max: 20 },
+      { subject: `ip:${getClientIp(req)}`, action: 'google_oauth_initiate:ip', max: 40 },
+    ], corsHeaders)
+    if (rlInitiate) return rlInitiate
 
     if (!GOOGLE_CLIENT_ID) {
       return new Response(
