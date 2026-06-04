@@ -84,3 +84,23 @@ export function estilosMarca(primaryColor: string | null | undefined): Record<st
     '--at-primary-soft': v.soft,
   }
 }
+
+/** Color de acento del tema por defecto (= --at-accent en src/index.css). */
+export const DEFAULT_ACCENT_COLOR = '#B96A3F'
+
+/** CSS vars de acento que el branding sobreescribe. */
+export const ACCENT_CSS_VARS = ['--at-accent', '--at-accent-hover'] as const
+
+/**
+ * Mapa de CSS vars de ACENTO para un color custom, o null si no hay (restablecer).
+ * Sobreescribe las 2 vars de acento dominantes; las variantes finas
+ * (-soft/-tint/-light/…) quedan en sus defaults (follow-up: derivar la paleta).
+ */
+export function estilosAccent(accentColor: string | null | undefined): Record<string, string> | null {
+  const color = normalizarColorHex(accentColor)
+  if (!color) return null
+  return {
+    '--at-accent': color,
+    '--at-accent-hover': oscurecer(color, 0.18),
+  }
+}

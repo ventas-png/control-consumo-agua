@@ -10,6 +10,7 @@ import { brandingKeys } from './keys'
 export interface CompanyBrandingRow {
   company_id: string
   primary_color: string | null
+  accent_color: string | null
   updated_at?: string | null
   created_at?: string | null
 }

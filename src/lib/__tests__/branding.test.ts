@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco,
-  derivarVariablesMarca, estilosMarca, DEFAULT_BRAND_COLOR,
+  derivarVariablesMarca, estilosMarca, estilosAccent, DEFAULT_BRAND_COLOR,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -78,5 +78,18 @@ describe('estilosMarca', () => {
     expect(m).not.toBeNull()
     expect(m!['--at-primary']).toBe('#1b3b36')
     expect(Object.keys(m!)).toEqual(['--at-primary', '--at-primary-hover', '--at-primary-soft'])
+  })
+})
+
+describe('estilosAccent', () => {
+  it('null/inválido → null', () => {
+    expect(estilosAccent(null)).toBeNull()
+    expect(estilosAccent('nope')).toBeNull()
+  })
+  it('color válido → --at-accent + --at-accent-hover', () => {
+    const m = estilosAccent('#B96A3F')
+    expect(m).not.toBeNull()
+    expect(m!['--at-accent']).toBe('#b96a3f')
+    expect(Object.keys(m!)).toEqual(['--at-accent', '--at-accent-hover'])
   })
 })
