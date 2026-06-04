@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   esColorHex, normalizarColorHex, oscurecer, mezclarBlanco,
-  derivarVariablesMarca, DEFAULT_BRAND_COLOR,
+  derivarVariablesMarca, estilosMarca, DEFAULT_BRAND_COLOR,
 } from '../branding'
 
 // plat:P20 — Helpers de color de marca (puros, deterministas).
@@ -64,5 +64,19 @@ describe('derivarVariablesMarca', () => {
   it('null/inválido → cae al color por defecto del tema', () => {
     expect(derivarVariablesMarca(null).primary).toBe(DEFAULT_BRAND_COLOR.toLowerCase())
     expect(derivarVariablesMarca('basura').primary).toBe(DEFAULT_BRAND_COLOR.toLowerCase())
+  })
+})
+
+describe('estilosMarca', () => {
+  it('null/inválido → null (señal de restablecer a los defaults)', () => {
+    expect(estilosMarca(null)).toBeNull()
+    expect(estilosMarca(undefined)).toBeNull()
+    expect(estilosMarca('rojo')).toBeNull()
+  })
+  it('color válido → mapa con las 3 CSS vars de marca', () => {
+    const m = estilosMarca('#1B3B36')
+    expect(m).not.toBeNull()
+    expect(m!['--at-primary']).toBe('#1b3b36')
+    expect(Object.keys(m!)).toEqual(['--at-primary', '--at-primary-hover', '--at-primary-soft'])
   })
 })
