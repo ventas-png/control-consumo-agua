@@ -21,6 +21,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { captureEdgeException } from '../_shared/sentry.ts'
 import {
   getPaymentProvider,
   resolverConfigPagoEfectiva,
@@ -243,6 +244,7 @@ Deno.serve(async (req: Request) => {
       error: resultado.error ?? null,
     })
   } catch (e) {
+    await captureEdgeException(e, { function: 'create-charge' })
     return json({ error: e instanceof Error ? e.message : 'Error interno' }, 500)
   }
 })

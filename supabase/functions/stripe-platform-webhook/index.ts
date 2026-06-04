@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+import { captureEdgeException } from '../_shared/sentry.ts'
 
 // ============================================================================
 // stripe-platform-webhook — receptor de eventos Stripe (plat:P1, F2.12)
@@ -340,6 +341,13 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err)
     console.error('[webhook] error procesando', event.type, errorMessage)
+    // El 500 hace que Stripe reintente; capturamos en Sentry para alertar si el
+    // reintento tampoco resuelve (tag event_type para filtrar por tipo de evento).
+    await captureEdgeException(err, {
+      function: 'stripe-platform-webhook',
+      transaction: `webhook:${event.type}`,
+      tags: { event_type: event.type },
+    })
   }
 
   await supabase
