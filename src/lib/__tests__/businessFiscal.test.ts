@@ -16,11 +16,17 @@ import {
   monedaPorRegimen,
   construirDteCanonico,
   validarDteParaTimbrar,
+  resolverConfigFiscalEfectiva,
+  regimenRealDeConfig,
   type ConfigEmisor,
   type ConfigReceptor,
   type FacturaParaDte,
 } from '../businessFiscal'
-import type { DteCanonico } from '../../types/fiscal'
+import type {
+  ConfigFiscalEmpresa,
+  ConfigFiscalLocacion,
+  DteCanonico,
+} from '../../types/fiscal'
 
 // ── Máquina de estados ────────────────────────────────────────────────────────
 describe('businessFiscal — máquina de estados', () => {
@@ -352,5 +358,123 @@ describe('businessFiscal — validarDteParaTimbrar', () => {
     dte.total = 0
     const errs = validarDteParaTimbrar(dte)
     expect(errs.some((e) => e.includes('total'))).toBe(true)
+  })
+})
+
+// ── Resolver de config fiscal efectiva (override empresa↔locación) ────────────
+describe('resolverConfigFiscalEfectiva — override locación↔empresa', () => {
+  const empresaGt: ConfigFiscalEmpresa = {
+    regimenFiscal: 'fel_gt',
+    nombre: 'Aguas del Valle SA',
+    nombreFiscal: 'AGUAS DEL VALLE, SOCIEDAD ANONIMA',
+    nit: '12345679',
+    taxId: '99999999',
+    rfc: null,
+    proveedorTimbrado: 'infile',
+    codigoPostal: '01001',
+  }
+
+  it('sin override de locación: hereda TODO de la empresa', () => {
+    const c = resolverConfigFiscalEfectiva(empresaGt, null)
+    expect(c.regimenFiscal).toBe('fel_gt')
+    expect(c.nombreFiscal).toBe('AGUAS DEL VALLE, SOCIEDAD ANONIMA')
+    expect(c.nit).toBe('12345679')
+    expect(c.proveedorTimbrado).toBe('infile')
+    expect(c.establecimiento).toBeNull() // no existe a nivel empresa
+    expect(c.desdeLocacion).toBe(false)
+  })
+
+  it('NIT del receptor cae a tax_id cuando no hay nit de empresa ni locación', () => {
+    const c = resolverConfigFiscalEfectiva(
+      { ...empresaGt, nit: null },
+      null,
+    )
+    expect(c.nit).toBe('99999999') // tax_id
+  })
+
+  it('la locación SOBREESCRIBE campo por campo (gana sobre la empresa)', () => {
+    const loc: ConfigFiscalLocacion = {
+      nit: '7654321K',
+      nombreFiscal: 'SUCURSAL NORTE',
+      proveedorTimbrado: 'guatefactura',
+      establecimiento: '3',
+    }
+    const c = resolverConfigFiscalEfectiva(empresaGt, loc)
+    expect(c.nit).toBe('7654321K') // override
+    expect(c.nombreFiscal).toBe('SUCURSAL NORTE') // override
+    expect(c.proveedorTimbrado).toBe('guatefactura') // override
+    expect(c.establecimiento).toBe('3') // solo locación
+    expect(c.regimenFiscal).toBe('fel_gt') // heredado
+    expect(c.desdeLocacion).toBe(true) // proveedor vino de la locación
+  })
+
+  it('override vacío/whitespace NO cuenta: hereda de la empresa', () => {
+    const c = resolverConfigFiscalEfectiva(empresaGt, {
+      nit: '   ',
+      proveedorTimbrado: '',
+      nombreFiscal: null,
+    })
+    expect(c.nit).toBe('12345679') // empresa
+    expect(c.proveedorTimbrado).toBe('infile') // empresa
+    expect(c.nombreFiscal).toBe('AGUAS DEL VALLE, SOCIEDAD ANONIMA')
+    expect(c.desdeLocacion).toBe(false)
+  })
+
+  it('régimen de la locación gana (ej. una locación MX en empresa GT)', () => {
+    const c = resolverConfigFiscalEfectiva(empresaGt, {
+      regimenFiscal: 'cfdi_mx',
+      rfc: 'GODE561231GR8',
+      lugarExpedicion: '64000',
+      serieFiscal: 'A',
+    })
+    expect(c.regimenFiscal).toBe('cfdi_mx')
+    expect(c.rfc).toBe('GODE561231GR8')
+    expect(c.lugarExpedicion).toBe('64000') // override
+    expect(c.serieFiscal).toBe('A')
+    expect(c.desdeLocacion).toBe(true)
+  })
+
+  it('lugar de expedición (MX) cae al CP de la empresa si la locación no lo trae', () => {
+    const empresaMx: ConfigFiscalEmpresa = {
+      regimenFiscal: 'cfdi_mx',
+      nombre: 'Servicios MX',
+      rfc: 'ABC230101AB1',
+      codigoPostal: '06600',
+    }
+    const c = resolverConfigFiscalEfectiva(empresaMx, { rfc: 'XEXX010101000' })
+    expect(c.lugarExpedicion).toBe('06600') // heredado del CP de empresa
+    expect(c.rfc).toBe('XEXX010101000') // override
+  })
+
+  it('nombre fiscal cae al nombre comercial (locación, luego empresa)', () => {
+    const c = resolverConfigFiscalEfectiva(
+      { regimenFiscal: 'fel_gt', nombre: 'Comercial SA', nombreFiscal: null, nit: '12345679' },
+      { nombre: 'Mi Condominio' },
+    )
+    // locación.nombreFiscal ausente → cae a locación.nombre.
+    expect(c.nombreFiscal).toBe('Mi Condominio')
+  })
+
+  it('empresa nula y locación nula: régimen "ninguno" y campos vacíos', () => {
+    const c = resolverConfigFiscalEfectiva(null, null)
+    expect(c.regimenFiscal).toBe('ninguno')
+    expect(c.nit).toBeNull()
+    expect(c.rfc).toBeNull()
+    expect(c.proveedorTimbrado).toBe('sandbox') // default seguro
+    expect(c.desdeLocacion).toBe(false)
+  })
+
+  it('régimen desconocido se normaliza a "ninguno"', () => {
+    const c = resolverConfigFiscalEfectiva(
+      { regimenFiscal: 'algo_raro' as ConfigFiscalEmpresa['regimenFiscal'], nombre: 'X' },
+      null,
+    )
+    expect(c.regimenFiscal).toBe('ninguno')
+  })
+
+  it('regimenRealDeConfig: fel_gt/cfdi_mx pasan; ninguno → null', () => {
+    expect(regimenRealDeConfig({ regimenFiscal: 'fel_gt' })).toBe('fel_gt')
+    expect(regimenRealDeConfig({ regimenFiscal: 'cfdi_mx' })).toBe('cfdi_mx')
+    expect(regimenRealDeConfig({ regimenFiscal: 'ninguno' })).toBeNull()
   })
 })

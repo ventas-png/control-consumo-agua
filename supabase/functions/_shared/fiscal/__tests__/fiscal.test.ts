@@ -13,6 +13,8 @@ import {
   aplicarTransicionFiscal,
   validarNitGt,
   validarRfcMx,
+  resolverConfigFiscalEfectiva,
+  regimenRealDeConfig,
 } from '../stateMachine.ts'
 import type { DteCanonico } from '../types.ts'
 
@@ -120,5 +122,37 @@ describe('stateMachine (espejo Deno)', () => {
     expect(validarNitGt('CF')).toBe(true)
     expect(validarRfcMx('GODE561231GR8')).toBe(true)
     expect(validarRfcMx('bad')).toBe(false)
+  })
+})
+
+// Espejo: smoke test del resolver de config efectiva (los exhaustivos viven en
+// src/lib/__tests__/businessFiscal). Verifica el override locación↔empresa.
+describe('resolverConfigFiscalEfectiva (espejo Deno)', () => {
+  it('sin override: hereda de la empresa', () => {
+    const c = resolverConfigFiscalEfectiva(
+      { regimenFiscal: 'fel_gt', nombre: 'A', nit: '12345679', proveedorTimbrado: 'infile' },
+      null,
+    )
+    expect(c.regimenFiscal).toBe('fel_gt')
+    expect(c.nit).toBe('12345679')
+    expect(c.proveedorTimbrado).toBe('infile')
+    expect(c.desdeLocacion).toBe(false)
+  })
+
+  it('la locación sobreescribe y desdeLocacion=true', () => {
+    const c = resolverConfigFiscalEfectiva(
+      { regimenFiscal: 'fel_gt', nombre: 'A', nit: '12345679', proveedorTimbrado: 'infile' },
+      { nit: '7654321K', proveedorTimbrado: 'guatefactura', establecimiento: '2' },
+    )
+    expect(c.nit).toBe('7654321K')
+    expect(c.proveedorTimbrado).toBe('guatefactura')
+    expect(c.establecimiento).toBe('2')
+    expect(c.desdeLocacion).toBe(true)
+  })
+
+  it('default seguro de proveedor = sandbox', () => {
+    const c = resolverConfigFiscalEfectiva(null, null)
+    expect(c.proveedorTimbrado).toBe('sandbox')
+    expect(regimenRealDeConfig(c)).toBeNull()
   })
 })

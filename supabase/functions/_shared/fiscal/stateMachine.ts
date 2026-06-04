@@ -9,6 +9,9 @@
 import type {
   AccionFiscal,
   ConfigEmisor,
+  ConfigFiscalEfectiva,
+  ConfigFiscalEmpresa,
+  ConfigFiscalLocacion,
   ConfigReceptor,
   DteCanonico,
   EmisorFiscal,
@@ -17,6 +20,7 @@ import type {
   LineaDte,
   ReceptorFiscal,
   RegimenFiscal,
+  RegimenFiscalConfig,
   TipoDocumentoFiscal,
 } from './types.ts'
 
@@ -253,4 +257,73 @@ export function validarDteParaTimbrar(dte: DteCanonico): string[] {
     errores.push('La tasa de IVA debe ser una fracción entre 0 y 1.')
   }
   return errores
+}
+
+// ── Resolver de CONFIG FISCAL EFECTIVA (override empresa↔locación) ────────────
+// serv:S11. ESPEJO Deno de resolverConfigFiscalEfectiva de
+// src/lib/businessFiscal.ts. override.campo = locacion.campo ?? empresa.campo.
+function nz(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+function override(
+  locacion: string | null | undefined,
+  empresa: string | null | undefined,
+): string | null {
+  return nz(locacion) ?? nz(empresa)
+}
+
+function normalizarRegimenConfig(
+  r: string | null | undefined,
+): RegimenFiscalConfig {
+  return r === 'fel_gt' || r === 'cfdi_mx' || r === 'ninguno' ? r : 'ninguno'
+}
+
+export function resolverConfigFiscalEfectiva(
+  empresa: ConfigFiscalEmpresa | null | undefined,
+  locacion?: ConfigFiscalLocacion | null,
+): ConfigFiscalEfectiva {
+  const emp = empresa ?? {}
+  const loc = locacion ?? {}
+
+  const regimenLoc = nz(loc.regimenFiscal)
+  const proveedorLoc = nz(loc.proveedorTimbrado)
+
+  const regimenFiscal = regimenLoc
+    ? normalizarRegimenConfig(regimenLoc)
+    : normalizarRegimenConfig(emp.regimenFiscal)
+
+  const nombreFiscal =
+    override(loc.nombreFiscal, loc.nombre) ??
+    override(emp.nombreFiscal, emp.nombre)
+
+  const nit = override(loc.nit, null) ?? override(emp.nit, emp.taxId)
+  const rfc = override(loc.rfc, emp.rfc)
+  const proveedorTimbrado =
+    override(loc.proveedorTimbrado, emp.proveedorTimbrado) ?? 'sandbox'
+  const establecimiento = nz(loc.establecimiento)
+  const lugarExpedicion = override(loc.lugarExpedicion, emp.codigoPostal)
+  const serieFiscal = nz(loc.serieFiscal)
+
+  return {
+    regimenFiscal,
+    nombreFiscal,
+    nit,
+    rfc,
+    proveedorTimbrado,
+    establecimiento,
+    lugarExpedicion,
+    serieFiscal,
+    desdeLocacion: regimenLoc != null || proveedorLoc != null,
+  }
+}
+
+export function regimenRealDeConfig(
+  config: Pick<ConfigFiscalEfectiva, 'regimenFiscal'>,
+): RegimenFiscal | null {
+  return config.regimenFiscal === 'fel_gt' || config.regimenFiscal === 'cfdi_mx'
+    ? config.regimenFiscal
+    : null
 }
