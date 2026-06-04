@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import { promptUpgrade } from '../shared/promptUpgrade'
-import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
+import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
@@ -17,7 +18,6 @@ interface Props {
   clientes: Cliente[]
   proyectos: Proyecto[]
   userRole: UserRole
-  currentUser: UserSession
   maxUnidadesPorTipo?: MaxUnidadesPorTipo | null
   onUnidadAdded: (unidad: Unidad) => void
   onUnidadUpdated: (id: string, partial: Partial<Unidad>) => void
@@ -122,7 +122,6 @@ export function UnidadesSection({
   clientes,
   proyectos,
   userRole,
-  currentUser,
   maxUnidadesPorTipo,
   onUnidadAdded,
   onUnidadUpdated,
@@ -131,6 +130,7 @@ export function UnidadesSection({
   canCreate: _canCreate = true,
   canEdit: _canEdit = true,
 }: Props) {
+  const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)

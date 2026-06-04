@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
+import type { Cliente, UserRole, ClienteLookupResult, Unidad } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
@@ -18,7 +19,6 @@ interface Props {
   unidades?: Unidad[]
   userRole: UserRole
   userId: string
-  currentUser: UserSession
   companyId?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
@@ -58,7 +58,8 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, unidades = [], userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
+export function ClientesSection({ clientes, unidades = [], userRole, userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
+  const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)

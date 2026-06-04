@@ -7,8 +7,8 @@ import type {
   FuenteEnergia,
   FacturaEnergia,
   Proyecto,
-  UserSession,
 } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import ProveedoresTab from './tabs/ProveedoresTab'
 import TarifasTab from './tabs/TarifasTab'
 import FuentesTab from './tabs/FuentesTab'
@@ -22,7 +22,6 @@ interface ServiciosEnergiaSectionProps {
   fuentesEnergia: FuenteEnergia[]
   facturasEnergia: FacturaEnergia[]
   proyectos: Proyecto[]
-  currentUser: UserSession | null
   moneda: string
   canCreate: boolean
   canEdit: boolean
@@ -50,7 +49,6 @@ export default function ServiciosEnergiaSection({
   fuentesEnergia,
   facturasEnergia,
   proyectos,
-  currentUser,
   moneda,
   canCreate,
   canEdit,
@@ -67,6 +65,7 @@ export default function ServiciosEnergiaSection({
   onFacturaUpdated,
   onFacturaDeleted,
 }: ServiciosEnergiaSectionProps) {
+  const currentUser = useSession()
   const { tab: tabParam } = useParams<{ tab?: string }>()
   const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
   const navigate = useNavigate()

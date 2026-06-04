@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Tarifa, UserRole, UserSession, Proyecto } from '../../types'
+import type { Tarifa, UserRole, Proyecto } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
@@ -10,7 +11,6 @@ interface Props {
   tarifas: Tarifa[]
   proyectos: Proyecto[]
   userRole: UserRole
-  currentUser: UserSession
   moneda?: string
   onTarifaAdded: (tarifa: Tarifa) => void
   onTarifaUpdated: (id: string, partial: Partial<Tarifa>) => void
@@ -51,7 +51,6 @@ export function TarifasSection({
   tarifas,
   proyectos,
   userRole,
-  currentUser,
   moneda = 'Q',
   onTarifaAdded,
   onTarifaUpdated,
@@ -59,6 +58,7 @@ export function TarifasSection({
   canCreate: canCreateProp = true,
   canEdit: canEditProp = true,
 }: Props) {
+  const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
