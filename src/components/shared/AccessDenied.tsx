@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { UserRole } from '../../types'
+import { useSession } from './SessionContext'
 
 export function AccessDenied() {
   return (
@@ -38,13 +39,13 @@ export function AccessDenied() {
 }
 
 interface Props {
-  userRole: UserRole
   allowedRoles: UserRole[]
   children: ReactNode
 }
 
-export function RoleGuard({ userRole, allowedRoles, children }: Props) {
-  if (!allowedRoles.includes(userRole)) {
+export function RoleGuard({ allowedRoles, children }: Props) {
+  const { role } = useSession()
+  if (!allowedRoles.includes(role)) {
     return <AccessDenied />
   }
   return <>{children}</>
