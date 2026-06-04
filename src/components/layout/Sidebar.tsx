@@ -4,7 +4,7 @@ import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 import { getDisplayRoleLabel } from '../../lib/permissions'
-import { BrandLogo } from '../shared/BrandLogo'
+import { CompanyBrandMark } from '../shared/CompanyBrandMark'
 
 interface Tab {
   id: AppSection
@@ -505,7 +505,7 @@ export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen,
       <div style={{ padding: '22px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ flexShrink: 0, lineHeight: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', borderRadius: '11px' }}>
-            <BrandLogo size={38} />
+            <CompanyBrandMark size={38} />
           </div>
           <div>
             <div style={{ color: 'var(--at-nav-ink)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
