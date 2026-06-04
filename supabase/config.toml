@@ -34,3 +34,14 @@ verify_jwt = false
 # envia auth header.
 [functions.stripe-platform-webhook]
 verify_jwt = false
+
+# Invitar usuario (T3/plat:P3): valida el JWT del admin/owner manualmente via
+# _shared/auth.requireUser, igual que create-user.
+[functions.invite-user]
+verify_jwt = false
+
+# Aceptar invitacion (T3/plat:P3): publico/sessionless por diseno — el invitado
+# todavia no tiene cuenta. Valida el token de invitacion + origen + fuerza de la
+# password server-side.
+[functions.accept-invitation]
+verify_jwt = false
