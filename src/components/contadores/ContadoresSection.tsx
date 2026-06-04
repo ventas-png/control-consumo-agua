@@ -1,6 +1,7 @@
 import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
+import type { Contador, Tarifa, TipoAgua, UserRole, Unidad } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { contadorInputSchema } from '../../domain/agua/schemas'
@@ -17,7 +18,6 @@ interface Props {
   tarifas: Tarifa[]
   unidades: Unidad[]
   userRole: UserRole
-  currentUser: UserSession
   moneda?: string
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
@@ -113,7 +113,6 @@ export function ContadoresSection({
   tarifas,
   unidades,
   userRole,
-  currentUser,
   moneda = 'Q',
   onContadorAdded,
   onContadorUpdated,
@@ -121,6 +120,7 @@ export function ContadoresSection({
   canCreate: _canCreate = true,
   canEdit: _canEdit = true,
 }: Props) {
+  const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)

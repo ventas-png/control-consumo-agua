@@ -1,7 +1,7 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -13,7 +13,6 @@ interface Props {
   registros: Registro[]
   tarifas: Tarifa[]
   userRole: UserRole
-  currentUser?: UserSession | null
   proyectos?: Proyecto[]
   moneda?: string
   onRegistroAdded: (registro: Registro) => void
@@ -30,7 +29,6 @@ export function LecturasSection({
   registros,
   tarifas,
   userRole: _userRole,
-  currentUser: _currentUser,
   proyectos = [],
   moneda = 'Q',
   onRegistroAdded,

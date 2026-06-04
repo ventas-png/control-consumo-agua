@@ -15,6 +15,7 @@ import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarif
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { filterProyectosByAssignment, deriveProyectoConfig } from './lib/proyectosAccess'
+import { SessionProvider } from './components/shared/SessionContext'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { BrandLogo } from './components/shared/BrandLogo'
@@ -720,7 +721,6 @@ export default function App() {
         fuentesEnergia={fuentesEnergia}
         facturasEnergia={facturasEnergia}
         proyectos={proyectos}
-        currentUser={currentUser}
         moneda={moneda}
         canCreate={canCreate('servicios_energia')}
         canEdit={canEdit('servicios_energia')}
@@ -741,7 +741,7 @@ export default function App() {
   )
 
   return (
-    <>
+    <SessionProvider value={currentUser}>
       {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
           en la esquina superior derecha para success/warning/info no críticos.
           Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
@@ -875,7 +875,6 @@ export default function App() {
                     unidades={unidades}
                     userRole={currentUser.role}
                     userId={currentUser.user_id}
-                    currentUser={currentUser}
                     companyId={currentUser.company_id}
                     onClienteAdded={addCliente}
                     onClienteUpdated={updateCliente}
@@ -899,7 +898,6 @@ export default function App() {
                     registros={registros}
                     tarifas={tarifas}
                     userRole={currentUser.role}
-                    currentUser={currentUser}
                     proyectos={proyectos}
                     moneda={moneda}
                     onRegistroAdded={addRegistro}
@@ -942,7 +940,6 @@ export default function App() {
                   registros={registros}
                   clientes={clientes}
                   userRole={currentUser.role}
-                  currentUser={currentUser}
                   moneda={moneda}
                   onEstadoUpdated={updateRegistroEstado}
                   onRegistroUpdated={(id, partial) => {
@@ -1063,7 +1060,6 @@ export default function App() {
                     tarifas={tarifas}
                     proyectos={proyectos}
                     userRole={currentUser.role}
-                    currentUser={currentUser}
                     moneda={moneda}
                     onTarifaAdded={addTarifa}
                     onTarifaUpdated={updateTarifa}
@@ -1083,7 +1079,6 @@ export default function App() {
                     clientes={clientes}
                     proyectos={proyectos}
                     userRole={currentUser.role}
-                    currentUser={currentUser}
                     maxUnidadesPorTipo={maxUnidadesPorTipo}
                     onUnidadAdded={addUnidad}
                     onUnidadUpdated={updateUnidad}
@@ -1103,7 +1098,6 @@ export default function App() {
                     tarifas={tarifas}
                     unidades={unidades}
                     userRole={currentUser.role}
-                    currentUser={currentUser}
                     moneda={moneda}
                     onContadorAdded={addContador}
                     onContadorUpdated={updateContador}
@@ -1181,6 +1175,6 @@ export default function App() {
         </main>
       </div>
     </div>
-    </>
+    </SessionProvider>
   )
 }

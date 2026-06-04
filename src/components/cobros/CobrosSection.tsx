@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
-import type { Registro, Cliente, UserRole, UserSession, Pago, ConvenioPago, FormaPago } from '../../types'
+import type { Registro, Cliente, UserRole, Pago, ConvenioPago, FormaPago } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { calcularTotalPagar } from '../../lib/business'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
@@ -37,7 +38,6 @@ interface Props {
   registros: Registro[]
   clientes: Cliente[]
   userRole: UserRole
-  currentUser: UserSession
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
   onRegistroUpdated?: (id: string, partial: Partial<Registro>) => void
@@ -59,7 +59,8 @@ const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   otro: '📎 Otro',
 }
 
-export function CobrosSection({ registros, clientes, userRole, currentUser, moneda = 'Q', onEstadoUpdated, onRegistroUpdated, canCreate: _canCreate = true, canEdit: _canEdit = true, canChangeStatus: _canChangeStatus = true }: Props) {
+export function CobrosSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated, onRegistroUpdated, canCreate: _canCreate = true, canEdit: _canEdit = true, canChangeStatus: _canChangeStatus = true }: Props) {
+  const currentUser = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('pendientes')
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'mora'>('todos')
