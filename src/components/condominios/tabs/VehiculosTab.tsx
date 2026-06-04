@@ -1,9 +1,9 @@
 import { useState, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   vehiculos: VehiculoResidente[]
@@ -176,64 +176,93 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <select style={{ ...inputStyle, width: 'auto' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
-          <option value="">Todas las unidades</option>
-          {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-        </select>
-        <select style={{ ...inputStyle, width: 'auto' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
-          <option value="todos">Todos los tipos</option>
-          {Object.entries(TIPO_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <label style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-          <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
-          Solo activos
-        </label>
-      </div>
-
-      {/* List */}
-      {filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No hay vehículos registrados" />
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-          {filtered.map(v => {
-            const unidad = unidades.find(u => u.id === v.unidad_id)
-            const tc = TIPO_COLOR[v.tipo] ?? TIPO_COLOR.otro
-            return (
-              <div key={v.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${v.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '12px', opacity: v.activo ? 1 : 0.6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '1px', color: 'var(--at-ink)' }}>{v.placa}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: tc.bg, color: tc.color }}>{TIPO_LABEL[v.tipo]}</span>
-                      {!v.activo && <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', borderRadius: '20px' }}>Inactivo</span>}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>
-                      {[v.anio, v.marca, v.modelo].filter(Boolean).join(' · ')}
-                    </div>
-                    {v.color && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Color: {v.color}</div>}
-                    {unidad && <div style={{ fontSize: '11px', color: 'var(--at-primary)', marginTop: '3px' }}>🏠 {unidad.nombre}</div>}
-                    {v.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', fontStyle: 'italic' }}>{v.notas}</div>}
-                  </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <button onClick={() => toggleActivo(v)}
-                        style={{ padding: '3px 7px', background: v.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: v.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
-                        {v.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                      <button onClick={() => startEdit(v)}
-                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(v.id)}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    </div>
-                  )}
-                </div>
+      {/* List — cond:B2: migrado a <DataTable> shared */}
+      <DataTable<VehiculoResidente>
+        data={filtered}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'placa', direction: 'asc' }}
+        searchPlaceholder="Buscar placa, marca, modelo…"
+        searchableKeys={['placa', v => v.marca ?? '', v => v.modelo ?? '']}
+        rowStyle={v => v.activo ? {} : { opacity: 0.6 }}
+        filters={[
+          {
+            key: 'unidad',
+            label: 'Unidad',
+            value: filtroUnidad,
+            onChange: setFiltroUnidad,
+            options: [{ value: '', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
+          },
+          {
+            key: 'tipo',
+            label: 'Tipo',
+            value: filtroTipo,
+            onChange: setFiltroTipo,
+            options: [{ value: 'todos', label: 'Todos los tipos' }, ...Object.entries(TIPO_LABEL).map(([v, l]) => ({ value: v, label: l }))],
+          },
+          {
+            key: 'activos',
+            label: 'Estado',
+            value: soloActivos ? 'activos' : 'todos',
+            onChange: v => setSoloActivos(v === 'activos'),
+            options: [{ value: 'activos', label: 'Solo activos' }, { value: 'todos', label: 'Todos' }],
+          },
+        ]}
+        emptyState={{ icon: '📋', title: 'No hay vehículos registrados' }}
+        columns={[
+          {
+            key: 'placa', header: 'Placa', sortable: true,
+            render: v => (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '1px', color: 'var(--at-ink)' }}>{v.placa}</span>
+                {!v.activo && <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', borderRadius: '20px' }}>Inactivo</span>}
               </div>
-            )
-          })}
-        </div>
-      )}
+            ),
+          },
+          {
+            key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: v => TIPO_LABEL[v.tipo] ?? v.tipo,
+            render: v => {
+              const tc = TIPO_COLOR[v.tipo] ?? TIPO_COLOR.otro
+              return <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: tc.bg, color: tc.color }}>{TIPO_LABEL[v.tipo]}</span>
+            },
+          },
+          {
+            key: 'vehiculo', header: 'Vehículo', hideOnMobile: true,
+            accessor: v => [v.marca, v.modelo].filter(Boolean).join(' '),
+            render: v => (
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{[v.anio, v.marca, v.modelo].filter(Boolean).join(' · ') || '—'}</div>
+                {v.color && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Color: {v.color}</div>}
+                {v.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontStyle: 'italic' }}>{v.notas}</div>}
+              </div>
+            ),
+          },
+          {
+            key: 'unidad', header: 'Unidad', sortable: true,
+            accessor: v => unidades.find(u => u.id === v.unidad_id)?.nombre ?? '',
+            render: v => {
+              const unidad = unidades.find(u => u.id === v.unidad_id)
+              return unidad ? <span style={{ fontSize: '12px', color: 'var(--at-primary)' }}>🏠 {unidad.nombre}</span> : <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+            },
+          },
+          {
+            key: 'actions', header: '', align: 'right',
+            render: v => canEdit ? (
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                <button onClick={() => toggleActivo(v)}
+                  style={{ padding: '3px 7px', background: v.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: v.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
+                  {v.activo ? 'Desactivar' : 'Activar'}
+                </button>
+                <button onClick={() => startEdit(v)} aria-label={`Editar ${v.placa}`}
+                  style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                <button onClick={() => handleDelete(v.id)} aria-label={`Eliminar ${v.placa}`}
+                  style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+              </div>
+            ) : null,
+          },
+        ] satisfies DataTableColumn<VehiculoResidente>[]}
+      />
     </div>
   )
 }

@@ -1,8 +1,8 @@
 import { useState, type CSSProperties} from 'react'
-import { EmptyState } from '../../shared/EmptyState'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudResidente, TipoSolicitud, EstadoSolicitud, PrioridadSolicitud, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   solicitudes: SolicitudResidente[]
@@ -172,101 +172,126 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoSolicitud | 'all')}
-          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', background: 'var(--at-surface)', cursor: 'pointer' }}>
-          <option value="all">Todos los estados</option>
-          {(Object.keys(ESTADO_STYLE) as EstadoSolicitud[]).map(e => (
-            <option key={e} value={e}>{ESTADO_STYLE[e].label}</option>
-          ))}
-        </select>
-        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoSolicitud | 'all')}
-          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', background: 'var(--at-surface)', cursor: 'pointer' }}>
-          <option value="all">Todos los tipos</option>
-          {(Object.keys(TIPO_LABELS) as TipoSolicitud[]).map(t => (
-            <option key={t} value={t}>{TIPO_LABELS[t].label}</option>
-          ))}
-        </select>
-        <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', alignSelf: 'center' }}>{filtered.length} solicitud(es)</span>
-      </div>
-
-      {/* List */}
-      {filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No hay solicitudes que mostrar" />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.map(s => {
-            const tipo = TIPO_LABELS[s.tipo]
-            const est = ESTADO_STYLE[s.estado]
-            const isExpanded = expandedId === s.id
-            const prioColor = PRIORIDAD_COLOR[s.prioridad]
-            return (
-              <div key={s.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${isExpanded ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '10px', overflow: 'hidden' }}>
-                <div style={{ padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}
-                  onClick={() => setExpandedId(isExpanded ? null : s.id)}>
-                  <div style={{ fontSize: '20px', flexShrink: 0 }}>{tipo.icon}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tipo.label}</span>
-                      {s.unidad_nombre && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>• {s.unidad_nombre}</span>}
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: prioColor, background: `${prioColor}15`, padding: '2px 6px', borderRadius: '20px' }}>
-                        {s.prioridad.toUpperCase()}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {s.descripcion}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{s.created_at.slice(0,10)}{s.fecha_limite ? ` — límite: ${s.fecha_limite}` : ''}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: est.color, background: est.bg, padding: '3px 8px', borderRadius: '20px' }}>{est.label}</span>
-                    {canEdit && (
-                      <button onClick={e => { e.stopPropagation(); handleDelete(s.id) }}
-                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
-                    )}
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div style={{ borderTop: '1px solid var(--at-chip)', padding: '12px 14px', background: 'var(--at-surface-2)' }}>
-                    <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink)' }}>{s.descripcion}</p>
-                    {s.respuesta && (
-                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', padding: '8px 10px', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta:</div>
-                        <div style={{ fontSize: '12px', color: 'var(--at-ink)' }}>{s.respuesta}</div>
-                      </div>
-                    )}
-                    {canEdit && (s.estado === 'pendiente' || s.estado === 'en_proceso') && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <textarea value={respuesta} onChange={e => setRespuesta(e.target.value)}
-                          placeholder="Respuesta / observaciones (opcional)…"
-                          rows={2} style={{ padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {s.estado === 'pendiente' && (
-                            <button onClick={() => handleEstado(s.id, 'en_proceso')}
-                              style={{ padding: '5px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                              ▶ En Proceso
-                            </button>
-                          )}
-                          <button onClick={() => handleEstado(s.id, 'resuelto')}
-                            style={{ padding: '5px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                            ✓ Resolver
-                          </button>
-                          <button onClick={() => handleEstado(s.id, 'rechazado')}
-                            style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                            ✕ Rechazar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+      {/* List — cond:B2: migrado a <DataTable> shared con expandedContent */}
+      <DataTable<SolicitudResidente>
+        data={filtered}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'created_at', direction: 'desc' }}
+        onRowClick={s => setExpandedId(expandedId === s.id ? null : s.id)}
+        searchPlaceholder="Buscar descripción, unidad…"
+        searchableKeys={['descripcion', s => s.unidad_nombre ?? '']}
+        filters={[
+          {
+            key: 'estado',
+            label: 'Estado',
+            value: filtroEstado,
+            onChange: v => setFiltroEstado(v as EstadoSolicitud | 'all'),
+            options: [
+              { value: 'all', label: 'Todos los estados' },
+              ...(Object.keys(ESTADO_STYLE) as EstadoSolicitud[]).map(e => ({ value: e, label: ESTADO_STYLE[e].label })),
+            ],
+          },
+          {
+            key: 'tipo',
+            label: 'Tipo',
+            value: filtroTipo,
+            onChange: v => setFiltroTipo(v as TipoSolicitud | 'all'),
+            options: [
+              { value: 'all', label: 'Todos los tipos' },
+              ...(Object.keys(TIPO_LABELS) as TipoSolicitud[]).map(t => ({ value: t, label: TIPO_LABELS[t].label })),
+            ],
+          },
+        ]}
+        emptyState={{ icon: '📋', title: 'No hay solicitudes que mostrar' }}
+        columns={[
+          {
+            key: 'tipo', header: 'Tipo', sortable: true,
+            accessor: s => TIPO_LABELS[s.tipo].label,
+            render: s => (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--at-ink)' }}>
+                <span style={{ fontSize: '20px' }}>{TIPO_LABELS[s.tipo].icon}</span>
+                {TIPO_LABELS[s.tipo].label}
+              </span>
+            ),
+          },
+          {
+            key: 'unidad', header: 'Unidad', sortable: true,
+            accessor: s => s.unidad_nombre ?? '',
+            render: s => s.unidad_nombre
+              ? <span style={{ color: 'var(--at-ink-2)' }}>{s.unidad_nombre}</span>
+              : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+          },
+          {
+            key: 'descripcion', header: 'Descripción', sortable: true, hideOnMobile: true,
+            render: s => (
+              <span style={{ color: 'var(--at-ink-3)', display: 'block', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.descripcion}
+              </span>
+            ),
+          },
+          {
+            key: 'prioridad', header: 'Prioridad', sortable: true,
+            render: s => {
+              const prioColor = PRIORIDAD_COLOR[s.prioridad]
+              return <span style={{ fontSize: '10px', fontWeight: 700, color: prioColor, background: `${prioColor}15`, padding: '2px 6px', borderRadius: '20px' }}>{s.prioridad.toUpperCase()}</span>
+            },
+          },
+          {
+            key: 'created_at', header: 'Fecha', sortable: true, hideOnMobile: true,
+            render: s => <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{s.created_at.slice(0, 10)}{s.fecha_limite ? ` — límite: ${s.fecha_limite}` : ''}</span>,
+          },
+          {
+            key: 'estado', header: 'Estado', sortable: true,
+            render: s => {
+              const est = ESTADO_STYLE[s.estado]
+              return <span style={{ fontSize: '11px', fontWeight: 700, color: est.color, background: est.bg, padding: '3px 8px', borderRadius: '20px' }}>{est.label}</span>
+            },
+          },
+          {
+            key: 'actions', header: '', align: 'right',
+            render: s => canEdit ? (
+              <button onClick={e => { e.stopPropagation(); handleDelete(s.id) }} aria-label="Eliminar solicitud"
+                style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
+            ) : null,
+          },
+        ] satisfies DataTableColumn<SolicitudResidente>[]}
+        isRowExpanded={s => expandedId === s.id}
+        expandedContent={s => (
+          <div style={{ padding: '4px 0 8px' }}>
+            <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink)' }}>{s.descripcion}</p>
+            {s.respuesta && (
+              <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', padding: '8px 10px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta:</div>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink)' }}>{s.respuesta}</div>
               </div>
-            )
-          })}
-        </div>
-      )}
+            )}
+            {canEdit && (s.estado === 'pendiente' || s.estado === 'en_proceso') && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
+                <textarea value={respuesta} onChange={e => setRespuesta(e.target.value)}
+                  placeholder="Respuesta / observaciones (opcional)…"
+                  rows={2} style={{ padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {s.estado === 'pendiente' && (
+                    <button onClick={() => handleEstado(s.id, 'en_proceso')}
+                      style={{ padding: '5px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      ▶ En Proceso
+                    </button>
+                  )}
+                  <button onClick={() => handleEstado(s.id, 'resuelto')}
+                    style={{ padding: '5px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    ✓ Resolver
+                  </button>
+                  <button onClick={() => handleEstado(s.id, 'rechazado')}
+                    style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                    ✕ Rechazar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      />
     </div>
   )
 }

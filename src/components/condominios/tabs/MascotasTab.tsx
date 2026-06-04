@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   mascotas: Mascota[]
@@ -20,7 +21,6 @@ const ESPECIE_ICON: Record<EspecieMascota, string> = { perro: '🐕', gato: '�
 export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [busqueda, setBusqueda] = useState('')
   const [filtroEspecie, setFiltroEspecie] = useState<EspecieMascota | 'todos'>('todos')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
@@ -33,11 +33,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
 
   const filtradas = mascotas.filter(m => {
     const matchEspecie = filtroEspecie === 'todos' || m.especie === filtroEspecie
-    const matchBusqueda = !busqueda ||
-      m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (m.raza || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-      (m.unidad_nombre || '').toLowerCase().includes(busqueda.toLowerCase())
-    return matchEspecie && matchBusqueda && m.activo
+    return matchEspecie && m.activo
   })
 
   // Alert for overdue vaccines (>1 year)
@@ -116,18 +112,6 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
         </div>
       )}
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar mascota, raza, unidad..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
-        {(['todos', 'perro', 'gato', 'ave', 'otro'] as const).map(e => (
-          <button key={e} onClick={() => setFiltroEspecie(e)}
-            style={{ padding: '7px 13px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEspecie === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
-            {e === 'todos' ? 'Todas' : `${ESPECIE_ICON[e]} ${e.charAt(0).toUpperCase() + e.slice(1)}`}
-          </button>
-        ))}
-      </div>
-
       {/* Form */}
       {showForm && (
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
@@ -194,53 +178,82 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
         </div>
       )}
 
-      {/* Lista */}
-      {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🐾</div>
-          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay mascotas registradas</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-          {filtradas.map(m => {
-            const vacunaDays = m.fecha_ultima_vacuna
-              ? Math.floor((new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24))
-              : null
-            const vacunaVencida = vacunaDays !== null && vacunaDays > 365
-            return (
-              <div key={m.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vacunaVencida ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  {m.foto_url
-                    ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
-                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--at-success-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                        {ESPECIE_ICON[m.especie]}
-                      </div>
-                  }
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)' }}>{m.nombre}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{m.especie}{m.raza ? ` · ${m.raza}` : ''}</div>
-                  </div>
+      {/* Lista — cond:B2: migrado a <DataTable> shared */}
+      <DataTable<Mascota>
+        data={filtradas}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'nombre', direction: 'asc' }}
+        searchPlaceholder="Buscar mascota, raza, unidad…"
+        searchableKeys={['nombre', m => m.raza ?? '', m => m.unidad_nombre ?? '']}
+        rowStyle={m => {
+          const vencida = m.fecha_ultima_vacuna
+            && (new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24) > 365
+          return vencida ? { background: 'var(--at-warning-tint)' } : {}
+        }}
+        filters={[{
+          key: 'especie',
+          label: 'Especie',
+          value: filtroEspecie,
+          onChange: v => setFiltroEspecie(v as EspecieMascota | 'todos'),
+          options: [
+            { value: 'todos', label: 'Todas las especies' },
+            ...(['perro', 'gato', 'ave', 'otro'] as const).map(e => ({ value: e, label: `${ESPECIE_ICON[e]} ${e.charAt(0).toUpperCase() + e.slice(1)}` })),
+          ],
+        }]}
+        emptyState={{ icon: '🐾', title: 'No hay mascotas registradas' }}
+        columns={[
+          {
+            key: 'nombre', header: 'Mascota', sortable: true,
+            render: m => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {m.foto_url
+                  ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
+                  : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--at-success-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                      {ESPECIE_ICON[m.especie]}
+                    </div>
+                }
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{m.nombre}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{m.especie}{m.raza ? ` · ${m.raza}` : ''}</div>
                 </div>
-                <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  {m.unidad_nombre && <span>📍 {m.unidad_nombre}</span>}
-                  {m.color && <span>🎨 {m.color}</span>}
-                  {m.fecha_ultima_vacuna && (
-                    <span style={{ color: vacunaVencida ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: vacunaVencida ? 700 : 400 }}>
-                      💉 Vacuna: {m.fecha_ultima_vacuna} {vacunaVencida ? '⚠️ Vencida' : ''}
-                    </span>
-                  )}
-                </div>
-                {canEdit && (
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                    <button onClick={() => startEdit(m)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
-                    <button onClick={() => eliminar(m.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
-                  </div>
-                )}
               </div>
-            )
-          })}
-        </div>
-      )}
+            ),
+          },
+          {
+            key: 'unidad_nombre', header: 'Unidad', sortable: true,
+            accessor: m => m.unidad_nombre ?? '',
+            render: m => m.unidad_nombre ? <span>📍 {m.unidad_nombre}</span> : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+          },
+          {
+            key: 'color', header: 'Color', hideOnMobile: true,
+            accessor: m => m.color ?? '',
+            render: m => m.color ? <span>🎨 {m.color}</span> : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+          },
+          {
+            key: 'fecha_ultima_vacuna', header: 'Vacuna', sortable: true,
+            accessor: m => m.fecha_ultima_vacuna ?? '',
+            render: m => {
+              if (!m.fecha_ultima_vacuna) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              const vencida = (new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24) > 365
+              return (
+                <span style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: vencida ? 700 : 400 }}>
+                  💉 {m.fecha_ultima_vacuna} {vencida ? '⚠️ Vencida' : ''}
+                </span>
+              )
+            },
+          },
+          {
+            key: 'actions', header: '', align: 'right',
+            render: m => canEdit ? (
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                <button onClick={() => startEdit(m)} aria-label={`Editar ${m.nombre}`} style={{ padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
+                <button onClick={() => eliminar(m.id)} aria-label={`Eliminar ${m.nombre}`} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
+              </div>
+            ) : null,
+          },
+        ] satisfies DataTableColumn<Mascota>[]}
+      />
     </div>
   )
 }
