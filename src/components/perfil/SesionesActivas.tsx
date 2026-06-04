@@ -2,6 +2,7 @@ import { useMemo, type CSSProperties } from 'react'
 import { describeUserAgent } from '../../lib/userAgent'
 import { useMisSesionesQuery, type SesionActiva } from '../../domain/sesiones/queries'
 import { useRevocarSesionMutation, useRevocarOtrasSesionesMutation } from '../../domain/sesiones/mutations'
+import { useFormato } from '../../hooks/useFormato'
 
 // plat:P9 — Lista de sesiones activas del usuario (dispositivos con sesión
 // abierta) con acción de cierre. Se monta dentro de una <Card> en PerfilSection.
@@ -40,6 +41,7 @@ function rowStyle(current: boolean): CSSProperties {
 
 export function SesionesActivas() {
   const { data: sesiones = [], isLoading, isError, refetch } = useMisSesionesQuery()
+  const { formatFechaHora } = useFormato()  // plat:P18 — hora absoluta en la tz del usuario
   const revocar = useRevocarSesionMutation()
   const revocarOtras = useRevocarOtrasSesionesMutation()
 
@@ -73,7 +75,10 @@ export function SesionesActivas() {
                   {s.is_current && <span style={badgeStyle}>Esta sesión</span>}
                   {s.aal === 'aal2' && <span style={mfaBadgeStyle}>2FA</span>}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
+                <div
+                  style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '3px' }}
+                  title={formatFechaHora(s.refreshed_at ?? s.updated_at ?? s.created_at)}
+                >
                   {s.ip ? `IP ${s.ip} · ` : ''}última actividad {ultimaActividad(s)}
                 </div>
               </div>
