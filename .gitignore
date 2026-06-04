@@ -31,5 +31,8 @@ npm-debug.log*
 # Supabase CLI cache
 supabase/.temp/
 
+# Claude Code background-agent worktrees (transient, harness-managed)
+.claude/worktrees/
+
 # infra:I14 condominios-media migration runtime artifact (rollback manifest)
 condominios-media-manifest-*.json
