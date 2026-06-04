@@ -45,6 +45,8 @@ const PasswordResetPage = lazy(() => import('./components/auth/PasswordResetPage
 const RegisterScreen = lazy(() => import('./components/auth/RegisterScreen').then(m => ({ default: m.RegisterScreen })))
 const SignupCompanyScreen = lazy(() => import('./components/auth/SignupCompanyScreen').then(m => ({ default: m.SignupCompanyScreen })))
 const OAuthOnboardingScreen = lazy(() => import('./components/auth/OAuthOnboardingScreen'))
+// T3/plat:P3 — landing pública de aceptación de invitación (/aceptar-invitacion).
+const AcceptInvitationPage = lazy(() => import('./components/onboarding/AcceptInvitationPage').then(m => ({ default: m.AcceptInvitationPage })))
 
 // Cliente-role portals — solo se cargan para usuarios con role='cliente'.
 // La inmensa mayoria son admins/staff que nunca tocan estos componentes.
@@ -265,6 +267,19 @@ export default function App() {
     return (
       <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
         <LazyShowcase />
+      </Suspense>
+    )
+  }
+
+  // T3/plat:P3 — landing pública de aceptación de invitación. Es sessionless
+  // (el invitado todavía no tiene cuenta), por eso se resuelve aquí arriba con
+  // el mismo patrón que /dev/components, ANTES del gate de auth/loading.
+  // NOTA DE COORDINACIÓN T7: único cambio en App.tsx (1 import lazy + este
+  // early-return). No refactoriza el routing ni useAuth.
+  if (typeof window !== 'undefined' && window.location.pathname === '/aceptar-invitacion') {
+    return (
+      <Suspense fallback={<AuthSplash />}>
+        <AcceptInvitationPage />
       </Suspense>
     )
   }
