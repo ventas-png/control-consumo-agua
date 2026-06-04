@@ -22,20 +22,26 @@ Guatefacturas), certificador FEL autorizado por SAT GT (Acuerdo de Directorio
 - **Validación de credenciales** del ambiente activo (usuario/clave, tolerante a
   llaves equivalentes) en `AinnovaProvider`.
 
+## Modelo de firma — CONFIRMADO
+
+El dueño confirmó que **Ainnova firma el DTE por el emisor (SaaS)**. Por tanto:
+
+- Bastan **usuario/clave** de Ainnova (lo que ya captura la UI). **No** se guarda el
+  certificado del emisor (.pfx) ni se firma en el edge.
+- El adapter solo **mapea** el DTE FEL y lo **envía** al web service con esas
+  credenciales; Ainnova firma, certifica ante SAT y devuelve UUID/serie/número.
+
 ## Qué falta para timbrar con valor fiscal (transporte)
 
 El transporte SOAP/REST contra `dte.guatefacturas.com` **falla seguro** hoy
 (`AinnovaContratoNoConfirmadoError`): jamás finge un timbrado. Para habilitarlo se
-necesita, de Ainnova/del dueño:
+necesita:
 
 1. **Contrato del web service**: operación y envelope EXACTOS (SOAP `webservices63`
-   — endpoint de pruebas `…/feltest/` — vs. una API REST con token), del manual de
+   — endpoint de pruebas `…/feltest/` — o una API REST con token), del manual de
    integración de Ainnova.
-2. **Modelo de firma**: ¿firma **Ainnova** el DTE por el emisor (SaaS), o hay que
-   **firmar el XML con el certificado del emisor** antes de enviarlo? El 2º caso
-   exige guardar el certificado (.pfx + clave) en la bóveda y firmar en el edge.
-3. **Credenciales sandbox** reales de Ainnova para validar end-to-end.
-4. **Red del entorno**: habilitar `dte.guatefacturas.com` en la política de red
+2. **Credenciales sandbox** reales de Ainnova para validar end-to-end.
+3. **Red del entorno**: habilitar `dte.guatefacturas.com` en la política de red
    (hoy fuera del allowlist) para que el edge alcance al certificador.
 
 ## Configuración (secrets del edge — Supabase → Edge Functions → Secrets)

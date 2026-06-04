@@ -12,13 +12,14 @@
 //   3. Mapea el DTE canónico → estructura DTE FEL (construirFelDte), lista para
 //      serializar a XML SAT GT.
 //
+// MODELO DE FIRMA — CONFIRMADO por el dueño: Ainnova firma el DTE por el emisor
+// (SaaS), así que bastan usuario/clave (NO se guarda el certificado del emisor).
+//
 // QUÉ FALTA PARA TIMBRAR DE VERDAD (transporte, no verificable desde este entorno —
-// el host dte.guatefacturas.com está fuera del allowlist de red y el contrato exacto
-// requiere el manual de integración + credenciales sandbox de Ainnova):
-//   a) Operación/envelope EXACTOS del web service (SOAP webservices63 vs REST/token).
-//   b) MODELO DE FIRMA: ¿firma Ainnova el DTE por el emisor (SaaS), o hay que firmar
-//      el XML con el certificado del emisor ANTES de enviarlo? Cambia el flujo y las
-//      credenciales requeridas (en el 2º caso hay que guardar el certificado .pfx).
+// el host dte.guatefacturas.com está fuera del allowlist de red):
+//   a) Operación/envelope EXACTOS del web service de Guatefacturas (SOAP
+//      webservices63 — endpoint de pruebas …/feltest/ — o REST/token), del manual.
+//   b) Credenciales sandbox reales de Ainnova para validar end-to-end.
 //   c) Whitelisting de dte.guatefacturas.com en la política de red del entorno.
 //
 // Mientras (a)/(b)/(c) no estén confirmados, el transporte FALLA SEGURO con un error
@@ -72,10 +73,10 @@ export class AinnovaContratoNoConfirmadoError extends Error {
   constructor(operacion: 'timbrar' | 'cancelar' | 'consultar') {
     super(
       `Ainnova: el transporte de "${operacion}" aún no está habilitado. ` +
+        'Firma confirmada: Ainnova firma por el emisor (SaaS), bastan usuario/clave. ' +
         'Pendiente: (1) operación/envelope del web service de Guatefacturas, ' +
-        '(2) modelo de firma (¿firma Ainnova o el emisor?), ' +
-        '(3) habilitar dte.guatefacturas.com en la red del entorno. ' +
-        'Aporta el manual de integración + credenciales sandbox de Ainnova para conectarlo.',
+        '(2) credenciales sandbox reales, ' +
+        '(3) habilitar dte.guatefacturas.com en la red del entorno.',
     )
     this.name = 'AinnovaContratoNoConfirmadoError'
   }
