@@ -45,3 +45,9 @@ verify_jwt = false
 # password server-side.
 [functions.accept-invitation]
 verify_jwt = false
+
+# Timbrar documento fiscal (serv:S11): nucleo FEL/CFDI provider-agnostic. Valida
+# el token a mano (service_role interno o JWT admin/owner del tenant), arma el DTE
+# canonico y lo timbra via el adapter (hoy SandboxProvider). Sin HTTP a PAC real.
+[functions.timbrar-documento]
+verify_jwt = false
