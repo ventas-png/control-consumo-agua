@@ -49,6 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,107 +70,61 @@ jobs:
       # ───────────────────────────────────────────────────────────────────────
 
       - name: Deploy create-cliente-account (no JWT — onboarding pre-login)
-        run: |
-          supabase functions deploy create-cliente-account \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh create-cliente-account --no-verify-jwt
 
       - name: Deploy create-payment-intent
-        run: |
-          supabase functions deploy create-payment-intent \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh create-payment-intent
 
       - name: Deploy create-user (JWT requerido — el código valida rol admin del caller)
-        run: |
-          supabase functions deploy create-user \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh create-user
 
       - name: Deploy delete-user (JWT requerido — el código valida rol admin del caller)
-        run: |
-          supabase functions deploy delete-user \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh delete-user
 
       - name: Deploy save-payment-config
-        run: |
-          supabase functions deploy save-payment-config \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh save-payment-config
 
       - name: Deploy stripe-webhook-handler
-        run: |
-          supabase functions deploy stripe-webhook-handler \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh stripe-webhook-handler
 
       - name: Deploy test-stripe
-        run: |
-          supabase functions deploy test-stripe \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh test-stripe
 
       - name: Deploy log-security-event (no JWT — pre-login eventos como failed_login_attempt)
-        run: |
-          supabase functions deploy log-security-event \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh log-security-event --no-verify-jwt
 
       - name: Deploy complete-oauth-onboarding (no JWT — verifica access_token Google internamente)
-        run: |
-          supabase functions deploy complete-oauth-onboarding \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh complete-oauth-onboarding --no-verify-jwt
 
       - name: Deploy google-oauth-initiate
-        run: |
-          supabase functions deploy google-oauth-initiate \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh google-oauth-initiate
 
       - name: Deploy google-oauth-callback
-        run: |
-          supabase functions deploy google-oauth-callback \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh google-oauth-callback
 
       - name: Deploy send-email
-        run: |
-          supabase functions deploy send-email \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh send-email
 
       - name: Deploy notify-package (no JWT — invocada por trigger Postgres con service_role)
-        run: |
-          supabase functions deploy notify-package \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh notify-package --no-verify-jwt
 
       - name: Deploy route-reminders (no JWT — invocada por pg_cron con service_role)
-        run: |
-          supabase functions deploy route-reminders \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh route-reminders --no-verify-jwt
 
       - name: Deploy health (no JWT — endpoint público para monitoreo externo)
-        run: |
-          supabase functions deploy health \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh health --no-verify-jwt
 
       - name: Deploy signup-company (no JWT — onboarding self-service público; valida origin + fuerza password + Supabase Auth email confirmation)
-        run: |
-          supabase functions deploy signup-company \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh signup-company --no-verify-jwt
 
       - name: Deploy create-checkout-session (JWT requerido — solo company_owner/admin de su company puede iniciar checkout)
-        run: |
-          supabase functions deploy create-checkout-session \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh create-checkout-session
 
       - name: Deploy create-billing-portal-session (JWT requerido — solo company_owner/admin de su company)
-        run: |
-          supabase functions deploy create-billing-portal-session \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: bash .github/scripts/deploy-fn.sh create-billing-portal-session
 
       - name: Deploy stripe-platform-webhook (no JWT — Stripe firma con HMAC SHA-256, validado contra STRIPE_PLATFORM_WEBHOOK_SECRET)
-        run: |
-          supabase functions deploy stripe-platform-webhook \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh stripe-platform-webhook --no-verify-jwt
 
       # ───────────────────────────────────────────────────────────────────────
       # Cobros pluggable (payfac): cada empresa/locación elige su payfac y conecta
@@ -178,22 +133,13 @@ jobs:
       # y nunca exponen el secreto de la bóveda payfac_secrets.
       # ───────────────────────────────────────────────────────────────────────
       - name: Deploy create-charge (no JWT — valida token a mano, service_role o JWT del tenant)
-        run: |
-          supabase functions deploy create-charge \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh create-charge --no-verify-jwt
 
       - name: Deploy payfac-save-credentials (no JWT — valida token a mano, service_role o admin/owner)
-        run: |
-          supabase functions deploy payfac-save-credentials \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh payfac-save-credentials --no-verify-jwt
 
       - name: Deploy payfac-test-connection (no JWT — valida token a mano, service_role o admin/owner)
-        run: |
-          supabase functions deploy payfac-test-connection \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh payfac-test-connection --no-verify-jwt
 
       # ───────────────────────────────────────────────────────────────────────
       # Fiscal FEL/CFDI (serv:S11): mismo patrón "elige tu PAC y conecta".
@@ -201,19 +147,10 @@ jobs:
       # verify_jwt=false + validación manual del token.
       # ───────────────────────────────────────────────────────────────────────
       - name: Deploy timbrar-documento (no JWT — valida token a mano, service_role o admin/owner)
-        run: |
-          supabase functions deploy timbrar-documento \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh timbrar-documento --no-verify-jwt
 
       - name: Deploy fiscal-save-credentials (no JWT — valida token a mano, service_role o admin/owner)
-        run: |
-          supabase functions deploy fiscal-save-credentials \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh fiscal-save-credentials --no-verify-jwt
 
       - name: Deploy fiscal-test-connection (no JWT — valida token a mano, service_role o admin/owner)
-        run: |
-          supabase functions deploy fiscal-test-connection \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+        run: bash .github/scripts/deploy-fn.sh fiscal-test-connection --no-verify-jwt
