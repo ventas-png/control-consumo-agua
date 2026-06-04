@@ -55,10 +55,13 @@ jobs:
   deno-check:
     name: deno check (advisory)
     runs-on: ubuntu-latest
-    # Advisory: los tests usan vitest, así que NO corremos `deno test`. Aquí solo
-    # typecheckeamos los módulos de las edge functions con Deno para cazar drift de
-    # tipos. No bloquea el merge mientras estabilizamos la baseline (igual criterio
-    # que el lint-functions advisory de deploy-functions.yml).
+    # Advisory: los tests usan vitest, así que NO corremos `deno test`. Aquí
+    # typecheckeamos con Deno SOLO los helpers puros extraídos (render.ts /
+    # validate.ts), que NO importan supabase-js. Los handlers (index.ts) usan el
+    # cliente Supabase sin tipos generados (`.from().select()` infiere `never`,
+    # casteado con `as`): `deno check` sobre ellos da falsos positivos de tipo, no
+    # bugs reales. Apuntando a los helpers, el chequeo caza drift de tipos REAL en
+    # la lógica pura. Se mantiene continue-on-error como red de seguridad.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -67,12 +70,11 @@ jobs:
         with:
           deno-version: v1.x
 
-      # Typecheck de los handlers + helpers puros. `deno check` resuelve los imports
-      # remotos (esm.sh) y los _shared/*.ts. Si falla por red de esm.sh, el job es
-      # advisory y no tumba el PR.
-      - name: deno check edge functions
+      # Typecheck Deno de los helpers puros (sin I/O ni supabase-js). Detecta drift
+      # de tipos que `tsc` no ve (tsconfig solo incluye src/).
+      - name: deno check pure helpers
         run: |
           deno check \
-            supabase/functions/notifications-dispatcher/index.ts \
-            supabase/functions/invite-user/index.ts \
-            supabase/functions/accept-invitation/index.ts
+            supabase/functions/notifications-dispatcher/render.ts \
+            supabase/functions/invite-user/validate.ts \
+            supabase/functions/accept-invitation/validate.ts
