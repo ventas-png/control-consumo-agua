@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { calcularTotalPagar, validarLectura } from '../business'
+import {
+  calcularTotalPagar,
+  validarLectura,
+  redondear2,
+  calcularIVA,
+  IVA_TASA_GT,
+  calcularMora,
+  calcularTotalFactura,
+  normalizarEstadoFactura,
+  esEstadoTerminalFactura,
+  puedeTransicionarFactura,
+  aplicarTransicionFactura,
+  type ReglaMora,
+} from '../business'
 
 describe('calcularTotalPagar', () => {
   describe('Tramo 1 — canon fijo (consumo ≤ mínimo)', () => {
@@ -150,5 +163,307 @@ describe('validarLectura', () => {
     const r = validarLectura(100, 200, { promedioHistorico: 20, factorAnormal: 10 })
     expect(r.valid).toBe(true)
     expect(r.warning).toBeUndefined()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// T4 · Facturación (agua:C4) — IVA, mora, total de factura y máquina de estados.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('redondear2', () => {
+  it('redondea a 2 decimales half-away-from-zero', () => {
+    expect(redondear2(1.005)).toBe(1.01)
+    expect(redondear2(1.004)).toBe(1.0)
+    expect(redondear2(2.675)).toBe(2.68)
+  })
+  it('no finitos → 0', () => {
+    expect(redondear2(NaN)).toBe(0)
+    expect(redondear2(Infinity)).toBe(0)
+  })
+})
+
+describe('calcularIVA', () => {
+  it('aplica 12% por defecto (GT) cuando no se pasa tasa', () => {
+    const r = calcularIVA(100)
+    expect(r.tasa).toBe(IVA_TASA_GT)
+    expect(r.tasa).toBe(0.12)
+    expect(r.iva).toBe(12)
+    expect(r.total).toBe(112)
+    expect(r.base).toBe(100)
+  })
+
+  it('respeta una tasa explícita (MX 16%)', () => {
+    const r = calcularIVA(250, 0.16)
+    expect(r.iva).toBe(40)
+    expect(r.total).toBe(290)
+  })
+
+  it('tasa 0 = exento (NO cae al default)', () => {
+    const r = calcularIVA(100, 0)
+    expect(r.tasa).toBe(0)
+    expect(r.iva).toBe(0)
+    expect(r.total).toBe(100)
+  })
+
+  it('null/undefined → default GT (distinto de 0)', () => {
+    expect(calcularIVA(100, null).iva).toBe(12)
+    expect(calcularIVA(100, undefined).iva).toBe(12)
+  })
+
+  it('redondea el IVA a centavos', () => {
+    // 33.33 * 0.12 = 3.9996 → 4.00
+    const r = calcularIVA(33.33, 0.12)
+    expect(r.iva).toBe(4.0)
+    expect(r.total).toBe(37.33)
+  })
+
+  it('base negativa o no finita → 0', () => {
+    expect(calcularIVA(-50).iva).toBe(0)
+    expect(calcularIVA(-50).total).toBe(0)
+    expect(calcularIVA(NaN).total).toBe(0)
+  })
+
+  it('tasa > 1 se recorta a 1 (error de captura)', () => {
+    const r = calcularIVA(100, 1.2)
+    expect(r.tasa).toBe(1)
+    expect(r.iva).toBe(100)
+  })
+
+  it('tasa negativa → 0', () => {
+    expect(calcularIVA(100, -0.5).iva).toBe(0)
+  })
+})
+
+describe('calcularMora', () => {
+  const reglaPct: ReglaMora = {
+    tipo: 'porcentaje',
+    valor: 5, // 5%
+    aplicar_sobre: 'saldo_vencido',
+    dias_vencimiento: 30,
+    periodo_gracia: 0,
+  }
+
+  it('no aplica si no ha llegado al vencimiento', () => {
+    const r = calcularMora(reglaPct, 20, 1000)
+    expect(r.aplica).toBe(false)
+    expect(r.diasAtraso).toBe(0)
+    expect(r.monto).toBe(0)
+    expect(r.motivo).toMatch(/no ha vencido/i)
+  })
+
+  it('no aplica exactamente en el día de vencimiento (diasAtraso = 0)', () => {
+    const r = calcularMora(reglaPct, 30, 1000)
+    expect(r.aplica).toBe(false)
+    expect(r.diasAtraso).toBe(0)
+  })
+
+  it('aplica 5% sobre el saldo vencido tras pasar el vencimiento', () => {
+    const r = calcularMora(reglaPct, 31, 1000)
+    expect(r.aplica).toBe(true)
+    expect(r.diasAtraso).toBe(1)
+    expect(r.base).toBe(1000)
+    expect(r.monto).toBe(50) // 1000 * 5%
+  })
+
+  it('respeta el periodo de gracia antes de cobrar', () => {
+    const conGracia: ReglaMora = { ...reglaPct, periodo_gracia: 5 }
+    // 33 días = 3 días de atraso, dentro de los 5 de gracia → no aplica
+    expect(calcularMora(conGracia, 33, 1000).aplica).toBe(false)
+    expect(calcularMora(conGracia, 33, 1000).motivo).toMatch(/gracia/i)
+    // 36 días = 6 de atraso, supera la gracia → aplica
+    expect(calcularMora(conGracia, 36, 1000).aplica).toBe(true)
+  })
+
+  it('monto_fijo ignora la base y cobra plano', () => {
+    const fija: ReglaMora = { tipo: 'monto_fijo', valor: 75, dias_vencimiento: 30 }
+    const r = calcularMora(fija, 45, 1000)
+    expect(r.aplica).toBe(true)
+    expect(r.monto).toBe(75)
+  })
+
+  it('monto_fijo aplica aunque el saldo sea 0', () => {
+    const fija: ReglaMora = { tipo: 'monto_fijo', valor: 50, dias_vencimiento: 30 }
+    const r = calcularMora(fija, 45, 0)
+    expect(r.aplica).toBe(true)
+    expect(r.monto).toBe(50)
+  })
+
+  it('porcentaje sobre saldo 0 no aplica (nada que recargar)', () => {
+    const r = calcularMora(reglaPct, 45, 0)
+    expect(r.aplica).toBe(false)
+    expect(r.motivo).toMatch(/sin saldo/i)
+  })
+
+  it('aplicar_sobre = monto_cuota usa el monto de la cuota como base', () => {
+    const sobreCuota: ReglaMora = { ...reglaPct, aplicar_sobre: 'monto_cuota' }
+    // saldo parcial 200, pero la base es la cuota completa 1000
+    const r = calcularMora(sobreCuota, 31, 200, 1000)
+    expect(r.base).toBe(1000)
+    expect(r.monto).toBe(50) // 1000 * 5%
+  })
+
+  it('valor 0 en la regla no cobra mora', () => {
+    const cero: ReglaMora = { ...reglaPct, valor: 0 }
+    const r = calcularMora(cero, 60, 1000)
+    expect(r.aplica).toBe(false)
+    expect(r.monto).toBe(0)
+  })
+
+  it('redondea el recargo porcentual a centavos', () => {
+    // 333.33 * 5% = 16.6665 → 16.67
+    const r = calcularMora(reglaPct, 31, 333.33)
+    expect(r.monto).toBe(16.67)
+  })
+})
+
+describe('calcularTotalFactura', () => {
+  it('subtotal + IVA (12%) + mora', () => {
+    const r = calcularTotalFactura(100, 0.12, 50)
+    expect(r.subtotal).toBe(100)
+    expect(r.iva_monto).toBe(12)
+    expect(r.monto_con_iva).toBe(112)
+    expect(r.mora_monto).toBe(50)
+    expect(r.total_a_pagar).toBe(162)
+  })
+
+  it('sin mora (default 0)', () => {
+    const r = calcularTotalFactura(200, 0.12)
+    expect(r.mora_monto).toBe(0)
+    expect(r.total_a_pagar).toBe(224)
+  })
+
+  it('IVA por defecto GT cuando la tasa es null', () => {
+    const r = calcularTotalFactura(100, null)
+    expect(r.iva_tasa).toBe(0.12)
+    expect(r.total_a_pagar).toBe(112)
+  })
+
+  it('exento (tasa 0): total = subtotal + mora', () => {
+    const r = calcularTotalFactura(100, 0, 10)
+    expect(r.iva_monto).toBe(0)
+    expect(r.total_a_pagar).toBe(110)
+  })
+
+  it('la mora NO genera IVA (se suma después del IVA)', () => {
+    // IVA solo sobre 100 (12), mora 100 entra sin IVA → 112 + 100 = 212
+    const r = calcularTotalFactura(100, 0.12, 100)
+    expect(r.iva_monto).toBe(12)
+    expect(r.total_a_pagar).toBe(212)
+  })
+
+  it('mora negativa se ignora', () => {
+    const r = calcularTotalFactura(100, 0.12, -50)
+    expect(r.mora_monto).toBe(0)
+    expect(r.total_a_pagar).toBe(112)
+  })
+})
+
+describe('normalizarEstadoFactura', () => {
+  it('mantiene los estados canónicos', () => {
+    for (const e of ['pendiente', 'emitida', 'pagada', 'vencida', 'anulada'] as const) {
+      expect(normalizarEstadoFactura(e)).toBe(e)
+    }
+  })
+  it('mapea legacy: pagado → pagada, mora → vencida', () => {
+    expect(normalizarEstadoFactura('pagado')).toBe('pagada')
+    expect(normalizarEstadoFactura('mora')).toBe('vencida')
+  })
+  it('null / desconocido → pendiente', () => {
+    expect(normalizarEstadoFactura(null)).toBe('pendiente')
+    expect(normalizarEstadoFactura(undefined)).toBe('pendiente')
+    expect(normalizarEstadoFactura('lo_que_sea')).toBe('pendiente')
+  })
+})
+
+describe('esEstadoTerminalFactura', () => {
+  it('pagada y anulada son terminales (incl. legacy pagado)', () => {
+    expect(esEstadoTerminalFactura('pagada')).toBe(true)
+    expect(esEstadoTerminalFactura('pagado')).toBe(true)
+    expect(esEstadoTerminalFactura('anulada')).toBe(true)
+  })
+  it('pendiente/emitida/vencida NO son terminales', () => {
+    expect(esEstadoTerminalFactura('pendiente')).toBe(false)
+    expect(esEstadoTerminalFactura('emitida')).toBe(false)
+    expect(esEstadoTerminalFactura('vencida')).toBe(false)
+    expect(esEstadoTerminalFactura('mora')).toBe(false) // legacy → vencida
+  })
+})
+
+describe('puedeTransicionarFactura', () => {
+  it('pendiente → emitir → emitida', () => {
+    const r = puedeTransicionarFactura('pendiente', 'emitir')
+    expect(r.ok).toBe(true)
+    expect(r.estado).toBe('emitida')
+  })
+  it('emitida → pagar → pagada', () => {
+    expect(puedeTransicionarFactura('emitida', 'pagar')).toEqual({ ok: true, estado: 'pagada' })
+  })
+  it('emitida → vencer → vencida', () => {
+    expect(puedeTransicionarFactura('emitida', 'vencer')).toEqual({ ok: true, estado: 'vencida' })
+  })
+  it('vencida → pagar → pagada (se puede pagar una vencida)', () => {
+    expect(puedeTransicionarFactura('vencida', 'pagar')).toEqual({ ok: true, estado: 'pagada' })
+  })
+  it('pendiente/emitida/vencida → anular → anulada', () => {
+    expect(puedeTransicionarFactura('pendiente', 'anular').estado).toBe('anulada')
+    expect(puedeTransicionarFactura('emitida', 'anular').estado).toBe('anulada')
+    expect(puedeTransicionarFactura('vencida', 'anular').estado).toBe('anulada')
+  })
+
+  // Transiciones inválidas
+  it('no se puede pagar una factura pendiente (hay que emitir primero)', () => {
+    const r = puedeTransicionarFactura('pendiente', 'pagar')
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/inválida/i)
+  })
+  it('no se puede vencer una factura pendiente', () => {
+    expect(puedeTransicionarFactura('pendiente', 'vencer').ok).toBe(false)
+  })
+  it('pagada es terminal: ninguna acción aplica', () => {
+    expect(puedeTransicionarFactura('pagada', 'anular').ok).toBe(false)
+    expect(puedeTransicionarFactura('pagada', 'vencer').ok).toBe(false)
+    expect(puedeTransicionarFactura('pagada', 'pagar').ok).toBe(false)
+  })
+  it('anulada es terminal: ninguna acción aplica', () => {
+    expect(puedeTransicionarFactura('anulada', 'emitir').ok).toBe(false)
+    expect(puedeTransicionarFactura('anulada', 'pagar').ok).toBe(false)
+  })
+  it('no se puede emitir una factura ya emitida', () => {
+    expect(puedeTransicionarFactura('emitida', 'emitir').ok).toBe(false)
+  })
+  it('acepta estados legacy: mora (→vencida) puede pagar', () => {
+    expect(puedeTransicionarFactura('mora', 'pagar')).toEqual({ ok: true, estado: 'pagada' })
+  })
+})
+
+describe('aplicarTransicionFactura', () => {
+  const T = '2026-06-04T12:00:00.000Z'
+
+  it('emitir setea factura_estado + emitida_at', () => {
+    const p = aplicarTransicionFactura('pendiente', 'emitir', T)
+    expect(p).toEqual({ factura_estado: 'emitida', emitida_at: T })
+  })
+  it('pagar setea pagada_at', () => {
+    const p = aplicarTransicionFactura('emitida', 'pagar', T)
+    expect(p).toEqual({ factura_estado: 'pagada', pagada_at: T })
+  })
+  it('vencer setea vencida_at', () => {
+    const p = aplicarTransicionFactura('emitida', 'vencer', T)
+    expect(p).toEqual({ factura_estado: 'vencida', vencida_at: T })
+  })
+  it('anular setea anulada_at', () => {
+    const p = aplicarTransicionFactura('vencida', 'anular', T)
+    expect(p).toEqual({ factura_estado: 'anulada', anulada_at: T })
+  })
+  it('lanza en transición inválida', () => {
+    expect(() => aplicarTransicionFactura('pagada', 'anular', T)).toThrow(/inválida/i)
+    expect(() => aplicarTransicionFactura('pendiente', 'pagar', T)).toThrow()
+  })
+  it('usa new Date() por defecto cuando no se pasa `ahora`', () => {
+    const before = Date.now()
+    const p = aplicarTransicionFactura('pendiente', 'emitir')
+    const stamped = new Date(p.emitida_at as string).getTime()
+    expect(stamped).toBeGreaterThanOrEqual(before)
+    expect(stamped).toBeLessThanOrEqual(Date.now())
   })
 })
