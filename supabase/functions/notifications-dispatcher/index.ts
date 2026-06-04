@@ -26,6 +26,20 @@
 // migracion 20260604100000_notifications_outbox.sql).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Helpers puros de render/plantillas/routing extraídos a ./render.ts para poder
+// testearlos en vitest sin I/O (infra:I22). El handler sigue haciendo las queries.
+import {
+  applyVars,
+  asString,
+  clampBatchSize,
+  formatFromHeader,
+  isGmailStatusRetriable,
+  isTokenExpired,
+  resolveEmailContent,
+  routeChannel,
+  type EmailTemplate,
+  type NotifTemplate,
+} from './render.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -116,12 +130,6 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
   return data.access_token
 }
 
-function formatFromHeader(fromEmail: string, fromName: string | null): string {
-  if (!fromName) return fromEmail
-  const encoded = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(fromName)))}?=`
-  return `"${encoded}" <${fromEmail}>`
-}
-
 function buildRawMessage(
   fromEmail: string, fromName: string | null, replyTo: string | null,
   to: string, subject: string, htmlBody: string,
@@ -149,8 +157,7 @@ function buildRawMessage(
 
 async function sendViaGmail(config: EmailConfig, to: string, subject: string, htmlBody: string, supabase: Client): Promise<void> {
   let accessToken = config.access_token
-  const isExpired = config.token_expiry != null &&
-    new Date(config.token_expiry).getTime() - Date.now() < 5 * 60 * 1000
+  const isExpired = isTokenExpired(config.token_expiry)
   if (isExpired && config.refresh_token) {
     const newToken = await refreshAccessToken(config.refresh_token, supabase, config.id)
     if (newToken) accessToken = newToken
@@ -165,7 +172,7 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
     const status = res.status
     const err = await res.json().catch(() => ({}))
     // 4xx (excepto 429) son terminales: token revocado, request malformado, etc.
-    const retriable = status === 429 || status >= 500
+    const retriable = isGmailStatusRetriable(status)
     const e = new Error(`Gmail API ${status}: ${JSON.stringify(err)}`) as Error & { retriable: boolean }
     e.retriable = retriable
     throw e
@@ -173,38 +180,14 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
 }
 
 // ---------------------------------------------------------------------------
-// Render de plantillas
+// Render de plantillas (helpers puros en ./render.ts; aquí solo el I/O)
 // ---------------------------------------------------------------------------
-
-function asString(v: unknown): string {
-  if (v == null) return ''
-  return typeof v === 'string' ? v : String(v)
-}
-
-// Sustituye {{var}} con payload (mismo motor que send-email / route-reminders).
-function applyVars(template: string, vars: Record<string, unknown>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => asString(vars[k]))
-}
-
-function emailLayout(content: string, empresa: string): string {
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${empresa}</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;"><tr><td align="center">
-  <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:600px;">
-    <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0d9488);padding:28px 32px;text-align:center;">
-      <span style="color:#fff;font-size:22px;font-weight:700;">${empresa}</span></td></tr>
-    <tr><td style="padding:32px;color:#334155;font-size:14px;line-height:1.7;white-space:pre-wrap;">${content}</td></tr>
-    <tr><td style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="margin:0;font-size:12px;color:#94a3b8;">Notificación automática de ${empresa}. Por favor no responda directamente.</p></td></tr>
-  </table>
-</td></tr></table></body></html>`
-}
 
 // Resuelve plantilla de notification_templates: primero la del tenant, luego la
 // global (company_id NULL). Devuelve null si no hay ninguna activa.
 async function resolveNotifTemplate(
   admin: Client, companyId: string | null, key: string, channel: string, locale = 'es',
-): Promise<{ subject: string | null; body: string } | null> {
+): Promise<NotifTemplate | null> {
   if (companyId) {
     const { data } = await admin.from('notification_templates')
       .select('subject, body')
@@ -282,38 +265,36 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
     .maybeSingle()
   if (!cfg) return { ok: false, error: 'sin Gmail configurado para la empresa', retriable: false }
 
-  // Resolucion de plantilla en cascada:
+  // Resolucion de plantilla en cascada (I/O aquí; la decisión en resolveEmailContent):
   //   1) notification_templates (tenant → global) por template_key.
   //   2) email_templates (override HTML existente) por template_key.
   //   3) payload directo subject/body (o body con layout por defecto).
-  let subject = asString(p.subject)
-  let htmlBody = asString(p.html_body) || asString(p.body)
-
   const notifTpl = row.template_key
     ? await resolveNotifTemplate(admin, row.company_id, row.template_key, 'email', asString(p.locale) || 'es')
     : null
-  if (notifTpl) {
-    subject = applyVars(notifTpl.subject ?? subject, vars)
-    htmlBody = emailLayout(applyVars(notifTpl.body, vars), empresaNombre)
-  } else if (row.template_key) {
-    const { data: emailTpl } = await admin.from('email_templates')
+  // email_templates solo se consulta si NO hubo notifTpl (mismo corto-circuito).
+  let emailTpl: EmailTemplate | null = null
+  if (!notifTpl && row.template_key) {
+    const { data } = await admin.from('email_templates')
       .select('subject, html_body')
       .eq('template_key', row.template_key).eq('is_active', true)
       .eq('company_id', row.company_id)
       .maybeSingle()
-    if (emailTpl) {
-      subject = applyVars(emailTpl.subject as string, vars)
-      htmlBody = applyVars(emailTpl.html_body as string, vars)
-    }
+    if (data) emailTpl = { subject: data.subject as string, html_body: data.html_body as string }
   }
 
-  if (!htmlBody) return { ok: false, error: 'email sin body ni plantilla resoluble', retriable: false }
-  if (!subject) subject = `Notificación de ${empresaNombre}`
-  // Si el body no parece HTML completo, envuelvelo en el layout estandar.
-  if (!/<html|<body|<table/i.test(htmlBody)) htmlBody = emailLayout(htmlBody, empresaNombre)
+  const content = resolveEmailContent({
+    payloadSubject: asString(p.subject),
+    payloadHtmlBody: asString(p.html_body) || asString(p.body),
+    empresaNombre,
+    vars,
+    notifTpl,
+    emailTpl,
+  })
+  if (!content.ok) return { ok: false, error: content.error, retriable: false }
 
   try {
-    await sendViaGmail(cfg as unknown as EmailConfig, toEmail, subject, htmlBody, admin)
+    await sendViaGmail(cfg as unknown as EmailConfig, toEmail, content.subject, content.htmlBody, admin)
     return { ok: true }
   } catch (err) {
     const retriable = (err as { retriable?: boolean })?.retriable ?? true
@@ -322,18 +303,11 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
 }
 
 async function dispatchRow(admin: Client, row: OutboxRow): Promise<DispatchResult> {
-  switch (row.channel) {
-    case 'in_app':
-      return await dispatchInApp(admin, row)
-    case 'email':
-      return await dispatchEmail(admin, row)
-    case 'whatsapp':
-      return { ok: false, error: 'canal whatsapp no implementado (follow-up)', retriable: false }
-    case 'push':
-      return { ok: false, error: 'canal push no implementado (follow-up)', retriable: false }
-    default:
-      return { ok: false, error: `canal desconocido: ${row.channel}`, retriable: false }
-  }
+  if (row.channel === 'in_app') return await dispatchInApp(admin, row)
+  if (row.channel === 'email') return await dispatchEmail(admin, row)
+  // whatsapp/push (follow-ups) y canales desconocidos: failed no-retriable.
+  const routing = routeChannel(row.channel)
+  return { ok: false, error: routing.error ?? `canal desconocido: ${row.channel}`, retriable: false }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +334,7 @@ Deno.serve(async (req: Request) => {
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const body = await req.json().catch(() => ({})) as { batch_size?: number }
-    const batchSize = Math.min(Math.max(Number(body.batch_size) || DEFAULT_BATCH, 1), MAX_BATCH)
+    const batchSize = clampBatchSize(body.batch_size, { def: DEFAULT_BATCH, max: MAX_BATCH })
 
     // Claim atomico del lote (marca 'sending').
     const { data: rows, error } = await admin.rpc('claim_notifications_batch', { p_batch_size: batchSize })
