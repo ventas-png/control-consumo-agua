@@ -21,6 +21,14 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimit, getClientIp } from '../_shared/rateLimit.ts'
+// Lógica pura (fortaleza de password, map RBAC, gate de estado de invitación)
+// extraída a ./validate.ts para poder testearla en vitest (infra:I22).
+import {
+  checkInvitationUsable,
+  isDuplicateUserError,
+  platformRoleId,
+  validatePassword,
+} from './validate.ts'
 
 function getAllowedOrigins(): string[] {
   const origins = new Set<string>([
@@ -64,26 +72,6 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
     )
   }
   return null
-}
-
-// Misma validación server-side que validatePasswordStrength del frontend.
-function validatePassword(pw: string): string | null {
-  if (!pw || pw.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
-  if (!/[A-Z]/.test(pw)) return 'La contraseña debe incluir al menos una mayúscula'
-  if (!/[a-z]/.test(pw)) return 'La contraseña debe incluir al menos una minúscula'
-  if (!/\d/.test(pw)) return 'La contraseña debe incluir al menos un número'
-  return null
-}
-
-// Mapa rol → role_id de plataforma (RBAC). Espejo EXACTO del de create-user
-// (migración 20260518000013_rbac_platform_modules.sql).
-const PLATFORM_ROLE_ID: Record<string, string> = {
-  admin:     '00000000-0000-0000-0000-000000000201',
-  operator:  '00000000-0000-0000-0000-000000000202',
-  operador:  '00000000-0000-0000-0000-000000000202',
-  viewer:    '00000000-0000-0000-0000-000000000203',
-  visor:     '00000000-0000-0000-0000-000000000203',
-  collector: '00000000-0000-0000-0000-000000000204',
 }
 
 interface InvitationRow {
@@ -159,23 +147,20 @@ Deno.serve(async (req: Request) => {
 
     const invitation = inv as InvitationRow
 
-    if (invitation.status !== 'pending') {
-      const msg = invitation.status === 'accepted'
-        ? 'Esta invitación ya fue utilizada.'
-        : 'Esta invitación ya no está disponible.'
-      return new Response(JSON.stringify({ error: msg }), {
-        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (new Date(invitation.expires_at).getTime() < Date.now()) {
-      // Marca expirada (best-effort) y devuelve 410.
-      await adminClient.from('user_invitations')
-        .update({ status: 'expired' })
-        .eq('id', invitation.id)
-        .eq('status', 'pending')
-      return new Response(JSON.stringify({ error: 'Esta invitación expiró. Pide una nueva.' }), {
-        status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Gate de estado (idempotencia + expiración) modelado como dato puro.
+    const gate = checkInvitationUsable(
+      { status: invitation.status, expiresAt: invitation.expires_at },
+    )
+    if (!gate.ok) {
+      if (gate.markExpired) {
+        // Marca expirada (best-effort) antes de responder 410.
+        await adminClient.from('user_invitations')
+          .update({ status: 'expired' })
+          .eq('id', invitation.id)
+          .eq('status', 'pending')
+      }
+      return new Response(JSON.stringify({ error: gate.error }), {
+        status: gate.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -222,8 +207,7 @@ Deno.serve(async (req: Request) => {
     })
 
     if (createErr || !created?.user) {
-      const m = createErr?.message?.toLowerCase() ?? ''
-      if (m.includes('already') || m.includes('exists') || m.includes('registered')) {
+      if (isDuplicateUserError(createErr?.message)) {
         return new Response(
           JSON.stringify({ error: 'Ya existe una cuenta con este correo. Inicia sesión.' }),
           { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -257,11 +241,11 @@ Deno.serve(async (req: Request) => {
     // 5. Asigna el rol RBAC (mismo map que create-user). super_admin /
     // company_owner / admin bypassan RBAC y no tienen platform role; los demás
     // sí. invited_by se usa como assigned_by (lo recuperamos de la invitación).
-    const platformRoleId = PLATFORM_ROLE_ID[invitation.role]
-    if (platformRoleId) {
+    const roleId = platformRoleId(invitation.role)
+    if (roleId) {
       const { error: roleErr } = await adminClient.from('user_roles').insert({
         user_id: userId,
-        role_id: platformRoleId,
+        role_id: roleId,
         assigned_by: userId, // self-assigned vía aceptación de invitación
       })
       if (roleErr) {

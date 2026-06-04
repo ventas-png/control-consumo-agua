@@ -1,0 +1,78 @@
+name: Edge Function Tests
+
+# Gate de CI para los tests de las edge functions (infra:I22 · Track T8, épicas #307/#321).
+#
+# Contexto: las edge functions viven en supabase/functions/ (Deno). Sus tests, sin
+# embargo, están escritos para **vitest** (igual que _shared/__tests__/*.test.ts y
+# signup-company/__tests__): importan `vitest` y tratan los módulos .ts como TS normal,
+# stubeando `Deno.env` / mockeando el cliente de supabase-js. Por eso el gate REAL corre
+# vitest acotado a supabase/functions/ (no `deno test`, que no resolvería `vitest`).
+#
+# Además, un job ADVISORY corre `deno check` sobre los helpers puros extraídos para
+# detectar drift de tipos a nivel Deno (lo que `tsc` no cubre: tsconfig solo incluye src/).
+#
+# Es aditivo: el workflow `ci.yml` ya corre `npm run test` (toda la suite, incl. estos
+# tests). Este workflow los aísla para feedback rápido y específico cuando solo cambian
+# edge functions, y deja el typecheck Deno como red de seguridad.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/edge-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/edge-tests.yml'
+  workflow_dispatch:
+
+# Cancela corridas superadas en el mismo ref para ahorrar minutos.
+concurrency:
+  group: edge-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vitest-edge:
+    name: vitest — supabase/functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Corre SOLO los tests bajo supabase/functions/ (vitest acepta rutas como filtro).
+      # `--dir` acota el descubrimiento para no levantar la suite de src/ aquí.
+      - name: Run edge function tests
+        run: npx vitest run --dir supabase/functions
+
+  deno-check:
+    name: deno check (advisory)
+    runs-on: ubuntu-latest
+    # Advisory: los tests usan vitest, así que NO corremos `deno test`. Aquí solo
+    # typecheckeamos los módulos de las edge functions con Deno para cazar drift de
+    # tipos. No bloquea el merge mientras estabilizamos la baseline (igual criterio
+    # que el lint-functions advisory de deploy-functions.yml).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      # Typecheck de los handlers + helpers puros. `deno check` resuelve los imports
+      # remotos (esm.sh) y los _shared/*.ts. Si falla por red de esm.sh, el job es
+      # advisory y no tumba el PR.
+      - name: deno check edge functions
+        run: |
+          deno check \
+            supabase/functions/notifications-dispatcher/index.ts \
+            supabase/functions/invite-user/index.ts \
+            supabase/functions/accept-invitation/index.ts

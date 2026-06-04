@@ -27,6 +27,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireUser } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
+// Lógica pura (whitelist de roles, token, expiración, validación de email)
+// extraída a ./validate.ts para poder testearla en vitest (infra:I22).
+import {
+  INVITABLE_ROLES,
+  computeExpiresAt,
+  generateToken,
+  isValidEmail,
+  roleLabel as labelForRole,
+} from './validate.ts'
 
 function getAllowedOrigins(): string[] {
   const origins = new Set<string>([
@@ -70,30 +79,6 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
     )
   }
   return null
-}
-
-// Token aleatorio seguro URL-safe (32 bytes → 43 chars base64url). crypto del
-// runtime (Web Crypto), no Math.random.
-function generateToken(): string {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-// Roles que un admin/owner puede otorgar por invitación. Espejo del whitelist de
-// create-user (allowedRolesForNonSuper). NUNCA super_admin / company_owner.
-const INVITABLE_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
-
-// Etiqueta legible del rol para el correo (es-MX).
-const ROLE_LABEL: Record<string, string> = {
-  admin: 'Administrador',
-  operator: 'Operador',
-  operador: 'Operador',
-  viewer: 'Visualizador',
-  visor: 'Visualizador',
-  collector: 'Cobros',
 }
 
 Deno.serve(async (req: Request) => {
@@ -151,7 +136,7 @@ Deno.serve(async (req: Request) => {
     const companyId = isSuperAdmin ? (body.company_id ?? callerCompanyId) : callerCompanyId
     const inviteeName = (body.full_name ?? '').trim()
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email || !isValidEmail(email)) {
       return new Response(JSON.stringify({ error: 'Correo electrónico inválido' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -198,7 +183,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Crea la invitación con token + expiración.
     const token = generateToken()
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const expiresAt = computeExpiresAt()
 
     const { data: invitation, error: insertErr } = await adminClient
       .from('user_invitations')
@@ -231,7 +216,7 @@ Deno.serve(async (req: Request) => {
     const companyLogo = (company as { logo_url?: string } | null)?.logo_url ?? ''
     const appUrl = (Deno.env.get('APP_URL') ?? origin ?? 'https://administratodo.com').replace(/\/$/, '')
     const acceptUrl = `${appUrl}/aceptar-invitacion?token=${encodeURIComponent(token)}`
-    const roleLabel = ROLE_LABEL[role] ?? role
+    const roleLabel = labelForRole(role)
 
     // 5. Envía el correo reusando send-email (template `notificacion_empresa`,
     // que soporta CTA). Desde la cuenta de Gmail de la empresa (company_id).

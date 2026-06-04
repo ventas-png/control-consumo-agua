@@ -24,6 +24,15 @@ describe('getClientIp', () => {
   it("devuelve 'unknown' sin headers de IP", () => {
     expect(getClientIp(mkReq({}))).toBe('unknown')
   })
+
+  // Gaps T8 (infra:I22): cadena de fallback completa y XFF degenerado.
+  it('un x-forwarded-for vacío cae a fly-client-ip (no devuelve string vacío)', () => {
+    expect(getClientIp(mkReq({ 'x-forwarded-for': '   ', 'fly-client-ip': '7.7.7.7' }))).toBe('7.7.7.7')
+  })
+
+  it('recorta espacios alrededor del primer hop de x-forwarded-for', () => {
+    expect(getClientIp(mkReq({ 'x-forwarded-for': '  8.8.8.8 , 9.9.9.9' }))).toBe('8.8.8.8')
+  })
 })
 
 describe('enforceRateLimit', () => {
@@ -55,6 +64,34 @@ describe('enforceRateLimit', () => {
   it('fail-open (null) ante error de infra (data null)', async () => {
     const res = await enforceRateLimit(clientReturning(null), { subject: 'x', action: 'y', max: 1 }, cors)
     expect(res).toBeNull()
+  })
+
+  // Gaps T8 (infra:I22): solo `false` explícito bloquea; cuerpo y mensaje del 429.
+  it('fail-open (null) cuando data es undefined (RPC no devolvió bool)', async () => {
+    const res = await enforceRateLimit(clientReturning(undefined), { subject: 'x', action: 'y', max: 1 }, cors)
+    expect(res).toBeNull()
+  })
+
+  it('NO bloquea con valores truthy ni con 0 (solo false estricto bloquea)', async () => {
+    expect(await enforceRateLimit(clientReturning(true), { subject: 's', action: 'a', max: 1 }, cors)).toBeNull()
+    expect(await enforceRateLimit(clientReturning(0), { subject: 's', action: 'a', max: 1 }, cors)).toBeNull()
+  })
+
+  it('el 429 lleva el mensaje por defecto en es-MX y Content-Type JSON', async () => {
+    const res = await enforceRateLimit(clientReturning(false), { subject: 's', action: 'a', max: 1 }, cors)
+    expect(res!.headers.get('Content-Type')).toBe('application/json')
+    const payload = await res!.json() as { error: string }
+    expect(payload.error).toMatch(/Demasiadas solicitudes/)
+  })
+
+  it('el 429 respeta el mensaje custom (opts.message)', async () => {
+    const res = await enforceRateLimit(
+      clientReturning(false),
+      { subject: 's', action: 'a', max: 1, message: 'Mensaje propio' },
+      cors,
+    )
+    const payload = await res!.json() as { error: string }
+    expect(payload.error).toBe('Mensaje propio')
   })
 
   it('pasa los argumentos correctos al RPC (incl. ventana en segundos)', async () => {
