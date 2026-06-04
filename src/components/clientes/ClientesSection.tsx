@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Cliente, UserRole, ClienteLookupResult, Unidad } from '../../types'
+import type { Cliente, ClienteLookupResult, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { supabase } from '../../lib/supabase'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
@@ -17,15 +18,11 @@ const ImportClientesModal = lazy(() => import('./ImportClientesModal').then(m =>
 interface Props {
   clientes: Cliente[]
   unidades?: Unidad[]
-  userRole: UserRole
   userId: string
   companyId?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
-  canCreate?: boolean
-  canEdit?: boolean
-  canChangeStatus?: boolean
 }
 
 const EMPTY_FORM = {
@@ -58,8 +55,9 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, unidades = [], userRole, userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
+export function ClientesSection({ clientes, unidades = [], userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const currentUser = useSession()
+  const perms = usePermissionsContext()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -78,7 +76,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, com
   // company_clientes activo per cliente
   const [activoMap, setActivoMap] = useState<Record<string, { ccId: string; activo: boolean }>>({})
 
-  const canEdit = canEditProp && userRole !== 'viewer'
+  const canEdit = perms.canEdit('clientes') && currentUser.role !== 'viewer'
 
   // Load account status and company_clientes.activo whenever clientes list changes
   useEffect(() => {
@@ -121,7 +119,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, com
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la visibilidad del cliente.' })
     }
   }
-  void (canCreateProp && userRole !== 'viewer') // canCreate reservado para uso futuro
+  void (perms.canCreate('clientes') && currentUser.role !== 'viewer') // canCreate reservado para uso futuro
 
   function startCreate() {
     setForm(EMPTY_FORM)
@@ -331,7 +329,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, com
         notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar el cliente.' })
       }
     } else {
-      await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
+      await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: currentUser.role }, userId)
       const clienteId = crypto.randomUUID()
       // agua:C6 — pre-validación Zod en boundary de persistencia. La
       // validación de UX (más estricta, con mensajes custom) ya corrió arriba

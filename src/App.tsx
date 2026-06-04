@@ -16,6 +16,7 @@ import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { filterProyectosByAssignment, deriveProyectoConfig } from './lib/proyectosAccess'
 import { SessionProvider } from './components/shared/SessionContext'
+import { PermissionsProvider } from './components/shared/PermissionsContext'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { BrandLogo } from './components/shared/BrandLogo'
@@ -722,8 +723,6 @@ export default function App() {
         facturasEnergia={facturasEnergia}
         proyectos={proyectos}
         moneda={moneda}
-        canCreate={canCreate('servicios_energia')}
-        canEdit={canEdit('servicios_energia')}
         onProveedorAdded={addProveedorEnergia}
         onProveedorUpdated={updateProveedorEnergia}
         onProveedorDeleted={deleteProveedorEnergia}
@@ -742,6 +741,7 @@ export default function App() {
 
   return (
     <SessionProvider value={currentUser}>
+    <PermissionsProvider>
       {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
           en la esquina superior derecha para success/warning/info no críticos.
           Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
@@ -873,15 +873,11 @@ export default function App() {
                   <ClientesSection
                     clientes={clientes}
                     unidades={unidades}
-                    userRole={currentUser.role}
                     userId={currentUser.user_id}
                     companyId={currentUser.company_id}
                     onClienteAdded={addCliente}
                     onClienteUpdated={updateCliente}
                     onClienteDeleted={deleteCliente}
-                    canCreate={canCreate('clientes')}
-                    canEdit={canEdit('clientes')}
-                    canChangeStatus={canChangeStatus('clientes')}
                   />
                 ) : (
                   <AccessDenied />
@@ -897,7 +893,6 @@ export default function App() {
                     contadores={contadores}
                     registros={registros}
                     tarifas={tarifas}
-                    userRole={currentUser.role}
                     proyectos={proyectos}
                     moneda={moneda}
                     onRegistroAdded={addRegistro}
@@ -909,7 +904,6 @@ export default function App() {
                       const r = rutas.find(x => x.id === id)
                       if (!r || (r.frecuencia ?? 'unica') === 'unica') updateRuta(id, { completada: true })
                     }}
-                    canCreate={canCreate('lecturas')}
                   />
                 ) : <AccessDenied />}
               </ErrorBoundary>
@@ -939,7 +933,6 @@ export default function App() {
                 <CobrosSection
                   registros={registros}
                   clientes={clientes}
-                  userRole={currentUser.role}
                   moneda={moneda}
                   onEstadoUpdated={updateRegistroEstado}
                   onRegistroUpdated={(id, partial) => {
@@ -947,9 +940,6 @@ export default function App() {
                       updateRegistroEstado(id, partial.estado ?? 'pendiente')
                     }
                   }}
-                  canCreate={canCreate('cobros')}
-                  canEdit={canEdit('cobros')}
-                  canChangeStatus={canChangeStatus('cobros')}
                 />
                 </RoleGuard>
               </ErrorBoundary>
@@ -1059,13 +1049,10 @@ export default function App() {
                   <TarifasSection
                     tarifas={tarifas}
                     proyectos={proyectos}
-                    userRole={currentUser.role}
                     moneda={moneda}
                     onTarifaAdded={addTarifa}
                     onTarifaUpdated={updateTarifa}
                     onTarifaDeleted={deleteTarifa}
-                    canCreate={canCreate('tarifas')}
-                    canEdit={canEdit('tarifas')}
                   />
                 ) : <AccessDenied />}
               </ErrorBoundary>
@@ -1078,14 +1065,11 @@ export default function App() {
                     contadores={contadores}
                     clientes={clientes}
                     proyectos={proyectos}
-                    userRole={currentUser.role}
                     maxUnidadesPorTipo={maxUnidadesPorTipo}
                     onUnidadAdded={addUnidad}
                     onUnidadUpdated={updateUnidad}
                     onUnidadDeleted={deleteUnidad}
                     onContadorUpdated={updateContador}
-                    canCreate={canCreate('unidades')}
-                    canEdit={canEdit('unidades')}
                   />
                 ) : <AccessDenied />}
               </ErrorBoundary>
@@ -1097,13 +1081,10 @@ export default function App() {
                     contadores={contadores}
                     tarifas={tarifas}
                     unidades={unidades}
-                    userRole={currentUser.role}
                     moneda={moneda}
                     onContadorAdded={addContador}
                     onContadorUpdated={updateContador}
                     onContadorDeleted={deleteContador}
-                    canCreate={canCreate('contadores')}
-                    canEdit={canEdit('contadores')}
                   />
                 ) : <AccessDenied />}
               </ErrorBoundary>
@@ -1175,6 +1156,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    </PermissionsProvider>
     </SessionProvider>
   )
 }

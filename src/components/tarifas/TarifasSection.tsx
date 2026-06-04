@@ -1,7 +1,8 @@
 import { useState, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Tarifa, UserRole, Proyecto } from '../../types'
+import type { Tarifa, Proyecto } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
@@ -10,13 +11,10 @@ import { getEditedTagInfo } from '../../lib/timeUtils'
 interface Props {
   tarifas: Tarifa[]
   proyectos: Proyecto[]
-  userRole: UserRole
   moneda?: string
   onTarifaAdded: (tarifa: Tarifa) => void
   onTarifaUpdated: (id: string, partial: Partial<Tarifa>) => void
   onTarifaDeleted: (id: string) => void
-  canCreate?: boolean
-  canEdit?: boolean
 }
 
 const TIPOS_AGUA = [
@@ -50,23 +48,21 @@ type FormState = typeof EMPTY_FORM
 export function TarifasSection({
   tarifas,
   proyectos,
-  userRole,
   moneda = 'Q',
   onTarifaAdded,
   onTarifaUpdated,
   onTarifaDeleted,
-  canCreate: canCreateProp = true,
-  canEdit: canEditProp = true,
 }: Props) {
   const currentUser = useSession()
+  const perms = usePermissionsContext()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
-  const canCreate = canCreateProp && userRole !== 'viewer'
-  const canEdit = canEditProp && userRole !== 'viewer'
+  const canCreate = perms.canCreate('tarifas') && currentUser.role !== 'viewer'
+  const canEdit = perms.canEdit('tarifas') && currentUser.role !== 'viewer'
 
   function startCreate() {
     setForm(EMPTY_FORM)

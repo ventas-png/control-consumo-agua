@@ -438,7 +438,6 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
             contadores={contadoresFiltrados}
             registros={registrosFiltrados}
             tarifas={tarifasFiltradas}
-            userRole={currentUser.role}
             moneda={moneda}
             onRegistroAdded={() => { void handleReadingAdded() }}
           />

@@ -9,6 +9,7 @@ import type {
   Proyecto,
 } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import ProveedoresTab from './tabs/ProveedoresTab'
 import TarifasTab from './tabs/TarifasTab'
 import FuentesTab from './tabs/FuentesTab'
@@ -23,8 +24,6 @@ interface ServiciosEnergiaSectionProps {
   facturasEnergia: FacturaEnergia[]
   proyectos: Proyecto[]
   moneda: string
-  canCreate: boolean
-  canEdit: boolean
   // CRUD callbacks
   onProveedorAdded: (p: ProveedorEnergia) => void
   onProveedorUpdated: (id: string, p: Partial<ProveedorEnergia>) => void
@@ -50,8 +49,6 @@ export default function ServiciosEnergiaSection({
   facturasEnergia,
   proyectos,
   moneda,
-  canCreate,
-  canEdit,
   onProveedorAdded,
   onProveedorUpdated,
   onProveedorDeleted,
@@ -66,6 +63,9 @@ export default function ServiciosEnergiaSection({
   onFacturaDeleted,
 }: ServiciosEnergiaSectionProps) {
   const currentUser = useSession()
+  const perms = usePermissionsContext()
+  const canCreate = perms.canCreate('servicios_energia')
+  const canEdit = perms.canEdit('servicios_energia')
   const { tab: tabParam } = useParams<{ tab?: string }>()
   const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
   const navigate = useNavigate()

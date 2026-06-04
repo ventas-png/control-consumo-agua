@@ -1,6 +1,6 @@
 import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Contador, Tarifa, TipoAgua, UserRole, Unidad } from '../../types'
+import type { Contador, Tarifa, TipoAgua, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { supabase } from '../../lib/supabase'
 import { validatedInsert } from '../../lib/validatedInsert'
@@ -17,13 +17,10 @@ interface Props {
   contadores: Contador[]
   tarifas: Tarifa[]
   unidades: Unidad[]
-  userRole: UserRole
   moneda?: string
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
   onContadorDeleted: (id: string) => void
-  canCreate?: boolean
-  canEdit?: boolean
 }
 
 const TIPOS_AGUA: { value: TipoAgua; label: string }[] = [
@@ -112,13 +109,10 @@ export function ContadoresSection({
   contadores,
   tarifas,
   unidades,
-  userRole,
   moneda = 'Q',
   onContadorAdded,
   onContadorUpdated,
   onContadorDeleted,
-  canCreate: _canCreate = true,
-  canEdit: _canEdit = true,
 }: Props) {
   const currentUser = useSession()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -130,7 +124,7 @@ export function ContadoresSection({
   const [filterUnidad, setFilterUnidad] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
 
-  const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
+  const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
 
   function startCreate() {
     setForm(EMPTY_FORM)
