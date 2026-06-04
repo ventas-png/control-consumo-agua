@@ -21,4 +21,10 @@ export const facturacionKeys = {
   // Reglas de mora configuradas (reglas_mora_config), scope company.
   reglasMora: (companyId?: string) =>
     [...facturacionKeys.all, 'reglas-mora', companyId ?? null] as const,
+  // TODAS las reglas de mora (incl. inactivas) para el editor de configuración.
+  reglasMoraConfig: (companyId?: string) =>
+    [...facturacionKeys.all, 'reglas-mora', 'config', companyId ?? null] as const,
+  // Tasa de IVA por defecto del tenant (companies.iva_tasa_default), scope company.
+  ivaTasaDefault: (companyId?: string) =>
+    [...facturacionKeys.all, 'iva-tasa-default', companyId ?? null] as const,
 } as const
