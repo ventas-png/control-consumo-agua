@@ -51,3 +51,10 @@ verify_jwt = false
 # canonico y lo timbra via el adapter (hoy SandboxProvider). Sin HTTP a PAC real.
 [functions.timbrar-documento]
 verify_jwt = false
+
+# serv:S11 — "probar conexion" al PAC. Resuelve la config fiscal efectiva
+# (override locacion<->empresa), pingea via el adapter (hoy Sandbox) y guarda el
+# estatus en fiscal_pac_secrets. verify_jwt=false: valida el token a mano
+# (service_role o JWT admin/owner). NUNCA expone el secreto. Sin HTTP a PAC real.
+[functions.fiscal-test-connection]
+verify_jwt = false

@@ -21,4 +21,17 @@ export const fiscalKeys = {
   // Un documento fiscal por id.
   documento: (id?: string) =>
     [...fiscalKeys.all, 'documento', id ?? null] as const,
+  // serv:S11 (habilitación "selecciona y conecta"):
+  // Config fiscal EFECTIVA de una locación (override resuelto vs empresa).
+  configEfectiva: (companyId?: string, projectId?: string) =>
+    [
+      ...fiscalKeys.all,
+      'config-efectiva',
+      companyId ?? null,
+      projectId ?? null,
+    ] as const,
+  // Estatus (NO sensible) de credenciales del PAC de un tenant. Devuelve
+  // proveedor + estado_conexion + flags, NUNCA el secreto.
+  credenciales: (companyId?: string) =>
+    [...fiscalKeys.all, 'credenciales', companyId ?? null] as const,
 } as const

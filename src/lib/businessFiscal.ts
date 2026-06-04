@@ -15,12 +15,16 @@
 
 import type {
   AccionFiscal,
+  ConfigFiscalEfectiva,
+  ConfigFiscalEmpresa,
+  ConfigFiscalLocacion,
   DteCanonico,
   EmisorFiscal,
   EstadoFiscal,
   LineaDte,
   ReceptorFiscal,
   RegimenFiscal,
+  RegimenFiscalConfig,
   TipoDocumentoFiscal,
 } from '../types/fiscal'
 
@@ -393,4 +397,115 @@ export function validarDteParaTimbrar(dte: DteCanonico): string[] {
   }
 
   return errores
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 4. Resolver de CONFIG FISCAL EFECTIVA por locación (override empresa↔locación).
+// ════════════════════════════════════════════════════════════════════════════
+//
+// serv:S11 (habilitación "selecciona y conecta"). La config fiscal del EMISOR
+// vive a nivel EMPRESA (companies) y cada LOCACIÓN (projects) puede
+// SOBREESCRIBIR campos via columnas nullable:
+//     efectiva.campo = locacion.campo ?? empresa.campo
+// Es decir, cada override de la locación que NO sea null/vacío gana; si es null,
+// se HEREDA de la empresa. PURO + determinista. Espejado en
+// supabase/functions/_shared/fiscal/stateMachine.ts.
+
+/** Trim que colapsa '' y whitespace a null (un override vacío = "hereda"). */
+function nz(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+/** override de locación ?? default de empresa (ambos normalizados con nz). */
+function override(
+  locacion: string | null | undefined,
+  empresa: string | null | undefined,
+): string | null {
+  return nz(locacion) ?? nz(empresa)
+}
+
+/** Normaliza un régimen guardado (incluye 'ninguno') o cae a 'ninguno'. */
+function normalizarRegimenConfig(
+  r: string | null | undefined,
+): RegimenFiscalConfig {
+  return r === 'fel_gt' || r === 'cfdi_mx' || r === 'ninguno' ? r : 'ninguno'
+}
+
+/**
+ * Resuelve la config fiscal EFECTIVA de una locación contra los defaults de su
+ * empresa. Override por campo: locación gana sobre empresa cuando aporta valor.
+ *
+ * Reglas por campo:
+ *   - regimenFiscal: locación ?? empresa (cae a 'ninguno').
+ *   - nombreFiscal:  (locación.nombreFiscal ?? locación.nombre) ?? (empresa.nombreFiscal ?? empresa.nombre).
+ *   - nit (GT):      locación.nit ?? empresa.nit ?? empresa.taxId.
+ *   - rfc (MX):      locación.rfc ?? empresa.rfc.
+ *   - proveedorTimbrado: locación ?? empresa ?? 'sandbox' (default seguro).
+ *   - establecimiento (GT): solo de la locación (no existe a nivel empresa).
+ *   - lugarExpedicion (MX): locación.lugarExpedicion ?? empresa.codigoPostal.
+ *   - serieFiscal (MX): solo de la locación.
+ *
+ * `desdeLocacion` = true si el régimen O el proveedor provinieron del override de
+ * la locación (útil para la UI: "esta locación tiene config propia").
+ *
+ * @param empresa  campos fiscales de companies (puede ser null/parcial).
+ * @param locacion override de projects (puede ser null/parcial = hereda todo).
+ */
+export function resolverConfigFiscalEfectiva(
+  empresa: ConfigFiscalEmpresa | null | undefined,
+  locacion?: ConfigFiscalLocacion | null,
+): ConfigFiscalEfectiva {
+  const emp = empresa ?? {}
+  const loc = locacion ?? {}
+
+  const regimenLoc = nz(loc.regimenFiscal)
+  const proveedorLoc = nz(loc.proveedorTimbrado)
+
+  const regimenFiscal = regimenLoc
+    ? normalizarRegimenConfig(regimenLoc)
+    : normalizarRegimenConfig(emp.regimenFiscal)
+
+  const nombreFiscal =
+    override(loc.nombreFiscal, loc.nombre) ??
+    override(emp.nombreFiscal, emp.nombre)
+
+  const nit = override(loc.nit, null) ?? override(emp.nit, emp.taxId)
+
+  const rfc = override(loc.rfc, emp.rfc)
+
+  const proveedorTimbrado =
+    override(loc.proveedorTimbrado, emp.proveedorTimbrado) ?? 'sandbox'
+
+  const establecimiento = nz(loc.establecimiento)
+
+  const lugarExpedicion = override(loc.lugarExpedicion, emp.codigoPostal)
+
+  const serieFiscal = nz(loc.serieFiscal)
+
+  return {
+    regimenFiscal,
+    nombreFiscal,
+    nit,
+    rfc,
+    proveedorTimbrado,
+    establecimiento,
+    lugarExpedicion,
+    serieFiscal,
+    desdeLocacion: regimenLoc != null || proveedorLoc != null,
+  }
+}
+
+/**
+ * Atajo: a partir de la config efectiva, devuelve el régimen "real" para timbrar
+ * ('fel_gt' | 'cfdi_mx') o null si la locación no factura ('ninguno'). El edge
+ * lo usa para decidir si hay comprobante que emitir.
+ */
+export function regimenRealDeConfig(
+  config: Pick<ConfigFiscalEfectiva, 'regimenFiscal'>,
+): RegimenFiscal | null {
+  return config.regimenFiscal === 'fel_gt' || config.regimenFiscal === 'cfdi_mx'
+    ? config.regimenFiscal
+    : null
 }

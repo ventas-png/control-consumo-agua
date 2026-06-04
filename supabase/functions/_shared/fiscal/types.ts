@@ -8,6 +8,10 @@
 
 export type RegimenFiscal = 'fel_gt' | 'cfdi_mx'
 
+// Régimen tal como se guarda (incluye 'ninguno'). ESPEJA RegimenFiscalConfig de
+// src/types/fiscal.ts.
+export type RegimenFiscalConfig = RegimenFiscal | 'ninguno'
+
 export type TipoDocumentoFiscal =
   | 'factura'
   | 'nota_credito'
@@ -114,4 +118,44 @@ export interface FacturaParaDte {
   total?: number | null
   descripcion: string
   mes?: string | null
+}
+
+// ── Config fiscal por nivel + config efectiva (override empresa↔locación) ─────
+// serv:S11 (habilitación "selecciona y conecta"). ESPEJA src/types/fiscal.ts.
+// La config del EMISOR vive a nivel EMPRESA (companies) y la LOCACIÓN (projects)
+// puede sobreescribir campos. resolverConfigFiscalEfectiva combina ambos.
+
+export interface ConfigFiscalEmpresa {
+  regimenFiscal?: RegimenFiscalConfig | null
+  nombre?: string | null
+  nombreFiscal?: string | null
+  nit?: string | null
+  taxId?: string | null
+  rfc?: string | null
+  proveedorTimbrado?: string | null
+  codigoPostal?: string | null
+}
+
+export interface ConfigFiscalLocacion {
+  regimenFiscal?: RegimenFiscalConfig | null
+  nombre?: string | null
+  nombreFiscal?: string | null
+  nit?: string | null
+  rfc?: string | null
+  proveedorTimbrado?: string | null
+  establecimiento?: string | null
+  lugarExpedicion?: string | null
+  serieFiscal?: string | null
+}
+
+export interface ConfigFiscalEfectiva {
+  regimenFiscal: RegimenFiscalConfig
+  nombreFiscal: string | null
+  nit: string | null
+  rfc: string | null
+  proveedorTimbrado: string
+  establecimiento: string | null
+  lugarExpedicion: string | null
+  serieFiscal: string | null
+  desdeLocacion: boolean
 }

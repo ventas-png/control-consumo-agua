@@ -23,6 +23,109 @@ export type RegimenFiscal = 'fel_gt' | 'cfdi_mx'
 // para tenants que no emiten comprobante fiscal).
 export type RegimenFiscalConfig = RegimenFiscal | 'ninguno'
 
+// ── Config fiscal por nivel (empresa / locación) y config efectiva ───────────
+// serv:S11 (habilitación "selecciona y conecta"). La config fiscal del EMISOR
+// vive a nivel EMPRESA (companies) y puede SOBREESCRIBIRSE por LOCACIÓN
+// (projects). resolverConfigFiscalEfectiva combina ambas:
+//     efectiva.campo = locacion.campo ?? empresa.campo
+// (cada columna nullable de la locación, si no es null, gana; si es null, hereda
+//  de la empresa). Espejado en supabase/functions/_shared/fiscal/.
+
+/** Config fiscal del EMISOR a nivel EMPRESA (fila companies, campos fiscales). */
+export interface ConfigFiscalEmpresa {
+  /** companies.regimen_fiscal: 'fel_gt' | 'cfdi_mx' | 'ninguno'. */
+  regimenFiscal?: RegimenFiscalConfig | null
+  /** companies.nombre (comercial; fallback de nombre fiscal). */
+  nombre?: string | null
+  /** companies.nombre_fiscal (razón social). */
+  nombreFiscal?: string | null
+  /** companies.nit (Guatemala). */
+  nit?: string | null
+  /** companies.tax_id (fallback del NIT en GT). */
+  taxId?: string | null
+  /** companies.rfc (México). */
+  rfc?: string | null
+  /** companies.proveedor_timbrado (PAC/Certificador). */
+  proveedorTimbrado?: string | null
+  /** companies.address_postal_code (fallback de lugar de expedición MX). */
+  codigoPostal?: string | null
+}
+
+/** Override fiscal por LOCACIÓN (fila projects, columnas fiscales nullable). */
+export interface ConfigFiscalLocacion {
+  /** projects.regimen_fiscal (null = hereda empresa). */
+  regimenFiscal?: RegimenFiscalConfig | null
+  /** projects.nombre (comercial de la locación; fallback de nombre fiscal). */
+  nombre?: string | null
+  /** projects.nombre_fiscal. */
+  nombreFiscal?: string | null
+  /** projects.nit (Guatemala). */
+  nit?: string | null
+  /** projects.rfc (México). */
+  rfc?: string | null
+  /** projects.proveedor_timbrado. */
+  proveedorTimbrado?: string | null
+  /** projects.establecimiento (Guatemala/FEL). */
+  establecimiento?: string | null
+  /** projects.lugar_expedicion (México/CFDI). */
+  lugarExpedicion?: string | null
+  /** projects.serie_fiscal (México/CFDI). */
+  serieFiscal?: string | null
+}
+
+/**
+ * Config fiscal EFECTIVA de una locación: el override de la locación resuelto
+ * contra los defaults de la empresa. Lo que el builder/adapter realmente usa.
+ */
+export interface ConfigFiscalEfectiva {
+  /** Régimen efectivo (locación ?? empresa). 'ninguno' = no factura. */
+  regimenFiscal: RegimenFiscalConfig
+  /** Razón social efectiva (nombreFiscal ?? nombre, locación antes que empresa). */
+  nombreFiscal: string | null
+  /** NIT efectivo (Guatemala): locación ?? empresa.nit ?? empresa.tax_id. */
+  nit: string | null
+  /** RFC efectivo (México): locación ?? empresa. */
+  rfc: string | null
+  /** PAC/Certificador efectivo (locación ?? empresa ?? 'sandbox'). */
+  proveedorTimbrado: string
+  /** Establecimiento efectivo (Guatemala/FEL): solo de la locación. */
+  establecimiento: string | null
+  /** Lugar de expedición efectivo (México): locación.lugarExpedicion ?? empresa.codigoPostal. */
+  lugarExpedicion: string | null
+  /** Serie fiscal efectiva (México): solo de la locación. */
+  serieFiscal: string | null
+  /** true si el origen del régimen/PAC fue el override de la locación. */
+  desdeLocacion: boolean
+}
+
+// ── Estatus (NO sensible) de credenciales del PAC ────────────────────────────
+// Lo que la capa de datos del cliente puede leer de la bóveda fiscal_pac_secrets
+// SIN el secreto: proveedor + estado de conexión + flags de presencia. NUNCA
+// incluye `credenciales`. Espeja la RPC public.fiscal_pac_estatus (SECURITY
+// DEFINER acotada a admin/owner del tenant, migración 20260604230000).
+export type EstadoConexionPac = 'desconocido' | 'ok' | 'error'
+
+export interface EstatusCredencialesPac {
+  id: string
+  company_id: string
+  /** Locación de las credenciales; null = nivel empresa. */
+  project_id: string | null
+  /** PAC/Certificador de estas credenciales. */
+  proveedor: string
+  /** Resultado del último "probar conexión". */
+  estado_conexion: EstadoConexionPac
+  /** Mensaje legible del último ping (null si nunca/ok sin nota). */
+  estado_mensaje: string | null
+  /** Cuándo se probó por última vez (null = nunca). */
+  estado_probado_en: string | null
+  /** ¿Hay credenciales cargadas para sandbox? (flag, NO el secreto). */
+  tiene_sandbox: boolean
+  /** ¿Hay credenciales cargadas para prod? (flag, NO el secreto). */
+  tiene_prod: boolean
+  created_at: string
+  updated_at: string
+}
+
 // ── Tipo de comprobante ──────────────────────────────────────────────────────
 export type TipoDocumentoFiscal =
   | 'factura'
