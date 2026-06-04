@@ -32,8 +32,10 @@ export const PAC_SANDBOX: PacOpcion = {
   label: 'Sandbox (pruebas) — sin PAC real',
 }
 
-/** PACs de Guatemala (FEL / SAT GT). */
+/** PACs/Certificadores de Guatemala (FEL / SAT GT). */
 export const PACS_FEL_GT: PacOpcion[] = [
+  // Ainnova (grupo Guatefacturas): certificador con adapter REAL en curso (serv:S11).
+  { value: 'ainnova', label: 'Ainnova' },
   { value: 'infile', label: 'Infile' },
   { value: 'guatefacturas', label: 'Guatefacturas (G4S)' },
   { value: 'megaprint', label: 'Megaprint' },

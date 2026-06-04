@@ -18,11 +18,11 @@ import {
 // etiquetas y el criterio heredado/override que dibuja los chips.
 
 describe('pacsParaRegimen — gating del selector por régimen', () => {
-  it('GT/FEL ofrece Sandbox + Infile, Guatefacturas (G4S) y Megaprint, con Sandbox primero', () => {
+  it('GT/FEL ofrece Sandbox + Ainnova, Infile, Guatefacturas (G4S) y Megaprint, con Sandbox primero', () => {
     const opts = pacsParaRegimen('fel_gt')
     expect(opts[0]).toEqual(PAC_SANDBOX)
     const values = opts.map((o) => o.value)
-    expect(values).toEqual(['sandbox', 'infile', 'guatefacturas', 'megaprint'])
+    expect(values).toEqual(['sandbox', 'ainnova', 'infile', 'guatefacturas', 'megaprint'])
     // No se cuelan PACs de México.
     expect(values).not.toContain('facturama')
   })
@@ -48,6 +48,7 @@ describe('pacsParaRegimen — gating del selector por régimen', () => {
 
 describe('etiquetaPac', () => {
   it('devuelve la etiqueta legible de un PAC conocido', () => {
+    expect(etiquetaPac('ainnova')).toBe('Ainnova')
     expect(etiquetaPac('guatefacturas')).toBe('Guatefacturas (G4S)')
     expect(etiquetaPac('finkok')).toBe('Finkok')
   })

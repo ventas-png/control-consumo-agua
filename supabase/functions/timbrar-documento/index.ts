@@ -22,6 +22,8 @@ import {
   getFiscalProvider,
   aplicarTransicionFiscal,
   validarDteParaTimbrar,
+  type AmbientePac,
+  type CredencialesPacPorAmbiente,
 } from '../_shared/fiscal/index.ts'
 import {
   armarDteDesdeFilas,
@@ -44,6 +46,40 @@ interface ReqBody {
   registro_id?: string
   /** Tipo de comprobante (default 'factura'). Reservado para follow-up. */
   tipo?: string
+  /** Ambiente del PAC ('sandbox' | 'prod'). Default 'sandbox' (no timbra con valor fiscal). */
+  ambiente?: string
+}
+
+/**
+ * Carga las credenciales del PAC desde la bóveda `fiscal_pac_secrets` (deny-all bajo
+ * RLS → solo service_role la lee). Override locación→empresa: intenta primero la
+ * fila de la locación (project_id) y cae a la de la empresa (project_id IS NULL),
+ * espejando la herencia de la config fiscal. Devuelve el jsonb por ambiente
+ * { sandbox?, prod? } (NUNCA se loguea ni se devuelve al cliente).
+ */
+async function cargarCredencialesPac(
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  companyId: string,
+  projectId: string | null,
+): Promise<CredencialesPacPorAmbiente | null> {
+  if (projectId) {
+    const { data } = await admin
+      .from('fiscal_pac_secrets')
+      .select('credenciales')
+      .eq('company_id', companyId)
+      .eq('project_id', projectId)
+      .maybeSingle()
+    const cred = (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales
+    if (cred && Object.keys(cred).length > 0) return cred
+  }
+  const { data } = await admin
+    .from('fiscal_pac_secrets')
+    .select('credenciales')
+    .eq('company_id', companyId)
+    .is('project_id', null)
+    .maybeSingle()
+  return (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales ?? null
 }
 
 Deno.serve(async (req: Request) => {
@@ -159,9 +195,21 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'DTE inválido', detalles: problemas }, 422)
     }
 
-    // ── 4) Resolver el provider por la config del tenant (hoy → Sandbox) ──
+    // ── 4) Resolver el provider por la config del tenant + credenciales de la bóveda ──
+    // El proveedor sale de la config de la empresa (la resolución por locación es
+    // follow-up). Las credenciales se cargan de fiscal_pac_secrets (override
+    // locación→empresa) y se inyectan al provider; Sandbox/stubs las ignoran. El
+    // ambiente default es 'sandbox' (no se timbra con valor fiscal salvo petición).
     const proveedor = (company as CompanyRow).proveedor_timbrado ?? 'sandbox'
-    const provider = getFiscalProvider(regimen, { companyId, proveedor, regimen })
+    const ambiente: AmbientePac = body.ambiente === 'prod' ? 'prod' : 'sandbox'
+    const credenciales = await cargarCredencialesPac(admin, companyId, projectId)
+    const provider = getFiscalProvider(regimen, {
+      companyId,
+      proveedor,
+      regimen,
+      ambiente,
+      credenciales,
+    })
 
     // ── 5) Crear el documento en 'por_timbrar', timbrar y persistir resultado ──
     const { data: doc, error: insErr } = await admin

@@ -18,6 +18,7 @@ import { PacNoConfiguradoError } from './provider.ts'
 import { SandboxProvider } from './sandboxProvider.ts'
 import { FelGtProvider } from './felGtProvider.ts'
 import { CfdiMxProvider } from './cfdiMxProvider.ts'
+import { AinnovaProvider, AINNOVA } from './ainnovaProvider.ts'
 import type { RegimenFiscal } from './types.ts'
 
 /**
@@ -39,10 +40,17 @@ export function getFiscalProvider(
     return new SandboxProvider()
   }
 
-  // Proveedores reales: hoy stubs que lanzan PacNoConfiguradoError al timbrar.
+  // FEL (Guatemala).
   if (regimen === 'fel_gt') {
+    // Ainnova: PAC REAL elegido por el dueño (carga credenciales + mapea DTE FEL;
+    // el transporte se habilita al confirmar el contrato — ver ainnovaProvider).
+    if (proveedor === AINNOVA) {
+      return new AinnovaProvider(cfg)
+    }
+    // Otros certificadores GT: aún stubs que lanzan PacNoConfiguradoError.
     return new FelGtProvider(cfg)
   }
+  // CFDI (México): aún stub.
   if (regimen === 'cfdi_mx') {
     return new CfdiMxProvider(cfg)
   }

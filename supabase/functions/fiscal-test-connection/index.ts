@@ -28,8 +28,10 @@ import {
   getFiscalProvider,
   resolverConfigFiscalEfectiva,
   regimenRealDeConfig,
+  type AmbientePac,
   type ConfigFiscalEmpresa,
   type ConfigFiscalLocacion,
+  type CredencialesPacPorAmbiente,
 } from '../_shared/fiscal/index.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -101,6 +103,37 @@ function locacionConfigDeRow(p: ProjectRow): ConfigFiscalLocacion {
     lugarExpedicion: p.lugar_expedicion ?? null,
     serieFiscal: p.serie_fiscal ?? null,
   }
+}
+
+/**
+ * Carga las credenciales del PAC desde la bóveda (deny-all bajo RLS → solo
+ * service_role). Override locación→empresa: intenta la fila de la locación y cae a
+ * la de la empresa (project_id IS NULL). El secreto NUNCA se loguea ni se devuelve;
+ * solo se inyecta al provider para que el ping pueda autenticar cuando esté listo.
+ */
+async function cargarCredencialesPac(
+  // deno-lint-ignore no-explicit-any
+  admin: any,
+  companyId: string,
+  projectId: string | null,
+): Promise<CredencialesPacPorAmbiente | null> {
+  if (projectId) {
+    const { data } = await admin
+      .from('fiscal_pac_secrets')
+      .select('credenciales')
+      .eq('company_id', companyId)
+      .eq('project_id', projectId)
+      .maybeSingle()
+    const cred = (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales
+    if (cred && Object.keys(cred).length > 0) return cred
+  }
+  const { data } = await admin
+    .from('fiscal_pac_secrets')
+    .select('credenciales')
+    .eq('company_id', companyId)
+    .is('project_id', null)
+    .maybeSingle()
+  return (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales ?? null
 }
 
 Deno.serve(async (req: Request) => {
@@ -256,11 +289,17 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // ── 4) PING vía el provider (hoy Sandbox; SIN HTTP a PAC real) ──
+    // ── 4) PING vía el provider (Sandbox responde ok; un PAC real autentica) ──
+    // Carga las credenciales del ambiente desde la bóveda y se las inyecta al
+    // provider. Sandbox/stubs las ignoran; un PAC real (Ainnova) las usa para el
+    // ping. Sin credenciales válidas, el ping reporta ok:false con mensaje claro.
+    const credenciales = await cargarCredencialesPac(admin, companyId, projectId)
     const provider = getFiscalProvider(regimen, {
       companyId,
       proveedor: config.proveedorTimbrado,
       regimen,
+      ambiente: ambiente as AmbientePac,
+      credenciales,
     })
 
     try {
