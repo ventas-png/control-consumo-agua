@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { validatePasswordStrength } from '../../lib/validation'
+import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
 
 // Landing pública de aceptación de invitación (T3/plat:P3).
@@ -95,6 +96,11 @@ export function AcceptInvitationPage() {
         setError(result?.error ?? fnErr?.message ?? 'No se pudo aceptar la invitación.')
         return
       }
+
+      // Funnel (PostHog): invitación aceptada = cuenta creada. Se emite acá
+      // (no en cada setPhase('success')) para no duplicar si el auto-login falla.
+      // Anónimo todavía; sin email ni nombre.
+      trackFunnel(FUNNEL.invitationAccepted)
 
       // Sesión lista: inicia sesión con el correo de la invitación y la
       // contraseña recién creada, luego entra al flujo autenticado normal.

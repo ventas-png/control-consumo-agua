@@ -18,6 +18,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { fiscalKeys } from './keys'
 import {
   normalizarEstadoFiscal,
@@ -136,7 +137,13 @@ export function useTimbrarDocumentoMutation(companyId?: string) {
       }
       return data ?? {}
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
+      // Funnel fiscal (PostHog): solo ids/estado, jamás UUID fiscal ni receptor.
+      trackFunnel(FUNNEL.documentoTimbrado, {
+        registro_id: vars.registroId,
+        estado: data.estado ?? null,
+        proveedor: data.proveedor ?? null,
+      })
       // Refresca toda la lectura fiscal del tenant + la del registro concreto.
       void qc.invalidateQueries({ queryKey: fiscalKeys.all })
       if (companyId) void qc.invalidateQueries({ queryKey: fiscalKeys.documentos(companyId) })
