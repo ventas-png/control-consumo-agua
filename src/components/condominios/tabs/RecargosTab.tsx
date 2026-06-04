@@ -1,9 +1,20 @@
-import { useState, type CSSProperties} from 'react'
+import { useState, useCallback, type CSSProperties} from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { condominiosKeys } from '../../../domain/condominios/keys'
 import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+// T4 · cond:C4 — el recargo de mora se calcula con la función PURA de la
+// foundation (#398), que respeta reglas_mora_config (tipo/valor/aplicar_sobre/
+// dias_vencimiento/periodo_gracia) en vez del antiguo `base * pct / 100` a mano.
+import { calcularMoraCuota, type ReglaMora } from '../../../lib/businessCondominios'
+// cond:C4 — ledger de recargos de mora vía la capa de datos T4. Reactivo a las
+// invalidaciones de las mutations de cuota (que tocan condominiosKeys.all), así
+// la lista refleja al instante lo que aplica el cron de mora (cond:C6) o las
+// acciones de cuota. Cae a la prop `recargos` si la query aún no resolvió.
+import { useRecargosMoraQuery } from '../../../domain/condominios/queries'
 
 interface Props {
   recargos: RecargoMora[]
@@ -24,6 +35,35 @@ const ESTADO_CFG: Record<EstadoRecargo, { label: string; bg: string; color: stri
   anulado:   { label: 'Anulado',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
+// T4 · cond:C4 — adapta la fila de config a la ReglaMora que consume
+// calcularMoraCuota (business.ts). Misma forma; sólo selecciona los campos.
+function reglaMoraDe(regla: ReglaMoraConfig): ReglaMora {
+  return {
+    tipo: regla.tipo,
+    valor: regla.valor,
+    aplicar_sobre: regla.aplicar_sobre,
+    dias_vencimiento: regla.dias_vencimiento,
+    periodo_gracia: regla.periodo_gracia,
+  }
+}
+
+/**
+ * Días transcurridos desde la fecha base de la cuota hasta `hoy`. La base es la
+ * de la máquina de estados (emitida_at) o, en su defecto, created_at — misma
+ * derivación que el cron de mora (cond:C6, COALESCE(emitida_at, created_at)).
+ * Pura: `hoy` se inyecta para tests deterministas.
+ */
+export function diasTranscurridosCuota(
+  cuota: { emitida_at?: string | null; created_at?: string | null; fecha_vencimiento?: string | null },
+  hoy: string = new Date().toISOString().slice(0, 10),
+): number {
+  const base = cuota.emitida_at ?? cuota.created_at ?? cuota.fecha_vencimiento
+  if (!base) return 0
+  const ms = new Date(hoy).getTime() - new Date(base).getTime()
+  if (!Number.isFinite(ms)) return 0
+  return Math.max(0, Math.floor(ms / 86_400_000))
+}
+
 export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -37,20 +77,43 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   const cuotasVencidas = cuotas.filter(c => c.estado === 'moroso' || c.estado === 'pendiente')
   const cuotasUnidad = form.unidad_id ? cuotasVencidas.filter(c => c.unidad_id === form.unidad_id) : []
 
-  const lista = recargos.filter(r =>
+  // cond:C4 — fuente del ledger: la query T4 (reactiva), scopeada a este proyecto;
+  // cae a la prop mientras carga / si está vacía para no romper el primer render.
+  const qc = useQueryClient()
+  const { data: recargosQuery } = useRecargosMoraQuery(companyId)
+  const recargosProyecto = recargosQuery && recargosQuery.length > 0
+    ? recargosQuery.filter(r => r.project_id === proyectoId)
+    : recargos
+
+  // Tras un write de recargo: refresca la carga del prop (CondominiosSection) y
+  // además invalida la query del ledger para que la lista reaccione al instante.
+  const refrescar = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: condominiosKeys.recargosMora(companyId) })
+    void onRefresh()
+  }, [qc, companyId, onRefresh])
+
+  const lista = recargosProyecto.filter(r =>
     (!filtroEstado || r.estado === filtroEstado) &&
     (!filtroUnidad || r.unidad_id === filtroUnidad)
   )
 
-  const totalAplicado = recargos.filter(r => r.estado === 'aplicado').reduce((s, r) => s + r.monto_calculado, 0)
-  const totalPendiente = recargos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.monto_calculado, 0)
+  const totalAplicado = recargosProyecto.filter(r => r.estado === 'aplicado').reduce((s, r) => s + r.monto_calculado, 0)
+  const totalPendiente = recargosProyecto.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.monto_calculado, 0)
 
   function calcularMonto() {
     if (!form.valor) return null
-    if (form.tipo === 'monto_fijo') return parseFloat(form.valor)
+    const valor = parseFloat(form.valor)
+    if (form.tipo === 'monto_fijo') return valor
     if (form.cuota_id) {
       const cuota = cuotas.find(c => c.id === form.cuota_id)
-      if (cuota) return (cuota.monto * parseFloat(form.valor)) / 100
+      if (cuota) {
+        // cond:C4 — recargo porcentual sobre la cuota vía la función pura. Como es
+        // una aplicación MANUAL e inmediata (el admin escribe el %), no exigimos
+        // vencimiento/gracia: regla con dias=0/gracia=0 → base * pct/100, pero ya
+        // sin aritmética a mano.
+        const regla: ReglaMora = { tipo: 'porcentaje', valor, aplicar_sobre: 'monto_cuota', dias_vencimiento: 0, periodo_gracia: 0 }
+        return calcularMoraCuota(regla, 0, cuota.monto).monto
+      }
     }
     return null
   }
@@ -79,14 +142,14 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    resetForm(); onRefresh()
+    resetForm(); refrescar()
   }
 
   async function cambiarEstado(r: RecargoMora, estado: EstadoRecargo) {
     const update: Record<string, unknown> = { estado }
     if (estado === 'anulado') update.fecha_anulacion = new Date().toISOString()
     await supabase.from('recargos_mora').update(update).eq('id', r.id)
-    onRefresh()
+    refrescar()
   }
 
   async function aplicarMasivo() {
@@ -103,11 +166,18 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     let pct = 5
     let tipoRecargo: TipoRecargo = 'porcentaje'
     let motivo = `Recargo masivo mora`
+    // Regla efectiva que alimenta calcularMoraCuota. Con regla activa usamos sus
+    // parámetros completos (incl. dias_vencimiento/periodo_gracia/aplicar_sobre);
+    // sin ella, construimos una regla mínima de porcentaje a partir del % del
+    // prompt (vencimiento/gracia = 0, comportamiento equivalente al previo pero
+    // ya pasando por la función pura).
+    let reglaEfectiva: ReglaMora
 
     if (reglaActiva) {
       pct = reglaActiva.valor
       tipoRecargo = reglaActiva.tipo === 'porcentaje' ? 'porcentaje' : 'monto_fijo'
       motivo = `Recargo automático — ${reglaActiva.nombre}`
+      reglaEfectiva = reglaMoraDe(reglaActiva)
       const conf = await confirm({
         icon: 'question',
         title: 'Aplicar mora automática',
@@ -142,27 +212,40 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       })
       if (!result) return
       pct = parseFloat(result.pct)
+      reglaEfectiva = { tipo: 'porcentaje', valor: pct, aplicar_sobre: 'monto_cuota', dias_vencimiento: 0, periodo_gracia: 0 }
     }
 
     setSaving(true)
     const today = new Date().toISOString().slice(0, 10)
+    // cond:C4 — el recargo por unidad es la SUMA del recargo de cada cuota
+    // vencida, calculado con calcularMoraCuota (respeta vencimiento/gracia de la
+    // regla). Para monto_fijo, la regla aplica el fijo por cuota.
     const rows = unidadesMorosas.map(uid => {
       const cuotasU = cuotasVenc.filter(c => c.unidad_id === uid)
-      const montoBase = cuotasU.reduce((s, c) => s + c.monto, 0)
-      const monto_calculado = tipoRecargo === 'porcentaje'
-        ? parseFloat(((montoBase * pct) / 100).toFixed(2))
-        : pct
+      const monto_calculado = parseFloat(
+        cuotasU.reduce((s, c) => {
+          const dias = diasTranscurridosCuota(c, today)
+          return s + calcularMoraCuota(reglaEfectiva, dias, c.monto).monto
+        }, 0).toFixed(2),
+      )
       return {
         company_id: companyId, project_id: proyectoId,
         unidad_id: uid, tipo: tipoRecargo, valor: pct,
         monto_calculado, fecha_aplicacion: today, motivo,
       }
-    })
+    }).filter(r => r.monto_calculado > 0) // omite unidades cuya mora resultó 0 (en gracia)
+
+    if (rows.length === 0) {
+      setSaving(false)
+      notify({ variant: 'info', title: 'Sin recargo aplicable', text: 'Las cuotas vencidas aún están dentro del periodo de gracia de la regla.' })
+      return
+    }
+
     const { error } = await supabase.from('recargos_mora').insert(rows)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, duration: 2200 })
-    onRefresh()
+    refrescar()
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
@@ -173,9 +256,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Recargos aplicados', val: recargos.filter(r => r.estado === 'aplicado').length, sub: `${moneda} ${totalAplicado.toLocaleString()}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Pendientes de aplicar', val: recargos.filter(r => r.estado === 'pendiente').length, sub: `${moneda} ${totalPendiente.toLocaleString()}`, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
-          { label: 'Anulados', val: recargos.filter(r => r.estado === 'anulado').length, sub: '', bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
+          { label: 'Recargos aplicados', val: recargosProyecto.filter(r => r.estado === 'aplicado').length, sub: `${moneda} ${totalAplicado.toLocaleString()}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
+          { label: 'Pendientes de aplicar', val: recargosProyecto.filter(r => r.estado === 'pendiente').length, sub: `${moneda} ${totalPendiente.toLocaleString()}`, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+          { label: 'Anulados', val: recargosProyecto.filter(r => r.estado === 'anulado').length, sub: '', bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
           { label: 'Unidades con mora', val: new Set(cuotas.filter(c => c.estado === 'moroso').map(c => c.unidad_id)).size, sub: '', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
