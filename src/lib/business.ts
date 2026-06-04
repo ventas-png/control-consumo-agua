@@ -141,3 +141,324 @@ export function validarLectura(
 
   return { valid: true, consumo }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// T4 · Facturación de dominio (agua:C4) — Agregado Factura: IVA + mora + máquina
+// de estados. Funciones PURAS (sin I/O), espejo de la migración
+// 20260604160000_factura_state_machine_mora_iva.sql. ADITIVO: no modifica las
+// firmas existentes (calcularTotalPagar / validarLectura) que consume App.tsx.
+//
+// La capa de datos las orquesta; la edge fn de mora (cron) y la UI de
+// cobros/tarifas reutilizan estas funciones (follow-ups del track).
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Redondeo monetario ──────────────────────────────────────────────────────
+// La DB guarda numeric(12,2). Redondeamos a 2 decimales con "round half away
+// from zero" para casar con el comportamiento de numeric de Postgres y evitar
+// drift de centavos entre el cálculo en TS y la columna persistida.
+export function redondear2(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  // Epsilon para neutralizar el error de coma flotante (0.1+0.2) antes de
+  // redondear: 1.005 debe dar 1.01, no 1.00.
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// IVA (agua:C4) — tasa configurable por tenant (companies.iva_tasa_default).
+// GT = 0.12 (12%). La tasa se expresa como FRACCIÓN [0,1].
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Tasa de IVA por defecto de Guatemala (12%). Fallback cuando el tenant no la define. */
+export const IVA_TASA_GT = 0.12
+
+export interface CalculoIVA {
+  /** Base imponible (subtotal sin IVA) ya redondeada. */
+  base: number
+  /** Tasa aplicada (fracción [0,1]). */
+  tasa: number
+  /** Monto de IVA = base * tasa, redondeado a 2 decimales. */
+  iva: number
+  /** Total con IVA = base + iva, redondeado. */
+  total: number
+}
+
+/**
+ * Calcula el IVA sobre una base imponible.
+ *
+ * @param base  Subtotal sin IVA (p.ej. `monto_calculado` de la factura de agua).
+ * @param tasa  Fracción [0,1]. Si es null/undefined usa IVA_TASA_GT (12%).
+ *              Una tasa de 0 es válida (exento) y NO cae al default.
+ *
+ * Defensa: base/tasa negativas o no finitas se normalizan a 0; tasa > 1 se
+ * recorta a 1 (un 120% sería un error de captura, no un IVA real).
+ */
+export function calcularIVA(base: number, tasa?: number | null): CalculoIVA {
+  const baseNum = Number.isFinite(base) && base > 0 ? base : 0
+  let t = tasa === null || tasa === undefined ? IVA_TASA_GT : Number(tasa)
+  if (!Number.isFinite(t) || t < 0) t = 0
+  if (t > 1) t = 1
+
+  const baseR = redondear2(baseNum)
+  const iva = redondear2(baseR * t)
+  return { base: baseR, tasa: t, iva, total: redondear2(baseR + iva) }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mora / recargo (agua:C4) — según reglas_mora_config.
+//   tipo: 'porcentaje' | 'monto_fijo'
+//   valor: % (cuando porcentaje) o monto (cuando monto_fijo)
+//   aplicar_sobre: 'saldo_vencido' | 'monto_cuota'
+//   dias_vencimiento: días tras emisión para considerar la factura vencida
+//   periodo_gracia: días extra de tolerancia ANTES de aplicar mora
+// El recargo en porcentaje se interpreta como porcentaje ENTERO (valor=5 → 5%),
+// coherente con la UI de condominios que captura "5" para 5% en reglas_mora_config.
+// ────────────────────────────────────────────────────────────────────────────
+
+export type TipoMora = 'porcentaje' | 'monto_fijo'
+export type AplicarSobreMora = 'saldo_vencido' | 'monto_cuota'
+
+/** Subconjunto de reglas_mora_config que necesita el cálculo puro de mora. */
+export interface ReglaMora {
+  tipo: TipoMora
+  valor: number
+  aplicar_sobre?: AplicarSobreMora
+  dias_vencimiento?: number
+  periodo_gracia?: number
+}
+
+export interface CalculoMora {
+  /** True si corresponde aplicar recargo (ya venció + pasó el periodo de gracia). */
+  aplica: boolean
+  /** Días de atraso = días transcurridos - dias_vencimiento (0 si no ha vencido). */
+  diasAtraso: number
+  /** Monto del recargo, redondeado a 2 decimales (0 si no aplica). */
+  monto: number
+  /** Base sobre la que se calculó (saldo vencido o monto de cuota). */
+  base: number
+  /** Motivo legible cuando no aplica (para logs/UI). */
+  motivo?: string
+}
+
+/**
+ * Calcula el recargo por mora de una factura.
+ *
+ * @param regla        Configuración de mora del proyecto (reglas_mora_config).
+ * @param diasTranscurridos  Días desde la emisión/fecha base de la factura.
+ * @param saldoVencido Saldo pendiente (monto_calculado - monto_pagado). Base
+ *                     cuando aplicar_sobre = 'saldo_vencido' (default).
+ * @param montoCuota   Monto total de la cuota/factura. Base cuando
+ *                     aplicar_sobre = 'monto_cuota'.
+ *
+ * Regla de aplicación: hay mora cuando
+ *   diasTranscurridos > dias_vencimiento + periodo_gracia
+ * El % se aplica sobre la base elegida; monto_fijo ignora la base.
+ */
+export function calcularMora(
+  regla: ReglaMora,
+  diasTranscurridos: number,
+  saldoVencido: number,
+  montoCuota?: number,
+): CalculoMora {
+  const dias = Number.isFinite(diasTranscurridos) ? Math.floor(diasTranscurridos) : 0
+  const diasVenc = Number.isFinite(regla?.dias_vencimiento) ? Number(regla.dias_vencimiento) : 0
+  const gracia = Number.isFinite(regla?.periodo_gracia) ? Number(regla.periodo_gracia) : 0
+
+  const saldo = Number.isFinite(saldoVencido) && saldoVencido > 0 ? saldoVencido : 0
+  const cuota = Number.isFinite(montoCuota as number) && (montoCuota as number) > 0 ? (montoCuota as number) : 0
+  const base = regla?.aplicar_sobre === 'monto_cuota' ? cuota : saldo
+
+  const diasAtraso = dias - diasVenc
+
+  // No vencida todavía (o exactamente en el día de vencimiento).
+  if (diasAtraso <= 0) {
+    return { aplica: false, diasAtraso: 0, monto: 0, base, motivo: 'La factura no ha vencido.' }
+  }
+  // Vencida pero dentro del periodo de gracia.
+  if (diasAtraso <= gracia) {
+    return { aplica: false, diasAtraso, monto: 0, base, motivo: 'Dentro del periodo de gracia.' }
+  }
+  // Sin base sobre la que cobrar (saldo 0): nada que recargar en %.
+  if (regla?.tipo === 'porcentaje' && base <= 0) {
+    return { aplica: false, diasAtraso, monto: 0, base, motivo: 'Sin saldo vencido sobre el que aplicar mora.' }
+  }
+
+  const valor = Number.isFinite(regla?.valor) && regla.valor > 0 ? Number(regla.valor) : 0
+  if (valor <= 0) {
+    return { aplica: false, diasAtraso, monto: 0, base, motivo: 'La regla de mora tiene valor 0.' }
+  }
+
+  // monto_fijo: recargo plano. porcentaje: valor es % entero (5 → 5%).
+  const monto =
+    regla.tipo === 'monto_fijo' ? redondear2(valor) : redondear2(base * (valor / 100))
+
+  return { aplica: monto > 0, diasAtraso, monto, base }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Total de la Factura = subtotal + IVA + mora (agua:C4).
+// Espeja registros.total_a_pagar. El IVA se calcula sobre el subtotal (base
+// imponible); la mora es un recargo financiero que se suma DESPUÉS y no genera
+// IVA (criterio conservador para servicios públicos / cuotas).
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface DesgloseFactura {
+  /** Base imponible (consumo/canon) sin IVA. */
+  subtotal: number
+  /** Tasa de IVA aplicada (fracción). */
+  iva_tasa: number
+  /** Monto de IVA sobre el subtotal. */
+  iva_monto: number
+  /** Subtotal + IVA. */
+  monto_con_iva: number
+  /** Recargo por mora (0 si no aplica). */
+  mora_monto: number
+  /** Total final a pagar = monto_con_iva + mora_monto. */
+  total_a_pagar: number
+}
+
+/**
+ * Compone el total de una factura a partir del subtotal, una tasa de IVA y un
+ * recargo de mora ya calculado (con calcularMora). Función pura de agregación;
+ * la usa la capa de datos para persistir iva_monto/monto_con_iva/mora_monto/
+ * total_a_pagar de forma consistente con la migración.
+ */
+export function calcularTotalFactura(
+  subtotal: number,
+  ivaTasa?: number | null,
+  moraMonto = 0,
+): DesgloseFactura {
+  const iva = calcularIVA(subtotal, ivaTasa)
+  const mora = Number.isFinite(moraMonto) && moraMonto > 0 ? redondear2(moraMonto) : 0
+  return {
+    subtotal: iva.base,
+    iva_tasa: iva.tasa,
+    iva_monto: iva.iva,
+    monto_con_iva: iva.total,
+    mora_monto: mora,
+    total_a_pagar: redondear2(iva.total + mora),
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Máquina de estados de la Factura (agua:C4).
+// Estados canónicos: pendiente → emitida → {pagada | vencida}; anulada terminal.
+// vencida → pagada permitido (se puede pagar una factura vencida).
+// vencida → anulada permitido. pagada y anulada son terminales.
+// ────────────────────────────────────────────────────────────────────────────
+
+export type EstadoFactura = 'pendiente' | 'emitida' | 'pagada' | 'vencida' | 'anulada'
+
+/** Acciones de transición de la máquina de estados. */
+export type AccionFactura = 'emitir' | 'pagar' | 'vencer' | 'anular'
+
+/**
+ * Mapa de transiciones permitidas: estado actual → acción → estado destino.
+ * Es la fuente de verdad de la máquina; tanto la validación como la aplicación
+ * la consultan. Mantener sincronizado con el CHECK de la migración.
+ */
+const TRANSICIONES_FACTURA: Record<EstadoFactura, Partial<Record<AccionFactura, EstadoFactura>>> = {
+  pendiente: { emitir: 'emitida', anular: 'anulada' },
+  emitida: { pagar: 'pagada', vencer: 'vencida', anular: 'anulada' },
+  vencida: { pagar: 'pagada', anular: 'anulada' },
+  pagada: {}, // terminal
+  anulada: {}, // terminal
+}
+
+/**
+ * Normaliza un estado (incluidos los legacy de `registros.estado`) al conjunto
+ * canónico. 'pagado' → 'pagada', 'mora' → 'vencida'. null/desconocido →
+ * 'pendiente' (estado inicial seguro). Espeja la tolerancia legacy del CHECK.
+ */
+export function normalizarEstadoFactura(estado?: string | null): EstadoFactura {
+  switch (estado) {
+    case 'pendiente':
+    case 'emitida':
+    case 'pagada':
+    case 'vencida':
+    case 'anulada':
+      return estado
+    case 'pagado':
+      return 'pagada'
+    case 'mora':
+      return 'vencida'
+    default:
+      return 'pendiente'
+  }
+}
+
+/** Estados terminales: ya no admiten ninguna transición. */
+export function esEstadoTerminalFactura(estado?: string | null): boolean {
+  const e = normalizarEstadoFactura(estado)
+  return e === 'pagada' || e === 'anulada'
+}
+
+export interface ResultadoTransicion {
+  ok: boolean
+  /** Estado resultante si la transición es válida. */
+  estado?: EstadoFactura
+  /** Mensaje de error cuando la transición es inválida. */
+  error?: string
+}
+
+/**
+ * Valida si una acción es aplicable al estado actual de la factura SIN mutar.
+ * Acepta estados legacy (los normaliza primero). Devuelve el estado destino.
+ */
+export function puedeTransicionarFactura(
+  estadoActual: string | null | undefined,
+  accion: AccionFactura,
+): ResultadoTransicion {
+  const actual = normalizarEstadoFactura(estadoActual)
+  const destino = TRANSICIONES_FACTURA[actual]?.[accion]
+  if (!destino) {
+    return {
+      ok: false,
+      error: `Transición inválida: no se puede "${accion}" una factura en estado "${actual}".`,
+    }
+  }
+  return { ok: true, estado: destino }
+}
+
+/** Campos que la transición setea sobre la fila de `registros` (parche parcial). */
+export interface ParcheTransicionFactura {
+  factura_estado: EstadoFactura
+  emitida_at?: string
+  pagada_at?: string
+  vencida_at?: string
+  anulada_at?: string
+}
+
+/**
+ * Aplica una transición y devuelve el parche a persistir (estado + timestamp de
+ * la transición). Fail-fast: lanza si la transición es inválida — el caller debe
+ * validar antes con puedeTransicionarFactura si quiere manejar el error sin throw.
+ *
+ * @param ahora  ISO timestamp a estampar (default new Date().toISOString()).
+ *               Parametrizado para tests deterministas.
+ */
+export function aplicarTransicionFactura(
+  estadoActual: string | null | undefined,
+  accion: AccionFactura,
+  ahora: string = new Date().toISOString(),
+): ParcheTransicionFactura {
+  const res = puedeTransicionarFactura(estadoActual, accion)
+  if (!res.ok || !res.estado) {
+    throw new Error(res.error ?? 'Transición de factura inválida.')
+  }
+  const parche: ParcheTransicionFactura = { factura_estado: res.estado }
+  switch (accion) {
+    case 'emitir':
+      parche.emitida_at = ahora
+      break
+    case 'pagar':
+      parche.pagada_at = ahora
+      break
+    case 'vencer':
+      parche.vencida_at = ahora
+      break
+    case 'anular':
+      parche.anulada_at = ahora
+      break
+  }
+  return parche
+}
