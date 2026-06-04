@@ -170,3 +170,50 @@ jobs:
           supabase functions deploy stripe-platform-webhook \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
+
+      # ───────────────────────────────────────────────────────────────────────
+      # Cobros pluggable (payfac): cada empresa/locación elige su payfac y conecta
+      # credenciales. verify_jwt=false en config.toml — estas funciones validan el
+      # token a mano (service_role interno O JWT de admin/owner/usuario del tenant)
+      # y nunca exponen el secreto de la bóveda payfac_secrets.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Deploy create-charge (no JWT — valida token a mano: service_role o JWT del tenant)
+        run: |
+          supabase functions deploy create-charge \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy payfac-save-credentials (no JWT — valida token a mano: service_role o admin/owner)
+        run: |
+          supabase functions deploy payfac-save-credentials \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy payfac-test-connection (no JWT — valida token a mano: service_role o admin/owner)
+        run: |
+          supabase functions deploy payfac-test-connection \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      # ───────────────────────────────────────────────────────────────────────
+      # Fiscal FEL/CFDI (serv:S11): mismo patrón "elige tu PAC y conecta".
+      # Faltaban en este workflow → daban 404 en producción (igual que payfac).
+      # verify_jwt=false + validación manual del token.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Deploy timbrar-documento (no JWT — valida token a mano: service_role o admin/owner)
+        run: |
+          supabase functions deploy timbrar-documento \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy fiscal-save-credentials (no JWT — valida token a mano: service_role o admin/owner)
+        run: |
+          supabase functions deploy fiscal-save-credentials \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy fiscal-test-connection (no JWT — valida token a mano: service_role o admin/owner)
+        run: |
+          supabase functions deploy fiscal-test-connection \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
