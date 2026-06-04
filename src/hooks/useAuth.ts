@@ -6,76 +6,10 @@ import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
 import { measureSLO, reportSLOError } from '../lib/slo'
-
-function getStoredSession(): UserSession | null {
-  try {
-    const data = sessionStorage.getItem('userSession')
-    if (!data) return null
-    const parsed = JSON.parse(data) as UserSession & { permissions?: string[] | Set<string> }
-    if (new Date() >= new Date(parsed.expires_at)) return null
-    // permissions serializes as array; hydrate back to Set
-    if (Array.isArray(parsed.permissions)) {
-      parsed.permissions = new Set(parsed.permissions) as Set<string>
-    }
-    return parsed as UserSession
-  } catch {
-    return null
-  }
-}
-
-function storeSession(session: UserSession): void {
-  const serializable = {
-    ...session,
-    permissions: session.permissions ? [...session.permissions] : undefined,
-  }
-  sessionStorage.setItem('userSession', JSON.stringify(serializable))
-  // Security: no longer store session in localStorage to prevent theft via XSS
-}
-
-function clearSession(): void {
-  sessionStorage.removeItem('userSession')
-  // Clean up legacy cached sessions from previous versions
-  localStorage.removeItem('cached_session')
-}
-
-// --- Login rate limiting ---
-const MAX_LOGIN_ATTEMPTS = 5
-const LOCKOUT_DURATION_MS = 60_000 // 1 minute
-
-interface LoginFailures { count: number; lockedUntil: number }
-
-function getLoginFailures(): LoginFailures {
-  try {
-    const raw = sessionStorage.getItem('login_failures')
-    if (!raw) return { count: 0, lockedUntil: 0 }
-    return JSON.parse(raw) as LoginFailures
-  } catch { return { count: 0, lockedUntil: 0 } }
-}
-
-function recordLoginFailure(): void {
-  const f = getLoginFailures()
-  f.count += 1
-  if (f.count >= MAX_LOGIN_ATTEMPTS) {
-    f.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
-  }
-  sessionStorage.setItem('login_failures', JSON.stringify(f))
-}
-
-function clearLoginFailures(): void {
-  sessionStorage.removeItem('login_failures')
-}
-
-function getLoginLockoutMessage(): string | null {
-  const f = getLoginFailures()
-  if (f.count >= MAX_LOGIN_ATTEMPTS && Date.now() < f.lockedUntil) {
-    const secsLeft = Math.ceil((f.lockedUntil - Date.now()) / 1000)
-    return `Demasiados intentos fallidos. Intente en ${secsLeft} segundos.`
-  }
-  if (f.count >= MAX_LOGIN_ATTEMPTS && Date.now() >= f.lockedUntil) {
-    clearLoginFailures()
-  }
-  return null
-}
+// agua:A9 — session-storage y rate-limit de login vivían inline aquí
+// (responsabilidades mezcladas); ahora son módulos puros y testeables.
+import { getStoredSession, storeSession, clearSession } from '../lib/authSession'
+import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../lib/loginRateLimit'
 
 async function applyOAuthSession(
   user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
