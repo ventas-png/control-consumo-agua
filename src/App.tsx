@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-
 import { notify } from './components/shared/Dialog'
 import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
+import { BrandingApplier } from './components/branding/BrandingApplier'
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
@@ -918,6 +919,8 @@ export default function App() {
         <Breadcrumbs activeSection={activeSection} onNavigate={navigateSection} />
         <PresenceBar activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
+        {/* plat:P20 — aplica el color de marca de la empresa a toda la app (efecto, no UI). */}
+        <BrandingApplier companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
           <Routes>

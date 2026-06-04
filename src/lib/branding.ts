@@ -65,3 +65,22 @@ export function derivarVariablesMarca(primary: string | null | undefined): Varia
     soft: mezclarBlanco(base, 0.82),
   }
 }
+
+/** CSS vars de tema que el branding sobreescribe (en orden). */
+export const BRAND_CSS_VARS = ['--at-primary', '--at-primary-hover', '--at-primary-soft'] as const
+
+/**
+ * Mapa de CSS vars a aplicar para un color de marca, o null si NO hay color
+ * custom (el caller debe entonces RESTABLECER esas vars a las de la hoja de
+ * estilos). Puro.
+ */
+export function estilosMarca(primaryColor: string | null | undefined): Record<string, string> | null {
+  const color = normalizarColorHex(primaryColor)
+  if (!color) return null
+  const v = derivarVariablesMarca(color)
+  return {
+    '--at-primary': v.primary,
+    '--at-primary-hover': v.hover,
+    '--at-primary-soft': v.soft,
+  }
+}
