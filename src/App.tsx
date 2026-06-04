@@ -16,7 +16,7 @@ import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarif
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { filterProyectosByAssignment, deriveProyectoConfig } from './lib/proyectosAccess'
-import { SessionProvider } from './components/shared/SessionContext'
+import { SessionProvider, useSession } from './components/shared/SessionContext'
 import { PermissionsProvider } from './components/shared/PermissionsContext'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
@@ -134,7 +134,8 @@ function AuthSplash() {
 // misma seccion. Se monta justo bajo el Topbar. Si no hay nadie mas, se
 // auto-oculta. Se inyecta el hook aqui (y no en App directo) para evitar
 // re-renders del arbol grande cuando llegan eventos Realtime cada 30s.
-function PresenceBar({ currentUser, activeSection }: { currentUser: UserSession; activeSection: AppSection }) {
+function PresenceBar({ activeSection }: { activeSection: AppSection }) {
+  const currentUser = useSession()
   const { others } = usePresence({
     companyId: currentUser.company_id ?? null,
     userId: currentUser.user_id,
@@ -844,9 +845,6 @@ export default function App() {
         />
       <Sidebar
         activeSection={activeSection}
-        userRole={currentUser.role}
-        currentUser={currentUser}
-        canViewModule={canViewModule}
         onSelect={(section) => { navigateSection(section); setSidebarOpen(false) }}
         onPrefetch={prefetchSection}
         onLogout={handleLogout}
@@ -898,8 +896,8 @@ export default function App() {
             </button>
           </div>
         )}
-        <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} onNavigate={navigateSection} sidebarOpen={sidebarOpen} />
-        <PresenceBar currentUser={currentUser} activeSection={activeSection} />
+        <Topbar activeSection={activeSection} onMenuToggle={() => setSidebarOpen(prev => !prev)} onNavigate={navigateSection} sidebarOpen={sidebarOpen} />
+        <PresenceBar activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
@@ -966,7 +964,7 @@ export default function App() {
             } />
             <Route path="/cobros" element={
               <ErrorBoundary sectionName="cobros">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
+                <RoleGuard allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
                 <CobrosSection
                   registros={registros}
                   clientes={clientes}
@@ -990,7 +988,7 @@ export default function App() {
             } />
             <Route path="/admin-dashboard" element={
               <ErrorBoundary sectionName="admin_dashboard">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
+                <RoleGuard allowedRoles={['company_owner']}>
                 <AdminClientDashboard
                   currentUser={currentUser}
                   data={{
@@ -1063,7 +1061,7 @@ export default function App() {
             } />
             <Route path="/configuracion" element={
               <ErrorBoundary sectionName="configuracion">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
+                <RoleGuard allowedRoles={['admin', 'super_admin', 'company_owner']}>
                 <ConfiguracionSection onLogout={handleLogout} />
                 </RoleGuard>
               </ErrorBoundary>
@@ -1075,7 +1073,7 @@ export default function App() {
             } />
             <Route path="/empresa" element={
               <ErrorBoundary sectionName="empresa">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
+                <RoleGuard allowedRoles={['company_owner']}>
                 <EmpresaSection currentUser={currentUser} />
                 </RoleGuard>
               </ErrorBoundary>
@@ -1128,7 +1126,7 @@ export default function App() {
             } />
             <Route path="/superadmin" element={
               <ErrorBoundary sectionName="superadmin">
-                <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
+                <RoleGuard allowedRoles={['super_admin']}>
                 <SuperAdminSection />
                 </RoleGuard>
               </ErrorBoundary>
