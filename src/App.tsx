@@ -23,6 +23,7 @@ import { setMonitoringUser } from './lib/monitoring'
 import { BrandLogo } from './components/shared/BrandLogo'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
+import { Breadcrumbs } from './components/layout/Breadcrumbs'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard, AccessDenied } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
@@ -833,6 +834,7 @@ export default function App() {
           .app-hamburger { display: flex !important; }
           .app-main { padding: 16px !important; }
           .app-topbar { padding: 0 14px !important; }
+          .app-breadcrumbs { padding: 7px 14px !important; }
           .app-alert-banner { padding: 10px 14px !important; flex-wrap: wrap; gap: 8px; }
         }
         @media (max-width: 480px) {
@@ -912,6 +914,8 @@ export default function App() {
           </div>
         )}
         <Topbar activeSection={activeSection} onMenuToggle={() => setSidebarOpen(prev => !prev)} onNavigate={navigateSection} sidebarOpen={sidebarOpen} />
+        {/* T6/agua:B11 — breadcrumbs de navegación (Sección › Subsección), bajo el topbar. */}
+        <Breadcrumbs activeSection={activeSection} onNavigate={navigateSection} />
         <PresenceBar activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
