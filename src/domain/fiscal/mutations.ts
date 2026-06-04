@@ -180,3 +180,249 @@ export function useRegimenFiscalQuery(companyId?: string) {
     enabled: !!companyId,
   })
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// serv:S11 — Habilitación "selecciona tu PAC y solo conecta" (UI parte 2).
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Tres mutaciones para el flujo selecciona → conecta → prueba:
+//   1. useGuardarConfigFiscalLocacionMutation — escribe las columnas fiscales NO
+//      secretas (régimen/NIT/RFC/nombre_fiscal/proveedor/establecimiento/…) DIRECTO
+//      en companies (ámbito empresa) o projects (ámbito locación). RLS de admin/
+//      owner lo permite (no es secreto). Invalida configEfectiva.
+//   2. useGuardarCredencialesPacMutation — invoca el edge fiscal-save-credentials
+//      (la bóveda es deny-all; el cliente NO escribe el secreto). Invalida
+//      credenciales.
+//   3. useProbarConexionPacMutation — invoca el edge fiscal-test-connection.
+//      Invalida credenciales (el ping persiste estado_conexion).
+//
+// Las CREDENCIALES jamás se escriben/leen directo desde el cliente (solo vía edge);
+// aquí solo se tocan COLUMNAS NO SENSIBLES de companies/projects.
+
+/** Ámbito de la config fiscal: la empresa (companies) o una locación (projects). */
+export type AmbitoFiscal =
+  | { tipo: 'empresa' }
+  | { tipo: 'locacion'; projectId: string }
+
+/**
+ * Datos NO secretos del emisor a persistir. Campos `undefined` se omiten del
+ * patch (no se tocan); `null`/'' limpian la columna (= "hereda" en una locación).
+ * Las columnas reales difieren por ámbito: establecimiento/serie_fiscal/
+ * lugar_expedicion SOLO existen en projects (locación).
+ */
+export interface ConfigFiscalEmisorInput {
+  regimenFiscal?: RegimenFiscalConfig | null
+  nombreFiscal?: string | null
+  nit?: string | null
+  rfc?: string | null
+  proveedorTimbrado?: string | null
+  /** Solo locación (GT/FEL). */
+  establecimiento?: string | null
+  /** Solo locación (MX/CFDI). */
+  lugarExpedicion?: string | null
+  /** Solo locación (MX/CFDI). */
+  serieFiscal?: string | null
+}
+
+/** '' → null (un override vacío = "hereda"); deja undefined intacto. */
+function limpiar(v: string | null | undefined): string | null | undefined {
+  if (v === undefined) return undefined
+  if (v === null) return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+/** Añade `col` al patch solo si `valor` no es undefined (permite null = limpiar). */
+function setSiPresente(
+  patch: Record<string, unknown>,
+  col: string,
+  valor: string | null | undefined,
+): void {
+  if (valor !== undefined) patch[col] = valor
+}
+
+/**
+ * Construye el patch de columnas (snake_case) para companies o projects desde el
+ * input del emisor. PURO/testeable. A nivel EMPRESA solo van las columnas que
+ * existen en companies (sin establecimiento/serie_fiscal/lugar_expedicion). En el
+ * mapeo MX, lugar_expedicion de la locación vive en projects.lugar_expedicion.
+ */
+export function buildConfigFiscalPatch(
+  ambito: AmbitoFiscal,
+  input: ConfigFiscalEmisorInput,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {}
+  setSiPresente(patch, 'regimen_fiscal', limpiar(input.regimenFiscal as string | null | undefined))
+  setSiPresente(patch, 'nombre_fiscal', limpiar(input.nombreFiscal))
+  setSiPresente(patch, 'nit', limpiar(input.nit))
+  setSiPresente(patch, 'rfc', limpiar(input.rfc))
+  setSiPresente(patch, 'proveedor_timbrado', limpiar(input.proveedorTimbrado))
+  if (ambito.tipo === 'locacion') {
+    // Columnas que SOLO existen en projects (override por locación).
+    setSiPresente(patch, 'establecimiento', limpiar(input.establecimiento))
+    setSiPresente(patch, 'lugar_expedicion', limpiar(input.lugarExpedicion))
+    setSiPresente(patch, 'serie_fiscal', limpiar(input.serieFiscal))
+  }
+  return patch
+}
+
+/**
+ * Guarda los datos NO secretos del emisor en el nivel elegido (empresa→companies,
+ * locación→projects) DIRECTO vía RLS (admin/owner). No toca credenciales. Tras
+ * guardar invalida la config efectiva (de ese scope y la raíz, porque la empresa
+ * afecta la herencia de todas las locaciones) y el estatus de credenciales (el
+ * proveedor mostrado puede cambiar).
+ */
+export function useGuardarConfigFiscalLocacionMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      ambito: AmbitoFiscal
+      input: ConfigFiscalEmisorInput
+    }) => {
+      const patch = buildConfigFiscalPatch(vars.ambito, vars.input)
+      if (Object.keys(patch).length === 0) return { ambito: vars.ambito }
+      if (vars.ambito.tipo === 'empresa') {
+        if (!companyId) throw new Error('Falta companyId para guardar la config de empresa.')
+        await runQuery((signal) =>
+          supabase.from('companies').update(patch).eq('id', companyId).abortSignal(signal),
+        )
+      } else {
+        const projectId = vars.ambito.projectId
+        await runQuery((signal) =>
+          supabase.from('projects').update(patch).eq('id', projectId).abortSignal(signal),
+        )
+      }
+      return { ambito: vars.ambito }
+    },
+    onSuccess: (_data, vars) => {
+      // La config de empresa afecta la herencia de TODAS las locaciones, así que
+      // invalidamos la raíz del dominio además del scope concreto.
+      void qc.invalidateQueries({ queryKey: fiscalKeys.all })
+      void qc.invalidateQueries({
+        queryKey: fiscalKeys.configEfectiva(
+          companyId,
+          vars.ambito.tipo === 'locacion' ? vars.ambito.projectId : undefined,
+        ),
+      })
+      if (companyId) void qc.invalidateQueries({ queryKey: fiscalKeys.credenciales(companyId) })
+    },
+  })
+}
+
+/** Respuesta del edge fiscal-save-credentials (SOLO flags, jamás el secreto). */
+export interface GuardarCredencialesResult {
+  ok?: boolean
+  company_id?: string
+  project_id?: string | null
+  proveedor?: string
+  tiene_sandbox?: boolean
+  tiene_prod?: boolean
+  estado_conexion?: string
+  error?: string
+}
+
+/** Credenciales de un ambiente (objeto opaco; el adapter las interpreta). */
+export type CredencialesAmbienteInput = Record<string, unknown>
+
+export interface GuardarCredencialesVars {
+  /** Tenant; opcional para admin/owner (el edge lo infiere del JWT). */
+  companyId?: string
+  /** Locación; null/omitido = nivel empresa. */
+  projectId?: string | null
+  /** PAC al que pertenecen las credenciales (ej. 'infile', 'facturama'). */
+  proveedor?: string
+  /** Credenciales por ambiente. Omitir un ambiente lo PRESERVA (merge en el edge). */
+  credenciales: {
+    sandbox?: CredencialesAmbienteInput | null
+    prod?: CredencialesAmbienteInput | null
+  }
+}
+
+/**
+ * Guarda las credenciales del PAC vía el edge `fiscal-save-credentials` (la bóveda
+ * es deny-all: el cliente NUNCA escribe el secreto directo). Tras guardar invalida
+ * el estatus de credenciales (flags tiene_sandbox/tiene_prod + estado_conexion, que
+ * vuelve a 'desconocido'). La respuesta NO contiene el secreto.
+ */
+export function useGuardarCredencialesPacMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: GuardarCredencialesVars): Promise<GuardarCredencialesResult> => {
+      const { data, error } = await supabase.functions.invoke<GuardarCredencialesResult>(
+        'fiscal-save-credentials',
+        {
+          body: {
+            ...(vars.companyId ? { company_id: vars.companyId } : {}),
+            project_id: vars.projectId ?? null,
+            ...(vars.proveedor ? { proveedor: vars.proveedor } : {}),
+            credenciales: vars.credenciales,
+          },
+        },
+      )
+      if (error) throw new Error(error.message)
+      if (data && data.ok === false) throw new Error(data.error ?? 'No se pudieron guardar las credenciales.')
+      return data ?? {}
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: fiscalKeys.all })
+      if (companyId) void qc.invalidateQueries({ queryKey: fiscalKeys.credenciales(companyId) })
+    },
+  })
+}
+
+/** Respuesta del edge fiscal-test-connection (ping vía Sandbox). */
+export interface ProbarConexionResult {
+  ok?: boolean
+  mensaje?: string
+  proveedor?: string | null
+  regimen?: string | null
+  ambiente?: string
+  desde_locacion?: boolean
+  estado_conexion?: string
+  probado_en?: string | null
+  advertencia?: string
+  error?: string
+}
+
+export interface ProbarConexionVars {
+  /** Tenant; opcional para admin/owner (el edge lo infiere del JWT). */
+  companyId?: string
+  /** Locación; null/omitido = nivel empresa. */
+  projectId?: string | null
+  /** Ambiente a reportar ('sandbox' | 'prod'). Default 'sandbox'. */
+  ambiente?: string
+}
+
+/**
+ * Prueba la conexión con el PAC vía el edge `fiscal-test-connection` (hoy pingea
+ * el SandboxProvider; sin HTTP a PAC real). El edge persiste estado_conexion en la
+ * bóveda; tras la respuesta invalidamos el estatus de credenciales para refrescar
+ * el badge. NO lanza en un ping fallido (ok:false): la request es válida; quien
+ * llama inspecciona `ok`/`mensaje`.
+ */
+export function useProbarConexionPacMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: ProbarConexionVars): Promise<ProbarConexionResult> => {
+      const { data, error } = await supabase.functions.invoke<ProbarConexionResult>(
+        'fiscal-test-connection',
+        {
+          body: {
+            ...(vars.companyId ? { company_id: vars.companyId } : {}),
+            project_id: vars.projectId ?? null,
+            ...(vars.ambiente ? { ambiente: vars.ambiente } : {}),
+          },
+        },
+      )
+      // Errores de transporte/auth SÍ se elevan; un ping con ok:false NO (es un
+      // resultado válido de la prueba, lo muestra el badge).
+      if (error) throw new Error(error.message)
+      return data ?? {}
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: fiscalKeys.all })
+      if (companyId) void qc.invalidateQueries({ queryKey: fiscalKeys.credenciales(companyId) })
+    },
+  })
+}
