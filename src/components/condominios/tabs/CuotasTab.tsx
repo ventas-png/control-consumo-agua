@@ -1,4 +1,4 @@
-import { useState, useRef, type ChangeEvent} from 'react'
+import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -10,6 +10,19 @@ import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
+// T4 · cond:C4 — capa de datos del agregado Cuota (estado/mora) + máquina de
+// estados. La tabla recibe `CuotaCondominio[]` (legacy, sin campos de
+// facturación) por props; aquí leemos esos campos vía la capa de datos T4 y los
+// cruzamos por id, igual que CobrosSection hace con useFacturasQuery en agua.
+import { useCuotasPorProyectoConEstadoQuery, type CuotaConEstado } from '../../../domain/condominios/queries'
+import { useReglasMoraConfigQuery } from '../../../domain/facturacion/mutations'
+import {
+  useEmitirCuotaMutation,
+  usePagarCuotaMutation,
+  useAnularCuotaMutation,
+} from '../../../domain/condominios/mutations'
+import { puedeTransicionarCuota } from '../../../lib/businessCondominios'
+import { CuotaEstadoBadge } from './CuotasUi'
 
 interface CSVRow {
   rawUnidad: string
@@ -46,12 +59,6 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-const ESTADO_COLORS: Record<EstadoCuota, { bg: string; color: string }> = {
-  pendiente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
-  moroso:    { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
-}
-
 export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -68,6 +75,123 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     fecha_vencimiento: '',
     notas: '',
   })
+
+  // T4 · cond:C4 — proyección de Cuota (estado/mora) del proyecto activo,
+  // cruzada por id. Las reglas de mora dan los días de vencimiento al emitir.
+  const { data: cuotasConEstado = [] } = useCuotasPorProyectoConEstadoQuery(companyId, proyectoId)
+  const { data: reglasMora = [] } = useReglasMoraConfigQuery(companyId)
+  const cuotaEstadoById = useMemo(() => {
+    const m = new Map<string, CuotaConEstado>()
+    for (const c of cuotasConEstado) m.set(c.id, c)
+    return m
+  }, [cuotasConEstado])
+
+  // Estado canónico de la cuota: el de la proyección (`cuota_estado`) si existe;
+  // si no, el legacy `estado` (normalizarEstadoCuota lo mapea pagado→pagada,
+  // moroso→vencida). Centraliza la lectura para badge + gating de acciones.
+  const estadoCanonicoDe = useCallback(
+    (c: CuotaCondominio) => cuotaEstadoById.get(c.id)?.cuota_estado ?? c.estado,
+    [cuotaEstadoById],
+  )
+
+  // Días de vencimiento: de la regla activa del proyecto si existe, si no 30.
+  const diasVencimiento = useMemo(() => {
+    const regla = reglasMora.find(r => r.project_id === proyectoId && r.activa)
+      ?? reglasMora.find(r => r.project_id === proyectoId)
+      ?? reglasMora[0]
+    return regla?.dias_vencimiento ?? 30
+  }, [reglasMora, proyectoId])
+
+  const emitirMut = useEmitirCuotaMutation()
+  const pagarMut = usePagarCuotaMutation()
+  const anularMut = useAnularCuotaMutation()
+  const [accionCuotaId, setAccionCuotaId] = useState<string | null>(null)
+
+  async function handleEmitir(cuota: CuotaCondominio) {
+    setAccionCuotaId(cuota.id)
+    try {
+      const proj = cuotaEstadoById.get(cuota.id)
+      await emitirMut.mutateAsync({
+        cuota: {
+          id: cuota.id,
+          cuota_estado: proj?.cuota_estado ?? cuota.estado,
+          monto: cuota.monto,
+          mora_monto: proj?.mora_monto,
+        },
+        diasVencimiento,
+      })
+      notify({ variant: 'success', title: '📤 Cuota emitida', duration: 1600 })
+      onRefresh()
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo emitir', text: (err as Error).message })
+    } finally {
+      setAccionCuotaId(null)
+    }
+  }
+
+  async function handlePagar(cuota: CuotaCondominio) {
+    const hoy = new Date().toISOString().slice(0, 10)
+    const datos = await openPromptDialog({
+      title: 'Registrar pago',
+      fields: [
+        { name: 'fecha_pago', label: 'Fecha de pago', type: 'date', initialValue: hoy, required: true, autoFocus: true },
+        {
+          name: 'metodo_pago', label: 'Método de pago', control: 'select', initialValue: 'efectivo',
+          options: [
+            { value: 'efectivo', label: 'Efectivo' },
+            { value: 'transferencia', label: 'Transferencia bancaria' },
+            { value: 'cheque', label: 'Cheque' },
+            { value: 'tarjeta', label: 'Tarjeta' },
+            { value: 'deposito', label: 'Depósito' },
+            { value: 'otro', label: 'Otro' },
+          ],
+        },
+        { name: 'referencia_pago', label: 'Referencia / No. transacción', placeholder: 'Opcional' },
+      ],
+      submitText: 'Confirmar pago',
+    })
+    if (!datos) return
+    setAccionCuotaId(cuota.id)
+    try {
+      const proj = cuotaEstadoById.get(cuota.id)
+      await pagarMut.mutateAsync({
+        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado, monto: cuota.monto },
+        fechaPago: datos.fecha_pago,
+        metodoPago: datos.metodo_pago,
+        referenciaPago: datos.referencia_pago || null,
+      })
+      notify({ variant: 'success', title: '✅ Cuota pagada', duration: 1600 })
+      onRefresh()
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo registrar el pago', text: (err as Error).message })
+    } finally {
+      setAccionCuotaId(null)
+    }
+  }
+
+  async function handleAnular(cuota: CuotaCondominio) {
+    const { isConfirmed } = await confirm({
+      title: '¿Anular cuota?',
+      text: 'La cuota quedará anulada (estado terminal). Esta acción no se puede revertir.',
+      icon: 'warning',
+      variant: 'danger',
+      confirmText: 'Sí, anular',
+    })
+    if (!isConfirmed) return
+    setAccionCuotaId(cuota.id)
+    try {
+      const proj = cuotaEstadoById.get(cuota.id)
+      await anularMut.mutateAsync({
+        cuota: { id: cuota.id, cuota_estado: proj?.cuota_estado ?? cuota.estado },
+      })
+      notify({ variant: 'success', title: '🚫 Cuota anulada', duration: 1600 })
+      onRefresh()
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo anular', text: (err as Error).message })
+    } finally {
+      setAccionCuotaId(null)
+    }
+  }
 
   const cuotasFiltradas = filtroEstado === 'todos'
     ? cuotas
@@ -223,50 +347,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Cuota registrada', duration: 1500 })
     resetForm()
-    onRefresh()
-  }
-
-  async function cambiarEstado(cuota: CuotaCondominio, nuevoEstado: EstadoCuota) {
-    if (!canEdit) return
-
-    if (nuevoEstado === 'pagado') {
-      const hoy = new Date().toISOString().slice(0, 10)
-      const datos = await openPromptDialog({
-        title: 'Registrar pago',
-        fields: [
-          { name: 'fecha_pago', label: 'Fecha de pago', type: 'date', initialValue: hoy, required: true, autoFocus: true },
-          {
-            name: 'metodo_pago',
-            label: 'Método de pago',
-            control: 'select',
-            initialValue: 'efectivo',
-            options: [
-              { value: 'efectivo', label: 'Efectivo' },
-              { value: 'transferencia', label: 'Transferencia bancaria' },
-              { value: 'cheque', label: 'Cheque' },
-              { value: 'tarjeta', label: 'Tarjeta' },
-              { value: 'deposito', label: 'Depósito' },
-              { value: 'otro', label: 'Otro' },
-            ],
-          },
-          { name: 'referencia_pago', label: 'Referencia / No. transacción', placeholder: 'Opcional' },
-        ],
-        submitText: 'Confirmar pago',
-      })
-      if (!datos) return
-      const { error } = await supabase.from('cuotas_condominio').update({
-        estado: 'pagado',
-        fecha_pago: datos.fecha_pago,
-        metodo_pago: datos.metodo_pago,
-        referencia_pago: datos.referencia_pago || null,
-      }).eq('id', cuota.id)
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-      onRefresh()
-      return
-    }
-
-    const { error } = await supabase.from('cuotas_condominio').update({ estado: nuevoEstado }).eq('id', cuota.id)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
@@ -624,16 +704,33 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           {
             key: 'monto', header: 'Monto', sortable: true,
             accessor: c => c.monto,
-            render: c => (
-              <>
-                <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
-                {c.estado === 'pagado' && c.metodo_pago && (
-                  <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '1px' }}>
-                    {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
-                  </div>
-                )}
-              </>
-            ),
+            render: c => {
+              // T4 · cond:C4 — desglose monto + mora = total. La mora (cond:C6) y el
+              // total los persiste la capa de facturación; si no hay, solo el monto.
+              const proj = cuotaEstadoById.get(c.id)
+              const mora = proj?.mora_monto ?? 0
+              const total = proj?.total_a_pagar ?? null
+              return (
+                <>
+                  <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
+                  {mora > 0 && (
+                    <div style={{ fontSize: '11px', color: 'var(--at-danger)', marginTop: '1px' }}>
+                      + mora {moneda} {mora.toFixed(2)}
+                    </div>
+                  )}
+                  {total != null && total > c.monto && (
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-primary-hover)', marginTop: '1px' }}>
+                      = {moneda} {total.toFixed(2)}
+                    </div>
+                  )}
+                  {c.estado === 'pagado' && c.metodo_pago && (
+                    <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '1px' }}>
+                      {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
+                    </div>
+                  )}
+                </>
+              )
+            },
           },
           {
             key: 'vencimiento', header: 'Vencimiento', sortable: true,
@@ -647,20 +744,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           },
           {
             key: 'estado', header: 'Estado', sortable: true,
-            accessor: c => c.estado,
-            render: c => canEdit ? (
-              <select value={c.estado} onChange={e => cambiarEstado(c, e.target.value as EstadoCuota)}
-                aria-label="Cambiar estado"
-                style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                <option value="pendiente">Pendiente</option>
-                <option value="pagado">Pagado</option>
-                <option value="moroso">Moroso</option>
-              </select>
-            ) : (
-              <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                {c.estado}
-              </span>
-            ),
+            accessor: c => estadoCanonicoDe(c),
+            // T4 · cond:C4 — badge del estado canónico (`cuota_estado`) de la
+            // máquina de estados. Sustituye el select legacy: el cambio de estado
+            // ahora pasa por las acciones gated (emitir/pagar/anular), única fuente
+            // de verdad de las transiciones.
+            render: c => <CuotaEstadoBadge estado={estadoCanonicoDe(c)} />,
           },
           {
             key: 'rubros', header: 'Rubros',
@@ -681,8 +770,35 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           },
           {
             key: 'acciones', header: '',
-            render: c => (
-              <div style={{ display: 'flex', gap: '4px' }}>
+            render: c => {
+              // T4 · cond:C4 — acciones gated por la máquina de estados
+              // (businessCondominios.ts es la fuente de verdad). Las acciones
+              // inválidas para el estado actual quedan ocultas.
+              const estadoCanon = estadoCanonicoDe(c)
+              const puedeEmitir = puedeTransicionarCuota(estadoCanon, 'emitir').ok
+              const puedePagar = puedeTransicionarCuota(estadoCanon, 'pagar').ok
+              const puedeAnular = puedeTransicionarCuota(estadoCanon, 'anular').ok
+              const procesando = accionCuotaId === c.id
+              return (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {canEdit && puedeEmitir && (
+                  <button onClick={() => void handleEmitir(c)} disabled={procesando} title="Emitir cuota (fija vencimiento y total)"
+                    style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-primary)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-primary-hover)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    📤 Emitir
+                  </button>
+                )}
+                {canEdit && puedePagar && (
+                  <button onClick={() => void handlePagar(c)} disabled={procesando} title="Registrar pago de la cuota"
+                    style={{ background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', color: 'white', fontSize: '12px', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    💰 Pagar
+                  </button>
+                )}
+                {canEdit && puedeAnular && (
+                  <button onClick={() => void handleAnular(c)} disabled={procesando} title="Anular cuota"
+                    style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-danger)', cursor: procesando ? 'not-allowed' : 'pointer', color: 'var(--at-danger)', fontSize: '12px', padding: '4px 9px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap', opacity: procesando ? 0.6 : 1 }}>
+                    🚫 Anular
+                  </button>
+                )}
                 {(c.estado === 'pendiente' || c.estado === 'moroso') && (
                   <button onClick={() => whatsappRecordatorio(c)} aria-label="Recordatorio por WhatsApp"
                     style={{ background: 'var(--at-success-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
@@ -697,7 +813,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                 )}
                 <button onClick={() => eliminar(c.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
               </div>
-            ),
+              )
+            },
           },
         ] satisfies DataTableColumn<CuotaCondominio>[]}
       />

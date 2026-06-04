@@ -2,6 +2,12 @@ import { useState, useMemo } from 'react'
 import { CuotaCondominio, RecargoMora, ConvenioCuotaCond, Unidad } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { exportarPDFEstadoCuenta } from '../exportUtils'
+// T4 · cond:C4 — estado canónico de la cuota + desglose. La query de cuotas de
+// CondominiosSection trae `select('*')`, así que las filas YA cargan
+// cuota_estado/mora_monto/total_a_pagar en runtime aunque el tipo CuotaCondominio
+// no las declare; las leemos con esta proyección de la capa de dominio.
+import type { CuotaConEstado } from '../../../domain/condominios/queries'
+import { CuotaEstadoBadge } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -21,6 +27,8 @@ interface Movimiento {
   cargo: number
   abono: number
   estado: string
+  /** Estado canónico de la cuota (`cuota_estado`), solo para tipo 'cuota'. */
+  cuotaEstado?: string | null
 }
 
 interface MovimientoConSaldo extends Movimiento {
@@ -53,13 +61,20 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
     cuotas
       .filter(c => c.unidad_id === unidadId && c.periodo?.startsWith(String(anio)))
       .forEach(c => {
+        // Estado canónico (`cuota_estado`) de la máquina de estados: presente en
+        // runtime (select('*')) aunque el tipo no lo declare. Cae al legacy
+        // `estado` si la fila aún no se ha emitido. El abono se reconoce cuando la
+        // cuota está saldada (pagada/pagado).
+        const ce = (c as CuotaConEstado).cuota_estado ?? null
+        const saldada = ce === 'pagada' || c.estado === 'pagado'
         list.push({
           fecha: c.fecha_vencimiento ?? c.periodo + '-01',
           tipo: 'cuota',
           descripcion: `${c.concepto} — Período ${c.periodo}`,
           cargo: c.monto,
-          abono: c.estado === 'pagado' ? c.monto : 0,
+          abono: saldada ? c.monto : 0,
           estado: c.estado,
+          cuotaEstado: ce,
         })
       })
 
@@ -254,8 +269,13 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
           },
           {
             key: 'estado', header: 'Estado', sortable: true, align: 'right',
-            accessor: m => m.estado,
+            accessor: m => m.cuotaEstado ?? m.estado,
+            // Para movimientos de cuota mostramos el badge del estado canónico
+            // (cond:C4); el resto (recargos/convenios) conservan su chip legacy.
             render: m => {
+              if (m.tipo === 'cuota' && m.cuotaEstado != null) {
+                return <CuotaEstadoBadge estado={m.cuotaEstado} />
+              }
               const sCfg = ESTADO_CFG[m.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)' }
               return (
                 <span style={{ padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: 10, fontWeight: 600 }}>{m.estado}</span>
