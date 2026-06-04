@@ -3,6 +3,7 @@ import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
+import { PreferenciasRegionales } from './PreferenciasRegionales'
 import { SesionesActivas } from './SesionesActivas'
 import { LegalYPrivacidad } from './LegalYPrivacidad'
 
@@ -549,6 +550,11 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
             <SubmitBtn loading={nameLoading} label="Guardar nombre" />
             <FeedbackMsg fb={nameFb} />
           </form>
+        </Card>
+
+        {/* Card 1b — Preferencias regionales (plat:P18) */}
+        <Card title="Preferencias regionales">
+          <PreferenciasRegionales userId={currentUser.user_id} />
         </Card>
 
         {/* Card 2 — Contraseña */}
