@@ -19,6 +19,7 @@ import {
   useEliminarReglaMoraMutation,
   type ReglaMoraInput,
 } from '../../domain/facturacion/mutations'
+import { FiscalConfigSection } from './FiscalConfigSection'
 
 interface Props {
   proyectos: Proyecto[]
@@ -178,6 +179,9 @@ export function FacturacionConfigSection({ proyectos, moneda = 'Q' }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* ── Facturación electrónica fiscal: PAC por empresa/locación + conexión (serv:S11) ── */}
+      <FiscalConfigSection proyectos={proyectos} />
+
       {/* ── Editor de IVA ── */}
       <section style={{ background: 'var(--at-surface)', borderRadius: 14, padding: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: 'var(--at-ink)' }}>Impuesto (IVA) por defecto</h3>

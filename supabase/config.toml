@@ -58,3 +58,11 @@ verify_jwt = false
 # (service_role o JWT admin/owner). NUNCA expone el secreto. Sin HTTP a PAC real.
 [functions.fiscal-test-connection]
 verify_jwt = false
+
+# serv:S11 — guardar credenciales del PAC en la boveda fiscal_pac_secrets
+# (deny-all bajo RLS). El cliente NO escribe directo: invoca este edge, que con
+# service_role hace el upsert por (company_id, project_id). verify_jwt=false:
+# valida el token a mano (service_role o JWT admin/owner del tenant). NUNCA
+# devuelve el secreto; al guardar resetea estado_conexion a 'desconocido'.
+[functions.fiscal-save-credentials]
+verify_jwt = false
