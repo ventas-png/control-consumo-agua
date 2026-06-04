@@ -1,5 +1,7 @@
 import { useState, useEffect, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
+import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 import { getDisplayRoleLabel } from '../../lib/permissions'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -297,9 +299,6 @@ const NAV: NavEntry[] = [
 
 interface Props {
   activeSection: AppSection
-  userRole: UserRole
-  currentUser: UserSession
-  canViewModule: (moduleKey: string) => boolean
   onSelect: (section: AppSection) => void
   // agua:A8 — prefetch del chunk de una sección al mostrar intención de navegar
   // (hover/focus de su item), para que el código ya esté en caché al hacer click.
@@ -359,7 +358,9 @@ function findActiveGroupId(activeSection: AppSection): string | null {
   return null
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onPrefetch, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
+export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
+  const currentUser = useSession()
+  const { canViewModule } = usePermissionsContext()
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
@@ -521,14 +522,14 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       <nav style={{ flex: 1, padding: '10px 10px', overflowY: 'auto' }}>
         {NAV.map(entry => {
           if (entry.kind === 'tab') {
-            if (!isTabVisible(entry.tab, userRole, canViewModule)) return null
+            if (!isTabVisible(entry.tab, currentUser.role, canViewModule)) return null
             if (!isServiceEnabled(entry.tab.id, currentUser)) return null
             return renderTabButton(entry.tab)
           }
 
           // Group entry
           const visibleTabs = entry.tabs.filter(t =>
-            isTabVisible(t, userRole, canViewModule) && isServiceEnabled(t.id, currentUser)
+            isTabVisible(t, currentUser.role, canViewModule) && isServiceEnabled(t.id, currentUser)
           )
           if (visibleTabs.length === 0) return null
 

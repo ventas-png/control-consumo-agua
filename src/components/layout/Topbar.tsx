@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import type { AppSection, UserSession } from '../../types'
+import type { AppSection } from '../../types'
+import { useSession } from '../shared/SessionContext'
 import { useOffline } from '../../hooks/useOffline'
 import { useTheme } from '../../hooks/useTheme'
 import { getDisplayRoleLabel } from '../../lib/permissions'
@@ -70,14 +71,14 @@ function getInitials(name: string): string {
 
 interface Props {
   activeSection: AppSection
-  currentUser: UserSession
   onMenuToggle: () => void
   onNavigate?: (section: AppSection) => void
   // F3.3b: refleja estado del sidebar para aria-expanded del hamburger
   sidebarOpen?: boolean
 }
 
-export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate, sidebarOpen = false }: Props) {
+export function Topbar({ activeSection, onMenuToggle, onNavigate, sidebarOpen = false }: Props) {
+  const currentUser = useSession()
   const { isOnline } = useOffline()
   const { pref, cycle } = useTheme()
   const themeIcon = pref === 'auto' ? '🌗' : pref === 'light' ? '☀️' : '🌙'
