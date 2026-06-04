@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { enforceRateLimit, getClientIp } from '../_shared/rateLimit.ts'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 import { validatePayload, type SignupPayload } from './validate.ts'
 
 // ============================================================================
@@ -99,15 +99,25 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Rate limit por IP: máx 5 registros/hora desde la misma red. Mitiga el abuso de
-    // alta self-service que el header de este archivo marcaba como TODO ("rate-limit
-    // table; no en MVP"). Server-side: el RPC corre como service_role (infra:I2).
-    const rl = await enforceRateLimit(admin, {
-      subject: `ip:${getClientIp(req)}`,
-      action: 'signup_company',
-      max: 5,
-      message: 'Demasiados registros desde esta red. Espera una hora e intenta de nuevo.',
-    }, corsHeaders)
+    // Rate limit por IP y por email: máx 5 registros/hora desde la misma red, y máx 3/hora
+    // contra el mismo correo. Mitiga el abuso de alta self-service que el header de este
+    // archivo marcaba como TODO ("rate-limit table; no en MVP") y, con la dimensión de email,
+    // frena el martilleo de un mismo correo desde IPs rotadas. Server-side: el RPC corre como
+    // service_role (infra:I2). El de IP corta primero (no quema el contador del email).
+    const rl = await enforceRateLimits(admin, [
+      {
+        subject: `ip:${getClientIp(req)}`,
+        action: 'signup_company',
+        max: 5,
+        message: 'Demasiados registros desde esta red. Espera una hora e intenta de nuevo.',
+      },
+      {
+        subject: `email:${email}`,
+        action: 'signup_company:email',
+        max: 3,
+        message: 'Demasiados intentos de registro con este correo. Espera una hora e intenta de nuevo.',
+      },
+    ], corsHeaders)
     if (rl) return rl
 
     // 1. Crear auth user. Si Supabase Auth tiene email confirmations habilitado,

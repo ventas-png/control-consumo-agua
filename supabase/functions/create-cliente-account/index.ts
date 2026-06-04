@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -87,6 +88,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
+
+    // Rate limit server-side (infra:I2). Endpoint anónimo de alta self-service: principal
+    // vector de abuso (enumeración de identidad vía buscar_cliente_para_onboarding + spam de
+    // cuentas). Keyeado por IP y por email para que ni una IP rotando correos ni un correo
+    // rotando IPs evada el tope. El de IP corta primero (no quema el contador del email).
+    const normalizedEmail = email.toLowerCase().trim()
+    const rl = await enforceRateLimits(adminClient, [
+      { subject: `ip:${getClientIp(req)}`, action: 'create_cliente_account', max: 10 },
+      { subject: `email:${normalizedEmail}`, action: 'create_cliente_account:email', max: 5 },
+    ], corsHeaders)
+    if (rl) return rl
 
     // Step 1: Look up client using existing RPC (SECURITY DEFINER, searches global pool)
     const { data: lookupResult, error: lookupError } = await adminClient.rpc(

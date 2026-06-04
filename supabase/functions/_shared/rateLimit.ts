@@ -52,6 +52,10 @@ export interface RateLimitOptions {
  * Aplica el límite vía el RPC `rate_limit_hit`. Devuelve un `Response` 429 si se excedió,
  * o `null` si se permite la solicitud.
  *
+ * El 429 incluye `Retry-After` (segundos = `windowSeconds`): es el peor caso para que el
+ * contador vuelva a admitir al sujeto (todas las filas de la ventana caen al desplazarse).
+ * Da una pista honesta al cliente/UI y a los proxies, sin filtrar el conteo exacto.
+ *
  * Fail-open: solo bloquea cuando el RPC devuelve `false` explícito. Si hay un error de
  * infraestructura (data null/undefined), permite la solicitud — mismo criterio que el
  * patrón inline previo, para no tumbar a usuarios legítimos si el contador falla.
@@ -76,8 +80,43 @@ export async function enforceRateLimit(
   if (data === false) {
     return new Response(
       JSON.stringify({ error: opts.message ?? 'Demasiadas solicitudes. Espera unos minutos e intenta de nuevo.' }),
-      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(windowSeconds),
+        },
+      },
     )
+  }
+  return null
+}
+
+/**
+ * Aplica varios límites en secuencia y devuelve el primer 429 que se dispare (o `null` si
+ * todos pasan). Útil para keyear un mismo endpoint por **varias dimensiones** —p. ej. IP
+ * **y** email— de forma que ni una IP rotando emails ni un email rotando IPs evada el tope.
+ *
+ * Corto-circuita en el primer límite excedido: NO registra hits en los límites posteriores,
+ * así un atacante no puede "quemar" el contador de email de una víctima saturando primero
+ * el de IP (el de IP corta antes de tocar el de email).
+ *
+ * @example
+ *   const rl = await enforceRateLimits(admin, [
+ *     { subject: `ip:${ip}`,       action: 'create_cliente_account',       max: 10 },
+ *     { subject: `email:${email}`, action: 'create_cliente_account:email', max: 5  },
+ *   ], corsHeaders)
+ *   if (rl) return rl
+ */
+export async function enforceRateLimits(
+  client: RpcClient,
+  limits: RateLimitOptions[],
+  corsHeaders: HeadersInit,
+): Promise<Response | null> {
+  for (const opts of limits) {
+    const res = await enforceRateLimit(client, opts, corsHeaders)
+    if (res) return res
   }
   return null
 }

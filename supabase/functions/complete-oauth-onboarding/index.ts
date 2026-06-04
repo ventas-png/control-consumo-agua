@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { requireUser } from '../_shared/auth.ts'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 // Generic identity error — same message for all failure modes to prevent enumeration
 const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI y fecha de nacimiento.'
@@ -38,6 +39,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
+
+    // Rate limit server-side (infra:I2). El JWT ya está validado, pero el OAuth onboarding
+    // dispara buscar_cliente_para_onboarding (enumeración de identidad por DPI+fecha): topamos
+    // intentos por usuario y por IP para frenar fuerza bruta de DPI/fecha desde una sesión.
+    const rlOauth = await enforceRateLimits(adminClient, [
+      { subject: oauthUser.id, action: 'complete_oauth_onboarding', max: 15 },
+      { subject: `ip:${getClientIp(req)}`, action: 'complete_oauth_onboarding:ip', max: 30 },
+    ], corsHeaders)
+    if (rlOauth) return rlOauth
 
     // Email comes from the verified JWT — cannot be tampered by the client
     const email = oauthUser.email
