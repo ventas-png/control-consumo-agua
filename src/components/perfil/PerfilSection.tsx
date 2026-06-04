@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { SesionesActivas } from './SesionesActivas'
+import { LegalYPrivacidad } from './LegalYPrivacidad'
 
 interface Props {
   currentUser: UserSession
@@ -696,6 +697,11 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         {/* Card 2c — Sesiones activas (plat:P9) */}
         <Card title="Sesiones activas">
           <SesionesActivas />
+        </Card>
+
+        {/* Card 2d — Legal y privacidad (plat:P33/P34) */}
+        <Card title="Legal y privacidad">
+          <LegalYPrivacidad />
         </Card>
 
         {/* Card 3 — Correo */}
