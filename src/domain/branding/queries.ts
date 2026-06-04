@@ -26,3 +26,26 @@ export function useBrandingQuery(companyId?: string) {
     enabled: !!companyId,
   })
 }
+
+export interface CompanyLogoRow {
+  id: string
+  nombre: string | null
+  logo_url: string | null
+}
+
+/**
+ * Identidad mínima de la empresa para el shell (logo + nombre). RLS de companies
+ * permite a los miembros leer su propia empresa. Consulta ligera (no trae todo el
+ * agregado de empresa).
+ */
+export function useCompanyLogoQuery(companyId?: string) {
+  return useQuery<CompanyLogoRow | null>({
+    queryKey: brandingKeys.logo(companyId),
+    queryFn: async () => {
+      const rows = (await runQuery<CompanyLogoRow[]>((signal) =>
+        supabase.from('companies').select('id, nombre, logo_url').eq('id', companyId!).abortSignal(signal))) ?? []
+      return rows[0] ?? null
+    },
+    enabled: !!companyId,
+  })
+}
