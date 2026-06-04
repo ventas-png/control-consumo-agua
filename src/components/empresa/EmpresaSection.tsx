@@ -15,6 +15,7 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { UserSession } from '../../types'
 import { StripePayPalConfig } from './StripePayPalConfig'
+import { PayfacConfigSection } from './PayfacConfigSection'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { EmpresaHeaderCard } from './EmpresaHeaderCard'
@@ -92,6 +93,18 @@ export function EmpresaSection({ currentUser }: Props) {
             companyId={companyId}
             onConfigUpdated={reload}
           />
+        </div>
+      )}
+
+      {/* Cobros pluggable: elige tu payfac (QPayPro/Visanet/…) y conecta. */}
+      {companyId && (
+        <div style={{
+          background: 'var(--at-surface)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid var(--at-line)',
+          marginTop: '24px',
+        }}>
+          <PayfacConfigSection proyectos={proyectos} />
         </div>
       )}
 

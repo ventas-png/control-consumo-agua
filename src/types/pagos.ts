@@ -50,6 +50,43 @@ export interface CompanyPaymentConfig {
   paypal_activo?: boolean;
 }
 
+// ── Cobros pluggable (payfac) ─────────────────────────────────────────────────
+// ESPEJA supabase/functions/_shared/payments/types.ts. La empresa/locación elige
+// su payfac (companies/projects.proveedor_pago) y solo conecta credenciales, igual
+// que la facturación FEL elige su PAC. Las CREDENCIALES viven en payfac_secrets
+// (service-role-only): el cliente NUNCA las lee, solo el estatus (PayfacEstatus).
+
+/** Payfac elegible. 'sandbox' es el default de pruebas (cobro simulado). */
+export type ProveedorPago = 'sandbox' | 'stripe' | 'paypal' | 'qpaypro' | 'visanet';
+
+/** Ambiente de credenciales/cobro. */
+export type AmbientePago = 'sandbox' | 'prod';
+
+/** Config de pago EFECTIVA resuelta (override locación↔empresa). */
+export interface ConfigPagoEfectiva {
+  proveedorPago: string;
+  moneda: string;
+  desdeLocacion: boolean;
+}
+
+/**
+ * Estatus NO sensible de credenciales del payfac (fila de la RPC payfac_estatus).
+ * NUNCA incluye `credenciales` — solo flags de presencia + estado del último ping.
+ */
+export interface PayfacEstatus {
+  id: string;
+  company_id: string;
+  project_id: string | null;
+  proveedor: string;
+  estado_conexion: 'desconocido' | 'ok' | 'error';
+  estado_mensaje: string | null;
+  estado_probado_en: string | null;
+  tiene_sandbox: boolean;
+  tiene_prod: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaymentRequest {
   id: string;
   cliente_id: string;
