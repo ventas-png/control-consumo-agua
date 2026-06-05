@@ -20,8 +20,23 @@ export function initAnalytics(): void {
     person_profiles: 'identified_only',
     capture_pageview: true,
     disable_session_recording: true,
+    // RGPD/CCPA: arrancamos OPTED-OUT. No se captura nada (ni pageviews) hasta que el
+    // usuario acepte la categoría "analítica" en el banner de cookies. El consentimiento
+    // guardado se aplica en el arranque vía applyStoredConsent() (lib/cookieConsent).
+    opt_out_capturing_by_default: true,
   })
   enabled = true
+}
+
+/**
+ * Aplica el consentimiento de la categoría "analítica". Sin efecto si PostHog no está
+ * configurado (sin VITE_POSTHOG_KEY). Lo invoca lib/cookieConsent al guardar o al
+ * rehidratar el consentimiento; nunca se llama directamente desde la UI.
+ */
+export function setAnalyticsConsent(granted: boolean): void {
+  if (!enabled) return
+  if (granted) posthog.opt_in_capturing()
+  else posthog.opt_out_capturing()
 }
 
 export function identify(id: string, props?: Record<string, unknown>): void {

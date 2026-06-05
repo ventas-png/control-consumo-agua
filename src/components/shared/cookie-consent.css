@@ -1,0 +1,151 @@
+/* Banner de consentimiento de cookies. Usa los tokens globales --at-* (index.css),
+   por lo que funciona en cualquier superficie (landing, app, páginas legales) y respeta
+   el modo oscuro automático. Fijo abajo-izquierda, no bloquea el contenido. */
+
+.cc-root {
+  position: fixed;
+  z-index: 1000;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  justify-content: flex-start;
+  pointer-events: none;
+}
+
+.cc-card {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 460px;
+  background: var(--at-surface);
+  color: var(--at-ink);
+  border: 1px solid var(--at-line);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  padding: 18px 20px;
+  font-family: var(--at-font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.cc-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--at-ink);
+}
+
+.cc-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--at-ink-2);
+}
+
+.cc-body a {
+  color: var(--at-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cc-options {
+  margin: 14px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.cc-option {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--at-line);
+  border-radius: 10px;
+  background: var(--at-bg);
+  cursor: pointer;
+}
+
+.cc-option input[type='checkbox'] {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.cc-option input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cc-option-text strong {
+  font-size: 13.5px;
+  color: var(--at-ink);
+}
+
+.cc-option-text p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--at-ink-3);
+}
+
+.cc-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--at-primary-soft);
+  color: var(--at-primary);
+  vertical-align: middle;
+}
+
+.cc-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cc-btn {
+  appearance: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.cc-ghost {
+  background: transparent;
+  color: var(--at-ink-2);
+  border-color: var(--at-line-strong);
+}
+
+.cc-ghost:hover {
+  background: var(--at-bg);
+  color: var(--at-ink);
+}
+
+.cc-primary {
+  background: var(--at-primary);
+  color: #fff;
+}
+
+.cc-primary:hover {
+  background: var(--at-primary-hover);
+}
+
+@media (max-width: 520px) {
+  .cc-root { left: 8px; right: 8px; bottom: 8px; }
+  .cc-card { max-width: none; padding: 16px; }
+  .cc-actions { justify-content: stretch; }
+  .cc-btn { flex: 1 1 auto; text-align: center; }
+}

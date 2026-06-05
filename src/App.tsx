@@ -300,9 +300,10 @@ export default function App() {
     }
     const legalDoc = legalRoutes[window.location.pathname]
     if (legalDoc) {
+      const legalLang = new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'es'
       return (
         <Suspense fallback={<AuthSplash />}>
-          <LegalPage doc={legalDoc} />
+          <LegalPage doc={legalDoc} lang={legalLang} />
         </Suspense>
       )
     }
