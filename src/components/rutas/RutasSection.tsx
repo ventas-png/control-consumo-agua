@@ -1,17 +1,11 @@
 import { useState, useEffect, useRef, type CSSProperties, type DragEvent} from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchActiveAppUsers, type AppUser } from '../../domain/usuarios/queries'
+import { createRuta, updateRuta, deleteRuta } from '../../domain/rutas/mutations'
 import { enviarNotificacionRuta, dispararRecordatorioRuta } from '../../lib/email'
 import { APP_CONFIG } from '../../lib/config'
 import type { FrecuenciaRuta } from '../../types'
-
-interface AppUser {
-  id: string
-  full_name: string
-  role: string
-  activo: boolean
-}
 
 interface Props {
   clientes: Cliente[]
@@ -124,13 +118,7 @@ export function RutasSection({
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
 
   useEffect(() => {
-    supabase
-      .from('app_users')
-      .select('id, full_name, role, activo')
-      .eq('activo', true)
-      .then(({ data }) => {
-        if (data) setUsuarios(data as AppUser[])
-      })
+    void fetchActiveAppUsers().then(setUsuarios)
   }, [])
 
   const inputStyle: CSSProperties = {
@@ -418,26 +406,22 @@ export function RutasSection({
     let rutaGuardada: Ruta | null = null
 
     if (editando) {
-      const { data, error } = await supabase
-        .from('rutas')
-        .update(payload)
-        .eq('id', editando.id)
-        .select()
+      const { data, error } = await updateRuta(editando.id, payload)
       if (error || !data) {
         notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la ruta' })
         setSaving(false)
         return
       }
-      rutaGuardada = data[0] as Ruta
+      rutaGuardada = data
       onRutaUpdated(editando.id, rutaGuardada)
     } else {
-      const { data, error } = await supabase.from('rutas').insert(payload).select()
+      const { data, error } = await createRuta(payload)
       if (error || !data) {
         notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la ruta' })
         setSaving(false)
         return
       }
-      rutaGuardada = data[0] as Ruta
+      rutaGuardada = data
       onRutaAdded(rutaGuardada)
     }
 
@@ -506,7 +490,7 @@ export function RutasSection({
       confirmText: 'Eliminar',
     })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('rutas').delete().eq('id', ruta.id)
+    const { error } = await deleteRuta(ruta.id)
     if (error) { notify({ variant: 'error', title: 'Error', text: 'No se pudo eliminar la ruta' }); return }
     onRutaDeleted(ruta.id)
   }

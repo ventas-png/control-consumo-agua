@@ -1,0 +1,23 @@
+// domain/usuarios/queries.ts — Lecturas de app_users compartidas por varios
+// módulos (rutas, contadores, unidades…). T7/PR3.
+import { supabase } from '../../lib/supabase'
+
+/** Forma mínima de un usuario de plataforma para selectores de asignación. */
+export interface AppUser {
+  id: string
+  full_name: string
+  role: string
+  activo: boolean
+}
+
+/**
+ * Usuarios activos del tenant (la RLS de app_users ya acota por empresa). Para
+ * dropdowns de asignación (rutas, etc.). Degrada a `[]` si no hay datos.
+ */
+export async function fetchActiveAppUsers(): Promise<AppUser[]> {
+  const { data } = await supabase
+    .from('app_users')
+    .select('id, full_name, role, activo')
+    .eq('activo', true)
+  return (data as AppUser[] | null) ?? []
+}
