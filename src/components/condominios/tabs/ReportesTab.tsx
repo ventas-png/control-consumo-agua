@@ -177,13 +177,7 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
         ]} />
       </Section>
 
-      {/* Print styles injected inline via a style tag approach */}
-      <style>{`
-        @media print {
-          .print-only { display: block !important; }
-          button { display: none !important; }
-        }
-      `}</style>
+      {/* Print styles (@media print) en src/styles/runtime.css (I24). */}
     </div>
   )
 }

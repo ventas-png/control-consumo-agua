@@ -95,6 +95,14 @@ verify_jwt = false
 [functions.payfac-save-credentials]
 verify_jwt = false
 
+# Validación server-side de uploads (infra:I13). Recibe el archivo, valida
+# magic-bytes vs MIME declarado + tamaño por bucket + saneo de SVG (lógica pura en
+# _shared/uploadValidation.ts) y, si pasa, sube a Storage con el JWT del llamador
+# (las RLS de storage.objects imponen el tenant). verify_jwt=false: valida el JWT a
+# mano via requireUser (consistente con el resto de funciones del repo).
+[functions.validate-upload]
+verify_jwt = false
+
 # SSO/SAML enterprise (plat:P10) — admin de dominios + proveedor SAML por tenant.
 # Deriva company_id de la SESION (nunca del input), exige owner/admin y gestiona
 # SOLO los dominios/proveedor de ESA empresa en company_sso_domains. Intenta

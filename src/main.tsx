@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import './components/shared/shared.css'
+// Estilos antes inyectados como <style> inline en runtime; consolidados aquí para
+// poder quitar 'unsafe-inline' de style-src en la CSP (infra:I24). Ver runtime.css.
+import './styles/runtime.css'
 import App from './App'
 import { queryClient } from './domain/queryClient'
 import { ErrorBoundary } from './components/ErrorBoundary'

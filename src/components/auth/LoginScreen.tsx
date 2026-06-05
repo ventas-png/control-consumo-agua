@@ -115,60 +115,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
   return (
     <>
-      <style>{`
-        @keyframes floatBubble {
-          0%   { transform: translateY(0) scale(1); opacity: 0.15; }
-          50%  { transform: translateY(-50px) scale(1.08); opacity: 0.25; }
-          100% { transform: translateY(0) scale(1); opacity: 0.15; }
-        }
-        @keyframes shake {
-          0%,100% { transform: translateX(0); }
-          20%     { transform: translateX(-8px); }
-          40%     { transform: translateX(8px); }
-          60%     { transform: translateX(-6px); }
-          80%     { transform: translateX(6px); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50%      { transform: scale(1.06); }
-        }
-        .login-input:focus {
-          outline: none;
-          border-color: var(--at-primary) !important;
-          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
-        }
-        .login-input::placeholder { color: var(--at-ink-3); }
-        .login-btn-main:hover:not(:disabled) {
-          filter: brightness(1.08);
-          transform: translateY(-1px);
-          box-shadow: 0 8px 24px rgba(27, 59, 54,0.45);
-        }
-        .login-btn-main:active:not(:disabled) { transform: translateY(0); }
-        .login-btn-google:hover:not(:disabled) {
-          background: var(--at-surface-2) !important;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
-        }
-        .feat-card:hover {
-          background: rgba(255,255,255,0.18) !important;
-          transform: translateX(4px);
-        }
-        @media (max-width: 640px) {
-          .login-left-panel { display: none !important; }
-        }
-        .login-right-panel {
-          padding: 48px 40px;
-        }
-        @media (max-width: 480px) {
-          .login-right-panel { padding: 32px 20px !important; }
-        }
-      `}</style>
+      {/* Estilos (.login-*, keyframes) en src/styles/runtime.css (I24). */}
 
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,

@@ -93,35 +93,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
       justifyContent: 'center',
       padding: '24px 16px',
     }}>
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .reg-input:focus {
-          outline: none;
-          border-color: var(--at-primary) !important;
-          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
-        }
-        .reg-btn-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, var(--at-primary-hover), var(--at-primary-hover)) !important;
-          transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(27, 59, 54,0.4) !important;
-        }
-        .reg-btn-back:hover {
-          background: rgba(255,255,255,0.12) !important;
-        }
-        .reg-card {
-          padding: 40px;
-        }
-        .reg-two-col {
-          grid-template-columns: 1fr 1fr;
-        }
-        @media (max-width: 480px) {
-          .reg-card { padding: 24px 20px !important; }
-          .reg-two-col { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
+      {/* Estilos (.reg-*, keyframes) en src/styles/runtime.css (I24). */}
 
       <div className="reg-card" style={{
         background: 'var(--at-surface)',
@@ -396,7 +368,6 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 'Crear cuenta'
               )}
             </button>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
             {/* Back link */}
             <button

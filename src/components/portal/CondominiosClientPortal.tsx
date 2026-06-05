@@ -46,25 +46,8 @@ const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mudanza',       label: 'Mudanzas',        icon: '🚛' },
 ]
 
-const PORTAL_CSS = `
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-.condo-skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.18) 25%,
-    rgba(255,255,255,0.38) 50%,
-    rgba(255,255,255,0.18) 75%
-  );
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: 6px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.condo-tab:hover { background: rgba(185, 106, 63,0.08) !important; }
-.condo-tab.active { background: white !important; color: var(--at-accent-hover) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-`
+// Los estilos .condo-skeleton/.condo-tab (y keyframes) viven ahora en
+// src/styles/runtime.css (I24).
 
 export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const clienteId = currentUser.cliente_id ?? ''
@@ -280,7 +263,6 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     /* infra:I14 — provides the resident's unit project_id to condominios-media uploaders. */
     <MediaScopeProvider projectId={proyectoId}>
     <div style={{ minHeight: '100vh', background: 'var(--at-accent-tint-2)' }}>
-      <style>{PORTAL_CSS}</style>
 
       {/* Header */}
       <div style={{

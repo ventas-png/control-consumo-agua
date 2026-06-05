@@ -129,7 +129,6 @@ function AuthSplash() {
           animation: 'spin 0.8s linear infinite',
         }} />
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
@@ -622,7 +621,6 @@ export default function App() {
             Cargando AdministraTodo…
           </div>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -755,33 +753,8 @@ export default function App() {
         bindings={shortcutBindings}
       />
 
-      <style>{`
-        @media (max-width: 767px) {
-          .app-sidebar {
-            position: fixed !important;
-            top: 0; left: 0;
-            height: 100vh;
-            z-index: 200;
-            transform: translateX(-256px);
-            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          .app-sidebar.open { transform: translateX(0); }
-          .app-backdrop { display: block !important; }
-          .app-hamburger { display: flex !important; }
-          .app-main { padding: 16px !important; }
-          .app-topbar { padding: 0 14px !important; }
-          .app-breadcrumbs { padding: 7px 14px !important; }
-          .app-alert-banner { padding: 10px 14px !important; flex-wrap: wrap; gap: 8px; }
-        }
-        @media (max-width: 480px) {
-          .app-online-badge { display: none !important; }
-        }
-        @media (min-width: 768px) {
-          .app-sidebar { position: sticky !important; transform: none !important; transition: none; }
-          .app-backdrop { display: none !important; }
-          .app-hamburger { display: none !important; }
-        }
-      `}</style>
+      {/* El CSS responsive del shell (.app-sidebar, etc.) vive ahora en
+          src/styles/runtime.css (I24: CSP sin 'unsafe-inline' en style-src). */}
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--at-bg)' }}>
         <div
           className="app-backdrop"
@@ -857,7 +830,7 @@ export default function App() {
         {/* plat:P20 — aplica el color de marca de la empresa a toda la app (efecto, no UI). */}
         <BrandingApplier companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
-          <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
+          <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>}>
           <Routes>
             <Route path="/clientes" element={
               <ErrorBoundary sectionName="clientes">

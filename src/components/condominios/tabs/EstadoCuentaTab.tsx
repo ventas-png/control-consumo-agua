@@ -147,7 +147,6 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
             ) : null },
         ] satisfies DataTableColumn<CuotaCondominio>[]}
       />
-      <style>{`@media print { button { display: none !important; } }`}</style>
     </div>
   )
 }

@@ -3,22 +3,7 @@ import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { Chart } from '../../lib/chartjs'
 
-const SHIMMER_CSS = `
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-.dash-skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.18) 25%,
-    rgba(255,255,255,0.38) 50%,
-    rgba(255,255,255,0.18) 75%
-  );
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: 8px;
-}
-`
+// El CSS de .dash-skeleton (shimmer) vive ahora en src/styles/runtime.css (I24).
 
 interface Props {
   registros: Registro[]
@@ -96,7 +81,6 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
 
   return (
     <div>
-      <style>{SHIMMER_CSS}</style>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {statCards.map(s => (
           <div key={s.label} style={{ background: s.bg, padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
@@ -126,7 +110,6 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
                 border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)',
                 borderRadius: '50%', animation: 'spin 0.8s linear infinite',
               }} />
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               <span style={{ fontSize: '13px', color: 'var(--at-ink-3)', fontWeight: 500 }}>Cargando datos…</span>
             </div>
           )}
