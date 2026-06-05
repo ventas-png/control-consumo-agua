@@ -11,7 +11,7 @@ export function useCrearProveedorEnergiaMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (payload: Omit<ProveedorEnergia, 'id' | 'created_at' | 'updated_at'>) => {
       const result = await runQuery<ProveedorEnergia>((signal) =>
-        supabase.from('proveedores_energia').insert([payload]).select().single().abortSignal(signal)
+        supabase.from('proveedores_energia').insert([payload]).select().abortSignal(signal).single()
       )
       if (!result) throw new Error('No se pudo crear el proveedor')
       return result
@@ -61,7 +61,7 @@ export function useCrearTarifaEnergiaMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (payload: Omit<TarifaEnergia, 'id' | 'created_at' | 'updated_at'>) => {
       const result = await runQuery<TarifaEnergia>((signal) =>
-        supabase.from('tarifas_energia').insert([payload]).select().single().abortSignal(signal)
+        supabase.from('tarifas_energia').insert([payload]).select().abortSignal(signal).single()
       )
       if (!result) throw new Error('No se pudo crear la tarifa')
       return result
@@ -111,7 +111,7 @@ export function useCrearFuenteEnergiaMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (payload: Omit<FuenteEnergia, 'id' | 'created_at' | 'updated_at'>) => {
       const result = await runQuery<FuenteEnergia>((signal) =>
-        supabase.from('fuentes_energia').insert([payload]).select().single().abortSignal(signal)
+        supabase.from('fuentes_energia').insert([payload]).select().abortSignal(signal).single()
       )
       if (!result) throw new Error('No se pudo crear la fuente')
       return result
@@ -161,7 +161,7 @@ export function useCrearFacturaEnergiaMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (payload: Omit<FacturaEnergia, 'id' | 'created_at' | 'updated_at'>) => {
       const result = await runQuery<FacturaEnergia>((signal) =>
-        supabase.from('facturas_energia').insert([payload]).select().single().abortSignal(signal)
+        supabase.from('facturas_energia').insert([payload]).select().abortSignal(signal).single()
       )
       if (!result) throw new Error('No se pudo crear la factura')
       return result
