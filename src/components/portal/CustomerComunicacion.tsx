@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
+import { NotificationPreferencesPanel } from '../comunicacion/NotificationPreferencesPanel'
 import { sanitizeInput } from '../../lib/validation'
 import { SecureImage } from '../shared/SecureImage'
 import { useSignedUrl } from '../../lib/storageUrls'
@@ -160,7 +161,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
   const [creating, setCreating] = useState(false)
   const [formError, setFormError] = useState('')
 
-  const [mainTab, setMainTab] = useState<'conversaciones' | 'comunicados'>('conversaciones')
+  const [mainTab, setMainTab] = useState<'conversaciones' | 'comunicados' | 'preferencias'>('conversaciones')
   const [expandedBroadcast, setExpandedBroadcast] = useState<string | null>(null)
 
   const { clienteBroadcasts, loadClienteBroadcasts, markAsRead } = useBroadcasts()
@@ -240,7 +241,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs ── */}
       <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', marginBottom: '-4px' }}>
-        {(['conversaciones', 'comunicados'] as const).map(tab => {
+        {(['conversaciones', 'comunicados', 'preferencias'] as const).map(tab => {
           const active = mainTab === tab
           const unreadCount = tab === 'comunicados'
             ? clienteBroadcasts.filter(r => !r.read_at).length
@@ -264,14 +265,15 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 gap: '6px',
               }}
             >
-              {tab === 'conversaciones' ? (
+              {tab === 'conversaciones' && (
                 <>
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
                   </svg>
                   Conversaciones
                 </>
-              ) : (
+              )}
+              {tab === 'comunicados' && (
                 <>
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
@@ -288,6 +290,15 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                       {unreadCount}
                     </span>
                   )}
+                </>
+              )}
+              {tab === 'preferencias' && (
+                <>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                  Notificaciones
                 </>
               )}
             </button>
@@ -947,6 +958,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             })
           )}
         </div>
+      )}
+
+      {mainTab === 'preferencias' && (
+        <NotificationPreferencesPanel
+          userId={currentUser.user_id}
+          companyId={companyId}
+          lockInApp
+        />
       )}
     </div>
   )

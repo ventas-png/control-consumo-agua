@@ -40,6 +40,12 @@ verify_jwt = false
 [functions.invite-user]
 verify_jwt = false
 
+# Crear comunicado masivo (T2/com:N5): resuelve la audiencia y el fan-out en el
+# servidor (broadcast_recipients + encola emails en notifications_outbox). Valida
+# el JWT del admin/owner a mano via _shared/auth.requireUser, igual que create-user.
+[functions.create-broadcast]
+verify_jwt = false
+
 # Aceptar invitacion (T3/plat:P3): publico/sessionless por diseno — el invitado
 # todavia no tiene cuenta. Valida el token de invitacion + origen + fuerza de la
 # password server-side.
