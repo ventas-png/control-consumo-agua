@@ -46,6 +46,14 @@ verify_jwt = false
 [functions.create-broadcast]
 verify_jwt = false
 
+# Dispatcher de notificaciones (T2): lo invoca pg_cron cada minuto via
+# run_notifications_dispatcher() con SERVICE_ROLE_KEY (o x-cron-secret). Procesa
+# notifications_outbox y entrega por canal, respetando preferencias (suppressed) y
+# registrando notification_events. verify_jwt=false: hace su propio control de
+# acceso interno (Bearer service_role / cron secret), no JWT de usuario.
+[functions.notifications-dispatcher]
+verify_jwt = false
+
 # Aceptar invitacion (T3/plat:P3): publico/sessionless por diseno — el invitado
 # todavia no tiene cuenta. Valida el token de invitacion + origen + fuerza de la
 # password server-side.
