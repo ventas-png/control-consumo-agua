@@ -1,0 +1,181 @@
+name: Apply Migrations to Production
+
+# Auto-aplica a PRODUCCIÓN las migraciones SQL que aterrizan en `main`, para que
+# el esquema de Supabase nunca se quede DETRÁS del código. Lección anti-drift:
+# durante junio/2026 varios PRs con migraciones se mergearon a `main` sin que el
+# SQL llegara a prod (había que dispararlo a mano con apply-migration.yml o MCP);
+# este workflow cierra ese hueco automáticamente.
+#
+# Mecanismo: Management API de Supabase (POST /v1/projects/{id}/database/query),
+# el MISMO probado en apply-migration.yml. NO usa `supabase db push` a propósito:
+# el historial remoto schema_migrations quedó desalineado (algunas migraciones se
+# aplicaron a mano/MCP con versión de apply-time, no la del archivo) y `db push`
+# abortaría por checksum/orden. El SQL de las migraciones es IDEMPOTENTE
+# (CREATE ... IF NOT EXISTS, DROP POLICY IF EXISTS → CREATE POLICY), así que
+# reaplicar siempre es seguro.
+#
+# Disparadores:
+#   - push a `main` que toque supabase/migrations/** → aplica SOLO los .sql
+#     añadidos/modificados en ese push (en orden de versión) y los registra en
+#     supabase_migrations.schema_migrations.
+#   - manual (workflow_dispatch):
+#       · con `migration_file` → aplica ESE archivo.
+#       · sin input → modo RECONCILIAR: aplica toda migración local cuya versión
+#         no esté registrada en el historial remoto (sana el drift de una vez).
+#
+# `paths` está acotado a supabase/migrations/** para que la PROPIA introducción
+# de este workflow (un cambio solo en .github/) NO se auto-dispare.
+#
+# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID (los mismos de
+# apply-migration.yml). Sin ellos el job falla con instrucciones.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+    inputs:
+      migration_file:
+        description: 'Archivo único a aplicar (en supabase/migrations/). Vacío = reconciliar todos los pendientes.'
+        required: false
+        default: ''
+
+concurrency:
+  # No cancelar una aplicación a medias: encolar.
+  group: apply-migrations-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Supabase secrets are set
+        run: |
+          missing=""
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Faltan secrets de GitHub:$missing"
+            echo "Agrégalos en: Settings → Secrets and variables → Actions."
+            echo "SUPABASE_ACCESS_TOKEN: Account → Access Tokens (Management API)."
+            echo "SUPABASE_PROJECT_ID: ref del proyecto (Project Settings → General)."
+            exit 1
+          fi
+
+  apply:
+    needs: check-secrets
+    runs-on: ubuntu-latest
+    env:
+      API_URL: https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query
+      ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      EVENT_NAME: ${{ github.event_name }}
+      INPUT_FILE: ${{ github.event.inputs.migration_file }}
+      PUSH_BEFORE: ${{ github.event.before }}
+      PUSH_AFTER: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build list of migrations to apply
+        id: list
+        run: |
+          set -uo pipefail
+          MIG_DIR="supabase/migrations"
+          files=""
+
+          remote_versions () {
+            # Versiones ya registradas en el historial remoto (una por línea).
+            local resp
+            resp=$(curl -s -X POST "$API_URL" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"query":"select version from supabase_migrations.schema_migrations order by version"}')
+            echo "$resp" | jq -r '.[].version' 2>/dev/null || true
+          }
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${INPUT_FILE:-}" ]; then
+            if [ ! -f "$MIG_DIR/$INPUT_FILE" ]; then
+              echo "::error::No existe $MIG_DIR/$INPUT_FILE"
+              exit 1
+            fi
+            files="$MIG_DIR/$INPUT_FILE"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Reconciliar: locales cuya versión NO esté en el historial remoto.
+            applied=$(remote_versions)
+            for f in $(ls "$MIG_DIR"/*.sql 2>/dev/null | sort); do
+              base=$(basename "$f" .sql); ver=${base%%_*}
+              if ! grep -qxF "$ver" <<<"$applied"; then files="$files $f"; fi
+            done
+          else
+            # push a main: solo los .sql añadidos/modificados en este push.
+            range=""
+            if [ -n "${PUSH_BEFORE:-}" ] \
+               && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
+               && git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null; then
+              range="$PUSH_BEFORE $PUSH_AFTER"
+            fi
+            if [ -n "$range" ]; then
+              changed=$(git diff --name-only --diff-filter=AM $range -- "$MIG_DIR" | grep '\.sql$' || true)
+            else
+              changed=$(git show --name-only --diff-filter=AM --pretty=format: "$PUSH_AFTER" -- "$MIG_DIR" | grep '\.sql$' || true)
+            fi
+            files="$changed"
+          fi
+
+          files=$(printf '%s\n' $files | sed '/^$/d' | sort -u | tr '\n' ' ')
+          echo "Migraciones a aplicar: ${files:-(ninguna)}"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Apply migrations via Management API
+        if: steps.list.outputs.files != ''
+        env:
+          FILES: ${{ steps.list.outputs.files }}
+        run: |
+          set -uo pipefail
+          fail=0
+          {
+            echo "### Aplicación de migraciones a producción"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for f in $FILES; do
+            base=$(basename "$f" .sql); ver=${base%%_*}; name=${base#*_}
+            echo "::group::Aplicando $base"
+            sql=$(cat "$f")
+            payload=$(jq -Rs '{query: .}' <<<"$sql")
+            resp=$(curl -s -X POST "$API_URL" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$payload")
+            echo "$resp"
+            if echo "$resp" | jq -e '.error' > /dev/null 2>&1; then
+              echo "::error::Falló $base"
+              echo "- ❌ \`$base\` — $(echo "$resp" | jq -c '.error' 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+              echo "::endgroup::"
+              continue
+            fi
+            # Registrar en el historial (best-effort; idempotente con ON CONFLICT).
+            hist="insert into supabase_migrations.schema_migrations (version, name) values ('$ver', '$name') on conflict (version) do nothing;"
+            curl -s -X POST "$API_URL" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -Rs '{query: .}' <<<"$hist")" > /dev/null || true
+            echo "- ✅ \`$base\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Una o más migraciones fallaron. Revisá el log."
+            exit 1
+          fi
+          echo "Todas las migraciones se aplicaron correctamente."
+
+      - name: Nothing to apply
+        if: steps.list.outputs.files == ''
+        run: echo "No hay migraciones nuevas que aplicar en este evento."
