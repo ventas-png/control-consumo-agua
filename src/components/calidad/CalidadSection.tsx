@@ -2,7 +2,8 @@ import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchFuentes, fetchRegistrosCalidad, getReporteCalidadSignedUrl } from '../../domain/calidad/queries'
+import { createFuente, updateFuente, setFuenteActiva, createRegistroCalidad, uploadReporteCalidad } from '../../domain/calidad/mutations'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
@@ -24,18 +25,6 @@ interface Props {
   canEdit?: boolean
 }
 
-async function recargarFuentes(): Promise<FuenteAgua[]> {
-  const { data } = await supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
-  return (data ?? []) as FuenteAgua[]
-}
-
-async function recargarRegistrosCalidad(): Promise<RegistroCalidad[]> {
-  const { data } = await supabase
-    .from('registros_calidad')
-    .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
-    .order('fecha', { ascending: false })
-  return (data ?? []) as RegistroCalidad[]
-}
 
 export function CalidadSection({
   fuentesAgua, registrosCalidad, empresa, userId,
@@ -91,13 +80,13 @@ export function CalidadSection({
         frecuencia_muestreo_dias: freqRaw === '' ? null : Number(freqRaw),
       }
       if (editandoId) {
-        const { error } = await supabase.from('fuentes_agua').update(payload).eq('id', editandoId)
-        if (error) throw error
+        const { error } = await updateFuente(editandoId, payload)
+        if (error) throw new Error(error)
       } else {
-        const { error } = await supabase.from('fuentes_agua').insert([payload])
-        if (error) throw error
+        const { error } = await createFuente(payload)
+        if (error) throw new Error(error)
       }
-      onFuentesUpdated(await recargarFuentes())
+      onFuentesUpdated(await fetchFuentes())
       setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '', frecuencia_muestreo_dias: '' })
       setEditandoId(null)
       notify({ variant: 'success', title: editandoId ? 'Fuente actualizada' : 'Fuente registrada', duration: 1500 })
@@ -116,9 +105,9 @@ export function CalidadSection({
   }
 
   async function toggleFuente(id: string, activo: boolean) {
-    const { error } = await supabase.from('fuentes_agua').update({ activo: !activo }).eq('id', id)
-    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
-    onFuentesUpdated(await recargarFuentes())
+    const { error } = await setFuenteActiva(id, !activo)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error })
+    onFuentesUpdated(await fetchFuentes())
   }
 
   // Análisis
@@ -173,12 +162,10 @@ export function CalidadSection({
       const ts = Date.now()
       const safeName = reporteFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${empresa.id}/${analisisFuenteId}/${ts}-${safeName}`
-      const { error: uploadErr } = await supabase.storage
-        .from('calidad-reportes')
-        .upload(path, reporteFile, { upsert: false })
+      const { error: uploadErr } = await uploadReporteCalidad(path, reporteFile)
       if (uploadErr) {
         setSavingAnalisis(false)
-        return notify({ variant: 'error', title: 'Error al subir reporte', text: uploadErr.message })
+        return notify({ variant: 'error', title: 'Error al subir reporte', text: uploadErr })
       }
       reporte_path = path
     }
@@ -196,9 +183,9 @@ export function CalidadSection({
     }
 
     try {
-      const { error } = await supabase.from('registros_calidad').insert([registro])
-      if (error) throw error
-      onRegistrosCalidadUpdated(await recargarRegistrosCalidad())
+      const { error } = await createRegistroCalidad(registro)
+      if (error) throw new Error(error)
+      onRegistrosCalidadUpdated(await fetchRegistrosCalidad())
       // Reset form
       setAnalisisFuenteId('')
       setAnalisisFecha(new Date().toISOString().slice(0, 16))
@@ -241,12 +228,10 @@ export function CalidadSection({
   async function verReporte(r: RegistroCalidad) {
     if (r.reporte_path) {
       // serv:S24 — ruta en Storage: crear URL firmada y descargar.
-      const { data, error } = await supabase.storage
-        .from('calidad-reportes')
-        .createSignedUrl(r.reporte_path, 60)
-      if (error || !data?.signedUrl) return notify({ variant: 'error', title: 'Error', text: 'No se pudo acceder al reporte.' })
+      const { url, error } = await getReporteCalidadSignedUrl(r.reporte_path)
+      if (error || !url) return notify({ variant: 'error', title: 'Error', text: 'No se pudo acceder al reporte.' })
       const link = document.createElement('a')
-      link.href = data.signedUrl
+      link.href = url
       link.download = r.reporte_nombre ?? 'reporte'
       link.click()
     } else if (r.reporte_base64) {
