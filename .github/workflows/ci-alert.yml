@@ -1,0 +1,58 @@
+name: Alerta de fallo (CI/Deploy)
+
+# Alerta de fallos de CI/deploy a Slack (infra:I18). Escucha el RESULTADO de los
+# workflows clave (vía workflow_run) y, si fallaron en `main`, notifica.
+#
+# Por qué workflow_run y no `if: failure()` dentro de cada workflow: así esta
+# alerta vive en UN solo lugar y no hay que tocar ci.yml / deploy-functions.yml
+# (que son de otra sesión). workflow_run solo se dispara desde el branch por
+# defecto, así que esto alerta sobre fallos en `main` (los que importan).
+#
+# Gating: si SLACK_WEBHOOK_URL no está configurado, el job hace no-op con un aviso
+# (no falla). Configúralo en Settings → Secrets and variables → Actions.
+# Las alertas de ERRORES DE PRODUCCIÓN (no de CI) las emite Sentry directamente
+# (ver docs/ALERTING.md) — esto cubre el pipeline, no el runtime.
+
+on:
+  workflow_run:
+    workflows: ["CI", "Deploy Supabase Edge Functions"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    # Solo cuando el workflow observado terminó en fallo.
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::SLACK_WEBHOOK_URL no configurado — se omite la alerta a Slack."
+            echo "Para activarla: Settings → Secrets and variables → Actions → SLACK_WEBHOOK_URL"
+            echo "(crea un Incoming Webhook en https://api.slack.com/messaging/webhooks)"
+            exit 0
+          fi
+          short_sha=$(echo "$SHA" | cut -c1-7)
+          text=$(printf '%s\n%s\n%s' \
+            ":red_circle: *${WF_NAME} falló* en \`${REPO}\`" \
+            "*Branch:* \`${BRANCH}\`  ·  *Commit:* \`${short_sha}\`  ·  *Por:* ${ACTOR}" \
+            "<${RUN_URL}|Ver el run en GitHub Actions>")
+          payload=$(jq -n --arg t "$text" '{text: $t}')
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$payload" "$SLACK_WEBHOOK_URL")
+          echo "Slack respondió HTTP $status"
+          # No reventamos el workflow si Slack falla puntualmente (la alerta es
+          # best-effort; el fallo real ya está en la pestaña Actions).
+          [ "$status" = "200" ] || echo "::warning::Slack devolvió $status"
