@@ -1,94 +1,48 @@
-import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
+import { useState, useEffect, type ChangeEvent} from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 import { SystemHealthModal } from './SystemHealthModal'
 import { SuperAdminMetricsCard } from './SuperAdminMetricsCard'
+import { useEmpresasSuperadminQuery, type EmpresaSuperadminRow } from '../../domain/superadmin/queries'
+import { superadminKeys } from '../../domain/superadmin/keys'
 
-interface Empresa {
-  id: string
-  nombre: string
-  nit: string | null
-  email: string | null
-  telefono: string | null
-  plan: string
-  activa: boolean
-  max_projects: number
-  max_units: number
-  servicio_agua: boolean
-  servicio_condominios: boolean
-  project_count?: number
-  user_count?: number
-  unit_count?: number
-}
+type Empresa = EmpresaSuperadminRow
+
+const PAGE_SIZE = 25
 
 export function SuperAdminSection() {
-  const [empresas, setEmpresas] = useState<Empresa[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [editingMax, setEditingMax] = useState<Record<string, number>>({})
   const [editingMaxUnits, setEditingMaxUnits] = useState<Record<string, number>>({})
-  const [maxUnitsSupported, setMaxUnitsSupported] = useState(false)
   const [showHealth, setShowHealth] = useState(false)
 
-  const cargar = useCallback(async () => {
-    setLoading(true)
+  // plat:P14 — paginación + búsqueda server-side (RPC sobre la MV de conteos).
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
 
-    // Try with max_units first; fall back without it if the column doesn't exist yet
-    let companiesData: Empresa[] | null = null
-    const { data: fullData, error: fullError } = await supabase
-      .from('companies')
-      .select('id, nombre, nit, email, telefono, plan, activa, max_projects, max_units, servicio_agua, servicio_condominios')
-      .order('nombre')
+  // Debounce de la búsqueda (300 ms) y reseteo a la primera página al buscar.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(0) }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-    type RawEmpresa = Omit<Empresa, 'servicio_agua' | 'servicio_condominios'> & { servicio_agua?: boolean; servicio_condominios?: boolean }
-    const normalizeFlags = (c: RawEmpresa): Empresa => ({
-      ...c,
-      servicio_agua: c.servicio_agua ?? true,
-      servicio_condominios: c.servicio_condominios ?? true,
-    })
+  const { data, isLoading, isFetching } = useEmpresasSuperadminQuery({
+    search: search || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  })
+  const empresas: Empresa[] = data?.rows ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-    if (!fullError && fullData) {
-      companiesData = (fullData as RawEmpresa[]).map(normalizeFlags)
-      setMaxUnitsSupported(true)
-    } else {
-      // Column max_units may not exist yet — fetch without it
-      const { data: fallbackData } = await supabase
-        .from('companies')
-        .select('id, nombre, nit, email, telefono, plan, activa, max_projects, servicio_agua, servicio_condominios')
-        .order('nombre')
-      if (fallbackData) {
-        companiesData = (fallbackData as (Omit<Empresa, 'max_units'> & { servicio_agua?: boolean; servicio_condominios?: boolean })[])
-          .map(c => ({ ...normalizeFlags(c as unknown as RawEmpresa), max_units: 50 }))
-      }
-      setMaxUnitsSupported(false)
-    }
+  // Las columnas de límites siempre existen en companies; sin fallback legacy.
+  const maxUnitsSupported = true
 
-    if (!companiesData) { setLoading(false); return }
-
-    // Obtener conteos por empresa
-    const empresasConConteos = await Promise.all(
-      companiesData.map(async (c) => {
-        const [{ count: projectCount }, { count: userCount }, unidadesResult] = await Promise.all([
-          supabase.from('projects').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
-          supabase.from('app_users').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
-          supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
-        ])
-        return {
-          ...c,
-          project_count: projectCount ?? 0,
-          user_count: userCount ?? 0,
-          // unidades table may not exist yet
-          unit_count: unidadesResult.error ? 0 : (unidadesResult.count ?? 0),
-        }
-      })
-    )
-
-    setEmpresas(empresasConConteos)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { void cargar() }, [cargar])
+  const invalidar = () => { void queryClient.invalidateQueries({ queryKey: superadminKeys.all }) }
 
   async function actualizarMaxProyectos(empresaId: string) {
     const nuevoMax = editingMax[empresaId]
@@ -102,7 +56,7 @@ export function SuperAdminSection() {
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       setEditingMax(prev => { const n = { ...prev }; delete n[empresaId]; return n })
-      void cargar()
+      invalidar()
     }
   }
 
@@ -126,7 +80,7 @@ export function SuperAdminSection() {
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
       setEditingMaxUnits(prev => { const n = { ...prev }; delete n[empresaId]; return n })
-      void cargar()
+      invalidar()
     }
   }
 
@@ -135,7 +89,7 @@ export function SuperAdminSection() {
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
     } else {
-      setEmpresas(prev => prev.map(e => e.id === empresaId ? { ...e, [campo]: nuevoValor } : e))
+      invalidar()
     }
   }
 
@@ -189,7 +143,7 @@ export function SuperAdminSection() {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      void cargar()
+      invalidar()
     }
   }
 
@@ -276,11 +230,11 @@ export function SuperAdminSection() {
       notify({ variant: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
     } else {
       notify({ variant: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, duration: 2000 })
-      void cargar()
+      invalidar()
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
         <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>Cargando...</span>
@@ -302,7 +256,7 @@ export function SuperAdminSection() {
             Panel Superadministrador
           </h1>
           <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', marginTop: '4px' }}>
-            {empresas.length} empresa(s) registrada(s)
+            {total} empresa(s){search ? ' encontrada(s)' : ' registrada(s)'}{isFetching ? ' · actualizando…' : ''}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -339,13 +293,31 @@ export function SuperAdminSection() {
       {/* F4.5.3: KPIs globales del SaaS (MRR, activas, churn, distribución por plan) */}
       <SuperAdminMetricsCard />
 
+      {/* plat:P14 — Búsqueda server-side por nombre / NIT / email */}
+      <div style={{ marginBottom: '16px' }}>
+        <input
+          type="search"
+          value={searchInput}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
+          placeholder="Buscar empresa por nombre, NIT o email…"
+          style={{
+            width: '100%', padding: '11px 14px', borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'rgba(255,255,255,0.04)', color: 'var(--at-chip)',
+            fontSize: '14px', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
       {/* Lista de empresas */}
       {empresas.length === 0 ? (
         <div style={{
           background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
           borderRadius: '12px', padding: '48px', textAlign: 'center',
         }}>
-          <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay empresas registradas.</p>
+          <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>
+            {search ? `No hay empresas que coincidan con "${search}".` : 'No hay empresas registradas.'}
+          </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -549,6 +521,41 @@ export function SuperAdminSection() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* plat:P14 — Paginación server-side */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '20px' }}>
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0 || isFetching}
+            style={{
+              padding: '8px 16px', borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
+              cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.5 : 1,
+              fontSize: '13px', fontWeight: 600,
+            }}
+          >
+            ← Anterior
+          </button>
+          <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
+            Página {page + 1} de {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1 || isFetching}
+            style={{
+              padding: '8px 16px', borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
+              cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page >= totalPages - 1 ? 0.5 : 1,
+              fontSize: '13px', fontWeight: 600,
+            }}
+          >
+            Siguiente →
+          </button>
         </div>
       )}
 
