@@ -10,14 +10,36 @@ el cliente, con JWTs de distinto rol/empresa.
 
 ## Qué afirma
 
-1. **Secretos = deny-all.** `fiscal_pac_secrets` y `company_payment_secrets` no
-   devuelven filas ni para `authenticated` ni para `anon`. El secreto sólo es
-   accesible por `service_role` (que hace BYPASSRLS) desde edge functions. El
-   cliente nunca lo ve.
-2. **anon sin acceso de negocio.** `registros` y `cuotas_condominio` devuelven 0
-   filas para `anon` (no hay policy para ese rol).
-3. **Aislamiento multi-tenant.** Dos usuarios de **empresas distintas** ven
-   conjuntos de `company_id` **disjuntos** en `cuotas_condominio`.
+1. **Secretos = deny-all.** `fiscal_pac_secrets`, `company_payment_secrets` y
+   `payfac_secrets` no devuelven filas ni para `authenticated` ni para `anon`. El
+   secreto sólo es accesible por `service_role` (que hace BYPASSRLS) desde edge
+   functions. El cliente nunca lo ve.
+2. **Store de sesiones = deny-all.** `user_sessions` (store de express-session,
+   columnas `sid/sess/expire`, política "No direct access") devuelve 0 filas para
+   `authenticated` y `anon`. No tiene `user_id`, así que el invariante "A no ve
+   filas de otro usuario" se cumple de forma trivial y más fuerte: A no ve nada.
+3. **anon sin acceso de negocio.** `registros`, `cuotas_condominio`,
+   `documentos_fiscales`, `notifications_outbox`, `user_invitations`,
+   `legal_acceptances`, `pagos`, `notification_preferences` y `user_preferences`
+   devuelven 0 filas para `anon` (no hay policy para ese rol; las user-scoped
+   exigen `auth.uid()`, que para `anon` es `NULL`).
+4. **Aislamiento multi-tenant (lectura).** Dos usuarios de **empresas distintas**
+   ven conjuntos de `company_id` **disjuntos** en las tablas calientes que exponen
+   `company_id`: `cuotas_condominio`, `documentos_fiscales`, `notifications_outbox`
+   y `user_invitations`.
+5. **Aislamiento user-scoped (lectura).** En `notification_preferences` y
+   `user_preferences` (RLS `user_id = auth.uid()`) cada fila visible para A tiene
+   `user_id = A`, y los `user_id` que ven A y B son disjuntos.
+6. **Negative write (cross-tenant).** A intenta escribir con `company_id` ajeno y
+   el `WITH CHECK` de RLS lo **rechaza** (no persiste nada, sin sembrar ni
+   limpiar): `INSERT` en `cuotas_condominio`/`documentos_fiscales` con company_id
+   ajeno, y `UPDATE` que re-etiqueta una fila propia hacia un tenant ajeno.
+7. **Guard anon/authenticated sobre RPCs sensibles (#378/#380).** Como `anon` y
+   como `authenticated`, invocar `enqueue_notification`,
+   `claim_notifications_batch`, `mark_notification_result` y
+   `run_notifications_dispatcher` es **rechazado** (error de permiso / función no
+   visible / PGRST — nunca un resultado exitoso). Regresa-guarda el agujero de
+   #378 (RPCs SECURITY DEFINER ejecutables por `anon` vía DEFAULT PRIVILEGES).
 
 ## Por qué está credencial-gated
 
@@ -49,10 +71,15 @@ En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
 
 ## Sembrado de datos
 
-El harness es **read-only**: no crea datos. Asume que A y B ya existen en empresas
-distintas y que B tiene al menos una `cuota_condominio` para que el assert de
-disjunción sea significativo (si B no tiene cuotas, el test sigue pasando pero no
-prueba aislamiento — sembrar 1 cuota por empresa lo hace concluyente).
+El harness es **read-only** salvo los *negative-write*, que son escrituras
+**diseñadas para ser rechazadas** por RLS (no persisten; igualmente intentan una
+limpieza best-effort por si un bug las dejara colar). No crea datos de prueba.
+Asume que A y B ya existen en empresas distintas y que B tiene al menos una
+`cuota_condominio` (y, idealmente, alguna fila en las demás tablas calientes)
+para que los asserts de disjunción sean significativos: si B no tiene filas, el
+test pasa pero no prueba aislamiento — sembrar 1 fila por empresa lo hace
+concluyente. Los asserts user-scoped son significativos cuando A y B tienen al
+menos una preferencia cada uno.
 
 ## Limitaciones / siguiente paso
 
