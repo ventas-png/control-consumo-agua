@@ -49,6 +49,10 @@ const SignupCompanyScreen = lazy(() => import('./components/auth/SignupCompanySc
 const OAuthOnboardingScreen = lazy(() => import('./components/auth/OAuthOnboardingScreen'))
 // T3/plat:P3 — landing pública de aceptación de invitación (/aceptar-invitacion).
 const AcceptInvitationPage = lazy(() => import('./components/onboarding/AcceptInvitationPage').then(m => ({ default: m.AcceptInvitationPage })))
+// Suite legal pública e indexable (/politica-privacidad, /terminos-servicio,
+// /acuerdo-dpa-cookies). Sessionless — se resuelve con early-return antes del gate
+// de auth, igual que /aceptar-invitacion. Lazy para no entrar al bundle autenticado.
+const LegalPage = lazy(() => import('./components/legal/LegalPage'))
 
 // Cliente-role portals — solo se cargan para usuarios con role='cliente'.
 // La inmensa mayoria son admins/staff que nunca tocan estos componentes.
@@ -283,6 +287,25 @@ export default function App() {
         <AcceptInvitationPage />
       </Suspense>
     )
+  }
+
+  // Suite legal pública (RGPD/CCPA + verificación de APIs de Google). Son páginas
+  // 100% públicas e indexables: se resuelven sessionless aquí arriba, ANTES del gate
+  // de auth, con el mismo patrón que /aceptar-invitacion. El doc se mapea por ruta.
+  if (typeof window !== 'undefined') {
+    const legalRoutes: Record<string, 'privacy' | 'tos' | 'dpa'> = {
+      '/politica-privacidad': 'privacy',
+      '/terminos-servicio': 'tos',
+      '/acuerdo-dpa-cookies': 'dpa',
+    }
+    const legalDoc = legalRoutes[window.location.pathname]
+    if (legalDoc) {
+      return (
+        <Suspense fallback={<AuthSplash />}>
+          <LegalPage doc={legalDoc} />
+        </Suspense>
+      )
+    }
   }
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()

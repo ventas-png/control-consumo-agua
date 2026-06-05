@@ -193,6 +193,47 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // 3.5. Evidencia legal (click-wrap). validatePayload ya exigió legal_accepted === true;
+    // aquí persistimos el rastro de auditoría: una fila por documento VIGENTE en
+    // legal_acceptances con la versión (p.ej. VFinal-2026), la IP real (getClientIp,
+    // server-side), el user-agent y el timestamp. El owner acepta también el DPA
+    // (audience 'company') en nombre del tenant. Idempotente vía el índice único.
+    // Best-effort: si fallara NO revertimos la cuenta ya creada (el usuario consintió y
+    // el server lo validó); se registra el error para auditoría/observabilidad.
+    try {
+      const { data: legalDocs, error: legalDocsErr } = await admin
+        .from('legal_documents')
+        .select('doc_type, version')
+        .eq('is_current', true)
+        .eq('locale', 'es')
+        .in('doc_type', ['tos', 'privacy', 'dpa'])
+      if (legalDocsErr) {
+        console.error('[signup-company] legal_documents lookup failed:', legalDocsErr.message)
+      } else if (!legalDocs || legalDocs.length === 0) {
+        console.error('[signup-company] no current legal_documents (es); acceptance not recorded')
+      } else {
+        const acceptedAt = new Date().toISOString()
+        const clientIp = getClientIp(req)
+        const userAgent = req.headers.get('user-agent')
+        const rows = (legalDocs as Array<{ doc_type: string; version: string }>).map((d) => ({
+          user_id: userId,
+          company_id: companyId,
+          doc_type: d.doc_type,
+          version: d.version,
+          locale: 'es',
+          accepted_at: acceptedAt,
+          client_ip: clientIp,
+          user_agent: userAgent,
+        }))
+        const { error: legalErr } = await admin
+          .from('legal_acceptances')
+          .upsert(rows, { onConflict: 'user_id,doc_type,version,locale', ignoreDuplicates: true })
+        if (legalErr) console.error('[signup-company] legal acceptance insert failed:', legalErr.message)
+      }
+    } catch (e) {
+      console.error('[signup-company] legal acceptance recording error:', e instanceof Error ? e.message : String(e))
+    }
+
     // 4. Welcome email — fire-and-forget. Solo se intenta si hay config de
     // superadmin email; si no, lo dejamos pasar silenciosamente para no
     // bloquear el signup en caso de que el operador todavia no haya conectado

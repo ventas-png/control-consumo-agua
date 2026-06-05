@@ -71,12 +71,18 @@ Deno.serve(async (req) => {
       cui_dui: string
       fecha_nacimiento: string
       password: string
+      legal_accepted?: boolean
     }
 
     const { full_name, email, cui_dui, fecha_nacimiento, password } = body
 
     if (!full_name || !email || !cui_dui || !fecha_nacimiento || !password) {
       return err('Todos los campos son requeridos.')
+    }
+
+    // Click-wrap obligatorio (RGPD/CCPA): el cliente debe aceptar los documentos legales.
+    if (body.legal_accepted !== true) {
+      return err('Debes aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA.')
     }
 
     if (password.length < 8) {
@@ -178,6 +184,45 @@ Deno.serve(async (req) => {
       console.error('Profile insert error:', profileError)
       await adminClient.auth.admin.deleteUser(newUserId)
       return err('No se pudo completar el registro. Intente nuevamente.')
+    }
+
+    // Step 6: Evidencia legal (click-wrap). Una fila por documento de usuario VIGENTE
+    // (Términos + Privacidad; el DPA es 'company', no aplica al residente) en
+    // legal_acceptances, con versión, IP real (server-side), user-agent y timestamp.
+    // Best-effort: si fallara NO revertimos la cuenta (el usuario consintió y el server
+    // lo validó); se registra el error. Idempotente vía el índice único.
+    try {
+      const { data: legalDocs, error: legalDocsErr } = await adminClient
+        .from('legal_documents')
+        .select('doc_type, version')
+        .eq('is_current', true)
+        .eq('locale', 'es')
+        .in('doc_type', ['tos', 'privacy'])
+      if (legalDocsErr) {
+        console.error('legal_documents lookup failed:', legalDocsErr.message)
+      } else if (!legalDocs || legalDocs.length === 0) {
+        console.error('no current legal_documents (es); acceptance not recorded')
+      } else {
+        const acceptedAt = new Date().toISOString()
+        const clientIp = getClientIp(req)
+        const userAgent = req.headers.get('user-agent')
+        const rows = (legalDocs as Array<{ doc_type: string; version: string }>).map((d) => ({
+          user_id: newUserId,
+          company_id: null,
+          doc_type: d.doc_type,
+          version: d.version,
+          locale: 'es',
+          accepted_at: acceptedAt,
+          client_ip: clientIp,
+          user_agent: userAgent,
+        }))
+        const { error: legalErr } = await adminClient
+          .from('legal_acceptances')
+          .upsert(rows, { onConflict: 'user_id,doc_type,version,locale', ignoreDuplicates: true })
+        if (legalErr) console.error('legal acceptance insert failed:', legalErr.message)
+      }
+    } catch (e) {
+      console.error('legal acceptance recording error:', e instanceof Error ? e.message : String(e))
     }
 
     return ok({ success: true, user_id: newUserId })

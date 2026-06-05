@@ -9,6 +9,7 @@ const ok: SignupPayload = {
   full_name: 'Juan Pérez',
   company_name: 'Acme',
   servicio_agua: true,
+  legal_accepted: true,
 }
 
 describe('signup-company/validatePayload', () => {
@@ -35,5 +36,10 @@ describe('signup-company/validatePayload', () => {
   it('exige al menos un servicio (agua o condominios)', () => {
     expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: false })).toMatch(/al menos un servicio/)
     expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: true })).toBeNull()
+  })
+
+  it('exige aceptar los documentos legales (click-wrap)', () => {
+    expect(validatePayload({ ...ok, legal_accepted: undefined })).toMatch(/Términos de Servicio/)
+    expect(validatePayload({ ...ok, legal_accepted: false })).toMatch(/Anexo DPA/)
   })
 })

@@ -38,6 +38,8 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   const [phone, setPhone] = useState('')
   const [servicioAgua, setServicioAgua] = useState(false)
   const [servicioCondominios, setServicioCondominios] = useState(false)
+  // Click-wrap obligatorio (RGPD/CCPA): desmarcado por defecto. Bloquea el envío.
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -56,6 +58,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   function validateStep2(): string | null {
     if (!companyName.trim()) return 'Ingresa el nombre de tu empresa.'
     if (!servicioAgua && !servicioCondominios) return 'Selecciona al menos un módulo (agua o condominios).'
+    if (!acceptedLegal) return 'Debes leer y aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA para continuar.'
     return null
   }
 
@@ -82,6 +85,9 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
           phone: phone.trim() || undefined,
           servicio_agua: servicioAgua,
           servicio_condominios: servicioCondominios,
+          // Evidencia click-wrap: el backend la valida y registra (versión + IP +
+          // timestamp + user-agent) en legal_acceptances.
+          legal_accepted: acceptedLegal,
         },
       })
       if (fnError) {
@@ -224,12 +230,29 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
               </label>
             </div>
 
+            {/* Click-wrap obligatorio, inmediatamente antes del botón de envío. */}
+            <label className="signup-legal" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', margin: '16px 0 4px', fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.5, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={acceptedLegal}
+                onChange={e => setAcceptedLegal(e.target.checked)}
+                style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
+                aria-describedby="signup-legal-text"
+              />
+              <span id="signup-legal-text">
+                He leído y acepto los{' '}
+                <a href="/terminos-servicio" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Términos de Servicio</a>, la{' '}
+                <a href="/politica-privacidad" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Política de Privacidad</a> y el{' '}
+                <a href="/acuerdo-dpa-cookies" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Anexo de Procesamiento de Datos (DPA)</a> de administratodo.com.
+              </span>
+            </label>
+
             {error && <div className="signup-error" role="alert">⚠️ {error}</div>}
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <button className="signup-btn-secondary" onClick={() => setStep(1)} type="button" disabled={loading}>
                 ← Atrás
               </button>
-              <button className="signup-btn-primary" onClick={() => void handleSubmit()} type="button" disabled={loading} style={{ flex: 1 }}>
+              <button className="signup-btn-primary" onClick={() => void handleSubmit()} type="button" disabled={loading || !acceptedLegal} style={{ flex: 1 }}>
                 {loading ? 'Creando cuenta…' : 'Crear cuenta gratis'}
               </button>
             </div>

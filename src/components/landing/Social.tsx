@@ -139,11 +139,15 @@ export function FinalCTA({ t, onSignup }: { t: Copy; onSignup: () => void }) {
 }
 
 export function Footer({ t }: { t: Copy }) {
+  // Cada item lleva href + external. Las columnas no-legales conservan el ancla #top;
+  // la columna Legal apunta a las páginas legales públicas reales (rutas independientes),
+  // abriéndolas en pestaña nueva con rel="noopener noreferrer".
+  const placeholder = (labels: readonly string[]) => labels.map((label) => ({ label, href: '#top', external: false }))
   const cols = [
-    { h: t.footer.product, items: t.footer.product_links },
-    { h: t.footer.company, items: t.footer.company_links },
-    { h: t.footer.resources, items: t.footer.resources_links },
-    { h: t.footer.legal, items: t.footer.legal_links },
+    { h: t.footer.product, items: placeholder(t.footer.product_links) },
+    { h: t.footer.company, items: placeholder(t.footer.company_links) },
+    { h: t.footer.resources, items: placeholder(t.footer.resources_links) },
+    { h: t.footer.legal, items: t.footer.legal_doc_links.map((l) => ({ label: l.label, href: l.href, external: true })) },
   ]
   return (
     <footer className="site-foot">
@@ -163,7 +167,13 @@ export function Footer({ t }: { t: Copy }) {
               <div key={c.h} className="foot-col">
                 {/* h3 (no h4) para no romper la jerarquia: el contexto no tiene h3 previo. */}
                 <h3>{c.h}</h3>
-                <ul>{c.items.map((s) => <li key={s}><a href="#top">{s}</a></li>)}</ul>
+                <ul>{c.items.map((it) => (
+                  <li key={it.label}>
+                    {it.external
+                      ? <a href={it.href} target="_blank" rel="noopener noreferrer">{it.label}</a>
+                      : <a href={it.href}>{it.label}</a>}
+                  </li>
+                ))}</ul>
               </div>
             ))}
           </div>
