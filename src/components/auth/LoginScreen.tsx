@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { detectSsoForEmail, signInWithSso, type SsoEmailDetection } from '../../lib/sso'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
@@ -34,12 +35,37 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   const [googleLoading, setGoogleLoading] = useState(false)
   const [shake, setShake] = useState(false)
   const [loadingSeconds, setLoadingSeconds] = useState(0)
+  // ── SSO/SAML enterprise (plat:P10) ──
+  // Detección PRE-login del dominio del email (vía RPC anon sso_lookup_domain).
+  // Toda la lógica vive en src/lib/sso.ts (useAuth.ts es T7, no se toca).
+  const [sso, setSso] = useState<SsoEmailDetection | null>(null)
+  const [ssoLoading, setSsoLoading] = useState(false)
+  // Si SSO falla (p.ej. no habilitado en el proyecto → handshake parqueado),
+  // se revela el password aunque el dominio esté "enforced": el login NUNCA
+  // se rompe (fallback graceful = password, igual que hoy).
+  const [ssoFailed, setSsoFailed] = useState(false)
 
   useEffect(() => {
     if (!loading) { setLoadingSeconds(0); return }
     const id = setInterval(() => setLoadingSeconds(s => s + 1), 1000)
     return () => clearInterval(id)
   }, [loading])
+
+  // Detección de SSO al teclear el email (debounce). Solo guarda la detección si
+  // el dominio usa SSO; si no, queda null y el login se comporta como siempre.
+  useEffect(() => {
+    setSsoFailed(false)
+    let cancelled = false
+    const id = setTimeout(() => {
+      void detectSsoForEmail(email).then(res => {
+        if (!cancelled) setSso(res.available ? res : null)
+      })
+    }, 400)
+    return () => { cancelled = true; clearTimeout(id) }
+  }, [email])
+
+  const ssoAvailable = !!sso?.available
+  const hidePassword = !!sso?.enforced && !ssoFailed
 
   function getLoginStatusText(seconds: number): string {
     if (seconds >= 15) return 'Iniciando sistema, espere...'
@@ -68,6 +94,23 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
       setTimeout(() => setShake(false), 500)
     }
     setGoogleLoading(false)
+  }
+
+  async function handleSso() {
+    if (!sso?.domain) return
+    setError('')
+    setSsoLoading(true)
+    const res = await signInWithSso(
+      sso.providerId ? { providerId: sso.providerId } : { domain: sso.domain },
+    )
+    if (res.error) {
+      // SSO no disponible (p.ej. parqueado): degradamos a password sin romper.
+      setSsoFailed(true)
+      setError('El inicio de sesión con SSO no está disponible ahora. Usa tu contraseña.')
+      setShake(true)
+      setTimeout(() => setShake(false), 500)
+    }
+    setSsoLoading(false)
   }
 
   return (
@@ -319,7 +362,31 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               />
             </div>
 
+            {/* SSO call-to-action (plat:P10): aparece cuando el dominio usa SSO */}
+            {ssoAvailable && (
+              <button
+                onClick={handleSso}
+                disabled={ssoLoading || loading || googleLoading}
+                style={{
+                  width: '100%', padding: '13px', fontSize: '15px', fontWeight: 700,
+                  background: 'var(--at-primary)', color: 'white',
+                  border: 'none', borderRadius: '14px', cursor: ssoLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  marginBottom: hidePassword ? '8px' : '14px',
+                  boxShadow: '0 4px 16px rgba(27, 59, 54,0.30)',
+                }}
+              >
+                {ssoLoading ? 'Redirigiendo…' : `🔐 Continuar con SSO${sso?.domain ? ` (${sso.domain})` : ''}`}
+              </button>
+            )}
+            {hidePassword && (
+              <p style={{ margin: '0 0 14px', fontSize: '12.5px', color: 'var(--at-ink-3)', textAlign: 'center' }}>
+                Tu organización requiere iniciar sesión con SSO.
+              </p>
+            )}
+
             {/* Password input */}
+            {!hidePassword && (
             <div style={{ position: 'relative', marginBottom: '22px' }}>
               <span style={{
                 position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
@@ -353,6 +420,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
+            )}
 
             {/* Error message */}
             {error && (
@@ -367,7 +435,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               </div>
             )}
 
-            {/* Submit button */}
+            {/* Submit button (oculto si el dominio fuerza SSO) */}
+            {!hidePassword && (
             <button
               className="login-btn-main"
               onClick={handleLogin}
@@ -394,6 +463,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 </>
               ) : 'Iniciar Sesión'}
             </button>
+            )}
 
             {/* Forgot password */}
             <div style={{ marginTop: '16px', textAlign: 'center' }}>

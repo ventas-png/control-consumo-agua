@@ -101,3 +101,32 @@ CONVENCIONES OBLIGATORIAS:
 - Pide a cada agente COMMIT/PUSH TEMPRANO; vigílalos con un guard (watch de rama o timer) y relánzalos si mueren.
 - Cada PR: tsc --noEmit limpio + suite de tests verde.
 ```
+
+---
+
+## Adenda 2026-06-05 — Cierre de Track T3 (Plataforma, épica #302)
+
+**T3 cerrable.** El único pendiente era SSO/SAML (P10). Se construyó **todo el andamiaje
+app-level** y se **parqueó solo el handshake real** (depende de habilitar SSO a nivel proyecto
+Supabase), igual que el adapter PAC en #391.
+
+| PR | Qué quedó |
+|---|---|
+| **#428** (PR1) | Modelo de datos + lookup seguro: `company_sso_domains` (`domain citext` UNIQUE global; **gate `enforced ⇒ verified`** por CHECK → sin secuestro cross-tenant; RLS owner/admin de su empresa; anon/otros tenants = 0 filas) + RPC **anon-callable** `sso_lookup_domain` (descubrimiento PRE-login, salida mínima, nunca filtra identidad) + `src/domain/sso/*` + tests. Banda T3 `20260606130000`. |
+| **#429** (PR2) | Edge `sso-admin` (deriva `company_id` de la sesión, exige owner/admin, gestiona solo su empresa; intenta registrar el proveedor SAML vía GoTrue Admin SSO API y, si SSO no está habilitado, **persiste la config y responde "parqueado"**). Lógica pura espejada en `_shared/sso.ts` + tests (I22). Columna `idp_metadata`, feature flag `enterprise_sso`, UI `SsoConfigSection` (gated) en `EmpresaSection`. Banda `20260606131000`. |
+| **#430** (PR3) | Detección de SSO en `LoginScreen` (ofrece "Continuar con SSO"; oculta password si el dominio está `enforced`; **fallback graceful** a password si SSO falla) + `src/lib/sso.ts` (wrapper `signInWithSSO` + detección pura testeada). |
+
+**Parqueo de P10:** issue **#430** (estilo #391) — enumera los pasos de habilitación: plan Pro,
+`GOTRUE_SAML_ENABLED`, clave de firma SAML, registro de proveedor por IdP, verificación de dominio
+automática. El login normal **nunca se rompe** sin SSO habilitado.
+
+**Definición de hecho (cumplida):**
+- Un owner/admin registra metadata IdP + dominio(s) de su empresa (persistido); el proveedor se
+  sincroniza cuando SSO esté habilitado, y si no, responde "parqueado" sin romper nada.
+- No se puede asociar/forzar un dominio sin verificar propiedad (sin secuestro cross-tenant).
+- `LoginScreen` detecta dominios SSO y ofrece/forza SSO; sin SSO habilitado, login = password.
+- Issue de parqueo de P10 (#430) abierto + épica #302 actualizada + esta nota de cierre.
+
+> Nota CI: por el límite de **preview branches concurrentes** de Supabase, los PRs apilados pueden
+> no levantar su propio preview simultáneamente; cada migración se valida en preview al liberarse un
+> slot (p. ej. al mergear el PR previo de la pila).
