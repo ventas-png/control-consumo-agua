@@ -1,22 +1,23 @@
-import { useState, useEffect, type CSSProperties } from 'react'
-import { supabase } from '../../lib/supabase'
+import { type CSSProperties } from 'react'
+import { usePlataformaKpisQuery } from '../../domain/superadmin/queries'
 
 // ============================================================================
 // SuperAdminMetricsCard — F4.5.3: KPIs de negocio para superadmin.
 // ============================================================================
-// Renderiza arriba de la lista de empresas en SuperAdminSection. Calcula:
-//   - MRR (Monthly Recurring Revenue) sumando subscriptions activas + trialing
+// Renderiza arriba de la lista de empresas en SuperAdminSection. Muestra:
+//   - MRR (Monthly Recurring Revenue) de subscriptions activas + trialing
 //   - Conteo de empresas activas y en trial
 //   - Churn rate ultimos 30 dias
 //   - Distribucion por plan (top 5 con barra normalizada)
 //
-// RLS: las tablas subscriptions y billing_plans solo dejan ver al super_admin
-// el universo completo (via is_super_admin() check en RLS policy). Los reads
-// aqui asumen ese contexto.
+// PERF: estos agregados YA NO se calculan en el cliente. Se leen pre-agregados
+// de la vista materializada mv_superadmin_plataforma vía la RPC SECURITY DEFINER
+// get_superadmin_plataforma_kpis (acotada a super_admin), refrescada por pg_cron
+// (migración 20260605200000). Antes este componente descargaba TODAS las
+// subscriptions y sumaba MRR/churn/plan en JS.
 //
-// Las queries son agregaciones simples — para volumenes pequeños (decenas/
-// cientos de empresas) el calculo en JS es trivial. Si crece > 10k empresas,
-// migrar a vistas materializadas en SQL.
+// computeMetrics() (más abajo) se conserva como referencia pura + cubierta por
+// tests unitarios; ya no la invoca el componente.
 
 interface SubscriptionRow {
   status: string
@@ -35,48 +36,33 @@ interface Metrics {
   error: string | null
 }
 
-const EMPTY_METRICS: Metrics = {
-  mrrCents: 0, activeCount: 0, trialingCount: 0,
-  cancelledLast30Days: 0, totalSubscriptions: 0,
-  planDistribution: [],
-  loading: true, error: null,
-}
-
 export function SuperAdminMetricsCard() {
-  const [m, setM] = useState<Metrics>(EMPTY_METRICS)
+  const { data: kpis, isLoading, error } = usePlataformaKpisQuery()
 
-  useEffect(() => {
-    let alive = true
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('subscriptions')
-          .select('status, canceled_at, plan:billing_plans!inner(id, code, name, price_monthly_cents)')
-        if (error) throw error
-        if (!alive) return
-        const rows = (data ?? []) as unknown as SubscriptionRow[]
-        setM(computeMetrics(rows))
-      } catch (e: unknown) {
-        if (!alive) return
-        setM(prev => ({ ...prev, loading: false, error: e instanceof Error ? e.message : String(e) }))
-      }
-    })()
-    return () => { alive = false }
-  }, [])
-
-  if (m.loading) {
+  if (isLoading) {
     return (
       <div style={cardStyle}>
         <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>Cargando métricas…</div>
       </div>
     )
   }
-  if (m.error) {
+  if (error) {
     return (
       <div style={cardStyle}>
-        <div style={{ fontSize: '13px', color: 'var(--at-danger)' }}>Error cargando métricas: {m.error}</div>
+        <div style={{ fontSize: '13px', color: 'var(--at-danger)' }}>Error cargando métricas: {error instanceof Error ? error.message : String(error)}</div>
       </div>
     )
+  }
+
+  const m: Metrics = {
+    mrrCents: kpis?.mrr_cents ?? 0,
+    activeCount: kpis?.suscripciones_activas ?? 0,
+    trialingCount: kpis?.suscripciones_trialing ?? 0,
+    cancelledLast30Days: kpis?.canceladas_30d ?? 0,
+    totalSubscriptions: kpis?.suscripciones_vigentes ?? 0,
+    planDistribution: kpis?.plan_distribution ?? [],
+    loading: false,
+    error: null,
   }
 
   return (
