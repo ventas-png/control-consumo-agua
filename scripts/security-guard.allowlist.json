@@ -1,7 +1,12 @@
 {
-  "_README": "Excepciones REVISADAS y justificadas para scripts/security-guard.mjs. El guard RESTA estas entradas a los hallazgos del catálogo de prod. Mantener cada lista LO MÁS VACÍA POSIBLE — toda excepción es una superficie de ataque tolerada y debe llevar justificación. Estado verificado (2026-06-05, proyecto nnsqmeigtgewatameexo): las tres listas están vacías porque el esquema NO tiene huecos (anon no ejecuta ninguna SECURITY DEFINER de public, y toda tabla de public tiene RLS + ≥1 policy). Si un cambio legítimo introduce una excepción, agrégala aquí con `reason` y revisión humana; el guard fallará hasta entonces.",
+  "_README": "Excepciones REVISADAS y justificadas para scripts/security-guard.mjs. El guard RESTA estas entradas a los hallazgos del catálogo de prod. Mantener cada lista LO MÁS VACÍA POSIBLE — toda excepción es una superficie de ataque tolerada y debe llevar justificación. Estado (2026-06-05, proyecto nnsqmeigtgewatameexo): la única excepción es sso_lookup_domain (RPC anon-callable PRE-login, plat:P10/#428); ninguna tabla de public sin RLS/policy. Si un cambio legítimo introduce una excepción, agrégala aquí con `reason` y revisión humana; el guard fallará hasta entonces.",
 
-  "anon_executable_security_definer_functions": [],
+  "anon_executable_security_definer_functions": [
+    {
+      "fn": "sso_lookup_domain",
+      "reason": "EXCEPCION INTENCIONAL (plat:P10, #428). RPC anon-callable a proposito: el descubrimiento de SSO ocurre PRE-login (sin sesion). SECURITY DEFINER que devuelve SOLO {sso_available, enforced, provider_id} para dominios verified; NUNCA filtra company_id, identidad ni datos del tenant. Documentado en la migracion 20260606130000_company_sso_domains.sql."
+    }
+  ],
 
   "tables_without_rls": [],
 
