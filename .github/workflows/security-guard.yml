@@ -1,0 +1,61 @@
+name: Security guard (aislamiento multi-tenant)
+
+# Verifica, contra el catálogo de PRODUCCIÓN (solo LECTURA, sin mutación), que no
+# se haya abierto un hueco multi-tenant — regresa-guarda la clase de bug de
+# #378/#380 (RPCs SECURITY DEFINER ejecutables por `anon`) y exige RLS+policy en
+# TODA tabla de `public`. Es COMPLEMENTO de apply-migrations-prod.yml: tras
+# aplicar migraciones a prod, este guard confirma que el esquema sigue cerrado.
+#
+# Disparadores:
+#   - push a `main`         → tras un merge (que puede aplicar migraciones a prod).
+#   - schedule nocturno     → atrapa derivas fuera de banda (cambios manuales/MCP).
+#   - workflow_dispatch     → corrida manual.
+#
+# Gated por presencia de secretos: sin SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN
+# el job es NO-OP VERDE (no falla CI en forks/sin wiring). Los mismos secretos que
+# apply-migration.yml / apply-migrations-prod.yml.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 07:00 UTC diario (~01:00 GT / 01:00 MX) — fuera de horas pico.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: security-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Catálogo de prod — sin huecos de aislamiento
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate por secretos de Supabase
+        id: gate
+        run: |
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN no configurados — guard omitido (no-op verde)."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 20
+
+      # Sin dependencias: el script usa solo APIs nativas de Node 20 (fetch, fs).
+      - name: Run security guard (solo lectura de catálogo)
+        if: steps.gate.outputs.run == 'true'
+        run: node scripts/security-guard.mjs
