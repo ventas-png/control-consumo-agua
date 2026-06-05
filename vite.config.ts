@@ -1,7 +1,47 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// Subresource Integrity (infra:I31). Añade integrity + crossorigin a los
+// <script>/<link> que Vite emite en index.html (entry JS, CSS y modulepreloads).
+// Hashea los BYTES YA ESCRITOS en disco (hook writeBundle) en vez del bundle en
+// memoria: garantiza que el hash coincide EXACTAMENTE con lo que sirve Vercel
+// (si no coincidiera, el navegador bloquearía el recurso y rompería la app).
+// Corre antes del closeBundle de VitePWA, así el precache toma el HTML ya firmado.
+function htmlSriPlugin(): Plugin {
+  return {
+    name: 'html-sri',
+    apply: 'build',
+    enforce: 'post',
+    writeBundle(options) {
+      const outDir = options.dir ?? 'dist'
+      const indexPath = path.join(outDir, 'index.html')
+      if (!fs.existsSync(indexPath)) return
+      const html = fs.readFileSync(indexPath, 'utf8')
+      const next = html.replace(/<(?:script|link)\b[^>]*>/g, (tag) => {
+        if (/\bintegrity=/.test(tag)) return tag
+        const m = tag.match(/\b(?:src|href)="([^"]+)"/)
+        if (!m) return tag
+        const ref = m[1]
+        // Solo assets locales emitidos por el build (mismo origen, con hash).
+        if (!ref.startsWith('/') && !ref.startsWith('./')) return tag
+        if (!/\.(?:js|mjs|css)$/.test(ref)) return tag
+        const filePath = path.join(outDir, ref.replace(/^\.?\//, ''))
+        if (!fs.existsSync(filePath)) return tag
+        const digest = crypto.createHash('sha384').update(fs.readFileSync(filePath)).digest('base64')
+        // Vite ya pone crossorigin en module scripts/preloads; no lo dupliques.
+        const needsCrossorigin = !/\bcrossorigin\b/.test(tag)
+        const attrs = ` integrity="sha384-${digest}"${needsCrossorigin ? ' crossorigin="anonymous"' : ''}`
+        return tag.endsWith('/>') ? `${tag.slice(0, -2)}${attrs} />` : `${tag.slice(0, -1)}${attrs}>`
+      })
+      if (next !== html) fs.writeFileSync(indexPath, next)
+    },
+  }
+}
 
 // Source-map upload to Sentry only runs when all three CI secrets are present.
 // Without them the plugin is omitted entirely, so local/preview builds are
@@ -14,6 +54,7 @@ const uploadSourcemaps = Boolean(sentryAuthToken && sentryOrg && sentryProject)
 export default defineConfig({
   plugins: [
     react(),
+    htmlSriPlugin(),
     // PWA + offline-first (infra:I4, F2.8).
     //
     // generateSW (workbox) en lugar de injectManifest porque no necesitamos
@@ -22,7 +63,8 @@ export default defineConfig({
     // usuario (la app es interna; los cambios deben llegar rápido).
     //
     // Estrategias runtime:
-    //   - Fuentes Google: StaleWhileRevalidate (rara vez cambian).
+    //   - Fuentes: self-hosted en /fonts (infra:I31); entran al precache vía
+    //     globPatterns (woff2), ya no se cachean orígenes de Google.
     //   - Supabase REST (GET): NetworkFirst con timeout 5s + fallback al
     //     cache. Usuario en zona sin red ve datos cacheados en lugar de error.
     //   - Supabase Storage (imagenes): CacheFirst con expiry 30 dias.
@@ -58,23 +100,6 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/auth\//],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
           {
             urlPattern: ({ url, request }) =>
               request.method === 'GET' &&
