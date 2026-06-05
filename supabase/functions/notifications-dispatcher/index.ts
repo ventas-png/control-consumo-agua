@@ -31,6 +31,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   applyVars,
   asString,
+  buildDispatchEvent,
   clampBatchSize,
   formatFromHeader,
   isGmailStatusRetriable,
@@ -40,6 +41,13 @@ import {
   type EmailTemplate,
   type NotifTemplate,
 } from './render.ts'
+// Decisión PURA de supresión por preferencia de canal (espejada en _shared/ por
+// la frontera Deno/Vite). El I/O —consultar notification_channel_enabled y marcar
+// 'suppressed'— lo hace el handler aquí.
+import {
+  resolvePreferenceUserId,
+  SUPPRESSION_REASON_CHANNEL_DISABLED,
+} from '../_shared/notificationPrefs.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -302,6 +310,42 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
   }
 }
 
+// Audit trail: registra un evento del ciclo de vida en notification_events.
+// Best-effort: un fallo aquí NO debe romper el despacho (el estado del outbox ya
+// quedó actualizado por mark_*). Escribe como service_role (la tabla es deny-all).
+async function recordEvent(
+  admin: Client,
+  outboxId: string,
+  eventType: 'queued' | 'sent' | 'delivered' | 'bounced' | 'failed' | 'suppressed',
+  detail: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await admin.from('notification_events').insert({
+    outbox_id: outboxId,
+    event_type: eventType,
+    detail,
+  })
+  if (error) console.error('[notifications-dispatcher] notification_events insert failed', outboxId, eventType, error.message)
+}
+
+// Preferencia de canal: ¿debe suprimirse esta fila porque el destinatario
+// desactivó el canal? 'in_app' nunca se suprime (resolvePreferenceUserId → null).
+// Para email/whatsapp/push consulta notification_channel_enabled(user_id, channel)
+// con el user_id declarado en payload.user_id. Fail-open: ante error del RPC o sin
+// user_id resoluble, NO suprime (modelo opt-out: mejor entregar que descartar).
+async function isChannelSuppressed(admin: Client, row: OutboxRow): Promise<boolean> {
+  const userId = resolvePreferenceUserId({ channel: row.channel, payload: row.payload })
+  if (!userId) return false
+  const { data, error } = await admin.rpc('notification_channel_enabled', {
+    p_user_id: userId,
+    p_channel: row.channel,
+  })
+  if (error) {
+    console.error('[notifications-dispatcher] notification_channel_enabled failed', row.id, error.message)
+    return false
+  }
+  return data === false
+}
+
 async function dispatchRow(admin: Client, row: OutboxRow): Promise<DispatchResult> {
   if (row.channel === 'in_app') return await dispatchInApp(admin, row)
   if (row.channel === 'email') return await dispatchEmail(admin, row)
@@ -344,8 +388,28 @@ Deno.serve(async (req: Request) => {
     let sent = 0
     let failed = 0
     let requeued = 0
+    let suppressed = 0
 
     for (const row of batch) {
+      // Respetar la preferencia de canal ANTES de despachar: si el destinatario
+      // desactivó el canal, marcar 'suppressed' (terminal, NO 'failed') y seguir.
+      if (await isChannelSuppressed(admin, row)) {
+        const { error: supErr } = await admin.rpc('mark_notification_suppressed', {
+          p_id: row.id,
+          p_reason: SUPPRESSION_REASON_CHANNEL_DISABLED,
+        })
+        if (supErr) {
+          console.error('[notifications-dispatcher] mark_notification_suppressed failed', row.id, supErr.message)
+        } else {
+          suppressed++
+          await recordEvent(admin, row.id, 'suppressed', {
+            channel: row.channel,
+            reason: SUPPRESSION_REASON_CHANNEL_DISABLED,
+          })
+        }
+        continue
+      }
+
       let result: DispatchResult
       try {
         result = await dispatchRow(admin, row)
@@ -361,12 +425,22 @@ Deno.serve(async (req: Request) => {
       })
       if (markErr) console.error('[notifications-dispatcher] mark_notification_result failed', row.id, markErr.message)
 
+      // Audit trail: una fila por intento (append-only). 'sent' o 'failed' con el
+      // detalle del proveedor; `terminal` distingue el fallo definitivo del que
+      // reintentará.
+      const event = buildDispatchEvent(result, {
+        channel: row.channel,
+        attempts: row.attempts,
+        maxAttempts: row.max_attempts,
+      })
+      await recordEvent(admin, row.id, event.eventType, event.detail)
+
       if (result.ok) sent++
       else if (result.retriable === false || row.attempts + 1 >= row.max_attempts) failed++
       else requeued++
     }
 
-    return json({ success: true, processed: batch.length, sent, failed, requeued })
+    return json({ success: true, processed: batch.length, sent, failed, requeued, suppressed })
   } catch (err) {
     return json({ error: String(err) }, 500)
   }

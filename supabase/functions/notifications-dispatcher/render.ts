@@ -165,3 +165,54 @@ export function clampBatchSize(
 ): number {
   return Math.min(Math.max(Number(raw) || def, 1), max)
 }
+
+// ---------------------------------------------------------------------------
+// Audit trail: forma del evento de notification_events para cada despacho
+// ---------------------------------------------------------------------------
+
+/** Resultado de un intento de despacho (mismo contrato que DispatchResult del handler). */
+export interface DispatchOutcome {
+  ok: boolean
+  error?: string
+  retriable?: boolean
+}
+
+/** Tipo de evento que el dispatcher inserta en notification_events tras despachar. */
+export type DispatchEventType = 'sent' | 'failed'
+
+export interface DispatchEvent {
+  eventType: DispatchEventType
+  detail: Record<string, unknown>
+}
+
+/**
+ * Construye el evento de audit trail para el RESULTADO de un despacho (decisión
+ * pura; el INSERT lo hace el handler):
+ *   - ok → 'sent' con detail { channel }.
+ *   - !ok → 'failed' con detail { channel, error, retriable, terminal, attempt }.
+ *     `terminal` replica la regla del handler (no-retriable o se agotaron los
+ *     intentos): así el audit trail distingue un fallo que reintentará de uno
+ *     definitivo, registrando una fila por intento (append-only).
+ * El evento 'suppressed' NO pasa por aquí (no es un resultado de despacho): lo
+ * construye el handler directamente con su razón.
+ */
+export function buildDispatchEvent(
+  outcome: DispatchOutcome,
+  ctx: { channel: string; attempts: number; maxAttempts: number },
+): DispatchEvent {
+  if (outcome.ok) {
+    return { eventType: 'sent', detail: { channel: ctx.channel } }
+  }
+  const attempt = ctx.attempts + 1
+  const terminal = outcome.retriable === false || attempt >= ctx.maxAttempts
+  return {
+    eventType: 'failed',
+    detail: {
+      channel: ctx.channel,
+      error: outcome.error ?? null,
+      retriable: outcome.retriable ?? true,
+      terminal,
+      attempt,
+    },
+  }
+}

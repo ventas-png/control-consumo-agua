@@ -25,6 +25,8 @@ import { empresaKeys } from '../../domain/empresa/keys'
 import { useEmpresaSectionDataQuery } from '../../domain/empresa/queries'
 import { CompanyBrandingSection } from './CompanyBrandingSection'
 import { isExemptPlatformRole } from '../../lib/permissions'
+import { SsoConfigSection } from './SsoConfigSection'
+import { useFeatureFlags } from '../../lib/featureFlags'
 
 interface Props {
   currentUser: UserSession
@@ -33,6 +35,7 @@ interface Props {
 export function EmpresaSection({ currentUser }: Props) {
   const companyId = currentUser.company_id
   const queryClient = useQueryClient()
+  const { has: hasFeature } = useFeatureFlags()
   const { data, isLoading } = useEmpresaSectionDataQuery(companyId, currentUser.user_id)
   const empresa = data?.empresa ?? null
   const proyectos = data?.proyectos ?? []
@@ -132,6 +135,18 @@ export function EmpresaSection({ currentUser }: Props) {
           marginTop: '24px',
         }}>
           <CompanyBrandingSection companyId={companyId} canEdit={isExemptPlatformRole(currentUser.role)} />
+        </div>
+      )}
+
+      {/* SSO/SAML enterprise (plat:P10) — gated por el feature flag enterprise_sso */}
+      {companyId && hasFeature('enterprise_sso') && (
+        <div style={{
+          background: 'var(--at-surface)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid var(--at-line)',
+          marginTop: '24px',
+        }}>
+          <SsoConfigSection />
         </div>
       )}
     </div>

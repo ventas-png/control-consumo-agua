@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applyVars,
   asString,
+  buildDispatchEvent,
   clampBatchSize,
   emailLayout,
   formatFromHeader,
@@ -251,5 +252,49 @@ describe('dispatcher/clampBatchSize', () => {
   it('acota por arriba al máximo y por abajo a 1', () => {
     expect(clampBatchSize(9999, bounds)).toBe(200)
     expect(clampBatchSize(-5, bounds)).toBe(1)
+  })
+})
+
+describe('dispatcher/buildDispatchEvent', () => {
+  const ctx = { channel: 'email', attempts: 0, maxAttempts: 5 }
+
+  it('ok → evento sent con el canal', () => {
+    expect(buildDispatchEvent({ ok: true }, ctx)).toEqual({
+      eventType: 'sent',
+      detail: { channel: 'email' },
+    })
+  })
+
+  it('fallo retriable con intentos restantes → failed, terminal=false', () => {
+    const ev = buildDispatchEvent({ ok: false, error: 'Gmail 503', retriable: true }, ctx)
+    expect(ev.eventType).toBe('failed')
+    expect(ev.detail).toEqual({
+      channel: 'email',
+      error: 'Gmail 503',
+      retriable: true,
+      terminal: false,
+      attempt: 1,
+    })
+  })
+
+  it('fallo no-retriable → failed, terminal=true aunque queden intentos', () => {
+    const ev = buildDispatchEvent({ ok: false, error: 'token revocado', retriable: false }, ctx)
+    expect(ev.detail.terminal).toBe(true)
+    expect(ev.detail.retriable).toBe(false)
+  })
+
+  it('último intento (attempts+1 >= max) → terminal=true aunque sea retriable', () => {
+    const ev = buildDispatchEvent(
+      { ok: false, error: 'Gmail 503', retriable: true },
+      { channel: 'email', attempts: 4, maxAttempts: 5 },
+    )
+    expect(ev.detail.terminal).toBe(true)
+    expect(ev.detail.attempt).toBe(5)
+  })
+
+  it('retriable ausente → default true; error ausente → null', () => {
+    const ev = buildDispatchEvent({ ok: false }, ctx)
+    expect(ev.detail.retriable).toBe(true)
+    expect(ev.detail.error).toBeNull()
   })
 })
