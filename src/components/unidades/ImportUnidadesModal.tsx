@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { notify } from '../shared/Dialog'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserSession } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { resolveUnidadProjectCompany } from '../../domain/unidades/queries'
+import { insertUnidades } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -175,33 +176,11 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const { data: userData } = await supabase
-        .from('app_users')
-        .select('project_id, company_id')
-        .eq('id', currentUser.user_id)
-        .single()
-      let projectId: string | null = (userData as { project_id?: string } | null)?.project_id ?? null
-      let companyId: string | null =
-        (userData as { company_id?: string } | null)?.company_id ?? currentUser.company_id ?? null
-
-      if (!projectId) {
-        const { data: assignment } = await supabase
-          .from('user_project_assignments')
-          .select('project_id')
-          .eq('user_id', currentUser.user_id)
-          .limit(1)
-          .single()
-        if (assignment) projectId = (assignment as { project_id: string }).project_id
-      }
-      if (!projectId && companyId) {
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1)
-          .single()
-        if (proj) projectId = (proj as { id: string }).id
-      }
+      const { projectId, companyId } = await resolveUnidadProjectCompany(
+        currentUser.user_id,
+        null,
+        currentUser.company_id ?? null,
+      )
 
       if (cancelled) return
       if (!projectId || !companyId) {
@@ -235,9 +214,9 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
           company_id: ids.companyId,
           activo: true,
         }))
-        const { data, error } = await supabase.from('unidades').insert(payload).select()
-        if (error) return { ok: 0, error: error.message }
-        if (data) insertedRef.current.push(...(data as Unidad[]))
+        const { data, error } = await insertUnidades(payload)
+        if (error) return { ok: 0, error }
+        if (data) insertedRef.current.push(...data)
         return { ok: batch.length }
       }}
       onClose={onClose}

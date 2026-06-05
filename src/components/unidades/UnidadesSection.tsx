@@ -3,7 +3,8 @@ import { confirm, notify } from '../shared/Dialog'
 import { promptUpgrade } from '../shared/promptUpgrade'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { useSession } from '../shared/SessionContext'
-import { supabase } from '../../lib/supabase'
+import { resolveUnidadProjectCompany, checkUnidadesLimit } from '../../domain/unidades/queries'
+import { createUnidad, updateUnidad, setUnidadActiva, deleteUnidad, assignContadoresToUnidad, unlinkContadores } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
 import { EmptyState } from '../shared'
@@ -229,17 +230,11 @@ export function UnidadesSection({
     const toAdd = selectedContadorIds.filter(id => !previouslyAssigned.includes(id))
     const toRemove = previouslyAssigned.filter(id => !selectedContadorIds.includes(id))
     if (toAdd.length > 0) {
-      const { error } = await supabase
-        .from('contadores')
-        .update({ unidad_id: savedUnitId, updated_at: new Date().toISOString() })
-        .in('id', toAdd)
+      const { error } = await assignContadoresToUnidad(savedUnitId, toAdd)
       if (!error) toAdd.forEach(id => onContadorUpdated(id, { unidad_id: savedUnitId }))
     }
     if (toRemove.length > 0) {
-      const { error } = await supabase
-        .from('contadores')
-        .update({ unidad_id: null, updated_at: new Date().toISOString() })
-        .in('id', toRemove)
+      const { error } = await unlinkContadores(toRemove)
       if (!error) toRemove.forEach(id => onContadorUpdated(id, { unidad_id: null }))
     }
   }
@@ -307,16 +302,11 @@ export function UnidadesSection({
     if (editingId) {
       // Keep company_id in sync when project changes
       const selectedProject = proyectos.find(p => p.id === form.project_id)
-      const { data, error } = await supabase
-        .from('unidades')
-        .update({
-          ...payload,
-          ...(form.project_id && { project_id: form.project_id }),
-          ...(selectedProject?.company_id && { company_id: selectedProject.company_id }),
-        })
-        .eq('id', editingId)
-        .select()
-        .single()
+      const { data, error } = await updateUnidad(editingId, {
+        ...payload,
+        ...(form.project_id && { project_id: form.project_id }),
+        ...(selectedProject?.company_id && { company_id: selectedProject.company_id }),
+      })
 
       if (!error && data) {
         onUnidadUpdated(editingId, data as Unidad)
@@ -324,45 +314,15 @@ export function UnidadesSection({
         cancelForm()
         notify({ variant: 'success', title: 'Unidad actualizada', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar la unidad.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo actualizar la unidad.' })
       }
     } else {
       // Resolve project_id and company_id
-      const { data: userData } = await supabase
-        .from('app_users')
-        .select('project_id, company_id')
-        .eq('id', currentUser.user_id)
-        .single()
-
-      // Use project selected in form; fallback to auto-resolve
-      let projectId: string | null =
-        form.project_id ||
-        (userData as { project_id?: string } | null)?.project_id ||
-        null
-      let companyId: string | null =
-        (userData as { company_id?: string } | null)?.company_id ??
-        currentUser.company_id ??
-        null
-
-      if (!projectId) {
-        const { data: assignment } = await supabase
-          .from('user_project_assignments')
-          .select('project_id')
-          .eq('user_id', currentUser.user_id)
-          .limit(1)
-          .single()
-        if (assignment) projectId = (assignment as { project_id: string }).project_id
-      }
-
-      if (!projectId && companyId) {
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1)
-          .single()
-        if (proj) projectId = (proj as { id: string }).id
-      }
+      const { projectId, companyId } = await resolveUnidadProjectCompany(
+        currentUser.user_id,
+        form.project_id || null,
+        currentUser.company_id ?? null,
+      )
 
       if (!projectId || !companyId) {
         notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto o empresa. Contacte al administrador.' })
@@ -373,12 +333,7 @@ export function UnidadesSection({
       // Verificar limite de unidades de la empresa. F4.1.2: si esta al limite,
       // mostrar prompt con CTA "Ver planes" en lugar de un notify que solo
       // dirigia al usuario a contactar al superadmin.
-      const [{ data: empresaData }, { count: unidadesCount }] = await Promise.all([
-        supabase.from('companies').select('max_units').eq('id', companyId).single(),
-        supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
-      ])
-      const maxUnits = (empresaData as { max_units?: number } | null)?.max_units ?? 50
-      const totalUnidades = unidadesCount ?? 0
+      const { maxUnits, total: totalUnidades } = await checkUnidadesLimit(companyId)
       if (totalUnidades >= maxUnits) {
         await promptUpgrade({
           resource: 'unit',
@@ -389,11 +344,7 @@ export function UnidadesSection({
         return
       }
 
-      const { data, error } = await supabase
-        .from('unidades')
-        .insert({ ...payload, project_id: projectId, company_id: companyId })
-        .select()
-        .single()
+      const { data, error } = await createUnidad({ ...payload, project_id: projectId, company_id: companyId })
 
       if (!error && data) {
         const newUnit = data as Unidad
@@ -402,7 +353,7 @@ export function UnidadesSection({
         cancelForm()
         notify({ variant: 'success', title: 'Unidad creada', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo guardar la unidad.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo guardar la unidad.' })
       }
     }
 
@@ -410,10 +361,7 @@ export function UnidadesSection({
   }
 
   async function handleToggleActivo(u: Unidad) {
-    const { error } = await supabase
-      .from('unidades')
-      .update({ activo: !u.activo, updated_at: new Date().toISOString() })
-      .eq('id', u.id)
+    const { error } = await setUnidadActiva(u.id, !u.activo)
 
     if (!error) {
       onUnidadUpdated(u.id, { activo: !u.activo })
@@ -437,12 +385,12 @@ export function UnidadesSection({
     })
     if (!conf.isConfirmed) return
 
-    const { error } = await supabase.from('unidades').delete().eq('id', u.id)
+    const { error } = await deleteUnidad(u.id)
     if (!error) {
       onUnidadDeleted(u.id)
       notify({ variant: 'success', title: 'Unidad eliminada', duration: 1500 })
     } else {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar la unidad.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo eliminar la unidad.' })
     }
   }
 
