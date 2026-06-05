@@ -166,3 +166,14 @@ jobs:
       # el token a mano (service_role o JWT admin/owner). Handshake real parqueado (#430).
       - name: Deploy sso-admin (no JWT — valida token a mano, service_role o admin/owner)
         run: bash .github/scripts/deploy-fn.sh sso-admin --no-verify-jwt
+
+      # Motor de notificaciones (T2). El dispatcher lo invoca pg_cron cada minuto
+      # (run_notifications_dispatcher → service_role); procesa el outbox, respeta
+      # preferencias de canal (suppressed) y registra notification_events.
+      # create-broadcast resuelve audiencia + fan-out, valida el JWT admin/owner a
+      # mano. Ambos verify_jwt=false (control de acceso interno propio).
+      - name: Deploy notifications-dispatcher (no JWT — invocada por pg_cron con service_role)
+        run: bash .github/scripts/deploy-fn.sh notifications-dispatcher --no-verify-jwt
+
+      - name: Deploy create-broadcast (no JWT — valida JWT admin/owner a mano)
+        run: bash .github/scripts/deploy-fn.sh create-broadcast --no-verify-jwt
