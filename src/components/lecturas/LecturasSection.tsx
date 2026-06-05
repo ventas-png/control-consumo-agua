@@ -3,7 +3,8 @@ import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { supabase } from '../../lib/supabase'
+import { createRegistro } from '../../domain/agua/mutations'
+import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 
@@ -212,38 +213,6 @@ export function LecturasSection({
     setFoto(null)
   }
 
-  // Marca la ocurrencia relevante (hoy / la más cercana pendiente) como completada
-  // para rutas recurrentes, en lugar de cerrar la ruta entera.
-  async function marcarOcurrenciaCompletada(rutaId: string) {
-    const hoyGT = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10)
-    const enRango = await supabase
-      .from('ruta_ocurrencias')
-      .select('id')
-      .eq('ruta_id', rutaId)
-      .in('estado', ['pendiente', 'vencida'])
-      .lte('fecha', hoyGT)
-      .order('fecha', { ascending: false })
-      .limit(1)
-    let occId = enRango.data?.[0]?.id as string | undefined
-    if (!occId) {
-      const proxima = await supabase
-        .from('ruta_ocurrencias')
-        .select('id')
-        .eq('ruta_id', rutaId)
-        .in('estado', ['pendiente', 'vencida'])
-        .gte('fecha', hoyGT)
-        .order('fecha', { ascending: true })
-        .limit(1)
-      occId = proxima.data?.[0]?.id as string | undefined
-    }
-    if (occId) {
-      await supabase
-        .from('ruta_ocurrencias')
-        .update({ estado: 'completada', completada_at: new Date().toISOString() })
-        .eq('id', occId)
-    }
-  }
-
   async function handleGuardar() {
     if (!unidadSeleccionada) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una unidad primero' })
     if (!contadorSeleccionado) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione un contador' })
@@ -294,16 +263,16 @@ export function LecturasSection({
     }
 
     setSaving(true)
-    const { data, error } = await supabase.from('registros').insert(registro).select()
+    const { data, error } = await createRegistro(registro)
     setSaving(false)
 
     if (error || !data) {
       console.error('Error inserting registro:', error)
-      notify({ variant: 'error', title: 'Error', text: error?.message || 'No se pudo guardar en la base de datos' })
+      notify({ variant: 'error', title: 'Error', text: error || 'No se pudo guardar en la base de datos' })
       return
     }
 
-    const nuevoRegistro = data[0] as Registro
+    const nuevoRegistro = data
     onRegistroAdded(nuevoRegistro)
 
     const result = await confirm({ title: 'Lectura Guardada', text: '¿Deseas enviar el recibo por WhatsApp?', icon: 'question', confirmText: 'Enviar WhatsApp', cancelText: 'No, gracias' })
@@ -377,9 +346,9 @@ export function LecturasSection({
         if (rutaActiva) {
           const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
           if (esRecurrente) {
-            await marcarOcurrenciaCompletada(rutaActiva.id)
+            await completeRelevantOcurrencia(rutaActiva.id)
           } else {
-            await supabase.from('rutas').update({ completada: true }).eq('id', rutaActiva.id)
+            await markRutaCompletada(rutaActiva.id)
           }
           onRutaCompletada?.(rutaActiva.id)
           onClearRuta?.()
