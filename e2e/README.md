@@ -6,6 +6,7 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 | Spec | Camino |
 |---|---|
 | `auth-login.e2e.ts` | Login email/password (Supabase) + rechazo de credenciales inválidas |
+| `unauthorized-access.e2e.ts` | Visitante anónimo: rutas protegidas caen al landing público, no al shell |
 | `invitation-accept.e2e.ts` | Alta por invitación (`/aceptar-invitacion?token=…`) |
 | `agua-lectura-cobro.e2e.ts` | Captura de lectura → emitir factura (agua) |
 | `condominios-cuota.e2e.ts` | Emitir cuota → registrar pago (condominios) |
