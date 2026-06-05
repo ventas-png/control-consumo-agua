@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { facturacionKeys } from './keys'
 import type { ReglaMoraConfig } from './queries'
 import {
@@ -145,7 +146,11 @@ export function useEmitirFacturaMutation(companyId?: string) {
       )
       return patch
     },
-    onSuccess: invalidar,
+    onSuccess: (_data, vars) => {
+      // Funnel de monetización (PostHog). Solo ids/flags, sin PII.
+      trackFunnel(FUNNEL.facturaEmitida, { factura_id: vars.factura.id, dominio: 'agua' })
+      invalidar()
+    },
   })
 }
 
@@ -232,7 +237,14 @@ export function useRegistrarPagoFacturaMutation(companyId?: string) {
         factura_estado: liquidada ? (patch.factura_estado as string) : (factura.factura_estado ?? null),
       }
     },
-    onSuccess: invalidar,
+    onSuccess: (data, vars) => {
+      trackFunnel(FUNNEL.pagoRegistrado, {
+        factura_id: vars.factura.id,
+        dominio: 'agua',
+        liquidada: data.liquidada,
+      })
+      invalidar()
+    },
   })
 }
 

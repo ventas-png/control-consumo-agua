@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { validatePasswordStrength } from '../../lib/validation'
+import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
@@ -92,6 +93,12 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
         setError(result.error)
         return
       }
+      // Funnel (PostHog): cima del embudo. Anónimo (el identify ocurre al primer
+      // login). Solo flags de servicio, sin email/nombre/teléfono.
+      trackFunnel(FUNNEL.companySignedUp, {
+        servicio_agua: servicioAgua,
+        servicio_condominios: servicioCondominios,
+      })
       setSuccess(true)
     } catch {
       setError('Error inesperado. Intenta de nuevo.')

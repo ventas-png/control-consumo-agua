@@ -50,6 +50,38 @@ export function track(event: string, props?: Record<string, unknown>): void {
   posthog.capture(event, props)
 }
 
+// ── Catálogo de eventos del FUNNEL ───────────────────────────────────────────
+//
+// Nombres centralizados de los eventos clave del producto, para construir los
+// embudos en PostHog sin que un typo rompa el reporte (signup → activación →
+// monetización). `company_id`/`role`/`plan` ya viajan como super-properties (ver
+// `registerSuperProperties` en App.tsx), así que NO hace falta pasarlos aquí.
+//
+// REGLA PII: las props de estos eventos llevan SOLO ids opacos / flags / montos,
+// nunca nombres, emails, NIT/RFC ni datos de tarjeta.
+export const FUNNEL = {
+  /** Onboarding: una empresa completó el signup self-service (plat:P5). */
+  companySignedUp: 'company_signed_up',
+  /** Onboarding: un invitado aceptó la invitación y creó su cuenta (plat:P3). */
+  invitationAccepted: 'invitation_accepted',
+  /** Billing: se emitió una factura (pendiente → emitida). */
+  facturaEmitida: 'factura_emitida',
+  /** Billing: se registró un pago/abono sobre una factura. */
+  pagoRegistrado: 'pago_registrado',
+  /** Fiscal: se timbró un comprobante (FEL/CFDI) contra el PAC. */
+  documentoTimbrado: 'documento_timbrado',
+} as const
+
+export type FunnelEvent = (typeof FUNNEL)[keyof typeof FUNNEL]
+
+/**
+ * Variante tipada de `track()` para los eventos del catálogo `FUNNEL`. Igual de
+ * no-op que `track` cuando PostHog está desactivado.
+ */
+export function trackFunnel(event: FunnelEvent, props?: Record<string, unknown>): void {
+  track(event, props)
+}
+
 export function resetAnalytics(): void {
   if (!enabled) return
   // posthog.reset() ya limpia las super-properties registradas, no necesita

@@ -18,6 +18,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { captureEdgeException } from '../_shared/sentry.ts'
 import {
   getFiscalProvider,
   aplicarTransicionFiscal,
@@ -276,6 +277,8 @@ Deno.serve(async (req: Request) => {
       .eq('id', docId)
     return json({ ok: false, documento_id: docId, estado: 'rechazado', error: resultado.error }, 422)
   } catch (e) {
+    // Error inesperado (no un rechazo de negocio del PAC, esos van con 422 arriba).
+    await captureEdgeException(e, { function: 'timbrar-documento' })
     return json({ error: e instanceof Error ? e.message : 'Error interno' }, 500)
   }
 })
