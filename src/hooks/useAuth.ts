@@ -11,6 +11,7 @@ import { measureSLO, reportSLOError } from '../lib/slo'
 import { getStoredSession, storeSession, clearSession } from '../lib/authSession'
 import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../lib/loginRateLimit'
 import { buildSessionFromSupabase, refreshSessionFromSupabase } from '../domain/auth/session'
+import { type MfaChallenge, needsTotpStepUp, findVerifiedTotpFactor, isValidTotpCode, classifyMfaVerifyError } from '../domain/auth/mfa'
 
 async function applyOAuthSession(
   user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
@@ -49,17 +50,6 @@ async function applyOAuthSession(
   } catch {
     // ignore
   }
-}
-
-// MFA challenge pending after a successful password sign-in when the user has
-// at least one verified TOTP factor enrolled. Signals the login UI to render a
-// 6-digit code input. The session is NOT stored until verifyMfaChallenge()
-// succeeds — Supabase keeps the AAL1 token in its own auth.* tables but our
-// UserSession layer treats AAL1 as "not logged in" for app purposes.
-export interface MfaChallenge {
-  factorId: string
-  challengeId: string
-  email: string
 }
 
 export function useAuth() {
@@ -355,9 +345,9 @@ export function useAuth() {
       // factors. If nextLevel === 'aal2' and current is 'aal1' the user must
       // verify a TOTP code before being treated as logged in.
       const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (!aal.error && aal.data && aal.data.nextLevel === 'aal2' && aal.data.currentLevel === 'aal1') {
+      if (needsTotpStepUp(aal)) {
         const factorsResult = await supabase.auth.mfa.listFactors()
-        const totpFactor = factorsResult.data?.totp?.[0] ?? factorsResult.data?.all?.find(f => f.factor_type === 'totp' && f.status === 'verified')
+        const totpFactor = findVerifiedTotpFactor(factorsResult.data)
         if (totpFactor) {
           const challengeResult = await supabase.auth.mfa.challenge({ factorId: totpFactor.id })
           if (!challengeResult.error && challengeResult.data) {
@@ -410,7 +400,7 @@ export function useAuth() {
   const verifyMfaChallenge = useCallback(async (code: string): Promise<string | null> => {
     if (!mfaChallenge) return 'No hay un desafío MFA activo. Vuelve a iniciar sesión.'
     const trimmed = code.trim()
-    if (!/^\d{6}$/.test(trimmed)) return 'El código debe tener 6 dígitos.'
+    if (!isValidTotpCode(trimmed)) return 'El código debe tener 6 dígitos.'
 
     try {
       const { error } = await supabase.auth.mfa.verify({
@@ -420,11 +410,7 @@ export function useAuth() {
       })
       if (error) {
         logSecurityEvent('mfa_verify_failed', { email: mfaChallenge.email, reason: error.message }).catch(console.error)
-        const msg = (error.message ?? '').toLowerCase()
-        if (msg.includes('invalid') || msg.includes('verification') || msg.includes('totp')) {
-          return 'Código incorrecto o expirado. Revisa la app de autenticación e intenta de nuevo.'
-        }
-        return error.message ? `Error: ${error.message}` : 'No fue posible verificar el código.'
+        return classifyMfaVerifyError(error.message)
       }
 
       const { data: sessionRes } = await supabase.auth.getSession()
