@@ -112,6 +112,10 @@ export interface RegistroCalidad {
   cumplimiento: Record<string, boolean | null>;
   cumple_total: boolean;
   observaciones?: string;
+  // serv:S24 — nuevo: ruta en Storage (calidad-reportes bucket). Null = registro
+  // previo que aún tiene base64.
+  reporte_path?: string | null;
+  // Campos legacy (base64). Permanecen para registros anteriores a S24.
   reporte_base64?: string;
   reporte_tipo?: 'pdf' | 'imagen';
   reporte_nombre?: string;

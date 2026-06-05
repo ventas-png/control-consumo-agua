@@ -1,75 +1,39 @@
+import { useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { type EnergyTab, energiaTabToPath, pathParamToEnergiaTab } from './energiaTabs'
-import type {
-  FuenteAgua,
-  ProveedorEnergia,
-  TarifaEnergia,
-  FuenteEnergia,
-  FacturaEnergia,
-  Proyecto,
-} from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
+import { useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery } from '../../domain/energia/queries'
+import { useFuentesAguaQuery, useProyectosQuery } from '../../domain/agua/queries'
+import { deriveProyectoConfig } from '../../lib/proyectosAccess'
 import ProveedoresTab from './tabs/ProveedoresTab'
 import TarifasTab from './tabs/TarifasTab'
 import FuentesTab from './tabs/FuentesTab'
 import FacturasTab from './tabs/FacturasTab'
 import DashboardTab from './tabs/DashboardTab'
 
-interface ServiciosEnergiaSectionProps {
-  fuentesAgua: FuenteAgua[]
-  proveedoresEnergia: ProveedorEnergia[]
-  tarifasEnergia: TarifaEnergia[]
-  fuentesEnergia: FuenteEnergia[]
-  facturasEnergia: FacturaEnergia[]
-  proyectos: Proyecto[]
-  moneda: string
-  // CRUD callbacks
-  onProveedorAdded: (p: ProveedorEnergia) => void
-  onProveedorUpdated: (id: string, p: Partial<ProveedorEnergia>) => void
-  onProveedorDeleted: (id: string) => void
-  onTarifaAdded: (t: TarifaEnergia) => void
-  onTarifaUpdated: (id: string, t: Partial<TarifaEnergia>) => void
-  onTarifaDeleted: (id: string) => void
-  onFuenteAdded: (f: FuenteEnergia) => void
-  onFuenteUpdated: (id: string, f: Partial<FuenteEnergia>) => void
-  onFuenteDeleted: (id: string) => void
-  onFacturaAdded: (f: FacturaEnergia) => void
-  onFacturaUpdated: (id: string, f: Partial<FacturaEnergia>) => void
-  onFacturaDeleted: (id: string) => void
-}
-
-// `EnergyTab` + helpers de routing de tabs viven en ./energiaTabs (serv:S1).
-
-export default function ServiciosEnergiaSection({
-  fuentesAgua,
-  proveedoresEnergia,
-  tarifasEnergia,
-  fuentesEnergia,
-  facturasEnergia,
-  proyectos,
-  moneda,
-  onProveedorAdded,
-  onProveedorUpdated,
-  onProveedorDeleted,
-  onTarifaAdded,
-  onTarifaUpdated,
-  onTarifaDeleted,
-  onFuenteAdded,
-  onFuenteUpdated,
-  onFuenteDeleted,
-  onFacturaAdded,
-  onFacturaUpdated,
-  onFacturaDeleted,
-}: ServiciosEnergiaSectionProps) {
+// serv:S3/S4/S5 — La sección ya no recibe props de datos ni callbacks.
+// Obtiene todo vía TanStack Query (energiaKeys + aguaKeys en caché).
+export default function ServiciosEnergiaSection() {
   const currentUser = useSession()
+  const companyId = currentUser?.company_id ?? undefined
   const perms = usePermissionsContext()
   const canCreate = perms.canCreate('servicios_energia')
   const canEdit = perms.canEdit('servicios_energia')
+
   const { tab: tabParam } = useParams<{ tab?: string }>()
   const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
   const navigate = useNavigate()
   const setActiveTab = (next: EnergyTab) => navigate(energiaTabToPath(next))
+
+  const { data: proveedoresEnergia = [] } = useProveedoresEnergiaQuery(companyId)
+  const { data: tarifasEnergia = [] } = useTarifasEnergiaQuery(companyId)
+  const { data: fuentesEnergia = [] } = useFuentesEnergiaQuery(companyId)
+  const { data: facturasEnergia = [] } = useFacturasEnergiaQuery(companyId)
+  const { data: fuentesAgua = [] } = useFuentesAguaQuery(companyId)
+  const { data: proyectos = [] } = useProyectosQuery(companyId)
+
+  const { moneda } = useMemo(() => deriveProyectoConfig(proyectos), [proyectos])
 
   const tabs: { id: EnergyTab; label: string; icon: string }[] = [
     { id: 'proveedores', label: 'Proveedores', icon: '🏢' },
@@ -83,7 +47,6 @@ export default function ServiciosEnergiaSection({
     <div style={{ padding: '1rem' }}>
       <h1 style={{ marginBottom: '1.5rem' }}>⚡ Servicio Energético</h1>
 
-      {/* Tabs Navigation */}
       <div
         style={{
           display: 'flex',
@@ -112,18 +75,14 @@ export default function ServiciosEnergiaSection({
         ))}
       </div>
 
-      {/* Tab Content */}
       <div style={{ minHeight: '400px' }}>
         {activeTab === 'proveedores' && (
           <ProveedoresTab
             proveedoresEnergia={proveedoresEnergia}
             proyectos={proyectos}
-            currentUser={currentUser}
+            companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
-            onProveedorAdded={onProveedorAdded}
-            onProveedorUpdated={onProveedorUpdated}
-            onProveedorDeleted={onProveedorDeleted}
           />
         )}
 
@@ -132,13 +91,10 @@ export default function ServiciosEnergiaSection({
             tarifasEnergia={tarifasEnergia}
             proveedoresEnergia={proveedoresEnergia}
             proyectos={proyectos}
-            currentUser={currentUser}
+            companyId={companyId ?? ''}
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
-            onTarifaAdded={onTarifaAdded}
-            onTarifaUpdated={onTarifaUpdated}
-            onTarifaDeleted={onTarifaDeleted}
           />
         )}
 
@@ -149,12 +105,9 @@ export default function ServiciosEnergiaSection({
             proveedoresEnergia={proveedoresEnergia}
             tarifasEnergia={tarifasEnergia}
             proyectos={proyectos}
-            currentUser={currentUser}
+            companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
-            onFuenteAdded={onFuenteAdded}
-            onFuenteUpdated={onFuenteUpdated}
-            onFuenteDeleted={onFuenteDeleted}
           />
         )}
 
@@ -165,13 +118,10 @@ export default function ServiciosEnergiaSection({
             tarifasEnergia={tarifasEnergia}
             proveedoresEnergia={proveedoresEnergia}
             proyectos={proyectos}
-            currentUser={currentUser}
+            companyId={companyId ?? ''}
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
-            onFacturaAdded={onFacturaAdded}
-            onFacturaUpdated={onFacturaUpdated}
-            onFacturaDeleted={onFacturaDeleted}
           />
         )}
 

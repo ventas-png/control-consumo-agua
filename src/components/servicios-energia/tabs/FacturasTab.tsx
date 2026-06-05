@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
+import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Proyecto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import FacturaEnergiaModal from '../FacturaEnergiaModal'
-import { supabase } from '../../../lib/supabase'
+import { useCrearFacturaEnergiaMutation, useActualizarFacturaEnergiaMutation, useEliminarFacturaEnergiaMutation } from '../../../domain/energia/mutations'
 
 interface FacturasTabProps {
   facturasEnergia: FacturaEnergia[]
@@ -10,13 +10,10 @@ interface FacturasTabProps {
   tarifasEnergia: TarifaEnergia[]
   proveedoresEnergia: ProveedorEnergia[]
   proyectos: Proyecto[]
-  currentUser: UserSession | null
+  companyId: string
   moneda: string
   canCreate: boolean
   canEdit: boolean
-  onFacturaAdded: (f: FacturaEnergia) => void
-  onFacturaUpdated: (id: string, f: Partial<FacturaEnergia>) => void
-  onFacturaDeleted: (id: string) => void
 }
 
 export default function FacturasTab({
@@ -25,20 +22,20 @@ export default function FacturasTab({
   tarifasEnergia,
   proveedoresEnergia,
   proyectos,
-  currentUser,
+  companyId,
   moneda,
   canCreate,
   canEdit,
-  onFacturaAdded,
-  onFacturaUpdated,
-  onFacturaDeleted,
 }: FacturasTabProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingFactura, setEditingFactura] = useState<FacturaEnergia | null>(null)
   const [filterFuente, setFilterFuente] = useState<string>('')
   const [filterEstado, setFilterEstado] = useState<string>('')
 
-  const companyId = currentUser?.company_id ?? null
+  const crearMutation = useCrearFacturaEnergiaMutation(companyId)
+  const actualizarMutation = useActualizarFacturaEnergiaMutation(companyId)
+  const eliminarMutation = useEliminarFacturaEnergiaMutation(companyId)
+
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
 
   const filteredFacturas = facturasEnergia.filter(f => {
@@ -60,13 +57,7 @@ export default function FacturasTab({
   const handleSaveFactura = async (formData: Partial<FacturaEnergia>) => {
     try {
       if (editingFactura?.id) {
-        const { error } = await supabase
-          .from('facturas_energia')
-          .update({ ...formData, updated_at: new Date().toISOString() })
-          .eq('id', editingFactura.id)
-
-        if (error) throw error
-        onFacturaUpdated(editingFactura.id, formData)
+        await actualizarMutation.mutateAsync({ id: editingFactura.id, patch: formData })
         notify({ variant: 'success', title: 'Factura actualizada', duration: 1500 })
       } else {
         // Derive project_id from the selected fuente_energia if possible
@@ -75,13 +66,7 @@ export default function FacturasTab({
         if (!projectId || !companyId) {
           throw new Error('No se pudo determinar el proyecto o la empresa')
         }
-        const { data, error } = await supabase
-          .from('facturas_energia')
-          .insert([{ ...formData, project_id: projectId, company_id: companyId }])
-          .select()
-
-        if (error) throw error
-        if (data) onFacturaAdded(data[0] as FacturaEnergia)
+        await crearMutation.mutateAsync({ ...formData, project_id: projectId, company_id: companyId } as Parameters<typeof crearMutation.mutateAsync>[0])
         notify({ variant: 'success', title: 'Factura creada', duration: 1500 })
       }
     } catch (err: unknown) {
@@ -95,9 +80,7 @@ export default function FacturasTab({
     if (!isConfirmed) return
 
     try {
-      const { error } = await supabase.from('facturas_energia').delete().eq('id', id)
-      if (error) throw error
-      onFacturaDeleted(id)
+      await eliminarMutation.mutateAsync(id)
       notify({ variant: 'success', title: 'Éxito', text: 'Factura eliminada' })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la factura' })

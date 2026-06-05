@@ -1,37 +1,34 @@
 import { useState } from 'react'
-import type { ProveedorEnergia, Proyecto, UserSession } from '../../../types'
+import type { ProveedorEnergia, Proyecto } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
-import { supabase } from '../../../lib/supabase'
+import { useCrearProveedorEnergiaMutation, useActualizarProveedorEnergiaMutation, useEliminarProveedorEnergiaMutation } from '../../../domain/energia/mutations'
 
 interface ProveedoresTabProps {
   proveedoresEnergia: ProveedorEnergia[]
   proyectos: Proyecto[]
-  currentUser: UserSession | null
+  companyId: string
   canCreate: boolean
   canEdit: boolean
-  onProveedorAdded: (p: ProveedorEnergia) => void
-  onProveedorUpdated: (id: string, p: Partial<ProveedorEnergia>) => void
-  onProveedorDeleted: (id: string) => void
 }
 
 export default function ProveedoresTab({
   proveedoresEnergia,
   proyectos,
-  currentUser,
+  companyId,
   canCreate,
   canEdit,
-  onProveedorAdded,
-  onProveedorUpdated,
-  onProveedorDeleted,
 }: ProveedoresTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<Partial<ProveedorEnergia>>({})
 
-  const companyId = currentUser?.company_id ?? null
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
+
+  const crearMutation = useCrearProveedorEnergiaMutation(companyId)
+  const actualizarMutation = useActualizarProveedorEnergiaMutation(companyId)
+  const eliminarMutation = useEliminarProveedorEnergiaMutation(companyId)
 
   const handleCreate = async () => {
     if (!companyId) {
@@ -98,9 +95,7 @@ export default function ProveedoresTab({
     }
 
     try {
-      const { data, error } = await supabase.from('proveedores_energia').insert([formValues]).select().single()
-      if (error) throw error
-      onProveedorAdded(data as ProveedorEnergia)
+      await crearMutation.mutateAsync(formValues as Parameters<typeof crearMutation.mutateAsync>[0])
       notify({ variant: 'success', title: 'Proveedor creado', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear el proveedor' })
@@ -115,12 +110,7 @@ export default function ProveedoresTab({
   const handleSaveEdit = async () => {
     if (!editingId) return
     try {
-      const { error } = await supabase
-        .from('proveedores_energia')
-        .update({ ...editFormData, updated_at: new Date().toISOString() })
-        .eq('id', editingId)
-      if (error) throw error
-      onProveedorUpdated(editingId, editFormData)
+      await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
       notify({ variant: 'success', title: 'Proveedor actualizado', duration: 1500 })
     } catch (err: unknown) {
@@ -138,9 +128,7 @@ export default function ProveedoresTab({
     })
     if (!isConfirmed) return
     try {
-      const { error } = await supabase.from('proveedores_energia').delete().eq('id', id)
-      if (error) throw error
-      onProveedorDeleted(id)
+      await eliminarMutation.mutateAsync(id)
       notify({ variant: 'success', title: 'Proveedor eliminado', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar el proveedor' })

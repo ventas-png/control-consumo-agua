@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyecto, UserSession, ModoSuministroEnergia } from '../../../types'
+import type { FuenteEnergia, FuenteAgua, ProveedorEnergia, TarifaEnergia, Proyecto, ModoSuministroEnergia } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
-import { supabase } from '../../../lib/supabase'
+import { useCrearFuenteEnergiaMutation, useActualizarFuenteEnergiaMutation, useEliminarFuenteEnergiaMutation } from '../../../domain/energia/mutations'
 
 interface FuentesTabProps {
   fuentesEnergia: FuenteEnergia[]
@@ -12,12 +12,9 @@ interface FuentesTabProps {
   proveedoresEnergia: ProveedorEnergia[]
   tarifasEnergia: TarifaEnergia[]
   proyectos: Proyecto[]
-  currentUser: UserSession | null
+  companyId: string
   canCreate: boolean
   canEdit: boolean
-  onFuenteAdded: (f: FuenteEnergia) => void
-  onFuenteUpdated: (id: string, f: Partial<FuenteEnergia>) => void
-  onFuenteDeleted: (id: string) => void
 }
 
 export default function FuentesTab({
@@ -26,25 +23,20 @@ export default function FuentesTab({
   proveedoresEnergia,
   tarifasEnergia,
   proyectos,
-  currentUser,
+  companyId,
   canCreate,
   canEdit,
-  onFuenteAdded,
-  onFuenteUpdated,
-  onFuenteDeleted,
 }: FuentesTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<Partial<FuenteEnergia>>({})
 
-  const companyId = currentUser?.company_id ?? null
+  const crearMutation = useCrearFuenteEnergiaMutation(companyId)
+  const actualizarMutation = useActualizarFuenteEnergiaMutation(companyId)
+  const eliminarMutation = useEliminarFuenteEnergiaMutation(companyId)
+
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
 
   const handleCreate = async () => {
-    if (!companyId) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo identificar la empresa del usuario' })
-      return
-    }
-
     if (proyectos.length === 0) {
       notify({ variant: 'error', title: 'Error', text: 'Debe crear al menos un proyecto antes de crear una fuente de energía' })
       return
@@ -147,9 +139,7 @@ export default function FuentesTab({
     }
 
     try {
-      const { data, error } = await supabase.from('fuentes_energia').insert([formValues]).select().single()
-      if (error) throw error
-      onFuenteAdded(data as FuenteEnergia)
+      await crearMutation.mutateAsync(formValues as Parameters<typeof crearMutation.mutateAsync>[0])
       notify({ variant: 'success', title: 'Fuente de energía creada', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear la fuente de energía' })
@@ -164,12 +154,7 @@ export default function FuentesTab({
   const handleSaveEdit = async () => {
     if (!editingId) return
     try {
-      const { error } = await supabase
-        .from('fuentes_energia')
-        .update({ ...editFormData, updated_at: new Date().toISOString() })
-        .eq('id', editingId)
-      if (error) throw error
-      onFuenteUpdated(editingId, editFormData)
+      await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
       notify({ variant: 'success', title: 'Fuente actualizada', duration: 1500 })
     } catch (err: unknown) {
@@ -187,9 +172,7 @@ export default function FuentesTab({
     })
     if (!isConfirmed) return
     try {
-      const { error } = await supabase.from('fuentes_energia').delete().eq('id', id)
-      if (error) throw error
-      onFuenteDeleted(id)
+      await eliminarMutation.mutateAsync(id)
       notify({ variant: 'success', title: 'Fuente eliminada', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la fuente' })

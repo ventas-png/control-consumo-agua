@@ -7,13 +7,13 @@ import { BrandingApplier } from './components/branding/BrandingApplier'
 import { PresenceIndicator } from './components/shared/PresenceIndicator'
 import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
-import type { AppSection, Cliente, Contador, Empresa, FacturaEnergia, FuenteAgua, FuenteEnergia, ProveedorEnergia, Registro, RegistroCalidad, Ruta, Tarifa, TarifaEnergia, Unidad, UserSession } from './types'
+import type { AppSection, Cliente, Contador, Empresa, FuenteAgua, Registro, RegistroCalidad, Ruta, Tarifa, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { lazyWithPreload } from './lib/lazyWithPreload'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useQueryClient } from '@tanstack/react-query'
-import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery, useClientesQuery, useRegistrosQuery } from './domain/agua/queries'
+import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery, useClientesQuery, useRegistrosQuery } from './domain/agua/queries'
 import { aguaKeys } from './domain/agua/keys'
 import { filterRutasByProjectAccess } from './lib/rutasAccess'
 import { filterProyectosByAssignment, deriveProyectoConfig } from './lib/proyectosAccess'
@@ -399,51 +399,8 @@ export default function App() {
   const deleteTarifa = useCallback((id: string) => {
     dataQueryClient.setQueryData<Tarifa[]>(aguaKeys.tarifas(dataCompanyId), (old = []) => old.filter(t => t.id !== id))
   }, [dataQueryClient, dataCompanyId])
-  // T7: `proveedoresEnergia` migran a la capa de datos (scope company). Parte del
-  // módulo de energía (hoy bajo agua; Track T1 / serv:S1 lo separará).
-  const { data: proveedoresEnergia = [] } = useProveedoresEnergiaQuery(dataCompanyId)
-  const addProveedorEnergia = useCallback((proveedor: ProveedorEnergia) => {
-    dataQueryClient.setQueryData<ProveedorEnergia[]>(aguaKeys.proveedoresEnergia(dataCompanyId), (old = []) => [proveedor, ...old])
-  }, [dataQueryClient, dataCompanyId])
-  const updateProveedorEnergia = useCallback((id: string, partial: Partial<ProveedorEnergia>) => {
-    dataQueryClient.setQueryData<ProveedorEnergia[]>(aguaKeys.proveedoresEnergia(dataCompanyId), (old = []) => old.map(p => (p.id === id ? { ...p, ...partial } : p)))
-  }, [dataQueryClient, dataCompanyId])
-  const deleteProveedorEnergia = useCallback((id: string) => {
-    dataQueryClient.setQueryData<ProveedorEnergia[]>(aguaKeys.proveedoresEnergia(dataCompanyId), (old = []) => old.filter(p => p.id !== id))
-  }, [dataQueryClient, dataCompanyId])
-  // T7: `tarifasEnergia` migran a la capa de datos (scope company). Energía.
-  const { data: tarifasEnergia = [] } = useTarifasEnergiaQuery(dataCompanyId)
-  const addTarifaEnergia = useCallback((tarifa: TarifaEnergia) => {
-    dataQueryClient.setQueryData<TarifaEnergia[]>(aguaKeys.tarifasEnergia(dataCompanyId), (old = []) => [tarifa, ...old])
-  }, [dataQueryClient, dataCompanyId])
-  const updateTarifaEnergia = useCallback((id: string, partial: Partial<TarifaEnergia>) => {
-    dataQueryClient.setQueryData<TarifaEnergia[]>(aguaKeys.tarifasEnergia(dataCompanyId), (old = []) => old.map(t => (t.id === id ? { ...t, ...partial } : t)))
-  }, [dataQueryClient, dataCompanyId])
-  const deleteTarifaEnergia = useCallback((id: string) => {
-    dataQueryClient.setQueryData<TarifaEnergia[]>(aguaKeys.tarifasEnergia(dataCompanyId), (old = []) => old.filter(t => t.id !== id))
-  }, [dataQueryClient, dataCompanyId])
-  // T7: `fuentesEnergia` migran a la capa de datos (scope company). Energía.
-  const { data: fuentesEnergia = [] } = useFuentesEnergiaQuery(dataCompanyId)
-  const addFuenteEnergia = useCallback((fuente: FuenteEnergia) => {
-    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => [fuente, ...old])
-  }, [dataQueryClient, dataCompanyId])
-  const updateFuenteEnergia = useCallback((id: string, partial: Partial<FuenteEnergia>) => {
-    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => old.map(f => (f.id === id ? { ...f, ...partial } : f)))
-  }, [dataQueryClient, dataCompanyId])
-  const deleteFuenteEnergia = useCallback((id: string) => {
-    dataQueryClient.setQueryData<FuenteEnergia[]>(aguaKeys.fuentesEnergia(dataCompanyId), (old = []) => old.filter(f => f.id !== id))
-  }, [dataQueryClient, dataCompanyId])
-  // T7: `facturasEnergia` migran a la capa de datos (cierra el grupo de energía).
-  const { data: facturasEnergia = [] } = useFacturasEnergiaQuery(dataCompanyId)
-  const addFacturaEnergia = useCallback((factura: FacturaEnergia) => {
-    dataQueryClient.setQueryData<FacturaEnergia[]>(aguaKeys.facturasEnergia(dataCompanyId), (old = []) => [factura, ...old])
-  }, [dataQueryClient, dataCompanyId])
-  const updateFacturaEnergia = useCallback((id: string, partial: Partial<FacturaEnergia>) => {
-    dataQueryClient.setQueryData<FacturaEnergia[]>(aguaKeys.facturasEnergia(dataCompanyId), (old = []) => old.map(f => (f.id === id ? { ...f, ...partial } : f)))
-  }, [dataQueryClient, dataCompanyId])
-  const deleteFacturaEnergia = useCallback((id: string) => {
-    dataQueryClient.setQueryData<FacturaEnergia[]>(aguaKeys.facturasEnergia(dataCompanyId), (old = []) => old.filter(f => f.id !== id))
-  }, [dataQueryClient, dataCompanyId])
+  // serv:S3/S4/S5 — Energía migrada a domain/energia: ServiciosEnergiaSection
+  // se auto-gestiona via queries/mutations; App.tsx ya no maneja su estado.
   // T7: `fuentesAgua` migran a la capa de datos. setFuentesAgua reemplaza la lista
   // en caché (lo usa CalidadSection vía onFuentesUpdated). recargarFuentesAgua del
   // useData previo no se usaba en App, así que se elimina.
@@ -764,32 +721,10 @@ export default function App() {
     proyectos.filter(p => p.estado === 'activo').length === 0
 
   // Authenticated app
-  // serv:S1 — Energía como módulo de 1er nivel con sub-rutas /energia/<tab>.
-  // El mismo elemento sirve a `/energia` (tab por defecto) y `/energia/:tab`
-  // (deep-link), evitando duplicar el bloque de props.
+  // serv:S1/S3 — Energía 1er nivel; la sección se auto-gestiona via queries propias.
   const energiaSection = (
     <ErrorBoundary sectionName="servicios_energia">
-      <ServiciosEnergiaSection
-        fuentesAgua={fuentesAgua}
-        proveedoresEnergia={proveedoresEnergia}
-        tarifasEnergia={tarifasEnergia}
-        fuentesEnergia={fuentesEnergia}
-        facturasEnergia={facturasEnergia}
-        proyectos={proyectos}
-        moneda={moneda}
-        onProveedorAdded={addProveedorEnergia}
-        onProveedorUpdated={updateProveedorEnergia}
-        onProveedorDeleted={deleteProveedorEnergia}
-        onTarifaAdded={addTarifaEnergia}
-        onTarifaUpdated={updateTarifaEnergia}
-        onTarifaDeleted={deleteTarifaEnergia}
-        onFuenteAdded={addFuenteEnergia}
-        onFuenteUpdated={updateFuenteEnergia}
-        onFuenteDeleted={deleteFuenteEnergia}
-        onFacturaAdded={addFacturaEnergia}
-        onFacturaUpdated={updateFacturaEnergia}
-        onFacturaDeleted={deleteFacturaEnergia}
-      />
+      <ServiciosEnergiaSection />
     </ErrorBoundary>
   )
 

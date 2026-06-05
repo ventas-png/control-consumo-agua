@@ -57,8 +57,8 @@ export function CalidadSection({
   const [analisisFecha, setAnalisisFecha] = useState(new Date().toISOString().slice(0, 16))
   const [analisisObs, setAnalisisObs] = useState('')
   const [parametroValues, setParametroValues] = useState<Record<string, string>>({})
-  const [reporteBase64, setReporteBase64] = useState<string | null>(null)
-  const [reporteTipo, setReporteTipo] = useState<'pdf' | 'imagen' | null>(null)
+  // serv:S24 — archivo del reporte (se sube a Storage, no a base64).
+  const [reporteFile, setReporteFile] = useState<File | null>(null)
   const [reporteNombre, setReporteNombre] = useState<string | null>(null)
   const [savingAnalisis, setSavingAnalisis] = useState(false)
 
@@ -166,6 +166,23 @@ export function CalidadSection({
 
     const { cumplimiento, cumple_total } = calcularCumplimiento(fuenteSeleccionada.tipo_agua, parametros)
 
+    setSavingAnalisis(true)
+    // serv:S24 — subir reporte a Storage antes del INSERT si hay archivo.
+    let reporte_path: string | null = null
+    if (reporteFile && empresa.id) {
+      const ts = Date.now()
+      const safeName = reporteFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${empresa.id}/${analisisFuenteId}/${ts}-${safeName}`
+      const { error: uploadErr } = await supabase.storage
+        .from('calidad-reportes')
+        .upload(path, reporteFile, { upsert: false })
+      if (uploadErr) {
+        setSavingAnalisis(false)
+        return notify({ variant: 'error', title: 'Error al subir reporte', text: uploadErr.message })
+      }
+      reporte_path = path
+    }
+
     const registro = {
       fuente_id: analisisFuenteId,
       fecha: new Date(analisisFecha).toISOString(),
@@ -173,13 +190,11 @@ export function CalidadSection({
       cumplimiento,
       cumple_total,
       observaciones: sanitizeInput(analisisObs) || null,
-      reporte_base64: reporteBase64 ?? null,
-      reporte_tipo: reporteTipo ?? null,
+      reporte_path,
       reporte_nombre: reporteNombre ?? null,
       created_by: userId ?? null,
     }
 
-    setSavingAnalisis(true)
     try {
       const { error } = await supabase.from('registros_calidad').insert([registro])
       if (error) throw error
@@ -189,7 +204,7 @@ export function CalidadSection({
       setAnalisisFecha(new Date().toISOString().slice(0, 16))
       setAnalisisObs('')
       setParametroValues({})
-      setReporteBase64(null); setReporteTipo(null); setReporteNombre(null)
+      setReporteFile(null); setReporteNombre(null)
       notify({ variant: 'success', title: cumple_total ? '✅ Análisis guardado — CUMPLE' : '⚠️ Análisis guardado — NO CUMPLE', duration: 2000 })
       setSubTab('historial')
     } catch (e) {
@@ -202,12 +217,10 @@ export function CalidadSection({
   function handleReporteFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { notify({ variant: 'error', title: 'Archivo muy grande', text: 'El archivo no debe superar 5 MB.' }); e.target.value = ''; return }
-    setReporteTipo(file.type.includes('pdf') ? 'pdf' : 'imagen')
+    if (file.size > 10 * 1024 * 1024) { notify({ variant: 'error', title: 'Archivo muy grande', text: 'El archivo no debe superar 10 MB.' }); e.target.value = ''; return }
+    // serv:S24 — guardamos el File para subir a Storage (no base64).
+    setReporteFile(file)
     setReporteNombre(file.name)
-    const reader = new FileReader()
-    reader.onload = ev => setReporteBase64((ev.target?.result as string).split(',')[1])
-    reader.readAsDataURL(file)
   }
 
   // Historial filtered
@@ -225,14 +238,28 @@ export function CalidadSection({
     setDetalleViewer(r)
   }
 
-  function verReporte(r: RegistroCalidad) {
-    if (!r.reporte_base64) return notify({ variant: 'info', title: 'Sin reporte', text: 'Este análisis no tiene reporte adjunto.' })
-    const mime = r.reporte_tipo === 'pdf' ? 'application/pdf' : 'image/jpeg'
-    const dataUrl = `data:${mime};base64,${r.reporte_base64}`
-    const link = document.createElement('a')
-    link.href = dataUrl
-    link.download = r.reporte_nombre ?? ('reporte.' + (r.reporte_tipo === 'pdf' ? 'pdf' : 'jpg'))
-    link.click()
+  async function verReporte(r: RegistroCalidad) {
+    if (r.reporte_path) {
+      // serv:S24 — ruta en Storage: crear URL firmada y descargar.
+      const { data, error } = await supabase.storage
+        .from('calidad-reportes')
+        .createSignedUrl(r.reporte_path, 60)
+      if (error || !data?.signedUrl) return notify({ variant: 'error', title: 'Error', text: 'No se pudo acceder al reporte.' })
+      const link = document.createElement('a')
+      link.href = data.signedUrl
+      link.download = r.reporte_nombre ?? 'reporte'
+      link.click()
+    } else if (r.reporte_base64) {
+      // Registros previos a S24: base64 legacy.
+      const mime = r.reporte_tipo === 'pdf' ? 'application/pdf' : 'image/jpeg'
+      const dataUrl = `data:${mime};base64,${r.reporte_base64}`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = r.reporte_nombre ?? ('reporte.' + (r.reporte_tipo === 'pdf' ? 'pdf' : 'jpg'))
+      link.click()
+    } else {
+      notify({ variant: 'info', title: 'Sin reporte', text: 'Este análisis no tiene reporte adjunto.' })
+    }
   }
 
   const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
@@ -446,7 +473,7 @@ export function CalidadSection({
                 <input type="file" accept=".pdf,image/*" hidden onChange={handleReporteFile} />
               </label>
               <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
-              {reporteNombre && <button onClick={() => { setReporteBase64(null); setReporteTipo(null); setReporteNombre(null) }} style={{ background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
+              {reporteNombre && <button onClick={() => { setReporteFile(null); setReporteNombre(null) }} style={{ background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
             </div>
           </div>
 
@@ -544,7 +571,7 @@ export function CalidadSection({
                             const { generarPDFAnalisis } = await import('../../lib/pdf')
                             generarPDFAnalisis(r, empresa)
                           }} style={{ background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-                          {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
+                          {(r.reporte_path || r.reporte_base64) && <button onClick={() => { void verReporte(r) }} style={{ background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
                         </div>
                       </td>
                     </tr>
