@@ -2,14 +2,13 @@
 // Guatemala) + resolución del centro a partir de la empresa. Lógica pura y
 // testeable, sin Leaflet (la consume tanto MapView como MapaSection).
 
+import type { MapCenterConfig } from '../../domain/mapa/schemas'
+// serv:S16 — el tipo canónico de la config de mapa vive en la capa de datos
+// (domain/mapa); lo re-exportamos para los consumidores del módulo (MapaSection).
+export type { MapCenterConfig }
+
 export const DEFAULT_CENTER: [number, number] = [14.6349, -90.5069]
 export const DEFAULT_ZOOM = 13
-
-export interface MapCenterConfig {
-  center_lat?: number | null
-  center_lng?: number | null
-  zoom_default?: number | null
-}
 
 const esNumeroFinito = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
