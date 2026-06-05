@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- AdministraTodo · sitemap. La app SaaS es autenticada y no se indexa; aquí solo
-     van las páginas públicas: la home y la suite legal (RGPD/CCPA + APIs de Google). -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+     van las páginas públicas: la home y la suite legal (RGPD/CCPA + APIs de Google).
+     Cada página legal declara su alternativa en inglés (?lang=en) vía hreflang. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://administratodo.com/</loc>
     <changefreq>monthly</changefreq>
@@ -9,18 +11,27 @@
   </url>
   <url>
     <loc>https://administratodo.com/politica-privacidad</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://administratodo.com/politica-privacidad" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://administratodo.com/politica-privacidad?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://administratodo.com/politica-privacidad" />
     <lastmod>2026-06-05</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://administratodo.com/terminos-servicio</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://administratodo.com/terminos-servicio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://administratodo.com/terminos-servicio?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://administratodo.com/terminos-servicio" />
     <lastmod>2026-06-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://administratodo.com/acuerdo-dpa-cookies</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://administratodo.com/acuerdo-dpa-cookies" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://administratodo.com/acuerdo-dpa-cookies?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://administratodo.com/acuerdo-dpa-cookies" />
     <lastmod>2026-06-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>

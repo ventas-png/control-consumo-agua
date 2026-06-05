@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from './icons'
 import type { Copy } from './i18n'
+import { openCookieSettings } from '../../lib/cookieConsentChannel'
 
 export function DemoVideo({ t }: { t: Copy }) {
   const [scene, setScene] = useState(0)
@@ -191,6 +192,14 @@ export function Footer({ t }: { t: Copy }) {
 
         <div className="foot-bottom">
           <span>{t.footer.copyright}</span>
+          <button
+            type="button"
+            className="foot-cookie-btn"
+            onClick={() => openCookieSettings()}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', color: 'var(--c-ink_2)', textDecoration: 'underline' }}
+          >
+            {t.footer.cookies_settings}
+          </button>
           <span className="foot-status"><i />{t.footer.status}</span>
         </div>
       </div>

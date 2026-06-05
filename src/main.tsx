@@ -11,16 +11,21 @@ import App from './App'
 import { queryClient } from './domain/queryClient'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
+import { CookieConsent } from './components/shared/CookieConsent'
 import { DialogProvider } from './components/shared/Dialog'
 import { PromptDialogRoot } from './components/shared/PromptDialog'
 import { I18nProvider } from './lib/i18n'
 import { FeatureFlagsProvider } from './lib/featureFlags'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
+import { applyStoredConsent } from './lib/cookieConsent'
 
 // Error monitoring + product analytics. Both no-op without their env vars.
+// PostHog arranca OPTED-OUT (RGPD); aplicamos el consentimiento ya guardado para que
+// quien aceptó "analítica" siga siendo medido sin reabrir el banner.
 initMonitoring()
 initAnalytics()
+applyStoredConsent()
 
 // One-time migration: remove stale v1 cache key
 localStorage.removeItem('aquacontrol_data_v1')
@@ -46,6 +51,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               </BrowserRouter>
               <PwaUpdatePrompt />
               <PromptDialogRoot />
+              <CookieConsent />
             </DialogProvider>
           </FeatureFlagsProvider>
         </I18nProvider>
