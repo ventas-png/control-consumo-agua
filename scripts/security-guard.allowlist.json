@@ -1,0 +1,9 @@
+{
+  "_README": "Excepciones REVISADAS y justificadas para scripts/security-guard.mjs. El guard RESTA estas entradas a los hallazgos del catálogo de prod. Mantener cada lista LO MÁS VACÍA POSIBLE — toda excepción es una superficie de ataque tolerada y debe llevar justificación. Estado verificado (2026-06-05, proyecto nnsqmeigtgewatameexo): las tres listas están vacías porque el esquema NO tiene huecos (anon no ejecuta ninguna SECURITY DEFINER de public, y toda tabla de public tiene RLS + ≥1 policy). Si un cambio legítimo introduce una excepción, agrégala aquí con `reason` y revisión humana; el guard fallará hasta entonces.",
+
+  "anon_executable_security_definer_functions": [],
+
+  "tables_without_rls": [],
+
+  "tables_without_policy": []
+}
