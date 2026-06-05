@@ -77,4 +77,5 @@ jobs:
           deno check \
             supabase/functions/notifications-dispatcher/render.ts \
             supabase/functions/invite-user/validate.ts \
-            supabase/functions/accept-invitation/validate.ts
+            supabase/functions/accept-invitation/validate.ts \
+            supabase/functions/_shared/uploadValidation.ts

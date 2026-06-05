@@ -154,3 +154,9 @@ jobs:
 
       - name: Deploy fiscal-test-connection (no JWT — valida token a mano, service_role o admin/owner)
         run: bash .github/scripts/deploy-fn.sh fiscal-test-connection --no-verify-jwt
+
+      # Validación server-side de uploads (infra:I13): magic-bytes + tamaño + saneo
+      # de SVG; sube con el JWT del llamador (RLS impone el tenant). verify_jwt=false
+      # → valida el JWT a mano via requireUser.
+      - name: Deploy validate-upload (no JWT — valida JWT a mano; magic-bytes + tamaño + SVG)
+        run: bash .github/scripts/deploy-fn.sh validate-upload --no-verify-jwt
