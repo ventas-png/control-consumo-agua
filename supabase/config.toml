@@ -94,3 +94,12 @@ verify_jwt = false
 # devuelve el secreto; al guardar resetea estado_conexion a 'desconocido'.
 [functions.payfac-save-credentials]
 verify_jwt = false
+
+# SSO/SAML enterprise (plat:P10) — admin de dominios + proveedor SAML por tenant.
+# Deriva company_id de la SESION (nunca del input), exige owner/admin y gestiona
+# SOLO los dominios/proveedor de ESA empresa en company_sso_domains. Intenta
+# registrar/sincronizar el proveedor SAML via GoTrue Admin SSO API; si SSO no esta
+# habilitado en el proyecto, responde "parqueado" pero igual persiste la config.
+# verify_jwt=false: valida el token a mano (service_role o JWT admin/owner).
+[functions.sso-admin]
+verify_jwt = false

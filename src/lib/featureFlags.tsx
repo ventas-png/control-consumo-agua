@@ -46,6 +46,7 @@ export const FEATURE_CODES = [
   'white_label',
   'multi_proyecto',
   'exportacion_avanzada',
+  'enterprise_sso',
 ] as const
 
 export type FeatureCode = typeof FEATURE_CODES[number]

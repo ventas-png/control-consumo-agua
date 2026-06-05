@@ -30,6 +30,8 @@ export const ssoDomainSchema = z.object({
   verified: z.boolean(),
   verification_token: z.string(),
   enforced: z.boolean(),
+  // Metadata IdP persistida (parqueable). Columna jsonb NOT NULL DEFAULT '{}'.
+  idp_metadata: z.record(z.string(), z.unknown()).optional().default({}),
   created_at: z.string(),
   updated_at: z.string(),
 })
