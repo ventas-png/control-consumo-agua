@@ -1,73 +1,47 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { createHash } from 'node:crypto'
 
-// Guard del hash CSP de sonner (infra:I24).
+// Guard de la POSTURA CSP (infra:I24).
 //
-// `<Toaster>` (sonner) inyecta su CSS como un <style> en runtime. Con la CSP
-// endurecida (style-src 'self' SIN 'unsafe-inline'), ese <style> solo se permite
-// vía un hash 'sha256-...' en style-src de vercel.json. Si se actualiza sonner y
-// cambia su CSS, el hash queda obsoleto y los toasts saldrían sin estilo. Este
-// test recomputa el hash desde node_modules y falla si vercel.json no lo tiene,
-// forzando a regenerarlo en el mismo PR del upgrade.
-//
-// Para regenerar tras un upgrade: corré este test, copiá el hash del mensaje de
-// error y pegalo en la directiva style-src de vercel.json.
+// Decisión (tras el incidente en prod): el endurecimiento crítico es `script-src`
+// —el vector real de XSS—, que se mantiene ESTRICTO (sin 'unsafe-inline' ni
+// 'unsafe-eval'). `style-src` usa 'unsafe-inline' A PROPÓSITO: la app y varias
+// librerías (sonner, etc.) inyectan <style> en runtime con contenido variable, y
+// el enfoque por hash resultó frágil (rechazaba hojas de estilo en prod ante
+// cualquier drift de versión → "Refused to apply a stylesheet…"). El riesgo de
+// `style-src 'unsafe-inline'` es bajo frente al de `script-src`. Ver vercel.json.
 
-/** Extrae el CSS exacto que sonner inyecta: el literal de plantilla en `wt(` ... `)`. */
-function extractSonnerInjectedCss(): string {
-  const src = readFileSync(resolve('node_modules/sonner/dist/index.mjs'), 'utf-8')
-  const callIdx = src.indexOf('wt(`')
-  if (callIdx === -1) throw new Error('No se encontró la inyección de estilos de sonner (wt(`...`))')
-  let j = callIdx + 'wt(`'.length
-  let out = ''
-  while (j < src.length) {
-    const c = src[j]
-    if (c === '\\') {
-      // Decodifica los escapes JS que afectan el textContent inyectado.
-      const next = src[j + 1]
-      out += next === '`' ? '`' : next === '\\' ? '\\' : next === '$' ? '$' : `\\${next}`
-      j += 2
-      continue
-    }
-    if (c === '`') break
-    out += c
-    j += 1
-  }
-  if (out.length === 0) throw new Error('CSS inyectado por sonner vacío')
-  return out
-}
-
-function sonnerStyleHash(): string {
-  const css = extractSonnerInjectedCss()
-  return 'sha256-' + createHash('sha256').update(css, 'utf-8').digest('base64')
-}
-
-function styleSrcFromVercelJson(): string {
+function cspFromVercelJson(): string {
   const vercel = JSON.parse(readFileSync(resolve('vercel.json'), 'utf-8'))
   const headers = vercel.headers?.[0]?.headers ?? []
   const csp = headers.find((h: { key: string }) => h.key === 'Content-Security-Policy')?.value
   if (!csp) throw new Error('No se encontró el header Content-Security-Policy en vercel.json')
-  const m = String(csp).match(/style-src ([^;]+);/)
-  if (!m) throw new Error('No se encontró la directiva style-src en la CSP')
-  return m[1]
+  return String(csp)
 }
 
-describe('CSP · hash de estilos de sonner', () => {
-  it('vercel.json incluye el hash sha256 del <style> que inyecta sonner', () => {
-    const hash = sonnerStyleHash()
-    const styleSrc = styleSrcFromVercelJson()
-    expect(
-      styleSrc.includes(`'${hash}'`),
-      `style-src de vercel.json no contiene el hash actual de sonner.\n` +
-        `Esperado: '${hash}'\n` +
-        `Actual style-src: ${styleSrc}\n` +
-        `→ Actualizá la directiva style-src en vercel.json con ese hash.`,
-    ).toBe(true)
+function directive(csp: string, name: string): string {
+  const m = csp.match(new RegExp(`(?:^|;)\\s*${name} ([^;]+)`))
+  return m ? m[1].trim() : ''
+}
+
+describe('CSP · postura de seguridad', () => {
+  const csp = cspFromVercelJson()
+
+  it('script-src se mantiene ESTRICTO (sin unsafe-inline ni unsafe-eval)', () => {
+    const scriptSrc = directive(csp, 'script-src')
+    expect(scriptSrc, 'falta script-src en la CSP').not.toBe('')
+    expect(scriptSrc).not.toContain("'unsafe-inline'")
+    expect(scriptSrc).not.toContain("'unsafe-eval'")
   })
 
-  it('style-src no usa unsafe-inline (residual acotado a style-src-attr)', () => {
-    expect(styleSrcFromVercelJson()).not.toContain("'unsafe-inline'")
+  it('mantiene object-src none + base-uri self + frame-src none', () => {
+    expect(directive(csp, 'object-src')).toContain("'none'")
+    expect(directive(csp, 'base-uri')).toContain("'self'")
+    expect(directive(csp, 'frame-src')).toContain("'none'")
+  })
+
+  it('style-src permite unsafe-inline (decisión documentada: <style> dinámicos)', () => {
+    expect(directive(csp, 'style-src')).toContain("'unsafe-inline'")
   })
 })
