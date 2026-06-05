@@ -1,9 +1,13 @@
 # https://www.robotstxt.org/robotstxt.html
-# AdministraTodo (control-consumo-agua) — la aplicación es un SaaS autenticado;
-# no hay rutas públicas indexables hoy. Cuando exista landing pública, ajustar
-# para permitir solo "/".
+# AdministraTodo (control-consumo-agua) — la aplicación es un SaaS autenticado y NO
+# debe indexarse, SALVO las páginas legales públicas (transparencia legal corporativa
+# y verificación de APIs de Google). Google aplica precedencia por longitud de ruta,
+# por lo que los Allow específicos prevalecen sobre el Disallow: / general.
 
 User-agent: *
+Allow: /politica-privacidad
+Allow: /terminos-servicio
+Allow: /acuerdo-dpa-cookies
 Disallow: /auth
 Disallow: /admin
 Disallow: /empresa
@@ -11,8 +15,7 @@ Disallow: /superadmin
 Disallow: /condominios
 Disallow: /agua
 Disallow: /api
-
-# Bloquear previews de Vercel para que no se indexen.
-User-agent: *
 Disallow: /
+
+Sitemap: https://administratodo.com/sitemap.xml
 Host: administratodo.com

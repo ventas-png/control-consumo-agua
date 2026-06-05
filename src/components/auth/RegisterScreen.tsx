@@ -19,6 +19,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  // Click-wrap obligatorio (RGPD/CCPA): desmarcado por defecto. Bloquea el envío.
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
 
   async function handleRegister() {
     setError('')
@@ -45,6 +47,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
       return
     }
 
+    if (!acceptedLegal) {
+      setError('Debes leer y aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA para continuar.')
+      return
+    }
+
     setLoading(true)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('create-cliente-account', {
@@ -54,6 +61,9 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
           cui_dui: cuiDui.trim(),
           fecha_nacimiento: fechaNacimiento,
           password,
+          // Evidencia click-wrap: el backend la valida y registra (versión + IP +
+          // timestamp + user-agent) en legal_acceptances.
+          legal_accepted: acceptedLegal,
         },
       })
 
@@ -327,11 +337,27 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
             )}
 
+            {/* Click-wrap obligatorio, inmediatamente antes del botón de envío. */}
+            <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginTop: '18px', fontSize: '12.5px', color: 'var(--at-ink-2)', lineHeight: 1.5, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={acceptedLegal}
+                onChange={e => setAcceptedLegal(e.target.checked)}
+                style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
+              />
+              <span>
+                He leído y acepto los{' '}
+                <a href="/terminos-servicio" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Términos de Servicio</a>, la{' '}
+                <a href="/politica-privacidad" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Política de Privacidad</a> y el{' '}
+                <a href="/acuerdo-dpa-cookies" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--at-primary)', textDecoration: 'underline' }}>Anexo de Procesamiento de Datos (DPA)</a> de administratodo.com.
+              </span>
+            </label>
+
             {/* Submit button */}
             <button
               className="reg-btn-primary"
               onClick={handleRegister}
-              disabled={loading}
+              disabled={loading || !acceptedLegal}
               style={{
                 marginTop: '20px',
                 width: '100%',

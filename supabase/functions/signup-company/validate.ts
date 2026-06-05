@@ -10,6 +10,9 @@ export interface SignupPayload {
   // Modulo inicial elegido en el formulario para personalizar el dashboard
   servicio_agua?: boolean
   servicio_condominios?: boolean
+  // Aceptacion click-wrap (RGPD/CCPA): debe venir en true. El handler registra la
+  // evidencia (version + IP + timestamp + user-agent) en legal_acceptances.
+  legal_accepted?: boolean
 }
 
 /** Devuelve un mensaje de error (es) si el payload es inválido, o `null` si es válido. */
@@ -30,6 +33,9 @@ export function validatePayload(p: SignupPayload): string | null {
   }
   if (p.servicio_agua !== true && p.servicio_condominios !== true) {
     return 'Selecciona al menos un servicio (agua o condominios)'
+  }
+  if (p.legal_accepted !== true) {
+    return 'Debes aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA'
   }
   return null
 }

@@ -1,0 +1,156 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   AdministraTodo · estilos de las páginas legales públicas
+   Scoped bajo .at-root (mismos tokens --c-* y tipografía Grotesk que el landing)
+   para mantener la identidad visual del sitio sin filtrar estilos a la app.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Barra superior simple con la marca y el enlace de regreso. */
+.at-root .legal-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--c-surface) 86%, transparent);
+  backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: 1px solid var(--c-line);
+}
+.at-root .legal-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+.at-root .legal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--c-ink);
+}
+.at-root .legal-back {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-ink_2);
+}
+.at-root .legal-back:hover { color: var(--c-primary); }
+
+/* Lienzo del documento. */
+.at-root .legal-main {
+  background: var(--c-bg);
+  padding: 48px 0 72px;
+}
+.at-root .legal-prose {
+  max-width: 820px;
+}
+
+/* Títulos. */
+.at-root .legal-prose h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+.at-root .legal-updated {
+  font-size: 14px;
+  color: var(--c-ink_3);
+  margin: 0 0 36px;
+}
+.at-root .legal-prose h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(20px, 2.4vw, 26px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--c-ink);
+  margin: 40px 0 14px;
+  padding-top: 8px;
+}
+.at-root .legal-prose h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--c-ink);
+  margin: 26px 0 10px;
+}
+/* Separador para el cambio de documento dentro del DPA (Política de Cookies). */
+.at-root .legal-prose h2.legal-divider {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: 2px solid var(--c-line);
+}
+.at-root .legal-prose .legal-subtle {
+  font-size: 14px;
+  color: var(--c-ink_3);
+  margin: 0 0 18px;
+}
+
+/* Cuerpo de texto. */
+.at-root .legal-prose p {
+  font-size: 16px;
+  line-height: 1.72;
+  color: var(--c-ink_2);
+  margin: 0 0 16px;
+}
+.at-root .legal-prose ul {
+  margin: 0 0 16px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.at-root .legal-prose li {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--c-ink_2);
+}
+.at-root .legal-prose strong { color: var(--c-ink); font-weight: 600; }
+.at-root .legal-prose a {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.at-root .legal-prose a:hover { color: var(--c-primary_hover); }
+
+/* Tablas (Finalidad/Base Legal en Privacidad; categorías de Cookies en el DPA). */
+.at-root .legal-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 22px;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+}
+.at-root .legal-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  min-width: 560px;
+}
+.at-root .legal-prose thead th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--c-ink);
+  background: var(--c-primary_soft);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--c-line);
+}
+.at-root .legal-prose tbody td {
+  padding: 12px 16px;
+  color: var(--c-ink_2);
+  line-height: 1.55;
+  border-bottom: 1px solid var(--c-line);
+  vertical-align: top;
+}
+.at-root .legal-prose tbody tr:last-child td { border-bottom: none; }
+.at-root .legal-prose tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--c-bg) 60%, transparent);
+}
+
+@media (max-width: 640px) {
+  .at-root .legal-main { padding: 32px 0 56px; }
+  .at-root .legal-prose p,
+  .at-root .legal-prose li { font-size: 15px; }
+}
