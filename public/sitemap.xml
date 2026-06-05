@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- AdministraTodo · sitemap. La app SaaS es autenticada y no se indexa; aquí solo
-     van las páginas públicas: la home y la suite legal (RGPD/CCPA + APIs de Google).
-     Cada página legal declara su alternativa en inglés (?lang=en) vía hreflang. -->
+<!-- AdministraTodo · sitemap. Solo las páginas públicas indexables: la suite legal
+     (RGPD/CCPA + APIs de Google). La app SaaS y el landing no se indexan (ver robots.txt),
+     por eso no se listan aquí — así cada URL del sitemap es rastreable y no genera avisos
+     de "bloqueado por robots.txt". Cada página declara su alternativa en inglés (hreflang). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  <url>
-    <loc>https://administratodo.com/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
-  </url>
   <url>
     <loc>https://administratodo.com/politica-privacidad</loc>
     <xhtml:link rel="alternate" hreflang="es" href="https://administratodo.com/politica-privacidad" />

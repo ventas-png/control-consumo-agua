@@ -3,8 +3,12 @@
 # debe indexarse, SALVO las páginas legales públicas (transparencia legal corporativa
 # y verificación de APIs de Google). Google aplica precedencia por longitud de ruta,
 # por lo que los Allow específicos prevalecen sobre el Disallow: / general.
+#
+# Importante: /sitemap.xml debe ir en Allow explícito — si no, el Disallow: / lo
+# bloquea y Search Console reporta "Couldn't fetch" al leer el sitemap.
 
 User-agent: *
+Allow: /sitemap.xml
 Allow: /politica-privacidad
 Allow: /terminos-servicio
 Allow: /acuerdo-dpa-cookies
