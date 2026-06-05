@@ -6,6 +6,11 @@ dist
 coverage
 storybook-static
 
+# Playwright (E2E) artifacts
+playwright-report
+test-results
+.playwright
+
 # Environment variables (contains secrets)
 .env
 .env.local

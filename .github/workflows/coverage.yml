@@ -1,0 +1,180 @@
+name: Coverage gate & E2E
+
+# ADITIVO a ci.yml (no lo toca). ci.yml corre tsc/test/build + coverage ADVISORY
+# (sin umbral). Este workflow agrega lo que falta para el Track T8:
+#   • coverage-gate: umbral DURO sobre la lógica de negocio crítica (money/auth).
+#   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
+#   • rls-harness:   verificación RLS server-side (gated por secreto).
+# Los jobs gated son no-op verdes cuando faltan los secretos del repo.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage-gate:
+    name: Coverage gate (lógica de negocio crítica)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Gate de UMBRAL sobre la lógica pura de negocio/auth (money/auth), donde la
+      # cobertura es real (~95%). Se corren SÓLO los test files dedicados de esos
+      # módulos: determinista, rápido (~7s) y sin el flake de timers que la
+      # instrumentación v8 provoca en tests de componentes (por eso ci.yml deja su
+      # coverage como advisory). Un umbral global de src/** sería ~9% (todo el UI
+      # sin unit tests) — inútil como gate. Umbrales vía CLI para NO tocar
+      # vite.config.ts (propiedad de la otra sesión). El "tests verdes" de toda la
+      # suite lo cubre ci.yml.
+      - name: Vitest + umbral de coverage (lógica de negocio crítica)
+        run: |
+          npx vitest run \
+            src/lib/__tests__/business.test.ts \
+            src/lib/__tests__/businessCondominios.test.ts \
+            src/lib/__tests__/businessFiscal.test.ts \
+            src/lib/__tests__/businessPagos.test.ts \
+            src/lib/__tests__/businessEnergia.test.ts \
+            src/lib/__tests__/validation.test.ts \
+            src/lib/__tests__/permissions.test.ts \
+            src/lib/__tests__/condominiosRoles.test.ts \
+            src/lib/__tests__/systemRoleIds.test.ts \
+            src/lib/__tests__/aguaPermissions.test.ts \
+            src/lib/__tests__/proyectosAccess.test.ts \
+            src/lib/__tests__/rutasAccess.test.ts \
+            --coverage \
+            --coverage.include='src/lib/business.ts' \
+            --coverage.include='src/lib/businessCondominios.ts' \
+            --coverage.include='src/lib/businessFiscal.ts' \
+            --coverage.include='src/lib/businessPagos.ts' \
+            --coverage.include='src/lib/businessEnergia.ts' \
+            --coverage.include='src/lib/validation.ts' \
+            --coverage.include='src/lib/permissions.ts' \
+            --coverage.include='src/lib/condominiosRoles.ts' \
+            --coverage.include='src/lib/systemRoleIds.ts' \
+            --coverage.include='src/lib/aguaPermissions.ts' \
+            --coverage.include='src/lib/proyectosAccess.ts' \
+            --coverage.include='src/lib/rutasAccess.ts' \
+            --coverage.thresholds.lines=90 \
+            --coverage.thresholds.statements=90 \
+            --coverage.thresholds.functions=90 \
+            --coverage.thresholds.branches=85
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-critical-${{ github.run_id }}
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: warn
+
+  e2e:
+    name: E2E (caminos de dinero/auth)
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
+      E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+      E2E_INVITE_TOKEN: ${{ secrets.E2E_INVITE_TOKEN }}
+      E2E_FISCAL_SANDBOX_READY: ${{ secrets.E2E_FISCAL_SANDBOX_READY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde.
+      - name: Gate por E2E_BASE_URL
+        id: gate
+        run: |
+          if [ -n "$E2E_BASE_URL" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "E2E_BASE_URL no configurado — E2E omitido (no-op verde). Ver e2e/README.md."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: npm ci
+
+      # Playwright se instala ON-DEMAND (no está en package.json a propósito: evita
+      # que el npm ci de ci.yml dispare la descarga de browsers).
+      - name: Install Playwright (on-demand)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          npm i -D --no-save @playwright/test@^1.48.0 @types/node@^20
+          npx playwright install --with-deps chromium
+
+      - name: Type-check e2e
+        if: steps.gate.outputs.run == 'true'
+        run: npx tsc -p e2e/tsconfig.json
+
+      - name: Run E2E
+        if: steps.gate.outputs.run == 'true'
+        run: npx playwright test --config e2e/playwright.config.ts
+
+      - name: Upload Playwright report
+        if: ${{ steps.gate.outputs.run == 'true' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  rls-harness:
+    name: RLS harness (server-side)
+    runs-on: ubuntu-latest
+    env:
+      RLS_SUPABASE_URL: ${{ secrets.RLS_SUPABASE_URL }}
+      RLS_SUPABASE_ANON_KEY: ${{ secrets.RLS_SUPABASE_ANON_KEY }}
+      RLS_USER_A_EMAIL: ${{ secrets.RLS_USER_A_EMAIL }}
+      RLS_USER_A_PASSWORD: ${{ secrets.RLS_USER_A_PASSWORD }}
+      RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
+      RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate por RLS_SUPABASE_URL
+        id: gate
+        run: |
+          if [ -n "$RLS_SUPABASE_URL" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "RLS secrets no configurados — harness omitido (no-op verde). Ver src/test/rls/README.md."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: npm ci
+
+      - name: Run RLS harness
+        if: steps.gate.outputs.run == 'true'
+        run: npx vitest run src/test/rls/rlsHarness.test.ts
