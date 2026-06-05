@@ -160,3 +160,9 @@ jobs:
       # → valida el JWT a mano via requireUser.
       - name: Deploy validate-upload (no JWT — valida JWT a mano; magic-bytes + tamaño + SVG)
         run: bash .github/scripts/deploy-fn.sh validate-upload --no-verify-jwt
+
+      # SSO/SAML admin (plat:P10): admin de dominios + proveedor SAML por tenant.
+      # Deriva company_id de la sesión, exige owner/admin; verify_jwt=false → valida
+      # el token a mano (service_role o JWT admin/owner). Handshake real parqueado (#430).
+      - name: Deploy sso-admin (no JWT — valida token a mano, service_role o admin/owner)
+        run: bash .github/scripts/deploy-fn.sh sso-admin --no-verify-jwt
