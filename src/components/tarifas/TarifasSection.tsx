@@ -3,7 +3,7 @@ import { confirm, notify } from '../shared/Dialog'
 import type { Tarifa, Proyecto } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { supabase } from '../../lib/supabase'
+import { createTarifa, updateTarifa, setTarifaActiva, deleteTarifa } from '../../domain/tarifas/mutations'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
@@ -118,32 +118,27 @@ export function TarifasSection({
     setLoading(true)
 
     if (editingId) {
-      const { data, error } = await supabase
-        .from('tarifas')
-        .update({
-          nombre,
-          tipo_agua: form.tipo_agua,
-          precio_m3,
-          precio_m3_exceso,
-          canon_fijo,
-          consumo_minimo,
-          descripcion: form.descripcion || null,
-          activa: true,
-          fecha_revision: form.fecha_revision || null,
-          updated_at: new Date().toISOString(),
-          updated_by: currentUser.user_id,
-          updated_by_name: currentUser.name || currentUser.email,
-        })
-        .eq('id', editingId)
-        .select()
-        .single()
+      const { data, error } = await updateTarifa(editingId, {
+        nombre,
+        tipo_agua: form.tipo_agua,
+        precio_m3,
+        precio_m3_exceso,
+        canon_fijo,
+        consumo_minimo,
+        descripcion: form.descripcion || null,
+        activa: true,
+        fecha_revision: form.fecha_revision || null,
+        updated_at: new Date().toISOString(),
+        updated_by: currentUser.user_id,
+        updated_by_name: currentUser.name || currentUser.email,
+      })
 
       if (!error && data) {
         onTarifaUpdated(editingId, data as Tarifa)
         cancelForm()
         notify({ variant: 'success', title: 'Tarifa actualizada', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar la tarifa.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo actualizar la tarifa.' })
       }
     } else {
       // Derive project_id from the explicitly selected project in the form.
@@ -157,30 +152,26 @@ export function TarifasSection({
         return
       }
 
-      const { data, error } = await supabase
-        .from('tarifas')
-        .insert({
-          nombre,
-          tipo_agua: form.tipo_agua,
-          precio_m3,
-          precio_m3_exceso,
-          canon_fijo,
-          consumo_minimo,
-          descripcion: form.descripcion || null,
-          activa: form.activa,
-          fecha_revision: form.fecha_revision || null,
-          project_id: projectId,
-          company_id: companyId,
-        })
-        .select()
-        .single()
+      const { data, error } = await createTarifa({
+        nombre,
+        tipo_agua: form.tipo_agua,
+        precio_m3,
+        precio_m3_exceso,
+        canon_fijo,
+        consumo_minimo,
+        descripcion: form.descripcion || null,
+        activa: form.activa,
+        fecha_revision: form.fecha_revision || null,
+        project_id: projectId,
+        company_id: companyId,
+      })
 
       if (!error && data) {
         onTarifaAdded(data as Tarifa)
         cancelForm()
         notify({ variant: 'success', title: 'Tarifa creada', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo guardar la tarifa.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo guardar la tarifa.' })
       }
     }
 
@@ -188,10 +179,7 @@ export function TarifasSection({
   }
 
   async function handleToggleActiva(t: Tarifa) {
-    const { error } = await supabase
-      .from('tarifas')
-      .update({ activa: !t.activa, updated_at: new Date().toISOString() })
-      .eq('id', t.id)
+    const { error } = await setTarifaActiva(t.id, !t.activa)
 
     if (!error) {
       onTarifaUpdated(t.id, { activa: !t.activa })
@@ -211,12 +199,12 @@ export function TarifasSection({
 
     if (!result.isConfirmed) return
 
-    const { error } = await supabase.from('tarifas').delete().eq('id', t.id)
+    const { error } = await deleteTarifa(t.id)
     if (!error) {
       onTarifaDeleted(t.id)
       notify({ variant: 'success', title: 'Tarifa eliminada', duration: 1500 })
     } else {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar la tarifa.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo eliminar la tarifa.' })
     }
   }
 
