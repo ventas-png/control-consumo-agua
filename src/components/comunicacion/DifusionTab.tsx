@@ -1,10 +1,9 @@
 import { useState, useEffect, type CSSProperties} from 'react'
-import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad, UserSession } from '../../types'
+import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { confirm, notify } from '../shared/Dialog'
 
 interface Props {
-  currentUser: UserSession
   clientes: Cliente[]
   proyectos: Proyecto[]
   unidades: Unidad[]
@@ -65,12 +64,11 @@ function resolveEstimatedCount(
 // ── Modal ──────────────────────────────────────────────────────────────────────
 
 function NuevoComunicadoModal({
-  clientes, proyectos, unidades, currentUser, onClose, onSent,
+  clientes, proyectos, unidades, onClose, onSent,
 }: {
   clientes: Cliente[]
   proyectos: Proyecto[]
   unidades: Unidad[]
-  currentUser: UserSession
   onClose: () => void
   onSent: () => void
 }) {
@@ -125,9 +123,6 @@ function NuevoComunicadoModal({
       target_type: form.target_type,
       target_ids: targetIds(),
       send_email: form.send_email,
-      currentUser,
-      allClientes: clientes,
-      allUnidades: unidades,
     })
     setSending(false)
 
@@ -137,7 +132,7 @@ function NuevoComunicadoModal({
     }
 
     const emailInfo = form.send_email
-      ? ` · ${result.emailsSent} emails enviados${result.emailErrors > 0 ? `, ${result.emailErrors} fallidos` : ''}`
+      ? ` · ${result.emailsQueued} emails en cola de envío`
       : ''
 
     notify({
@@ -469,7 +464,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 
 // ── Main tab ───────────────────────────────────────────────────────────────────
 
-export default function DifusionTab({ currentUser, clientes, proyectos, unidades, canCreate }: Props) {
+export default function DifusionTab({ clientes, proyectos, unidades, canCreate }: Props) {
   const { broadcasts, loading, loadBroadcasts } = useBroadcasts()
   const [showModal, setShowModal] = useState(false)
 
@@ -538,7 +533,6 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
           clientes={clientes}
           proyectos={proyectos}
           unidades={unidades}
-          currentUser={currentUser}
           onClose={() => setShowModal(false)}
           onSent={loadBroadcasts}
         />

@@ -1,70 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
+import { useTeamUsersQuery } from '../../domain/comunicacion/queries'
 import { sanitizeInput } from '../../lib/validation'
-import { supabase } from '../../lib/supabase'
-import { SecureImage } from '../shared/SecureImage'
-import { useSignedUrl } from '../../lib/storageUrls'
 import DifusionTab from './DifusionTab'
 import { NuevaConversacionModal } from './NuevaConversacionModal'
 import { NuevaDiscusionInternaModal } from './NuevaDiscusionInternaModal'
-
-// Sub-componente para firmar el link a un adjunto no-imagen del chat
-// (bucket conv-attachments es privado tras S6 follow-up).
-function AttachmentLink({ src, name, type, getIcon, body }: {
-  src: string
-  name?: string | null
-  type?: string | null
-  getIcon: (mime?: string | null) => string
-  body?: string | null
-}) {
-  const signed = useSignedUrl(src, 'conv-attachments')
-  if (!signed) return null
-  return (
-    <a
-      href={signed}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        marginTop: body ? '6px' : 0,
-        background: 'rgba(0,0,0,0.08)', borderRadius: '8px',
-        padding: '8px 10px', color: 'inherit', textDecoration: 'none',
-      }}
-    >
-      <span style={{ fontSize: '20px' }}>{getIcon(type)}</span>
-      <div style={{ overflow: 'hidden' }}>
-        <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {name}
-        </div>
-      </div>
-    </a>
-  )
-}
-
-// Sub-componente para imágenes adjuntas: SecureImage envuelta en link firmado.
-function AttachmentImage({ src, name, body }: { src: string; name?: string | null; body?: string | null }) {
-  const signed = useSignedUrl(src, 'conv-attachments')
-  if (!signed) return null
-  return (
-    <a href={signed} target="_blank" rel="noopener noreferrer">
-      <SecureImage
-        bucket="conv-attachments"
-        src={src}
-        alt={name ?? 'imagen'}
-        style={{ maxWidth: '220px', maxHeight: '200px', borderRadius: '8px', marginTop: body ? '6px' : 0, display: 'block' }}
-      />
-    </a>
-  )
-}
 import { AssignToUsersModal } from './AssignToUsersModal'
-import { ConversationList } from './ConversationList'
 import { AccessRulesPanel } from './AccessRulesPanel'
-import {
-  CATEGORY_LABELS, PRIORITY_LABELS, PRIORITY_COLORS,
-  STATUS_LABELS, STATUS_COLORS,
-  getFileIcon, formatBytes,
-} from './conversationConstants'
+import { ConversationStatsBar } from './ConversationStatsBar'
+import { ConversationListPanel } from './ConversationListPanel'
+import { ConversationDetailView } from './ConversationDetailView'
+import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type {
   UserSession,
   Cliente,
@@ -76,7 +23,6 @@ import type {
   ConversationStatus,
   ConversationServiceType,
 } from '../../types'
-import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 
 interface Props {
   currentUser: UserSession
@@ -88,7 +34,34 @@ interface Props {
   serviceType?: ConversationServiceType
 }
 
-// ── Componente principal ─────────────────────────────────────────────────────
+type MainTab = 'conversaciones' | 'difusion' | 'preferencias'
+
+const TAB_ICONS: Record<MainTab, ReactNode> = {
+  conversaciones: (
+    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  ),
+  difusion: (
+    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+    </svg>
+  ),
+  preferencias: (
+    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+}
+
+const TAB_LABELS: Record<MainTab, string> = {
+  conversaciones: 'Conversaciones',
+  difusion: 'Difusión',
+  preferencias: 'Notificaciones',
+}
+
+// ── Componente principal (orquestador; sub-componentes en com:N6) ────────────
 export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, canCreate, canEdit, serviceType = 'agua' }: Props) {
   const {
     conversations,
@@ -117,7 +90,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     serviceType,
   })
 
-  const [mainTab, setMainTab] = useState<'conversaciones' | 'difusion'>('conversaciones')
+  const [mainTab, setMainTab] = useState<MainTab>('conversaciones')
   const [view, setView] = useState<'list' | 'detail' | 'config'>('list')
   const [convTab, setConvTab] = useState<'clientes' | 'equipo'>('clientes')
   const [filterText, setFilterText] = useState('')
@@ -129,11 +102,16 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   const [showNuevaInternaModal, setShowNuevaInternaModal] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
-  const [teamUsers, setTeamUsers] = useState<{ id: string; full_name: string; role: string }[]>([])
-  const teamUsersLoadedRef = useRef(false)
+  // Carga perezosa de usuarios del equipo: solo cuando se va a asignar (com:N6 →
+  // capa de datos useTeamUsersQuery, habilitada al pedirla).
+  const [teamUsersRequested, setTeamUsersRequested] = useState(false)
+  const { data: teamUsers = [] } = useTeamUsersQuery(
+    teamUsersRequested ? currentUser.company_id : undefined,
+  )
 
   const clientesTabLabel = serviceType === 'condominios' ? 'Residentes' : 'Clientes'
   const showDifusion = serviceType !== 'condominios'
+  const mainTabs: MainTab[] = ['conversaciones', ...(showDifusion ? ['difusion' as const] : []), 'preferencias']
 
   // isAdmin: puede VER el panel de configuración
   // For condominios: exempt platform roles OR has the "Administrador General" system role
@@ -192,21 +170,6 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     loadAssignments()
     if (isAdmin) loadAccessRules()
   }, [loadConversations, loadAssignments, loadAccessRules, isAdmin])
-
-  async function loadTeamUsers() {
-    if (teamUsersLoadedRef.current || !currentUser.company_id) return
-    const { data } = await supabase
-      .from('app_users')
-      .select('id, full_name, role')
-      .eq('company_id', currentUser.company_id)
-      .eq('activo', true)
-      .neq('role', 'cliente')
-      .order('full_name')
-    if (data) {
-      setTeamUsers(data)
-      teamUsersLoadedRef.current = true
-    }
-  }
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) ?? null
 
@@ -276,8 +239,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     }
   }
 
-  async function handleOpenAssignModal() {
-    await loadTeamUsers()
+  function handleOpenAssignModal() {
+    setTeamUsersRequested(true)
     setShowAssignModal(true)
   }
 
@@ -352,9 +315,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* ── Main tabs: Conversaciones / Difusión ── */}
+      {/* ── Main tabs: Conversaciones / Difusión / Notificaciones ── */}
       <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', paddingBottom: '0' }}>
-        {(['conversaciones', ...(showDifusion ? ['difusion'] : [])] as ('conversaciones' | 'difusion')[]).map(tab => {
+        {mainTabs.map(tab => {
           const active = mainTab === tab
           return (
             <button
@@ -369,21 +332,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 display: 'flex', alignItems: 'center', gap: '8px',
               }}
             >
-              {tab === 'conversaciones' ? (
-                <>
-                  <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  Conversaciones
-                </>
-              ) : (
-                <>
-                  <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                  </svg>
-                  Difusión
-                </>
-              )}
+              {TAB_ICONS[tab]}
+              {TAB_LABELS[tab]}
             </button>
           )
         })}
@@ -392,11 +342,19 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {/* ── Difusión tab ── */}
       {mainTab === 'difusion' && (
         <DifusionTab
-          currentUser={currentUser}
           clientes={clientes}
           proyectos={proyectos}
           unidades={unidades}
           canCreate={canCreate}
+        />
+      )}
+
+      {/* ── Preferencias de notificación tab ── */}
+      {mainTab === 'preferencias' && (
+        <NotificationPreferencesPanel
+          userId={currentUser.user_id}
+          companyId={currentUser.company_id}
+          lockInApp
         />
       )}
 
@@ -451,25 +409,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       </div>
 
       {/* ── Stats rápidas ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
-        {[
-          { label: 'Abiertas', value: stats.abiertas, color: 'var(--at-primary-2)' },
-          { label: 'En Progreso', value: stats.en_progreso, color: 'var(--at-warning)' },
-          { label: 'Esperando', value: stats.esperando, color: 'var(--at-accent)' },
-          { label: 'Resueltas', value: stats.resueltas, color: 'var(--at-success)' },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: 'var(--at-surface)',
-            border: '1px solid var(--at-line)',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            borderTop: `3px solid ${s.color}`,
-          }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+      <ConversationStatsBar stats={stats} />
 
       {/* ── Vista Configuración ── */}
       {view === 'config' && isAdmin && (
@@ -496,426 +436,50 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           alignItems: 'start',
           minHeight: '500px',
         }}>
-          {/* Lista */}
-          <div style={{
-            background: 'var(--at-surface)',
-            border: '1px solid var(--at-line)',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            {/* Tabs: Clientes / Equipo */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--at-chip)' }}>
-              {([['clientes', `👥 ${clientesTabLabel}`, clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
-                <button key={tab} onClick={() => { setConvTab(tab); setView('list') }}
-                  style={{
-                    flex: 1, padding: '10px 8px', border: 'none', borderBottom: `2px solid ${convTab === tab ? (tab === 'equipo' ? 'var(--at-accent-hover)' : 'var(--at-primary)') : 'transparent'}`,
-                    background: 'var(--at-surface)', cursor: 'pointer', fontSize: '12.5px', fontWeight: convTab === tab ? 700 : 400,
-                    color: convTab === tab ? (tab === 'equipo' ? 'var(--at-accent-hover)' : 'var(--at-primary)') : 'var(--at-ink-3)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
-                  }}>
-                  {label}
-                  <span style={{ background: convTab === tab ? (tab === 'equipo' ? 'var(--at-accent-tint)' : 'var(--at-primary-soft)') : 'var(--at-chip)', color: convTab === tab ? (tab === 'equipo' ? 'var(--at-accent-hover)' : 'var(--at-primary-hover)') : 'var(--at-ink-3)', borderRadius: '999px', padding: '1px 6px', fontSize: '11px', fontWeight: 600 }}>
-                    {count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Filtros */}
-            <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-chip)' }}>
-              <input
-                type="text"
-                placeholder="Buscar conversación..."
-                value={filterText}
-                onChange={e => setFilterText(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px',
-                  border: '1px solid var(--at-line)',
-                  borderRadius: '8px',
-                  fontSize: '12.5px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  marginBottom: '8px',
-                }}
-              />
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <select
-                  value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value as ConversationStatus | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
-                >
-                  <option value="todas">Todos los estados</option>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-                <select
-                  value={filterCategory}
-                  onChange={e => setFilterCategory(e.target.value as ConversationCategory | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
-                >
-                  <option value="todas">Todas las categorías</option>
-                  {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
-                    <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Lista de conversaciones */}
-            <div style={{ flex: 1, overflowY: 'auto', maxHeight: '600px' }}>
-              {loading ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13px' }}>
-                  Cargando…
-                </div>
-              ) : (
-                <ConversationList
-                  conversations={visibleConversations}
-                  activeId={activeConversationId}
-                  onSelect={handleSelectConversation}
-                  filter={filterText}
-                  unseenConvIds={unseenConvIds}
-                />
-              )}
-            </div>
-          </div>
+          <ConversationListPanel
+            convTab={convTab}
+            onChangeTab={tab => { setConvTab(tab); setView('list') }}
+            clientesTabLabel={clientesTabLabel}
+            clientConvCount={clientConvs.length}
+            teamConvCount={teamConvs.length}
+            filterText={filterText}
+            onFilterText={setFilterText}
+            filterStatus={filterStatus}
+            onFilterStatus={setFilterStatus}
+            filterCategory={filterCategory}
+            onFilterCategory={setFilterCategory}
+            serviceType={serviceType}
+            loading={loading}
+            visibleConversations={visibleConversations}
+            activeConversationId={activeConversationId}
+            onSelect={handleSelectConversation}
+            unseenConvIds={unseenConvIds}
+          />
 
           {/* Detalle */}
           {view === 'detail' && activeConversation && (
-            <div style={{
-              background: 'var(--at-surface)',
-              border: '1px solid var(--at-line)',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              minHeight: '500px',
-            }}>
-              {/* Header conversación */}
-              <div style={{
-                padding: '14px 16px',
-                borderBottom: '1px solid var(--at-chip)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => setView('list')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '18px', padding: '0', lineHeight: 1 }}
-                    >
-                      ←
-                    </button>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{activeConversation.subject}</span>
-                    <span style={{
-                      fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                      background: STATUS_COLORS[activeConversation.status] + '18',
-                      color: STATUS_COLORS[activeConversation.status], fontWeight: 600,
-                    }}>
-                      {STATUS_LABELS[activeConversation.status]}
-                    </span>
-                    <span style={{
-                      fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                      background: PRIORITY_COLORS[activeConversation.priority] + '18',
-                      color: PRIORITY_COLORS[activeConversation.priority], fontWeight: 600,
-                    }}>
-                      {PRIORITY_LABELS[activeConversation.priority]}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px', marginLeft: '26px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    {activeConversation.is_internal ? (
-                      <span style={{ background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 600 }}>
-                        🏢 Discusión interna de equipo
-                      </span>
-                    ) : (
-                      <span>{activeConversation.cliente_nombre} ·</span>
-                    )}
-                    <span>{CATEGORY_LABELS[activeConversation.category]}</span>
-                    {activeConversation.assigned_name && <span>· Agente: {activeConversation.assigned_name}</span>}
-                  </div>
-                </div>
-                {canEdit && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-                    <select
-                      value={activeConversation.status}
-                      onChange={e => handleChangeStatus(e.target.value as ConversationStatus)}
-                      style={{
-                        padding: '6px 10px',
-                        border: '1px solid var(--at-line-strong)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        outline: 'none',
-                      }}
-                    >
-                      {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                      ))}
-                    </select>
-                    {/* Asignación principal */}
-                    {activeConversation.assigned_name ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
-                          👤 {activeConversation.assigned_name}
-                        </span>
-                        <button
-                          onClick={handleUnassign}
-                          style={{ background: 'none', border: '1px solid var(--at-line-strong)', borderRadius: '6px', fontSize: '11px', color: 'var(--at-ink-3)', cursor: 'pointer', padding: '2px 8px' }}
-                        >
-                          Desasignar
-                        </button>
-                        {activeConversation.assigned_to !== currentUser.user_id && (
-                          <button
-                            onClick={handleAssignToMe}
-                            style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11px', color: 'var(--at-primary-hover)', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
-                          >
-                            Asignarme
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleAssignToMe}
-                        style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11.5px', color: 'var(--at-primary-hover)', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
-                      >
-                        + Asignarme
-                      </button>
-                    )}
-                    {/* Asignación a equipo */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                      <button
-                        onClick={handleOpenAssignModal}
-                        style={{
-                          background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px',
-                          fontSize: '11.5px', color: 'var(--at-success-strong)', cursor: 'pointer', padding: '4px 10px', fontWeight: 600,
-                        }}
-                      >
-                        👥 Asignar a...
-                      </button>
-                      {activeAssignments.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
-                          {activeAssignments.map(a => (
-                            <span
-                              key={a.id}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: 'var(--at-accent-tint)', color: 'var(--at-accent-dark)',
-                                fontSize: '11px', padding: '2px 6px', borderRadius: '999px', fontWeight: 500,
-                              }}
-                            >
-                              {a.user_name}
-                              <button
-                                onClick={() => handleRemoveAssignment(a.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-accent-hover)', padding: '0', lineHeight: 1, fontSize: '12px' }}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Mensajes */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px' }}>
-                {messages.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13px', marginTop: '40px' }}>
-                    No hay mensajes aún
-                  </div>
-                ) : (
-                  messages.map(msg => {
-                    const isAgent = msg.sender_type === 'agent'
-                    const isNote = msg.is_internal_note
-                    return (
-                      <div key={msg.id} style={{
-                        display: 'flex',
-                        justifyContent: isAgent ? 'flex-end' : 'flex-start',
-                      }}>
-                        <div style={{
-                          maxWidth: '72%',
-                          padding: '10px 13px',
-                          borderRadius: isAgent ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
-                          background: isNote
-                            ? 'var(--at-warning-tint)'
-                            : isAgent
-                            ? 'var(--at-primary)'
-                            : 'var(--at-chip)',
-                          color: isNote ? 'var(--at-warning-strong)' : isAgent ? 'white' : 'var(--at-ink)',
-                          border: isNote ? '1px solid var(--at-warning-border)' : 'none',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                        }}>
-                          <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', opacity: 0.7 }}>
-                            {isNote ? '📝 Nota interna · ' : ''}{msg.sender_name ?? 'Usuario'}
-                          </div>
-                          {msg.body && (
-                            <div style={{ fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                              {msg.body}
-                            </div>
-                          )}
-                          {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
-                            <AttachmentImage src={msg.attachment_url} name={msg.attachment_name} body={msg.body} />
-                          )}
-                          {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
-                            <AttachmentLink
-                              src={msg.attachment_url}
-                              name={msg.attachment_name}
-                              type={msg.attachment_type}
-                              getIcon={getFileIcon}
-                              body={msg.body}
-                            />
-                          )}
-                          <div style={{ fontSize: '10px', opacity: 0.6, marginTop: '5px', textAlign: 'right' }}>
-                            {new Date(msg.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-
-              {/* Compositor de mensaje */}
-              {canCreate && activeConversation.status !== 'cerrada' && (
-                <div style={{ borderTop: '1px solid var(--at-chip)', padding: '12px 14px' }}>
-                  {/* Toggle nota interna — solo para conversaciones con clientes */}
-                  {!activeConversation.is_internal && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
-                      <input type="checkbox" checked={isInternalNote} onChange={e => setIsInternalNote(e.target.checked)}
-                        style={{ width: '13px', height: '13px', accentColor: 'var(--at-warning)' }} />
-                      Nota interna (solo visible para el equipo)
-                    </label>
-                  )}
-                  {/* Preview archivo pendiente */}
-                  {pendingFile && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      padding: '7px 10px', marginBottom: '7px',
-                      background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)',
-                      borderRadius: '8px',
-                    }}>
-                      {pendingFile.type.startsWith('image/') ? (
-                        <img
-                          src={URL.createObjectURL(pendingFile)}
-                          alt="preview"
-                          style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{getFileIcon(pendingFile.type)}</span>
-                      )}
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--at-primary-hover)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {pendingFile.name}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{formatBytes(pendingFile.size)}</div>
-                      </div>
-                      <button
-                        onClick={() => setPendingFile(null)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                    <textarea
-                      value={messageText}
-                      onChange={e => setMessageText(e.target.value)}
-                      placeholder={isInternalNote ? 'Escribe una nota interna…' : 'Escribe una respuesta al cliente…'}
-                      rows={3}
-                      style={{
-                        flex: 1,
-                        padding: '10px 12px',
-                        border: `1px solid ${isInternalNote ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
-                        borderRadius: '10px',
-                        fontSize: '13px',
-                        resize: 'none',
-                        outline: 'none',
-                        fontFamily: 'inherit',
-                        background: isInternalNote ? 'var(--at-warning-tint)' : 'var(--at-surface)',
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendMessage()
-                      }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid var(--at-line)', borderRadius: '10px', background: 'var(--at-surface)', fontSize: '18px' }}>
-                        📎
-                        <input
-                          type="file"
-                          accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv"
-                          style={{ display: 'none' }}
-                          onChange={e => {
-                            const file = e.target.files?.[0]
-                            e.target.value = ''
-                            if (!file) return
-                            if (file.size > 10 * 1024 * 1024) {
-                              notify({ variant: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
-                              return
-                            }
-                            setPendingFile(file)
-                          }}
-                        />
-                      </label>
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={sending || (!messageText.trim() && !pendingFile)}
-                        style={{
-                          padding: '10px 16px',
-                          background: (sending || (!messageText.trim() && !pendingFile)) ? 'var(--at-ink-3)' : 'var(--at-primary)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '10px',
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          cursor: (sending || (!messageText.trim() && !pendingFile)) ? 'not-allowed' : 'pointer',
-                          whiteSpace: 'nowrap',
-                          transition: 'background 0.14s',
-                        }}
-                      >
-                        {sending ? '…' : 'Enviar'}
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '5px' }}>
-                    Ctrl+Enter para enviar · Max 10 MB por adjunto
-                  </div>
-                </div>
-              )}
-
-              {activeConversation.status === 'cerrada' && (
-                <div style={{
-                  borderTop: '1px solid var(--at-chip)', padding: '12px 14px',
-                  background: 'var(--at-surface-2)', textAlign: 'center',
-                  fontSize: '12.5px', color: 'var(--at-ink-3)',
-                }}>
-                  Esta conversación está cerrada.
-                  {canEdit && (
-                    <button
-                      onClick={() => handleChangeStatus('abierta')}
-                      style={{ marginLeft: '10px', color: 'var(--at-primary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}
-                    >
-                      Reabrir
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Placeholder si no hay conversación seleccionada */}
-          {view === 'list' && conversations.length > 0 && (
-            <div style={{
-              display: 'none', // solo en mobile ya que ocultamos el detalle
-            }} />
+            <ConversationDetailView
+              conversation={activeConversation}
+              messages={messages}
+              canCreate={canCreate}
+              canEdit={canEdit}
+              currentUserId={currentUser.user_id}
+              activeAssignments={activeAssignments}
+              onBack={() => setView('list')}
+              onChangeStatus={handleChangeStatus}
+              onAssignToMe={handleAssignToMe}
+              onUnassign={handleUnassign}
+              onOpenAssignModal={handleOpenAssignModal}
+              onRemoveAssignment={handleRemoveAssignment}
+              messageText={messageText}
+              onChangeMessage={setMessageText}
+              isInternalNote={isInternalNote}
+              onToggleInternalNote={setIsInternalNote}
+              pendingFile={pendingFile}
+              onPickFile={setPendingFile}
+              sending={sending}
+              onSendMessage={handleSendMessage}
+            />
           )}
         </div>
       )}
