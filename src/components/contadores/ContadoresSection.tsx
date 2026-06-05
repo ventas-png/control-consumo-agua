@@ -2,7 +2,7 @@ import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Contador, Tarifa, TipoAgua, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
-import { supabase } from '../../lib/supabase'
+import { updateContador, setContadorActivo, deleteContador } from '../../domain/contadores/mutations'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { contadorInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput } from '../../lib/validation'
@@ -191,9 +191,7 @@ export function ContadoresSection({
       const updatedProjectId = selectedUnidad?.project_id ?? null
       const updatedCompanyId = selectedUnidad?.company_id ?? null
 
-      const { data, error } = await supabase
-        .from('contadores')
-        .update({
+      const { data, error } = await updateContador(editingId, {
           numero_serie,
           tipo_agua: form.tipo_agua,
           descripcion: form.descripcion || null,
@@ -223,16 +221,13 @@ export function ContadoresSection({
           updated_by: currentUser.user_id,
           updated_by_name: currentUser.name || currentUser.email,
         })
-        .eq('id', editingId)
-        .select()
-        .single()
 
       if (!error && data) {
         onContadorUpdated(editingId, data as Contador)
         cancelForm()
         notify({ variant: 'success', title: 'Contador actualizado', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar el contador.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo actualizar el contador.' })
       }
     } else {
       // Derive project_id and company_id from the selected unidad, not from the current user.
@@ -300,10 +295,7 @@ export function ContadoresSection({
   }
 
   async function handleToggleActivo(c: Contador) {
-    const { error } = await supabase
-      .from('contadores')
-      .update({ activo: !c.activo, updated_at: new Date().toISOString() })
-      .eq('id', c.id)
+    const { error } = await setContadorActivo(c.id, !c.activo)
 
     if (!error) {
       onContadorUpdated(c.id, { activo: !c.activo })
@@ -322,12 +314,12 @@ export function ContadoresSection({
     })
     if (!conf.isConfirmed) return
 
-    const { error } = await supabase.from('contadores').delete().eq('id', c.id)
+    const { error } = await deleteContador(c.id)
     if (!error) {
       onContadorDeleted(c.id)
       notify({ variant: 'success', title: 'Contador eliminado', duration: 1500 })
     } else {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo eliminar el contador.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo eliminar el contador.' })
     }
   }
 
