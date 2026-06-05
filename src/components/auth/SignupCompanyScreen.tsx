@@ -110,7 +110,6 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   if (success) {
     return (
       <div className="signup-screen">
-        <style>{styles}</style>
         <div className="signup-card success">
           <div className="signup-logo"><BrandLogo size={48} /></div>
           <div className="success-check">✓</div>
@@ -132,7 +131,6 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
 
   return (
     <div className="signup-screen">
-      <style>{styles}</style>
       <div className="signup-card">
         <button className="signup-back" onClick={onBack} type="button">← Volver</button>
         <div className="signup-logo"><BrandLogo size={48} /></div>
@@ -242,103 +240,4 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   )
 }
 
-const styles = `
-.signup-screen {
-  position: fixed; inset: 0; z-index: 2000;
-  background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
-  display: flex; align-items: center; justify-content: center;
-  overflow: auto; padding: 20px;
-}
-.signup-card {
-  background: var(--at-surface); border-radius: 20px;
-  box-shadow: 0 30px 80px rgba(0,0,0,.3);
-  width: 100%; max-width: 480px; padding: 32px;
-  position: relative;
-}
-.signup-card.success { text-align: center; }
-.signup-back {
-  position: absolute; top: 16px; left: 16px;
-  background: none; border: none; color: var(--at-ink-3);
-  cursor: pointer; font-size: 13px; font-weight: 500;
-  padding: 6px 10px; border-radius: 6px;
-}
-.signup-back:hover { background: var(--at-surface-2); }
-.signup-logo { display: flex; justify-content: center; margin-bottom: 14px; margin-top: 8px; }
-.signup-card h1 { font-size: 22px; font-weight: 800; color: var(--at-ink); margin: 0 0 6px; text-align: center; }
-.signup-subtitle { color: var(--at-ink-3); font-size: 14px; margin: 0 0 24px; text-align: center; }
-.signup-stepper { display: flex; align-items: center; justify-content: center; margin-bottom: 24px; gap: 8px; }
-.signup-step { display: flex; align-items: center; gap: 8px; opacity: 0.4; transition: opacity 0.2s; }
-.signup-step.active { opacity: 1; }
-.signup-step-num {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--at-primary); color: white;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 13px;
-}
-.signup-step-label { font-size: 13px; font-weight: 600; color: var(--at-ink-2); }
-.signup-step-divider { width: 40px; height: 2px; background: var(--at-line); }
-.signup-field { display: block; margin-bottom: 14px; }
-.signup-field > span {
-  display: block; font-size: 12px; font-weight: 700;
-  color: var(--at-ink-2); margin-bottom: 5px;
-  text-transform: uppercase; letter-spacing: 0.04em;
-}
-.signup-field input {
-  width: 100%; box-sizing: border-box;
-  padding: 11px 14px; border: 1.5px solid var(--at-line);
-  border-radius: 10px; font-size: 14px;
-  background: var(--at-surface); color: var(--at-ink);
-  outline: none; transition: border-color 0.15s;
-}
-.signup-field input:focus { border-color: var(--at-primary); box-shadow: 0 0 0 3px rgba(27,59,54,0.12); }
-.signup-pw-wrap { position: relative; }
-.signup-pw-wrap input { padding-right: 42px; }
-.signup-pw-wrap button {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; cursor: pointer; font-size: 16px;
-  padding: 0; opacity: 0.6;
-}
-.signup-error {
-  background: var(--at-danger-tint); border: 1px solid var(--at-danger-border);
-  color: var(--at-danger); border-radius: 10px;
-  padding: 10px 14px; font-size: 13px; font-weight: 500;
-  margin: 4px 0 14px;
-}
-.signup-btn-primary {
-  width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
-  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
-  color: white; border: none; border-radius: 12px;
-  cursor: pointer; transition: filter 0.15s;
-  box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);
-}
-.signup-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-.signup-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.signup-btn-secondary {
-  padding: 13px 18px; font-size: 15px; font-weight: 600;
-  background: var(--at-surface); color: var(--at-ink-2);
-  border: 1.5px solid var(--at-line); border-radius: 12px;
-  cursor: pointer; transition: background 0.15s;
-}
-.signup-btn-secondary:hover:not(:disabled) { background: var(--at-surface-2); }
-.signup-modules { margin: 6px 0 18px; }
-.signup-modules-title { font-size: 13px; font-weight: 700; color: var(--at-ink); margin: 0 0 4px; }
-.signup-modules-sub { font-size: 12px; color: var(--at-ink-3); margin: 0 0 12px; }
-.signup-module-card {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px 14px; margin-bottom: 8px;
-  border: 1.5px solid var(--at-line); border-radius: 12px;
-  cursor: pointer; transition: all 0.15s;
-}
-.signup-module-card:hover { background: var(--at-surface-2); }
-.signup-module-card.selected { border-color: var(--at-primary); background: var(--at-primary-tint, rgba(27,59,54,0.05)); }
-.signup-module-card input { margin-top: 3px; cursor: pointer; }
-.signup-module-card strong { display: block; font-size: 14px; color: var(--at-ink); margin-bottom: 2px; }
-.signup-module-card span { font-size: 12px; color: var(--at-ink-3); }
-.success-check {
-  width: 60px; height: 60px; border-radius: 50%;
-  background: var(--at-success); color: white;
-  font-size: 32px; font-weight: 800;
-  display: inline-flex; align-items: center; justify-content: center;
-  margin-bottom: 14px;
-}
-`
+// Los estilos .signup-* viven ahora en src/styles/runtime.css (I24).

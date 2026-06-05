@@ -1059,29 +1059,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   // ── Full portal ──────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--at-primary-tint)' }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes shimmer {
-          0%   { background-position: -400px 0; }
-          100% { background-position: 400px 0; }
-        }
-        .kpi-skeleton {
-          background: linear-gradient(90deg,
-            rgba(255,255,255,0.18) 25%,
-            rgba(255,255,255,0.38) 50%,
-            rgba(255,255,255,0.18) 75%
-          );
-          background-size: 800px 100%;
-          animation: shimmer 1.4s infinite linear;
-          border-radius: 6px;
-        }
-        .portal-tab:hover { background: rgba(27, 59, 54,0.08) !important; }
-        .portal-tab.active { background: white !important; color: var(--at-primary) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .portal-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; transform: translateY(-1px); }
-        .contador-row:hover { background: var(--at-primary-tint) !important; cursor: pointer; }
-        .lectura-row:nth-child(even) { background: var(--at-surface-2); }
-        .portal-input:focus { outline: none; border-color: var(--at-primary) !important; box-shadow: 0 0 0 3px rgba(27, 59, 54,0.12); }
-      `}</style>
+      {/* Estilos .kpi-skeleton/.portal-* (y keyframes) en src/styles/runtime.css (I24). */}
 
       {/* Header */}
       <div style={{

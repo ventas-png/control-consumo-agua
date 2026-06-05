@@ -2,22 +2,7 @@ import { memo } from 'react'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
-const SKELETON_CSS = `
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-.stat-skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.18) 25%,
-    rgba(255,255,255,0.38) 50%,
-    rgba(255,255,255,0.18) 75%
-  );
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: 8px;
-}
-`
+// El CSS de .stat-skeleton (shimmer) vive ahora en src/styles/runtime.css (I24).
 
 function SkeletonLine({ width, height = 14 }: { width: number | string; height?: number }) {
   return (
@@ -115,7 +100,6 @@ function AdminDashboardStatsImpl({ registros, moneda, clientes, fechaDesde, fech
 
   return (
     <>
-      <style>{SKELETON_CSS}</style>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',

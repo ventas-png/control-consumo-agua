@@ -1,0 +1,387 @@
+/*
+ * runtime.css — estilos antes inyectados como <style> inline en runtime.
+ *
+ * MOTIVO (infra:I24, hardening CSP). Cada componente renderizaba su CSS con un
+ * elemento <style>{`...`}</style>. Eso obliga a `style-src 'unsafe-inline'` en la
+ * CSP (un <style> inyectado en runtime sin nonce/hash sería bloqueado de otro modo).
+ * Un <style> en el DOM aplica GLOBALMENTE, no scopeado al componente, así que
+ * consolidarlos aquí (CSS bundleado por Vite, servido como hoja externa → cubierto
+ * por `style-src 'self'`) es un refactor que PRESERVA el comportamiento y permite
+ * quitar 'unsafe-inline' de `style-src`/`style-src-elem`.
+ *
+ * Importado una sola vez en src/main.tsx. NO agregar aquí estilos por ATRIBUTO
+ * (los `style={{}}` de React siguen cubiertos por `style-src-attr 'unsafe-inline'`).
+ */
+
+/* ── Keyframes compartidos ──────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* ── Skeletons (shimmer) ────────────────────────────────────────────────── */
+.stat-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.18) 25%,
+    rgba(255,255,255,0.38) 50%,
+    rgba(255,255,255,0.18) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+.dash-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.18) 25%,
+    rgba(255,255,255,0.38) 50%,
+    rgba(255,255,255,0.18) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+.kpi-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.18) 25%,
+    rgba(255,255,255,0.38) 50%,
+    rgba(255,255,255,0.18) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+.condo-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.18) 25%,
+    rgba(255,255,255,0.38) 50%,
+    rgba(255,255,255,0.18) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+/* ── App shell: sidebar responsive (antes en App.tsx) ───────────────────── */
+@media (max-width: 767px) {
+  .app-sidebar {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100vh;
+    z-index: 200;
+    transform: translateX(-256px);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .app-sidebar.open { transform: translateX(0); }
+  .app-backdrop { display: block !important; }
+  .app-hamburger { display: flex !important; }
+  .app-main { padding: 16px !important; }
+  .app-topbar { padding: 0 14px !important; }
+  .app-breadcrumbs { padding: 7px 14px !important; }
+  .app-alert-banner { padding: 10px 14px !important; flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 480px) {
+  .app-online-badge { display: none !important; }
+}
+@media (min-width: 768px) {
+  .app-sidebar { position: sticky !important; transform: none !important; transition: none; }
+  .app-backdrop { display: none !important; }
+  .app-hamburger { display: none !important; }
+}
+
+/* ── LoginScreen ────────────────────────────────────────────────────────── */
+@keyframes floatBubble {
+  0%   { transform: translateY(0) scale(1); opacity: 0.15; }
+  50%  { transform: translateY(-50px) scale(1.08); opacity: 0.25; }
+  100% { transform: translateY(0) scale(1); opacity: 0.15; }
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-8px); }
+  40%     { transform: translateX(8px); }
+  60%     { transform: translateX(-6px); }
+  80%     { transform: translateX(6px); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.login-input:focus {
+  outline: none;
+  border-color: var(--at-primary) !important;
+  box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
+}
+.login-input::placeholder { color: var(--at-ink-3); }
+.login-btn-main:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(27, 59, 54,0.45);
+}
+.login-btn-main:active:not(:disabled) { transform: translateY(0); }
+.login-btn-google:hover:not(:disabled) {
+  background: var(--at-surface-2) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+}
+.feat-card:hover {
+  background: rgba(255,255,255,0.18) !important;
+  transform: translateX(4px);
+}
+@media (max-width: 640px) {
+  .login-left-panel { display: none !important; }
+}
+.login-right-panel {
+  padding: 48px 40px;
+}
+@media (max-width: 480px) {
+  .login-right-panel { padding: 32px 20px !important; }
+}
+
+/* ── RegisterScreen + OAuthOnboardingScreen (.reg-card compartido) ───────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reg-input:focus {
+  outline: none;
+  border-color: var(--at-primary) !important;
+  box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
+}
+.reg-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--at-primary-hover), var(--at-primary-hover)) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(27, 59, 54,0.4) !important;
+}
+.reg-btn-back:hover {
+  background: rgba(255,255,255,0.12) !important;
+}
+.reg-card {
+  padding: 40px;
+}
+.reg-two-col {
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 480px) {
+  .reg-card { padding: 24px 20px !important; }
+  .reg-two-col { grid-template-columns: 1fr !important; }
+}
+.oauth-input:focus {
+  outline: none;
+  border-color: var(--at-primary) !important;
+  box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
+}
+
+/* ── SignupCompanyScreen ────────────────────────────────────────────────── */
+.signup-screen {
+  position: fixed; inset: 0; z-index: 2000;
+  background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
+  display: flex; align-items: center; justify-content: center;
+  overflow: auto; padding: 20px;
+}
+.signup-card {
+  background: var(--at-surface); border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+  width: 100%; max-width: 480px; padding: 32px;
+  position: relative;
+}
+.signup-card.success { text-align: center; }
+.signup-back {
+  position: absolute; top: 16px; left: 16px;
+  background: none; border: none; color: var(--at-ink-3);
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  padding: 6px 10px; border-radius: 6px;
+}
+.signup-back:hover { background: var(--at-surface-2); }
+.signup-logo { display: flex; justify-content: center; margin-bottom: 14px; margin-top: 8px; }
+.signup-card h1 { font-size: 22px; font-weight: 800; color: var(--at-ink); margin: 0 0 6px; text-align: center; }
+.signup-subtitle { color: var(--at-ink-3); font-size: 14px; margin: 0 0 24px; text-align: center; }
+.signup-stepper { display: flex; align-items: center; justify-content: center; margin-bottom: 24px; gap: 8px; }
+.signup-step { display: flex; align-items: center; gap: 8px; opacity: 0.4; transition: opacity 0.2s; }
+.signup-step.active { opacity: 1; }
+.signup-step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--at-primary); color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px;
+}
+.signup-step-label { font-size: 13px; font-weight: 600; color: var(--at-ink-2); }
+.signup-step-divider { width: 40px; height: 2px; background: var(--at-line); }
+.signup-field { display: block; margin-bottom: 14px; }
+.signup-field > span {
+  display: block; font-size: 12px; font-weight: 700;
+  color: var(--at-ink-2); margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.signup-field input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 14px; border: 1.5px solid var(--at-line);
+  border-radius: 10px; font-size: 14px;
+  background: var(--at-surface); color: var(--at-ink);
+  outline: none; transition: border-color 0.15s;
+}
+.signup-field input:focus { border-color: var(--at-primary); box-shadow: 0 0 0 3px rgba(27,59,54,0.12); }
+.signup-pw-wrap { position: relative; }
+.signup-pw-wrap input { padding-right: 42px; }
+.signup-pw-wrap button {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  padding: 0; opacity: 0.6;
+}
+.signup-error {
+  background: var(--at-danger-tint); border: 1px solid var(--at-danger-border);
+  color: var(--at-danger); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 500;
+  margin: 4px 0 14px;
+}
+.signup-btn-primary {
+  width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
+  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
+  color: white; border: none; border-radius: 12px;
+  cursor: pointer; transition: filter 0.15s;
+  box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);
+}
+.signup-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.signup-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.signup-btn-secondary {
+  padding: 13px 18px; font-size: 15px; font-weight: 600;
+  background: var(--at-surface); color: var(--at-ink-2);
+  border: 1.5px solid var(--at-line); border-radius: 12px;
+  cursor: pointer; transition: background 0.15s;
+}
+.signup-btn-secondary:hover:not(:disabled) { background: var(--at-surface-2); }
+.signup-modules { margin: 6px 0 18px; }
+.signup-modules-title { font-size: 13px; font-weight: 700; color: var(--at-ink); margin: 0 0 4px; }
+.signup-modules-sub { font-size: 12px; color: var(--at-ink-3); margin: 0 0 12px; }
+.signup-module-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; margin-bottom: 8px;
+  border: 1.5px solid var(--at-line); border-radius: 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.signup-module-card:hover { background: var(--at-surface-2); }
+.signup-module-card.selected { border-color: var(--at-primary); background: var(--at-primary-tint, rgba(27,59,54,0.05)); }
+.signup-module-card input { margin-top: 3px; cursor: pointer; }
+.signup-module-card strong { display: block; font-size: 14px; color: var(--at-ink); margin-bottom: 2px; }
+.signup-module-card span { font-size: 12px; color: var(--at-ink-3); }
+.success-check {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: var(--at-success); color: white;
+  font-size: 32px; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+
+/* ── AcceptInvitationPage ───────────────────────────────────────────────── */
+.invite-screen {
+  position: fixed; inset: 0; z-index: 2000;
+  background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
+  display: flex; align-items: center; justify-content: center;
+  overflow: auto; padding: 20px;
+}
+.invite-card {
+  background: var(--at-surface); border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+  width: 100%; max-width: 460px; padding: 32px;
+  position: relative;
+}
+.invite-logo { display: flex; justify-content: center; margin-bottom: 14px; margin-top: 4px; }
+.invite-card h1 { font-size: 21px; font-weight: 800; color: var(--at-ink); margin: 0 0 6px; text-align: center; }
+.invite-sub { color: var(--at-ink-3); font-size: 14px; margin: 0 0 22px; text-align: center; line-height: 1.5; }
+.invite-summary {
+  background: var(--at-surface-2); border: 1.5px solid var(--at-line);
+  border-radius: 12px; padding: 6px 16px; margin-bottom: 20px;
+}
+.invite-summary-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--at-line);
+}
+.invite-summary-row:last-child { border-bottom: none; }
+.invite-summary-row > span {
+  font-size: 12px; font-weight: 700; color: var(--at-ink-3);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.invite-summary-row > strong { font-size: 14px; color: var(--at-ink); font-weight: 700; }
+.invite-field { display: block; margin-bottom: 14px; }
+.invite-field > span {
+  display: block; font-size: 12px; font-weight: 700;
+  color: var(--at-ink-2); margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.invite-field input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 14px; border: 1.5px solid var(--at-line);
+  border-radius: 10px; font-size: 14px;
+  background: var(--at-surface); color: var(--at-ink);
+  outline: none; transition: border-color 0.15s;
+}
+.invite-field input:focus { border-color: var(--at-primary); box-shadow: 0 0 0 3px rgba(27,59,54,0.12); }
+.invite-pw-wrap { position: relative; }
+.invite-pw-wrap input { padding-right: 42px; }
+.invite-pw-wrap button {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  padding: 0; opacity: 0.6;
+}
+.invite-error {
+  background: var(--at-danger-tint); border: 1px solid var(--at-danger-border);
+  color: var(--at-danger); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 500;
+  margin: 4px 0 14px;
+}
+.invite-btn-primary {
+  width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
+  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
+  color: white; border: none; border-radius: 12px;
+  cursor: pointer; transition: filter 0.15s;
+  box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);
+}
+.invite-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.invite-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.invite-check, .invite-x {
+  width: 60px; height: 60px; border-radius: 50%;
+  font-size: 32px; font-weight: 800; color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+.invite-check { background: var(--at-success); }
+.invite-x { background: var(--at-danger); }
+.invite-spinner {
+  width: 36px; height: 36px; margin: 12px auto 4px;
+  border: 3px solid var(--at-line);
+  border-top-color: var(--at-primary);
+  border-radius: 50%;
+  animation: invite-spin 0.8s linear infinite;
+}
+@keyframes invite-spin { to { transform: rotate(360deg); } }
+
+/* ── Dialog (Radix) ─────────────────────────────────────────────────────── */
+@keyframes at-dialog-overlay-in {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+@keyframes at-dialog-content-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ── CustomerPortal ─────────────────────────────────────────────────────── */
+.portal-tab:hover { background: rgba(27, 59, 54,0.08) !important; }
+.portal-tab.active { background: white !important; color: var(--at-primary) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.portal-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; transform: translateY(-1px); }
+.contador-row:hover { background: var(--at-primary-tint) !important; cursor: pointer; }
+.lectura-row:nth-child(even) { background: var(--at-surface-2); }
+.portal-input:focus { outline: none; border-color: var(--at-primary) !important; box-shadow: 0 0 0 3px rgba(27, 59, 54,0.12); }
+
+/* ── CondominiosClientPortal ────────────────────────────────────────────── */
+.condo-tab:hover { background: rgba(185, 106, 63,0.08) !important; }
+.condo-tab.active { background: white !important; color: var(--at-accent-hover) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+/* ── Estilos de impresión (antes en EstadoCuentaTab / ReportesTab) ──────── */
+@media print {
+  .print-only { display: block !important; }
+  button { display: none !important; }
+}

@@ -69,15 +69,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
       background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
       padding: '16px',
     }}>
-      <style>{`
-        .oauth-input:focus {
-          outline: none;
-          border-color: var(--at-primary) !important;
-          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
-        }
-        .reg-card { padding: 40px; }
-        @media (max-width: 480px) { .reg-card { padding: 24px 20px !important; } }
-      `}</style>
+      {/* Estilos (.oauth-input, .reg-card) en src/styles/runtime.css (I24). */}
 
       <div className="reg-card" style={{
         background: 'var(--at-surface)', borderRadius: '24px',

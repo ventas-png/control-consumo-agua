@@ -759,7 +759,6 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
-      <style>{SHIMMER_KEYFRAMES}</style>
       {/* Hero header con gradiente */}
       <div style={{
         background: 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)',
@@ -1925,8 +1924,6 @@ function EmptyState({ icon, title, hint, action }: { icon: string; title: string
     </div>
   )
 }
-
-const SHIMMER_KEYFRAMES = `@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`
 
 function CheckoutForm({ onSave }: { onSave: (foto: string | null, obs: string) => void }) {
   const [foto, setFoto] = useState<string | null>(null)

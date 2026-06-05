@@ -125,7 +125,6 @@ export function AcceptInvitationPage() {
 
   return (
     <div className="invite-screen">
-      <style>{styles}</style>
       <div className="invite-card">
         <div className="invite-logo"><BrandLogo size={48} /></div>
 
@@ -233,86 +232,4 @@ export function AcceptInvitationPage() {
   )
 }
 
-const styles = `
-.invite-screen {
-  position: fixed; inset: 0; z-index: 2000;
-  background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
-  display: flex; align-items: center; justify-content: center;
-  overflow: auto; padding: 20px;
-}
-.invite-card {
-  background: var(--at-surface); border-radius: 20px;
-  box-shadow: 0 30px 80px rgba(0,0,0,.3);
-  width: 100%; max-width: 460px; padding: 32px;
-  position: relative;
-}
-.invite-logo { display: flex; justify-content: center; margin-bottom: 14px; margin-top: 4px; }
-.invite-card h1 { font-size: 21px; font-weight: 800; color: var(--at-ink); margin: 0 0 6px; text-align: center; }
-.invite-sub { color: var(--at-ink-3); font-size: 14px; margin: 0 0 22px; text-align: center; line-height: 1.5; }
-.invite-summary {
-  background: var(--at-surface-2); border: 1.5px solid var(--at-line);
-  border-radius: 12px; padding: 6px 16px; margin-bottom: 20px;
-}
-.invite-summary-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 0; border-bottom: 1px solid var(--at-line);
-}
-.invite-summary-row:last-child { border-bottom: none; }
-.invite-summary-row > span {
-  font-size: 12px; font-weight: 700; color: var(--at-ink-3);
-  text-transform: uppercase; letter-spacing: 0.04em;
-}
-.invite-summary-row > strong { font-size: 14px; color: var(--at-ink); font-weight: 700; }
-.invite-field { display: block; margin-bottom: 14px; }
-.invite-field > span {
-  display: block; font-size: 12px; font-weight: 700;
-  color: var(--at-ink-2); margin-bottom: 5px;
-  text-transform: uppercase; letter-spacing: 0.04em;
-}
-.invite-field input {
-  width: 100%; box-sizing: border-box;
-  padding: 11px 14px; border: 1.5px solid var(--at-line);
-  border-radius: 10px; font-size: 14px;
-  background: var(--at-surface); color: var(--at-ink);
-  outline: none; transition: border-color 0.15s;
-}
-.invite-field input:focus { border-color: var(--at-primary); box-shadow: 0 0 0 3px rgba(27,59,54,0.12); }
-.invite-pw-wrap { position: relative; }
-.invite-pw-wrap input { padding-right: 42px; }
-.invite-pw-wrap button {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; cursor: pointer; font-size: 16px;
-  padding: 0; opacity: 0.6;
-}
-.invite-error {
-  background: var(--at-danger-tint); border: 1px solid var(--at-danger-border);
-  color: var(--at-danger); border-radius: 10px;
-  padding: 10px 14px; font-size: 13px; font-weight: 500;
-  margin: 4px 0 14px;
-}
-.invite-btn-primary {
-  width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
-  background: linear-gradient(135deg, var(--at-primary), var(--at-accent-2));
-  color: white; border: none; border-radius: 12px;
-  cursor: pointer; transition: filter 0.15s;
-  box-shadow: 0 6px 20px rgba(27, 59, 54, 0.3);
-}
-.invite-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-.invite-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.invite-check, .invite-x {
-  width: 60px; height: 60px; border-radius: 50%;
-  font-size: 32px; font-weight: 800; color: white;
-  display: inline-flex; align-items: center; justify-content: center;
-  margin-bottom: 14px;
-}
-.invite-check { background: var(--at-success); }
-.invite-x { background: var(--at-danger); }
-.invite-spinner {
-  width: 36px; height: 36px; margin: 12px auto 4px;
-  border: 3px solid var(--at-line);
-  border-top-color: var(--at-primary);
-  border-radius: 50%;
-  animation: invite-spin 0.8s linear infinite;
-}
-@keyframes invite-spin { to { transform: rotate(360deg); } }
-`
+// Los estilos .invite-* (e invite-spin) viven ahora en src/styles/runtime.css (I24).
