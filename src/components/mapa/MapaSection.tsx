@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cliente, Registro } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchMapCenter, saveMapCenter } from '../../domain/mapa/queries'
 import { notify } from '../shared/Dialog'
 import { MapView } from './MapView'
 import { buildMedidoresLayer, type EstadoBucket } from './aguaMapLayer'
@@ -46,12 +46,7 @@ export function MapaSection({ clientes, registros, companyId, canConfigurar = fa
     if (!companyId) { setMapCfg(null); return }
     let cancelado = false
     setMapCfg(undefined)
-    void supabase
-      .from('companies')
-      .select('center_lat, center_lng, zoom_default')
-      .eq('id', companyId)
-      .single()
-      .then(({ data }) => { if (!cancelado) setMapCfg((data as MapCenterConfig) ?? null) })
+    void fetchMapCenter(companyId).then(cfg => { if (!cancelado) setMapCfg(cfg) })
     return () => { cancelado = true }
   }, [companyId])
 
@@ -86,7 +81,7 @@ export function MapaSection({ clientes, registros, companyId, canConfigurar = fa
       zoom_default: Math.round(v.zoom),
     }
     setGuardando(true)
-    const { error } = await supabase.from('companies').update(payload).eq('id', companyId)
+    const { error } = await saveMapCenter(companyId, payload)
     setGuardando(false)
     if (error) {
       notify({ variant: 'error', title: 'No se pudo guardar', text: 'No se pudo fijar el centro del mapa.' })
