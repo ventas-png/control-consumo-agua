@@ -1,0 +1,104 @@
+name: Deploy Staging (Vercel)
+
+# Entorno de STAGING (infra:I16) — un deployment estable, pre-producción, para
+# validar un cambio "como en prod" antes de promoverlo. Complementa (NO sustituye)
+# la integración Git de Vercel: los Preview por PR y el deploy de producción al
+# hacer merge a `main` los sigue manejando Vercel. Este workflow añade un alias
+# estable de staging al que apuntar QA / smoke tests / stakeholders.
+#
+# Disparadores:
+#   - push a la rama `staging` (mantén ahí lo que quieras validar), o
+#   - manual (workflow_dispatch) desde la pestaña Actions.
+#
+# Requiere los secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID
+# (ver docs/RUNBOOK_DEPLOY_ROLLBACK.md). Sin ellos el job falla con instrucciones.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [staging]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  # Alias estable de staging. Override con la variable de repo STAGING_ALIAS si
+  # prefieres un dominio propio (p. ej. staging.administratodo.com, ya añadido a
+  # Vercel). Default: un subdominio *.vercel.app del proyecto.
+  STAGING_ALIAS: ${{ vars.STAGING_ALIAS || 'staging-control-consumo-agua.vercel.app' }}
+
+jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Vercel secrets are set
+        run: |
+          missing=""
+          [ -z "${{ secrets.VERCEL_TOKEN }}" ]      && missing="$missing VERCEL_TOKEN"
+          [ -z "${{ secrets.VERCEL_ORG_ID }}" ]     && missing="$missing VERCEL_ORG_ID"
+          [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ] && missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Faltan secrets de GitHub:$missing"
+            echo "Agrégalos en: Settings → Secrets and variables → Actions."
+            echo "ORG_ID/PROJECT_ID salen de '.vercel/project.json' tras 'vercel link', o del dashboard de Vercel."
+            exit 1
+          fi
+
+  deploy:
+    needs: check-secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      # Trae las env vars del entorno Preview del proyecto (incluye las VITE_*).
+      - name: Pull Vercel env (preview)
+        run: vercel pull --yes --environment=preview --token="${{ secrets.VERCEL_TOKEN }}"
+
+      # Construimos con VITE_APP_ENV=staging para que Sentry/PostHog etiqueten los
+      # eventos como 'staging' (si la var no está fijada en el proyecto de Vercel).
+      - name: Build
+        run: VITE_APP_ENV=staging vercel build --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy (prebuilt)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployment: $url"
+
+      - name: Alias to staging
+        run: vercel alias set "${{ steps.deploy.outputs.url }}" "$STAGING_ALIAS" --token="${{ secrets.VERCEL_TOKEN }}"
+
+      # Smoke test: el alias debe responder 200. Con reintentos porque la
+      # propagación del alias puede tardar unos segundos.
+      - name: Smoke test
+        run: |
+          target="https://$STAGING_ALIAS"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --retry 6 --retry-delay 5 --retry-all-errors "$target")
+          echo "GET $target → $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Smoke test de staging falló (HTTP $code)"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Staging"
+            echo "- **Deployment:** ${{ steps.deploy.outputs.url }}"
+            echo "- **Alias:** https://$STAGING_ALIAS"
+            echo ""
+            echo "Para promover a producción: workflow **Promote / Rollback Production**, action \`promote\`, con esa URL de deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
