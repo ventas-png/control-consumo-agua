@@ -52,13 +52,33 @@ function parseDsn(dsn: string | undefined): ParsedDsn | null {
   }
 }
 
-const DSN = parseDsn(Deno.env.get('SENTRY_DSN'))
-const ENVIRONMENT = Deno.env.get('SENTRY_ENVIRONMENT') ?? 'production'
-const RELEASE = Deno.env.get('SENTRY_RELEASE') || undefined
+interface SentryConfig {
+  dsn: ParsedDsn | null
+  environment: string
+  release?: string
+}
+
+let cachedConfig: SentryConfig | null = null
+
+// Lee el entorno de forma PEREZOSA y memoizada. Perezosa a propósito: importar
+// este módulo no toca `Deno.env` en tiempo de carga, así que un test que importe
+// sus helpers puros (parseDsn/parseStack) bajo vitest/Node no revienta con
+// "Deno is not defined". El `globalThis.Deno?` extra evita el throw aunque algo
+// llegue a llamar esto fuera de Deno.
+function getConfig(): SentryConfig {
+  if (cachedConfig) return cachedConfig
+  const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env
+  cachedConfig = {
+    dsn: parseDsn(env?.get('SENTRY_DSN')),
+    environment: env?.get('SENTRY_ENVIRONMENT') ?? 'production',
+    release: env?.get('SENTRY_RELEASE') || undefined,
+  }
+  return cachedConfig
+}
 
 /** ¿Está la captura de Sentry activa en este entorno? */
 export function sentryEnabled(): boolean {
-  return DSN !== null
+  return getConfig().dsn !== null
 }
 
 /** Genera un event_id de 32 hex (formato que espera Sentry). */
@@ -127,7 +147,9 @@ export async function captureEdgeException(
   error: unknown,
   context: EdgeErrorContext = {},
 ): Promise<string | null> {
-  if (!DSN) return null
+  const cfg = getConfig()
+  const dsn = cfg.dsn
+  if (!dsn) return null
 
   try {
     const err = error instanceof Error ? error : new Error(String(error))
@@ -146,8 +168,8 @@ export async function captureEdgeException(
       platform: 'javascript',
       level: context.level ?? 'error',
       logger: 'edge',
-      environment: ENVIRONMENT,
-      ...(RELEASE ? { release: RELEASE } : {}),
+      environment: cfg.environment,
+      ...(cfg.release ? { release: cfg.release } : {}),
       ...(context.transaction ? { transaction: context.transaction } : {}),
       server_name: context.function ?? 'edge-function',
       tags,
@@ -177,13 +199,13 @@ export async function captureEdgeException(
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 2000)
     try {
-      await fetch(DSN.envelopeUrl, {
+      await fetch(dsn.envelopeUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-sentry-envelope',
           // Auth por header (equivalente a `?sentry_key=`); `sentry_client`
           // identifica este cliente casero en el dashboard de Sentry.
-          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${DSN.publicKey}, sentry_client=edge-fetch/1.0`,
+          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${dsn.publicKey}, sentry_client=edge-fetch/1.0`,
         },
         body: envelope,
         signal: controller.signal,
