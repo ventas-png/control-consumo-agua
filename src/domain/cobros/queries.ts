@@ -10,6 +10,36 @@ import { runQuery } from '../queryFetch'
 import { payfacKeys } from './keys'
 import { resolverConfigPagoEfectiva } from '../../lib/businessPagos'
 import type { ConfigPagoEfectiva, PayfacEstatus } from '../../types/pagos'
+import type { Pago, ConvenioPago } from '../../types'
+
+/** Pagos (no borrados) + convenios del tenant, más recientes primero. */
+export interface PagosYConvenios {
+  pagos: Pago[]
+  convenios: ConvenioPago[]
+}
+
+/**
+ * Carga pagos manuales (con deleted_at null) y convenios del tenant para la
+ * pantalla de cobros. Lectura imperativa (no-hook) para usarse desde un
+ * `useCallback` que llena estado local. Defaultea a `[]` ante datos ausentes.
+ */
+export async function fetchPagosYConvenios(): Promise<PagosYConvenios> {
+  const [pagosRes, conveniosRes] = await Promise.all([
+    supabase
+      .from('pagos')
+      .select('*')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('convenios_pago')
+      .select('*')
+      .order('created_at', { ascending: false }),
+  ])
+  return {
+    pagos: (pagosRes.data as Pago[]) ?? [],
+    convenios: (conveniosRes.data as ConvenioPago[]) ?? [],
+  }
+}
 
 interface CompanyPagoRow {
   id: string

@@ -192,3 +192,63 @@ export function useProbarConexionPayfacMutation(companyId?: string) {
     },
   })
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Cobros MANUALES (pagos / convenios) — escrituras directas vía RLS.
+//
+// Distinto del flujo payfac de arriba (que pasa por edges): estas son las
+// escrituras del cobro manual del back-office. El armado del payload y la lógica
+// de negocio (saldos, transición de Factura) se quedan en la UI; aquí solo baja
+// el acceso a datos. Contrato uniforme: `{ error: string | null }`.
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Inserta un pago manual (payload ya armado por la UI). */
+export async function createPago(payload: Record<string, unknown>): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('pagos').insert(payload)
+  return { error: error?.message ?? null }
+}
+
+/** Marca un pago como verificado (sella verification_status/estado + verified_by/at). */
+export async function verifyPago(pagoId: string, verifiedBy: string): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('pagos')
+    .update({
+      verification_status: 'verificado',
+      estado: 'verificado',
+      verified_by: verifiedBy,
+      verified_at: new Date().toISOString(),
+    })
+    .eq('id', pagoId)
+  return { error: error?.message ?? null }
+}
+
+/** Rechaza un pago con motivo (sella verification_status/estado + verified_by/at + notas). */
+export async function rejectPago(
+  pagoId: string,
+  verifiedBy: string,
+  notas: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('pagos')
+    .update({
+      verification_status: 'rechazado',
+      estado: 'rechazado',
+      verified_by: verifiedBy,
+      verified_at: new Date().toISOString(),
+      verification_notes: notas,
+    })
+    .eq('id', pagoId)
+  return { error: error?.message ?? null }
+}
+
+/** Crea un convenio de pago (payload ya armado por la UI). */
+export async function createConvenio(payload: Record<string, unknown>): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('convenios_pago').insert(payload)
+  return { error: error?.message ?? null }
+}
+
+/** Cambia el estado de un convenio (activo/completado/incumplido/cancelado). */
+export async function setConvenioEstado(id: string, estado: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('convenios_pago').update({ estado }).eq('id', id)
+  return { error: error?.message ?? null }
+}

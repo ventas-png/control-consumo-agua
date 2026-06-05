@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import { fetchPagosYConvenios } from '../../domain/cobros/queries'
+import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/mutations'
+import { updateRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente, Pago, ConvenioPago, FormaPago } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
@@ -201,19 +203,9 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
 
   const cargarPagosYConvenios = useCallback(async () => {
     setLoadingPagos(true)
-    const [pagosRes, conveniosRes] = await Promise.all([
-      supabase
-        .from('pagos')
-        .select('*')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('convenios_pago')
-        .select('*')
-        .order('created_at', { ascending: false }),
-    ])
-    if (pagosRes.data) setPagos(pagosRes.data as Pago[])
-    if (conveniosRes.data) setConvenios(conveniosRes.data as ConvenioPago[])
+    const { pagos, convenios } = await fetchPagosYConvenios()
+    setPagos(pagos)
+    setConvenios(convenios)
     setLoadingPagos(false)
   }, [])
 
@@ -259,10 +251,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   async function marcarMora() {
     if (!bulk.hasSelection) return
     const ids = bulk.selectedItems.map(r => r.id)
-    const { error } = await supabase
-      .from('registros')
-      .update({ estado: 'mora' })
-      .in('id', ids)
+    const { error } = await marcarRegistrosMora(ids)
     if (!error) {
       ids.forEach(id => onEstadoUpdated(id, 'mora'))
       bulk.clear()
@@ -305,17 +294,9 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
     try {
       if (aprobar) {
         // Verify the payment
-        const { error } = await supabase
-          .from('pagos')
-          .update({
-            verification_status: 'verificado',
-            estado: 'verificado',
-            verified_by: currentUser.user_id,
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', pagoId)
+        const { error } = await verifyPago(pagoId, currentUser.user_id)
 
-        if (error) throw error
+        if (error) throw new Error(error)
 
         // Update the registro monto_pagado if needed
         if (pago.registro_id) {
@@ -326,15 +307,12 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
             const saldo = total - nuevoMontoPagado
 
             // Update registro state and status
-            const { error: updateError } = await supabase
-              .from('registros')
-              .update({
-                monto_pagado: nuevoMontoPagado,
-                estado: saldo <= 0 ? 'pagado' : 'pendiente',
-              })
-              .eq('id', pago.registro_id)
+            const { error: updateError } = await updateRegistro(pago.registro_id, {
+              monto_pagado: nuevoMontoPagado,
+              estado: saldo <= 0 ? 'pagado' : 'pendiente',
+            })
 
-            if (updateError) throw updateError
+            if (updateError) throw new Error(updateError)
 
             if (onRegistroUpdated) {
               onRegistroUpdated(pago.registro_id, {
@@ -369,18 +347,9 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
         const razon = promptResult?.razon
 
         if (razon) {
-          const { error } = await supabase
-            .from('pagos')
-            .update({
-              verification_status: 'rechazado',
-              estado: 'rechazado',
-              verified_by: currentUser.user_id,
-              verified_at: new Date().toISOString(),
-              verification_notes: razon,
-            })
-            .eq('id', pagoId)
+          const { error } = await rejectPago(pagoId, currentUser.user_id, razon)
 
-          if (error) throw error
+          if (error) throw new Error(error)
 
           notify({
             variant: 'success',
@@ -392,11 +361,11 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
       }
 
       void cargarPagosYConvenios()
-    } catch (err: any) {
+    } catch (err) {
       notify({
         variant: 'error',
         title: 'Error',
-        text: err.message || 'No se pudo procesar la verificación',
+        text: (err as Error).message || 'No se pudo procesar la verificación',
       })
     } finally {
       setVerificando(null)
@@ -873,7 +842,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    const { error } = await supabase.from('convenios_pago').update({ estado }).eq('id', id)
+    const { error } = await setConvenioEstado(id, estado)
     if (!error) {
       onRefresh()
       notify({ variant: 'success', title: 'Estado actualizado', duration: 1200 })

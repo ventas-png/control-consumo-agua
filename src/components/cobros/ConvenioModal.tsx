@@ -2,7 +2,8 @@ import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
-import { supabase } from '../../lib/supabase'
+import { createConvenio } from '../../domain/cobros/mutations'
+import { marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
@@ -37,7 +38,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
 
     setSaving(true)
     try {
-      const { error } = await supabase.from('convenios_pago').insert({
+      const { error } = await createConvenio({
         cliente_id: clienteId,
         numero_convenio: numeroConvenio.trim(),
         descripcion: descripcion || null,
@@ -52,12 +53,10 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         created_by: currentUserId,
       })
 
-      if (error) throw error
+      if (error) throw new Error(error)
 
       // Marcar los registros como mora para que el cobrador haga seguimiento
-      await supabase.from('registros')
-        .update({ estado: 'mora' })
-        .in('id', registros.map(r => r.id))
+      await marcarRegistrosMora(registros.map(r => r.id))
 
       notify({
         variant: 'success',

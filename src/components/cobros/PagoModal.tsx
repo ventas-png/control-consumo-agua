@@ -2,7 +2,8 @@ import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
-import { supabase } from '../../lib/supabase'
+import { createPago } from '../../domain/cobros/mutations'
+import { updateRegistro } from '../../domain/agua/mutations'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
 import { FacturaEstadoBadge, FacturaDesglose } from './facturaUi'
@@ -59,7 +60,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
     setSaving(true)
     try {
       // Insertar pago
-      const { error: pagoError } = await supabase.from('pagos').insert({
+      const { error: pagoError } = await createPago({
         registro_id: registro.id,
         cliente_id: registro.cliente_id,
         project_id: null,
@@ -73,7 +74,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
         created_by: currentUserId,
       })
 
-      if (pagoError) throw pagoError
+      if (pagoError) throw new Error(pagoError)
 
       // Actualizar estado de registro si se pagó completo
       const nuevoEstado: Registro['estado'] = esPagoCompleto ? 'pagado' : 'pendiente'
@@ -89,9 +90,9 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
         update.factura_estado = 'pagada'
         update.pagada_at = new Date().toISOString()
       }
-      const { error: regError } = await supabase.from('registros').update(update).eq('id', registro.id)
+      const { error: regError } = await updateRegistro(registro.id, update)
 
-      if (regError) throw regError
+      if (regError) throw new Error(regError)
 
       notify({
         variant: 'success',
