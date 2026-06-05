@@ -1,41 +1,38 @@
 import { useState } from 'react'
-import type { TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
+import type { TarifaEnergia, ProveedorEnergia, Proyecto } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
 import { sanitizeInput } from '../../../lib/validation'
-import { supabase } from '../../../lib/supabase'
+import { useCrearTarifaEnergiaMutation, useActualizarTarifaEnergiaMutation, useEliminarTarifaEnergiaMutation } from '../../../domain/energia/mutations'
 
 interface TarifasTabProps {
   tarifasEnergia: TarifaEnergia[]
   proveedoresEnergia: ProveedorEnergia[]
   proyectos: Proyecto[]
-  currentUser: UserSession | null
+  companyId: string
   moneda: string
   canCreate: boolean
   canEdit: boolean
-  onTarifaAdded: (t: TarifaEnergia) => void
-  onTarifaUpdated: (id: string, t: Partial<TarifaEnergia>) => void
-  onTarifaDeleted: (id: string) => void
 }
 
 export default function TarifasTab({
   tarifasEnergia,
   proveedoresEnergia,
   proyectos,
-  currentUser,
+  companyId,
   moneda,
   canCreate,
   canEdit,
-  onTarifaAdded,
-  onTarifaUpdated,
-  onTarifaDeleted,
 }: TarifasTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<Partial<TarifaEnergia>>({})
 
-  const companyId = currentUser?.company_id ?? null
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
+
+  const crearMutation = useCrearTarifaEnergiaMutation(companyId)
+  const actualizarMutation = useActualizarTarifaEnergiaMutation(companyId)
+  const eliminarMutation = useEliminarTarifaEnergiaMutation(companyId)
 
   const handleCreate = async () => {
     if (!companyId) {
@@ -123,9 +120,7 @@ export default function TarifasTab({
     }
 
     try {
-      const { data, error } = await supabase.from('tarifas_energia').insert([formValues]).select().single()
-      if (error) throw error
-      onTarifaAdded(data as TarifaEnergia)
+      await crearMutation.mutateAsync(formValues as Parameters<typeof crearMutation.mutateAsync>[0])
       notify({ variant: 'success', title: 'Tarifa creada', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo crear la tarifa' })
@@ -140,12 +135,7 @@ export default function TarifasTab({
   const handleSaveEdit = async () => {
     if (!editingId) return
     try {
-      const { error } = await supabase
-        .from('tarifas_energia')
-        .update({ ...editFormData, updated_at: new Date().toISOString() })
-        .eq('id', editingId)
-      if (error) throw error
-      onTarifaUpdated(editingId, editFormData)
+      await actualizarMutation.mutateAsync({ id: editingId, patch: editFormData })
       setEditingId(null)
       notify({ variant: 'success', title: 'Tarifa actualizada', duration: 1500 })
     } catch (err: unknown) {
@@ -163,9 +153,7 @@ export default function TarifasTab({
     })
     if (!isConfirmed) return
     try {
-      const { error } = await supabase.from('tarifas_energia').delete().eq('id', id)
-      if (error) throw error
-      onTarifaDeleted(id)
+      await eliminarMutation.mutateAsync(id)
       notify({ variant: 'success', title: 'Tarifa eliminada', duration: 1500 })
     } catch (err: unknown) {
       notify({ variant: 'error', title: 'Error', text: err instanceof Error ? err.message : 'No se pudo eliminar la tarifa' })
