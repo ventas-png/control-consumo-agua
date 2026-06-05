@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { notify } from '../shared/Dialog'
 import type { Contador, TipoAgua, UserSession } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchUnidadesByCompany, resolveDefaultProjectCompany } from '../../domain/contadores/queries'
 import { validatedInsertMany } from '../../lib/validatedInsert'
 import { contadorInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput } from '../../lib/validation'
@@ -138,11 +138,8 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
     if (unidadMapRef.current) return unidadMapRef.current
     const map = new Map<string, { id: string; project_id: string; company_id: string }>()
     if (ids) {
-      const { data } = await supabase
-        .from('unidades')
-        .select('id, nombre, project_id, company_id')
-        .eq('company_id', ids.companyId)
-      for (const u of (data ?? []) as Array<{ id: string; nombre: string; project_id: string; company_id: string }>) {
+      const rows = await fetchUnidadesByCompany(ids.companyId)
+      for (const u of rows) {
         if (u.nombre) map.set(u.nombre.trim().toLowerCase(), { id: u.id, project_id: u.project_id, company_id: u.company_id })
       }
     }
@@ -153,33 +150,10 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const { data: userData } = await supabase
-        .from('app_users')
-        .select('project_id, company_id')
-        .eq('id', currentUser.user_id)
-        .single()
-      let projectId: string | null = (userData as { project_id?: string } | null)?.project_id ?? null
-      let companyId: string | null =
-        (userData as { company_id?: string } | null)?.company_id ?? currentUser.company_id ?? null
-
-      if (!projectId) {
-        const { data: assignment } = await supabase
-          .from('user_project_assignments')
-          .select('project_id')
-          .eq('user_id', currentUser.user_id)
-          .limit(1)
-          .single()
-        if (assignment) projectId = (assignment as { project_id: string }).project_id
-      }
-      if (!projectId && companyId) {
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1)
-          .single()
-        if (proj) projectId = (proj as { id: string }).id
-      }
+      const { projectId, companyId } = await resolveDefaultProjectCompany(
+        currentUser.user_id,
+        currentUser.company_id ?? null,
+      )
 
       if (cancelled) return
       if (!projectId || !companyId) {
