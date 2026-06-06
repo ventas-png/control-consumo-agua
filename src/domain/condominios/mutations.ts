@@ -208,3 +208,13 @@ export function useAnularCuotaMutation() {
     onSuccess: invalidar,
   })
 }
+
+// ── Importación de contactos de emergencia — T7/PR3 ────────────────────────
+
+/** Inserta contactos de emergencia en lote (import; payload ya armado por la UI). */
+export async function createContactosEmergencia(
+  rows: Record<string, unknown>[],
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('contactos_emergencia').insert(rows)
+  return { error: error?.message ?? null }
+}

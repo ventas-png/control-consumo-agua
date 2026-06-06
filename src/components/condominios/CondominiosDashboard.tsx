@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import type { UserSession, Proyecto, Unidad, AppSection } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchCondominioStatsForProject, fetchCondominioStatsRows } from '../../domain/condominios/queries'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
 
 interface Props {
@@ -47,46 +47,19 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
   const cargarStats = useCallback(async () => {
     if (!companyId) return
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    const todayISO = todayStart.toISOString()
-
-    const mkBase = (table: string) => {
-      let q = supabase.from(table).select('id', { count: 'exact', head: true }).eq('company_id', companyId)
-      if (selectedProjectId) q = q.eq('project_id', selectedProjectId)
-      return q
-    }
 
     if (selectedProjectId) {
       const unidadesProyecto = unidades.filter(u => u.project_id === selectedProjectId)
-      const [cuotasPendRes, cuotasMoraRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
-        mkBase('cuotas_condominio').eq('estado', 'pendiente').is('deleted_at', null),
-        mkBase('cuotas_condominio').eq('estado', 'mora').is('deleted_at', null),
-        mkBase('visitantes').gte('hora_entrada', todayISO),
-        supabase.from('tickets_mantenimiento').select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId).eq('project_id', selectedProjectId).neq('estado', 'cerrado').is('deleted_at', null),
-        supabase.from('conversations').select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId).eq('service_type', 'condominios').eq('project_id', selectedProjectId)
-          .in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
-      ])
+      const s = await fetchCondominioStatsForProject(companyId, selectedProjectId)
       setStats({
         totalUnidades: unidadesProyecto.length,
         ocupadas: unidadesProyecto.filter(u => u.estado_ocupacional === 'habitado').length,
-        cuotasPendientes: cuotasPendRes.count ?? 0,
-        cuotasMora: cuotasMoraRes.count ?? 0,
-        visitantesHoy: visitantesRes.count ?? 0,
-        ticketsAbiertos: ticketsRes.count ?? 0,
-        comunSinAsignar: comunRes.count ?? 0,
+        ...s,
       })
       setPerProject({})
     } else {
       // All projects: lightweight row fetch + JS aggregation
-      const [cuotasRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
-        supabase.from('cuotas_condominio').select('project_id, estado').eq('company_id', companyId).is('deleted_at', null),
-        supabase.from('visitantes').select('project_id').eq('company_id', companyId).gte('hora_entrada', todayISO),
-        supabase.from('tickets_mantenimiento').select('project_id, estado').eq('company_id', companyId).neq('estado', 'cerrado').is('deleted_at', null),
-        supabase.from('conversations').select('project_id').eq('company_id', companyId)
-          .eq('service_type', 'condominios').in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
-      ])
+      const rows = await fetchCondominioStatsRows(companyId)
 
       const byProject: Record<string, ProjectStats> = {}
       const ensure = (pid: string) => { if (!byProject[pid]) byProject[pid] = EMPTY_STATS() }
@@ -98,14 +71,14 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
         byProject[u.project_id].totalUnidades++
         if (u.estado_ocupacional === 'habitado') byProject[u.project_id].ocupadas++
       }
-      for (const r of cuotasRes.data ?? []) {
+      for (const r of rows.cuotas) {
         const pid = r.project_id; if (!pid) continue; ensure(pid)
         if (r.estado === 'pendiente') byProject[pid].cuotasPendientes++
         if (r.estado === 'mora') byProject[pid].cuotasMora++
       }
-      for (const r of visitantesRes.data ?? []) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].visitantesHoy++ }
-      for (const r of ticketsRes.data ?? []) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].ticketsAbiertos++ }
-      for (const r of comunRes.data ?? []) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].comunSinAsignar++ }
+      for (const r of rows.visitantes) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].visitantesHoy++ }
+      for (const r of rows.tickets) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].ticketsAbiertos++ }
+      for (const r of rows.conversations) { const pid = r.project_id; if (!pid) continue; ensure(pid); byProject[pid].comunSinAsignar++ }
 
       const totals = EMPTY_STATS()
       for (const s of Object.values(byProject)) {

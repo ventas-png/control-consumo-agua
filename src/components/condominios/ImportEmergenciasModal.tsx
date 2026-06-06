@@ -1,5 +1,5 @@
 import type { TipoContactoEmergencia } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { createContactosEmergencia } from '../../domain/condominios/mutations'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
 
@@ -94,9 +94,9 @@ export function ImportEmergenciasModal({ proyectoId, companyId, onClose, onImpor
           company_id: companyId,
           activo: true,
         }))
-        const { error } = await supabase.from('contactos_emergencia').insert(payload)
+        const { error } = await createContactosEmergencia(payload)
         return error
-          ? { ok: 0, error: error.message }
+          ? { ok: 0, error }
           : { ok: batch.length }
       }}
       onClose={onClose}
