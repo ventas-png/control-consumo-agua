@@ -121,3 +121,77 @@ export function useRecargosMoraQuery(companyId?: string) {
     enabled: !!companyId,
   })
 }
+
+// ── Dashboard de condominios (stats) — T7/PR3 ──────────────────────────────
+// Lecturas imperativas (no-hook) para CondominiosDashboard. La agregación por
+// proyecto (todos) se queda en la UI; aquí solo baja el acceso a datos.
+
+function startOfTodayISO(): string {
+  const t = new Date()
+  t.setHours(0, 0, 0, 0)
+  return t.toISOString()
+}
+
+/** Conteos del dashboard de condominios para UN proyecto. */
+export interface CondominioProjectStats {
+  cuotasPendientes: number
+  cuotasMora: number
+  visitantesHoy: number
+  ticketsAbiertos: number
+  comunSinAsignar: number
+}
+
+/** 5 conteos ligeros (cuotas pendientes/mora, visitantes hoy, tickets abiertos, comun. sin asignar). */
+export async function fetchCondominioStatsForProject(
+  companyId: string,
+  projectId: string,
+): Promise<CondominioProjectStats> {
+  const todayISO = startOfTodayISO()
+  const cuotaBase = () =>
+    supabase.from('cuotas_condominio').select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId).eq('project_id', projectId)
+  const [cuotasPendRes, cuotasMoraRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
+    cuotaBase().eq('estado', 'pendiente').is('deleted_at', null),
+    cuotaBase().eq('estado', 'mora').is('deleted_at', null),
+    supabase.from('visitantes').select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId).eq('project_id', projectId).gte('hora_entrada', todayISO),
+    supabase.from('tickets_mantenimiento').select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId).eq('project_id', projectId).neq('estado', 'cerrado').is('deleted_at', null),
+    supabase.from('conversations').select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId).eq('service_type', 'condominios').eq('project_id', projectId)
+      .in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
+  ])
+  return {
+    cuotasPendientes: cuotasPendRes.count ?? 0,
+    cuotasMora: cuotasMoraRes.count ?? 0,
+    visitantesHoy: visitantesRes.count ?? 0,
+    ticketsAbiertos: ticketsRes.count ?? 0,
+    comunSinAsignar: comunRes.count ?? 0,
+  }
+}
+
+/** Filas ligeras para computar stats por proyecto en JS (todos los proyectos). */
+export interface CondominioStatsRows {
+  cuotas: { project_id: string | null; estado: string }[]
+  visitantes: { project_id: string | null }[]
+  tickets: { project_id: string | null; estado: string }[]
+  conversations: { project_id: string | null }[]
+}
+
+/** Trae las filas (cuotas/visitantes/tickets/conversations) del tenant para el dashboard. */
+export async function fetchCondominioStatsRows(companyId: string): Promise<CondominioStatsRows> {
+  const todayISO = startOfTodayISO()
+  const [cuotasRes, visitantesRes, ticketsRes, comunRes] = await Promise.all([
+    supabase.from('cuotas_condominio').select('project_id, estado').eq('company_id', companyId).is('deleted_at', null),
+    supabase.from('visitantes').select('project_id').eq('company_id', companyId).gte('hora_entrada', todayISO),
+    supabase.from('tickets_mantenimiento').select('project_id, estado').eq('company_id', companyId).neq('estado', 'cerrado').is('deleted_at', null),
+    supabase.from('conversations').select('project_id').eq('company_id', companyId)
+      .eq('service_type', 'condominios').in('status', ['abierta', 'en_progreso', 'esperando_cliente']).is('assigned_to', null),
+  ])
+  return {
+    cuotas: (cuotasRes.data as CondominioStatsRows['cuotas']) ?? [],
+    visitantes: (visitantesRes.data as CondominioStatsRows['visitantes']) ?? [],
+    tickets: (ticketsRes.data as CondominioStatsRows['tickets']) ?? [],
+    conversations: (comunRes.data as CondominioStatsRows['conversations']) ?? [],
+  }
+}
