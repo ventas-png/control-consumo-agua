@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { MemoriaLabores, TipoPeriodo, EstadoMemoria } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -69,14 +69,14 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
       publicado_por: form.estado === 'publicado' ? userId || null : null,
     }
     const { error } = editId
-      ? await supabase.from('memoria_labores').update(payload).eq('id', editId)
-      : await supabase.from('memoria_labores').insert(payload)
+      ? await updateCondominioRow('memoria_labores', editId, payload)
+      : await createCondominioRow('memoria_labores', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
   async function handlePublicar(id: string) {
-    const { error } = await supabase.from('memoria_labores').update({ estado: 'publicado', publicado_por: userId || null }).eq('id', id)
+    const { error } = await updateCondominioRow('memoria_labores', id, { estado: 'publicado', publicado_por: userId || null })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -84,7 +84,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar memoria?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('memoria_labores').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('memoria_labores', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selected?.id === id) setSelected(null)
     onRefresh()

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { MantenimientoJardineria, TipoJardineria, EstadoJardineria } from '../../../types'
 
@@ -76,7 +76,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Fecha y al menos un área son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('mantenimiento_jardineria').insert({
+    const { error } = await createCondominioRow('mantenimiento_jardineria', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, tipo: form.tipo, areas: form.areas,
       proveedor: form.proveedor.trim() || null,
@@ -96,7 +96,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   }
 
   async function cambiarEstado(r: MantenimientoJardineria, estado: EstadoJardineria) {
-    await supabase.from('mantenimiento_jardineria').update({ estado }).eq('id', r.id)
+    await updateCondominioRow('mantenimiento_jardineria', r.id, { estado })
     if (selected?.id === r.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
   }

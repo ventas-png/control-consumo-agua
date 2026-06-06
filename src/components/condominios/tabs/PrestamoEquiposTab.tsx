@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PrestamoEquipo, EstadoPrestamo, Unidad } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -48,7 +48,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   async function handleSave() {
     if (!form.equipo_nombre.trim() || !form.unidad_id) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Equipo y unidad son obligatorios.' })
     setSaving(true)
-    const { error } = await supabase.from('prestamos_equipo').insert({
+    const { error } = await createCondominioRow('prestamos_equipo', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id,
       equipo_nombre: form.equipo_nombre.trim(),
@@ -78,24 +78,24 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
       submitText: 'Sí, devuelto',
     })
     if (!result) return
-    await supabase.from('prestamos_equipo').update({
+    await updateCondominioRow('prestamos_equipo', p.id, {
       estado: 'devuelto',
       fecha_devolucion: new Date().toISOString().slice(0, 10),
       hora_devolucion: new Date().toTimeString().slice(0, 5),
       observaciones: result.observaciones || p.observaciones,
-    }).eq('id', p.id)
+    })
     onRefresh()
   }
 
   async function marcarEstado(id: string, estado: EstadoPrestamo) {
-    await supabase.from('prestamos_equipo').update({ estado }).eq('id', id)
+    await updateCondominioRow('prestamos_equipo', id, { estado })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('prestamos_equipo').delete().eq('id', id)
+    await deleteCondominioRow('prestamos_equipo', id)
     onRefresh()
   }
 

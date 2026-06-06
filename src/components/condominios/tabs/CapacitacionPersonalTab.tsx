@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { CapacitacionPersonal, EstadoCapacitacion } from '../../../types'
 
@@ -54,7 +54,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
       notify({ variant: 'warning', title: 'Error', text: 'Empleado, curso y fecha de inicio son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('capacitacion_personal_cond').insert({
+    const { error } = await createCondominioRow('capacitacion_personal_cond', {
       company_id: companyId, project_id: proyectoId,
       nombre_empleado: form.nombre_empleado.trim(),
       cargo: form.cargo.trim() || null,
@@ -73,14 +73,14 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   }
 
   async function cambiarEstado(id: string, estado: EstadoCapacitacion) {
-    await supabase.from('capacitacion_personal_cond').update({ estado }).eq('id', id)
+    await updateCondominioRow('capacitacion_personal_cond', id, { estado })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('capacitacion_personal_cond').delete().eq('id', id)
+    await deleteCondominioRow('capacitacion_personal_cond', id)
     onRefresh()
   }
 

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { FirmaDigital, EstadoFirma, TipoDocumentoFirma, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -69,8 +69,8 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('firmas_digitales').update(payload).eq('id', editId)
-      : await supabase.from('firmas_digitales').insert(payload)
+      ? await updateCondominioRow('firmas_digitales', editId, payload)
+      : await createCondominioRow('firmas_digitales', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -78,15 +78,15 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar firma?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('firmas_digitales').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('firmas_digitales', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function marcarFirmado(id: string) {
-    const { error } = await supabase.from('firmas_digitales').update({
+    const { error } = await updateCondominioRow('firmas_digitales', id, {
       estado: 'firmado', fecha_firma: new Date().toISOString(),
-    }).eq('id', id)
+    })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

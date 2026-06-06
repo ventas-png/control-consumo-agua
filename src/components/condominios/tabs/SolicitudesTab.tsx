@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SolicitudResidente, TipoSolicitud, EstadoSolicitud, PrioridadSolicitud, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -73,7 +73,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
   async function handleSave() {
     if (!form.descripcion.trim()) return notify({ variant: 'warning', title: t('condominios.solicitudes.err_description_title'), text: t('condominios.solicitudes.err_description') })
     setSaving(true)
-    const { error } = await supabase.from('solicitudes_residente').insert({
+    const { error } = await createCondominioRow('solicitudes_residente', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id || null,
       tipo: form.tipo, descripcion: form.descripcion.trim(),
@@ -88,14 +88,14 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
   async function handleEstado(id: string, estado: EstadoSolicitud) {
     const payload: Record<string, unknown> = { estado }
     if (estado === 'resuelto' || estado === 'rechazado') payload.respuesta = respuesta || null
-    await supabase.from('solicitudes_residente').update(payload).eq('id', id)
+    await updateCondominioRow('solicitudes_residente', id, payload)
     setExpandedId(null); setRespuesta(''); onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.solicitudes.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('solicitudes_residente').delete().eq('id', id)
+    await deleteCondominioRow('solicitudes_residente', id)
     onRefresh()
   }
 

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ServicioHousekeeping, EstadoHousekeeping, TipoHousekeeping, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -84,8 +84,8 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
       costo: form.costo ?? null, notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('servicios_housekeeping').update(payload).eq('id', editId)
-      : await supabase.from('servicios_housekeeping').insert(payload)
+      ? await updateCondominioRow('servicios_housekeeping', editId, payload)
+      : await createCondominioRow('servicios_housekeeping', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -93,13 +93,13 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar servicio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('servicios_housekeeping').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('servicios_housekeeping', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoHousekeeping) {
-    const { error } = await supabase.from('servicios_housekeeping').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('servicios_housekeeping', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

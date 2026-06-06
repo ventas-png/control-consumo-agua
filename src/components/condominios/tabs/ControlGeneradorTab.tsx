@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ControlGenerador, TipoRegistroGenerador, EstadoGenerador } from '../../../types'
 
@@ -74,7 +74,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
       notify({ variant: 'warning', title: 'Faltan datos', text: 'El nombre del generador es obligatorio' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('control_generador').insert({
+    const { error } = await createCondominioRow('control_generador', {
       company_id: companyId, project_id: proyectoId,
       generador: form.generador.trim(), fecha: form.fecha, tipo: form.tipo,
       nivel_combustible_pct: form.nivel_combustible_pct ? parseFloat(form.nivel_combustible_pct) : null,

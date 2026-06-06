@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ControlCamaraSeguridad, TipoCamara, EstadoCamara } from '../../../types'
 
@@ -91,10 +91,10 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
     }
     let error
     if (editando && selected) {
-      const res = await supabase.from('control_camaras_seguridad').update(payload).eq('id', selected.id)
+      const res = await updateCondominioRow('control_camaras_seguridad', selected.id, payload)
       error = res.error
     } else {
-      const res = await supabase.from('control_camaras_seguridad').insert(payload)
+      const res = await createCondominioRow('control_camaras_seguridad', payload)
       error = res.error
     }
     setSaving(false)
@@ -104,13 +104,13 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
   }
 
   async function cambiarEstado(c: ControlCamaraSeguridad, estado: EstadoCamara) {
-    await supabase.from('control_camaras_seguridad').update({ estado }).eq('id', c.id)
+    await updateCondominioRow('control_camaras_seguridad', c.id, { estado })
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
   }
 
   async function toggleActivo(c: ControlCamaraSeguridad) {
-    await supabase.from('control_camaras_seguridad').update({ activo: !c.activo }).eq('id', c.id)
+    await updateCondominioRow('control_camaras_seguridad', c.id, { activo: !c.activo })
     onRefresh()
   }
 

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PresupuestoCondominio, GastoCondominio, CategoriaGasto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -78,10 +78,10 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
     setSaving(true)
     const existing = presMap[editCat]
     if (existing) {
-      const { error } = await supabase.from('presupuesto_condominio').update({ monto_presupuestado: monto, notas: editNotas || null }).eq('id', existing.id)
+      const { error } = await updateCondominioRow('presupuesto_condominio', existing.id, { monto_presupuestado: monto, notas: editNotas || null })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('presupuesto_condominio').insert({
+      const { error } = await createCondominioRow('presupuesto_condominio', {
         company_id: companyId, project_id: proyectoId,
         anio, categoria: editCat, monto_presupuestado: monto, notas: editNotas || null,
       })
@@ -93,7 +93,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar presupuesto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('presupuesto_condominio').delete().eq('id', id)
+    await deleteCondominioRow('presupuesto_condominio', id)
     onRefresh()
   }
 
