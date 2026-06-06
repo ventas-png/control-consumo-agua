@@ -11,6 +11,31 @@
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
+---
+
+## 🔒 Auditoría de cierre — seguridad + performance (T7 follow-ups)
+
+Tras completar la migración se auditó la postura del SaaS multi-tenant con los
+**Supabase advisors** (señal autoritativa, no especulación).
+
+**Seguridad**
+- ✅ **RLS habilitado en las 140+ tablas** (sin `rls_disabled_in_public`) — el aislamiento por tenant, cubierto.
+- ✅ Las funciones `SECURITY DEFINER` privilegiadas (superadmin / payfac / fiscal / paquetería) **guardan internamente** por `is_super_admin()` / empresa propia / `auth.uid()`. Los ~40 lints de "anon/authenticated puede ejecutar SECURITY DEFINER" son mayormente **helpers de RLS** (`get_my_company_id()`, `current_user_role()`, …) que *deben* ser ejecutables o la RLS se rompe — no son vulnerabilidades.
+- **Fix #469:** `get_company_usage`, `get_company_effective_limits` y `calculate_monthly_total_cents` tomaban `p_company_id` **sin** verificar al llamador → fuga cross-tenant de conteos / límites / total de facturación. Se agregó guard (`is_super_admin()` OR empresa propia OR `service_role`). Migración validada en preview branch y **verificada en prod**.
+
+**Performance**
+- **#470:** índices en las **~175 FKs de _scoping_** (company/project/unidad/cliente) — aceleran filtros RLS y `DELETE` en cascada. NO se indexaron las 250 a ciegas (el advisor reporta ~298 índices **ya sin uso** → evitar write-amplification sin beneficio a este volumen).
+- `pg_net` en schema `public` (advisor WARN): **se deja a propósito** — en uso por 13 `net.http_post` en 9 migraciones (notificaciones / cron / billing); moverlo rompería ese pipeline para una WARN de bajo riesgo.
+
+**Consistencia de capa de datos (fuera de componentes)**
+- **#471:** `usePlanLimits` + la query suelta de `App.tsx` → `domain/`. Los hooks de **realtime** (`useConversations` / `useNotifications` / `usePresence`) y **auth** (`useAuth`) **retienen `supabase` a propósito**: sus `.channel()` / `onAuthStateChange` son suscripciones *stateful*, no acceso request/response. Ese es el límite arquitectónico correcto.
+
+**Backlog opcional (por demanda — no bloqueante, no seguridad):**
+- CRUD inline de los hooks de realtime → `domain/` (bajo valor; el channel se queda en el hook igual).
+- Las ~75 FKs no-scoping sin índice + los ~298 índices sin uso → revisar cuando haya tráfico real que lo justifique.
+
+---
+
 ## ✅ Hecho
 
 **Primera tanda (sesión previa):** `mapa` #440 · `tarifas` #441 · `rutas` #445 ·
