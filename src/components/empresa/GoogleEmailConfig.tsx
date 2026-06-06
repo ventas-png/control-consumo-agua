@@ -1,7 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchEmailConfig,
+  fetchEmailTemplates,
+  fetchEmailSendLog,
+  deleteEmailConfig,
+  updateEmailConfigMeta,
+  updateEmailTemplate,
+  insertEmailTemplate,
+  deleteEmailTemplate,
+  initiateGoogleOAuth,
+  sendEmail,
+  type EmailConfig,
+  type EmailTemplate,
+  type EmailSendLogRow,
+} from '../../domain/comunicacion/emailConfig'
 
 // Template metadata displayed in the UI
 const TEMPLATE_DEFS = [
@@ -14,52 +28,9 @@ const TEMPLATE_DEFS = [
   { key: 'notificacion_empresa', label: 'Notificación a Empresa', icon: '📣', desc: 'Solo superadmin: avisos o anuncios a clientes empresa.' },
 ]
 
-interface EmailConfig {
-  id: string
-  email: string
-  is_active: boolean
-  updated_at: string
-  from_name: string | null
-  reply_to: string | null
-}
-
-interface EmailTemplate {
-  id: string
-  template_key: string
-  subject: string
-  html_body: string
-  is_active: boolean
-}
-
-interface EmailSendLogRow {
-  id: number
-  template_key: string
-  to_email: string
-  from_email: string | null
-  status: 'sent' | 'failed'
-  error_message: string | null
-  sent_at: string
-}
-
 interface Props {
   companyId?: string | null
   isSuperadmin?: boolean
-}
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
-
-async function getAccessToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? ''
-}
-
-async function callFn(name: string, body: unknown): Promise<Response> {
-  const token = await getAccessToken()
-  return fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  })
 }
 
 export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
@@ -83,31 +54,13 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       return
     }
 
-    // Supabase query builder is immutable — apply ownership filter via ternary
-    const { data } = await (
-      isSuperadmin
-        ? supabase.from('company_email_configs')
-            .select('id, email, is_active, updated_at, from_name, reply_to')
-            .eq('is_superadmin', true)
-        : supabase.from('company_email_configs')
-            .select('id, email, is_active, updated_at, from_name, reply_to')
-            .eq('company_id', companyId!)
-    ).maybeSingle()
-    const cfg = data as EmailConfig | null
+    const scope = { isSuperadmin, companyId }
+    const cfg = await fetchEmailConfig(scope)
     setConfig(cfg)
     setFromName(cfg?.from_name ?? '')
     setReplyTo(cfg?.reply_to ?? '')
 
-    const { data: tplData } = await (
-      isSuperadmin
-        ? supabase.from('email_templates')
-            .select('id, template_key, subject, html_body, is_active')
-            .eq('is_superadmin', true)
-        : supabase.from('email_templates')
-            .select('id, template_key, subject, html_body, is_active')
-            .eq('company_id', companyId!)
-    )
-    setTemplates((tplData as EmailTemplate[]) ?? [])
+    setTemplates(await fetchEmailTemplates(scope))
     setLoading(false)
   }, [companyId, isSuperadmin])
 
@@ -116,17 +69,16 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   async function handleConnect() {
     setConnecting(true)
     try {
-      const res = await callFn('google-oauth-initiate', {
+      const { url, error } = await initiateGoogleOAuth({
         company_id: isSuperadmin ? null : companyId,
         is_superadmin: isSuperadmin,
       })
-      const data = await res.json() as { url?: string; error?: string }
-      if (!res.ok || !data.url) {
-        notify({ variant: 'error', title: 'Error', text: data.error ?? 'No se pudo iniciar la conexión con Google.' })
+      if (error || !url) {
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo iniciar la conexión con Google.' })
         return
       }
       // Redirect the current page to Google OAuth
-      window.location.href = data.url
+      window.location.href = url
     } catch {
       notify({ variant: 'error', title: 'Error de red', text: 'No se pudo conectar con el servidor.' })
     } finally {
@@ -145,13 +97,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     })
     if (!isConfirmed) return
 
-    const query = supabase.from('company_email_configs').delete()
-    if (isSuperadmin) {
-      query.eq('is_superadmin', true)
-    } else {
-      query.eq('company_id', companyId)
-    }
-    await query
+    await deleteEmailConfig({ isSuperadmin, companyId })
     setConfig(null)
     notify({ variant: 'success', title: 'Desconectado', duration: 1500 })
   }
@@ -163,7 +109,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     }
     setSendingTest(true)
     try {
-      const res = await callFn('send-email', {
+      const { ok, error } = await sendEmail({
         company_id: isSuperadmin ? null : companyId,
         is_superadmin: isSuperadmin,
         template_key: 'difusion',
@@ -176,11 +122,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
           from_name: isSuperadmin ? 'Superadministrador' : 'Administrador',
         },
       })
-      if (res.ok) {
+      if (ok) {
         notify({ variant: 'success', title: '¡Correo enviado!', text: `El correo de prueba fue enviado a ${testEmail}.`, duration: 3000 })
       } else {
-        const err = await res.json() as { error?: string }
-        notify({ variant: 'error', title: 'Error al enviar', text: err.error ?? 'No se pudo enviar el correo de prueba.' })
+        notify({ variant: 'error', title: 'Error al enviar', text: error ?? 'No se pudo enviar el correo de prueba.' })
       }
     } catch {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo conectar con el servidor.' })
@@ -228,14 +173,9 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
     if (!subject && !html_body) return // nothing to save
 
     if (existing) {
-      await supabase.from('email_templates').update({ subject, html_body, updated_at: new Date().toISOString() }).eq('id', existing.id)
+      await updateEmailTemplate(existing.id, { subject, html_body })
     } else {
-      await supabase.from('email_templates').insert({
-        template_key: def.key,
-        subject,
-        html_body,
-        ...(isSuperadmin ? { is_superadmin: true } : { company_id: companyId }),
-      })
+      await insertEmailTemplate({ isSuperadmin, companyId }, { template_key: def.key, subject, html_body })
     }
 
     notify({ variant: 'success', title: 'Template guardado', duration: 1200 })
@@ -251,7 +191,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
-    await supabase.from('email_templates').delete().eq('id', templateId)
+    await deleteEmailTemplate(templateId)
     notify({ variant: 'success', title: 'Eliminado', duration: 1000 })
     void loadConfig()
   }
@@ -259,13 +199,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   async function handleSaveMeta() {
     if (!config) return
     setSavingMeta(true)
-    const { error } = await supabase
-      .from('company_email_configs')
-      .update({
-        from_name: fromName.trim() || null,
-        reply_to: replyTo.trim() || null,
-      })
-      .eq('id', config.id)
+    const { error } = await updateEmailConfigMeta(config.id, {
+      from_name: fromName.trim() || null,
+      reply_to: replyTo.trim() || null,
+    })
     setSavingMeta(false)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar la configuración.' })
@@ -278,20 +215,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   const loadSendLog = useCallback(async () => {
     if (!isSuperadmin && !companyId) return
     setLogLoading(true)
-    const { data } = await (
-      isSuperadmin
-        ? supabase.from('email_send_log')
-            .select('id, template_key, to_email, from_email, status, error_message, sent_at')
-            .eq('is_superadmin', true)
-            .order('sent_at', { ascending: false })
-            .limit(20)
-        : supabase.from('email_send_log')
-            .select('id, template_key, to_email, from_email, status, error_message, sent_at')
-            .eq('company_id', companyId!)
-            .order('sent_at', { ascending: false })
-            .limit(20)
-    )
-    setSendLog((data as EmailSendLogRow[]) ?? [])
+    setSendLog(await fetchEmailSendLog({ isSuperadmin, companyId }))
     setLogLoading(false)
   }, [companyId, isSuperadmin])
 

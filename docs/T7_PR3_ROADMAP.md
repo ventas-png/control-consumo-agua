@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 44** (tras los lotes
-> `auth/`, `empresa` RBAC/usuarios y `empresa` pagos). Restan **34** tabs "complejos" +
-> **10** sueltos fuera de condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 43** (tras los lotes
+> `auth/`, `empresa` RBAC/usuarios, `empresa` pagos y `empresa` correo). Restan **34** tabs
+> "complejos" + **9** sueltos fuera de condominios.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -34,6 +34,10 @@ edges create-user/delete-user).
 **Empresa pagos:** `StripePayPalConfig`, `PayfacConfigSection` → `domain/cobros/paymentConfig.ts`
 (columnas Stripe/PayPal de `companies`, edges save-payment-config/test-stripe, override
 `projects.proveedor_pago`).
+
+**Empresa correo:** `GoogleEmailConfig` → `domain/comunicacion/emailConfig.ts`
+(`company_email_configs`/`email_templates`/`email_send_log` con scope superadmin/empresa,
+edges google-oauth-initiate/send-email).
 
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
@@ -93,10 +97,10 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 10 archivos
+### B) Fuera de condominios — 9 archivos
 
-`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅ y `empresa` pagos (2) ✅ hechos. Resta
-**`empresa`** residual (`GoogleEmailConfig`, `SavedReportsModal`, `AuditLogModal`,
+`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅, `empresa` pagos (2) ✅ y `empresa` correo
+(1) ✅ hechos. Resta **`empresa`** residual (`SavedReportsModal`, `AuditLogModal`,
 `FinancialAuditModal`, `PapeleraModal`, `EmpresaProyectosSection`, `EmpresaHeaderCard`) +
 sueltos (`perfil/PerfilSection`, `tarifas/FiscalConfigSection`, `historial/HistorialSection`).
 `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
