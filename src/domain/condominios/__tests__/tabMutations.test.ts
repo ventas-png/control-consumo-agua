@@ -19,6 +19,7 @@ import {
   deleteCondominioRow,
   deleteCondominioRowBy,
   deleteCondominioRowsByIds,
+  updateCondominioRowsByIds,
   marcarCuotasMorosas,
 } from '../tabMutations'
 
@@ -95,5 +96,17 @@ describe('tabMutations (CRUD genérico)', () => {
     expect(await deleteCondominioRowsByIds('huespedes_str', ['a', 'b'])).toEqual({ error: null })
     h.state.result = { error: { message: 'boom' } }
     expect(await deleteCondominioRowsByIds('huespedes_str', ['a'])).toEqual({ error: { message: 'boom' } })
+  })
+
+  it('updateCondominioRowsByIds con lista vacía es no-op (no error)', async () => {
+    h.state.result = { error: { message: 'no debería llamarse' } }
+    expect(await updateCondominioRowsByIds('visitantes', [], { hora_salida: 'x' })).toEqual({ error: null })
+  })
+
+  it('updateCondominioRowsByIds aplica patch por .in y propaga error', async () => {
+    h.state.result = { error: null }
+    expect(await updateCondominioRowsByIds('visitantes', ['a', 'b'], { hora_salida: 'x' })).toEqual({ error: null })
+    h.state.result = { error: { message: 'rls' } }
+    expect(await updateCondominioRowsByIds('visitantes', ['a'], { hora_salida: 'x' })).toEqual({ error: { message: 'rls' } })
   })
 })

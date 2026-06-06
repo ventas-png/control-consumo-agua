@@ -225,6 +225,27 @@ export async function fetchReservasStrByUnidad<T>(unidadId: string): Promise<T[]
   return (data as T[] | null) ?? []
 }
 
+// ── Seguridad / accesos ──
+
+/**
+ * Historial de visitantes con una identificación (DPI) en la empresa, con nombre de unidad.
+ * Devuelve `{ data, error }` (con shape `{ message }`) porque el buscador del puesto de
+ * seguridad distingue "error" de "sin resultados".
+ */
+export async function fetchVisitantesPorDpi<T>(
+  companyId: string,
+  dpi: string,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('visitantes')
+    .select('*, unidades(nombre)')
+    .eq('company_id', companyId)
+    .eq('identificacion', dpi)
+    .order('hora_entrada', { ascending: false })
+    .limit(50)
+  return { data: (data as T[] | null) ?? [], error }
+}
+
 /** Fila de config del condominio (id + términos de mudanza) o `null` si no existe. */
 export async function fetchConfigCondominioTerminos(
   projectId: string,

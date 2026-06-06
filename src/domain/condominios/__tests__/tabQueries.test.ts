@@ -39,6 +39,7 @@ import {
   fetchContratosByUnidad,
   fetchReservasStrByUnidad,
   fetchConfigCondominioTerminos,
+  fetchVisitantesPorDpi,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -168,5 +169,21 @@ describe('rentas / STR', () => {
   })
   it('fetchConfigCondominioTerminos sin fila → null', async () => {
     expect(await fetchConfigCondominioTerminos('p1', 'co1')).toBeNull()
+  })
+})
+
+describe('seguridad / accesos', () => {
+  it('fetchVisitantesPorDpi devuelve { data, error } con filas', async () => {
+    h.state.byTable.visitantes = { data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null }
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({
+      data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null,
+    })
+  })
+  it('fetchVisitantesPorDpi sin filas → { data: [], error: null }', async () => {
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({ data: [], error: null })
+  })
+  it('fetchVisitantesPorDpi propaga el error', async () => {
+    h.state.byTable.visitantes = { data: null, error: { message: 'rls' } }
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({ data: [], error: { message: 'rls' } })
   })
 })

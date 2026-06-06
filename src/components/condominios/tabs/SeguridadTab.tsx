@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
+import { fetchVisitantesPorDpi } from '../../../domain/condominios/tabQueries'
 import { validatedInsert } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { SecureImage } from '../../shared/SecureImage'
@@ -131,24 +137,20 @@ export function SeguridadTab({
 
   async function iniciarRonda() {
     setSaving(true)
-    const { data: rondaData, error } = await supabase
-      .from('rondas_seguridad')
-      .insert({
-        company_id: companyId, project_id: proyectoId,
-        guardia_id: userId, estado: 'en_curso',
-        ruta_id: rondaForm.ruta_id || null,
-        notas: rondaForm.notas.trim() || null,
-      })
-      .select('id')
-      .single()
+    const { data: rondaData, error } = await createCondominioRowReturning('rondas_seguridad', {
+      company_id: companyId, project_id: proyectoId,
+      guardia_id: userId, estado: 'en_curso',
+      ruta_id: rondaForm.ruta_id || null,
+      notas: rondaForm.notas.trim() || null,
+    })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
 
     // Si se seleccionó una ruta, crear las visitas_control para cada punto
     if (rondaForm.ruta_id && rondaData) {
       const puntos = puntosControl.filter(p => p.ruta_id === rondaForm.ruta_id).sort((a, b) => a.orden - b.orden)
       if (puntos.length > 0) {
-        await supabase.from('visitas_control').insert(
-          puntos.map(p => ({ ronda_id: rondaData.id, punto_id: p.id, estado: 'pendiente' }))
+        await createCondominioRow('visitas_control',
+          puntos.map(p => ({ ronda_id: rondaData.id as string, punto_id: p.id, estado: 'pendiente' }))
         )
       }
     }
@@ -157,15 +159,15 @@ export function SeguridadTab({
   }
 
   async function finalizarRonda(id: string, estado: EstadoRonda) {
-    await supabase.from('rondas_seguridad').update({ estado, fin: new Date().toISOString() }).eq('id', id)
+    await updateCondominioRow('rondas_seguridad', id, { estado, fin: new Date().toISOString() })
     onRefresh()
   }
 
   async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string) {
-    await supabase.from('visitas_control').update({
+    await updateCondominioRow('visitas_control', visitaId, {
       estado, notas: notas ?? null,
       visitado_en: estado !== 'pendiente' ? new Date().toISOString() : null,
-    }).eq('id', visitaId)
+    })
     onRefresh()
   }
 
@@ -190,7 +192,7 @@ export function SeguridadTab({
   async function registrarNovedad() {
     if (!novedadForm.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese la descripción.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('novedades_seguridad').insert({
+    const { error } = await createCondominioRow('novedades_seguridad', {
       company_id: companyId, project_id: proyectoId,
       ronda_id: novedadForm.ronda_id || null,
       tipo: novedadForm.tipo, descripcion: novedadForm.descripcion.trim(),
@@ -210,7 +212,7 @@ export function SeguridadTab({
   async function eliminarNovedad(id: string) {
     const r = await confirm({ title: '¿Eliminar novedad?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('novedades_seguridad').delete().eq('id', id)
+    await deleteCondominioRow('novedades_seguridad', id)
     onRefresh()
   }
 
@@ -270,13 +272,7 @@ export function SeguridadTab({
     setSearchResult('idle')
     setSearchResultVisitantes([])
     setShowRegForm(false)
-    const { data, error } = await supabase
-      .from('visitantes')
-      .select('*, unidades(nombre)')
-      .eq('company_id', companyId)
-      .eq('identificacion', dpi)
-      .order('hora_entrada', { ascending: false })
-      .limit(50)
+    const { data, error } = await fetchVisitantesPorDpi<Visitante & { unidades?: { nombre: string } }>(companyId, dpi)
     setSearching(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (data && data.length > 0) {

@@ -86,6 +86,17 @@ export async function deleteCondominioRowsByIds(
   return { error }
 }
 
+/** Aplica `patch` a un conjunto de filas de `table` por id (`.in`). No-op si `ids` vacío. */
+export async function updateCondominioRowsByIds(
+  table: string,
+  ids: string[],
+  patch: Record<string, unknown>,
+): Promise<{ error: RowError }> {
+  if (ids.length === 0) return { error: null }
+  const { error } = await supabase.from(table).update(patch).in('id', ids)
+  return { error }
+}
+
 /**
  * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
  * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de
