@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
 interface Props {
@@ -42,7 +42,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
       notify({ variant: 'error', title: 'Error', text: 'Complete asunto y mensaje.' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('mensajes_portal').insert({
+    const { error } = await createCondominioRow('mensajes_portal', {
       company_id: companyId, project_id: proyectoId, unidad_id: unidad.id,
       asunto: msgForm.asunto.trim(), cuerpo: msgForm.cuerpo.trim(), tipo: msgForm.tipo,
     })
@@ -67,7 +67,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
       submitText: 'Enviar respuesta',
     })
     if (!result?.respuesta) return
-    await supabase.from('mensajes_portal').update({ estado: 'respondido', respuesta: result.respuesta, respondido_en: new Date().toISOString() }).eq('id', id)
+    await updateCondominioRow('mensajes_portal', id, { estado: 'respondido', respuesta: result.respuesta, respondido_en: new Date().toISOString() })
     onRefresh()
   }
 

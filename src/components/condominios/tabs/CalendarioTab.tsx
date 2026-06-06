@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EventoCalendario, TipoEvento, Asamblea, AgendaItem } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -90,7 +90,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   async function handleSave() {
     if (!form.titulo.trim() || !form.fecha_inicio) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y fecha de inicio son obligatorios.' })
     setSaving(true)
-    const { error } = await supabase.from('eventos_calendario').insert({
+    const { error } = await createCondominioRow('eventos_calendario', {
       company_id: companyId,
       project_id: proyectoId,
       titulo: form.titulo.trim(),
@@ -113,7 +113,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar evento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('eventos_calendario').delete().eq('id', id)
+    await deleteCondominioRow('eventos_calendario', id)
     onRefresh()
   }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { TicketMantenimiento } from '../../../types'
 
 interface Props {
@@ -44,7 +44,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
   async function enviarSolicitud() {
     if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título de la solicitud.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('tickets_mantenimiento').insert({
+    const { error } = await createCondominioRow('tickets_mantenimiento', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: unidadId, tipo: 'correctivo',
       titulo: form.titulo.trim(), descripcion: form.descripcion.trim() || null,

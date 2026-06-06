@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { AsambleaDigital, Unidad } from '../../../types'
 
 interface Props {
@@ -91,8 +91,8 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
       quorum_requerido: parseInt(form.quorum_requerido) || 50,
     }
     const { error } = editId
-      ? await supabase.from('asambleas_digital').update(payload).eq('id', editId)
-      : await supabase.from('asambleas_digital').insert({ ...payload, estado: 'programada', created_by: userId })
+      ? await updateCondominioRow('asambleas_digital', editId, payload)
+      : await createCondominioRow('asambleas_digital', { ...payload, estado: 'programada', created_by: userId })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm()
@@ -100,7 +100,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   async function cambiarEstado(a: AsambleaDigital, nuevoEstado: EstadoA) {
-    const { error } = await supabase.from('asambleas_digital').update({ estado: nuevoEstado }).eq('id', a.id)
+    const { error } = await updateCondominioRow('asambleas_digital', a.id, { estado: nuevoEstado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -108,7 +108,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   async function eliminar(a: AsambleaDigital) {
     const res = await confirm({ title: '¿Eliminar asamblea?', text: a.titulo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('asambleas_digital').delete().eq('id', a.id)
+    await deleteCondominioRow('asambleas_digital', a.id)
     onRefresh()
   }
 
@@ -121,7 +121,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   async function guardarActa() {
     if (!actaAsamblea) return
     setSavingActa(true)
-    const { error } = await supabase.from('asambleas_digital').update({ acta_url: actaTexto.trim() || null }).eq('id', actaAsamblea.id)
+    const { error } = await updateCondominioRow('asambleas_digital', actaAsamblea.id, { acta_url: actaTexto.trim() || null })
     setSavingActa(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Acta guardada', duration: 1500 })

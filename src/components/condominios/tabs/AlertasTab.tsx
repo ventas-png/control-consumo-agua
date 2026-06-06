@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -157,7 +157,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
   async function handleSave() {
     if (!form.titulo.trim() || !form.fecha_alerta) return notify({ variant: 'warning', title: t('condominios.alertas.err_required_title'), text: t('condominios.alertas.err_required') })
     setSaving(true)
-    const { error } = await supabase.from('alertas_condominio').insert({
+    const { error } = await createCondominioRow('alertas_condominio', {
       company_id: companyId,
       project_id: proyectoId,
       tipo: form.tipo,
@@ -174,14 +174,14 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
   }
 
   async function handleEstado(id: string, estado: 'resuelta' | 'ignorada') {
-    await supabase.from('alertas_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('alertas_condominio', id, { estado })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.alertas.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('alertas_condominio').delete().eq('id', id)
+    await deleteCondominioRow('alertas_condominio', id)
     onRefresh()
   }
 

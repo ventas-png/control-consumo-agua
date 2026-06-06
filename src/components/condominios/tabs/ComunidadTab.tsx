@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -50,7 +50,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
     if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título del anuncio.' }); return }
     if (!form.contenido.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el contenido del anuncio.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('anuncios_comunidad').insert({
+    const { error } = await createCondominioRow('anuncios_comunidad', {
       company_id: companyId,
       project_id: proyectoId,
       titulo: form.titulo.trim(),
@@ -69,7 +69,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   async function toggleActivo(anuncio: AnuncioComunidad) {
-    const { error } = await supabase.from('anuncios_comunidad').update({ activo: !anuncio.activo }).eq('id', anuncio.id)
+    const { error } = await updateCondominioRow('anuncios_comunidad', anuncio.id, { activo: !anuncio.activo })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -77,7 +77,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   async function eliminar(id: string) {
     const result = await confirm({ title: '¿Eliminar anuncio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    await supabase.from('anuncios_comunidad').delete().eq('id', id)
+    await deleteCondominioRow('anuncios_comunidad', id)
     onRefresh()
   }
 
