@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  fetchUserNotifications,
+  markNotificationRead,
+  markNotificationsRead,
+} from '../domain/comunicacion/notifications'
 import type { UserNotification } from '../types'
 
 const LIMIT = 30
@@ -12,12 +17,7 @@ export function useNotifications(userId?: string) {
 
   const load = useCallback(async () => {
     if (!userId) return
-    const { data } = await supabase
-      .from('user_notifications')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(LIMIT)
-    if (data) setItems(data as UserNotification[])
+    setItems(await fetchUserNotifications(LIMIT))
   }, [userId])
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function useNotifications(userId?: string) {
   const marcarLeida = useCallback(async (id: string) => {
     const now = new Date().toISOString()
     setItems(prev => prev.map(n => (n.id === id ? { ...n, leido: true, leido_at: now } : n)))
-    await supabase.from('user_notifications').update({ leido: true, leido_at: now }).eq('id', id)
+    await markNotificationRead(id, now)
   }, [])
 
   const marcarTodas = useCallback(async () => {
@@ -46,7 +46,7 @@ export function useNotifications(userId?: string) {
     if (ids.length === 0) return
     const now = new Date().toISOString()
     setItems(prev => prev.map(n => (n.leido ? n : { ...n, leido: true, leido_at: now })))
-    await supabase.from('user_notifications').update({ leido: true, leido_at: now }).in('id', ids)
+    await markNotificationsRead(ids, now)
   }, [items])
 
   return { items, unread, load, marcarLeida, marcarTodas }

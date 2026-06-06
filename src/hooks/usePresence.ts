@@ -1,5 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { upsertPresence, fetchActivePresence, type PresenceRow } from '../domain/presence/presence'
+
+// Re-export para los consumidores existentes (p.ej. PresenceIndicator) que
+// importan el tipo desde el hook.
+export type { PresenceRow }
 
 // ============================================================================
 // usePresence — F4.4.2: heartbeat + lectura de presencia colaborativa.
@@ -20,15 +25,6 @@ import { supabase } from '../lib/supabase'
 
 const HEARTBEAT_INTERVAL_MS = 30_000
 const PRESENCE_TTL_MS = 60_000
-
-export interface PresenceRow {
-  user_id: string
-  company_id: string
-  project_id: string | null
-  section: string | null
-  record_id: string | null
-  last_seen: string
-}
 
 export interface UsePresenceOptions {
   companyId: string | null | undefined
@@ -60,14 +56,14 @@ export function usePresence(opts: UsePresenceOptions): PresenceState {
 
     async function beat() {
       const o = lastBeatRef.current
-      await supabase.from('user_presence').upsert({
-        user_id: o.userId,
-        company_id: o.companyId,
-        project_id: o.projectId ?? null,
+      await upsertPresence({
+        userId: o.userId,
+        companyId: o.companyId,
+        projectId: o.projectId ?? null,
         section: o.section ?? null,
-        record_id: o.recordId ?? null,
-        last_seen: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+        recordId: o.recordId ?? null,
+        lastSeen: new Date().toISOString(),
+      })
     }
 
     // Heartbeat inicial inmediato + interval
@@ -77,13 +73,8 @@ export function usePresence(opts: UsePresenceOptions): PresenceState {
     // Cargar estado inicial: presencia activa de la company
     void (async () => {
       const since = new Date(Date.now() - PRESENCE_TTL_MS).toISOString()
-      const { data } = await supabase
-        .from('user_presence')
-        .select('user_id, company_id, project_id, section, record_id, last_seen')
-        .eq('company_id', companyId)
-        .gte('last_seen', since)
+      const rows = await fetchActivePresence(companyId, since)
       if (!alive) return
-      const rows = (data ?? []) as PresenceRow[]
       setState({ others: rows.filter(r => r.user_id !== userId), loading: false })
     })()
 
