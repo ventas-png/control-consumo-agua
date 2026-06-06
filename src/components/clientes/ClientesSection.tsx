@@ -3,7 +3,19 @@ import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, ClienteLookupResult, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchClienteAccountMap,
+  fetchCompanyClientesActivoMap,
+  buscarClienteParaOnboarding,
+  fetchClienteById,
+} from '../../domain/clientes/queries'
+import {
+  updateCliente,
+  linkClienteToCompany,
+  addCompanyClientesLinks,
+  setCompanyClienteActivo,
+  unlinkClienteFromCompany,
+} from '../../domain/clientes/mutations'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
@@ -97,27 +109,8 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
   useEffect(() => {
     if (!companyId || clientes.length === 0) return
     const ids = clientes.map(c => c.id)
-
-    supabase
-      .from('app_users')
-      .select('cliente_id')
-      .in('cliente_id', ids)
-      .then(({ data }) => {
-        const map: Record<string, boolean> = {}
-        data?.forEach(u => { if (u.cliente_id) map[u.cliente_id] = true })
-        setAccountMap(map)
-      })
-
-    supabase
-      .from('company_clientes')
-      .select('id, cliente_id, activo')
-      .eq('company_id', companyId)
-      .in('cliente_id', ids)
-      .then(({ data }) => {
-        const map: Record<string, { ccId: string; activo: boolean }> = {}
-        data?.forEach(row => { map[row.cliente_id] = { ccId: row.id, activo: row.activo ?? true } })
-        setActivoMap(map)
-      })
+    void fetchClienteAccountMap(ids).then(setAccountMap)
+    void fetchCompanyClientesActivoMap(companyId, ids).then(setActivoMap)
   }, [companyId, clientes])
 
   async function handleToggleActivo(clienteId: string) {
@@ -125,10 +118,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     if (!current) return
     const newActivo = !current.activo
     setActivoMap(prev => ({ ...prev, [clienteId]: { ...current, activo: newActivo } }))
-    const { error } = await supabase
-      .from('company_clientes')
-      .update({ activo: newActivo })
-      .eq('id', current.ccId)
+    const { error } = await setCompanyClienteActivo(current.ccId, newActivo)
     if (error) {
       setActivoMap(prev => ({ ...prev, [clienteId]: current }))
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la visibilidad del cliente.' })
@@ -203,23 +193,23 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
 
     setOnboardingStep('lookup_loading')
 
-    const { data, error } = await supabase.rpc('buscar_cliente_para_onboarding', {
-      p_cui_dui: cui_dui,
-      p_fecha_nac: fecha_nacimiento,
-      p_email: email,
+    const { data, error } = await buscarClienteParaOnboarding({
+      cuiDui: cui_dui,
+      fechaNac: fecha_nacimiento,
+      email,
     })
 
-    if (error) {
+    if (error || !data) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo realizar la búsqueda. Verifique conexión.' })
       setOnboardingStep('lookup')
       return
     }
 
-    const result = data as ClienteLookupResult
+    const result = data
 
     if (result.match_count === 3) {
       // All 3 match - auto-add to company
-      await linkClientToCompany(result.cliente_id!, result.cliente_nombre!)
+      await autoLinkCliente(result.cliente_id!, result.cliente_nombre!)
     } else if (result.match_count === 2) {
       // 2 of 3 match - warning
       setLookupResult(result)
@@ -231,46 +221,39 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     }
   }
 
-  async function linkClientToCompany(clienteId: string, clienteNombre: string) {
+  async function autoLinkCliente(clienteId: string, clienteNombre: string) {
     if (!companyId) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar la empresa actual.' })
       setOnboardingStep('lookup')
       return
     }
 
-    const { error } = await supabase.from('company_clientes').insert({
-      company_id: companyId,
-      cliente_id: clienteId,
-      added_by: userId,
-    })
+    const { error, alreadyLinked } = await linkClienteToCompany(companyId, clienteId, userId)
 
+    if (alreadyLinked) {
+      notify({
+        variant: 'info',
+        title: 'Cliente ya vinculado',
+        text: `${clienteNombre} ya se encuentra vinculado a tu empresa.`,
+        duration: 3000,
+      })
+      setOnboardingStep('lookup')
+      return
+    }
     if (error) {
-      if (error.code === '23505') {
-        notify({
-          variant: 'info',
-          title: 'Cliente ya vinculado',
-          text: `${clienteNombre} ya se encuentra vinculado a tu empresa.`,
-          duration: 3000,
-        })
-      } else {
-        notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo vincular el cliente.' })
-      }
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo vincular el cliente.' })
       setOnboardingStep('lookup')
       return
     }
 
     // Fetch the full client record to add to local state
-    const { data: clienteData } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('id', clienteId)
-      .single()
+    const clienteData = await fetchClienteById(clienteId)
 
     if (clienteData) {
       // Only add to local list if not already present
       const alreadyInList = clientes.some(c => c.id === clienteId)
       if (!alreadyInList) {
-        onClienteAdded(clienteData as Cliente)
+        onClienteAdded(clienteData)
       }
     }
 
@@ -352,24 +335,19 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
     }
 
     if (editingId) {
-      const { data, error } = await supabase
-        .from('clientes')
-        .update({
-          ...payload,
-          updated_at: new Date().toISOString(),
-          updated_by: currentUser.user_id,
-          updated_by_name: currentUser.name || currentUser.email,
-        })
-        .eq('id', editingId)
-        .select()
-        .single()
+      const { data, error } = await updateCliente(editingId, {
+        ...payload,
+        updated_at: new Date().toISOString(),
+        updated_by: currentUser.user_id,
+        updated_by_name: currentUser.name || currentUser.email,
+      })
 
       if (!error && data) {
-        onClienteUpdated(editingId, data as Cliente)
+        onClienteUpdated(editingId, data)
         cancelForm()
         notify({ variant: 'success', title: 'Cliente actualizado', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error?.message ?? 'No se pudo actualizar el cliente.' })
+        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo actualizar el cliente.' })
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: currentUser.role }, userId)
@@ -387,11 +365,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       if (!error) {
         // Link new client to company first so SELECT RLS policy passes
         if (companyId) {
-          await supabase.from('company_clientes').insert({
-            company_id: companyId,
-            cliente_id: clienteId,
-            added_by: userId,
-          })
+          await addCompanyClientesLinks([{ company_id: companyId, cliente_id: clienteId, added_by: userId }])
         }
 
         const newCliente = { ...payload, id: clienteId } as Cliente
@@ -421,17 +395,13 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
       return
     }
 
-    const { error } = await supabase
-      .from('company_clientes')
-      .delete()
-      .eq('cliente_id', c.id)
-      .eq('company_id', companyId)
+    const { error } = await unlinkClienteFromCompany(c.id, companyId)
 
     if (!error) {
       onClienteDeleted(c.id)
       notify({ variant: 'success', title: 'Cliente removido de la empresa', duration: 1500 })
     } else {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo quitar el cliente.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo quitar el cliente.' })
     }
   }
 

@@ -1,7 +1,8 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import type { Cliente } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchClientesForDedup } from '../../domain/clientes/queries'
+import { addCompanyClientesLinks, upsertCompanyClientesLinks } from '../../domain/clientes/mutations'
 import { validatedInsertMany } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
@@ -243,10 +244,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         }
 
         // Load ALL global clients (not just filtered ones) for accurate duplicate detection
-        const { data: allClientes, error } = await supabase
-          .from('clientes')
-          .select('id, codigo, cui_dui')
-          .order('codigo')
+        const { data: allClientes, error } = await fetchClientesForDedup()
 
         if (error) {
           notify({ variant: 'error', title: 'Error', text: 'No se pudieron cargar los clientes globales.' })
@@ -324,7 +322,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
       if (!error) {
         // Link to company now that the clients exist
         if (companyId) {
-          await supabase.from('company_clientes').insert(
+          await addCompanyClientesLinks(
             lote.map(c => ({ company_id: companyId, cliente_id: c.id, added_by: userId }))
           )
         }
@@ -353,9 +351,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
       }
 
       if (links.length > 0) {
-        await supabase
-          .from('company_clientes')
-          .upsert(links, { onConflict: 'company_id,cliente_id', ignoreDuplicates: true })
+        await upsertCompanyClientesLinks(links)
         insertados.push(...linkedClientes)
       }
     }

@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { fetchContratosByUnidades, fetchReservasByUnidades } from '../../domain/clientes/queries'
+import {
+  createContrato, updateContrato, deleteContrato,
+  createReserva, updateReserva, deleteReserva,
+} from '../../domain/clientes/mutations'
 import type {
   Cliente, Unidad, ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR,
@@ -83,20 +87,12 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     if (clienteUnidades.length === 0) { setLoading(false); return }
     const unidadIds = clienteUnidades.map(u => u.id)
     setLoading(true)
-    const [contratosRes, reservasRes] = await Promise.all([
-      supabase
-        .from('contratos_arrendamiento')
-        .select('*')
-        .in('unidad_id', unidadIds)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('reservas_str')
-        .select('*')
-        .in('unidad_id', unidadIds)
-        .order('fecha_entrada', { ascending: false }),
+    const [contratosData, reservasData] = await Promise.all([
+      fetchContratosByUnidades(unidadIds),
+      fetchReservasByUnidades(unidadIds),
     ])
-    if (contratosRes.data) setContratos(contratosRes.data as ContratoArrendamiento[])
-    if (reservasRes.data) setReservas(reservasRes.data as ReservaSTR[])
+    setContratos(contratosData)
+    setReservas(reservasData)
     setLoading(false)
   }
 
@@ -170,16 +166,16 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       estado: 'activo' as EstadoContrato,
     }
 
-    let error
+    let error: string | null = null
     if (editingContratoId) {
-      ;({ error } = await supabase.from('contratos_arrendamiento').update(payload).eq('id', editingContratoId))
+      ;({ error } = await updateContrato(editingContratoId, payload))
     } else {
-      ;({ error } = await supabase.from('contratos_arrendamiento').insert(payload))
+      ;({ error } = await createContrato(payload))
     }
 
     setSavingContrato(false)
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar el contrato.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo guardar el contrato.' })
     } else {
       notify({ variant: 'success', title: editingContratoId ? 'Contrato actualizado' : 'Contrato creado', duration: 1800 })
       cancelContratoForm()
@@ -196,9 +192,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       confirmText: 'Sí, eliminar',
     })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
+    const { error } = await deleteContrato(c.id)
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error })
     } else {
       setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
     }
@@ -282,16 +278,16 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       notas: strForm.notas.trim() || null,
     }
 
-    let error
+    let error: string | null = null
     if (editingSTRId) {
-      ;({ error } = await supabase.from('reservas_str').update(payload).eq('id', editingSTRId))
+      ;({ error } = await updateReserva(editingSTRId, payload))
     } else {
-      ;({ error } = await supabase.from('reservas_str').insert(payload))
+      ;({ error } = await createReserva(payload))
     }
 
     setSavingSTR(false)
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message ?? 'No se pudo guardar la reserva.' })
+      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo guardar la reserva.' })
     } else {
       notify({ variant: 'success', title: editingSTRId ? 'Reserva actualizada' : 'Reserva creada', duration: 1800 })
       cancelSTRForm()
@@ -308,9 +304,9 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       confirmText: 'Sí, eliminar',
     })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('reservas_str').delete().eq('id', r.id)
+    const { error } = await deleteReserva(r.id)
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error })
     } else {
       setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
     }
