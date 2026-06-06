@@ -3,16 +3,39 @@
 // user_roles → UserSession (permisos, ids de rol, roles asignados).
 import { describe, it, expect, vi } from 'vitest'
 
-// session.ts importa lib/supabase (inicializa el cliente); los helpers bajo prueba
-// son PUROS y no lo usan, así que lo stubeamos para no tocar red/env — mismo
-// patrón que el resto de tests de domain/.
-vi.mock('../../../lib/supabase', () => ({ supabase: {} }))
+// session.ts importa lib/supabase (inicializa el cliente). Los parsers bajo
+// prueba son PUROS; appUserProfileExists sí lee, así que el mock encadenable
+// expone .from().select().eq().maybeSingle() con un resultado configurable.
+const { maybeSingle } = vi.hoisted(() => ({ maybeSingle: vi.fn() }))
+vi.mock('../../../lib/supabase', () => ({
+  supabase: {
+    from: () => {
+      const c: Record<string, unknown> = {}
+      c.select = () => c
+      c.eq = () => c
+      c.maybeSingle = maybeSingle
+      return c
+    },
+  },
+}))
 
 import {
   buildPermissionsSet,
   buildAssignedRoleIds,
   buildAssignedRoles,
+  appUserProfileExists,
 } from '../session'
+
+describe('appUserProfileExists', () => {
+  it('hay perfil → true', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: { id: 'u1' }, error: null })
+    expect(await appUserProfileExists('u1')).toBe(true)
+  })
+  it('sin perfil → false', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    expect(await appUserProfileExists('u1')).toBe(false)
+  })
+})
 
 describe('buildPermissionsSet', () => {
   it('error o sin data → undefined (no asume permisos)', () => {

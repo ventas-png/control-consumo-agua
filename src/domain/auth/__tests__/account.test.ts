@@ -3,7 +3,7 @@
 // signOut). Sin red/React: sólo el mapeo de resultados de supabase a `{ error }`.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { invoke, resetPasswordForEmail, updateUser, getSession, getUser, signInFn, signOutFn } = vi.hoisted(() => ({
+const { invoke, resetPasswordForEmail, updateUser, getSession, getUser, signInFn, signOutFn, updateEq } = vi.hoisted(() => ({
   invoke: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
@@ -11,10 +11,12 @@ const { invoke, resetPasswordForEmail, updateUser, getSession, getUser, signInFn
   getUser: vi.fn(),
   signInFn: vi.fn(),
   signOutFn: vi.fn(),
+  updateEq: vi.fn(),
 }))
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
     functions: { invoke },
+    from: () => ({ update: () => ({ eq: updateEq }) }),
     auth: {
       resetPasswordForEmail,
       updateUser,
@@ -38,6 +40,7 @@ import {
   fetchCurrentAuthProvider,
   signInWithPassword,
   updateUserEmail,
+  updateAppUserName,
 } from '../account'
 
 beforeEach(() => {
@@ -48,6 +51,19 @@ beforeEach(() => {
   getUser.mockReset()
   signInFn.mockReset()
   signOutFn.mockReset()
+  updateEq.mockReset()
+})
+
+describe('updateAppUserName', () => {
+  it('éxito → { error: null } y filtra por id', async () => {
+    updateEq.mockResolvedValueOnce({ error: null })
+    expect(await updateAppUserName('u1', 'Nuevo Nombre')).toEqual({ error: null })
+    expect(updateEq).toHaveBeenCalledWith('id', 'u1')
+  })
+  it('error → mensaje legible', async () => {
+    updateEq.mockResolvedValueOnce({ error: { message: 'denied' } })
+    expect(await updateAppUserName('u1', 'X')).toEqual({ error: 'denied' })
+  })
 })
 
 describe('fetchCurrentAuthProvider', () => {

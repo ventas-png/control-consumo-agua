@@ -129,3 +129,18 @@ export async function updateUserEmail(
   const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo })
   return { error: error?.message ?? null }
 }
+
+/**
+ * Actualiza el nombre visible (`full_name`) del usuario en `app_users`. El caller
+ * pasa el valor ya saneado (p.ej. trim). Devuelve `{ error }` mapeado a string.
+ */
+export async function updateAppUserName(
+  userId: string,
+  fullName: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('app_users')
+    .update({ full_name: fullName })
+    .eq('id', userId)
+  return { error: error?.message ?? null }
+}
