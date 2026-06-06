@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { OnboardingResidente, EstadoOnboarding, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -84,14 +84,14 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('onboarding_residentes').update(payload).eq('id', editId)
-      : await supabase.from('onboarding_residentes').insert(payload)
+      ? await updateCondominioRow('onboarding_residentes', editId, payload)
+      : await createCondominioRow('onboarding_residentes', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
 
   async function toggleCheck(id: string, key: keyof OnboardingResidente, val: boolean) {
-    const { error } = await supabase.from('onboarding_residentes').update({ [key]: !val }).eq('id', id)
+    const { error } = await updateCondominioRow('onboarding_residentes', id, { [key]: !val })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -99,8 +99,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   async function activarPortal(o: OnboardingResidente) {
     if (!o.unidad_id) { notify({ variant: 'warning', title: 'Sin unidad', text: 'Este onboarding no tiene una unidad asignada.' }); return }
     const token = crypto.randomUUID().replace(/-/g, '')
-    const { error } = await supabase.from('unidades')
-      .update({ portal_activo: true, token_portal: token }).eq('id', o.unidad_id)
+    const { error } = await updateCondominioRow('unidades', o.unidad_id, { portal_activo: true, token_portal: token })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     const url = `${window.location.origin}/portal/${token}`
     await navigator.clipboard.writeText(url).catch(() => {})
@@ -116,7 +115,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar onboarding?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('onboarding_residentes').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('onboarding_residentes', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

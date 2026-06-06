@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SeguimientoAcuerdo, ActaReunion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -50,9 +50,9 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('seguimiento_acuerdos').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('seguimiento_acuerdos', editId, payload))
     } else {
-      ({ error } = await supabase.from('seguimiento_acuerdos').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('seguimiento_acuerdos', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -60,14 +60,14 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('seguimiento_acuerdos').update({ estado }).eq('id', id)
+    await updateCondominioRow('seguimiento_acuerdos', id, { estado })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar acuerdo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('seguimiento_acuerdos').delete().eq('id', id)
+    await deleteCondominioRow('seguimiento_acuerdos', id)
     onRefresh()
   }
 

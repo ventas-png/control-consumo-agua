@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LocalComercial, EstadoLocal, GiroLocal } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -90,8 +90,8 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('locales_comerciales').update(payload).eq('id', editId)
-      : await supabase.from('locales_comerciales').insert(payload)
+      ? await updateCondominioRow('locales_comerciales', editId, payload)
+      : await createCondominioRow('locales_comerciales', payload)
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -99,7 +99,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.locales.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('locales_comerciales').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('locales_comerciales', id)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()
   }

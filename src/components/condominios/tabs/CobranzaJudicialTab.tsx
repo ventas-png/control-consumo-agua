@@ -1,5 +1,5 @@
 import { useState, Fragment, type CSSProperties } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { CobranzaJudicial, EtapaCobranzaJudicial, EstadoCobranzaJudicial, Unidad } from '../../../types'
@@ -51,7 +51,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
       notify({ variant: 'warning', title: 'Error', text: 'Unidad y monto son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('cobranza_judicial').insert({
+    const { error } = await createCondominioRow('cobranza_judicial', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id, etapa: form.etapa,
       monto_adeudado: parseFloat(form.monto_adeudado),
@@ -69,14 +69,14 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
     const idx = ETAPAS.indexOf(c.etapa)
     if (idx >= ETAPAS.length - 1) return
     const siguienteEtapa = ETAPAS[idx + 1]
-    await supabase.from('cobranza_judicial').update({
+    await updateCondominioRow('cobranza_judicial', c.id, {
       etapa: siguienteEtapa, fecha_actualizacion: new Date().toISOString().slice(0, 10),
-    }).eq('id', c.id)
+    })
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: EstadoCobranzaJudicial) {
-    await supabase.from('cobranza_judicial').update({ estado }).eq('id', id)
+    await updateCondominioRow('cobranza_judicial', id, { estado })
     onRefresh()
   }
 
@@ -95,7 +95,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
     })
     if (!result) return
     const value = result.notas
-    await supabase.from('cobranza_judicial').update({ notas: value || null }).eq('id', c.id)
+    await updateCondominioRow('cobranza_judicial', c.id, { notas: value || null })
     onRefresh()
   }
 

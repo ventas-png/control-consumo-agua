@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { ReciboDigital, EstadoReciboDigital, CuotaCondominio, Unidad } from '../../../types'
 import { exportarPDFRecibo, exportarExcel } from '../exportUtils'
@@ -66,7 +66,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
       notify({ variant: 'warning', title: 'Error', text: 'Unidad, monto y concepto son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('recibos_digitales').insert({
+    const { error } = await createCondominioRow('recibos_digitales', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id,
       cuota_id: form.cuota_id || null,
@@ -85,14 +85,14 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
   }
 
   async function marcarEnviado(id: string) {
-    await supabase.from('recibos_digitales').update({ estado: 'enviado' }).eq('id', id)
+    await updateCondominioRow('recibos_digitales', id, { estado: 'enviado' })
     onRefresh()
   }
 
   async function anular(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Anular recibo?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
     if (!isConfirmed) return
-    await supabase.from('recibos_digitales').update({ estado: 'anulado' }).eq('id', id)
+    await updateCondominioRow('recibos_digitales', id, { estado: 'anulado' })
     onRefresh()
   }
 

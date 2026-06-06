@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -120,8 +120,8 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('gastos_condominio').update(payload).eq('id', editId)
-      : await supabase.from('gastos_condominio').insert(payload)
+      ? await updateCondominioRow('gastos_condominio', editId, payload)
+      : await createCondominioRow('gastos_condominio', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -129,7 +129,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar gasto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('gastos_condominio').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('gastos_condominio', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

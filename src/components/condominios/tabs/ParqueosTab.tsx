@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ParqueoCondominio, Unidad, TipoParqueo } from '../../../types'
 
 interface Props {
@@ -74,8 +74,8 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
       notas: form.notas.trim() || null,
     }
     const { error } = editingId
-      ? await supabase.from('parqueos_condominio').update(data).eq('id', editingId)
-      : await supabase.from('parqueos_condominio').insert(data)
+      ? await updateCondominioRow('parqueos_condominio', editingId, data)
+      : await createCondominioRow('parqueos_condominio', data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: editingId ? 'Parqueo actualizado' : 'Parqueo registrado', duration: 1400 })
@@ -83,14 +83,14 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
   }
 
   async function toggleActivo(p: ParqueoCondominio) {
-    await supabase.from('parqueos_condominio').update({ activo: !p.activo }).eq('id', p.id)
+    await updateCondominioRow('parqueos_condominio', p.id, { activo: !p.activo })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: '¿Eliminar parqueo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('parqueos_condominio').delete().eq('id', id)
+    await deleteCondominioRow('parqueos_condominio', id)
     onRefresh()
   }
 
