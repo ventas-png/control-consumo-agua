@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 46** (tras los lotes
-> `auth/` y `empresa` RBAC/usuarios). Restan **34** tabs "complejos" + **12** sueltos
-> fuera de condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 44** (tras los lotes
+> `auth/`, `empresa` RBAC/usuarios y `empresa` pagos). Restan **34** tabs "complejos" +
+> **10** sueltos fuera de condominios.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -30,6 +30,10 @@
 `EmpresaUsuariosSection` → `domain/empresa/roles.ts` (roles/permissions/role_permissions/
 user_roles) + `domain/empresa/usuarios.ts` (app_users.activo, user_project_assignments,
 edges create-user/delete-user).
+
+**Empresa pagos:** `StripePayPalConfig`, `PayfacConfigSection` → `domain/cobros/paymentConfig.ts`
+(columnas Stripe/PayPal de `companies`, edges save-payment-config/test-stripe, override
+`projects.proveedor_pago`).
 
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
@@ -89,13 +93,12 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 12 archivos
+### B) Fuera de condominios — 10 archivos
 
-`auth/` (5) ✅ y `empresa` RBAC/usuarios (4) ✅ hechos. Resta **`empresa`** residual
-(config/integraciones: `StripePayPalConfig`, `GoogleEmailConfig`, `PayfacConfigSection`,
-`SavedReportsModal`, `AuditLogModal`, `FinancialAuditModal`, `PapeleraModal`,
-`EmpresaProyectosSection`, `EmpresaHeaderCard`) + sueltos (`perfil/PerfilSection`,
-`tarifas/FiscalConfigSection`, `historial/HistorialSection`).
+`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅ y `empresa` pagos (2) ✅ hechos. Resta
+**`empresa`** residual (`GoogleEmailConfig`, `SavedReportsModal`, `AuditLogModal`,
+`FinancialAuditModal`, `PapeleraModal`, `EmpresaProyectosSection`, `EmpresaHeaderCard`) +
+sueltos (`perfil/PerfilSection`, `tarifas/FiscalConfigSection`, `historial/HistorialSection`).
 `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
 
 ---
