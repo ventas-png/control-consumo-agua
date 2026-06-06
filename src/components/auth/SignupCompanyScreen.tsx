@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { signupCompany } from '../../domain/auth/account'
 import { validatePasswordStrength } from '../../lib/validation'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -76,27 +76,24 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
 
     setLoading(true)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('signup-company', {
-        body: {
-          email: email.trim().toLowerCase(),
-          password,
-          full_name: fullName.trim(),
-          company_name: companyName.trim(),
-          phone: phone.trim() || undefined,
-          servicio_agua: servicioAgua,
-          servicio_condominios: servicioCondominios,
-          // Evidencia click-wrap: el backend la valida y registra (versión + IP +
-          // timestamp + user-agent) en legal_acceptances.
-          legal_accepted: acceptedLegal,
-        },
+      const { data, error: fnError } = await signupCompany({
+        email: email.trim().toLowerCase(),
+        password,
+        full_name: fullName.trim(),
+        company_name: companyName.trim(),
+        phone: phone.trim() || undefined,
+        servicio_agua: servicioAgua,
+        servicio_condominios: servicioCondominios,
+        // Evidencia click-wrap: el backend la valida y registra (versión + IP +
+        // timestamp + user-agent) en legal_acceptances.
+        legal_accepted: acceptedLegal,
       })
       if (fnError) {
-        setError(`Error: ${fnError.message ?? 'No se pudo crear la cuenta.'}`)
+        setError(`Error: ${fnError ?? 'No se pudo crear la cuenta.'}`)
         return
       }
-      const result = data as { success?: boolean; error?: string }
-      if (result?.error) {
-        setError(result.error)
+      if (data?.error) {
+        setError(data.error)
         return
       }
       // Funnel (PostHog): cima del embudo. Anónimo (el identify ocurre al primer

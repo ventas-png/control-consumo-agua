@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent} from 'react'
-import { supabase } from '../../lib/supabase'
+import { createClienteAccount } from '../../domain/auth/account'
 import { validatePasswordStrength } from '../../lib/validation'
 import { BrandLogo } from '../shared/BrandLogo'
 
@@ -54,27 +54,24 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
 
     setLoading(true)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('create-cliente-account', {
-        body: {
-          full_name: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          cui_dui: cuiDui.trim(),
-          fecha_nacimiento: fechaNacimiento,
-          password,
-          // Evidencia click-wrap: el backend la valida y registra (versión + IP +
-          // timestamp + user-agent) en legal_acceptances.
-          legal_accepted: acceptedLegal,
-        },
+      const { data, error: fnError } = await createClienteAccount({
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        cui_dui: cuiDui.trim(),
+        fecha_nacimiento: fechaNacimiento,
+        password,
+        // Evidencia click-wrap: el backend la valida y registra (versión + IP +
+        // timestamp + user-agent) en legal_acceptances.
+        legal_accepted: acceptedLegal,
       })
 
       if (fnError) {
-        setError(`Error: ${fnError.message || fnError.context?.statusCode || JSON.stringify(fnError)}`)
+        setError(`Error: ${fnError}`)
         return
       }
 
-      const result = data as { success?: boolean; error?: string }
-      if (result.error) {
-        setError(result.error)
+      if (data?.error) {
+        setError(data.error)
         return
       }
 

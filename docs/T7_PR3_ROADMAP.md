@@ -4,9 +4,8 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 55** (al cierre de
-> `condominios/tabs` lote 6). Restan **34** tabs "complejos" + **21** sueltos fuera de
-> condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 50** (tras el lote
+> `auth/`). Restan **34** tabs "complejos" + **16** sueltos fuera de condominios.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -22,12 +21,17 @@
 - raíz — `Dashboard` + `ImportEmergenciasModal` #458; **`CondominiosSection`** (loader de ~141 tablas → `domain/condominios/sectionData.ts`) #459.
 - `tabs/` CRUD **simple** — lotes #460 (15), #461 (27), #462 (20), #463 (18), #464 (15), #465 (16) = **111 tabs**.
 
+**Auth (fuera de condominios):** `auth/` — `RegisterScreen`, `PasswordResetModal`,
+`SignupCompanyScreen`, `OAuthOnboardingScreen`, `PasswordResetPage` → `domain/auth/account.ts`
+(edge functions de alta + reset/updateUser/getSession/signOut).
+
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
 - `domain/contadores/queries.resolveDefaultProjectCompany(userId, fallbackCompanyId)`.
 - `domain/unidades/queries.resolveUnidadProjectCompany(userId, formProjectId, fallbackCompanyId)` · `checkUnidadesLimit(companyId)`.
 - `domain/clientes/mutations.updateCliente(id, payload)` · `domain/agua/mutations.{createRegistro,updateRegistro,marcarRegistrosMora,uploadRegistroFoto}`.
 - `domain/cobros/mutations.{createPago,uploadComprobantePago,…}`.
+- `domain/auth/account`: `createClienteAccount` · `signupCompany` · `completeOAuthOnboarding` · `requestPasswordReset` · `updatePassword` · `hasActiveSession` · `signOut` · `signOutGlobal`.
 - **`domain/condominios/tabMutations`** — CRUD genérico de los tabs (ver abajo).
 
 ---
@@ -50,7 +54,7 @@
 
 ---
 
-## ⬜ Backlog restante (55 archivos)
+## ⬜ Backlog restante (50 archivos)
 
 ### A) `condominios/tabs` "complejos" — 34 tabs
 
@@ -78,10 +82,12 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 21 archivos
+### B) Fuera de condominios — 16 archivos
 
-Sobre todo **`empresa`** residual (el dominio `domain/empresa` ya existe; bajar las calls
-que quedan) + algún suelto. `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
+`auth/` (5) ✅ hecho → `domain/auth/account`. Resta sobre todo **`empresa`** residual (el
+dominio `domain/empresa` ya existe; bajar las calls que quedan) + algún suelto
+(`perfil`, `tarifas/FiscalConfigSection`, `historial`).
+`grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
 
 ---
 

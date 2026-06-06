@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { completeOAuthOnboarding, signOut } from '../../domain/auth/account'
 import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
@@ -25,8 +25,9 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
 
     setLoading(true)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('complete-oauth-onboarding', {
-        body: { cui_dui: cuiDui.trim(), fecha_nacimiento: fechaNacimiento },
+      const { data, error: fnError } = await completeOAuthOnboarding({
+        cui_dui: cuiDui.trim(),
+        fecha_nacimiento: fechaNacimiento,
       })
 
       if (fnError) {
@@ -34,13 +35,12 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
         return
       }
 
-      const result = data as { success?: boolean; error?: string }
-      if (result?.error) {
-        setError(result.error)
+      if (data?.error) {
+        setError(data.error)
         return
       }
 
-      if (result?.success) {
+      if (data?.success) {
         onSuccess()
       }
     } catch {
@@ -51,7 +51,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
   }
 
   async function handleCancel() {
-    await supabase.auth.signOut()
+    await signOut()
     onCancel()
   }
 
