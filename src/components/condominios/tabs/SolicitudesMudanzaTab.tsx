@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchConfigCondominioTerminos } from '../../../domain/condominios/tabQueries'
 import { SecureImage } from '../../shared/SecureImage'
 import { useSignedUrl } from '../../../lib/storageUrls'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza, Unidad } from '../../../types'
@@ -80,12 +81,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
   const [savingTerminos, setSavingTerminos]   = useState(false)
 
   const cargarTerminos = useCallback(async () => {
-    const { data } = await supabase
-      .from('config_condominio')
-      .select('id, terminos_mudanza')
-      .eq('project_id', proyectoId)
-      .eq('company_id', companyId)
-      .maybeSingle()
+    const data = await fetchConfigCondominioTerminos(proyectoId, companyId)
 
     if (data) {
       setTerminosMudanza(data.terminos_mudanza ?? '')
@@ -112,16 +108,11 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
     }
     setSavingTerminos(true)
     if (terminosId) {
-      const { error } = await supabase
-        .from('config_condominio')
-        .update({ terminos_mudanza: terminosText.trim(), updated_at: new Date().toISOString() })
-        .eq('id', terminosId)
+      const { error } = await updateCondominioRow('config_condominio', terminosId, { terminos_mudanza: terminosText.trim(), updated_at: new Date().toISOString() })
       setSavingTerminos(false)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
-      const { error } = await supabase
-        .from('config_condominio')
-        .upsert({ company_id: companyId, project_id: proyectoId, terminos_mudanza: terminosText.trim() }, { onConflict: 'project_id' })
+      const { error } = await upsertCondominioRow('config_condominio', { company_id: companyId, project_id: proyectoId, terminos_mudanza: terminosText.trim() }, 'project_id')
       setSavingTerminos(false)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     }
@@ -188,7 +179,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       payload.fecha_autorizada = fechaAut || s.fecha_solicitada || null
       payload.hora_autorizada  = horaAut  || s.hora_solicitada  || null
     }
-    const { error } = await supabase.from('solicitud_mudanza_unidad').update(payload).eq('id', s.id)
+    const { error } = await updateCondominioRow('solicitud_mudanza_unidad', s.id, payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada', duration: 1400 })
@@ -197,21 +188,21 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
   async function cambiarEstado(id: string, estado: EstadoSolicitudMudanza) {
     if (!canEdit) return
-    const { error } = await supabase.from('solicitud_mudanza_unidad').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('solicitud_mudanza_unidad', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function toggleCampo(id: string, campo: 'deposito_requerido' | 'deposito_pagado' | 'ascensor_reservado', valor: boolean) {
     if (!canEdit) return
-    const { error } = await supabase.from('solicitud_mudanza_unidad').update({ [campo]: valor }).eq('id', id)
+    const { error } = await updateCondominioRow('solicitud_mudanza_unidad', id, { [campo]: valor })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function actualizarMontoDeposito(id: string, monto: number | null) {
     if (!canEdit) return
-    const { error } = await supabase.from('solicitud_mudanza_unidad').update({ monto_deposito: monto }).eq('id', id)
+    const { error } = await updateCondominioRow('solicitud_mudanza_unidad', id, { monto_deposito: monto })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

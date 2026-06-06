@@ -14,10 +14,9 @@ import { useQuery } from '@tanstack/react-query'
 import { notify } from '../shared/Dialog'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { supabase } from '../../lib/supabase'
-import { runQuery } from '../../domain/queryFetch'
 import type { PayfacEstatus } from '../../types/pagos'
 import { useConfigPagoEfectivaQuery, useEstatusPayfacQuery } from '../../domain/cobros/queries'
+import { fetchProjectProveedorPagoOverride } from '../../domain/cobros/paymentConfig'
 import {
   useGuardarConfigPagoMutation,
   useGuardarCredencialesPayfacMutation,
@@ -69,13 +68,7 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
   const { data: rawOverride } = useQuery<{ proveedorPago: string | null } | null>({
     queryKey: ['payfac', 'project-override-crudo', ambitoProjectId],
     enabled: !esEmpresa && !!ambitoProjectId,
-    queryFn: async () => {
-      const rows = await runQuery<Array<{ proveedor_pago: string | null }>>((signal) =>
-        supabase.from('projects').select('proveedor_pago').eq('id', ambitoProjectId).limit(1).abortSignal(signal),
-      )
-      const p = rows?.[0]
-      return p ? { proveedorPago: p.proveedor_pago ?? null } : null
-    },
+    queryFn: () => fetchProjectProveedorPagoOverride(ambitoProjectId),
   })
 
   const { data: estatusList = [] } = useEstatusPayfacQuery(companyId)

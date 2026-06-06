@@ -35,6 +35,18 @@ export async function createCondominioRowReturning(
   return { data: (data as Record<string, unknown>) ?? null, error }
 }
 
+/** Upsert de una fila en `table` (resuelve conflictos por `onConflict`). */
+export async function upsertCondominioRow(
+  table: string,
+  payload: Record<string, unknown>,
+  onConflict?: string,
+): Promise<{ error: RowError }> {
+  const { error } = await supabase
+    .from(table)
+    .upsert(payload, onConflict ? { onConflict } : undefined)
+  return { error }
+}
+
 /** Actualiza la fila `id` de `table` con `patch`. */
 export async function updateCondominioRow(
   table: string,
@@ -51,5 +63,35 @@ export async function deleteCondominioRow(
   id: string,
 ): Promise<{ error: RowError }> {
   const { error } = await supabase.from(table).delete().eq('id', id)
+  return { error }
+}
+
+/** Elimina filas de `table` por una columna distinta de `id` (ej. encuesta_id). */
+export async function deleteCondominioRowBy(
+  table: string,
+  column: string,
+  value: string,
+): Promise<{ error: RowError }> {
+  const { error } = await supabase.from(table).delete().eq(column, value)
+  return { error }
+}
+
+/** Elimina un conjunto de filas de `table` por id (`.in`). Si `ids` viene vacío, no-op. */
+export async function deleteCondominioRowsByIds(
+  table: string,
+  ids: string[],
+): Promise<{ error: RowError }> {
+  if (ids.length === 0) return { error: null }
+  const { error } = await supabase.from(table).delete().in('id', ids)
+  return { error }
+}
+
+/**
+ * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
+ * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de
+ * error (`{ message }`) que el resto de helpers de tab.
+ */
+export async function marcarCuotasMorosas(ids: string[]): Promise<{ error: RowError }> {
+  const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', ids)
   return { error }
 }

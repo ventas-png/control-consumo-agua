@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { requestPasswordReset } from '../../domain/auth/account'
 import { sanitizeInput, validateEmail } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
@@ -25,9 +25,7 @@ export function PasswordResetModal({ onClose }: Props) {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail.toLowerCase(), {
-        redirectTo: window.location.origin,
-      })
+      const { error } = await requestPasswordReset(cleanEmail.toLowerCase(), window.location.origin)
 
       if (error) {
         setEmailError('Error al solicitar restablecimiento. Intenta de nuevo.')

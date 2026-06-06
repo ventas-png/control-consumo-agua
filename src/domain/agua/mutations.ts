@@ -46,6 +46,18 @@ export async function updateRegistro(
 }
 
 /**
+ * Elimina un registro por id. Devuelve también `count` (con `count: 'exact'`)
+ * para que la UI distinga "borrado" de "sin permisos" (RLS devuelve count 0 sin
+ * error cuando la fila no es visible/eliminable para el usuario).
+ */
+export async function deleteRegistro(
+  id: string,
+): Promise<{ error: string | null; count: number | null }> {
+  const { error, count } = await supabase.from('registros').delete({ count: 'exact' }).eq('id', id)
+  return { error: error?.message ?? null, count: count ?? null }
+}
+
+/**
  * Marca un conjunto de registros como 'mora' (para seguimiento del cobrador).
  * Usado al marcar mora en lote y al crear un convenio.
  */

@@ -1,6 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchEjecucionesMantenimiento } from '../../../domain/condominios/tabQueries'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
 import { notify } from '../../shared/Dialog'
 
@@ -65,8 +66,8 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
   useEffect(() => {
     if (!selected) return
     setLoadingEj(true)
-    supabase.from('ejecuciones_mantenimiento').select('*').eq('plan_id', selected).order('fecha', { ascending: false })
-      .then(({ data }) => { setEjecuciones((data ?? []) as EjecucionMantenimiento[]); setLoadingEj(false) })
+    void fetchEjecucionesMantenimiento<EjecucionMantenimiento>(selected)
+      .then(data => { setEjecuciones(data); setLoadingEj(false) })
   }, [selected])
 
   async function handleSavePlan() {
@@ -76,7 +77,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
     if (!proxima && form.ultima_ejecucion) {
       proxima = addDays(form.ultima_ejecucion, FREQ_DAYS[form.frecuencia] ?? 30)
     }
-    const { error } = await supabase.from('planes_mantenimiento').insert({
+    const { error } = await createCondominioRow('planes_mantenimiento', {
       company_id: companyId, project_id: proyectoId,
       equipo: form.equipo.trim(), descripcion: form.descripcion || null,
       frecuencia: form.frecuencia, responsable: form.responsable || null,
@@ -94,25 +95,24 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
     setSavingEjec(true)
     const proxima = addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30)
     const [ejRes] = await Promise.all([
-      supabase.from('ejecuciones_mantenimiento').insert({
+      createCondominioRow('ejecuciones_mantenimiento', {
         company_id: companyId, plan_id: selected, fecha: ejecForm.fecha,
         realizado_por: ejecForm.realizado_por || null,
         costo_real: ejecForm.costo_real || null,
         observaciones: ejecForm.observaciones || null,
         estado: ejecForm.estado,
       }),
-      supabase.from('planes_mantenimiento').update({ ultima_ejecucion: ejecForm.fecha, proxima_ejecucion: proxima }).eq('id', selected),
+      updateCondominioRow('planes_mantenimiento', selected, { ultima_ejecucion: ejecForm.fecha, proxima_ejecucion: proxima }),
     ])
     setSavingEjec(false)
     if (ejRes.error) return notify({ variant: 'error', title: 'Error', text: ejRes.error.message })
     setShowEjecForm(false); setEjecForm({ ...BLANK_EJEC })
-    const { data } = await supabase.from('ejecuciones_mantenimiento').select('*').eq('plan_id', selected).order('fecha', { ascending: false })
-    setEjecuciones((data ?? []) as EjecucionMantenimiento[])
+    setEjecuciones(await fetchEjecucionesMantenimiento<EjecucionMantenimiento>(selected))
     onRefresh()
   }
 
   async function toggleActivo(id: string, activo: boolean) {
-    await supabase.from('planes_mantenimiento').update({ activo: !activo }).eq('id', id)
+    await updateCondominioRow('planes_mantenimiento', id, { activo: !activo })
     onRefresh()
   }
 

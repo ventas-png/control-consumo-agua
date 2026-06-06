@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 55** (al cierre de
-> `condominios/tabs` lote 6). Restan **34** tabs "complejos" + **21** sueltos fuera de
-> condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 17**. **Sección B COMPLETA.**
+> Sección A en curso: **17** tabs hechos (grupos Portal read-only, Mantenimiento/otros,
+> Amenidades/reservas, Asambleas/votaciones y Rentas/STR completos); restan **17**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -22,12 +22,50 @@
 - raíz — `Dashboard` + `ImportEmergenciasModal` #458; **`CondominiosSection`** (loader de ~141 tablas → `domain/condominios/sectionData.ts`) #459.
 - `tabs/` CRUD **simple** — lotes #460 (15), #461 (27), #462 (20), #463 (18), #464 (15), #465 (16) = **111 tabs**.
 
+**Auth (fuera de condominios):** `auth/` — `RegisterScreen`, `PasswordResetModal`,
+`SignupCompanyScreen`, `OAuthOnboardingScreen`, `PasswordResetPage` → `domain/auth/account.ts`
+(edge functions de alta + reset/updateUser/getSession/signOut).
+
+**Empresa RBAC/usuarios:** `RolPermisosModal`, `CustomRoleEditor`, `AsignacionModal`,
+`EmpresaUsuariosSection` → `domain/empresa/roles.ts` (roles/permissions/role_permissions/
+user_roles) + `domain/empresa/usuarios.ts` (app_users.activo, user_project_assignments,
+edges create-user/delete-user).
+
+**Empresa pagos:** `StripePayPalConfig`, `PayfacConfigSection` → `domain/cobros/paymentConfig.ts`
+(columnas Stripe/PayPal de `companies`, edges save-payment-config/test-stripe, override
+`projects.proveedor_pago`).
+
+**Empresa correo:** `GoogleEmailConfig` → `domain/comunicacion/emailConfig.ts`
+(`company_email_configs`/`email_templates`/`email_send_log` con scope superadmin/empresa,
+edges google-oauth-initiate/send-email).
+
+**Empresa trazabilidad/reportes:** `AuditLogModal`, `FinancialAuditModal`, `PapeleraModal`
+→ `domain/empresa/auditoria.ts` (permission_audit_log/audit_log + soft-delete restore;
+reusa `usuarios.fetchAppUserNamesByIds`). `SavedReportsModal` → `domain/empresa/reportes.ts`
+(report_templates/report_runs + SELECT dinámico de la tabla fuente + log de corrida).
+
+**Empresa CRUD + sueltos:** `EmpresaHeaderCard`, `EmpresaProyectosSection` →
+`domain/empresa/mutations.ts` (companies/projects update/insert + logos company-logos/
+project-logos). `HistorialSection` → `domain/agua/mutations` (`updateRegistro` reusado +
+`deleteRegistro` nuevo). `FiscalConfigSection` → `domain/fiscal/queries.fetchProjectFiscalOverride`.
+
+**Perfil (billing + auth/MFA):** `PerfilSection` → `domain/auth/account` (provider,
+signIn, updatePassword, updateUserEmail) + `domain/auth/mfaActions` (enroll/challenge/
+verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
+`domain/facturacion/billing` (subscription/plans/RPC desglose). **Cierra la sección B.**
+
+**Condominios tabs complejos (sección A) — lote Portal read-only:** `DirectorioTab`,
+`MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab` →
+`domain/condominios/tabQueries.ts` (selects propios con join/counts/rango + `activarPortalUnidad`).
+
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
 - `domain/contadores/queries.resolveDefaultProjectCompany(userId, fallbackCompanyId)`.
 - `domain/unidades/queries.resolveUnidadProjectCompany(userId, formProjectId, fallbackCompanyId)` · `checkUnidadesLimit(companyId)`.
 - `domain/clientes/mutations.updateCliente(id, payload)` · `domain/agua/mutations.{createRegistro,updateRegistro,marcarRegistrosMora,uploadRegistroFoto}`.
 - `domain/cobros/mutations.{createPago,uploadComprobantePago,…}`.
+- `domain/auth/account`: `createClienteAccount` · `signupCompany` · `completeOAuthOnboarding` · `requestPasswordReset` · `updatePassword` · `hasActiveSession` · `signOut` · `signOutGlobal`.
+- `domain/empresa/roles`: CRUD de roles/permisos RBAC (`fetchCompanyRoles`, `fetch*RolePermission*`, `insertUserRoles`, `createRole`, …). `domain/empresa/usuarios`: `setUsuarioActivo` · `*UserProjectAssignments` · `createCompanyUser` · `deleteCompanyUser`.
 - **`domain/condominios/tabMutations`** — CRUD genérico de los tabs (ver abajo).
 
 ---
@@ -50,9 +88,29 @@
 
 ---
 
-## ⬜ Backlog restante (55 archivos)
+## ⬜ Backlog restante (50 archivos)
 
-### A) `condominios/tabs` "complejos" — 34 tabs
+### A) `condominios/tabs` "complejos" — 27 tabs (7 hechos)
+
+> ✅ **Portal read-only** (lote 8): `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`,
+> `PortalTransparenciaTab` → `domain/condominios/tabQueries.ts`.
+> ✅ **Mantenimiento/otros** (lote 9): `MantenimientoPrevTab`, `AutomatizacionesTab`,
+> `TareasPersonalTab` → genéricos `tabMutations` + `fetchEjecucionesMantenimiento` (tabQueries)
+> + `marcarCuotasMorosas` (`.in`, tabMutations).
+> ✅ **Reservas/eventos** (lote 10): `PortalReservasTab`, `EventosComunidadTab` → genéricos
+> `tabMutations` + `upsertCondominioRow` nuevo.
+> ✅ **AmenidadesTab** (lote 11, ~1.7k líneas): todo CRUD por id (amenidades/reservas/bloqueos)
+> + cuotas vía `createCondominioRowReturning`. Cierra el grupo Amenidades/reservas. Sin
+> funciones de dominio nuevas (reusa genéricos).
+> ✅ **Asambleas/votaciones** (lote 12): `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`,
+> `EncuestasTab` → genéricos + nuevos en tabQueries (`fetchPuntosAsambleaConVotos`,
+> `fetchAsambleasDigital`, `fetchPuntosByAsambleaIds`, `fetchVotosUnidad`, `fetchVotosVotacion`)
+> y `deleteCondominioRowBy` (delete por columna ≠ id) + `upsertCondominioRow`.
+> ✅ **Rentas/STR** (lote 13, ~2.1k líneas): `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab`
+> → genéricos + `deleteCondominioRowsByIds` (delete `.in('id', …)` con no-op si vacío) y nuevos
+> selects (`fetchHuespedesByReservas`, `fetchVisitantesActivosByReservas`, `fetchContratosByUnidad`,
+> `fetchReservasStrByUnidad`, `fetchConfigCondominioTerminos` vía `maybeSingle`). El patrón
+> `saveGuests` (sync de huéspedes: delete `.in` + update loop + insert lote) reusa los genéricos.
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -66,22 +124,23 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 | Sub-feature (lote sugerido) | Tabs |
 |---|---|
 | Cuotas/cobranza | `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab` |
-| Asambleas/votaciones | `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab` |
-| Amenidades/reservas | `AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab` |
+| ~~Asambleas/votaciones~~ ✅ | ~~`AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab`~~ → genéricos + selects/`deleteCondominioRowBy` |
+| ~~Amenidades/reservas~~ ✅ | ~~`AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab`~~ → genéricos + `upsertCondominioRow` |
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
-| Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |
-| Mantenimiento/otros | `MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab` |
-| Portal read-only | `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab` |
+| ~~Rentas/STR~~ ✅ | ~~`STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab`~~ → genéricos + `deleteCondominioRowsByIds`/selects STR |
+| ~~Mantenimiento/otros~~ ✅ | ~~`MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab`~~ → genéricos + `marcarCuotasMorosas`/`fetchEjecucionesMantenimiento` |
+| ~~Portal read-only~~ ✅ | ~~`DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab`~~ → `tabQueries.ts` |
 
 > Para los `select` de estos tabs: si leen datos que **CondominiosSection ya carga**, evaluá
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 21 archivos
+### B) Fuera de condominios — ✅ COMPLETA (0 archivos)
 
-Sobre todo **`empresa`** residual (el dominio `domain/empresa` ya existe; bajar las calls
-que quedan) + algún suelto. `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
+Todos los lotes hechos: `auth/` (5) · `empresa` RBAC/usuarios (4) · pagos (2) · correo (1) ·
+trazabilidad/reportes (4) · CRUD+sueltos (4) · `perfil/PerfilSection` (1, billing + auth/MFA).
+`grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'` → **0**.
 
 ---
 

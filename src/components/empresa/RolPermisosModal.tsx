@@ -1,5 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchCompanyRoles,
+  fetchAllRolePermissions,
+  fetchUserRoleAssignments,
+  fetchUserRoleIds,
+  deleteUserRoles,
+  insertUserRoles,
+  updateUserRoleExpiration,
+  deleteRole,
+} from '../../domain/empresa/roles'
 import type { RoleDef } from '../../types'
 import { CONDOMINIOS_SECTION_GROUPS } from '../../lib/condominiosRoles'
 import { AGUA_MODULE_GROUPS } from '../../lib/aguaPermissions'
@@ -36,14 +45,10 @@ export function RolPermisosModal({
 
   const loadRoles = useCallback(async () => {
     const [{ data: rolesData, error: rolesErr }, { data: rolePermsData }] = await Promise.all([
-      supabase.from('roles')
-        .select('id, company_id, name, description, is_system, color, service')
-        .or(`is_system.eq.true,company_id.eq.${companyId}`)
-        .order('is_system', { ascending: false })
-        .order('name'),
-      supabase.from('role_permissions').select('role_id, permission_key, effect'),
+      fetchCompanyRoles(companyId),
+      fetchAllRolePermissions(),
     ])
-    if (rolesErr) throw rolesErr
+    if (rolesErr) throw new Error(rolesErr)
 
     const permMap = new Map<string, string[]>()
     for (const rp of (rolePermsData ?? []) as Array<{ role_id: string; permission_key: string; effect: string }>) {
@@ -67,8 +72,7 @@ export function RolPermisosModal({
     void (async () => {
       try {
         await loadRoles()
-        const { data: userRolesData } = await supabase
-          .from('user_roles').select('role_id, expires_at').eq('user_id', usuarioId)
+        const { data: userRolesData } = await fetchUserRoleAssignments(usuarioId)
         if (cancelled) return
         const rows = (userRolesData ?? []) as Array<{ role_id: string; expires_at: string | null }>
         setSelectedRoleIds(new Set(rows.map(ur => ur.role_id)))
@@ -158,8 +162,8 @@ export function RolPermisosModal({
     setSaving(true)
     setError(null)
     try {
-      const { data: existing } = await supabase.from('user_roles').select('role_id').eq('user_id', usuarioId)
-      const existingIds = new Set(((existing ?? []) as Array<{ role_id: string }>).map(r => r.role_id))
+      const { data: existing } = await fetchUserRoleIds(usuarioId)
+      const existingIds = new Set((existing ?? []).map(r => r.role_id))
 
       const toAdd = [...selectedRoleIds].filter(id => !existingIds.has(id))
       const toRemove = [...existingIds].filter(id => !selectedRoleIds.has(id))
@@ -172,9 +176,8 @@ export function RolPermisosModal({
       })
 
       if (toRemove.length > 0) {
-        const { error: delErr } = await supabase.from('user_roles')
-          .delete().eq('user_id', usuarioId).in('role_id', toRemove)
-        if (delErr) throw delErr
+        const { error: delErr } = await deleteUserRoles(usuarioId, toRemove)
+        if (delErr) throw new Error(delErr)
       }
       if (toAdd.length > 0) {
         const rows = toAdd.map(role_id => ({
@@ -182,16 +185,14 @@ export function RolPermisosModal({
           role_id,
           expires_at: expirations.get(role_id) ? expirations.get(role_id) : null,
         }))
-        const { error: insErr } = await supabase.from('user_roles').insert(rows)
-        if (insErr) throw insErr
+        const { error: insErr } = await insertUserRoles(rows)
+        if (insErr) throw new Error(insErr)
       }
       // UPDATE expires_at on roles that were already assigned
       for (const roleId of toUpdateExpiration) {
         const exp = expirations.get(roleId) ?? null
-        const { error: updErr } = await supabase.from('user_roles')
-          .update({ expires_at: exp })
-          .eq('user_id', usuarioId).eq('role_id', roleId)
-        if (updErr) throw updErr
+        const { error: updErr } = await updateUserRoleExpiration(usuarioId, roleId, exp)
+        if (updErr) throw new Error(updErr)
       }
 
       onSaved()
@@ -205,8 +206,8 @@ export function RolPermisosModal({
 
   async function handleDeleteCustomRole(roleId: string) {
     if (!confirm('¿Eliminar este rol personalizado? Los usuarios que lo tengan asignado perderán esos permisos.')) return
-    const { error: delErr } = await supabase.from('roles').delete().eq('id', roleId)
-    if (delErr) { setError(delErr.message); return }
+    const { error: delErr } = await deleteRole(roleId)
+    if (delErr) { setError(delErr); return }
     void loadRoles()
   }
 

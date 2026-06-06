@@ -5,7 +5,7 @@
 // plan usa `effectiveMaxProjects`, calculado en el contenedor.
 import { notify } from '../shared/Dialog'
 import { openTextPrompt, openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import { createProyecto, updateProyecto, uploadProyectoLogo } from '../../domain/empresa/mutations'
 import type { Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { SecureImage } from '../shared/SecureImage'
@@ -106,7 +106,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
       max_unidades_parqueadero: getLimit('max_unidades_parqueadero'),
       max_unidades_otro: getLimit('max_unidades_otro'),
     }
-    const { error } = await supabase.from('projects').update(formValues).eq('id', proyecto.id)
+    const { error } = await updateProyecto(proyecto.id, formValues)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
     } else {
@@ -143,7 +143,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
   }
 
   async function aplicarCambioEstado(id: string, estado: Proyecto['estado']) {
-    const { error } = await supabase.from('projects').update({ estado }).eq('id', id)
+    const { error } = await updateProyecto(id, { estado })
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     } else {
@@ -152,16 +152,11 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
   }
 
   async function subirLogoProyecto(proyectoId: string, file: File) {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
-    const path = `${proyectoId}/logo-${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage
-      .from('project-logos')
-      .upload(path, file, { contentType: file.type })
-    if (uploadError) {
+    const { error } = await uploadProyectoLogo(proyectoId, file)
+    if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo subir el logo del proyecto.' })
       return
     }
-    await supabase.from('projects').update({ logo_url: path }).eq('id', proyectoId)
     onReload()
   }
 
@@ -191,7 +186,7 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
 
     if (!nombre) return
 
-    const { error } = await supabase.from('projects').insert({
+    const { error } = await createProyecto({
       nombre: nombre.trim(),
       company_id: companyId,
     })

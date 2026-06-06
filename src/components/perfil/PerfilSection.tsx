@@ -1,6 +1,24 @@
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchCurrentAuthProvider,
+  signInWithPassword,
+  updatePassword,
+  updateUserEmail,
+} from '../../domain/auth/account'
+import {
+  listMfaFactors,
+  enrollTotpFactor,
+  challengeMfaFactor,
+  verifyMfaFactor,
+  unenrollMfaFactor,
+} from '../../domain/auth/mfaActions'
+import { createCheckoutSession, createBillingPortalSession } from '../../domain/shared/mutations'
+import {
+  fetchActiveSubscription,
+  fetchActiveBillingPlans,
+  fetchMonthlyTotalBreakdown,
+} from '../../domain/facturacion/billing'
 import { logSecurityEvent } from '../../lib/security'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { PreferenciasRegionales } from './PreferenciasRegionales'
@@ -126,8 +144,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [isOAuthUser, setIsOAuthUser] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const provider = data.user?.app_metadata?.provider
+    void fetchCurrentAuthProvider().then(provider => {
       if (provider && provider !== 'email') setIsOAuthUser(true)
     })
   }, [])
@@ -162,16 +179,13 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     if (pwNew !== pwConfirm) { setPwFb({ type: 'error', msg: 'La nueva contraseña y la confirmación no coinciden' }); return }
     setPwLoading(true)
     // Verify current password
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: currentUser.email,
-      password: pwCurrent,
-    })
+    const { error: signInErr } = await signInWithPassword(currentUser.email, pwCurrent)
     if (signInErr) {
       setPwFb({ type: 'error', msg: 'La contraseña actual es incorrecta' })
       setPwLoading(false)
       return
     }
-    const { error: updateErr } = await supabase.auth.updateUser({ password: pwNew })
+    const { error: updateErr } = await updatePassword(pwNew)
     if (updateErr) {
       setPwFb({ type: 'error', msg: 'Error al actualizar la contraseña. Intente de nuevo.' })
     } else {
@@ -203,7 +217,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   // un enrollment para mantener el badge sincronizado.
   useEffect(() => {
     let alive = true
-    void supabase.auth.mfa.listFactors().then(({ data }) => {
+    void listMfaFactors().then(({ data }) => {
       if (!alive || !data) return
       const all = (data.all ?? []) as TotpFactor[]
       setMfaFactors(all.filter(f => (f as unknown as { factor_type: string }).factor_type === 'totp'))
@@ -219,14 +233,11 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     // "factor already exists".
     const orphans = mfaFactors.filter(f => f.status === 'unverified')
     for (const o of orphans) {
-      await supabase.auth.mfa.unenroll({ factorId: o.id }).catch(() => undefined)
+      await unenrollMfaFactor(o.id).catch(() => undefined)
     }
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName: `Authenticator (${new Date().toISOString().slice(0, 10)})`,
-    })
+    const { data, error } = await enrollTotpFactor(`Authenticator (${new Date().toISOString().slice(0, 10)})`)
     if (error || !data) {
-      setMfaFb({ type: 'error', msg: error?.message ?? 'No fue posible iniciar el enrolamiento.' })
+      setMfaFb({ type: 'error', msg: error ?? 'No fue posible iniciar el enrolamiento.' })
       setMfaLoading(false)
       return
     }
@@ -245,19 +256,15 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setMfaLoading(true)
     let challengeId = enrollState.challengeId
     if (!challengeId) {
-      const ch = await supabase.auth.mfa.challenge({ factorId: enrollState.factorId })
+      const ch = await challengeMfaFactor(enrollState.factorId)
       if (ch.error || !ch.data) {
-        setMfaFb({ type: 'error', msg: ch.error?.message ?? 'No fue posible crear el desafío.' })
+        setMfaFb({ type: 'error', msg: ch.error ?? 'No fue posible crear el desafío.' })
         setMfaLoading(false)
         return
       }
       challengeId = ch.data.id
     }
-    const { error } = await supabase.auth.mfa.verify({
-      factorId: enrollState.factorId,
-      challengeId,
-      code: mfaCode.trim(),
-    })
+    const { error } = await verifyMfaFactor(enrollState.factorId, challengeId, mfaCode.trim())
     if (error) {
       setMfaFb({ type: 'error', msg: 'Código incorrecto. Revisa la app de autenticación e intenta de nuevo.' })
       setMfaLoading(false)
@@ -272,7 +279,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   async function handleCancelEnroll() {
     if (!enrollState) return
     setMfaLoading(true)
-    await supabase.auth.mfa.unenroll({ factorId: enrollState.factorId }).catch(() => undefined)
+    await unenrollMfaFactor(enrollState.factorId).catch(() => undefined)
     setEnrollState(null)
     setMfaCode('')
     setMfaFb(null)
@@ -287,9 +294,9 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     if (!confirm) return
     setMfaFb(null)
     setMfaLoading(true)
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: verifiedFactor.id })
+    const { error } = await unenrollMfaFactor(verifiedFactor.id)
     if (error) {
-      setMfaFb({ type: 'error', msg: error.message ?? 'No fue posible desactivar el segundo factor.' })
+      setMfaFb({ type: 'error', msg: error ?? 'No fue posible desactivar el segundo factor.' })
       setMfaLoading(false)
       return
     }
@@ -341,32 +348,18 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   useEffect(() => {
     if (!currentUser.company_id) { setSubLoading(false); return }
     let alive = true
-    void supabase
-      .from('subscriptions')
-      .select('status, billing_cycle, current_period_end, trial_end, cancel_at_period_end, plan:billing_plans!inner(code, name, description, price_monthly_cents, currency, features)')
-      .eq('company_id', currentUser.company_id)
-      .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive) return
-        setSubscription(data as unknown as SubscriptionRow | null)
-        setSubLoading(false)
-      })
-    void supabase
-      .from('billing_plans')
-      .select('code, name, price_monthly_cents, price_yearly_cents, description, features')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .then(({ data }) => {
-        if (alive && data) setAvailablePlans(data as typeof availablePlans)
-      })
-    void supabase
-      .rpc('calculate_monthly_total_cents', { p_company_id: currentUser.company_id })
-      .then(({ data }) => {
-        if (!alive || !data) return
-        const row = (data as UsageBreakdown[])?.[0]
-        if (row) setUsageBreakdown(row)
-      })
+    void fetchActiveSubscription<SubscriptionRow>(currentUser.company_id).then(data => {
+      if (!alive) return
+      setSubscription(data)
+      setSubLoading(false)
+    })
+    void fetchActiveBillingPlans<typeof availablePlans[number]>().then(data => {
+      if (alive && data.length) setAvailablePlans(data)
+    })
+    void fetchMonthlyTotalBreakdown<UsageBreakdown>(currentUser.company_id).then(row => {
+      if (!alive || !row) return
+      setUsageBreakdown(row)
+    })
     return () => { alive = false }
   }, [currentUser.company_id])
 
@@ -413,19 +406,16 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setBillingFb(null)
     setBillingActionLoading(true)
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' },
-      })
+      const { url, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
       if (error) {
-        setBillingFb({ type: 'error', msg: error.message ?? 'No se pudo crear la sesión de pago.' })
+        setBillingFb({ type: 'error', msg: error ?? 'No se pudo crear la sesión de pago.' })
         return
       }
-      const result = data as { url?: string; error?: string }
-      if (result?.error || !result?.url) {
-        setBillingFb({ type: 'error', msg: result?.error ?? 'Respuesta inválida del servidor.' })
+      if (!url) {
+        setBillingFb({ type: 'error', msg: 'Respuesta inválida del servidor.' })
         return
       }
-      window.location.href = result.url
+      window.location.href = url
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setBillingFb({ type: 'error', msg: `Error: ${msg}` })
@@ -438,17 +428,16 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setBillingFb(null)
     setBillingActionLoading(true)
     try {
-      const { data, error } = await supabase.functions.invoke('create-billing-portal-session', { body: {} })
+      const { url, error } = await createBillingPortalSession()
       if (error) {
-        setBillingFb({ type: 'error', msg: error.message ?? 'No se pudo abrir el portal.' })
+        setBillingFb({ type: 'error', msg: error ?? 'No se pudo abrir el portal.' })
         return
       }
-      const result = data as { url?: string; error?: string }
-      if (result?.error || !result?.url) {
-        setBillingFb({ type: 'error', msg: result?.error ?? 'Respuesta inválida del servidor.' })
+      if (!url) {
+        setBillingFb({ type: 'error', msg: 'Respuesta inválida del servidor.' })
         return
       }
-      window.location.href = result.url
+      window.location.href = url
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setBillingFb({ type: 'error', msg: `Error: ${msg}` })
@@ -470,18 +459,15 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     if (!newEmail.trim() || !newEmail.includes('@')) { setEmailFb({ type: 'error', msg: 'Ingresa un correo electrónico válido' }); return }
     if (newEmail.trim().toLowerCase() === currentUser.email.toLowerCase()) { setEmailFb({ type: 'error', msg: 'El nuevo correo debe ser diferente al actual' }); return }
     setEmailLoading(true)
-    const { error } = await supabase.auth.updateUser(
-      { email: newEmail.trim().toLowerCase() },
-      { emailRedirectTo: window.location.origin }
-    )
+    const { error } = await updateUserEmail(newEmail.trim().toLowerCase(), window.location.origin)
     if (error) {
-      const msg = error.message?.toLowerCase() ?? ''
+      const msg = error.toLowerCase()
       if (msg.includes('rate limit') || msg.includes('too many')) {
         setEmailFb({ type: 'error', msg: 'Demasiados intentos. Espera unos minutos e intenta de nuevo.' })
       } else if (msg.includes('email') && (msg.includes('taken') || msg.includes('already') || msg.includes('registered'))) {
         setEmailFb({ type: 'error', msg: 'Ese correo electrónico ya está en uso por otra cuenta.' })
       } else {
-        setEmailFb({ type: 'error', msg: error.message ?? 'Error al solicitar el cambio de correo. Intente de nuevo.' })
+        setEmailFb({ type: 'error', msg: error ?? 'Error al solicitar el cambio de correo. Intente de nuevo.' })
       }
     } else {
       setEmailFb({ type: 'success', msg: `Revisa tu bandeja en ${newEmail} y confirma el cambio desde el enlace enviado` })

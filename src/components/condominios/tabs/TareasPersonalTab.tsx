@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio,
@@ -75,21 +80,21 @@ export function TareasPersonalTab({
   async function crearBloque() {
     if (!bloqueForm.personal_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione el empleado.' }); return }
     setSaving(true)
-    const { data, error } = await supabase.from('bloques_turno').insert({
+    const { data, error } = await createCondominioRowReturning('bloques_turno', {
       company_id: companyId, project_id: proyectoId,
       personal_id: bloqueForm.personal_id, turno: bloqueForm.turno,
       fecha: bloqueForm.fecha, creado_por: userId,
       notas: bloqueForm.notas.trim() || null,
-    }).select('id').single()
+    })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setBloqueForm(blankBloque(hoy)); setShowBloqueForm(false)
-    if (data) setBloqueAbierto(data.id)
+    if (data) setBloqueAbierto(data.id as string)
     onRefresh()
   }
 
   async function iniciarBloque(id: string) {
-    await supabase.from('bloques_turno').update({ estado: 'en_curso', iniciado_en: new Date().toISOString() }).eq('id', id)
+    await updateCondominioRow('bloques_turno', id, { estado: 'en_curso', iniciado_en: new Date().toISOString() })
     onRefresh()
   }
 
@@ -97,16 +102,16 @@ export function TareasPersonalTab({
     const ts = tareasDeBloque(id)
     const completadas = ts.filter(t => t.estado === 'completada' || t.estado === 'con_observacion').length
     const puntaje = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
-    await supabase.from('bloques_turno').update({
+    await updateCondominioRow('bloques_turno', id, {
       estado, cerrado_en: new Date().toISOString(), puntaje_completitud: puntaje,
-    }).eq('id', id)
+    })
     onRefresh()
   }
 
   async function deleteBloque(id: string) {
     const r = await confirm({ title: '¿Eliminar bloque?', text: 'Se eliminan también las tareas asociadas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('bloques_turno').delete().eq('id', id)
+    await deleteCondominioRow('bloques_turno', id)
     if (bloqueAbierto === id) setBloqueAbierto(null)
     onRefresh()
   }
@@ -118,7 +123,7 @@ export function TareasPersonalTab({
     const ts = tareasDeBloque(bloqueId)
     const maxOrden = ts.length ? Math.max(...ts.map(t => t.orden)) : -1
     setSaving(true)
-    const { error } = await supabase.from('tareas_bloque').insert({
+    const { error } = await createCondominioRow('tareas_bloque', {
       bloque_id: bloqueId,
       plantilla_id: nuevaTarea.plantilla_id || null,
       titulo: plantilla?.titulo ?? nuevaTarea.titulo.trim(),
@@ -139,7 +144,7 @@ export function TareasPersonalTab({
     const ts = tareasDeBloque(bloqueId)
     const maxOrden = ts.length ? Math.max(...ts.map(t => t.orden)) : -1
     setSaving(true)
-    await supabase.from('tareas_bloque').insert(
+    await createCondominioRow('tareas_bloque',
       pls.map((p, i) => ({
         bloque_id: bloqueId, plantilla_id: p.id,
         titulo: p.titulo, descripcion: p.descripcion ?? null,
@@ -166,21 +171,21 @@ export function TareasPersonalTab({
         submitText: 'Registrar',
       })
       if (!result) return
-      await supabase.from('tareas_bloque').update({
+      await updateCondominioRow('tareas_bloque', tareaId, {
         estado, notas_operativo: result.notas,
         completada_en: new Date().toISOString(),
-      }).eq('id', tareaId)
+      })
     } else {
-      await supabase.from('tareas_bloque').update({
+      await updateCondominioRow('tareas_bloque', tareaId, {
         estado,
         completada_en: estado !== 'pendiente' ? new Date().toISOString() : null,
-      }).eq('id', tareaId)
+      })
     }
     onRefresh()
   }
 
   async function deleteTarea(id: string) {
-    await supabase.from('tareas_bloque').delete().eq('id', id)
+    await deleteCondominioRow('tareas_bloque', id)
     onRefresh()
   }
 

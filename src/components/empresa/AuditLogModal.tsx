@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchPermissionAuditLog, fetchRoleNamesByIds } from '../../domain/empresa/auditoria'
+import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
 import { EditModal } from '../shared/EditModal'
 
@@ -45,14 +46,8 @@ export function AuditLogModal({ onClose }: Props) {
     setLoading(true)
     setError(null)
     try {
-      let query = supabase
-        .from('permission_audit_log')
-        .select('id, actor_id, target_user_id, target_role_id, action, details, occurred_at')
-        .order('occurred_at', { ascending: false })
-        .range(page * pageSize, page * pageSize + pageSize - 1)
-      if (filterAction) query = query.eq('action', filterAction)
-      const { data, error: err } = await query
-      if (err) throw err
+      const { data, error: err } = await fetchPermissionAuditLog({ page, pageSize, action: filterAction || undefined })
+      if (err) throw new Error(err)
       const auditRows = (data ?? []) as AuditRow[]
       setRows(auditRows)
 
@@ -65,17 +60,15 @@ export function AuditLogModal({ onClose }: Props) {
         if (r.target_role_id) roleIds.add(r.target_role_id)
       }
       if (userIds.size > 0) {
-        const { data: u } = await supabase.from('app_users')
-          .select('id, full_name').in('id', [...userIds])
+        const u = await fetchAppUserNamesByIds([...userIds])
         const map: UserMap = {}
-        for (const x of (u ?? []) as Array<{ id: string; full_name: string }>) map[x.id] = x.full_name
+        for (const x of u) map[x.id] = x.full_name
         setUsers(map)
       }
       if (roleIds.size > 0) {
-        const { data: r } = await supabase.from('roles')
-          .select('id, name, color').in('id', [...roleIds])
+        const r = await fetchRoleNamesByIds([...roleIds])
         const map: RoleMap = {}
-        for (const x of (r ?? []) as Array<{ id: string; name: string; color: string }>) map[x.id] = { name: x.name, color: x.color }
+        for (const x of r) map[x.id] = { name: x.name, color: x.color }
         setRoles(map)
       }
     } catch (e: unknown) {

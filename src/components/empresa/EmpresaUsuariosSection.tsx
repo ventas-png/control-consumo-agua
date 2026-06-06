@@ -7,7 +7,8 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import { createCompanyUser, deleteCompanyUser, setUsuarioActivo } from '../../domain/empresa/usuarios'
+import { insertUserRoles } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
 import { RolPermisosModal } from './RolPermisosModal'
@@ -113,47 +114,37 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
     }
 
     try {
-      const { data: session } = await supabase.auth.getSession()
-      const token = session.session?.access_token
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-      const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token ?? ''}` },
-        body: JSON.stringify({
-          email: formValues.email,
-          password: formValues.password,
-          full_name: formValues.nombre,
-          role: formValues.rol,
-          company_id: currentUser.company_id,
-        }),
+      const { userId, error } = await createCompanyUser({
+        email: formValues.email,
+        password: formValues.password,
+        full_name: formValues.nombre,
+        role: formValues.rol,
+        company_id: currentUser.company_id,
       })
 
-      if (!res.ok) {
-        const err = await res.json() as { error?: string }
-        notify({ variant: 'error', title: 'Error al crear usuario', text: err.error ?? 'No se pudo crear el usuario.' })
+      if (error) {
+        notify({ variant: 'error', title: 'Error al crear usuario', text: error })
         return
       }
-
-      const created = await res.json() as { user_id?: string }
-      if (!created.user_id) return
+      if (!userId) return
 
       // Assign RBAC roles via user_roles. With the legacy columns dropped,
       // user_roles is the sole source of truth for permissions.
       const newAssignments: { user_id: string; role_id: string }[] = []
       if (formValues.aguaRol && formValues.aguaRol in SYSTEM_ROLE_IDS.agua) {
         newAssignments.push({
-          user_id: created.user_id,
+          user_id: userId,
           role_id: SYSTEM_ROLE_IDS.agua[formValues.aguaRol as AguaSystemRoleKey],
         })
       }
       if (formValues.condRol && formValues.condRol in SYSTEM_ROLE_IDS.condominios) {
         newAssignments.push({
-          user_id: created.user_id,
+          user_id: userId,
           role_id: SYSTEM_ROLE_IDS.condominios[formValues.condRol as CondominiosSystemRoleKey],
         })
       }
       if (newAssignments.length > 0) {
-        await supabase.from('user_roles').insert(newAssignments)
+        await insertUserRoles(newAssignments)
       }
 
       notify({ variant: 'success', title: 'Usuario creado', duration: 1500 })
@@ -168,7 +159,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // RolPermisosModal, which writes directly to user_roles.
 
   async function toggleActivoUsuario(usuario: Usuario) {
-    await supabase.from('app_users').update({ activo: !usuario.activo }).eq('id', usuario.id)
+    await setUsuarioActivo(usuario.id, !usuario.activo)
     onReload()
   }
 
@@ -192,18 +183,9 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
     if (!result) return
 
     try {
-      const { data: session } = await supabase.auth.getSession()
-      const token = session.session?.access_token
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-      const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token ?? ''}` },
-        body: JSON.stringify({ user_id: usuario.id }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json() as { error?: string }
-        notify({ variant: 'error', title: 'No se pudo eliminar', text: err.error ?? 'No se pudo eliminar el usuario.' })
+      const { error } = await deleteCompanyUser(usuario.id)
+      if (error) {
+        notify({ variant: 'error', title: 'No se pudo eliminar', text: error })
         return
       }
 

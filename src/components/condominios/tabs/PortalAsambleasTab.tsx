@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchAsambleasDigital, fetchPuntosByAsambleaIds, fetchVotosUnidad } from '../../../domain/condominios/tabQueries'
 import { EmptyState } from '../../shared/EmptyState'
 import { StatusBadge } from '../../shared/StatusBadge'
 import { notify } from '../../shared/Dialog'
@@ -64,36 +65,23 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
 
   async function cargar() {
     setLoading(true)
-    const { data: asambs } = await supabase
-      .from('asambleas_digital')
-      .select('*')
-      .eq('project_id', proyectoId)
-      .order('fecha_hora', { ascending: false })
-      .limit(20)
-    const list = (asambs as AsambleaDigital[]) ?? []
+    const list = await fetchAsambleasDigital<AsambleaDigital>(proyectoId)
     setAsambleas(list)
 
     if (list.length > 0) {
       const ids = list.map(a => a.id)
-      const { data: pts } = await supabase
-        .from('puntos_asamblea')
-        .select('*')
-        .in('asamblea_id', ids)
-        .order('orden')
+      const pts = await fetchPuntosByAsambleaIds<PuntoAsamblea2>(ids)
       const byAsamblea: Record<string, PuntoAsamblea2[]> = {}
-      ;(pts as PuntoAsamblea2[] ?? []).forEach(p => {
+      pts.forEach(p => {
         if (!byAsamblea[p.asamblea_id]) byAsamblea[p.asamblea_id] = []
         byAsamblea[p.asamblea_id].push(p)
       })
       setPuntos(byAsamblea)
 
       // Cargar votos previos del residente
-      const { data: votos } = await supabase
-        .from('votos_asamblea')
-        .select('punto_id, voto')
-        .eq('unidad_id', unidadId)
+      const votos = await fetchVotosUnidad<VotoUnidad>(unidadId)
       const votosMap: Record<string, VotoUnidad['voto']> = {}
-      ;(votos as VotoUnidad[] ?? []).forEach(v => { votosMap[v.punto_id] = v.voto })
+      votos.forEach(v => { votosMap[v.punto_id] = v.voto })
       setMisVotos(votosMap)
     }
     setLoading(false)
@@ -105,7 +93,7 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
       return
     }
     setVoting(punto.id)
-    const { error } = await supabase.from('votos_asamblea').insert({
+    const { error } = await createCondominioRow('votos_asamblea', {
       punto_id: punto.id,
       asamblea_id: punto.asamblea_id,
       unidad_id: unidadId,

@@ -5,7 +5,7 @@
 // `onReload`, que el contenedor cablea a la invalidación de la query de dominio.
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import { updateEmpresa, uploadEmpresaLogo } from '../../domain/empresa/mutations'
 import { SecureImage } from '../shared/SecureImage'
 import { COUNTRIES, countryByCode, countryName } from '../../lib/countries'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
@@ -40,7 +40,7 @@ export function EmpresaHeaderCard({ empresa, proyectosCount, maxProjectsDisplay,
       email: formValues.email.trim() || null,
       telefono: formValues.telefono.trim() || null,
     }
-    const { error } = await supabase.from('companies').update(payload).eq('id', empresa.id)
+    const { error } = await updateEmpresa(empresa.id, payload)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
     } else {
@@ -102,7 +102,7 @@ export function EmpresaHeaderCard({ empresa, proyectosCount, maxProjectsDisplay,
       address_state: formValues.address_state.trim() || null,
       address_postal_code: formValues.address_postal_code.trim() || null,
     }
-    const { error } = await supabase.from('companies').update(payload).eq('id', empresa.id)
+    const { error } = await updateEmpresa(empresa.id, payload)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar los datos fiscales.' })
     } else {
@@ -118,20 +118,13 @@ export function EmpresaHeaderCard({ empresa, proyectosCount, maxProjectsDisplay,
 
   async function subirLogo(file: File) {
     if (!empresa) return
-    // Path único por upload para que cada cambio de logo produzca una signed
-    // URL fresca de inmediato (el useSignedUrl reacts a la nueva value en BD).
-    // Logos viejos quedan huérfanos en el bucket — cleanup mecánico pendiente.
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
-    const path = `${empresa.id}/logo-${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage
-      .from('company-logos')
-      .upload(path, file, { contentType: file.type })
-    if (uploadError) {
+    // Path único por upload (lo arma el dominio) para que cada cambio produzca
+    // una signed URL fresca; logos viejos quedan huérfanos (cleanup pendiente).
+    const { error } = await uploadEmpresaLogo(empresa.id, file)
+    if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo subir el logo.' })
       return
     }
-    // Guardamos el path bare; SecureImage firma en cada render.
-    await supabase.from('companies').update({ logo_url: path }).eq('id', empresa.id)
     onReload()
   }
 

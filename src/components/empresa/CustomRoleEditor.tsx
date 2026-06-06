@@ -1,5 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchPermissionsCatalog,
+  fetchRoleById,
+  fetchRolePermissionKeys,
+  fetchAllRolePermissionKeys,
+  updateRole,
+  createRole,
+  deleteRolePermissions,
+  insertRolePermissions,
+} from '../../domain/empresa/roles'
 import type { PermissionDef, RoleDef } from '../../types'
 
 interface Props {
@@ -29,38 +38,22 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
     setLoading(true)
     setError(null)
     try {
-      const { data: permsData, error: permsErr } = await supabase
-        .from('permissions')
-        .select('key, category, label, description')
-        .order('category')
-        .order('label')
-      if (permsErr) throw permsErr
-      setPermissions((permsData ?? []) as PermissionDef[])
+      const { data: permsData, error: permsErr } = await fetchPermissionsCatalog()
+      if (permsErr) throw new Error(permsErr)
+      setPermissions(permsData ?? [])
 
       if (roleId) {
-        const { data: roleData, error: roleErr } = await supabase
-          .from('roles')
-          .select('id, company_id, name, description, is_system, color')
-          .eq('id', roleId)
-          .single()
-        if (roleErr) throw roleErr
+        const { data: roleData, error: roleErr } = await fetchRoleById(roleId)
+        if (roleErr) throw new Error(roleErr)
         const r = roleData as RoleDef
         setName(r.name)
         setDescription(r.description ?? '')
         setColor(r.color ?? PALETTE[0])
-        const { data: rpData } = await supabase
-          .from('role_permissions')
-          .select('permission_key')
-          .eq('role_id', roleId)
-          .eq('effect', 'allow')
-        setSelectedKeys(new Set(((rpData ?? []) as Array<{ permission_key: string }>).map(r => r.permission_key)))
+        const { data: rpData } = await fetchRolePermissionKeys(roleId)
+        setSelectedKeys(new Set((rpData ?? []).map(r => r.permission_key)))
       } else if (cloneFromRoleId) {
-        const { data: rpData } = await supabase
-          .from('role_permissions')
-          .select('permission_key')
-          .eq('role_id', cloneFromRoleId)
-          .eq('effect', 'allow')
-        setSelectedKeys(new Set(((rpData ?? []) as Array<{ permission_key: string }>).map(r => r.permission_key)))
+        const { data: rpData } = await fetchRolePermissionKeys(cloneFromRoleId)
+        setSelectedKeys(new Set((rpData ?? []).map(r => r.permission_key)))
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error cargando datos.')
@@ -109,34 +102,32 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
     try {
       let savedRoleId = roleId
       if (savedRoleId) {
-        const { error: updErr } = await supabase.from('roles').update({
+        const { error: updErr } = await updateRole(savedRoleId, {
           name: name.trim(), description: description.trim() || null, color, updated_at: new Date().toISOString(),
-        }).eq('id', savedRoleId)
-        if (updErr) throw updErr
+        })
+        if (updErr) throw new Error(updErr)
       } else {
-        const { data: insData, error: insErr } = await supabase.from('roles').insert({
+        const { data: insData, error: insErr } = await createRole({
           company_id: companyId, name: name.trim(), description: description.trim() || null, is_system: false, color,
-        }).select('id').single()
-        if (insErr) throw insErr
-        savedRoleId = (insData as { id: string }).id
+        })
+        if (insErr) throw new Error(insErr)
+        savedRoleId = insData!.id
       }
 
-      const { data: existingPerms } = await supabase
-        .from('role_permissions').select('permission_key').eq('role_id', savedRoleId)
-      const existing = new Set(((existingPerms ?? []) as Array<{ permission_key: string }>).map(r => r.permission_key))
+      const { data: existingPerms } = await fetchAllRolePermissionKeys(savedRoleId)
+      const existing = new Set((existingPerms ?? []).map(r => r.permission_key))
 
       const toAdd = [...selectedKeys].filter(k => !existing.has(k))
       const toRemove = [...existing].filter(k => !selectedKeys.has(k))
 
       if (toRemove.length > 0) {
-        const { error: delErr } = await supabase.from('role_permissions')
-          .delete().eq('role_id', savedRoleId).in('permission_key', toRemove)
-        if (delErr) throw delErr
+        const { error: delErr } = await deleteRolePermissions(savedRoleId, toRemove)
+        if (delErr) throw new Error(delErr)
       }
       if (toAdd.length > 0) {
         const rows = toAdd.map(permission_key => ({ role_id: savedRoleId, permission_key, effect: 'allow' }))
-        const { error: insErr } = await supabase.from('role_permissions').insert(rows)
-        if (insErr) throw insErr
+        const { error: insErr } = await insertRolePermissions(rows)
+        if (insErr) throw new Error(insErr)
       }
 
       onSaved()

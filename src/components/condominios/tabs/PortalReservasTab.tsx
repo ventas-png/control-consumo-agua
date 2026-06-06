@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
@@ -137,26 +137,22 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     // Sólo generar cuota cuando la reserva queda confirmada de inmediato
     if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
       const periodo = form.fecha.slice(0, 7)
-      const { data: cuotaData, error: cuotaErr } = await supabase
-        .from('cuotas_condominio')
-        .insert({
-          company_id: companyId,
-          project_id: proyectoId,
-          unidad_id: unidadId,
-          concepto: 'amenidad',
-          monto: montoTarifa,
-          periodo,
-          fecha_vencimiento: form.fecha,
-          estado: 'pendiente',
-          notas: `Reserva ${amenidadSel!.nombre} ${form.fecha} ${form.hora_inicio}-${form.hora_fin}`,
-        })
-        .select('id')
-        .single()
+      const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
+        company_id: companyId,
+        project_id: proyectoId,
+        unidad_id: unidadId,
+        concepto: 'amenidad',
+        monto: montoTarifa,
+        periodo,
+        fecha_vencimiento: form.fecha,
+        estado: 'pendiente',
+        notas: `Reserva ${amenidadSel!.nombre} ${form.fecha} ${form.hora_inicio}-${form.hora_fin}`,
+      })
       if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
-      cuotaId = cuotaData?.id ?? null
+      cuotaId = (cuotaData?.id as string | undefined) ?? null
     }
 
-    const { error } = await supabase.from('reservas_amenidades').insert({
+    const { error } = await createCondominioRow('reservas_amenidades', {
       company_id: companyId, amenidad_id: form.amenidad_id,
       unidad_id: unidadId, fecha: form.fecha,
       hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
@@ -189,7 +185,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     const r = await confirm({ title: '¿Cancelar reserva?', icon: 'question', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
     const reserva = reservas.find(x => x.id === id)
-    await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
+    await updateCondominioRow('reservas_amenidades', id, { estado: 'cancelada' })
     if (reserva?.cuota_id) {
       await softDelete('cuotas_condominio', { id: reserva.cuota_id, estado: 'pendiente' })
     }

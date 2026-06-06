@@ -1,6 +1,11 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchCompanyPaymentConfig,
+  setCompanyProviderActivo,
+  savePaymentConfig,
+  testStripeConnection,
+} from '../../domain/cobros/paymentConfig'
 import type { CompanyPaymentConfig } from '../../types'
 
 // -- Reusable style objects --------------------------------------------------
@@ -148,13 +153,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   async function cargarConfig() {
     setLoading(true)
-    const { data } = await supabase
-      .from('companies')
-      .select(
-        'stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_configured,paypal_activo'
-      )
-      .eq('id', companyId)
-      .single()
+    const { data } = await fetchCompanyPaymentConfig(companyId)
 
     if (data) {
       setConfig({
@@ -181,15 +180,12 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
     setSavingStripe(true)
     const nuevoEstado = !config.stripe_activo
-    const { error } = await supabase
-      .from('companies')
-      .update({ stripe_activo: nuevoEstado })
-      .eq('id', companyId)
+    const { error } = await setCompanyProviderActivo(companyId, { stripe_activo: nuevoEstado })
 
     setSavingStripe(false)
 
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error })
     } else {
       setConfig(prev => ({ ...prev, stripe_activo: nuevoEstado }))
       notify({
@@ -213,15 +209,12 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
     setSavingPaypal(true)
     const nuevoEstado = !config.paypal_activo
-    const { error } = await supabase
-      .from('companies')
-      .update({ paypal_activo: nuevoEstado })
-      .eq('id', companyId)
+    const { error } = await setCompanyProviderActivo(companyId, { paypal_activo: nuevoEstado })
 
     setSavingPaypal(false)
 
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error })
     } else {
       setConfig(prev => ({ ...prev, paypal_activo: nuevoEstado }))
       notify({
@@ -259,9 +252,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
     setSavingStripe(true)
 
-    const { error: fnError } = await supabase.functions.invoke('save-payment-config', {
-      body: { companyId, provider: 'stripe', publicKey, secretKey },
-    })
+    const { error: fnError } = await savePaymentConfig({ companyId, provider: 'stripe', publicKey, secretKey })
 
     setSavingStripe(false)
 
@@ -292,9 +283,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
     setSavingPaypal(true)
 
-    const { error: fnError } = await supabase.functions.invoke('save-payment-config', {
-      body: { companyId, provider: 'paypal', publicKey: clientId, secretKey: clientSecret },
-    })
+    const { error: fnError } = await savePaymentConfig({ companyId, provider: 'paypal', publicKey: clientId, secretKey: clientSecret })
 
     setSavingPaypal(false)
 
@@ -320,9 +309,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
   async function probarConexionStripe() {
     setTestingStripe(true)
     try {
-      const { error } = await supabase.functions.invoke('test-stripe', {
-        body: { companyId },
-      })
+      const { error } = await testStripeConnection(companyId)
 
       if (!error) {
         notify({

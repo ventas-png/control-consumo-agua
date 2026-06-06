@@ -1,6 +1,11 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  updateCondominioRow,
+  deleteCondominioRow,
+  upsertCondominioRow,
+} from '../../../domain/condominios/tabMutations'
 import type { EventoComunidad, RegistroAsistenteEvento } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -66,9 +71,9 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('eventos_comunidad').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('eventos_comunidad', editId, payload))
     } else {
-      ({ error } = await supabase.from('eventos_comunidad').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('eventos_comunidad', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -78,7 +83,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar evento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('eventos_comunidad').delete().eq('id', id)
+    await deleteCondominioRow('eventos_comunidad', id)
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
@@ -87,22 +92,22 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
     if (!selected) return
     if (!formAsistente.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Seleccione una unidad.' })
     if (!formAsistente.nombre.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El nombre es obligatorio.' })
-    const { error } = await supabase.from('registro_asistentes_evento').upsert({
+    const { error } = await upsertCondominioRow('registro_asistentes_evento', {
       company_id: companyId, evento_id: selected.id,
       unidad_id: formAsistente.unidad_id, nombre: formAsistente.nombre.trim(),
       num_personas: parseInt(formAsistente.num_personas) || 1, confirmado: formAsistente.confirmado,
-    }, { onConflict: 'evento_id,unidad_id' })
+    }, 'evento_id,unidad_id')
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowAsistenteForm(false); setFormAsistente({ ...BLANK_ASISTENTE }); onRefresh()
   }
 
   async function marcarAsistio(asistenteId: string, asistio: boolean) {
-    await supabase.from('registro_asistentes_evento').update({ asistio }).eq('id', asistenteId)
+    await updateCondominioRow('registro_asistentes_evento', asistenteId, { asistio })
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('eventos_comunidad').update({ estado }).eq('id', id)
+    await updateCondominioRow('eventos_comunidad', id, { estado })
     onRefresh()
   }
 

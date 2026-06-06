@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, Fragment, type ReactNode, type CSSProperties } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchFinancialAuditLog } from '../../domain/empresa/auditoria'
+import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 
 // ============================================================================
 // FinancialAuditModal — F4.2.1: UI sobre audit_log generico de F2.7.
@@ -66,17 +67,14 @@ export function FinancialAuditModal({ onClose }: Props) {
     setLoading(true)
     setError(null)
     try {
-      let q = supabase
-        .from('audit_log')
-        .select('id, table_name, record_id, action, actor_id, before, after, project_id, occurred_at')
-        .order('occurred_at', { ascending: false })
-        .range(page * pageSize, page * pageSize + pageSize - 1)
-      if (filterTable)  q = q.eq('table_name', filterTable)
-      if (filterAction) q = q.eq('action', filterAction)
-      if (filterFrom)   q = q.gte('occurred_at', `${filterFrom}T00:00:00`)
-      if (filterTo)     q = q.lte('occurred_at', `${filterTo}T23:59:59`)
-      const { data, error: err } = await q
-      if (err) throw err
+      const { data, error: err } = await fetchFinancialAuditLog({
+        page, pageSize,
+        tableName: filterTable || undefined,
+        action: filterAction || undefined,
+        from: filterFrom || undefined,
+        to: filterTo || undefined,
+      })
+      if (err) throw new Error(err)
       const auditRows = (data ?? []) as AuditRow[]
       setRows(auditRows)
 
@@ -84,10 +82,9 @@ export function FinancialAuditModal({ onClose }: Props) {
       const actorIds = new Set<string>()
       for (const r of auditRows) if (r.actor_id) actorIds.add(r.actor_id)
       if (actorIds.size > 0) {
-        const { data: u } = await supabase.from('app_users')
-          .select('id, full_name').in('id', [...actorIds])
+        const u = await fetchAppUserNamesByIds([...actorIds])
         const map: UserMap = {}
-        for (const x of (u ?? []) as Array<{ id: string; full_name: string }>) map[x.id] = x.full_name
+        for (const x of u) map[x.id] = x.full_name
         setUsers(map)
       }
     } catch (e: unknown) {

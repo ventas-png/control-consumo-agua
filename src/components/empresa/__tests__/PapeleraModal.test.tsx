@@ -122,7 +122,8 @@ describe('PapeleraModal', () => {
     await waitFor(() => expect(updateCalls.length).toBeGreaterThan(0))
     const call = updateCalls[updateCalls.length - 1]
     expect(call.table).toBe('pagos')
-    expect(call.id).toBe('33333333-3333-3333-3333-333333333333')
+    // restoreDeletedRows unifica single+bulk vía .in(id, [..]) (equivalente a .eq)
+    expect(call.ids).toEqual(['33333333-3333-3333-3333-333333333333'])
     expect((call.payload as { deleted_at: string | null; deleted_by: string | null }).deleted_at).toBeNull()
     expect((call.payload as { deleted_at: string | null; deleted_by: string | null }).deleted_by).toBeNull()
   })

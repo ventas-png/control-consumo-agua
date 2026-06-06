@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchReportTemplates,
+  createReportTemplate,
+  deleteReportTemplate,
+  updateReportTemplateRecipients,
+  fetchReportRuns,
+  runReportQuery,
+  logReportRun,
+} from '../../domain/empresa/reportes'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { exportData, type ExportColumn } from '../../lib/exportData'
@@ -126,13 +134,9 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('report_templates')
-        .select('id, company_id, project_id, name, description, source_table, columns, filters, schedule_kind, recipients, default_format, created_by, created_at, last_run_at')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-      if (err) throw err
-      setTemplates((data ?? []) as ReportTemplate[])
+      const { data, error: err } = await fetchReportTemplates<ReportTemplate>(companyId)
+      if (err) throw new Error(err)
+      setTemplates(data ?? [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los reportes.')
     } finally {
@@ -168,7 +172,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     if (!result) return
     const source = result.source_table as SourceTable
     const format = result.default_format as Format
-    const { error: err } = await supabase.from('report_templates').insert({
+    const { error: err } = await createReportTemplate({
       company_id: companyId,
       name: result.name.trim(),
       description: result.description?.trim() || null,
@@ -179,7 +183,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       recipients: [],
       default_format: format,
     })
-    if (err) { notify({ variant: 'error', title: 'Error', text: err.message }); return }
+    if (err) { notify({ variant: 'error', title: 'Error', text: err }); return }
     notify({ variant: 'success', title: 'Reporte creado', duration: 1500 })
     void load()
   }
@@ -193,8 +197,8 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       confirmText: 'Eliminar',
     })
     if (!r.isConfirmed) return
-    const { error: err } = await supabase.from('report_templates').delete().eq('id', t.id)
-    if (err) { notify({ variant: 'error', title: 'Error', text: err.message }); return }
+    const { error: err } = await deleteReportTemplate(t.id)
+    if (err) { notify({ variant: 'error', title: 'Error', text: err }); return }
     notify({ variant: 'success', title: 'Eliminado', duration: 1500 })
     void load()
   }
@@ -208,18 +212,13 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     setExpandedId(t.id)
     if (runs[t.id]) return
     setRunsLoading(t.id)
-    const { data, error: err } = await supabase
-      .from('report_runs')
-      .select('id, triggered_by, triggered_at, rows_count, format, status, error_msg')
-      .eq('template_id', t.id)
-      .order('triggered_at', { ascending: false })
-      .limit(5)
+    const { data, error: err } = await fetchReportRuns<ReportRun>(t.id)
     setRunsLoading(null)
     if (err) {
-      notify({ variant: 'error', title: 'Error', text: err.message })
+      notify({ variant: 'error', title: 'Error', text: err })
       return
     }
-    setRuns(prev => ({ ...prev, [t.id]: (data ?? []) as ReportRun[] }))
+    setRuns(prev => ({ ...prev, [t.id]: data ?? [] }))
   }
 
   async function handleRun(t: ReportTemplate) {
@@ -228,18 +227,9 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     let errorMsg: string | null = null
     let rowsCount = 0
     try {
-      let q = supabase.from(t.source_table).select('*').eq('company_id', companyId)
-      // Filtrar soft-deleted en tablas con esa columna (F2.7)
-      q = q.is('deleted_at', null)
-      // Aplicar filtros guardados (key/value)
-      for (const [k, v] of Object.entries(t.filters)) {
-        if (v !== null && v !== '' && v !== undefined) {
-          q = q.eq(k, v)
-        }
-      }
-      const { data, error: err } = await q
-      if (err) throw err
-      const rows = (data ?? []) as Array<Record<string, unknown>>
+      const { data, error: err } = await runReportQuery(t.source_table, companyId, t.filters)
+      if (err) throw new Error(err)
+      const rows = data ?? []
       rowsCount = rows.length
       const exportColumns: ExportColumn<Record<string, unknown>>[] = t.columns.map(c => ({
         header: c.header,
@@ -259,16 +249,9 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       notify({ variant: 'error', title: 'Error', text: errorMsg })
     } finally {
       // Log run para auditoria — fire-and-forget, ya manejamos el error principal
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('report_runs').insert({
-        template_id: t.id,
-        company_id: companyId,
-        triggered_by: 'manual',
-        rows_count: rowsCount,
-        format: t.default_format,
-        status,
-        error_msg: errorMsg,
-        actor_id: user?.id ?? null,
+      await logReportRun({
+        templateId: t.id, companyId, triggeredBy: 'manual',
+        rowsCount, format: t.default_format, status, errorMsg,
       })
       setRunning(null)
     }
@@ -299,11 +282,8 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       notify({ variant: 'error', title: 'Emails inválidos', text: invalid.join(', ') })
       return
     }
-    const { error: err } = await supabase
-      .from('report_templates')
-      .update({ recipients: emails })
-      .eq('id', t.id)
-    if (err) { notify({ variant: 'error', title: 'Error', text: err.message }); return }
+    const { error: err } = await updateReportTemplateRecipients(t.id, emails)
+    if (err) { notify({ variant: 'error', title: 'Error', text: err }); return }
     notify({ variant: 'success', title: `${emails.length} destinatario${emails.length === 1 ? '' : 's'}`, duration: 1500 })
     void load()
   }
@@ -327,14 +307,9 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     let errorMsg: string | null = null
     let rowsCount = 0
     try {
-      let q = supabase.from(t.source_table).select('*').eq('company_id', companyId)
-      q = q.is('deleted_at', null)
-      for (const [k, v] of Object.entries(t.filters)) {
-        if (v !== null && v !== '' && v !== undefined) q = q.eq(k, v)
-      }
-      const { data, error: err } = await q
-      if (err) throw err
-      const rows = (data ?? []) as Array<Record<string, unknown>>
+      const { data, error: err } = await runReportQuery(t.source_table, companyId, t.filters)
+      if (err) throw new Error(err)
+      const rows = data ?? []
       rowsCount = rows.length
 
       const exportColumns: ExportColumn<Record<string, unknown>>[] = t.columns.map(c => ({
@@ -359,12 +334,9 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       errorMsg = e instanceof Error ? e.message : String(e)
       notify({ variant: 'error', title: 'Error', text: errorMsg })
     } finally {
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('report_runs').insert({
-        template_id: t.id, company_id: companyId,
-        triggered_by: 'manual', rows_count: rowsCount,
-        format: t.default_format, status, error_msg: errorMsg,
-        actor_id: user?.id ?? null,
+      await logReportRun({
+        templateId: t.id, companyId, triggeredBy: 'manual',
+        rowsCount, format: t.default_format, status, errorMsg,
       })
       setRunning(null)
     }

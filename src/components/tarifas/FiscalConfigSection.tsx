@@ -13,8 +13,6 @@ import { useQuery } from '@tanstack/react-query'
 import { notify } from '../shared/Dialog'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { supabase } from '../../lib/supabase'
-import { runQuery } from '../../domain/queryFetch'
 import type { Proyecto } from '../../types/plataforma'
 import type {
   ConfigFiscalLocacion,
@@ -24,6 +22,7 @@ import type {
 import {
   useConfigFiscalEfectivaQuery,
   useEstatusCredencialesPacQuery,
+  fetchProjectFiscalOverride,
 } from '../../domain/fiscal/queries'
 import {
   useGuardarConfigFiscalLocacionMutation,
@@ -103,15 +102,7 @@ export function FiscalConfigSection({ proyectos }: Props) {
     queryKey: ['fiscal', 'project-override-crudo', ambitoProjectId],
     enabled: !esEmpresa && !!ambitoProjectId,
     queryFn: async () => {
-      const rows = await runQuery<Array<Record<string, string | null>>>((signal) =>
-        supabase
-          .from('projects')
-          .select('regimen_fiscal,nombre_fiscal,nombre,nit,rfc,proveedor_timbrado,establecimiento,lugar_expedicion,serie_fiscal')
-          .eq('id', ambitoProjectId)
-          .limit(1)
-          .abortSignal(signal),
-      )
-      const p = rows?.[0]
+      const p = await fetchProjectFiscalOverride(ambitoProjectId)
       if (!p) return null
       return {
         regimenFiscal: (p.regimen_fiscal as ConfigFiscalLocacion['regimenFiscal']) ?? null,

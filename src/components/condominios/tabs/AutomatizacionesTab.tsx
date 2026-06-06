@@ -1,5 +1,10 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  updateCondominioRow,
+  deleteCondominioRow,
+  marcarCuotasMorosas,
+} from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { AutomatizacionCond, TriggerTipoAuto, AccionTipoAuto, CuotaCondominio, TicketMantenimiento } from '../../../types'
 
@@ -61,7 +66,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El nombre es obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('automatizaciones_cond').insert({
+    const { error } = await createCondominioRow('automatizaciones_cond', {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre.trim(), trigger_tipo: form.trigger_tipo,
       trigger_valor: form.trigger_valor, accion_tipo: form.accion_tipo,
@@ -73,7 +78,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   }
 
   async function toggleActiva(id: string, activa: boolean) {
-    await supabase.from('automatizaciones_cond').update({ activa: !activa }).eq('id', id)
+    await updateCondominioRow('automatizaciones_cond', id, { activa: !activa })
     onRefresh()
   }
 
@@ -85,7 +90,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     if (a.accion_tipo === 'marcar_moroso' && a.trigger_tipo === 'cuota_vencida_dias') {
       if (afectados === 0) {
         notify({ variant: 'success', title: 'Sin elementos afectados', text: '✓ No hay cuotas que cumplan el criterio actualmente.', duration: 2000 })
-        await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+        await updateCondominioRow('automatizaciones_cond', a.id, { ultima_ejecucion: new Date().toISOString() })
         onRefresh(); return
       }
       const { isConfirmed } = await confirm({
@@ -103,11 +108,10 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       const afectadas = cuotas.filter(c =>
         c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < limitDate
       )
-      const { error } = await supabase.from('cuotas_condominio')
-        .update({ estado: 'moroso' }).in('id', afectadas.map(c => c.id))
+      const { error } = await marcarCuotasMorosas(afectadas.map(c => c.id))
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       notify({ variant: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, duration: 1600 })
-      await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+      await updateCondominioRow('automatizaciones_cond', a.id, { ultima_ejecucion: new Date().toISOString() })
       onRefresh(); return
     }
 
@@ -121,14 +125,14 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
           + (afectados > 0 ? ' — revisa el Centro de Notificaciones.' : ''),
       duration: 4000,
     })
-    await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+    await updateCondominioRow('automatizaciones_cond', a.id, { ultima_ejecucion: new Date().toISOString() })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar automatización?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('automatizaciones_cond').delete().eq('id', id)
+    await deleteCondominioRow('automatizaciones_cond', id)
     onRefresh()
   }
 

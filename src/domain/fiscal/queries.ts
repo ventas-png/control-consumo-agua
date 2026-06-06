@@ -217,3 +217,24 @@ export function useEstatusCredencialesPacQuery(companyId?: string) {
     enabled: !!companyId,
   })
 }
+
+/**
+ * Override CRUDO de las columnas fiscales NO secretas de una locación
+ * (`projects`). Permite distinguir "hereda" (columna NULL) de "override" (con
+ * valor) en los chips de FiscalConfigSection. RLS ya acota a admin/owner; no hay
+ * secretos en estas columnas. Devuelve la fila cruda o null (la UI mapea a
+ * ConfigFiscalLocacion). Mantiene el abortSignal vía runQuery.
+ */
+export async function fetchProjectFiscalOverride(
+  projectId: string,
+): Promise<Record<string, string | null> | null> {
+  const rows = await runQuery<Array<Record<string, string | null>>>((signal) =>
+    supabase
+      .from('projects')
+      .select('regimen_fiscal,nombre_fiscal,nombre,nit,rfc,proveedor_timbrado,establecimiento,lugar_expedicion,serie_fiscal')
+      .eq('id', projectId)
+      .limit(1)
+      .abortSignal(signal),
+  )
+  return rows?.[0] ?? null
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { hasActiveSession, updatePassword, signOutGlobal } from '../../domain/auth/account'
 import { logSecurityEvent } from '../../lib/security'
 import { validatePasswordStrength } from '../../lib/validation'
 
@@ -20,9 +20,7 @@ export function PasswordResetPage({ onBack }: Props) {
   useEffect(() => {
     // Supabase processes the recovery token from the URL automatically (detectSessionInUrl: true)
     // and fires PASSWORD_RECOVERY — we just verify a recovery session exists
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSessionReady(!!session)
-    })
+    hasActiveSession().then(setSessionReady)
   }, [])
 
   async function handleUpdate() {
@@ -41,7 +39,7 @@ export function PasswordResetPage({ onBack }: Props) {
 
     setLoading(true)
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      const { error } = await updatePassword(newPassword)
 
       if (error) {
         notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la contraseña. Intenta de nuevo.' })
@@ -50,7 +48,7 @@ export function PasswordResetPage({ onBack }: Props) {
       }
 
       // Invalidate all sessions after password change
-      await supabase.auth.signOut({ scope: 'global' })
+      await signOutGlobal()
       window.history.replaceState({}, document.title, window.location.pathname)
       await logSecurityEvent('password_reset_completed', { success: true })
       setSuccess(true)

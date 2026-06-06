@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Fragment, type CSSProperties } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchDeletedRows, restoreDeletedRows } from '../../domain/empresa/auditoria'
+import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 import { confirm, notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
@@ -79,24 +80,17 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
     bulk.clear()
     try {
       const orderCol = ORDER_COLUMNS[table]
-      const { data, error: err } = await supabase
-        .from(table)
-        .select('*')
-        .not('deleted_at', 'is', null)
-        .order('deleted_at', { ascending: false })
-        .order(orderCol, { ascending: false })
-        .range(page * pageSize, page * pageSize + pageSize - 1)
-      if (err) throw err
+      const { data, error: err } = await fetchDeletedRows(table, orderCol, page, pageSize)
+      if (err) throw new Error(err)
       const deleted = (data ?? []) as DeletedRow[]
       setRows(deleted)
 
       const actorIds = new Set<string>()
       for (const r of deleted) if (r.deleted_by) actorIds.add(r.deleted_by)
       if (actorIds.size > 0) {
-        const { data: u } = await supabase.from('app_users')
-          .select('id, full_name').in('id', [...actorIds])
+        const u = await fetchAppUserNamesByIds([...actorIds])
         const map: UserMap = {}
-        for (const x of (u ?? []) as Array<{ id: string; full_name: string }>) map[x.id] = x.full_name
+        for (const x of u) map[x.id] = x.full_name
         setUsers(map)
       }
     } catch (e: unknown) {
@@ -119,12 +113,9 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
       cancelText: 'Cancelar',
     })
     if (!result.isConfirmed) return
-    const { error: err } = await supabase
-      .from(table)
-      .update({ deleted_at: null, deleted_by: null })
-      .eq('id', rowId)
+    const { error: err } = await restoreDeletedRows(table, [rowId])
     if (err) {
-      notify({ variant: 'error', title: 'Error', text: err.message })
+      notify({ variant: 'error', title: 'Error', text: err })
       return
     }
     notify({ variant: 'success', title: 'Restaurado', duration: 1500 })
@@ -143,12 +134,9 @@ export function PapeleraModal({ onClose, defaultTable = 'cuotas_condominio' }: P
       cancelText: 'Cancelar',
     })
     if (!result.isConfirmed) return
-    const { error: err } = await supabase
-      .from(table)
-      .update({ deleted_at: null, deleted_by: null })
-      .in('id', ids)
+    const { error: err } = await restoreDeletedRows(table, ids)
     if (err) {
-      notify({ variant: 'error', title: 'Error', text: err.message })
+      notify({ variant: 'error', title: 'Error', text: err })
       return
     }
     notify({ variant: 'success', title: `${ids.length} registros restaurados`, duration: 1500 })
