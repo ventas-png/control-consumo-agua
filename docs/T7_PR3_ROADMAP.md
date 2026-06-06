@@ -25,14 +25,15 @@ Tras completar la migración se auditó la postura del SaaS multi-tenant con los
 
 **Performance**
 - **#470:** índices en las **~175 FKs de _scoping_** (company/project/unidad/cliente) — aceleran filtros RLS y `DELETE` en cascada. NO se indexaron las 250 a ciegas (el advisor reporta ~298 índices **ya sin uso** → evitar write-amplification sin beneficio a este volumen).
+- ✅ **#473 (perf pass quirúrgico):** índices en las **28 FKs de _join/cascada_** que respaldan lecturas/`DELETE` reales hacia entidades de dominio y aún no tenían índice líder. Se **excluyeron a propósito** las ~47 FKs de actor/auditoría (→ `auth.users` / `app_users`), que casi nunca se joinan. Validado en transacción con `ROLLBACK` y **verificado en prod** (28 índices presentes).
 - `pg_net` en schema `public` (advisor WARN): **se deja a propósito** — en uso por 13 `net.http_post` en 9 migraciones (notificaciones / cron / billing); moverlo rompería ese pipeline para una WARN de bajo riesgo.
 
 **Consistencia de capa de datos (fuera de componentes)**
-- **#471:** `usePlanLimits` + la query suelta de `App.tsx` → `domain/`. Los hooks de **realtime** (`useConversations` / `useNotifications` / `usePresence`) y **auth** (`useAuth`) **retienen `supabase` a propósito**: sus `.channel()` / `onAuthStateChange` son suscripciones *stateful*, no acceso request/response. Ese es el límite arquitectónico correcto.
+- **#471:** `usePlanLimits` + la query suelta de `App.tsx` → `domain/`.
+- ✅ **#1 completo — CRUD inline de los hooks → `domain/`** (#474 `useNotifications`+`usePresence`, #475 `useBroadcasts`, #476 `useConversations`, #477 `useAuth`/`app_users`). Ahora **ningún hook accede a tablas directo**: solo retienen los primitivos *stateful* que son de su capa — `.channel()` de Realtime y `supabase.auth.*` / `onAuthStateChange`. Ese es el límite arquitectónico correcto. Cada lectura/escritura vive en `domain/comunicacion/{notifications,broadcasts,conversations}`, `domain/presence/` y `domain/auth/{session,account}`, con tests de contrato.
 
 **Backlog opcional (por demanda — no bloqueante, no seguridad):**
-- CRUD inline de los hooks de realtime → `domain/` (bajo valor; el channel se queda en el hook igual).
-- Las ~75 FKs no-scoping sin índice + los ~298 índices sin uso → revisar cuando haya tráfico real que lo justifique.
+- ⏳ **#3 — drop de los ~298 índices sin uso**: diferido hasta tener **tráfico real** que confirme cuáles siguen sin usarse (en prod nueva, "sin uso" aún no es señal fiable). Las FKs no-scoping de actor/auditoría se dejaron sin índice a propósito (ver #473).
 
 ---
 
