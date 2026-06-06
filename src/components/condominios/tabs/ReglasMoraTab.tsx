@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { ReglaMoraConfig, TipoReglaRecargo, AplicarSobreRecargo } from '../../../types'
 
@@ -55,22 +55,22 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
       notas: form.notas.trim() || null,
     }
     const { error } = editId
-      ? await supabase.from('reglas_mora_config').update(payload).eq('id', editId)
-      : await supabase.from('reglas_mora_config').insert(payload)
+      ? await updateCondominioRow('reglas_mora_config', editId, payload)
+      : await createCondominioRow('reglas_mora_config', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     cancelar(); onRefresh()
   }
 
   async function toggleActiva(r: ReglaMoraConfig) {
-    await supabase.from('reglas_mora_config').update({ activa: !r.activa }).eq('id', r.id)
+    await updateCondominioRow('reglas_mora_config', r.id, { activa: !r.activa })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar regla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('reglas_mora_config').delete().eq('id', id)
+    await deleteCondominioRow('reglas_mora_config', id)
     onRefresh()
   }
 

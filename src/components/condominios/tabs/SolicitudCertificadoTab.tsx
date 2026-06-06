@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { SolicitudCertificado, TipoCertificado, EstadoCertificado, Unidad } from '../../../types'
 
@@ -48,7 +48,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   async function guardar() {
     if (!form.solicitante.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del solicitante obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('solicitudes_certificado').insert({
+    const { error } = await createCondominioRow('solicitudes_certificado', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id || null,
       solicitante: form.solicitante.trim(), tipo: form.tipo,
@@ -70,7 +70,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
     const patch: Record<string, unknown> = { estado: siguiente }
     if (siguiente === 'aprobado') patch.fecha_aprobacion = new Date().toISOString().split('T')[0]
     if (siguiente === 'entregado') patch.fecha_entrega = new Date().toISOString().split('T')[0]
-    const { error } = await supabase.from('solicitudes_certificado').update(patch).eq('id', s.id)
+    const { error } = await updateCondominioRow('solicitudes_certificado', s.id, patch)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, ...patch } as SolicitudCertificado : null)
     onRefresh()
@@ -79,7 +79,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   async function rechazar(s: SolicitudCertificado) {
     const res = await confirm({ title: 'Rechazar solicitud', text: '¿Confirmar rechazo?', icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!res.isConfirmed) return
-    await supabase.from('solicitudes_certificado').update({ estado: 'rechazado' as EstadoCertificado }).eq('id', s.id)
+    await updateCondominioRow('solicitudes_certificado', s.id, { estado: 'rechazado' as EstadoCertificado })
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, estado: 'rechazado' } as SolicitudCertificado : null)
     onRefresh()
   }

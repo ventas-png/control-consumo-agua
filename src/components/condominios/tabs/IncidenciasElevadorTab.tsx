@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { IncidenciaElevador, TipoIncidenciaElevador, EstadoIncidenciaElevador } from '../../../types'
 
@@ -74,7 +74,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Elevador y descripción son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('incidencias_elevador').insert({
+    const { error } = await createCondominioRow('incidencias_elevador', {
       company_id: companyId, project_id: proyectoId,
       elevador: form.elevador.trim(), tipo: form.tipo,
       descripcion: form.descripcion.trim(), fecha: form.fecha,
@@ -99,7 +99,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     const idx = flujo.indexOf(r.estado)
     if (idx === -1 || idx >= flujo.length - 1) return
     const next = flujo[idx + 1]
-    await supabase.from('incidencias_elevador').update({ estado: next }).eq('id', r.id)
+    await updateCondominioRow('incidencias_elevador', r.id, { estado: next })
     if (selected?.id === r.id) setSelected(prev => prev ? { ...prev, estado: next } : null)
     onRefresh()
   }

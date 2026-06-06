@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm } from '../../shared/Dialog'
 import type { CuotaCondominio, Unidad } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -40,14 +40,14 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
   async function marcarPagada(id: string) {
     const r = await confirm({ title: '¿Marcar como pagada?', icon: 'question', confirmText: 'Sí, pagada' })
     if (!r.isConfirmed) return
-    await supabase.from('cuotas_condominio').update({ estado: 'pagado' }).eq('id', id)
+    await updateCondominioRow('cuotas_condominio', id, { estado: 'pagado' })
     onRefresh()
   }
 
   async function marcarMorosa(id: string) {
     const r = await confirm({ title: '¿Marcar como morosa?', icon: 'warning', variant: 'danger', confirmText: 'Sí, morosa' })
     if (!r.isConfirmed) return
-    await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).eq('id', id)
+    await updateCondominioRow('cuotas_condominio', id, { estado: 'moroso' })
     onRefresh()
   }
 

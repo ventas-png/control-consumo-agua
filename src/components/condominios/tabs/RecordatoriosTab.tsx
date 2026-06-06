@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { RecordatorioCondominio, PrioridadRecordatorio, TipoEntidadRecordatorio } from '../../../types'
 
@@ -62,7 +62,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
     if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Error', text: 'El título es obligatorio' }); return }
     if (!form.fecha_limite) { notify({ variant: 'warning', title: 'Error', text: 'La fecha límite es obligatoria' }); return }
     setSaving(true)
-    const { error } = await supabase.from('recordatorios_condominio').insert({
+    const { error } = await createCondominioRow('recordatorios_condominio', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(),
       descripcion: form.descripcion.trim() || null,
@@ -78,17 +78,17 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   async function marcarCompletado(r: RecordatorioCondominio) {
-    await supabase.from('recordatorios_condominio').update({
+    await updateCondominioRow('recordatorios_condominio', r.id, {
       completado: !r.completado,
       fecha_completado: !r.completado ? new Date().toISOString() : null,
-    }).eq('id', r.id)
+    })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const res = await confirm({ title: '¿Eliminar recordatorio?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('recordatorios_condominio').delete().eq('id', id)
+    await deleteCondominioRow('recordatorios_condominio', id)
     onRefresh()
   }
 

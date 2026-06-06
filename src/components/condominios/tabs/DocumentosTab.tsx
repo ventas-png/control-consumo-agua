@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { DocumentoCondominio, CategoriaDocumento, VisibilidadDocumento } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -73,8 +73,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
       subido_por: userId || null,
     }
     const { error } = editId
-      ? await supabase.from('documentos_condominio').update(payload).eq('id', editId)
-      : await supabase.from('documentos_condominio').insert(payload)
+      ? await updateCondominioRow('documentos_condominio', editId, payload)
+      : await createCondominioRow('documentos_condominio', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -82,13 +82,13 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar documento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('documentos_condominio').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('documentos_condominio', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function toggleVigente(d: DocumentoCondominio) {
-    const { error } = await supabase.from('documentos_condominio').update({ vigente: !d.vigente }).eq('id', d.id)
+    const { error } = await updateCondominioRow('documentos_condominio', d.id, { vigente: !d.vigente })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ComentarioTicket, TicketMantenimiento } from '../../../types'
 
@@ -31,7 +31,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
   async function guardar() {
     if (!contenido.trim()) { notify({ variant: 'warning', title: 'Error', text: 'Escribe un comentario' }); return }
     setSaving(true)
-    const { error: ce } = await supabase.from('comentarios_ticket').insert({
+    const { error: ce } = await createCondominioRow('comentarios_ticket', {
       company_id: companyId, ticket_id: ticket.id,
       autor_nombre: autorNombre,
       contenido: contenido.trim(),
@@ -39,7 +39,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
     })
     if (ce) { setSaving(false); notify({ variant: 'error', title: 'Error', text: ce.message }); return }
     if (estadoNuevo) {
-      await supabase.from('tickets_mantenimiento').update({ estado: estadoNuevo }).eq('id', ticket.id)
+      await updateCondominioRow('tickets_mantenimiento', ticket.id, { estado: estadoNuevo })
     }
     setSaving(false)
     setContenido('')

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { PresenciaPersonal, EstadoPresencia } from '../../../types'
 
@@ -46,7 +46,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('presencia_personal').insert({
+    const { error } = await createCondominioRow('presencia_personal', {
       company_id: companyId,
       project_id: proyectoId,
       nombre: form.nombre.trim(),
@@ -65,14 +65,14 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
   }
 
   async function actualizarEstado(id: string, estado: EstadoPresencia) {
-    const { error } = await supabase.from('presencia_personal').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('presencia_personal', id, { estado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
 
   async function registrarSalida(id: string) {
     const hora = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
-    const { error } = await supabase.from('presencia_personal').update({ hora_salida: hora }).eq('id', id)
+    const { error } = await updateCondominioRow('presencia_personal', id, { hora_salida: hora })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }

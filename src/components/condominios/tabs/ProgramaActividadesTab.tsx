@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ProgramaActividad, CategoriaActividad, EstadoActividad } from '../../../types'
 
@@ -71,7 +71,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre y fecha de inicio son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('programa_actividades').insert({
+    const { error } = await createCondominioRow('programa_actividades', {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre.trim(), descripcion: form.descripcion.trim() || null,
       categoria: form.categoria,
@@ -94,7 +94,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
   }
 
   async function cambiarEstado(a: ProgramaActividad, estado: EstadoActividad) {
-    await supabase.from('programa_actividades').update({ estado }).eq('id', a.id)
+    await updateCondominioRow('programa_actividades', a.id, { estado })
     if (selected?.id === a.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
   }
@@ -103,7 +103,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
     if (a.cupo_maximo && a.inscritos >= a.cupo_maximo) {
       notify({ variant: 'warning', title: 'Sin cupo', text: 'La actividad no tiene cupos disponibles' }); return
     }
-    await supabase.from('programa_actividades').update({ inscritos: a.inscritos + 1 }).eq('id', a.id)
+    await updateCondominioRow('programa_actividades', a.id, { inscritos: a.inscritos + 1 })
     onRefresh()
   }
 

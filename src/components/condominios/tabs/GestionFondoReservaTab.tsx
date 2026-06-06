@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { FondoReservaMovimiento } from '../../../types'
 
 interface Props {
@@ -70,7 +70,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       return
     }
     setSaving(true)
-    const { error } = await supabase.from('fondo_reserva').insert({
+    const { error } = await createCondominioRow('fondo_reserva', {
       company_id: companyId, project_id: proyectoId,
       tipo: form.tipo, concepto: form.concepto.trim(),
       monto: parseFloat(form.monto), fecha: form.fecha,

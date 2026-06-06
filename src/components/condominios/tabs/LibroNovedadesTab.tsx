@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LibroNovedad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -49,7 +49,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
     if (!form.responsable.trim() || !form.novedades.trim())
       return notify({ variant: 'warning', title: 'Requerido', text: 'Responsable y novedades son obligatorios.' })
     setSaving(true)
-    const { error } = await supabase.from('libro_novedades').insert({
+    const { error } = await createCondominioRow('libro_novedades', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, turno: form.turno, responsable: form.responsable.trim(),
       hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
@@ -63,14 +63,14 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   }
 
   async function toggleFirmado(id: string, firmado: boolean) {
-    await supabase.from('libro_novedades').update({ firmado: !firmado }).eq('id', id)
+    await updateCondominioRow('libro_novedades', id, { firmado: !firmado })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar entrada?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('libro_novedades').delete().eq('id', id)
+    await deleteCondominioRow('libro_novedades', id)
     onRefresh()
   }
 

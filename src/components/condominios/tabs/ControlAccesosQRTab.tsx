@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsert } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { Visitante, Unidad } from '../../../types'
@@ -111,9 +111,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   async function registrarEntradaDesdeQR() {
     if (!resultadoValidacion?.visitante) return
     setRegistrando(true)
-    const { error } = await supabase.from('visitantes')
-      .update({ hora_entrada: new Date().toISOString() })
-      .eq('id', resultadoValidacion.visitante.id)
+    const { error } = await updateCondominioRow('visitantes', resultadoValidacion.visitante.id, { hora_entrada: new Date().toISOString() })
     setRegistrando(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
@@ -122,7 +120,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   }
 
   async function registrarSalida(v: Visitante) {
-    await supabase.from('visitantes').update({ hora_salida: new Date().toISOString() }).eq('id', v.id)
+    await updateCondominioRow('visitantes', v.id, { hora_salida: new Date().toISOString() })
     onRefresh()
   }
 

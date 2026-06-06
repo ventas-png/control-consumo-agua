@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { LecturaMedidorGas, Unidad } from '../../../types'
@@ -55,7 +55,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
     const consumo = consumoCalculado
     const costo_total = consumo != null && form.costo_unitario ? consumo * parseFloat(form.costo_unitario) : null
     setSaving(true)
-    const { error } = await supabase.from('lecturas_medidor_gas').insert({
+    const { error } = await createCondominioRow('lecturas_medidor_gas', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id || null,
       area: form.area.trim() || null,
