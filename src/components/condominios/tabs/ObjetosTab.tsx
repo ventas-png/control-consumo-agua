@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ObjetoPerdido, EstadoObjeto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -80,10 +80,10 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       registrado_por: userId || null,
     }
     if (editId) {
-      const { error } = await supabase.from('objetos_perdidos').update(payload).eq('id', editId)
+      const { error } = await updateCondominioRow('objetos_perdidos', editId, payload)
       if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('objetos_perdidos').insert(payload)
+      const { error } = await createCondominioRow('objetos_perdidos', payload)
       if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
     }
     setSaving(false)
@@ -94,7 +94,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   async function handleDelete(id: string) {
     const result = await confirm({ title: t('condominios.objetos.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('objetos_perdidos').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('objetos_perdidos', id)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()
   }
@@ -105,18 +105,18 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       setReclamadoPor('')
       return
     }
-    const { error } = await supabase.from('objetos_perdidos').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('objetos_perdidos', id, { estado })
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()
   }
 
   async function confirmarReclamo() {
     if (!reclamoId) return
-    const { error } = await supabase.from('objetos_perdidos').update({
+    const { error } = await updateCondominioRow('objetos_perdidos', reclamoId, {
       estado: 'reclamado',
       reclamado_por: reclamadoPor || null,
       fecha_reclamo: new Date().toISOString().slice(0, 10),
-    }).eq('id', reclamoId)
+    })
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     setReclamoId(null)
     setReclamadoPor('')

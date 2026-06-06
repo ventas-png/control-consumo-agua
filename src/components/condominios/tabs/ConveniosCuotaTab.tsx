@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ConvenioCuotaCond, EstadoConvenioCuota, Unidad } from '../../../types'
 
@@ -53,7 +53,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
     const num_cuotas = parseInt(form.num_cuotas)
     const monto_cuota = parseFloat((monto_total / num_cuotas).toFixed(2))
     setSaving(true)
-    const { error } = await supabase.from('convenios_cuota_cond').insert({
+    const { error } = await createCondominioRow('convenios_cuota_cond', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id,
       descripcion: form.descripcion.trim(),
@@ -71,13 +71,13 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
   async function registrarPago(c: ConvenioCuotaCond) {
     const nuevasPagadas = c.cuotas_pagadas + 1
     const nuevoEstado: EstadoConvenioCuota = nuevasPagadas >= c.num_cuotas ? 'cumplido' : 'activo'
-    await supabase.from('convenios_cuota_cond').update({ cuotas_pagadas: nuevasPagadas, estado: nuevoEstado }).eq('id', c.id)
+    await updateCondominioRow('convenios_cuota_cond', c.id, { cuotas_pagadas: nuevasPagadas, estado: nuevoEstado })
     notify({ variant: 'success', title: nuevoEstado === 'cumplido' ? '✅ Convenio cumplido' : 'Pago registrado', duration: 1500 })
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: EstadoConvenioCuota) {
-    await supabase.from('convenios_cuota_cond').update({ estado }).eq('id', id)
+    await updateCondominioRow('convenios_cuota_cond', id, { estado })
     onRefresh()
   }
 

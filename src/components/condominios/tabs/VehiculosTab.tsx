@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -67,9 +67,9 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('vehiculos_residentes').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('vehiculos_residentes', editId, payload))
     } else {
-      ({ error } = await supabase.from('vehiculos_residentes').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('vehiculos_residentes', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
@@ -79,12 +79,12 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.vehiculos.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('vehiculos_residentes').delete().eq('id', id)
+    await deleteCondominioRow('vehiculos_residentes', id)
     onRefresh()
   }
 
   async function toggleActivo(v: VehiculoResidente) {
-    await supabase.from('vehiculos_residentes').update({ activo: !v.activo }).eq('id', v.id)
+    await updateCondominioRow('vehiculos_residentes', v.id, { activo: !v.activo })
     onRefresh()
   }
 

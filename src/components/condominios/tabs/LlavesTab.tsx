@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LlaveCondominio, EstadoLlave, TipoLlave, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -85,8 +85,8 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('llaves_condominio').update(payload).eq('id', editId)
-      : await supabase.from('llaves_condominio').insert(payload)
+      ? await updateCondominioRow('llaves_condominio', editId, payload)
+      : await createCondominioRow('llaves_condominio', payload)
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -94,7 +94,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.llaves.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('llaves_condominio').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('llaves_condominio', id)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()
   }
@@ -102,7 +102,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
   async function handleEstado(id: string, estado: EstadoLlave) {
     const updates: Record<string, unknown> = { estado }
     if (estado === 'devuelta') updates.fecha_devolucion = new Date().toISOString().slice(0, 10)
-    const { error } = await supabase.from('llaves_condominio').update(updates).eq('id', id)
+    const { error } = await updateCondominioRow('llaves_condominio', id, updates)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()
   }

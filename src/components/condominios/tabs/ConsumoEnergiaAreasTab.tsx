@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ConsumoEnergiaArea } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -77,8 +77,8 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('consumo_energia_areas').update(payload).eq('id', editId)
-      : await supabase.from('consumo_energia_areas').insert(payload)
+      ? await updateCondominioRow('consumo_energia_areas', editId, payload)
+      : await createCondominioRow('consumo_energia_areas', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -87,7 +87,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
   const handleDelete = async (c: ConsumoEnergiaArea) => {
     const r = await confirm({ title: '¿Eliminar registro?', text: `${c.area} · ${c.periodo}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('consumo_energia_areas').delete().eq('id', c.id)
+    await deleteCondominioRow('consumo_energia_areas', c.id)
     onRefresh()
   }
 

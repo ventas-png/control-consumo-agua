@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EntregaUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -76,9 +76,9 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('entrega_unidades').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('entrega_unidades', editId, payload))
     } else {
-      ({ error } = await supabase.from('entrega_unidades').insert(payload))
+      ({ error } = await createCondominioRow('entrega_unidades', payload))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -88,14 +88,14 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar acta de entrega?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('entrega_unidades').delete().eq('id', id)
+    await deleteCondominioRow('entrega_unidades', id)
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
 
   async function toggleFirma(e: EntregaUnidad, campo: 'firmado_propietario' | 'firmado_inquilino') {
     const update = { [campo]: !e[campo] }
-    await supabase.from('entrega_unidades').update(update).eq('id', e.id)
+    await updateCondominioRow('entrega_unidades', e.id, update)
     onRefresh()
   }
 
