@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { EmptyState } from '../../shared/EmptyState'
 import { Proforma, ContratoProveedor } from '../../../types'
@@ -81,8 +81,8 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
       notas: form.notas.trim() || null,
     }
     const { error } = editId
-      ? await supabase.from('proformas_condominio').update(payload).eq('id', editId)
-      : await supabase.from('proformas_condominio').insert({ ...payload, estado: 'borrador' })
+      ? await updateCondominioRow('proformas_condominio', editId, payload)
+      : await createCondominioRow('proformas_condominio', { ...payload, estado: 'borrador' })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
@@ -92,10 +92,10 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
     const cfg = ESTADO_CFG[p.estado]
     if (!cfg.next) return
     const nuevoEstado = cfg.next
-    const { error } = await supabase.from('proformas_condominio').update({ estado: nuevoEstado }).eq('id', p.id)
+    const { error } = await updateCondominioRow('proformas_condominio', p.id, { estado: nuevoEstado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (nuevoEstado === 'convertida_oc') {
-      await supabase.from('ordenes_compra').insert({
+      await createCondominioRow('ordenes_compra', {
         company_id: companyId, project_id: proyectoId,
         proveedor_nombre: p.proveedor_nombre,
         concepto: p.concepto,
@@ -112,14 +112,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
   async function rechazar(p: Proforma) {
     const res = await confirm({ title: '¿Rechazar proforma?', text: p.concepto, icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!res.isConfirmed) return
-    await supabase.from('proformas_condominio').update({ estado: 'rechazada' }).eq('id', p.id)
+    await updateCondominioRow('proformas_condominio', p.id, { estado: 'rechazada' })
     onRefresh()
   }
 
   async function eliminar(p: Proforma) {
     const res = await confirm({ title: '¿Eliminar?', text: p.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('proformas_condominio').delete().eq('id', p.id)
+    await deleteCondominioRow('proformas_condominio', p.id)
     onRefresh()
   }
 

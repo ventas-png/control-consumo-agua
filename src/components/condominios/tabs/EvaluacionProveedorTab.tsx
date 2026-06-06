@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EvaluacionProveedor, ContratoProveedor } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -61,9 +61,9 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('evaluaciones_proveedor').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('evaluaciones_proveedor', editId, payload))
     } else {
-      ({ error } = await supabase.from('evaluaciones_proveedor').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('evaluaciones_proveedor', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -73,7 +73,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar evaluación?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('evaluaciones_proveedor').delete().eq('id', id)
+    await deleteCondominioRow('evaluaciones_proveedor', id)
     onRefresh()
   }
 

@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AccesoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -53,9 +53,9 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('accesos_residentes').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('accesos_residentes', editId, payload))
     } else {
-      ({ error } = await supabase.from('accesos_residentes').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('accesos_residentes', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -65,12 +65,12 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar acceso?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('accesos_residentes').delete().eq('id', id)
+    await deleteCondominioRow('accesos_residentes', id)
     onRefresh()
   }
 
   async function toggleActivo(a: AccesoResidente) {
-    await supabase.from('accesos_residentes').update({ activo: !a.activo }).eq('id', a.id)
+    await updateCondominioRow('accesos_residentes', a.id, { activo: !a.activo })
     onRefresh()
   }
 

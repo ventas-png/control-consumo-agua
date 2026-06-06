@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ControlPlagas, TipoControlPlagas, ResultadoControlPlagas } from '../../../types'
 
@@ -69,7 +69,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   async function guardar() {
     if (areasSeleccionadas.length === 0) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Selecciona al menos un área' }); return }
     setSaving(true)
-    const { error } = await supabase.from('control_plagas').insert({
+    const { error } = await createCondominioRow('control_plagas', {
       company_id: companyId, project_id: proyectoId,
       tipo: form.tipo, empresa: form.empresa.trim() || null,
       tecnico: form.tecnico.trim() || null, areas: areasSeleccionadas,

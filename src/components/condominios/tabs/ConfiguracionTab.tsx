@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ConfiguracionCondominio } from '../../../types'
 import { toast } from '../../../lib/toast'
 import { Button } from '../../shared/Button'
@@ -63,12 +63,10 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     const tipo = schema.tipo === 'texto_largo' ? 'texto' : schema.tipo
 
     if (existing) {
-      const { error } = await supabase.from('configuracion_condominio')
-        .update({ valor: values[clave] || null, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
+      const { error } = await updateCondominioRow('configuracion_condominio', existing.id, { valor: values[clave] || null, updated_at: new Date().toISOString() })
       if (error) { toast.error(error.message); setSaving(null); return }
     } else {
-      const { error } = await supabase.from('configuracion_condominio').insert({
+      const { error } = await createCondominioRow('configuracion_condominio', {
         company_id: companyId, project_id: proyectoId,
         clave, valor: values[clave] || null, tipo,
       })
@@ -89,11 +87,9 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
       const existing = configuracion.find(c => c.clave === clave)
       const tipo = schema.tipo === 'texto_largo' ? 'texto' : schema.tipo
       if (existing) {
-        await supabase.from('configuracion_condominio')
-          .update({ valor: values[clave] || null, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
+        await updateCondominioRow('configuracion_condominio', existing.id, { valor: values[clave] || null, updated_at: new Date().toISOString() })
       } else {
-        await supabase.from('configuracion_condominio').insert({
+        await createCondominioRow('configuracion_condominio', {
           company_id: companyId, project_id: proyectoId, clave, valor: values[clave] || null, tipo,
         })
       }

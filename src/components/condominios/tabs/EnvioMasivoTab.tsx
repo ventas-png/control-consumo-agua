@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { PlantillaMensajeCond, CuotaCondominio, Unidad, ReservaAmenidad, CanalPlantilla } from '../../../types'
 
 interface Props {
@@ -103,7 +103,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       fecha_envio: new Date().toISOString(),
     }))
 
-    const { error } = await supabase.from('notificaciones_enviadas').insert(rows)
+    const { error } = await createCondominioRow('notificaciones_enviadas', rows)
     setEnviando(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
