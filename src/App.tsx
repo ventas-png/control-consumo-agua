@@ -11,6 +11,7 @@ import type { AppSection, Cliente, Contador, Empresa, FuenteAgua, Registro, Regi
 import { sectionToPath, pathToSection } from './lib/routes'
 import { lazyWithPreload } from './lib/lazyWithPreload'
 import { supabase } from './lib/supabase'
+import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
 import { useAuth } from './hooks/useAuth'
 import { useQueryClient } from '@tanstack/react-query'
 import { useProyectosQuery, useProyectoAssignmentsQuery, useRutasQuery, useTarifasQuery, useContadoresQuery, useUnidadesQuery, useFuentesAguaQuery, useRegistrosCalidadQuery, useEmpresaQuery, useClientesQuery, useRegistrosQuery } from './domain/agua/queries'
@@ -557,14 +558,7 @@ export default function App() {
 
   const fetchUnreadComunicacion = useCallback(async () => {
     if (!currentUser?.company_id) return
-    // `planned` uses the cheap pg_class estimate; falls back to an approximate count
-    // without scanning the whole table. Avoids COUNT(*) every 60s.
-    const { count } = await supabase
-      .from('conversations')
-      .select('id', { count: 'planned', head: true })
-      .eq('company_id', currentUser.company_id)
-      .eq('status', 'abierta')
-    setUnreadComunicacion(count ?? 0)
+    setUnreadComunicacion(await fetchOpenConversationsCount(currentUser.company_id))
   }, [currentUser?.company_id])
 
   useEffect(() => {

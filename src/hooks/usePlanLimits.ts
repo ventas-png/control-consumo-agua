@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchCompanyEffectiveLimits, fetchCompanyUsage } from '../domain/empresa/queries'
 
 // Limites efectivos y uso actual de una company (plat:P1 part 3, F2.13).
 // Wrapper sobre las RPCs get_company_effective_limits y get_company_usage,
@@ -48,20 +48,20 @@ export function usePlanLimits(companyId: string | null | undefined): PlanLimits 
     setState(s => ({ ...s, loading: true, error: null }))
     void (async () => {
       const [limitsRes, usageRes] = await Promise.all([
-        supabase.rpc('get_company_effective_limits', { p_company_id: companyId }),
-        supabase.rpc('get_company_usage', { p_company_id: companyId }),
+        fetchCompanyEffectiveLimits(companyId),
+        fetchCompanyUsage(companyId),
       ])
       if (!alive) return
       if (limitsRes.error || usageRes.error) {
         setState(s => ({
           ...s,
           loading: false,
-          error: limitsRes.error?.message ?? usageRes.error?.message ?? 'Error cargando límites',
+          error: limitsRes.error ?? usageRes.error ?? 'Error cargando límites',
         }))
         return
       }
-      const limits = (limitsRes.data as Array<{ max_projects: number | null; max_units: number | null }> | null)?.[0]
-      const usage = (usageRes.data as Array<{ projects_count: number; units_count: number }> | null)?.[0]
+      const limits = limitsRes.data
+      const usage = usageRes.data
       setState({
         max_projects: limits?.max_projects ?? null,
         max_units: limits?.max_units ?? null,

@@ -121,3 +121,30 @@ export function useEmpresaSectionDataQuery(companyId?: string, currentUserId?: s
     enabled: !!companyId && !!currentUserId,
   })
 }
+
+// ── Límites de plan y uso (plat:P1/F2.13) — T7 follow-up ───────────────────
+// Lecturas imperativas (no-hook) usadas por usePlanLimits. Envuelven las RPCs
+// SECURITY DEFINER get_company_effective_limits / get_company_usage (guardadas
+// por empresa propia / service_role). Devuelven la PRIMERA fila o null.
+
+/** Límites efectivos del plan (GREATEST(plan, override legacy)); null = ilimitado. */
+export async function fetchCompanyEffectiveLimits(
+  companyId: string,
+): Promise<{ data: { max_projects: number | null; max_units: number | null } | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('get_company_effective_limits', { p_company_id: companyId })
+  return {
+    data: (data as Array<{ max_projects: number | null; max_units: number | null }> | null)?.[0] ?? null,
+    error: error?.message ?? null,
+  }
+}
+
+/** Uso actual de la empresa (conteo de proyectos/unidades). */
+export async function fetchCompanyUsage(
+  companyId: string,
+): Promise<{ data: { projects_count: number; units_count: number } | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('get_company_usage', { p_company_id: companyId })
+  return {
+    data: (data as Array<{ projects_count: number; units_count: number }> | null)?.[0] ?? null,
+    error: error?.message ?? null,
+  }
+}
