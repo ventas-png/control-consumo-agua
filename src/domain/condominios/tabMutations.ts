@@ -53,3 +53,13 @@ export async function deleteCondominioRow(
   const { error } = await supabase.from(table).delete().eq('id', id)
   return { error }
 }
+
+/**
+ * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
+ * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de
+ * error (`{ message }`) que el resto de helpers de tab.
+ */
+export async function marcarCuotasMorosas(ids: string[]): Promise<{ error: RowError }> {
+  const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', ids)
+  return { error }
+}

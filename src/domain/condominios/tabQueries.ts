@@ -113,6 +113,18 @@ export async function fetchPresupuestosAnio<T>(projectId: string, anio: number):
   return (data as T[] | null) ?? []
 }
 
+// ── MantenimientoPrevTab ──
+
+/** Ejecuciones de un plan de mantenimiento (más recientes primero). Degrada a `[]`. */
+export async function fetchEjecucionesMantenimiento<T>(planId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('ejecuciones_mantenimiento')
+    .select('*')
+    .eq('plan_id', planId)
+    .order('fecha', { ascending: false })
+  return (data as T[] | null) ?? []
+}
+
 /** Montos de gastos del condominio dentro de un año (para "ejecutado"). */
 export async function fetchGastosAnioMontos(
   projectId: string,

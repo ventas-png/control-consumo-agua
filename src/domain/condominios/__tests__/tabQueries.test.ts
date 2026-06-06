@@ -28,6 +28,7 @@ import {
   fetchFondoReservaMovimientos,
   fetchPresupuestosAnio,
   fetchGastosAnioMontos,
+  fetchEjecucionesMantenimiento,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -91,5 +92,15 @@ describe('PortalTransparenciaTab reads', () => {
   })
   it('fetchGastosAnioMontos degrada a []', async () => {
     expect(await fetchGastosAnioMontos('p1', 2026)).toEqual([])
+  })
+})
+
+describe('fetchEjecucionesMantenimiento', () => {
+  it('devuelve filas del plan', async () => {
+    h.state.byTable.ejecuciones_mantenimiento = { data: [{ id: 'e1', fecha: '2026-01-01' }], error: null }
+    expect(await fetchEjecucionesMantenimiento('plan1')).toEqual([{ id: 'e1', fecha: '2026-01-01' }])
+  })
+  it('sin data → []', async () => {
+    expect(await fetchEjecucionesMantenimiento('plan1')).toEqual([])
   })
 })

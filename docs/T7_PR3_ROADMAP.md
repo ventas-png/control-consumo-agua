@@ -4,8 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 30**. **Sección B COMPLETA.**
-> Sección A en curso: **4** tabs "complejos" hechos (Portal read-only), restan **30**.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 27**. **Sección B COMPLETA.**
+> Sección A en curso: **7** tabs "complejos" hechos (Portal read-only + Mantenimiento/otros),
+> restan **27**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -89,10 +90,13 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 
 ## ⬜ Backlog restante (50 archivos)
 
-### A) `condominios/tabs` "complejos" — 30 tabs (4 hechos)
+### A) `condominios/tabs` "complejos" — 27 tabs (7 hechos)
 
 > ✅ **Portal read-only** (lote 8): `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`,
 > `PortalTransparenciaTab` → `domain/condominios/tabQueries.ts`.
+> ✅ **Mantenimiento/otros** (lote 9): `MantenimientoPrevTab`, `AutomatizacionesTab`,
+> `TareasPersonalTab` → genéricos `tabMutations` + `fetchEjecucionesMantenimiento` (tabQueries)
+> + `marcarCuotasMorosas` (`.in`, tabMutations).
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -111,7 +115,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
 | Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |
-| Mantenimiento/otros | `MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab` |
+| ~~Mantenimiento/otros~~ ✅ | ~~`MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab`~~ → genéricos + `marcarCuotasMorosas`/`fetchEjecucionesMantenimiento` |
 | ~~Portal read-only~~ ✅ | ~~`DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab`~~ → `tabQueries.ts` |
 
 > Para los `select` de estos tabs: si leen datos que **CondominiosSection ya carga**, evaluá
