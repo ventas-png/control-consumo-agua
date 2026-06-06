@@ -4,8 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 50** (tras el lote
-> `auth/`). Restan **34** tabs "complejos" + **16** sueltos fuera de condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 46** (tras los lotes
+> `auth/` y `empresa` RBAC/usuarios). Restan **34** tabs "complejos" + **12** sueltos
+> fuera de condominios.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -25,6 +26,11 @@
 `SignupCompanyScreen`, `OAuthOnboardingScreen`, `PasswordResetPage` → `domain/auth/account.ts`
 (edge functions de alta + reset/updateUser/getSession/signOut).
 
+**Empresa RBAC/usuarios:** `RolPermisosModal`, `CustomRoleEditor`, `AsignacionModal`,
+`EmpresaUsuariosSection` → `domain/empresa/roles.ts` (roles/permissions/role_permissions/
+user_roles) + `domain/empresa/usuarios.ts` (app_users.activo, user_project_assignments,
+edges create-user/delete-user).
+
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
 - `domain/contadores/queries.resolveDefaultProjectCompany(userId, fallbackCompanyId)`.
@@ -32,6 +38,7 @@
 - `domain/clientes/mutations.updateCliente(id, payload)` · `domain/agua/mutations.{createRegistro,updateRegistro,marcarRegistrosMora,uploadRegistroFoto}`.
 - `domain/cobros/mutations.{createPago,uploadComprobantePago,…}`.
 - `domain/auth/account`: `createClienteAccount` · `signupCompany` · `completeOAuthOnboarding` · `requestPasswordReset` · `updatePassword` · `hasActiveSession` · `signOut` · `signOutGlobal`.
+- `domain/empresa/roles`: CRUD de roles/permisos RBAC (`fetchCompanyRoles`, `fetch*RolePermission*`, `insertUserRoles`, `createRole`, …). `domain/empresa/usuarios`: `setUsuarioActivo` · `*UserProjectAssignments` · `createCompanyUser` · `deleteCompanyUser`.
 - **`domain/condominios/tabMutations`** — CRUD genérico de los tabs (ver abajo).
 
 ---
@@ -82,11 +89,13 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 16 archivos
+### B) Fuera de condominios — 12 archivos
 
-`auth/` (5) ✅ hecho → `domain/auth/account`. Resta sobre todo **`empresa`** residual (el
-dominio `domain/empresa` ya existe; bajar las calls que quedan) + algún suelto
-(`perfil`, `tarifas/FiscalConfigSection`, `historial`).
+`auth/` (5) ✅ y `empresa` RBAC/usuarios (4) ✅ hechos. Resta **`empresa`** residual
+(config/integraciones: `StripePayPalConfig`, `GoogleEmailConfig`, `PayfacConfigSection`,
+`SavedReportsModal`, `AuditLogModal`, `FinancialAuditModal`, `PapeleraModal`,
+`EmpresaProyectosSection`, `EmpresaHeaderCard`) + sueltos (`perfil/PerfilSection`,
+`tarifas/FiscalConfigSection`, `historial/HistorialSection`).
 `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
 
 ---

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchUserProjectAssignments,
+  deleteUserProjectAssignments,
+  insertUserProjectAssignments,
+} from '../../domain/empresa/usuarios'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
 
@@ -28,12 +32,9 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
 
   useEffect(() => {
     async function cargarAsignaciones() {
-      const { data } = await supabase
-        .from('user_project_assignments')
-        .select('project_id')
-        .eq('user_id', usuario.id)
+      const { data } = await fetchUserProjectAssignments(usuario.id)
       if (data) {
-        setAsignados(new Set(data.map((a: { project_id: string }) => a.project_id)))
+        setAsignados(new Set(data.map(a => a.project_id)))
       }
       setLoading(false)
     }
@@ -43,11 +44,8 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
   async function guardar() {
     setSaving(true)
     try {
-      const { error: deleteError } = await supabase
-        .from('user_project_assignments')
-        .delete()
-        .eq('user_id', usuario.id)
-      if (deleteError) throw deleteError
+      const { error: deleteError } = await deleteUserProjectAssignments(usuario.id)
+      if (deleteError) throw new Error(deleteError)
 
       if (asignados.size > 0) {
         const nuevas = Array.from(asignados).map(project_id => ({
@@ -55,10 +53,8 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
           project_id,
           permission_type: 'total',
         }))
-        const { error: insertError } = await supabase
-          .from('user_project_assignments')
-          .insert(nuevas)
-        if (insertError) throw insertError
+        const { error: insertError } = await insertUserProjectAssignments(nuevas)
+        if (insertError) throw new Error(insertError)
       }
 
       onSaved()
