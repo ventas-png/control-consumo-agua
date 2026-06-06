@@ -4,16 +4,18 @@ import { describe, it, expect, vi } from 'vitest'
 const insertSelect = vi.fn()
 const updateEq = vi.fn()
 const updateIn = vi.fn()
+const storageUpload = vi.fn()
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
     from: () => ({
       insert: () => ({ select: insertSelect }),
       update: () => ({ eq: updateEq, in: updateIn }),
     }),
+    storage: { from: () => ({ upload: storageUpload }) },
   },
 }))
 
-import { createRegistro, updateRegistro, marcarRegistrosMora } from '../mutations'
+import { createRegistro, updateRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
 
 describe('createRegistro', () => {
   it('éxito → devuelve la primera fila', async () => {
@@ -48,5 +50,17 @@ describe('marcarRegistrosMora', () => {
   it('error → mensaje legible', async () => {
     updateIn.mockResolvedValueOnce({ error: { message: 'rls' } })
     expect(await marcarRegistrosMora(['a'])).toEqual({ error: 'rls' })
+  })
+})
+
+describe('uploadRegistroFoto', () => {
+  it('éxito → { error: null }', async () => {
+    storageUpload.mockResolvedValueOnce({ error: null })
+    expect(await uploadRegistroFoto('c1/123', new Blob(['x']), 'image/png')).toEqual({ error: null })
+  })
+
+  it('error → mensaje legible', async () => {
+    storageUpload.mockResolvedValueOnce({ error: { message: 'too big' } })
+    expect(await uploadRegistroFoto('c1/123', new Blob(['x']))).toEqual({ error: 'too big' })
   })
 })

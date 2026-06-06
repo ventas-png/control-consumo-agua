@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import type { Cliente, Contador, Tarifa } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
@@ -73,9 +73,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         // Path normalizado: `${cliente_id}/...` (antes `registros/${id}_${ts}`) para que la
         // RLS de storage scopee por carpeta-de-cliente sin parsear ids embebidos (infra:I14).
         const path = `${selectedClienteId}/${timestamp}`
-        const { error: uploadError } = await supabase.storage
-          .from('registro-fotos')
-          .upload(path, preview.image, { contentType: preview.image.type })
+        const { error: uploadError } = await uploadRegistroFoto(path, preview.image, preview.image.type)
 
         if (!uploadError) {
           fotoPath = path
@@ -83,7 +81,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       }
 
       // Crear registro
-      const { error } = await supabase.from('registros').insert({
+      const { error } = await createRegistro({
         cliente_id: selectedClienteId,
         cliente_nombre: selectedCliente?.nombre,
         fecha: new Date().toISOString().split('T')[0],
@@ -99,7 +97,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         foto: fotoPath,
       })
 
-      if (error) throw error
+      if (error) throw new Error(error)
 
       notify({
         variant: 'success',
