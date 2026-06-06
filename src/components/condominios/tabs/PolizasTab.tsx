@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
@@ -90,8 +90,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('polizas_seguro').update(payload).eq('id', editId)
-      : await supabase.from('polizas_seguro').insert(payload)
+      ? await updateCondominioRow('polizas_seguro', editId, payload)
+      : await createCondominioRow('polizas_seguro', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -99,13 +99,13 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar póliza?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('polizas_seguro').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('polizas_seguro', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoPoliza) {
-    const { error } = await supabase.from('polizas_seguro').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('polizas_seguro', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

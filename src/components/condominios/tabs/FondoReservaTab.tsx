@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
 import type { FondoReserva } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -76,8 +76,8 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('fondo_reserva_condominio').update(payload).eq('id', editId)
-      : await supabase.from('fondo_reserva_condominio').insert(payload)
+      ? await updateCondominioRow('fondo_reserva_condominio', editId, payload)
+      : await createCondominioRow('fondo_reserva_condominio', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false)

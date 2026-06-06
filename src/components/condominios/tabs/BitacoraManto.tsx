@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { BitacoraManto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -63,9 +63,9 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('bitacora_manto').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('bitacora_manto', editId, payload))
     } else {
-      ({ error } = await supabase.from('bitacora_manto').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('bitacora_manto', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -75,20 +75,20 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('bitacora_manto').delete().eq('id', id)
+    await deleteCondominioRow('bitacora_manto', id)
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
 
   async function toggleFirmado(r: BitacoraManto) {
-    await supabase.from('bitacora_manto').update({ firmado: !r.firmado }).eq('id', r.id)
+    await updateCondominioRow('bitacora_manto', r.id, { firmado: !r.firmado })
     onRefresh()
   }
 
   async function toggleTareaCompletada(r: BitacoraManto, i: number) {
     const tareas = (r.tareas ?? []) as TareaItem[]
     const updated = tareas.map((t, idx) => idx === i ? { ...t, completado: !t.completado } : t)
-    await supabase.from('bitacora_manto').update({ tareas: updated }).eq('id', r.id)
+    await updateCondominioRow('bitacora_manto', r.id, { tareas: updated })
     onRefresh()
   }
 

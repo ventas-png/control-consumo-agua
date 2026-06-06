@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
@@ -120,10 +120,10 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
       notas: form.notas || null,
     }
     if (editId) {
-      const { error } = await supabase.from('contratos_proveedores').update(payload).eq('id', editId)
+      const { error } = await updateCondominioRow('contratos_proveedores', editId, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('contratos_proveedores').insert(payload)
+      const { error } = await createCondominioRow('contratos_proveedores', payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false)
@@ -134,13 +134,13 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   async function handleDelete(id: string) {
     const result = await confirm({ title: '¿Eliminar contrato?', text: 'Esta acción no se puede deshacer.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('contratos_proveedores').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('contratos_proveedores', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: string) {
-    const { error } = await supabase.from('contratos_proveedores').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('contratos_proveedores', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

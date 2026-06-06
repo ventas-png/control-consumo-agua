@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { TarifaCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -74,22 +74,22 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('tarifas_condominio').update(payload).eq('id', editId)
-      : await supabase.from('tarifas_condominio').insert(payload)
+      ? await updateCondominioRow('tarifas_condominio', editId, payload)
+      : await createCondominioRow('tarifas_condominio', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
   }
 
   const toggleActivo = async (t: TarifaCondominio) => {
-    await supabase.from('tarifas_condominio').update({ activo: !t.activo }).eq('id', t.id)
+    await updateCondominioRow('tarifas_condominio', t.id, { activo: !t.activo })
     onRefresh()
   }
 
   const handleDelete = async (t: TarifaCondominio) => {
     const r = await confirm({ title: '¿Eliminar tarifa?', text: t.concepto, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('tarifas_condominio').delete().eq('id', t.id)
+    await deleteCondominioRow('tarifas_condominio', t.id)
     onRefresh()
   }
 

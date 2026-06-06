@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { IncidenteSeguridad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
@@ -77,8 +77,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       seguimiento: form.seguimiento || null,
     }
     const { error } = editId
-      ? await supabase.from('incidentes_seguridad').update(payload).eq('id', editId)
-      : await supabase.from('incidentes_seguridad').insert(payload)
+      ? await updateCondominioRow('incidentes_seguridad', editId, payload)
+      : await createCondominioRow('incidentes_seguridad', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -87,7 +87,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   const avanzarEstado = async (i: IncidenteSeguridad) => {
     const cfg = ESTADO_FLOW[i.estado]
     if (!cfg.next) return
-    const { error } = await supabase.from('incidentes_seguridad').update({ estado: cfg.next }).eq('id', i.id)
+    const { error } = await updateCondominioRow('incidentes_seguridad', i.id, { estado: cfg.next })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === i.id ? { ...sel, estado: cfg.next as IncidenteSeguridad['estado'] } : sel)
@@ -96,7 +96,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   const handleDelete = async (i: IncidenteSeguridad) => {
     const r = await confirm({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('incidentes_seguridad').delete().eq('id', i.id)
+    await deleteCondominioRow('incidentes_seguridad', i.id)
     if (selected?.id === i.id) setSelected(null)
     onRefresh()
   }

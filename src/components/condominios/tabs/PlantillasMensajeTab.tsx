@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { PlantillaMensajeCond, CanalPlantilla } from '../../../types'
 
 interface Props {
@@ -69,8 +69,8 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
       activa: form.activa,
     }
     const { error } = editId
-      ? await supabase.from('plantillas_mensaje_cond').update(payload).eq('id', editId)
-      : await supabase.from('plantillas_mensaje_cond').insert(payload)
+      ? await updateCondominioRow('plantillas_mensaje_cond', editId, payload)
+      : await createCondominioRow('plantillas_mensaje_cond', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setEditId(null)
@@ -79,14 +79,14 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
   }
 
   async function toggleActiva(p: PlantillaMensajeCond) {
-    await supabase.from('plantillas_mensaje_cond').update({ activa: !p.activa }).eq('id', p.id)
+    await updateCondominioRow('plantillas_mensaje_cond', p.id, { activa: !p.activa })
     onRefresh()
   }
 
   async function eliminar(p: PlantillaMensajeCond) {
     const r = await confirm({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('plantillas_mensaje_cond').delete().eq('id', p.id)
+    await deleteCondominioRow('plantillas_mensaje_cond', p.id)
     onRefresh()
   }
 

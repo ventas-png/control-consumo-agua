@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
@@ -65,11 +65,11 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
 
     const existing = revisionDeTarea(tareaId)
     if (existing) {
-      await supabase.from('revisiones_tarea').update({
+      await updateCondominioRow('revisiones_tarea', existing.id, {
         estado, comentario, revisado_por: userId, revisado_en: new Date().toISOString(),
-      }).eq('id', existing.id)
+      })
     } else {
-      await supabase.from('revisiones_tarea').insert({
+      await createCondominioRow('revisiones_tarea', {
         tarea_id: tareaId, bloque_id: bloqueId,
         revisado_por: userId, estado, comentario,
       })

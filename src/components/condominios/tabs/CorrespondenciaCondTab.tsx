@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
 import { notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -42,7 +42,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
   async function handleSave() {
     if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
     setSaving(true)
-    const { error } = await supabase.from('correspondencia_condominio').insert({
+    const { error } = await createCondominioRow('correspondencia_condominio', {
       company_id: companyId, project_id: proyectoId,
       tipo: form.tipo, categoria: form.categoria, asunto: form.asunto.trim(),
       remitente: form.remitente || null, destinatario: form.destinatario || null,
@@ -56,7 +56,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('correspondencia_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('correspondencia_condominio', id, { estado })
     onRefresh()
   }
 

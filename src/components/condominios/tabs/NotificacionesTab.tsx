@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ReglaNotificacion, EventoNotificacion, CanalNotificacion, DestinatarioNotificacion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -75,9 +75,9 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('reglas_notificacion').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('reglas_notificacion', editId, payload))
     } else {
-      ({ error } = await supabase.from('reglas_notificacion').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('reglas_notificacion', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -85,14 +85,14 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
   }
 
   async function toggleActivo(r: ReglaNotificacion) {
-    await supabase.from('reglas_notificacion').update({ activo: !r.activo }).eq('id', r.id)
+    await updateCondominioRow('reglas_notificacion', r.id, { activo: !r.activo })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar regla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('reglas_notificacion').delete().eq('id', id)
+    await deleteCondominioRow('reglas_notificacion', id)
     onRefresh()
   }
 

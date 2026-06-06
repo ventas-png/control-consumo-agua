@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type {
   PersonalCondominio, CargoPersonal, EstadoPersonal, TurnoPersonal,
   ContactoEmergenciaPersonal, CodigoAccesoPersonal, EquipoAsignadoPersonal,
@@ -144,8 +144,8 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
       banco: form.banco || null, numero_cuenta: form.numero_cuenta || null, tipo_cuenta: form.tipo_cuenta || null,
     }
     const { error } = editId
-      ? await supabase.from('personal_condominio').update(payload).eq('id', editId)
-      : await supabase.from('personal_condominio').insert(payload)
+      ? await updateCondominioRow('personal_condominio', editId, payload)
+      : await createCondominioRow('personal_condominio', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -153,13 +153,13 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar personal?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('personal_condominio').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('personal_condominio', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoPersonal) {
-    const { error } = await supabase.from('personal_condominio').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('personal_condominio', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

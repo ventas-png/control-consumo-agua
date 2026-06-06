@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { ProyectoCondominio, CategoriaProyectoCond, EstadoProyectoCond } from '../../../types'
@@ -79,8 +79,8 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
       notas: form.notas.trim() || null,
     }
     const { error } = editId
-      ? await supabase.from('proyectos_condominio').update(payload).eq('id', editId)
-      : await supabase.from('proyectos_condominio').insert(payload)
+      ? await updateCondominioRow('proyectos_condominio', editId, payload)
+      : await createCondominioRow('proyectos_condominio', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     cancelar(); onRefresh()
@@ -106,14 +106,14 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
     const v = parseInt(result.pct || '0')
     const value = Math.min(100, Math.max(0, v))
     const nuevoEstado: EstadoProyectoCond = value === 100 ? 'completado' : p.estado === 'planificado' ? 'en_progreso' : p.estado
-    await supabase.from('proyectos_condominio').update({ porcentaje_avance: value, estado: nuevoEstado }).eq('id', p.id)
+    await updateCondominioRow('proyectos_condominio', p.id, { porcentaje_avance: value, estado: nuevoEstado })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar proyecto?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('proyectos_condominio').delete().eq('id', id)
+    await deleteCondominioRow('proyectos_condominio', id)
     onRefresh()
   }
 

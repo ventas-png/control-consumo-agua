@@ -1,5 +1,5 @@
 import { useState, useMemo, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { MedidorUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -61,7 +61,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
     if (!selectedUnidad || !selectedContador) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona unidad y contador.' })
     if (vinculados.has(`${selectedUnidad}:${selectedContador}`)) return notify({ variant: 'info', title: 'Ya vinculado', text: 'Esta combinación ya existe.' })
     setSaving(true)
-    const { error } = await supabase.from('medidores_unidad').insert({
+    const { error } = await createCondominioRow('medidores_unidad', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: selectedUnidad, contador_id: selectedContador,
       notas: notas || null, activo: true,
@@ -74,7 +74,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   async function handleDesactivar(id: string) {
     const r = await confirm({ title: '¿Desvincular medidor?', icon: 'warning', variant: 'danger', confirmText: 'Desvincular' })
     if (!r.isConfirmed) return
-    await supabase.from('medidores_unidad').update({ activo: false }).eq('id', id)
+    await updateCondominioRow('medidores_unidad', id, { activo: false })
     onRefresh()
   }
 
