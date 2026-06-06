@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties} from 'react'
-import { supabase } from '../../lib/supabase'
+import {
+  fetchPortalBootstrap,
+  fetchPortalContadores,
+  fetchPortalProjectsByCompanies,
+  fetchRegistrosByContadores,
+  fetchRegistrosByProjects,
+} from '../../domain/portal/queries'
+import { updateCliente } from '../../domain/clientes/mutations'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
@@ -162,36 +169,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     if (!clienteId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [
-        { data: ccData },
-        { data: uData },
-        { data: rData },
-        { data: clData },
-      ] = await Promise.all([
-        // Companies the client belongs to (with visibility flag)
-        supabase
-          .from('company_clientes')
-          .select('company_id, activo, companies(id, nombre)')
-          .eq('cliente_id', clienteId),
-        // Active units
-        supabase
-          .from('unidades')
-          .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
-          .eq('cliente_id', clienteId)
-          .eq('activo', true),
-        // Reading history — all historical records (no date cap)
-        supabase
-          .from('registros')
-          .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
-          .eq('cliente_id', clienteId)
-          .order('fecha', { ascending: false }),
-        // Own contact info
-        supabase
-          .from('clientes')
-          .select('email, telefono, whatsapp, telefono_alterno')
-          .eq('id', clienteId)
-          .single(),
-      ])
+      const { ccData, uData, rData, clData } = await fetchPortalBootstrap(clienteId)
 
       // Build companies list and activo map from junction
       const companyMap: Record<string, CompanyInfo> = {}
@@ -214,22 +192,14 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const unidadIds = unidadesList.map(u => u.id)
       let cData: ContadorInfo[] = []
       if (unidadIds.length > 0) {
-        const { data: contData } = await supabase
-          .from('contadores')
-          .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
-          .in('unidad_id', unidadIds)
-          .eq('activo', true)
+        const contData = await fetchPortalContadores(unidadIds)
         cData = (contData as ContadorInfo[]) ?? []
       }
       setCompanies(companiesList)
 
       // Fetch projects for found companies
       if (companiesList.length > 0) {
-        const { data: pData } = await supabase
-          .from('projects')
-          .select('id, nombre, company_id, moneda')
-          .in('company_id', companiesList.map(c => c.id))
-          .eq('estado', 'activo')
+        const pData = await fetchPortalProjectsByCompanies(companiesList.map(c => c.id))
         setProjects((pData as ProjectInfo[]) ?? [])
       } else {
         setProjects([])
@@ -238,34 +208,24 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setUnidades(unidadesList)
       setContadores(cData)
 
-      const REGISTROS_SELECT = 'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
-
       // Run both fallbacks in parallel (instead of sequentially) — saves ~400-1500ms on cold start.
       // Fallback 1: by contador_id — catches registros where cliente_id is wrong/null
       // Fallback 2: by project_id — catches registros where contador_id is also null
       //   (safe because RLS, migration 20260420000023, restricts clients to their own data)
       const contadorIds = cData.map(c => c.id)
-      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
-      const [byContadorRes, byProjectRes] = await Promise.all([
-        contadorIds.length > 0
-          ? supabase.from('registros').select(REGISTROS_SELECT)
-              .in('contador_id', contadorIds)
-              .order('fecha', { ascending: false })
-          : Promise.resolve({ data: null }),
-        unidadProjectIds.length > 0 && clienteId
-          ? supabase.from('registros').select(REGISTROS_SELECT)
-              .in('project_id', unidadProjectIds)
-              .order('fecha', { ascending: false })
-          : Promise.resolve({ data: null }),
+      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))] as string[]
+      const [byContadorData, byProjectData] = await Promise.all([
+        contadorIds.length > 0 ? fetchRegistrosByContadores(contadorIds) : Promise.resolve(null),
+        unidadProjectIds.length > 0 && clienteId ? fetchRegistrosByProjects(unidadProjectIds) : Promise.resolve(null),
       ])
 
       const merged = new Map<string, LecturaInfo>()
       for (const row of (rData as LecturaInfo[] | null) ?? []) merged.set(row.id, row)
-      for (const row of (byContadorRes.data as LecturaInfo[] | null) ?? []) {
+      for (const row of (byContadorData as LecturaInfo[] | null) ?? []) {
         if (!merged.has(row.id)) merged.set(row.id, row)
       }
       const knownCounterIds = new Set(contadorIds)
-      for (const row of (byProjectRes.data as LecturaInfo[] | null) ?? []) {
+      for (const row of (byProjectData as LecturaInfo[] | null) ?? []) {
         if (merged.has(row.id)) continue
         const safe = row.cliente_id === clienteId || (row.contador_id != null && knownCounterIds.has(row.contador_id))
         if (safe) merged.set(row.id, row)
@@ -586,15 +546,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
     setSavingContacto(true)
     setContactoMsg(null)
-    const { error } = await supabase
-      .from('clientes')
-      .update({
-        email: email ? sanitizeInput(email) : null,
-        telefono: telefono ? sanitizeInput(telefono) : null,
-        whatsapp: whatsapp ? sanitizeInput(whatsapp) : null,
-        telefono_alterno: telefonoAlt ? sanitizeInput(telefonoAlt) : null,
-      })
-      .eq('id', clienteId)
+    const { error } = await updateCliente(clienteId, {
+      email: email ? sanitizeInput(email) : null,
+      telefono: telefono ? sanitizeInput(telefono) : null,
+      whatsapp: whatsapp ? sanitizeInput(whatsapp) : null,
+      telefono_alterno: telefonoAlt ? sanitizeInput(telefonoAlt) : null,
+    })
 
     setSavingContacto(false)
     if (error) {

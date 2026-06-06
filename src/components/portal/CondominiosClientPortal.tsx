@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente } from '../../domain/portal/queries'
 import { BrandLogo } from '../shared/BrandLogo'
 import { EditModal } from '../shared/EditModal'
 import { NotificationBell } from '../layout/NotificationBell'
@@ -75,11 +75,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     setLoading(true)
     try {
       // Batch 1: load client's units
-      const { data: uData } = await supabase
-        .from('unidades')
-        .select('*')
-        .eq('cliente_id', clienteId)
-        .eq('activo', true)
+      const uData = await fetchPortalUnidadesByCliente(clienteId)
       const unidadesList = (uData as Unidad[]) ?? []
       setUnidades(unidadesList)
 
@@ -88,57 +84,15 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setSelectedUnidadId(prev => prev || unidadesList[0].id)
 
       const unidadIds  = unidadesList.map(u => u.id)
-      const projectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
-      const today      = new Date().toISOString().slice(0, 10)
+      const projectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))] as string[]
 
-      // Bounds for queries without natural date filter — prevent unbounded growth
-      // as unit history accumulates. The portal shows recent activity, the
-      // admin side (Condominios) keeps full visibility via its own loader.
-      const SESENTA_DIAS_ATRAS = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
-      const NOVENTA_DIAS_ATRAS = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-      const HACE_DOS_ANOS = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-
-      // Batch 2: all condominios data in parallel
-      const [
-        { data: projData },
-        { data: amenidadesData },
-        { data: cuotasData },
-        { data: reservasData },
-        { data: bloqueosData },
-        { data: ticketsData },
-        { data: anunciosData },
-        { data: visitantesData },
-        { data: mensajesData },
-        { data: solicitudesRentaData },
-        { data: paquetesData },
-      ] = await Promise.all([
-        supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
-        supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
-        // cuotas: últimos 2 años + cap 500. Cubre pendientes vigentes y pagadas
-        // recientes; deuda muy antigua igual está incluida hasta el cap.
-        supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
-          .is('deleted_at', null)
-          .gte('fecha_vencimiento', HACE_DOS_ANOS)
-          .order('fecha_vencimiento', { ascending: false })
-          .limit(500),
-        supabase.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
-        supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
-        // tickets: últimos 90 días + cap 200. Tickets viejos cerrados rara vez se consultan.
-        supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
-          .is('deleted_at', null)
-          .gte('created_at', NOVENTA_DIAS_ATRAS)
-          .order('created_at', { ascending: false })
-          .limit(200),
-        supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
-        supabase.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
-        // mensajes: últimos 60 días + cap 100. Conversación reciente con admin.
-        supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
-          .gte('created_at', SESENTA_DIAS_ATRAS)
-          .order('created_at', { ascending: false })
-          .limit(100),
-        supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
-        supabase.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
-      ])
+      // Batch 2: all condominios data in parallel (los caps de tiempo viven en la
+      // capa domain; el portal muestra actividad reciente, el admin tiene su loader).
+      const {
+        projData, amenidadesData, cuotasData, reservasData, bloqueosData,
+        ticketsData, anunciosData, visitantesData, mensajesData,
+        solicitudesRentaData, paquetesData,
+      } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
       if (proj) {

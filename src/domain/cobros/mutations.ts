@@ -252,3 +252,19 @@ export async function setConvenioEstado(id: string, estado: string): Promise<{ e
   const { error } = await supabase.from('convenios_pago').update({ estado }).eq('id', id)
   return { error: error?.message ?? null }
 }
+
+/**
+ * Sube el comprobante de un pago al bucket privado `pagos-comprobantes` (el path
+ * lo arma la UI; el display site firma vía useSignedUrl). Usado por el pago
+ * manual del portal del cliente. Devuelve `{ error }`.
+ */
+export async function uploadComprobantePago(
+  path: string,
+  file: File | Blob,
+  contentType?: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.storage
+    .from('pagos-comprobantes')
+    .upload(path, file, contentType ? { contentType } : undefined)
+  return { error: error?.message ?? null }
+}
