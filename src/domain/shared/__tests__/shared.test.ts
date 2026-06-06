@@ -13,7 +13,7 @@ vi.mock('../../../lib/supabase', () => ({
   },
 }))
 
-import { uploadCondominiosMedia, removeCondominiosMedia } from '../storage'
+import { uploadCondominiosMedia, removeCondominiosMedia, uploadMudanzaDoc } from '../storage'
 import { fetchActiveSubscription } from '../queries'
 import { createCheckoutSession } from '../mutations'
 
@@ -32,6 +32,15 @@ describe('storage condominios-media', () => {
   it('remove → contrato { error }', async () => {
     remove.mockResolvedValueOnce({ error: null })
     expect(await removeCondominiosMedia(['p/x'])).toEqual({ error: null })
+  })
+  it('uploadMudanzaDoc mapea el error a string', async () => {
+    upload.mockResolvedValueOnce({ data: null, error: { message: 'mime no permitido' } })
+    expect(await uploadMudanzaDoc('u1/x.jpg', new Blob(['x']), { contentType: 'image/jpeg' }))
+      .toEqual({ error: 'mime no permitido' })
+  })
+  it('uploadMudanzaDoc éxito → { error: null }', async () => {
+    upload.mockResolvedValueOnce({ data: { path: 'u1/x.jpg' }, error: null })
+    expect(await uploadMudanzaDoc('u1/x.jpg', new Blob(['x']))).toEqual({ error: null })
   })
 })
 

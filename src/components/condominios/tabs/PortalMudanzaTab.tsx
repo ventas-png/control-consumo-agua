@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchSolicitudesMudanzaByUnidad, fetchTerminosMudanzaPorProyecto } from '../../../domain/condominios/tabQueries'
+import { uploadMudanzaDoc } from '../../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza } from '../../../types'
 
@@ -55,21 +57,13 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
     setLoading(true)
 
     // Fetch solicitudes and terms in parallel
-    const [{ data: solData }, { data: termData }] = await Promise.all([
-      supabase
-        .from('solicitud_mudanza_unidad')
-        .select('*')
-        .eq('unidad_id', unidadId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('config_condominio')
-        .select('terminos_mudanza')
-        .eq('project_id', proyectoId)
-        .maybeSingle(),
+    const [solData, terminos] = await Promise.all([
+      fetchSolicitudesMudanzaByUnidad<SolicitudMudanzaUnidad>(unidadId),
+      fetchTerminosMudanzaPorProyecto(proyectoId),
     ])
 
-    setSolicitudes((solData as SolicitudMudanzaUnidad[]) ?? [])
-    setTerminosMudanza(termData?.terminos_mudanza ?? '')
+    setSolicitudes(solData)
+    setTerminosMudanza(terminos ?? '')
     setLoading(false)
   }, [unidadId, proyectoId])
 
@@ -112,12 +106,12 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
         return
       }
       const path = buildUploadPath(unidadId, file.name)
-      const { error: upErr } = await supabase.storage.from('mudanza-docs').upload(path, file, {
+      const { error: upErr } = await uploadMudanzaDoc(path, file, {
         contentType: magicCheck.detected,
       })
       if (upErr) {
         setSaving(false)
-        notify({ variant: 'error', title: 'Error', text: `No se pudo subir la imagen: ${upErr.message}` })
+        notify({ variant: 'error', title: 'Error', text: `No se pudo subir la imagen: ${upErr}` })
         return
       }
       // S6 phase 2: store the bare path; display sites sign via useSignedUrl.
@@ -138,7 +132,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       payload.imagenes = uploadedPaths
     }
 
-    const { error } = await supabase.from('solicitud_mudanza_unidad').insert(payload)
+    const { error } = await createCondominioRow('solicitud_mudanza_unidad', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })

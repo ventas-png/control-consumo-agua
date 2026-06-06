@@ -9,7 +9,7 @@ const h = vi.hoisted(() => {
   b.then = (resolve: (v: unknown) => void) => resolve(state.result)
   return { state, b }
 })
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b } }))
+vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b, rpc: () => h.b } }))
 
 import {
   createCondominioRow,
@@ -21,6 +21,8 @@ import {
   deleteCondominioRowsByIds,
   updateCondominioRowsByIds,
   marcarCuotasMorosas,
+  firmarRecepcionPaquete,
+  autorizarSalidaPaquete,
 } from '../tabMutations'
 
 beforeEach(() => { h.state.result = { data: null, error: null } })
@@ -108,5 +110,27 @@ describe('tabMutations (CRUD genérico)', () => {
     expect(await updateCondominioRowsByIds('visitantes', ['a', 'b'], { hora_salida: 'x' })).toEqual({ error: null })
     h.state.result = { error: { message: 'rls' } }
     expect(await updateCondominioRowsByIds('visitantes', ['a'], { hora_salida: 'x' })).toEqual({ error: { message: 'rls' } })
+  })
+
+  it('createCondominioRowReturning devuelve la fila creada (con select de embed)', async () => {
+    h.state.result = { data: { id: 'p1', unidades: { nombre: 'A-1' } }, error: null }
+    expect(await createCondominioRowReturning('paquetes_recibidos', {}, '*, unidades(nombre)'))
+      .toEqual({ data: { id: 'p1', unidades: { nombre: 'A-1' } }, error: null })
+  })
+
+  it('firmarRecepcionPaquete (rpc) propaga el resultado', async () => {
+    h.state.result = { error: null }
+    expect(await firmarRecepcionPaquete('p1', 'path/firma.png', 'Ana')).toEqual({ error: null })
+    h.state.result = { error: { message: 'no autorizado' } }
+    expect(await firmarRecepcionPaquete('p1', 'path/firma.png', 'Ana')).toEqual({ error: { message: 'no autorizado' } })
+  })
+
+  it('autorizarSalidaPaquete (rpc) devuelve { data, error }', async () => {
+    h.state.result = { data: { id: 'p1', codigo_retiro: 'ABC123' }, error: null }
+    expect(await autorizarSalidaPaquete({
+      unidadId: 'u1', tipo: 'paquete', descripcion: 'caja',
+      autorizadoNombre: 'Ana', autorizadoDocumento: null, autorizadoTelefono: null,
+      fotos: null, notas: null,
+    })).toEqual({ data: { id: 'p1', codigo_retiro: 'ABC123' }, error: null })
   })
 })

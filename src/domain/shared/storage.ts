@@ -27,3 +27,16 @@ export async function removeCondominiosMedia(paths: string[]): Promise<{ error: 
   const { error } = await supabase.storage.from('condominios-media').remove(paths)
   return { error: error?.message ?? null }
 }
+
+/**
+ * Sube un documento de mudanza al bucket privado `mudanza-docs`. Devuelve `{ error }`
+ * (mensaje legible). El path lo arma la UI con `buildUploadPath`.
+ */
+export async function uploadMudanzaDoc(
+  path: string,
+  body: Blob | File,
+  options?: UploadMediaOptions,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.storage.from('mudanza-docs').upload(path, body, options)
+  return { error: error?.message ?? null }
+}

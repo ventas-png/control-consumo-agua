@@ -40,6 +40,8 @@ import {
   fetchReservasStrByUnidad,
   fetchConfigCondominioTerminos,
   fetchVisitantesPorDpi,
+  fetchSolicitudesMudanzaByUnidad,
+  fetchTerminosMudanzaPorProyecto,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -185,5 +187,22 @@ describe('seguridad / accesos', () => {
   it('fetchVisitantesPorDpi propaga el error', async () => {
     h.state.byTable.visitantes = { data: null, error: { message: 'rls' } }
     expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({ data: [], error: { message: 'rls' } })
+  })
+})
+
+describe('paquetería / mudanza (portal)', () => {
+  it('fetchSolicitudesMudanzaByUnidad devuelve filas', async () => {
+    h.state.byTable.solicitud_mudanza_unidad = { data: [{ id: 's1' }], error: null }
+    expect(await fetchSolicitudesMudanzaByUnidad('u1')).toEqual([{ id: 's1' }])
+  })
+  it('fetchSolicitudesMudanzaByUnidad sin data → []', async () => {
+    expect(await fetchSolicitudesMudanzaByUnidad('u1')).toEqual([])
+  })
+  it('fetchTerminosMudanzaPorProyecto devuelve el texto', async () => {
+    h.state.byTable.config_condominio = { data: { terminos_mudanza: 'Reglas…' }, error: null }
+    expect(await fetchTerminosMudanzaPorProyecto('p1')).toBe('Reglas…')
+  })
+  it('fetchTerminosMudanzaPorProyecto sin fila → null', async () => {
+    expect(await fetchTerminosMudanzaPorProyecto('p1')).toBeNull()
   })
 })

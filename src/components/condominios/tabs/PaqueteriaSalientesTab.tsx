@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
+import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { generarCodigoRetiro, codigoRetiroQrUrl } from '../../../lib/paquetes'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -75,7 +80,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     if (!form.autorizado_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Indique a quién se autoriza el retiro.' }); return }
     setSaving(true)
     const codigo = generarCodigoRetiro()
-    const { data, error } = await supabase.from('paquetes_recibidos').insert({
+    const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
       direccion: 'saliente_tercero', tipo: form.tipo, descripcion: form.descripcion.trim(),
       autorizado_nombre: form.autorizado_nombre.trim(),
@@ -84,17 +89,17 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
       fotos: fotos.length ? fotos : null,
       notas: form.notas.trim() || null,
       estado: 'pendiente', recibido_por: userId, codigo_retiro: codigo,
-    }).select('*, unidades(nombre)').single()
+    }, '*, unidades(nombre)')
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    const row = { ...(data as PaqueteRecibido & { unidades?: { nombre: string } | null }), unidad_nombre: (data as { unidades?: { nombre: string } | null }).unidades?.nombre }
+    const row = { ...(data as unknown as PaqueteRecibido & { unidades?: { nombre: string } | null }), unidad_nombre: (data as { unidades?: { nombre: string } | null }).unidades?.nombre }
     resetForm()
     onRefresh()
     setVerCodigo(row)
   }
 
   async function confirmarCustodia(id: string) {
-    const { error } = await supabase.from('paquetes_recibidos').update({ recibido_por: userId, hora_recepcion: new Date().toISOString() }).eq('id', id)
+    const { error } = await updateCondominioRow('paquetes_recibidos', id, { recibido_por: userId, hora_recepcion: new Date().toISOString() })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -108,13 +113,13 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     setEntregaSaving(true)
     try {
       const path = buildUploadPath(`${proyectoId}/paquetes-firmas`, 'firma.png', 'png')
-      const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
-      const { error } = await supabase.from('paquetes_recibidos').update({
+      const { error: upErr } = await uploadCondominiosMedia(path, file, { contentType: 'image/png', upsert: false })
+      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
+      const { error } = await updateCondominioRow('paquetes_recibidos', entregando.id, {
         estado: 'entregado', hora_entrega: new Date().toISOString(), entregado_por: userId,
         firma_path: path, entregado_a_nombre: entregaNombre.trim() || entregando.autorizado_nombre || null,
         entregado_via: 'porteria',
-      }).eq('id', entregando.id)
+      })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       setEntregando(null); setEntregaCodigo(''); setEntregaNombre('')
       onRefresh()
@@ -126,14 +131,14 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   async function devolver(id: string) {
     const r = await confirm({ title: '¿Devolver al residente?', text: 'El paquete sale de custodia sin entregarse al tercero.', icon: 'warning', confirmText: 'Devolver' })
     if (!r.isConfirmed) return
-    await supabase.from('paquetes_recibidos').update({ estado: 'devuelto' }).eq('id', id)
+    await updateCondominioRow('paquetes_recibidos', id, { estado: 'devuelto' })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('paquetes_recibidos').delete().eq('id', id)
+    await deleteCondominioRow('paquetes_recibidos', id)
     onRefresh()
   }
 

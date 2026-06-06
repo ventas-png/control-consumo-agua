@@ -246,6 +246,28 @@ export async function fetchVisitantesPorDpi<T>(
   return { data: (data as T[] | null) ?? [], error }
 }
 
+// ── Paquetería / mudanza (portal residente) ──
+
+/** Solicitudes de mudanza de una unidad (más recientes primero). Degrada a `[]`. */
+export async function fetchSolicitudesMudanzaByUnidad<T>(unidadId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('solicitud_mudanza_unidad')
+    .select('*')
+    .eq('unidad_id', unidadId)
+    .order('created_at', { ascending: false })
+  return (data as T[] | null) ?? []
+}
+
+/** Términos de mudanza del proyecto (vista del residente, sólo por project_id). */
+export async function fetchTerminosMudanzaPorProyecto(projectId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('config_condominio')
+    .select('terminos_mudanza')
+    .eq('project_id', projectId)
+    .maybeSingle()
+  return (data as { terminos_mudanza: string | null } | null)?.terminos_mudanza ?? null
+}
+
 /** Fila de config del condominio (id + términos de mudanza) o `null` si no existe. */
 export async function fetchConfigCondominioTerminos(
   projectId: string,
