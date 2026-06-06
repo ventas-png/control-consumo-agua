@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
 import type { PresenceRow } from '../../hooks/usePresence'
 
 // ============================================================================
@@ -39,9 +39,8 @@ export function PresenceIndicator({ others, maxAvatars = 4 }: Props) {
       return
     }
     let alive = true
-    void supabase.from('app_users').select('id, full_name').in('id', missing).then(({ data }) => {
+    void fetchAppUserNamesByIds(missing).then((rows) => {
       if (!alive) return
-      const rows = (data ?? []) as Array<{ id: string; full_name: string }>
       for (const r of rows) {
         const info: UserInfo = { id: r.id, full_name: r.full_name, initials: getInitials(r.full_name) }
         cache.set(r.id, info)

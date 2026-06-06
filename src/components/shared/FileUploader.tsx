@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../lib/fileValidation'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useMediaScope } from './MediaScopeContext'
@@ -60,15 +60,13 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
     const path = buildUploadPath(`${projectId}/${folder}`, file.name)
 
     setProgress(30)
-    const { data, error: upErr } = await supabase.storage
-      .from('condominios-media')
-      .upload(path, file, {
-        // Magic-detected type (ignores client-spoofed file.type), refined from the
-        // generic office container (zip/cfb) to the precise mime via extension so
-        // it matches the bucket's allowed_mime_types.
-        contentType: resolveUploadContentType(magicCheck.detected, file.name),
-        upsert: false,
-      })
+    const { data, error: upErr } = await uploadCondominiosMedia(path, file, {
+      // Magic-detected type (ignores client-spoofed file.type), refined from the
+      // generic office container (zip/cfb) to the precise mime via extension so
+      // it matches the bucket's allowed_mime_types.
+      contentType: resolveUploadContentType(magicCheck.detected, file.name),
+      upsert: false,
+    })
     setProgress(80)
 
     if (upErr || !data) {
@@ -92,7 +90,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
     if (!value) return
     // value may be a bare path (new) or a legacy publicUrl (old) — handle both.
     const path = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
-    if (path) await supabase.storage.from('condominios-media').remove([path])
+    if (path) await removeCondominiosMedia([path])
     onChange(null)
   }
 

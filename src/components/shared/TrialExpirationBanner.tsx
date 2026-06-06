@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchActiveSubscription } from '../../domain/shared/queries'
 import { promptUpgrade } from './promptUpgrade'
 
 // ============================================================================
@@ -39,17 +39,11 @@ export function TrialExpirationBanner({ companyId }: Props) {
   useEffect(() => {
     if (!companyId) { setLoading(false); return }
     let alive = true
-    void supabase
-      .from('subscriptions')
-      .select('status, trial_end')
-      .eq('company_id', companyId)
-      .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive) return
-        setSubscription(data as SubscriptionRow | null)
-        setLoading(false)
-      })
+    void fetchActiveSubscription(companyId).then((data) => {
+      if (!alive) return
+      setSubscription(data)
+      setLoading(false)
+    })
     return () => { alive = false }
   }, [companyId])
 

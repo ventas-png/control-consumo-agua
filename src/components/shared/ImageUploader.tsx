@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent} from 'react'
-import { supabase } from '../../lib/supabase'
+import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 import { SecureImage } from './SecureImage'
 import { useMediaScope } from './MediaScopeContext'
@@ -66,13 +66,13 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       // We always re-encode to JPEG via canvas (compressImage), so forcing
       // .jpg + image/jpeg is safe regardless of input format.
       const path = buildUploadPath(`${projectId}/${folder}`, file.name, 'jpg')
-      const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-      if (upErr) { setError(upErr.message); return }
+      const { error: upErr } = await uploadCondominiosMedia(path, blob, { contentType: 'image/jpeg', upsert: false })
+      if (upErr) { setError(upErr); return }
       // S6 phase 2: persist the bare path; SecureImage signs at render time.
       // Delete previous photo only if it was uploaded in this same session.
       if (value && sessionUploadsRef.current.has(value)) {
         const prevPath = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
-        if (prevPath) await supabase.storage.from('condominios-media').remove([prevPath])
+        if (prevPath) await removeCondominiosMedia([prevPath])
       }
       sessionUploadsRef.current.add(path)
       onChange(path)
@@ -92,7 +92,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
   async function handleRemove() {
     if (!value) return
     const path = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
-    if (path) await supabase.storage.from('condominios-media').remove([path])
+    if (path) await removeCondominiosMedia([path])
     sessionUploadsRef.current.delete(value)
     onChange(null)
   }
@@ -175,8 +175,8 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       for (const file of toUpload) {
         const blob = await compressImage(file)
         const path = buildUploadPath(`${projectId}/${folder}`, file.name, 'jpg')
-        const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg' })
-        if (upErr) { setError(upErr.message); break }
+        const { error: upErr } = await uploadCondominiosMedia(path, blob, { contentType: 'image/jpeg' })
+        if (upErr) { setError(upErr); break }
         // S6 phase 2: persist the bare path; SecureImage signs at render time.
         newUrls.push(path)
       }
@@ -190,7 +190,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
 
   async function handleRemove(url: string) {
     const path = url.startsWith('http') ? url.match(/condominios-media\/(.+)$/)?.[1] : url
-    if (path) await supabase.storage.from('condominios-media').remove([path])
+    if (path) await removeCondominiosMedia([path])
     onChange(values.filter(u => u !== url))
   }
 

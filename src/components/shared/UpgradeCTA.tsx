@@ -7,7 +7,7 @@
 import { useState, type ReactNode } from 'react'
 import { Button } from './Button'
 import { useFeatureFlags } from '../../lib/featureFlags'
-import { supabase } from '../../lib/supabase'
+import { createCheckoutSession } from '../../domain/shared/mutations'
 import { notify } from './Dialog'
 
 interface Props {
@@ -46,22 +46,16 @@ export function UpgradeCTA({
     try {
       // plat:P36d — invoca edge function que crea Stripe Checkout session
       // y devuelve la URL. Redirigimos al usuario alli para completar el pago.
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: {
-          plan_code: targetPlanCode,
-          billing_cycle: billingCycle,
-          return_path: window.location.pathname + window.location.hash,
-        },
+      const { url, error } = await createCheckoutSession({
+        plan_code: targetPlanCode,
+        billing_cycle: billingCycle,
+        return_path: window.location.pathname + window.location.hash,
       })
 
-      if (error) throw error
+      if (error) throw new Error(error)
+      if (!url) throw new Error('No se obtuvo URL de checkout')
 
-      const checkoutUrl = (data as { url?: string })?.url
-      if (!checkoutUrl) {
-        throw new Error('No se obtuvo URL de checkout')
-      }
-
-      window.location.href = checkoutUrl
+      window.location.href = url
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al abrir checkout'
       notify({
