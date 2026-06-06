@@ -246,6 +246,49 @@ export async function fetchVisitantesPorDpi<T>(
   return { data: (data as T[] | null) ?? [], error }
 }
 
+// ── Cuotas / cobranza ──
+
+/** Cuotas de un plan de pago, ordenadas por número. Degrada a `[]`. */
+export async function fetchCuotasPlanPago<T>(planId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('cuotas_plan_pago')
+    .select('*')
+    .eq('plan_id', planId)
+    .order('numero')
+  return (data as T[] | null) ?? []
+}
+
+/** Cantidad de recibos digitales emitidos en un proyecto (para numerar el siguiente). */
+export async function countRecibosByProyecto(projectId: string): Promise<number> {
+  const { count } = await supabase
+    .from('recibos_digitales')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+  return count ?? 0
+}
+
+/** Bitácora de generación de cuotas de un proyecto (50 más recientes). Degrada a `[]`. */
+export async function fetchGeneracionCuotasLogs<T>(projectId: string, companyId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('generacion_cuotas_log')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return (data as T[] | null) ?? []
+}
+
+/** Notas actuales de una cuota de condominio (para anexar en conciliación). */
+export async function fetchCuotaCondominioNotas(id: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('cuotas_condominio')
+    .select('notas')
+    .eq('id', id)
+    .single()
+  return (data as { notas?: string | null } | null)?.notas ?? null
+}
+
 // ── Paquetería / mudanza (portal residente) ──
 
 /** Solicitudes de mudanza de una unidad (más recientes primero). Degrada a `[]`. */

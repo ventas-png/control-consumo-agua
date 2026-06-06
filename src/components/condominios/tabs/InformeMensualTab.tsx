@@ -1,5 +1,5 @@
 import { useState, type ReactNode} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { upsertCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { InformeMensual, EstadoInformeMensual, CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, IncidenteSeguridad } from '../../../types'
@@ -54,7 +54,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
     const incidentesMes = incidentes.filter(i => i.fecha?.startsWith(ym))
 
     setSaving(true)
-    const { error } = await supabase.from('informes_mensuales').upsert({
+    const { error } = await upsertCondominioRow('informes_mensuales', {
       company_id: companyId, project_id: proyectoId, periodo: ym,
       total_cuotas: cuotasMes.length,
       cuotas_pagadas: cuotasMes.filter(c => c.estado === 'pagado').length,
@@ -65,7 +65,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
       tickets_resueltos: ticketsMes.filter(t => t.estado === 'resuelto' || t.estado === 'cerrado').length,
       num_visitantes: visitantesMes.length,
       num_incidentes: incidentesMes.length,
-    }, { onConflict: 'project_id,periodo' })
+    }, 'project_id,periodo')
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `Informe ${ym} generado`, duration: 1600 })
@@ -87,9 +87,9 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
     })
     if (!result) return
     const notas = result.notas
-    await supabase.from('informes_mensuales').update({
+    await updateCondominioRow('informes_mensuales', c.id, {
       estado: 'publicado', firmado_por: autorNombre, notas: notas || null,
-    }).eq('id', c.id)
+    })
     onRefresh()
   }
 

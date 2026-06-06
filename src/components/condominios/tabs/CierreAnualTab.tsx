@@ -1,5 +1,5 @@
 import { useState, type ReactNode} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { upsertCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { toast } from '../../../lib/toast'
@@ -62,14 +62,14 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
     const monto_mora_total = cuotasAnio.filter(c => c.estado === 'moroso').reduce((s, c) => s + c.monto, 0)
 
     setSaving(true)
-    const { error } = await supabase.from('cierres_anuales').upsert({
+    const { error } = await upsertCondominioRow('cierres_anuales', {
       company_id: companyId, project_id: proyectoId, anio,
       total_ingresos: parseFloat(total_ingresos.toFixed(2)),
       total_egresos: parseFloat(total_egresos.toFixed(2)),
       saldo, total_cuotas_generadas, total_cuotas_cobradas,
       tasa_recaudacion, unidades_morosas,
       monto_mora_total: parseFloat(monto_mora_total.toFixed(2)),
-    }, { onConflict: 'project_id,anio' })
+    }, 'project_id,anio')
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success(`Cierre ${anio} generado`)
@@ -85,9 +85,9 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
       confirmText: 'Sí, cerrar',
     })
     if (!isConfirmed) return
-    await supabase.from('cierres_anuales').update({
+    await updateCondominioRow('cierres_anuales', c.id, {
       estado: 'cerrado', firmado_por: autorNombre, fecha_cierre: new Date().toISOString(),
-    }).eq('id', c.id)
+    })
     onRefresh()
   }
 

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
+import { fetchCuotasPlanPago } from '../../../domain/condominios/tabQueries'
 import type { PlanPagoCond, CuotaPlanPago } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -45,8 +51,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
 
   const fetchCuotas = useCallback(async (planId: string) => {
     setLoadingCuotas(true)
-    const { data } = await supabase.from('cuotas_plan_pago').select('*').eq('plan_id', planId).order('numero')
-    setCuotas((data ?? []) as CuotaPlanPago[])
+    setCuotas(await fetchCuotasPlanPago<CuotaPlanPago>(planId))
     setLoadingCuotas(false)
   }, [])
 
@@ -63,22 +68,22 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     const montoCuota = parseFloat((montoTotal / numCuotas).toFixed(2))
     setSaving(true)
 
-    const { data: plan, error } = await supabase.from('planes_pago_condominio').insert({
+    const { data: plan, error } = await createCondominioRowReturning('planes_pago_condominio', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
       concepto: form.concepto.trim(), monto_total: montoTotal, num_cuotas: numCuotas,
       monto_cuota: montoCuota, fecha_inicio: form.fecha_inicio,
       notas: form.notas || null, aprobado_por: form.aprobado_por || null,
-    }).select().single()
+    })
 
     if (error || !plan) { setSaving(false); return notify({ variant: 'error', title: 'Error', text: error?.message ?? 'Error al crear plan' }) }
 
     // Generate installments
     const installments = Array.from({ length: numCuotas }, (_, i) => ({
-      company_id: companyId, plan_id: plan.id,
+      company_id: companyId, plan_id: plan.id as string,
       numero: i + 1, monto: montoCuota,
       fecha_vencimiento: addMonths(form.fecha_inicio, i + 1),
     }))
-    await supabase.from('cuotas_plan_pago').insert(installments)
+    await createCondominioRow('cuotas_plan_pago', installments)
 
     setSaving(false)
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
@@ -87,26 +92,26 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('planes_pago_condominio').delete().eq('id', id)
+    await deleteCondominioRow('planes_pago_condominio', id)
     if (selected?.id === id) { setSelected(null); setCuotas([]) }
     onRefresh()
   }
 
   async function cambiarEstadoPlan(id: string, estado: string) {
-    await supabase.from('planes_pago_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('planes_pago_condominio', id, { estado })
     onRefresh()
   }
 
   async function marcarCuotaPagada(cuota: CuotaPlanPago) {
     const pagado = !cuota.pagado
     const update: Record<string, unknown> = { pagado, fecha_pago: pagado ? new Date().toISOString().slice(0, 10) : null }
-    await supabase.from('cuotas_plan_pago').update(update).eq('id', cuota.id)
+    await updateCondominioRow('cuotas_plan_pago', cuota.id, update)
 
     // Check if plan is complete
     if (pagado && selected) {
-      const { data: all } = await supabase.from('cuotas_plan_pago').select('id, pagado').eq('plan_id', selected.id)
-      const todasPagadas = (all ?? []).every(c => c.id === cuota.id ? true : c.pagado)
-      if (todasPagadas) await supabase.from('planes_pago_condominio').update({ estado: 'completado' }).eq('id', selected.id)
+      const all = await fetchCuotasPlanPago<CuotaPlanPago>(selected.id)
+      const todasPagadas = all.every(c => c.id === cuota.id ? true : c.pagado)
+      if (todasPagadas) await updateCondominioRow('planes_pago_condominio', selected.id, { estado: 'completado' })
     }
     fetchCuotas(selected!.id)
     onRefresh()

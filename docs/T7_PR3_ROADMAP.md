@@ -4,10 +4,10 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 9**. **Sección B COMPLETA.**
-> Sección A en curso: **25** tabs hechos (Portal read-only, Mantenimiento/otros, Amenidades/reservas,
-> Asambleas/votaciones, Rentas/STR, Seguridad/rondas y Paquetería/storage completos); restan **9**
-> (solo el grupo Cuotas/cobranza).
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 0**. 🎯 **OBJETIVO CUMPLIDO.**
+> **Secciones A y B COMPLETAS** — ningún componente importa `supabase` directo; todo el acceso
+> a datos vive en `src/domain/`. Los 34 tabs "complejos" de condominios quedaron migrados
+> (último grupo: Cuotas/cobranza, lote 16).
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -91,7 +91,7 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 
 ## ⬜ Backlog restante (50 archivos)
 
-### A) `condominios/tabs` "complejos" — 34 tabs (25 hechos, 9 restantes)
+### A) `condominios/tabs` "complejos" — 34 tabs ✅ COMPLETO (34/34)
 
 > ✅ **Portal read-only** (lote 8): `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`,
 > `PortalTransparenciaTab` → `domain/condominios/tabQueries.ts`.
@@ -122,6 +122,13 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 > `unidades(nombre)`), RPCs `firmarRecepcionPaquete`/`autorizarSalidaPaquete`, storage
 > `uploadCondominiosMedia` (reusado) y `uploadMudanzaDoc` nuevo (bucket `mudanza-docs`), y selects
 > `fetchSolicitudesMudanzaByUnidad`/`fetchTerminosMudanzaPorProyecto`. **Cierra Paquetería.**
+> ✅ **Cuotas/cobranza** (lote 16): `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`,
+> `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`,
+> `ConciliacionCobrosTab`, `SolicitudesRentaTab` → genéricos (`upsertCondominioRow` ahora acepta
+> arrays para el snapshot de saldos; reusa `updateCondominioRowsByIds`/`marcarCuotasMorosas`) +
+> selects `fetchCuotasPlanPago`, `countRecibosByProyecto`, `fetchCuotaCondominioNotas`,
+> `fetchGeneracionCuotasLogs`. Los inserts de `cuotas_condominio` siguen vía `validatedInsert(Many)`.
+> **Cierra la sección A → métrica 0.** 🎯
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -134,7 +141,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 
 | Sub-feature (lote sugerido) | Tabs |
 |---|---|
-| Cuotas/cobranza | `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab` |
+| ~~Cuotas/cobranza~~ ✅ | ~~`CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab`~~ → genéricos + selects/`upsert` array |
 | ~~Asambleas/votaciones~~ ✅ | ~~`AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab`~~ → genéricos + selects/`deleteCondominioRowBy` |
 | ~~Amenidades/reservas~~ ✅ | ~~`AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab`~~ → genéricos + `upsertCondominioRow` |
 | ~~Seguridad/rondas~~ ✅ | ~~`SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab`~~ → genéricos + `updateCondominioRowsByIds`/`fetchVisitantesPorDpi` |

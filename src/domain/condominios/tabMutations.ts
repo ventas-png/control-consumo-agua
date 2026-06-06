@@ -39,10 +39,10 @@ export async function createCondominioRowReturning(
   return { data: (data as unknown as Record<string, unknown>) ?? null, error }
 }
 
-/** Upsert de una fila en `table` (resuelve conflictos por `onConflict`). */
+/** Upsert de una fila (o varias) en `table` (resuelve conflictos por `onConflict`). */
 export async function upsertCondominioRow(
   table: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown> | Record<string, unknown>[],
   onConflict?: string,
 ): Promise<{ error: RowError }> {
   const { error } = await supabase

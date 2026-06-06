@@ -78,6 +78,12 @@ describe('tabMutations (CRUD genérico)', () => {
     expect(await upsertCondominioRow('x', {})).toEqual({ error: { message: 'conflict' } })
   })
 
+  it('upsertCondominioRow acepta lote (array) con onConflict', async () => {
+    h.state.result = { error: null }
+    expect(await upsertCondominioRow('historial_saldos_unidad', [{ a: 1 }, { a: 2 }], 'project_id,unidad_id,periodo'))
+      .toEqual({ error: null })
+  })
+
   it('deleteCondominioRowBy borra por columna distinta de id', async () => {
     h.state.result = { error: null }
     expect(await deleteCondominioRowBy('respuestas_encuesta', 'encuesta_id', 'e1')).toEqual({ error: null })

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchGeneracionCuotasLogs } from '../../../domain/condominios/tabQueries'
 import { validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog } from '../../../types'
@@ -100,7 +101,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setGenerando(false); return }
 
     // Log de auditoría
-    await supabase.from('generacion_cuotas_log').insert({
+    await createCondominioRow('generacion_cuotas_log', {
       company_id: companyId,
       project_id: proyectoId,
       periodo,
@@ -118,14 +119,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
 
   async function cargarLogs() {
     setLoadingLogs(true)
-    const { data } = await supabase
-      .from('generacion_cuotas_log')
-      .select('*')
-      .eq('project_id', proyectoId)
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-    setLogs((data ?? []) as GeneracionCuotasLog[])
+    setLogs(await fetchGeneracionCuotasLogs<GeneracionCuotasLog>(proyectoId, companyId))
     setLoadingLogs(false)
   }
 
