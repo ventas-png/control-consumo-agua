@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ActaReunion, TipoActa } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -92,9 +92,9 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('actas_reunion').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('actas_reunion', editId, payload))
     } else {
-      ({ error } = await supabase.from('actas_reunion').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('actas_reunion', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -104,13 +104,13 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar acta?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('actas_reunion').delete().eq('id', id)
+    await deleteCondominioRow('actas_reunion', id)
     if (viewId === id) setViewId(null)
     onRefresh()
   }
 
   async function toggleAprobada(a: ActaReunion) {
-    await supabase.from('actas_reunion').update({ aprobada: !a.aprobada }).eq('id', a.id)
+    await updateCondominioRow('actas_reunion', a.id, { aprobada: !a.aprobada })
     onRefresh()
   }
 

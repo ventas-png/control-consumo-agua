@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { toast } from '../../../lib/toast'
 import { confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -62,7 +62,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
     if (!form.descripcion.trim()) { toast.error(t('condominios.infracciones.err_description')); return }
     if (!form.unidad_id) { toast.error(t('condominios.infracciones.err_unit')); return }
     setSaving(true)
-    const { error } = await supabase.from('infracciones_condominio').insert({
+    const { error } = await createCondominioRow('infracciones_condominio', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
       tipo: form.tipo, descripcion: form.descripcion.trim(),
       monto_multa: form.monto_multa ? Number(form.monto_multa) : null,
@@ -77,14 +77,14 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   }
 
   async function cambiarEstado(id: string, estado: EstadoInfraccion) {
-    await supabase.from('infracciones_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('infracciones_condominio', id, { estado })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: t('condominios.infracciones.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('infracciones_condominio').delete().eq('id', id)
+    await deleteCondominioRow('infracciones_condominio', id)
     onRefresh()
   }
 

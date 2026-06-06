@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ProgramacionLimpieza } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -83,8 +83,8 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
       notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('programacion_limpieza').update(payload).eq('id', editId)
-      : await supabase.from('programacion_limpieza').insert(payload)
+      ? await updateCondominioRow('programacion_limpieza', editId, payload)
+      : await createCondominioRow('programacion_limpieza', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -93,20 +93,20 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
   const marcarEjecutada = async (p: ProgramacionLimpieza) => {
     const hoy = new Date().toISOString().slice(0, 10)
     const proxima = addDays(hoy, FRECUENCIA_DIAS[p.frecuencia])
-    const { error } = await supabase.from('programacion_limpieza').update({ ultima_ejecucion: hoy, proxima_ejecucion: proxima, estado: 'completado' }).eq('id', p.id)
+    const { error } = await updateCondominioRow('programacion_limpieza', p.id, { ultima_ejecucion: hoy, proxima_ejecucion: proxima, estado: 'completado' })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   const toggleActivo = async (p: ProgramacionLimpieza) => {
-    await supabase.from('programacion_limpieza').update({ activo: !p.activo }).eq('id', p.id)
+    await updateCondominioRow('programacion_limpieza', p.id, { activo: !p.activo })
     onRefresh()
   }
 
   const handleDelete = async (p: ProgramacionLimpieza) => {
     const r = await confirm({ title: '¿Eliminar programación?', text: p.area, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('programacion_limpieza').delete().eq('id', p.id)
+    await deleteCondominioRow('programacion_limpieza', p.id)
     onRefresh()
   }
 

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { Button } from '../../shared/Button'
 import { ArticuloManual, SeccionManual } from '../../../types'
@@ -40,7 +40,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
       notify({ variant: 'warning', title: 'Error', text: 'Título y contenido son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('manual_residente_cond').insert({
+    const { error } = await createCondominioRow('manual_residente_cond', {
       company_id: companyId, project_id: proyectoId,
       seccion: form.seccion, titulo: form.titulo.trim(),
       contenido: form.contenido.trim(), orden: form.orden || 0, activo: true,
@@ -51,14 +51,14 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
   }
 
   async function toggleActivo(id: string, activo: boolean) {
-    await supabase.from('manual_residente_cond').update({ activo: !activo }).eq('id', id)
+    await updateCondominioRow('manual_residente_cond', id, { activo: !activo })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar artículo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('manual_residente_cond').delete().eq('id', id)
+    await deleteCondominioRow('manual_residente_cond', id)
     onRefresh()
   }
 

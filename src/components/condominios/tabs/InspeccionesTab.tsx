@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { FileUploader } from '../../shared/FileUploader'
@@ -82,8 +82,8 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
       certificado_url: form.certificado_url || null, notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('inspecciones_normativas').update(payload).eq('id', editId)
-      : await supabase.from('inspecciones_normativas').insert(payload)
+      ? await updateCondominioRow('inspecciones_normativas', editId, payload)
+      : await createCondominioRow('inspecciones_normativas', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -91,7 +91,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar inspección?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('inspecciones_normativas').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('inspecciones_normativas', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

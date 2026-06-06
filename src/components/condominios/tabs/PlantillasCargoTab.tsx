@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PlantillaTareaCargo, AreaCondominio } from '../../../types'
 
 interface Props {
@@ -58,10 +58,10 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
       requiere_foto: form.requiere_foto,
     }
     if (editId) {
-      const { error } = await supabase.from('plantillas_tarea_cargo').update(payload).eq('id', editId)
+      const { error } = await updateCondominioRow('plantillas_tarea_cargo', editId, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('plantillas_tarea_cargo').insert({ ...payload, company_id: companyId, project_id: proyectoId })
+      const { error } = await createCondominioRow('plantillas_tarea_cargo', { ...payload, company_id: companyId, project_id: proyectoId })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false); resetForm(); onRefresh()
@@ -70,12 +70,12 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
   async function deletePlantilla(id: string) {
     const r = await confirm({ title: '¿Eliminar plantilla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('plantillas_tarea_cargo').delete().eq('id', id)
+    await deleteCondominioRow('plantillas_tarea_cargo', id)
     onRefresh()
   }
 
   async function toggleActivo(p: PlantillaTareaCargo) {
-    await supabase.from('plantillas_tarea_cargo').update({ activo: !p.activo }).eq('id', p.id)
+    await updateCondominioRow('plantillas_tarea_cargo', p.id, { activo: !p.activo })
     onRefresh()
   }
 

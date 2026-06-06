@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { RegistroAutoridad, TipoAutoridad, ResultadoAutoridad } from '../../../types'
 
@@ -61,7 +61,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
       notify({ variant: 'warning', title: 'Faltan datos', text: 'El motivo es obligatorio' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('registro_autoridades').insert({
+    const { error } = await createCondominioRow('registro_autoridades', {
       company_id: companyId, project_id: proyectoId,
       tipo_autoridad: form.tipo_autoridad,
       nombre_institucion: form.nombre_institucion.trim() || null,
@@ -84,7 +84,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
   }
 
   async function marcarSeguimientoRealizado(r: RegistroAutoridad) {
-    await supabase.from('registro_autoridades').update({ requiere_seguimiento: false }).eq('id', r.id)
+    await updateCondominioRow('registro_autoridades', r.id, { requiere_seguimiento: false })
     if (selected?.id === r.id) setSelected(prev => prev ? { ...prev, requiere_seguimiento: false } : null)
     onRefresh()
   }

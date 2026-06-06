@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
@@ -58,16 +58,16 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
     }
     setSaving(true)
     if (editando && selected) {
-      const { error } = await supabase.from('reglamento_condominio').update({
+      const { error } = await updateCondominioRow('reglamento_condominio', selected.id, {
         capitulo: form.capitulo.trim(), numero_articulo: form.numero_articulo.trim(),
         titulo: form.titulo.trim(), contenido: form.contenido.trim(),
         categoria: form.categoria, version: form.version.trim(),
         fecha_vigencia: form.fecha_vigencia || null, notas: form.notas.trim() || null,
-      }).eq('id', selected.id)
+      })
       setSaving(false)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
-      const { error } = await supabase.from('reglamento_condominio').insert({
+      const { error } = await createCondominioRow('reglamento_condominio', {
         company_id: companyId, project_id: proyectoId,
         capitulo: form.capitulo.trim(), numero_articulo: form.numero_articulo.trim(),
         titulo: form.titulo.trim(), contenido: form.contenido.trim(),
@@ -84,7 +84,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
   }
 
   async function toggleVigente(a: ArticuloReglamento) {
-    await supabase.from('reglamento_condominio').update({ vigente: !a.vigente }).eq('id', a.id)
+    await updateCondominioRow('reglamento_condominio', a.id, { vigente: !a.vigente })
     if (selected?.id === a.id) setSelected(prev => prev ? { ...prev, vigente: !prev.vigente } : null)
     onRefresh()
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -81,8 +81,8 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       foto_url: fotoUrl,
     }
     const { error } = editingId
-      ? await supabase.from('mascotas').update(data).eq('id', editingId)
-      : await supabase.from('mascotas').insert(data)
+      ? await updateCondominioRow('mascotas', editingId, data)
+      : await createCondominioRow('mascotas', data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); return }
     notify({ variant: 'success', title: editingId ? t('condominios.mascotas.saved_edit') : t('condominios.mascotas.saved_new'), duration: 1400 })
@@ -92,7 +92,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   async function eliminar(id: string) {
     const r = await confirm({ title: t('condominios.mascotas.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('mascotas').delete().eq('id', id)
+    await deleteCondominioRow('mascotas', id)
     onRefresh()
   }
 
