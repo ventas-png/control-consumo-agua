@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { EmptyState } from '../../shared/EmptyState'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -56,7 +56,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
       notify({ variant: 'warning', title: 'Error', text: 'Título y descripción son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('sugerencias_condominio').insert({
+    const { error } = await createCondominioRow('sugerencias_condominio', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.anonima ? null : (form.unidad_id || null),
       categoria: form.categoria, titulo: form.titulo.trim(),
@@ -88,15 +88,15 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
     })
     if (!result) return
     const respuesta = result.respuesta.trim()
-    await supabase.from('sugerencias_condominio').update({
+    await updateCondominioRow('sugerencias_condominio', s.id, {
       estado: 'respondida', respuesta, respondido_por: autorNombre,
       fecha_respuesta: new Date().toISOString(),
-    }).eq('id', s.id)
+    })
     onRefresh()
   }
 
   async function cambiarEstado(s: SugerenciaCondominio, estado: EstadoSugerencia) {
-    await supabase.from('sugerencias_condominio').update({ estado }).eq('id', s.id)
+    await updateCondominioRow('sugerencias_condominio', s.id, { estado })
     onRefresh()
   }
 

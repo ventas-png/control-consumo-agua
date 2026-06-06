@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { CajaChica, MovimientoCaja } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -36,7 +36,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   async function handleAbrirCaja() {
     if (!formCaja.responsable.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El responsable es obligatorio.' })
     setSavingCaja(true)
-    const { error } = await supabase.from('caja_chica').insert({
+    const { error } = await createCondominioRow('caja_chica', {
       company_id: companyId, project_id: proyectoId,
       responsable: formCaja.responsable.trim(),
       monto_inicial: parseFloat(formCaja.monto_inicial) || 0,
@@ -61,7 +61,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
     })
     if (!result?.cerrado_por) return
     const cerrado_por = result.cerrado_por
-    await supabase.from('caja_chica').update({ estado: 'cerrada', fecha_cierre: new Date().toISOString().slice(0, 10), cerrado_por }).eq('id', caja.id)
+    await updateCondominioRow('caja_chica', caja.id, { estado: 'cerrada', fecha_cierre: new Date().toISOString().slice(0, 10), cerrado_por })
     if (selected?.id === caja.id) setSelected(p => p ? { ...p, estado: 'cerrada' } : null)
     onRefresh()
   }
@@ -71,7 +71,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
     if (!formMov.concepto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El concepto es obligatorio.' })
     if (!formMov.monto || parseFloat(formMov.monto) <= 0) return notify({ variant: 'warning', title: 'Requerido', text: 'El monto debe ser mayor a 0.' })
     setSavingMov(true)
-    const { error } = await supabase.from('movimientos_caja').insert({
+    const { error } = await createCondominioRow('movimientos_caja', {
       company_id: companyId, caja_id: selected.id,
       tipo: formMov.tipo, concepto: formMov.concepto.trim(),
       monto: parseFloat(formMov.monto), comprobante: formMov.comprobante || null,
@@ -85,7 +85,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   async function handleDeleteMovimiento(id: string) {
     const r = await confirm({ title: '¿Eliminar movimiento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('movimientos_caja').delete().eq('id', id)
+    await deleteCondominioRow('movimientos_caja', id)
     onRefresh()
   }
 

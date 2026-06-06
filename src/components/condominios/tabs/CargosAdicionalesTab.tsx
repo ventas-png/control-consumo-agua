@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { CargoAdicionalUnidad, CategoriaCargoAdicional, EstadoCargoAdicional, Unidad } from '../../../types'
 
@@ -62,7 +62,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Unidad, concepto y monto son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('cargos_adicionales_unidad').insert({
+    const { error } = await createCondominioRow('cargos_adicionales_unidad', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id, concepto: form.concepto.trim(),
       categoria: form.categoria, monto: parseFloat(form.monto),
@@ -79,7 +79,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   }
 
   async function marcarPagado(c: CargoAdicionalUnidad) {
-    const { error } = await supabase.from('cargos_adicionales_unidad').update({ estado: 'pagado' as EstadoCargoAdicional }).eq('id', c.id)
+    const { error } = await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'pagado' as EstadoCargoAdicional })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -87,7 +87,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   async function anular(c: CargoAdicionalUnidad) {
     const res = await confirm({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', variant: 'danger', confirmText: 'Anular' })
     if (!res.isConfirmed) return
-    await supabase.from('cargos_adicionales_unidad').update({ estado: 'anulado' as EstadoCargoAdicional }).eq('id', c.id)
+    await updateCondominioRow('cargos_adicionales_unidad', c.id, { estado: 'anulado' as EstadoCargoAdicional })
     onRefresh()
   }
 

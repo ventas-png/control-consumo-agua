@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AvisoCobro } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -72,9 +72,9 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('avisos_cobro').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('avisos_cobro', editId, payload))
     } else {
-      ({ error } = await supabase.from('avisos_cobro').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('avisos_cobro', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -84,12 +84,12 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar aviso?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('avisos_cobro').delete().eq('id', id)
+    await deleteCondominioRow('avisos_cobro', id)
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('avisos_cobro').update({ estado }).eq('id', id)
+    await updateCondominioRow('avisos_cobro', id, { estado })
     onRefresh()
   }
 

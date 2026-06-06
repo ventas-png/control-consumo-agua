@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
 
@@ -72,7 +72,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   async function guardar() {
     if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Título obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('tareas_condominio').insert({
+    const { error } = await createCondominioRow('tareas_condominio', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), descripcion: form.descripcion.trim() || null,
       categoria: form.categoria, prioridad: form.prioridad, estado: 'pendiente' as EstadoTarea,
@@ -95,7 +95,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
     const siguiente = FLUJO[idx + 1]
     const patch: Record<string, unknown> = { estado: siguiente }
     if (siguiente === 'completada') patch.fecha_cierre = new Date().toISOString().split('T')[0]
-    const { error } = await supabase.from('tareas_condominio').update(patch).eq('id', t.id)
+    const { error } = await updateCondominioRow('tareas_condominio', t.id, patch)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === t.id) setSelected(prev => prev ? { ...prev, ...patch } as TareaCondominio : null)
     onRefresh()
@@ -104,7 +104,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   async function cancelar(t: TareaCondominio) {
     const res = await confirm({ title: 'Cancelar tarea', text: '¿Seguro?', icon: 'warning', confirmText: 'Cancelar tarea' })
     if (!res.isConfirmed) return
-    await supabase.from('tareas_condominio').update({ estado: 'cancelada' as EstadoTarea }).eq('id', t.id)
+    await updateCondominioRow('tareas_condominio', t.id, { estado: 'cancelada' as EstadoTarea })
     if (selected?.id === t.id) setSelected(prev => prev ? { ...prev, estado: 'cancelada' } as TareaCondominio : null)
     onRefresh()
   }
@@ -117,7 +117,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
       texto: comentario.texto.trim(),
     }
     const nuevos = [...t.comentarios, nuevo]
-    const { error } = await supabase.from('tareas_condominio').update({ comentarios: nuevos }).eq('id', t.id)
+    const { error } = await updateCondominioRow('tareas_condominio', t.id, { comentarios: nuevos })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, comentarios: nuevos } : null)
     setComentario({ autor: '', texto: '' })

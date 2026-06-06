@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AgendaItem, TipoAgenda, EstadoAgenda } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -103,10 +103,10 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
       notas: form.notas || null,
     }
     if (editId) {
-      const { error } = await supabase.from('agenda_operativa').update(payload).eq('id', editId)
+      const { error } = await updateCondominioRow('agenda_operativa', editId, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('agenda_operativa').insert(payload)
+      const { error } = await createCondominioRow('agenda_operativa', payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     }
     setSaving(false)
@@ -117,13 +117,13 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   async function handleDelete(id: string) {
     const result = await confirm({ title: '¿Eliminar elemento?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!result.isConfirmed) return
-    const { error } = await supabase.from('agenda_operativa').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('agenda_operativa', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoAgenda) {
-    const { error } = await supabase.from('agenda_operativa').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('agenda_operativa', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

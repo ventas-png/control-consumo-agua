@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { TicketMantenimiento, EstadoTicket, PrioridadTicket } from '../../../types'
 
 interface Props {
@@ -99,7 +99,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         if (costoResult) updates.costo_real = costoResult.costoReal ? parseFloat(costoResult.costoReal) : null
       }
     }
-    const { error } = await supabase.from('tickets_mantenimiento').update(updates).eq('id', ticket.id)
+    const { error } = await updateCondominioRow('tickets_mantenimiento', ticket.id, updates)
     setMoviendo(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -82,8 +82,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
       registrado_por: userId || null, notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('registros_residuos').update(payload).eq('id', editId)
-      : await supabase.from('registros_residuos').insert(payload)
+      ? await updateCondominioRow('registros_residuos', editId, payload)
+      : await createCondominioRow('registros_residuos', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -91,13 +91,13 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar registro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('registros_residuos').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('registros_residuos', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoResiduo) {
-    const { error } = await supabase.from('registros_residuos').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('registros_residuos', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

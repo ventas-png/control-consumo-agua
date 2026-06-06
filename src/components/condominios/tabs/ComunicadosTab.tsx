@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -72,7 +72,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
     if (!form.titulo.trim() || !form.contenido.trim()) return notify({ variant: 'warning', title: 'Campos requeridos', text: 'Título y contenido son obligatorios.' })
     if (form.destinatario === 'especifico' && !form.unidad_id) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona la unidad destinataria.' })
     setSaving(true)
-    const { error } = await supabase.from('comunicados_condominio').insert({
+    const { error } = await createCondominioRow('comunicados_condominio', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), contenido: form.contenido.trim(),
       tipo: form.tipo, destinatario: form.destinatario,
@@ -93,7 +93,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
       confirmText: 'Publicar',
     })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('anuncios_comunidad').insert({
+    const { error } = await createCondominioRow('anuncios_comunidad', {
       company_id: companyId, project_id: proyectoId,
       titulo: c.titulo, contenido: c.contenido,
       tipo: TIPO_A_ANUNCIO[c.tipo] ?? 'aviso',
@@ -107,7 +107,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar comunicado?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('comunicados_condominio').delete().eq('id', id)
+    await deleteCondominioRow('comunicados_condominio', id)
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
