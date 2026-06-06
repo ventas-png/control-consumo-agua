@@ -1,5 +1,12 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+  deleteCondominioRowsByIds,
+} from '../../../domain/condominios/tabMutations'
+import { fetchHuespedesByReservas, fetchVisitantesActivosByReservas } from '../../../domain/condominios/tabQueries'
 import type { ReservaSTR, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR, Unidad, HuespedSTR } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -86,19 +93,17 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   useEffect(() => {
     if (reservasSTR.length === 0) return
     const ids = reservasSTR.map(r => r.id)
-    supabase.from('huespedes_str').select('*').in('reserva_str_id', ids).then(({ data }) => {
-      if (!data) return
+    void fetchHuespedesByReservas<HuespedSTR>(ids).then(data => {
       const grouped: Record<string, HuespedSTR[]> = {}
       data.forEach(h => {
         if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
-        grouped[h.reserva_str_id].push(h as HuespedSTR)
+        grouped[h.reserva_str_id].push(h)
       })
       setReservaHuespedes(grouped)
     })
-    supabase.from('visitantes').select('reserva_str_id').in('reserva_str_id', ids).is('hora_salida', null).then(({ data }) => {
-      if (!data) return
+    void fetchVisitantesActivosByReservas(ids).then(data => {
       const counts: Record<string, number> = {}
-      data.forEach((v: { reserva_str_id?: string | null }) => {
+      data.forEach(v => {
         if (v.reserva_str_id) counts[v.reserva_str_id] = (counts[v.reserva_str_id] ?? 0) + 1
       })
       setEntryCount(counts)
@@ -185,24 +190,22 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     const formIds = new Set(huespedes.filter(h => h.id).map(h => h.id!))
 
     const toDelete = existing.filter(h => !h.visitante_id && !formIds.has(h.id)).map(h => h.id)
-    if (toDelete.length > 0) {
-      await supabase.from('huespedes_str').delete().in('id', toDelete)
-    }
+    await deleteCondominioRowsByIds('huespedes_str', toDelete)
 
     for (const h of huespedes.filter(g => g.id && !g.visitante_id)) {
-      await supabase.from('huespedes_str').update({
+      await updateCondominioRow('huespedes_str', h.id!, {
         nombre: h.nombre.trim(),
         identificacion: h.identificacion.trim() || null,
         es_menor: h.es_menor,
         fecha_nacimiento: h.es_menor && h.fecha_nacimiento ? h.fecha_nacimiento : null,
         foto_url: h.foto_url,
         foto_documento_url: h.foto_documento_url,
-      }).eq('id', h.id!)
+      })
     }
 
     const toInsert = huespedes.filter(h => !h.id && h.nombre.trim())
     if (toInsert.length > 0) {
-      await supabase.from('huespedes_str').insert(toInsert.map(h => ({
+      await createCondominioRow('huespedes_str', toInsert.map(h => ({
         reserva_str_id: reservaId,
         nombre: h.nombre.trim(),
         identificacion: h.identificacion.trim() || null,
@@ -245,12 +248,12 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
     let reservaId: string | null = editId
     if (editId) {
-      const { error } = await supabase.from('reservas_str').update(payload).eq('id', editId)
+      const { error } = await updateCondominioRow('reservas_str', editId, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { data, error } = await supabase.from('reservas_str').insert(payload).select('id').single()
+      const { data, error } = await createCondominioRowReturning('reservas_str', payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
-      reservaId = data.id
+      reservaId = (data?.id as string) ?? null
     }
 
     if (reservaId) await saveGuests(reservaId)
@@ -260,13 +263,13 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('reservas_str').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('reservas_str', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
   async function handleEstado(id: string, estado: EstadoSTR) {
-    const { error } = await supabase.from('reservas_str').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('reservas_str', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

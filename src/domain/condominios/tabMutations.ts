@@ -76,6 +76,16 @@ export async function deleteCondominioRowBy(
   return { error }
 }
 
+/** Elimina un conjunto de filas de `table` por id (`.in`). Si `ids` viene vacío, no-op. */
+export async function deleteCondominioRowsByIds(
+  table: string,
+  ids: string[],
+): Promise<{ error: RowError }> {
+  if (ids.length === 0) return { error: null }
+  const { error } = await supabase.from(table).delete().in('id', ids)
+  return { error }
+}
+
 /**
  * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
  * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de

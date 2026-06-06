@@ -18,6 +18,7 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
   deleteCondominioRowBy,
+  deleteCondominioRowsByIds,
   marcarCuotasMorosas,
 } from '../tabMutations'
 
@@ -82,5 +83,17 @@ describe('tabMutations (CRUD genérico)', () => {
   it('deleteCondominioRowBy propaga el error', async () => {
     h.state.result = { error: { message: 'fk' } }
     expect(await deleteCondominioRowBy('x', 'col', 'v')).toEqual({ error: { message: 'fk' } })
+  })
+
+  it('deleteCondominioRowsByIds con lista vacía es no-op (no error)', async () => {
+    h.state.result = { error: { message: 'no debería llamarse' } }
+    expect(await deleteCondominioRowsByIds('huespedes_str', [])).toEqual({ error: null })
+  })
+
+  it('deleteCondominioRowsByIds borra por .in y propaga error', async () => {
+    h.state.result = { error: null }
+    expect(await deleteCondominioRowsByIds('huespedes_str', ['a', 'b'])).toEqual({ error: null })
+    h.state.result = { error: { message: 'boom' } }
+    expect(await deleteCondominioRowsByIds('huespedes_str', ['a'])).toEqual({ error: { message: 'boom' } })
   })
 })

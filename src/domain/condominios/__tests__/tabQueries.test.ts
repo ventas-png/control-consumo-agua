@@ -10,7 +10,7 @@ const h = vi.hoisted(() => {
   }
   function makeBuilder(table: string) {
     const b: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'in', 'is', 'order', 'limit', 'gte', 'lte', 'update']) b[m] = () => b
+    for (const m of ['select', 'eq', 'in', 'is', 'order', 'limit', 'gte', 'lte', 'update', 'maybeSingle', 'single']) b[m] = () => b
     b.then = (resolve: (v: unknown) => void) => resolve(state.byTable[table] ?? state.fallback)
     return b
   }
@@ -34,6 +34,11 @@ import {
   fetchPuntosByAsambleaIds,
   fetchVotosUnidad,
   fetchVotosVotacion,
+  fetchHuespedesByReservas,
+  fetchVisitantesActivosByReservas,
+  fetchContratosByUnidad,
+  fetchReservasStrByUnidad,
+  fetchConfigCondominioTerminos,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -132,5 +137,36 @@ describe('asambleas / votaciones', () => {
   it('fetchVotosVotacion devuelve filas con join', async () => {
     h.state.byTable.votos = { data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null }
     expect(await fetchVotosVotacion('vot1')).toEqual([{ id: 'v1', unidades: { nombre: 'A-1' } }])
+  })
+})
+
+describe('rentas / STR', () => {
+  it('fetchHuespedesByReservas con ids vacíos no consulta → []', async () => {
+    expect(await fetchHuespedesByReservas([])).toEqual([])
+  })
+  it('fetchHuespedesByReservas devuelve filas', async () => {
+    h.state.byTable.huespedes_str = { data: [{ id: 'h1', reserva_str_id: 'r1' }], error: null }
+    expect(await fetchHuespedesByReservas(['r1'])).toEqual([{ id: 'h1', reserva_str_id: 'r1' }])
+  })
+  it('fetchVisitantesActivosByReservas con ids vacíos → []', async () => {
+    expect(await fetchVisitantesActivosByReservas([])).toEqual([])
+  })
+  it('fetchVisitantesActivosByReservas devuelve filas', async () => {
+    h.state.byTable.visitantes = { data: [{ reserva_str_id: 'r1' }], error: null }
+    expect(await fetchVisitantesActivosByReservas(['r1'])).toEqual([{ reserva_str_id: 'r1' }])
+  })
+  it('fetchContratosByUnidad degrada a []', async () => {
+    expect(await fetchContratosByUnidad('u1')).toEqual([])
+  })
+  it('fetchReservasStrByUnidad devuelve filas', async () => {
+    h.state.byTable.reservas_str = { data: [{ id: 'r1' }], error: null }
+    expect(await fetchReservasStrByUnidad('u1')).toEqual([{ id: 'r1' }])
+  })
+  it('fetchConfigCondominioTerminos devuelve la fila (maybeSingle)', async () => {
+    h.state.byTable.config_condominio = { data: { id: 'c1', terminos_mudanza: 'X' }, error: null }
+    expect(await fetchConfigCondominioTerminos('p1', 'co1')).toEqual({ id: 'c1', terminos_mudanza: 'X' })
+  })
+  it('fetchConfigCondominioTerminos sin fila → null', async () => {
+    expect(await fetchConfigCondominioTerminos('p1', 'co1')).toBeNull()
   })
 })

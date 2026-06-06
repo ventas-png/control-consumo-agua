@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 20**. **Sección B COMPLETA.**
-> Sección A en curso: **14** tabs hechos (grupos Portal read-only, Mantenimiento/otros,
-> Amenidades/reservas y Asambleas/votaciones completos); restan **20**.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 17**. **Sección B COMPLETA.**
+> Sección A en curso: **17** tabs hechos (grupos Portal read-only, Mantenimiento/otros,
+> Amenidades/reservas, Asambleas/votaciones y Rentas/STR completos); restan **17**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -106,6 +106,11 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 > `EncuestasTab` → genéricos + nuevos en tabQueries (`fetchPuntosAsambleaConVotos`,
 > `fetchAsambleasDigital`, `fetchPuntosByAsambleaIds`, `fetchVotosUnidad`, `fetchVotosVotacion`)
 > y `deleteCondominioRowBy` (delete por columna ≠ id) + `upsertCondominioRow`.
+> ✅ **Rentas/STR** (lote 13, ~2.1k líneas): `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab`
+> → genéricos + `deleteCondominioRowsByIds` (delete `.in('id', …)` con no-op si vacío) y nuevos
+> selects (`fetchHuespedesByReservas`, `fetchVisitantesActivosByReservas`, `fetchContratosByUnidad`,
+> `fetchReservasStrByUnidad`, `fetchConfigCondominioTerminos` vía `maybeSingle`). El patrón
+> `saveGuests` (sync de huéspedes: delete `.in` + update loop + insert lote) reusa los genéricos.
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -123,7 +128,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 | ~~Amenidades/reservas~~ ✅ | ~~`AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab`~~ → genéricos + `upsertCondominioRow` |
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
-| Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |
+| ~~Rentas/STR~~ ✅ | ~~`STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab`~~ → genéricos + `deleteCondominioRowsByIds`/selects STR |
 | ~~Mantenimiento/otros~~ ✅ | ~~`MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab`~~ → genéricos + `marcarCuotasMorosas`/`fetchEjecucionesMantenimiento` |
 | ~~Portal read-only~~ ✅ | ~~`DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab`~~ → `tabQueries.ts` |
 

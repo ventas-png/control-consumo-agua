@@ -180,6 +180,65 @@ export async function fetchVotosVotacion(
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
+// ── Rentas / STR ──
+
+/** Huéspedes de un conjunto de reservas STR (`.in`). Degrada a `[]`. */
+export async function fetchHuespedesByReservas<T>(reservaIds: string[]): Promise<T[]> {
+  if (reservaIds.length === 0) return []
+  const { data } = await supabase
+    .from('huespedes_str')
+    .select('*')
+    .in('reserva_str_id', reservaIds)
+  return (data as T[] | null) ?? []
+}
+
+/** Visitantes aún dentro (sin hora_salida) por reserva STR. Degrada a `[]`. */
+export async function fetchVisitantesActivosByReservas(
+  reservaIds: string[],
+): Promise<Array<{ reserva_str_id?: string | null }>> {
+  if (reservaIds.length === 0) return []
+  const { data } = await supabase
+    .from('visitantes')
+    .select('reserva_str_id')
+    .in('reserva_str_id', reservaIds)
+    .is('hora_salida', null)
+  return (data as Array<{ reserva_str_id?: string | null }> | null) ?? []
+}
+
+/** Contratos de arrendamiento de una unidad (más recientes primero). Degrada a `[]`. */
+export async function fetchContratosByUnidad<T>(unidadId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('contratos_arrendamiento')
+    .select('*')
+    .eq('unidad_id', unidadId)
+    .order('created_at', { ascending: false })
+  return (data as T[] | null) ?? []
+}
+
+/** Reservas STR de una unidad (por fecha de entrada desc). Degrada a `[]`. */
+export async function fetchReservasStrByUnidad<T>(unidadId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('reservas_str')
+    .select('*')
+    .eq('unidad_id', unidadId)
+    .order('fecha_entrada', { ascending: false })
+  return (data as T[] | null) ?? []
+}
+
+/** Fila de config del condominio (id + términos de mudanza) o `null` si no existe. */
+export async function fetchConfigCondominioTerminos(
+  projectId: string,
+  companyId: string,
+): Promise<{ id: string; terminos_mudanza: string | null } | null> {
+  const { data } = await supabase
+    .from('config_condominio')
+    .select('id, terminos_mudanza')
+    .eq('project_id', projectId)
+    .eq('company_id', companyId)
+    .maybeSingle()
+  return (data as { id: string; terminos_mudanza: string | null } | null) ?? null
+}
+
 /** Montos de gastos del condominio dentro de un año (para "ejecutado"). */
 export async function fetchGastosAnioMontos(
   projectId: string,

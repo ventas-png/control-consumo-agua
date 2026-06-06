@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { confirm, notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+  deleteCondominioRowsByIds,
+} from '../../../domain/condominios/tabMutations'
+import {
+  fetchContratosByUnidad,
+  fetchReservasStrByUnidad,
+  fetchHuespedesByReservas,
+} from '../../../domain/condominios/tabQueries'
 import { ImageUploader } from '../../shared/ImageUploader'
 import type {
   ContratoArrendamiento, ReservaSTR,
@@ -111,7 +122,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
   async function submit() {
     setSaving(true)
-    const { error } = await supabase.from('solicitud_renta_unidad').insert({
+    const { error } = await createCondominioRow('solicitud_renta_unidad', {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: unidadId,
@@ -231,24 +242,20 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   const cargar = useCallback(async () => {
     if (!unidadId || solicitudRenta?.estado !== 'aprobada') return
     setLoading(true)
-    const [{ data: cd }, { data: rd }] = await Promise.all([
-      supabase.from('contratos_arrendamiento').select('*').eq('unidad_id', unidadId).order('created_at', { ascending: false }),
-      supabase.from('reservas_str').select('*').eq('unidad_id', unidadId).order('fecha_entrada', { ascending: false }),
+    const [cd, reservasData] = await Promise.all([
+      fetchContratosByUnidad<ContratoArrendamiento>(unidadId),
+      fetchReservasStrByUnidad<ReservaSTR>(unidadId),
     ])
-    setContratos((cd as ContratoArrendamiento[]) ?? [])
-    const reservasData = (rd as ReservaSTR[]) ?? []
+    setContratos(cd)
     setReservas(reservasData)
 
     // Fetch group members for all reservations to show pre-registration progress.
     if (reservasData.length > 0) {
-      const { data: hd } = await supabase
-        .from('huespedes_str')
-        .select('*')
-        .in('reserva_str_id', reservasData.map(r => r.id))
+      const hd = await fetchHuespedesByReservas<HuespedSTR>(reservasData.map(r => r.id))
       const grouped: Record<string, HuespedSTR[]> = {}
-      ;(hd ?? []).forEach(h => {
+      hd.forEach(h => {
         if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
-        grouped[h.reserva_str_id].push(h as HuespedSTR)
+        grouped[h.reserva_str_id].push(h)
       })
       setReservaHuespedes(grouped)
     } else {
@@ -293,10 +300,10 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       notas: formCA.notas || null,
     }
     if (editCA) {
-      const { error } = await supabase.from('contratos_arrendamiento').update(payload).eq('id', editCA.id)
+      const { error } = await updateCondominioRow('contratos_arrendamiento', editCA.id, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingCA(false); return }
     } else {
-      const { error } = await supabase.from('contratos_arrendamiento').insert(payload)
+      const { error } = await createCondominioRow('contratos_arrendamiento', payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingCA(false); return }
     }
     setSavingCA(false); setShowCA(false); cargar()
@@ -306,7 +313,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   async function deleteCA(c: ContratoArrendamiento) {
     const r = await confirm({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
+    await deleteCondominioRow('contratos_arrendamiento', c.id)
     setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
     notify({ variant: 'success', title: 'Eliminado', duration: 1200 })
   }
@@ -380,24 +387,22 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     const formIds = new Set(huespedes.filter(h => h.id).map(h => h.id!))
 
     const toDelete = existing.filter(h => !h.visitante_id && !formIds.has(h.id)).map(h => h.id)
-    if (toDelete.length > 0) {
-      await supabase.from('huespedes_str').delete().in('id', toDelete)
-    }
+    await deleteCondominioRowsByIds('huespedes_str', toDelete)
 
     for (const h of huespedes.filter(g => g.id && !g.visitante_id)) {
-      await supabase.from('huespedes_str').update({
+      await updateCondominioRow('huespedes_str', h.id!, {
         nombre: h.nombre.trim(),
         identificacion: h.identificacion.trim() || null,
         es_menor: h.es_menor,
         fecha_nacimiento: h.es_menor && h.fecha_nacimiento ? h.fecha_nacimiento : null,
         foto_url: h.foto_url,
         foto_documento_url: h.foto_documento_url,
-      }).eq('id', h.id!)
+      })
     }
 
     const toInsert = huespedes.filter(h => !h.id && h.nombre.trim())
     if (toInsert.length > 0) {
-      await supabase.from('huespedes_str').insert(toInsert.map(h => ({
+      await createCondominioRow('huespedes_str', toInsert.map(h => ({
         reserva_str_id: reservaId,
         nombre: h.nombre.trim(),
         identificacion: h.identificacion.trim() || null,
@@ -441,12 +446,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     }
     let reservaId: string | null = editSTR?.id ?? null
     if (editSTR) {
-      const { error } = await supabase.from('reservas_str').update(payload).eq('id', editSTR.id)
+      const { error } = await updateCondominioRow('reservas_str', editSTR.id, payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingSTR(false); return }
     } else {
-      const { data, error } = await supabase.from('reservas_str').insert(payload).select('id').single()
+      const { data, error } = await createCondominioRowReturning('reservas_str', payload)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingSTR(false); return }
-      reservaId = data.id
+      reservaId = (data?.id as string) ?? null
     }
     if (reservaId) await saveGuests(reservaId)
     setSavingSTR(false); resetSTRForm(); cargar()
@@ -456,7 +461,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   async function deleteSTR(r: ReservaSTR) {
     const res = await confirm({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('reservas_str').delete().eq('id', r.id)
+    await deleteCondominioRow('reservas_str', r.id)
     setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
     notify({ variant: 'success', title: 'Eliminada', duration: 1200 })
   }
