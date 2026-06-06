@@ -35,6 +35,18 @@ export async function createCondominioRowReturning(
   return { data: (data as Record<string, unknown>) ?? null, error }
 }
 
+/** Upsert de una fila en `table` (resuelve conflictos por `onConflict`). */
+export async function upsertCondominioRow(
+  table: string,
+  payload: Record<string, unknown>,
+  onConflict?: string,
+): Promise<{ error: RowError }> {
+  const { error } = await supabase
+    .from(table)
+    .upsert(payload, onConflict ? { onConflict } : undefined)
+  return { error }
+}
+
 /** Actualiza la fila `id` de `table` con `patch`. */
 export async function updateCondominioRow(
   table: string,

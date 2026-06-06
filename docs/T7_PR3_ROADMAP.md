@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 27**. **Sección B COMPLETA.**
-> Sección A en curso: **7** tabs "complejos" hechos (Portal read-only + Mantenimiento/otros),
-> restan **27**.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 25**. **Sección B COMPLETA.**
+> Sección A en curso: **9** tabs hechos; restan **25** (incl. `AmenidadesTab`, pendiente por
+> tamaño).
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -97,6 +97,9 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 > ✅ **Mantenimiento/otros** (lote 9): `MantenimientoPrevTab`, `AutomatizacionesTab`,
 > `TareasPersonalTab` → genéricos `tabMutations` + `fetchEjecucionesMantenimiento` (tabQueries)
 > + `marcarCuotasMorosas` (`.in`, tabMutations).
+> ✅ **Reservas/eventos** (lote 10): `PortalReservasTab`, `EventosComunidadTab` → genéricos
+> `tabMutations` + `upsertCondominioRow` nuevo. (`AmenidadesTab` del grupo queda como lote
+> propio por tamaño, ~1.7k líneas.)
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -111,7 +114,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 |---|---|
 | Cuotas/cobranza | `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab` |
 | Asambleas/votaciones | `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab` |
-| Amenidades/reservas | `AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab` |
+| Amenidades/reservas | `AmenidadesTab` (pendiente) · ~~`PortalReservasTab`, `EventosComunidadTab`~~ ✅ → genéricos + `upsertCondominioRow` |
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
 | Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => {
   const state: { result: unknown } = { result: { data: null, error: null } }
   const b: Record<string, unknown> = {}
-  for (const m of ['insert', 'update', 'delete', 'eq', 'in', 'select', 'single']) b[m] = () => b
+  for (const m of ['insert', 'upsert', 'update', 'delete', 'eq', 'in', 'select', 'single']) b[m] = () => b
   b.then = (resolve: (v: unknown) => void) => resolve(state.result)
   return { state, b }
 })
@@ -14,6 +14,7 @@ vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b } }))
 import {
   createCondominioRow,
   createCondominioRowReturning,
+  upsertCondominioRow,
   updateCondominioRow,
   deleteCondominioRow,
   marcarCuotasMorosas,
@@ -60,5 +61,15 @@ describe('tabMutations (CRUD genérico)', () => {
   it('marcarCuotasMorosas propaga el error con .message', async () => {
     h.state.result = { error: { message: 'rls' } }
     expect(await marcarCuotasMorosas(['c1'])).toEqual({ error: { message: 'rls' } })
+  })
+
+  it('upsertCondominioRow éxito → { error: null }', async () => {
+    h.state.result = { error: null }
+    expect(await upsertCondominioRow('registro_asistentes_evento', { a: 1 }, 'evento_id,unidad_id')).toEqual({ error: null })
+  })
+
+  it('upsertCondominioRow propaga el error con .message', async () => {
+    h.state.result = { error: { message: 'conflict' } }
+    expect(await upsertCondominioRow('x', {})).toEqual({ error: { message: 'conflict' } })
   })
 })
