@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { fetchConvCountsForProject, fetchConvRowsAllProjects } from '../../domain/admin-dashboard/queries'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
@@ -74,35 +74,19 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
     const abiertos = new Set(['abierta', 'en_progreso', 'esperando_cliente'])
 
     if (selectedProjectId) {
-      // Single project: 5 lightweight count queries
-      const mkBase = () => {
-        return supabase.from('conversations').select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId).eq('service_type', 'agua').eq('project_id', selectedProjectId)
-      }
-      const abArr = [...abiertos]
-      const [sinAsignarRes, cerradasRes, criticasRes, urgentesRes, enProcesoRes] = await Promise.all([
-        mkBase().in('status', abArr).is('assigned_to', null),
-        mkBase().eq('status', 'cerrada').gte('closed_at', hace24h),
-        mkBase().in('status', abArr).lt('created_at', hace48h),
-        mkBase().in('status', abArr).lt('created_at', hace24h).gte('created_at', hace48h),
-        mkBase().in('status', abArr).gte('created_at', hace24h),
-      ])
-      setConvStats({
-        sinAsignar: sinAsignarRes.count ?? 0,
-        cerradasHoy: cerradasRes.count ?? 0,
-        criticas: criticasRes.count ?? 0,
-        urgentes: urgentesRes.count ?? 0,
-        enProceso: enProcesoRes.count ?? 0,
+      // Single project: 5 lightweight count queries (en la capa domain).
+      const stats = await fetchConvCountsForProject({
+        companyId,
+        projectId: selectedProjectId,
+        hace24h,
+        hace48h,
+        abiertos: [...abiertos],
       })
+      setConvStats(stats)
       setPerProjectStats({})
     } else {
       // All projects: fetch lightweight rows and compute per-project stats in JS
-      const { data: rows } = await supabase
-        .from('conversations')
-        .select('project_id, status, assigned_to, created_at, closed_at')
-        .eq('company_id', companyId)
-        .eq('service_type', 'agua')
-      if (!rows) return
+      const rows = await fetchConvRowsAllProjects(companyId)
 
       const empty = (): ConvStats => ({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
       const totals = empty()

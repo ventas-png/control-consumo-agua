@@ -1,7 +1,24 @@
 // domain/agua/mutations.ts — Escrituras del dominio agua. T7/PR3: el acceso
-// directo a `registros` sale de los componentes hacia la capa domain.
+// directo a `registros` (y la foto del registro en Storage) sale de los
+// componentes hacia la capa domain.
 import { supabase } from '../../lib/supabase'
 import type { Registro } from '../../types'
+
+/**
+ * Sube la foto de un registro al bucket `registro-fotos` (path bare; el display
+ * site firma vía useSignedUrl). El path lo arma la UI (scopeado por carpeta de
+ * cliente para la RLS de storage, infra:I14). Devuelve `{ error }`.
+ */
+export async function uploadRegistroFoto(
+  path: string,
+  file: File | Blob,
+  contentType?: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.storage
+    .from('registro-fotos')
+    .upload(path, file, contentType ? { contentType } : undefined)
+  return { error: error?.message ?? null }
+}
 
 /**
  * Inserta un registro de lectura (payload ya armado por la UI). Devuelve la fila
