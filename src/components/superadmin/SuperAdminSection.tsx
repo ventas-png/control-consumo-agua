@@ -2,7 +2,7 @@ import { useState, useEffect, type ChangeEvent} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { supabase } from '../../lib/supabase'
+import { updateEmpresaCampo, createEmpresa, createCompanyOwner } from '../../domain/superadmin/mutations'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 import { SystemHealthModal } from './SystemHealthModal'
 import { SuperAdminMetricsCard } from './SuperAdminMetricsCard'
@@ -50,7 +50,7 @@ export function SuperAdminSection() {
       notify({ variant: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 proyecto.' })
       return
     }
-    const { error } = await supabase.from('companies').update({ max_projects: nuevoMax }).eq('id', empresaId)
+    const { error } = await updateEmpresaCampo(empresaId, { max_projects: nuevoMax })
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite.' })
     } else {
@@ -74,7 +74,7 @@ export function SuperAdminSection() {
       })
       return
     }
-    const { error } = await supabase.from('companies').update({ max_units: nuevoMax }).eq('id', empresaId)
+    const { error } = await updateEmpresaCampo(empresaId, { max_units: nuevoMax })
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite de unidades.' })
     } else {
@@ -85,7 +85,7 @@ export function SuperAdminSection() {
   }
 
   async function toggleServicio(empresaId: string, campo: 'servicio_agua' | 'servicio_condominios', nuevoValor: boolean) {
-    const { error } = await supabase.from('companies').update({ [campo]: nuevoValor }).eq('id', empresaId)
+    const { error } = await updateEmpresaCampo(empresaId, { [campo]: nuevoValor })
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
     } else {
@@ -134,10 +134,7 @@ export function SuperAdminSection() {
       activa: result.activa === 'true',
     }
 
-    const { error } = await supabase
-      .from('companies')
-      .update(formValues)
-      .eq('id', empresa.id)
+    const { error } = await updateEmpresaCampo(empresa.id, formValues)
 
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
@@ -195,11 +192,7 @@ export function SuperAdminSection() {
     }
     if (maxUnitsSupported) insertPayload.max_units = formValues.maxUnits
 
-    const { data: nuevaEmpresa, error: empresaError } = await supabase
-      .from('companies')
-      .insert(insertPayload)
-      .select()
-      .single()
+    const { data: nuevaEmpresa, error: empresaError } = await createEmpresa(insertPayload)
 
     if (empresaError || !nuevaEmpresa) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la empresa.' })
@@ -207,27 +200,15 @@ export function SuperAdminSection() {
     }
 
     // 2. Crear el company_owner via Edge Function (requiere service role)
-    const { data: session } = await supabase.auth.getSession()
-    const token = session.session?.access_token
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-    const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token ?? ''}`,
-      },
-      body: JSON.stringify({
-        email: formValues.ownerEmail,
-        password: formValues.ownerPass,
-        full_name: formValues.ownerNombre,
-        role: 'company_owner',
-        company_id: (nuevaEmpresa as { id: string }).id,
-      }),
+    const { ok, error: ownerError } = await createCompanyOwner({
+      email: formValues.ownerEmail,
+      password: formValues.ownerPass,
+      full_name: formValues.ownerNombre,
+      company_id: (nuevaEmpresa as { id: string }).id,
     })
 
-    if (!res.ok) {
-      const err = await res.json() as { error?: string }
-      notify({ variant: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
+    if (!ok) {
+      notify({ variant: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${ownerError ?? 'Error desconocido'}` })
     } else {
       notify({ variant: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, duration: 2000 })
       invalidar()
