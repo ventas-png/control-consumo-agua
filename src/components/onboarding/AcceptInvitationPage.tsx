@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { previewInvitation } from '../../domain/onboarding/queries'
+import { acceptInvitation, signInWithPassword } from '../../domain/onboarding/mutations'
 import { validatePasswordStrength } from '../../lib/validation'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -59,11 +60,8 @@ export function AcceptInvitationPage() {
     let alive = true
     void (async () => {
       try {
-        const { data, error: fnErr } = await supabase.functions.invoke('accept-invitation', {
-          body: { token, action: 'preview' },
-        })
+        const { data: result, error: fnErr } = await previewInvitation(token)
         if (!alive) return
-        const result = data as { valid?: boolean; email?: string; role?: string; company_name?: string | null; error?: string } | null
         if (fnErr || !result || result.error || !result.valid) {
           setInvalidMsg(result?.error ?? 'Esta invitación no es válida o expiró.')
           setPhase('invalid')
@@ -88,12 +86,9 @@ export function AcceptInvitationPage() {
 
     setSubmitting(true)
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke('accept-invitation', {
-        body: { token, password, full_name: fullName.trim() || undefined },
-      })
-      const result = data as { success?: boolean; email?: string; error?: string } | null
+      const { data: result, error: fnErr } = await acceptInvitation(token, password, fullName.trim() || undefined)
       if (fnErr || !result || result.error || !result.success) {
-        setError(result?.error ?? fnErr?.message ?? 'No se pudo aceptar la invitación.')
+        setError(result?.error ?? fnErr ?? 'No se pudo aceptar la invitación.')
         return
       }
 
@@ -105,7 +100,7 @@ export function AcceptInvitationPage() {
       // Sesión lista: inicia sesión con el correo de la invitación y la
       // contraseña recién creada, luego entra al flujo autenticado normal.
       const email = result.email ?? preview?.email ?? ''
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+      const { error: signInErr } = await signInWithPassword(email, password)
       if (signInErr) {
         // La cuenta se creó pero el auto-login falló (raro). Mandamos al login.
         setPhase('success')

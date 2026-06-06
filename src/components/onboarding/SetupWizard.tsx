@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { supabase } from '../../lib/supabase'
+import { createProject } from '../../domain/onboarding/mutations'
 import { notify } from '../shared/Dialog'
 import { InputField } from '../shared/InputField'
 import type { UserSession } from '../../types'
@@ -75,7 +75,7 @@ export function SetupWizard({ currentUser, trigger, onComplete, autoOpen = false
       return
     }
     setSaving(true)
-    const { error } = await supabase.from('projects').insert({
+    const { error } = await createProject({
       company_id: currentUser.company_id,
       nombre: nombre.trim(),
       moneda,
@@ -84,7 +84,7 @@ export function SetupWizard({ currentUser, trigger, onComplete, autoOpen = false
     })
     setSaving(false)
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: error.message })
+      notify({ variant: 'error', title: 'Error', text: error })
       return
     }
     setStep('done')
