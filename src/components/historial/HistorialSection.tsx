@@ -1,7 +1,7 @@
 import { useState, useMemo, type CSSProperties } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 import { DataTable, type DataTableColumn } from '../shared'
@@ -139,10 +139,7 @@ export function HistorialSection({
   async function updateEstado() {
     if (!editModal) return
     setSavingEstado(true)
-    const { error } = await supabase
-      .from('registros')
-      .update({ estado: editModal.estado })
-      .eq('id', editModal.registroId)
+    const { error } = await updateRegistro(editModal.registroId, { estado: editModal.estado })
     if (!error) {
       onEstadoUpdated(editModal.registroId, editModal.estado)
       setEditModal(null)
@@ -162,10 +159,7 @@ export function HistorialSection({
       confirmText: '🗑️ Eliminar',
     })
     if (!result.isConfirmed) return
-    const { error, count } = await supabase
-      .from('registros')
-      .delete({ count: 'exact' })
-      .eq('id', registro.id)
+    const { error, count } = await deleteRegistro(registro.id)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo eliminar la lectura' })
       return

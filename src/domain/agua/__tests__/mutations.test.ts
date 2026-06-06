@@ -4,18 +4,20 @@ import { describe, it, expect, vi } from 'vitest'
 const insertSelect = vi.fn()
 const updateEq = vi.fn()
 const updateIn = vi.fn()
+const deleteEq = vi.fn()
 const storageUpload = vi.fn()
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
     from: () => ({
       insert: () => ({ select: insertSelect }),
       update: () => ({ eq: updateEq, in: updateIn }),
+      delete: () => ({ eq: deleteEq }),
     }),
     storage: { from: () => ({ upload: storageUpload }) },
   },
 }))
 
-import { createRegistro, updateRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
+import { createRegistro, updateRegistro, deleteRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
 
 describe('createRegistro', () => {
   it('éxito → devuelve la primera fila', async () => {
@@ -38,6 +40,23 @@ describe('updateRegistro', () => {
   it('error → mensaje legible', async () => {
     updateEq.mockResolvedValueOnce({ error: { message: 'denied' } })
     expect(await updateRegistro('reg1', {})).toEqual({ error: 'denied' })
+  })
+})
+
+describe('deleteRegistro', () => {
+  it('éxito → { error: null, count }', async () => {
+    deleteEq.mockResolvedValueOnce({ error: null, count: 1 })
+    expect(await deleteRegistro('reg1')).toEqual({ error: null, count: 1 })
+  })
+
+  it('sin permisos (count 0, sin error) → distingue del borrado', async () => {
+    deleteEq.mockResolvedValueOnce({ error: null, count: 0 })
+    expect(await deleteRegistro('reg1')).toEqual({ error: null, count: 0 })
+  })
+
+  it('error → mensaje legible y count null', async () => {
+    deleteEq.mockResolvedValueOnce({ error: { message: 'denied' }, count: null })
+    expect(await deleteRegistro('reg1')).toEqual({ error: 'denied', count: null })
   })
 })
 

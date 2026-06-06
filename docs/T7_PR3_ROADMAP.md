@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 39** (lotes `auth/`,
-> `empresa` RBAC/usuarios, pagos, correo y trazabilidad/reportes). Restan **34** tabs
-> "complejos" + **5** sueltos fuera de condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 35**. Fuera de condominios
+> queda **1** suelto (`perfil/PerfilSection` — billing + auth/MFA, lote dedicado). Restan
+> **34** tabs "complejos" de condominios.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -43,6 +43,11 @@ edges google-oauth-initiate/send-email).
 → `domain/empresa/auditoria.ts` (permission_audit_log/audit_log + soft-delete restore;
 reusa `usuarios.fetchAppUserNamesByIds`). `SavedReportsModal` → `domain/empresa/reportes.ts`
 (report_templates/report_runs + SELECT dinámico de la tabla fuente + log de corrida).
+
+**Empresa CRUD + sueltos:** `EmpresaHeaderCard`, `EmpresaProyectosSection` →
+`domain/empresa/mutations.ts` (companies/projects update/insert + logos company-logos/
+project-logos). `HistorialSection` → `domain/agua/mutations` (`updateRegistro` reusado +
+`deleteRegistro` nuevo). `FiscalConfigSection` → `domain/fiscal/queries.fetchProjectFiscalOverride`.
 
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
@@ -102,13 +107,13 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 5 archivos
+### B) Fuera de condominios — 1 archivo
 
-`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅, pagos (2) ✅, correo (1) ✅ y
-trazabilidad/reportes (4) ✅ hechos. Resta **`empresa`** residual (`EmpresaProyectosSection`,
-`EmpresaHeaderCard`) + sueltos (`perfil/PerfilSection`, `tarifas/FiscalConfigSection`,
-`historial/HistorialSection`).
-`grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
+`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅, pagos (2) ✅, correo (1) ✅,
+trazabilidad/reportes (4) ✅ y CRUD+sueltos (4: EmpresaHeaderCard, EmpresaProyectosSection,
+HistorialSection, FiscalConfigSection) ✅ hechos. Resta **`perfil/PerfilSection`** — lote
+dedicado: billing (subscriptions/billing_plans/rpc + edges checkout/portal) + auth/MFA
+(signIn/updateUser/mfa.*). `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
 
 ---
 
