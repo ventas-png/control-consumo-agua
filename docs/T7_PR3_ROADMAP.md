@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 35**. Fuera de condominios
-> queda **1** suelto (`perfil/PerfilSection` — billing + auth/MFA, lote dedicado). Restan
-> **34** tabs "complejos" de condominios.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 34**. **Sección B (fuera de
+> condominios) COMPLETA** — 0 archivos. Lo que resta son los **34** tabs "complejos" de
+> `condominios/` (sección A).
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -48,6 +48,11 @@ reusa `usuarios.fetchAppUserNamesByIds`). `SavedReportsModal` → `domain/empres
 `domain/empresa/mutations.ts` (companies/projects update/insert + logos company-logos/
 project-logos). `HistorialSection` → `domain/agua/mutations` (`updateRegistro` reusado +
 `deleteRegistro` nuevo). `FiscalConfigSection` → `domain/fiscal/queries.fetchProjectFiscalOverride`.
+
+**Perfil (billing + auth/MFA):** `PerfilSection` → `domain/auth/account` (provider,
+signIn, updatePassword, updateUserEmail) + `domain/auth/mfaActions` (enroll/challenge/
+verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
+`domain/facturacion/billing` (subscription/plans/RPC desglose). **Cierra la sección B.**
 
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
@@ -107,13 +112,11 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en
 > `domain/condominios/queries.ts` (o un `tabQueries.ts`).
 
-### B) Fuera de condominios — 1 archivo
+### B) Fuera de condominios — ✅ COMPLETA (0 archivos)
 
-`auth/` (5) ✅, `empresa` RBAC/usuarios (4) ✅, pagos (2) ✅, correo (1) ✅,
-trazabilidad/reportes (4) ✅ y CRUD+sueltos (4: EmpresaHeaderCard, EmpresaProyectosSection,
-HistorialSection, FiscalConfigSection) ✅ hechos. Resta **`perfil/PerfilSection`** — lote
-dedicado: billing (subscriptions/billing_plans/rpc + edges checkout/portal) + auth/MFA
-(signIn/updateUser/mfa.*). `grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'`.
+Todos los lotes hechos: `auth/` (5) · `empresa` RBAC/usuarios (4) · pagos (2) · correo (1) ·
+trazabilidad/reportes (4) · CRUD+sueltos (4) · `perfil/PerfilSection` (1, billing + auth/MFA).
+`grep -rlE "from '.*lib/supabase'" src/components | grep -v '/condominios/'` → **0**.
 
 ---
 

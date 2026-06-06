@@ -20,3 +20,14 @@ export async function createCheckoutSession(
   const url = (data as { url?: string } | null)?.url ?? null
   return { url, error: null }
 }
+
+/**
+ * Invoca el edge `create-billing-portal-session` (Stripe Billing Portal) y
+ * devuelve la URL a la que redirigir. `{ url: null, error }` si falla o no hay URL.
+ */
+export async function createBillingPortalSession(): Promise<{ url: string | null; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('create-billing-portal-session', { body: {} })
+  if (error) return { url: null, error: error.message }
+  const url = (data as { url?: string } | null)?.url ?? null
+  return { url, error: null }
+}

@@ -101,3 +101,31 @@ export async function signOut(): Promise<void> {
 export async function signOutGlobal(): Promise<void> {
   await supabase.auth.signOut({ scope: 'global' })
 }
+
+/** Proveedor de auth del usuario actual ('email' | 'google' | …); undefined si no hay sesión. */
+export async function fetchCurrentAuthProvider(): Promise<string | undefined> {
+  const { data } = await supabase.auth.getUser()
+  return data.user?.app_metadata?.provider as string | undefined
+}
+
+/** Reautentica con email + contraseña (verifica la contraseña actual antes de un cambio sensible). */
+export async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  return { error: error?.message ?? null }
+}
+
+/**
+ * Solicita el cambio de email del usuario (Supabase envía verificación al nuevo
+ * correo). Devuelve el mensaje de error CRUDO para que la UI lo clasifique
+ * (rate limit / email en uso / genérico).
+ */
+export async function updateUserEmail(
+  newEmail: string,
+  emailRedirectTo: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo })
+  return { error: error?.message ?? null }
+}

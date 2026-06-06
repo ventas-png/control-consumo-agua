@@ -3,11 +3,13 @@
 // signOut). Sin red/React: sólo el mapeo de resultados de supabase a `{ error }`.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { invoke, resetPasswordForEmail, updateUser, getSession, signOutFn } = vi.hoisted(() => ({
+const { invoke, resetPasswordForEmail, updateUser, getSession, getUser, signInFn, signOutFn } = vi.hoisted(() => ({
   invoke: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
   getSession: vi.fn(),
+  getUser: vi.fn(),
+  signInFn: vi.fn(),
   signOutFn: vi.fn(),
 }))
 vi.mock('../../../lib/supabase', () => ({
@@ -17,6 +19,8 @@ vi.mock('../../../lib/supabase', () => ({
       resetPasswordForEmail,
       updateUser,
       getSession,
+      getUser,
+      signInWithPassword: signInFn,
       signOut: signOutFn,
     },
   },
@@ -31,6 +35,9 @@ import {
   hasActiveSession,
   signOut,
   signOutGlobal,
+  fetchCurrentAuthProvider,
+  signInWithPassword,
+  updateUserEmail,
 } from '../account'
 
 beforeEach(() => {
@@ -38,7 +45,44 @@ beforeEach(() => {
   resetPasswordForEmail.mockReset()
   updateUser.mockReset()
   getSession.mockReset()
+  getUser.mockReset()
+  signInFn.mockReset()
   signOutFn.mockReset()
+})
+
+describe('fetchCurrentAuthProvider', () => {
+  it('devuelve el provider del app_metadata', async () => {
+    getUser.mockResolvedValueOnce({ data: { user: { app_metadata: { provider: 'google' } } } })
+    expect(await fetchCurrentAuthProvider()).toBe('google')
+  })
+  it('sin sesión → undefined', async () => {
+    getUser.mockResolvedValueOnce({ data: { user: null } })
+    expect(await fetchCurrentAuthProvider()).toBeUndefined()
+  })
+})
+
+describe('signInWithPassword', () => {
+  it('éxito → { error: null }', async () => {
+    signInFn.mockResolvedValueOnce({ error: null })
+    expect(await signInWithPassword('a@b.com', 'pw')).toEqual({ error: null })
+    expect(signInFn).toHaveBeenCalledWith({ email: 'a@b.com', password: 'pw' })
+  })
+  it('error → mensaje legible', async () => {
+    signInFn.mockResolvedValueOnce({ error: { message: 'bad creds' } })
+    expect(await signInWithPassword('a@b.com', 'x')).toEqual({ error: 'bad creds' })
+  })
+})
+
+describe('updateUserEmail', () => {
+  it('éxito → pasa email + emailRedirectTo', async () => {
+    updateUser.mockResolvedValueOnce({ error: null })
+    expect(await updateUserEmail('new@b.com', 'https://app')).toEqual({ error: null })
+    expect(updateUser).toHaveBeenCalledWith({ email: 'new@b.com' }, { emailRedirectTo: 'https://app' })
+  })
+  it('error → mensaje crudo (la UI lo clasifica)', async () => {
+    updateUser.mockResolvedValueOnce({ error: { message: 'Email rate limit exceeded' } })
+    expect(await updateUserEmail('new@b.com', 'https://app')).toEqual({ error: 'Email rate limit exceeded' })
+  })
 })
 
 describe('createClienteAccount', () => {
