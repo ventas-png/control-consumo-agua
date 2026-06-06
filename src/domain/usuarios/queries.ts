@@ -21,3 +21,12 @@ export async function fetchActiveAppUsers(): Promise<AppUser[]> {
     .eq('activo', true)
   return (data as AppUser[] | null) ?? []
 }
+
+/** Nombre (id + full_name) de un conjunto de usuarios por id. Para el indicador
+ * de presencia (resuelve nombres faltantes). Degrada a `[]`. */
+export async function fetchAppUserNamesByIds(
+  ids: string[],
+): Promise<{ id: string; full_name: string }[]> {
+  const { data } = await supabase.from('app_users').select('id, full_name').in('id', ids)
+  return (data as { id: string; full_name: string }[] | null) ?? []
+}
