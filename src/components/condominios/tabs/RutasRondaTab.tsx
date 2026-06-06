@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
 import type { AreaCondominio, RutaRonda, PuntoControlRuta } from '../../../types'
 
 interface Props {
@@ -58,13 +63,13 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
     if (!areaForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del área.' }); return }
     setSaving(true)
     if (editAreaId) {
-      const { error } = await supabase.from('areas_condominio').update({
+      const { error } = await updateCondominioRow('areas_condominio', editAreaId, {
         nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
         icono: areaForm.icono, orden: areaForm.orden, activo: areaForm.activo,
-      }).eq('id', editAreaId)
+      })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { error } = await supabase.from('areas_condominio').insert({
+      const { error } = await createCondominioRow('areas_condominio', {
         company_id: companyId, project_id: proyectoId,
         nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
         icono: areaForm.icono, orden: areaForm.orden,
@@ -77,7 +82,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   async function deleteArea(id: string) {
     const r = await confirm({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('areas_condominio').delete().eq('id', id)
+    await deleteCondominioRow('areas_condominio', id)
     onRefresh()
   }
 
@@ -96,19 +101,19 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
     if (!rutaForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre de la ruta.' }); return }
     setSaving(true)
     if (editRutaId) {
-      const { error } = await supabase.from('rutas_ronda').update({
+      const { error } = await updateCondominioRow('rutas_ronda', editRutaId, {
         nombre: rutaForm.nombre.trim(), descripcion: rutaForm.descripcion.trim() || null,
         tiempo_estimado_min: rutaForm.tiempo_estimado_min ? parseInt(rutaForm.tiempo_estimado_min) : null,
-      }).eq('id', editRutaId)
+      })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     } else {
-      const { data, error } = await supabase.from('rutas_ronda').insert({
+      const { data, error } = await createCondominioRowReturning('rutas_ronda', {
         company_id: companyId, project_id: proyectoId,
         nombre: rutaForm.nombre.trim(), descripcion: rutaForm.descripcion.trim() || null,
         tiempo_estimado_min: rutaForm.tiempo_estimado_min ? parseInt(rutaForm.tiempo_estimado_min) : null,
-      }).select('id').single()
+      })
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
-      if (data) setSelectedRutaId(data.id)
+      if (data) setSelectedRutaId(data.id as string)
     }
     setSaving(false); resetRutaForm(); onRefresh()
   }
@@ -116,7 +121,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   async function deleteRuta(id: string) {
     const r = await confirm({ title: '¿Eliminar ruta?', text: 'Se eliminarán también los puntos de control.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('rutas_ronda').delete().eq('id', id)
+    await deleteCondominioRow('rutas_ronda', id)
     if (selectedRutaId === id) setSelectedRutaId(null)
     onRefresh()
   }
@@ -130,7 +135,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
     const existentes = puntosDeRuta(selectedRutaId)
     const maxOrden = existentes.length ? Math.max(...existentes.map(p => p.orden)) : -1
     setSaving(true)
-    const { error } = await supabase.from('puntos_control_ruta').insert({
+    const { error } = await createCondominioRow('puntos_control_ruta', {
       ruta_id: selectedRutaId, area_id: newPuntoAreaId,
       orden: maxOrden + 1,
       instrucciones: newPuntoInstrucciones.trim() || null,
@@ -143,7 +148,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function deletePunto(id: string) {
-    await supabase.from('puntos_control_ruta').delete().eq('id', id)
+    await deleteCondominioRow('puntos_control_ruta', id)
     onRefresh()
   }
 
@@ -154,8 +159,8 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
     if (swapIdx < 0 || swapIdx >= puntos.length) return
     const swap = puntos[swapIdx]
     await Promise.all([
-      supabase.from('puntos_control_ruta').update({ orden: swap.orden }).eq('id', punto.id),
-      supabase.from('puntos_control_ruta').update({ orden: punto.orden }).eq('id', swap.id),
+      updateCondominioRow('puntos_control_ruta', punto.id, { orden: swap.orden }),
+      updateCondominioRow('puntos_control_ruta', swap.id, { orden: punto.orden }),
     ])
     onRefresh()
   }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
 
 interface Props {
@@ -71,10 +71,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
     if (nuevoEstado === 'aprobada') {
       payload.tipo_aprobado = tipoAprobado
     }
-    const { error } = await supabase
-      .from('solicitud_renta_unidad')
-      .update(payload)
-      .eq('id', s.id)
+    const { error } = await updateCondominioRow('solicitud_renta_unidad', s.id, payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } from '../../../domain/condominios/tabMutations'
+import { fetchHuespedesByReservas } from '../../../domain/condominios/tabQueries'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
@@ -108,19 +109,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     if (!showStrModal) return
     const activas = reservasSTR.filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
     if (activas.length === 0) return
-    supabase
-      .from('huespedes_str')
-      .select('*')
-      .in('reserva_str_id', activas.map(r => r.id))
-      .then(({ data }) => {
-        if (!data) return
-        const grouped: Record<string, HuespedSTR[]> = {}
-        data.forEach(h => {
-          if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
-          grouped[h.reserva_str_id].push(h as HuespedSTR)
-        })
-        setStrHuespedes(grouped)
+    void fetchHuespedesByReservas<HuespedSTR>(activas.map(r => r.id)).then(data => {
+      const grouped: Record<string, HuespedSTR[]> = {}
+      data.forEach(h => {
+        if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
+        grouped[h.reserva_str_id].push(h)
       })
+      setStrHuespedes(grouped)
+    })
   }, [showStrModal, reservasSTR])
 
   // KPIs — exclude companions to avoid double-counting
@@ -373,18 +369,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
 
     // Link pre-registered guest slot to this entry
     if (strCtx?.huespedId && insertedVisitante?.id) {
-      await supabase.from('huespedes_str')
-        .update({ visitante_id: insertedVisitante.id })
-        .eq('id', strCtx.huespedId)
+      await updateCondominioRow('huespedes_str', strCtx.huespedId, { visitante_id: insertedVisitante.id })
     }
 
     // First ingress of an approved/scheduled mudanza moves it to "en_curso"
     if (mudanzaCtx?.solicitudId) {
       const sol = solicitudesMudanza.find(s => s.id === mudanzaCtx.solicitudId)
       if (sol && (sol.estado === 'aprobada' || sol.estado === 'programada')) {
-        await supabase.from('solicitud_mudanza_unidad')
-          .update({ estado: 'en_curso' })
-          .eq('id', mudanzaCtx.solicitudId)
+        await updateCondominioRow('solicitud_mudanza_unidad', mudanzaCtx.solicitudId, { estado: 'en_curso' })
       }
     }
 
@@ -449,14 +441,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     }
     setGuardandoSalida(true)
     const horaSalida = new Date().toISOString()
-    const { error } = await supabase.from('visitantes').update({ hora_salida: horaSalida }).eq('id', salidaPendiente.id)
+    const { error } = await updateCondominioRow('visitantes', salidaPendiente.id, { hora_salida: horaSalida })
     if (error) { setGuardandoSalida(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
 
     if (salidaConAcomp) {
       const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
-      if (acompsActivos.length > 0) {
-        await supabase.from('visitantes').update({ hora_salida: horaSalida }).in('id', acompsActivos.map(a => a.id))
-      }
+      await updateCondominioRowsByIds('visitantes', acompsActivos.map(a => a.id), { hora_salida: horaSalida })
     }
 
     if (modoSalida === 'con_novedad') {
@@ -470,7 +460,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       partes.push(`Salida: ${new Date(horaSalida).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`)
       const descripcion = `${partes.join(' | ')}\n\n${novedadForm.comentarios.trim()}`
       const ubicacion = novedadForm.ubicacion.trim() || salidaPendiente.unidad_nombre || null
-      const { error: ne } = await supabase.from('novedades_seguridad').insert({
+      const { error: ne } = await createCondominioRow('novedades_seguridad', {
         company_id: companyId,
         project_id: proyectoId,
         ronda_id: null,

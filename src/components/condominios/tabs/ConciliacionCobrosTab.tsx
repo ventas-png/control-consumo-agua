@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchCuotaCondominioNotas } from '../../../domain/condominios/tabQueries'
 import { CuotaCondominio, Unidad, ConciliacionCobrosLog } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
@@ -51,7 +52,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
     setSaving(true)
 
     // Log de conciliación
-    const { error: logError } = await supabase.from('conciliacion_cobros_log').insert({
+    const { error: logError } = await createCondominioRow('conciliacion_cobros_log', {
       company_id: companyId,
       project_id: proyectoId,
       cuota_id: cuota.id,
@@ -74,14 +75,13 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
 
     // Actualizar cuota si el monto es suficiente
     if (montoRecibido >= cuota.monto - tolerancia) {
-      await supabase.from('cuotas_condominio').update({ estado: 'pagado' }).eq('id', cuota.id)
+      await updateCondominioRow('cuotas_condominio', cuota.id, { estado: 'pagado' })
     } else {
       // Pago parcial: dejar en pendiente con nota
-      const { data: existing } = await supabase.from('cuotas_condominio').select('notas').eq('id', cuota.id).single()
-      const notaActual = (existing as { notas?: string } | null)?.notas ?? ''
-      await supabase.from('cuotas_condominio').update({
+      const notaActual = (await fetchCuotaCondominioNotas(cuota.id)) ?? ''
+      await updateCondominioRow('cuotas_condominio', cuota.id, {
         notas: `${notaActual}\nPago parcial: ${moneda} ${montoRecibido.toFixed(2)} (${form.fecha})`.trim()
-      }).eq('id', cuota.id)
+      })
     }
 
     setSaving(false)

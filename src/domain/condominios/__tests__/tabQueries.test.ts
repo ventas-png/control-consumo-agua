@@ -39,6 +39,13 @@ import {
   fetchContratosByUnidad,
   fetchReservasStrByUnidad,
   fetchConfigCondominioTerminos,
+  fetchVisitantesPorDpi,
+  fetchSolicitudesMudanzaByUnidad,
+  fetchTerminosMudanzaPorProyecto,
+  fetchCuotasPlanPago,
+  countRecibosByProyecto,
+  fetchCuotaCondominioNotas,
+  fetchGeneracionCuotasLogs,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -168,5 +175,66 @@ describe('rentas / STR', () => {
   })
   it('fetchConfigCondominioTerminos sin fila → null', async () => {
     expect(await fetchConfigCondominioTerminos('p1', 'co1')).toBeNull()
+  })
+})
+
+describe('seguridad / accesos', () => {
+  it('fetchVisitantesPorDpi devuelve { data, error } con filas', async () => {
+    h.state.byTable.visitantes = { data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null }
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({
+      data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null,
+    })
+  })
+  it('fetchVisitantesPorDpi sin filas → { data: [], error: null }', async () => {
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({ data: [], error: null })
+  })
+  it('fetchVisitantesPorDpi propaga el error', async () => {
+    h.state.byTable.visitantes = { data: null, error: { message: 'rls' } }
+    expect(await fetchVisitantesPorDpi('co1', '123')).toEqual({ data: [], error: { message: 'rls' } })
+  })
+})
+
+describe('paquetería / mudanza (portal)', () => {
+  it('fetchSolicitudesMudanzaByUnidad devuelve filas', async () => {
+    h.state.byTable.solicitud_mudanza_unidad = { data: [{ id: 's1' }], error: null }
+    expect(await fetchSolicitudesMudanzaByUnidad('u1')).toEqual([{ id: 's1' }])
+  })
+  it('fetchSolicitudesMudanzaByUnidad sin data → []', async () => {
+    expect(await fetchSolicitudesMudanzaByUnidad('u1')).toEqual([])
+  })
+  it('fetchTerminosMudanzaPorProyecto devuelve el texto', async () => {
+    h.state.byTable.config_condominio = { data: { terminos_mudanza: 'Reglas…' }, error: null }
+    expect(await fetchTerminosMudanzaPorProyecto('p1')).toBe('Reglas…')
+  })
+  it('fetchTerminosMudanzaPorProyecto sin fila → null', async () => {
+    expect(await fetchTerminosMudanzaPorProyecto('p1')).toBeNull()
+  })
+})
+
+describe('cuotas / cobranza', () => {
+  it('fetchCuotasPlanPago devuelve filas', async () => {
+    h.state.byTable.cuotas_plan_pago = { data: [{ id: 'c1', numero: 1 }], error: null }
+    expect(await fetchCuotasPlanPago('plan1')).toEqual([{ id: 'c1', numero: 1 }])
+  })
+  it('fetchCuotasPlanPago sin data → []', async () => {
+    expect(await fetchCuotasPlanPago('plan1')).toEqual([])
+  })
+  it('countRecibosByProyecto devuelve el count', async () => {
+    h.state.byTable.recibos_digitales = { data: null, count: 7, error: null }
+    expect(await countRecibosByProyecto('p1')).toBe(7)
+  })
+  it('countRecibosByProyecto sin count → 0', async () => {
+    expect(await countRecibosByProyecto('p1')).toBe(0)
+  })
+  it('fetchCuotaCondominioNotas devuelve las notas', async () => {
+    h.state.byTable.cuotas_condominio = { data: { notas: 'parcial' }, error: null }
+    expect(await fetchCuotaCondominioNotas('c1')).toBe('parcial')
+  })
+  it('fetchCuotaCondominioNotas sin fila → null', async () => {
+    expect(await fetchCuotaCondominioNotas('c1')).toBeNull()
+  })
+  it('fetchGeneracionCuotasLogs devuelve filas', async () => {
+    h.state.byTable.generacion_cuotas_log = { data: [{ id: 'l1' }], error: null }
+    expect(await fetchGeneracionCuotasLogs('p1', 'co1')).toEqual([{ id: 'l1' }])
   })
 })

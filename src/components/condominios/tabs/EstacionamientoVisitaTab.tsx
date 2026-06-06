@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { EstacionamientoVisita, TipoVehiculoVisita, Unidad } from '../../../types'
@@ -60,7 +60,7 @@ export default function EstacionamientoVisitaTab({
       return
     }
     setSaving(true)
-    const { error } = await supabase.from('estacionamiento_visita').insert({
+    const { error } = await createCondominioRow('estacionamiento_visita', {
       company_id: companyId,
       project_id: proyectoId,
       espacio: form.espacio.trim(),
@@ -86,10 +86,7 @@ export default function EstacionamientoVisitaTab({
       confirmText: 'Sí, registrar',
     })
     if (!res.isConfirmed) return
-    const { error } = await supabase
-      .from('estacionamiento_visita')
-      .update({ hora_salida: new Date().toISOString() })
-      .eq('id', id)
+    const { error } = await updateCondominioRow('estacionamiento_visita', id, { hora_salida: new Date().toISOString() })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }

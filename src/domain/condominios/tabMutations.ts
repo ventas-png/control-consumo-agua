@@ -26,19 +26,23 @@ export async function createCondominioRow(
   return { error }
 }
 
-/** Inserta una fila en `table` y devuelve la fila creada. */
+/**
+ * Inserta una fila en `table` y devuelve la fila creada. `select` permite traer
+ * embeds (ej. `'*, unidades(nombre)'`); por defecto trae todas las columnas.
+ */
 export async function createCondominioRowReturning(
   table: string,
   payload: Record<string, unknown>,
+  select = '*',
 ): Promise<{ data: Record<string, unknown> | null; error: RowError }> {
-  const { data, error } = await supabase.from(table).insert(payload).select().single()
-  return { data: (data as Record<string, unknown>) ?? null, error }
+  const { data, error } = await supabase.from(table).insert(payload).select(select).single()
+  return { data: (data as unknown as Record<string, unknown>) ?? null, error }
 }
 
-/** Upsert de una fila en `table` (resuelve conflictos por `onConflict`). */
+/** Upsert de una fila (o varias) en `table` (resuelve conflictos por `onConflict`). */
 export async function upsertCondominioRow(
   table: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown> | Record<string, unknown>[],
   onConflict?: string,
 ): Promise<{ error: RowError }> {
   const { error } = await supabase
@@ -86,6 +90,17 @@ export async function deleteCondominioRowsByIds(
   return { error }
 }
 
+/** Aplica `patch` a un conjunto de filas de `table` por id (`.in`). No-op si `ids` vacío. */
+export async function updateCondominioRowsByIds(
+  table: string,
+  ids: string[],
+  patch: Record<string, unknown>,
+): Promise<{ error: RowError }> {
+  if (ids.length === 0) return { error: null }
+  const { error } = await supabase.from(table).update(patch).in('id', ids)
+  return { error }
+}
+
 /**
  * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
  * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de
@@ -94,4 +109,52 @@ export async function deleteCondominioRowsByIds(
 export async function marcarCuotasMorosas(ids: string[]): Promise<{ error: RowError }> {
   const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', ids)
   return { error }
+}
+
+/**
+ * Firma la recepción de un paquete por parte del residente (RPC `SECURITY DEFINER`
+ * que acota la escritura a la unidad del usuario). `firmaPath` es el objeto ya subido
+ * a `condominios-media`.
+ */
+export async function firmarRecepcionPaquete(
+  paqueteId: string,
+  firmaPath: string,
+  nombre: string,
+): Promise<{ error: RowError }> {
+  const { error } = await supabase.rpc('paquete_firmar_recepcion', {
+    p_paquete_id: paqueteId, p_firma_path: firmaPath, p_nombre: nombre,
+  })
+  return { error }
+}
+
+/** Parámetros de `autorizarSalidaPaquete` (el residente autoriza un retiro por tercero). */
+export interface AutorizarSalidaParams {
+  unidadId: string
+  tipo: string
+  descripcion: string
+  autorizadoNombre: string
+  autorizadoDocumento: string | null
+  autorizadoTelefono: string | null
+  fotos: string[] | null
+  notas: string | null
+}
+
+/**
+ * Autoriza la salida de un paquete vía RPC `paquete_autorizar_salida` (crea el registro
+ * con código de retiro y lo devuelve). Mismo shape de error `{ message }`.
+ */
+export async function autorizarSalidaPaquete(
+  p: AutorizarSalidaParams,
+): Promise<{ data: Record<string, unknown> | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('paquete_autorizar_salida', {
+    p_unidad_id: p.unidadId,
+    p_tipo: p.tipo,
+    p_descripcion: p.descripcion,
+    p_autorizado_nombre: p.autorizadoNombre,
+    p_autorizado_documento: p.autorizadoDocumento,
+    p_autorizado_telefono: p.autorizadoTelefono,
+    p_fotos: p.fotos,
+    p_notas: p.notas,
+  })
+  return { data: (data as Record<string, unknown>) ?? null, error }
 }

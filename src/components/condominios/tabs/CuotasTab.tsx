@@ -4,7 +4,8 @@ import { openPromptDialog } from '../../shared/PromptDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas } from '../../../domain/condominios/tabMutations'
+import { countRecibosByProyecto } from '../../../domain/condominios/tabQueries'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
@@ -381,12 +382,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     })
     if (!datos) return
 
-    const { error } = await supabase.from('cuotas_condominio').update({
+    const { error } = await updateCondominioRowsByIds('cuotas_condominio', ids, {
       estado: 'pagado',
       fecha_pago: datos.fecha_pago,
       metodo_pago: datos.metodo_pago,
       referencia_pago: datos.referencia_pago || null,
-    }).in('id', ids)
+    })
 
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${ids.length} cuotas marcadas como pagadas`, text: `Total: ${moneda} ${totalMonto.toFixed(2)}`, duration: 2000 })
@@ -416,20 +417,17 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       confirmText: '⚡ Aplicar mora',
     })
     if (!isConfirmed) return
-    const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
+    const { error } = await marcarCuotasMorosas(vencidas.map(c => c.id))
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${vencidas.length} cuotas marcadas como morosas`, duration: 1500 })
     onRefresh()
   }
 
   async function crearRecibo(cuota: CuotaCondominio) {
-    const { count } = await supabase
-      .from('recibos_digitales')
-      .select('*', { count: 'exact', head: true })
-      .eq('project_id', proyectoId)
-    const numero = `REC-${String((count ?? 0) + 1).padStart(4, '0')}`
+    const count = await countRecibosByProyecto(proyectoId)
+    const numero = `REC-${String(count + 1).padStart(4, '0')}`
 
-    const { error } = await supabase.from('recibos_digitales').insert({
+    const { error } = await createCondominioRow('recibos_digitales', {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: cuota.unidad_id ?? null,

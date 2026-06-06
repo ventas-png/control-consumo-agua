@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { firmarRecepcionPaquete, autorizarSalidaPaquete } from '../../../domain/condominios/tabMutations'
+import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { codigoRetiroQrUrl } from '../../../lib/paquetes'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -72,9 +73,9 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
     setSaving(true)
     try {
       const path = buildUploadPath(`${projectId}/paquetes-firmas`, 'firma.png', 'png')
-      const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr.message }); return }
-      const { error } = await supabase.rpc('paquete_firmar_recepcion', { p_paquete_id: firmando.id, p_firma_path: path, p_nombre: nombre.trim() })
+      const { error: upErr } = await uploadCondominiosMedia(path, file, { contentType: 'image/png', upsert: false })
+      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
+      const { error } = await firmarRecepcionPaquete(firmando.id, path, nombre.trim())
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       setFirmando(null)
       notify({ variant: 'success', title: 'Recepción firmada', text: 'Gracias, registramos tu firma.', duration: 1600 })
@@ -94,21 +95,21 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
     if (!salForm.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Describe el paquete que dejarás.' }); return }
     if (!salForm.autorizado_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Indica a quién autorizas a recogerlo.' }); return }
     setSalSaving(true)
-    const { data, error } = await supabase.rpc('paquete_autorizar_salida', {
-      p_unidad_id: unidadId,
-      p_tipo: salForm.tipo,
-      p_descripcion: salForm.descripcion.trim(),
-      p_autorizado_nombre: salForm.autorizado_nombre.trim(),
-      p_autorizado_documento: salForm.autorizado_documento.trim() || null,
-      p_autorizado_telefono: salForm.autorizado_telefono.trim() || null,
-      p_fotos: salFotos.length ? salFotos : null,
-      p_notas: salForm.notas.trim() || null,
+    const { data, error } = await autorizarSalidaPaquete({
+      unidadId,
+      tipo: salForm.tipo,
+      descripcion: salForm.descripcion.trim(),
+      autorizadoNombre: salForm.autorizado_nombre.trim(),
+      autorizadoDocumento: salForm.autorizado_documento.trim() || null,
+      autorizadoTelefono: salForm.autorizado_telefono.trim() || null,
+      fotos: salFotos.length ? salFotos : null,
+      notas: salForm.notas.trim() || null,
     })
     setSalSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetSalForm()
     onRefresh()
-    setVerCodigo(data as PaqueteRecibido)
+    setVerCodigo(data as unknown as PaqueteRecibido)
   }
 
   const SegBtn = ({ id, label }: { id: 'recibidos' | 'salidas'; label: string }) => (

@@ -225,6 +225,92 @@ export async function fetchReservasStrByUnidad<T>(unidadId: string): Promise<T[]
   return (data as T[] | null) ?? []
 }
 
+// ── Seguridad / accesos ──
+
+/**
+ * Historial de visitantes con una identificación (DPI) en la empresa, con nombre de unidad.
+ * Devuelve `{ data, error }` (con shape `{ message }`) porque el buscador del puesto de
+ * seguridad distingue "error" de "sin resultados".
+ */
+export async function fetchVisitantesPorDpi<T>(
+  companyId: string,
+  dpi: string,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('visitantes')
+    .select('*, unidades(nombre)')
+    .eq('company_id', companyId)
+    .eq('identificacion', dpi)
+    .order('hora_entrada', { ascending: false })
+    .limit(50)
+  return { data: (data as T[] | null) ?? [], error }
+}
+
+// ── Cuotas / cobranza ──
+
+/** Cuotas de un plan de pago, ordenadas por número. Degrada a `[]`. */
+export async function fetchCuotasPlanPago<T>(planId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('cuotas_plan_pago')
+    .select('*')
+    .eq('plan_id', planId)
+    .order('numero')
+  return (data as T[] | null) ?? []
+}
+
+/** Cantidad de recibos digitales emitidos en un proyecto (para numerar el siguiente). */
+export async function countRecibosByProyecto(projectId: string): Promise<number> {
+  const { count } = await supabase
+    .from('recibos_digitales')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+  return count ?? 0
+}
+
+/** Bitácora de generación de cuotas de un proyecto (50 más recientes). Degrada a `[]`. */
+export async function fetchGeneracionCuotasLogs<T>(projectId: string, companyId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('generacion_cuotas_log')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return (data as T[] | null) ?? []
+}
+
+/** Notas actuales de una cuota de condominio (para anexar en conciliación). */
+export async function fetchCuotaCondominioNotas(id: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('cuotas_condominio')
+    .select('notas')
+    .eq('id', id)
+    .single()
+  return (data as { notas?: string | null } | null)?.notas ?? null
+}
+
+// ── Paquetería / mudanza (portal residente) ──
+
+/** Solicitudes de mudanza de una unidad (más recientes primero). Degrada a `[]`. */
+export async function fetchSolicitudesMudanzaByUnidad<T>(unidadId: string): Promise<T[]> {
+  const { data } = await supabase
+    .from('solicitud_mudanza_unidad')
+    .select('*')
+    .eq('unidad_id', unidadId)
+    .order('created_at', { ascending: false })
+  return (data as T[] | null) ?? []
+}
+
+/** Términos de mudanza del proyecto (vista del residente, sólo por project_id). */
+export async function fetchTerminosMudanzaPorProyecto(projectId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('config_condominio')
+    .select('terminos_mudanza')
+    .eq('project_id', projectId)
+    .maybeSingle()
+  return (data as { terminos_mudanza: string | null } | null)?.terminos_mudanza ?? null
+}
+
 /** Fila de config del condominio (id + términos de mudanza) o `null` si no existe. */
 export async function fetchConfigCondominioTerminos(
   projectId: string,

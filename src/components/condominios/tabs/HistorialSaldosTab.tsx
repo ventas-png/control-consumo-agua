@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { upsertCondominioRow } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
@@ -75,7 +75,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
       }
     })
 
-    const { error } = await supabase.from('historial_saldos_unidad').upsert(rows, { onConflict: 'project_id,unidad_id,periodo' })
+    const { error } = await upsertCondominioRow('historial_saldos_unidad', rows, 'project_id,unidad_id,periodo')
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success(`Snapshot ${periodo} generado`, { description: `${rows.length} unidades procesadas` })
