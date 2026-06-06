@@ -154,6 +154,19 @@ export function buildAssignedRoles(result: { data: unknown; error: unknown }): A
     }))
 }
 
+/**
+ * ¿Existe ya un perfil `app_users` para este auth user? Lo usa el bootstrap de
+ * OAuth para decidir si el usuario nuevo (sin perfil) debe pasar por onboarding.
+ */
+export async function appUserProfileExists(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('app_users')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle()
+  return !!data
+}
+
 // Reconstruye la sesion desde Supabase y la persiste si cambiaron role,
 // company/cliente, service flags o el set de permisos. Devuelve la nueva
 // sesion (o null si no aplico cambio) para que el caller decida si re-render.

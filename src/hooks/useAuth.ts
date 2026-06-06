@@ -10,7 +10,8 @@ import { measureSLO, reportSLOError } from '../lib/slo'
 // (responsabilidades mezcladas); ahora son módulos puros y testeables.
 import { getStoredSession, storeSession, clearSession } from '../lib/authSession'
 import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../lib/loginRateLimit'
-import { buildSessionFromSupabase, refreshSessionFromSupabase } from '../domain/auth/session'
+import { buildSessionFromSupabase, refreshSessionFromSupabase, appUserProfileExists } from '../domain/auth/session'
+import { updateAppUserName } from '../domain/auth/account'
 import { type MfaChallenge, needsTotpStepUp, findVerifiedTotpFactor, isValidTotpCode, classifyMfaVerifyError } from '../domain/auth/mfa'
 
 async function applyOAuthSession(
@@ -25,13 +26,9 @@ async function applyOAuthSession(
   if (getStoredSession()) return
   try {
     // Check if an app_users profile already exists for this auth user
-    const { data: profile } = await supabase
-      .from('app_users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
+    const profileExists = await appUserProfileExists(user.id)
 
-    if (!profile) {
+    if (!profileExists) {
       // New OAuth user without app_users — needs onboarding to link to a cliente record
       const fullName: string =
         (user.user_metadata?.full_name as string | undefined) ??
@@ -487,12 +484,10 @@ export function useAuth() {
 
   const updateProfile = useCallback(async (newName: string): Promise<string | null> => {
     if (!currentUser) return 'No hay sesión activa'
-    const { error } = await supabase
-      .from('app_users')
-      .update({ full_name: newName.trim() })
-      .eq('id', currentUser.user_id)
+    const trimmed = newName.trim()
+    const { error } = await updateAppUserName(currentUser.user_id, trimmed)
     if (error) return 'Error al actualizar el nombre'
-    const updated = { ...currentUser, name: newName.trim() }
+    const updated = { ...currentUser, name: trimmed }
     storeSession(updated)
     setCurrentUser(updated)
     return null
