@@ -2,7 +2,7 @@
 // (extraen la primera fila de la RPC + mapean error).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const rpc = vi.fn()
+const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }))
 vi.mock('../../../lib/supabase', () => ({ supabase: { rpc } }))
 
 import { fetchCompanyEffectiveLimits, fetchCompanyUsage } from '../queries'
