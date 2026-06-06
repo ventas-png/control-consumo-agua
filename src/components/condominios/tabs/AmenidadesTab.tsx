@@ -2,7 +2,12 @@ import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  createCondominioRowReturning,
+  updateCondominioRow,
+  deleteCondominioRow,
+} from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -240,7 +245,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (!amenidadForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre.' }); return }
     if (amenidadForm.requiere_tarifa && !amenidadForm.tarifa_uso) { notify({ variant: 'error', title: 'Error', text: 'Indique el monto de la tarifa por uso.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('amenidades').insert({
+    const { error } = await createCondominioRow('amenidades', {
       company_id: companyId, project_id: proyectoId,
       nombre: amenidadForm.nombre.trim(),
       descripcion: amenidadForm.descripcion.trim() || null,
@@ -299,7 +304,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (!editAmenidadForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre.' }); return }
     if (editAmenidadForm.requiere_tarifa && !editAmenidadForm.tarifa_uso) { notify({ variant: 'error', title: 'Error', text: 'Indique el monto de la tarifa por uso.' }); return }
     setSavingEdit(true)
-    const { error } = await supabase.from('amenidades').update({
+    const { error } = await updateCondominioRow('amenidades', editingAmenidad.id, {
       nombre: editAmenidadForm.nombre.trim(),
       descripcion: editAmenidadForm.descripcion.trim() || null,
       capacidad_max: editAmenidadForm.capacidad_max ? Number(editAmenidadForm.capacidad_max) : null,
@@ -318,7 +323,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       requiere_aprobacion: editAmenidadForm.requiere_aprobacion,
       reglamento: editAmenidadForm.reglamento.trim() || null,
       foto_url: editAmenidadFotoUrl,
-    }).eq('id', editingAmenidad.id)
+    })
     setSavingEdit(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setEditingAmenidad(null)
@@ -326,7 +331,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function toggleAmenidad(a: Amenidad) {
-    await supabase.from('amenidades').update({ activo: !a.activo }).eq('id', a.id)
+    await updateCondominioRow('amenidades', a.id, { activo: !a.activo })
     onRefresh()
   }
 
@@ -344,7 +349,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     }
     const r = await confirm({ title: '¿Eliminar amenidad?', text: 'Esta acción no se puede deshacer.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('amenidades').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('amenidades', id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -397,9 +402,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     // Solo generar cuota si la reserva queda confirmada de inmediato
     if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
       const periodo = reservaForm.fecha.slice(0, 7)
-      const { data: cuotaData, error: cuotaErr } = await supabase
-        .from('cuotas_condominio')
-        .insert({
+      const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
           company_id: companyId,
           project_id: proyectoId,
           unidad_id: reservaForm.unidad_id,
@@ -410,16 +413,14 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           estado: 'pendiente',
           notas: `Reserva ${amen!.nombre} ${reservaForm.fecha} ${reservaForm.hora_inicio}-${reservaForm.hora_fin}`,
           created_by: userId,
-        })
-        .select('id')
-        .single()
+      })
       if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
-      cuotaId = cuotaData?.id ?? null
+      cuotaId = (cuotaData?.id as string | undefined) ?? null
     }
 
     const tarifaPagada = aplicaTarifa && metodoPago === 'pagar_momento' ? reservaForm.tarifa_pagada : false
 
-    const { error } = await supabase.from('reservas_amenidades').insert({
+    const { error } = await createCondominioRow('reservas_amenidades', {
       company_id: companyId,
       amenidad_id: reservaForm.amenidad_id,
       unidad_id: reservaForm.unidad_id,
@@ -460,7 +461,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const r = await confirm({ title: '¿Cancelar reserva?', icon: 'warning', variant: 'danger', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
     const reserva = reservas.find(x => x.id === id)
-    await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
+    await updateCondominioRow('reservas_amenidades', id, { estado: 'cancelada' })
     if (reserva?.cuota_id) {
       await softDelete('cuotas_condominio', { id: reserva.cuota_id, estado: 'pendiente' })
     }
@@ -470,13 +471,13 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   async function marcarNoShow(r: ReservaAmenidad) {
     const update = !r.no_show
-    await supabase.from('reservas_amenidades').update({ no_show: update }).eq('id', r.id)
+    await updateCondominioRow('reservas_amenidades', r.id, { no_show: update })
     onRefresh()
   }
 
   async function marcarTarifaPagada(r: ReservaAmenidad) {
     const update: Record<string, unknown> = { tarifa_pagada: true }
-    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, update)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -493,7 +494,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) { notify({ variant: 'error', title: 'Error', text: 'La hora fin debe ser posterior a la hora inicio.' }); return }
     }
     setSaving(true)
-    const { error } = await supabase.from('amenidades_bloqueos').insert({
+    const { error } = await createCondominioRow('amenidades_bloqueos', {
       company_id: companyId,
       project_id: proyectoId,
       amenidad_id: bloqueoForm.amenidad_id,
@@ -532,9 +533,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const mensaje = buildMensajeRecordatorio(r, unidad)
     const url = `https://wa.me/${formatPhoneForWa(tel)}?text=${encodeURIComponent(mensaje)}`
     window.open(url, '_blank', 'noopener,noreferrer')
-    await supabase.from('reservas_amenidades')
-      .update({ recordatorio_enviado: true, recordatorio_enviado_at: new Date().toISOString() })
-      .eq('id', r.id)
+    await updateCondominioRow('reservas_amenidades', r.id, { recordatorio_enviado: true, recordatorio_enviado_at: new Date().toISOString() })
     onRefresh()
   }
 
@@ -548,19 +547,19 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (amen?.requiere_deposito && r.deposito_estado === 'no_aplica') {
       update.deposito_estado = 'pendiente'
     }
-    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, update)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
   }
 
   async function registrarCheckout(r: ReservaAmenidad, fotoUrl: string | null, observaciones: string) {
-    const { error } = await supabase.from('reservas_amenidades').update({
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, {
       checkout_at: new Date().toISOString(),
       checkout_foto_url: fotoUrl,
       checkout_por: userId,
       observaciones_uso: observaciones || null,
-    }).eq('id', r.id)
+    })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, checkout_at: new Date().toISOString(), checkout_foto_url: fotoUrl, observaciones_uso: observaciones || null } : d)
@@ -576,7 +575,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       update.deposito_retenido_monto = null
       update.deposito_retenido_motivo = null
     }
-    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, update)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
@@ -631,9 +630,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     let cuotaId: string | null = null
     if (form.cargo) {
       const periodo = r.fecha.slice(0, 7)
-      const { data: cuotaData, error: cuotaErr } = await supabase
-        .from('cuotas_condominio')
-        .insert({
+      const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
           company_id: companyId,
           project_id: proyectoId,
           unidad_id: r.unidad_id,
@@ -644,11 +641,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           estado: 'pendiente',
           notas: `Retención por daños — ${amen?.nombre || 'amenidad'} · ${r.fecha} · ${form.motivo}`,
           created_by: userId,
-        })
-        .select('id')
-        .single()
+      })
       if (cuotaErr) { notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
-      cuotaId = cuotaData?.id ?? null
+      cuotaId = (cuotaData?.id as string | undefined) ?? null
     }
     const update = {
       deposito_estado: 'retenido' as EstadoDepositoReserva,
@@ -656,7 +651,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       deposito_retenido_motivo: form.motivo,
       cuota_retencion_id: cuotaId,
     }
-    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, update)
     if (error) {
       if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
       notify({ variant: 'error', title: 'Error', text: error.message }); return
@@ -690,9 +685,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     // Generar cargo si tiene tarifa con cargar_unidad y aún no existe
     if (!cuotaId && r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'cargar_unidad') {
       const periodo = r.fecha.slice(0, 7)
-      const { data: cuotaData, error: cuotaErr } = await supabase
-        .from('cuotas_condominio')
-        .insert({
+      const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
           company_id: companyId,
           project_id: proyectoId,
           unidad_id: r.unidad_id,
@@ -703,19 +696,17 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           estado: 'pendiente',
           notas: `Reserva ${amen?.nombre || 'amenidad'} ${r.fecha} ${r.hora_inicio}-${r.hora_fin}`,
           created_by: userId,
-        })
-        .select('id')
-        .single()
+      })
       if (cuotaErr) { notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
-      cuotaId = cuotaData?.id ?? null
+      cuotaId = (cuotaData?.id as string | undefined) ?? null
     }
-    const { error } = await supabase.from('reservas_amenidades').update({
+    const { error } = await updateCondominioRow('reservas_amenidades', r.id, {
       estado: 'confirmada',
       aprobada_por: userId,
       aprobada_at: new Date().toISOString(),
       cuota_id: cuotaId,
       rechazada_motivo: null,
-    }).eq('id', r.id)
+    })
     if (error) {
       if (cuotaId && !r.cuota_id) await softDelete('cuotas_condominio', { id: cuotaId })
       notify({ variant: 'error', title: 'Error', text: error.message }); return
@@ -743,17 +734,17 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (r.cuota_id) {
       await softDelete('cuotas_condominio', { id: r.cuota_id, estado: 'pendiente' })
     }
-    await supabase.from('reservas_amenidades').update({
+    await updateCondominioRow('reservas_amenidades', r.id, {
       estado: 'cancelada',
       rechazada_motivo: motivo.trim(),
-    }).eq('id', r.id)
+    })
     onRefresh()
   }
 
   async function eliminarBloqueo(id: string) {
     const r = await confirm({ title: '¿Eliminar bloqueo?', icon: 'warning', variant: 'danger', confirmText: 'Sí, eliminar', cancelText: 'No' })
     if (!r.isConfirmed) return
-    await supabase.from('amenidades_bloqueos').delete().eq('id', id)
+    await deleteCondominioRow('amenidades_bloqueos', id)
     onRefresh()
   }
 
@@ -1694,7 +1685,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div style={{ marginTop: 8 }}>
                   <ImageUploader value={null} onChange={async (url) => {
                     if (!url) return
-                    await supabase.from('reservas_amenidades').update({ checkin_foto_url: url }).eq('id', r.id)
+                    await updateCondominioRow('reservas_amenidades', r.id, { checkin_foto_url: url })
                     onRefresh()
                     setReservaDetalle(d => d ? { ...d, checkin_foto_url: url } : d)
                   }} folder="amenidades-checkin" label="Agregar foto" />

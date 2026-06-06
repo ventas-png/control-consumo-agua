@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 25**. **Sección B COMPLETA.**
-> Sección A en curso: **9** tabs hechos; restan **25** (incl. `AmenidadesTab`, pendiente por
-> tamaño).
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 24**. **Sección B COMPLETA.**
+> Sección A en curso: **10** tabs hechos (grupos Portal read-only, Mantenimiento/otros y
+> Amenidades/reservas completos); restan **24**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -98,8 +98,10 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 > `TareasPersonalTab` → genéricos `tabMutations` + `fetchEjecucionesMantenimiento` (tabQueries)
 > + `marcarCuotasMorosas` (`.in`, tabMutations).
 > ✅ **Reservas/eventos** (lote 10): `PortalReservasTab`, `EventosComunidadTab` → genéricos
-> `tabMutations` + `upsertCondominioRow` nuevo. (`AmenidadesTab` del grupo queda como lote
-> propio por tamaño, ~1.7k líneas.)
+> `tabMutations` + `upsertCondominioRow` nuevo.
+> ✅ **AmenidadesTab** (lote 11, ~1.7k líneas): todo CRUD por id (amenidades/reservas/bloqueos)
+> + cuotas vía `createCondominioRowReturning`. Cierra el grupo Amenidades/reservas. Sin
+> funciones de dominio nuevas (reusa genéricos).
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -114,7 +116,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 |---|---|
 | Cuotas/cobranza | `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab` |
 | Asambleas/votaciones | `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab` |
-| Amenidades/reservas | `AmenidadesTab` (pendiente) · ~~`PortalReservasTab`, `EventosComunidadTab`~~ ✅ → genéricos + `upsertCondominioRow` |
+| ~~Amenidades/reservas~~ ✅ | ~~`AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab`~~ → genéricos + `upsertCondominioRow` |
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
 | Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |
