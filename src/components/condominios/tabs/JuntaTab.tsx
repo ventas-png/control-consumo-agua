@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { MiembroJunta, CargoJunta, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -72,9 +72,9 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('junta_directiva').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('junta_directiva', editId, payload))
     } else {
-      ({ error } = await supabase.from('junta_directiva').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('junta_directiva', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -84,12 +84,12 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar miembro?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('junta_directiva').delete().eq('id', id)
+    await deleteCondominioRow('junta_directiva', id)
     onRefresh()
   }
 
   async function toggleActivo(m: MiembroJunta) {
-    await supabase.from('junta_directiva').update({ activo: !m.activo, periodo_fin: m.activo ? new Date().toISOString().slice(0,10) : null }).eq('id', m.id)
+    await updateCondominioRow('junta_directiva', m.id, { activo: !m.activo, periodo_fin: m.activo ? new Date().toISOString().slice(0,10) : null })
     onRefresh()
   }
 

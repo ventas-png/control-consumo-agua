@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { VisitaFrecuente, RelacionVisitaFrecuente, Unidad } from '../../../types'
 
@@ -65,7 +65,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Unidad y nombre son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('visitas_frecuentes').insert({
+    const { error } = await createCondominioRow('visitas_frecuentes', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id, nombre: form.nombre.trim(),
       identificacion: form.identificacion.trim() || null,
@@ -85,14 +85,14 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
   }
 
   async function toggleActivo(v: VisitaFrecuente) {
-    await supabase.from('visitas_frecuentes').update({ activo: !v.activo }).eq('id', v.id)
+    await updateCondominioRow('visitas_frecuentes', v.id, { activo: !v.activo })
     onRefresh()
   }
 
   async function eliminar(v: VisitaFrecuente) {
     const res = await confirm({ title: 'Eliminar visita frecuente', text: `¿Eliminar a ${v.nombre}?`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('visitas_frecuentes').delete().eq('id', v.id)
+    await deleteCondominioRow('visitas_frecuentes', v.id)
     if (selected?.id === v.id) setSelected(null)
     onRefresh()
   }

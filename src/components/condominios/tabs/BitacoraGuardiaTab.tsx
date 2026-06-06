@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { BitacoraGuardia, TurnoGuardia, EstadoBitacoraGuardia, TipoNovedadGuardia, NovedadGuardia } from '../../../types'
 
@@ -56,7 +56,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
   async function guardar() {
     if (!form.guardia_nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre del guardia obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('bitacora_guardia').insert({
+    const { error } = await createCondominioRow('bitacora_guardia', {
       company_id: companyId,
       project_id: proyectoId,
       fecha: form.fecha,
@@ -78,7 +78,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
   async function cerrarTurno(b: BitacoraGuardia) {
     const res = await confirm({ title: 'Cerrar turno', text: '¿Marcar bitácora como cerrada?', icon: 'question', confirmText: 'Cerrar turno' })
     if (!res.isConfirmed) return
-    const { error } = await supabase.from('bitacora_guardia').update({ estado: 'cerrado' as EstadoBitacoraGuardia }).eq('id', b.id)
+    const { error } = await updateCondominioRow('bitacora_guardia', b.id, { estado: 'cerrado' as EstadoBitacoraGuardia })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === b.id) setSelected(prev => prev ? { ...prev, estado: 'cerrado' } : null)
     onRefresh()
@@ -88,7 +88,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
     if (!novDetalle.descripcion.trim()) return
     const nueva: NovedadGuardia = { ...novDetalle, hora: novDetalle.hora || new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) }
     const nuevas = [...b.novedades, nueva]
-    const { error } = await supabase.from('bitacora_guardia').update({ novedades: nuevas }).eq('id', b.id)
+    const { error } = await updateCondominioRow('bitacora_guardia', b.id, { novedades: nuevas })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, novedades: nuevas } : null)
     setNovDetalle({ hora: '', descripcion: '', tipo: 'normal' })

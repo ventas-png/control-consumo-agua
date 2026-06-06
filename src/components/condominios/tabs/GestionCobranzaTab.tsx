@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { GestionCobranza, EtapaCobranza, EstadoCobranza, TipoContactoCobranza, ContactoCobranza, Unidad } from '../../../types'
@@ -64,7 +64,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Responsable y monto son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('gestion_cobranza').insert({
+    const { error } = await createCondominioRow('gestion_cobranza', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id || null,
       responsable: form.responsable.trim(),
@@ -84,7 +84,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     const idx = FLUJO_ETAPAS.indexOf(c.etapa)
     if (idx < 0 || idx >= FLUJO_ETAPAS.length - 1) return
     const siguiente = FLUJO_ETAPAS[idx + 1]
-    const { error } = await supabase.from('gestion_cobranza').update({ etapa: siguiente }).eq('id', c.id)
+    const { error } = await updateCondominioRow('gestion_cobranza', c.id, { etapa: siguiente })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, etapa: siguiente } : null)
     onRefresh()
@@ -93,10 +93,10 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
   async function marcarResuelto(c: GestionCobranza) {
     const res = await confirm({ title: 'Marcar como resuelto', text: '¿Confirmar resolución del cobro?', icon: 'question', confirmText: 'Resolver' })
     if (!res.isConfirmed) return
-    const { error } = await supabase.from('gestion_cobranza').update({
+    const { error } = await updateCondominioRow('gestion_cobranza', c.id, {
       estado: 'resuelto' as EstadoCobranza, etapa: 'resuelto' as EtapaCobranza,
       fecha_resolucion: new Date().toISOString().split('T')[0],
-    }).eq('id', c.id)
+    })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado: 'resuelto', etapa: 'resuelto', fecha_resolucion: new Date().toISOString().split('T')[0] } : null)
     onRefresh()
@@ -111,7 +111,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
       siguiente_accion: contactoForm.siguiente_accion.trim() || undefined,
     }
     const nuevos = [...c.contactos, nuevo]
-    const { error } = await supabase.from('gestion_cobranza').update({ contactos: nuevos }).eq('id', c.id)
+    const { error } = await updateCondominioRow('gestion_cobranza', c.id, { contactos: nuevos })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setSelected(prev => prev ? { ...prev, contactos: nuevos } : null)
     setContactoForm({ tipo: 'llamada', resultado: '', siguiente_accion: '' })
@@ -130,7 +130,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     if (!result) return
     const adeudado = parseFloat(result.adeudado || '0')
     const pagado = parseFloat(result.pagado || '0')
-    const { error } = await supabase.from('gestion_cobranza').update({ monto_adeudado: adeudado, monto_pagado: pagado }).eq('id', c.id)
+    const { error } = await updateCondominioRow('gestion_cobranza', c.id, { monto_adeudado: adeudado, monto_pagado: pagado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, monto_adeudado: adeudado, monto_pagado: pagado } : null)
     onRefresh()

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { InfraccionCondominio, SugerenciaCondominio, Unidad, EstadoInfraccion, EstadoSugerencia } from '../../../types'
@@ -96,7 +96,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     setResolviendo(inf.id)
     const update: Partial<InfraccionCondominio> = { estado: nuevoEstado }
     if (resolucion !== undefined) update.resolucion = resolucion || null
-    const { error } = await supabase.from('infracciones_condominio').update(update).eq('id', inf.id)
+    const { error } = await updateCondominioRow('infracciones_condominio', inf.id, update)
     setResolviendo(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
@@ -120,9 +120,9 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     if (!result) return
     const respuesta = result.respuesta
     setResolviendo(sug.id)
-    const { error } = await supabase.from('sugerencias_condominio').update({
+    const { error } = await updateCondominioRow('sugerencias_condominio', sug.id, {
       respuesta, estado: 'respondida', fecha_respuesta: new Date().toISOString().slice(0, 10),
-    }).eq('id', sug.id)
+    })
     setResolviendo(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
@@ -132,7 +132,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     const { isConfirmed } = await confirm({ title: 'Archivar sugerencia', text: '¿Archivar esta sugerencia?', confirmText: 'Archivar' })
     if (!isConfirmed) return
     setResolviendo(sug.id)
-    const { error } = await supabase.from('sugerencias_condominio').update({ estado: 'archivada' }).eq('id', sug.id)
+    const { error } = await updateCondominioRow('sugerencias_condominio', sug.id, { estado: 'archivada' })
     setResolviendo(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm } from '../../shared/Dialog'
 import { toast } from '../../../lib/toast'
 import { CampanaCobro, CanalCampana, EstadoCampana, CuotaCondominio, Unidad } from '../../../types'
@@ -56,7 +56,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
       toast.warning('Nombre y mensaje son obligatorios'); return
     }
     setSaving(true)
-    const { error } = await supabase.from('campanas_cobro').insert({
+    const { error } = await createCondominioRow('campanas_cobro', {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre.trim(), mensaje: form.mensaje.trim(),
       canal: form.canal,
@@ -77,23 +77,23 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
       confirmText: 'Enviar',
     })
     if (!isConfirmed) return
-    await supabase.from('campanas_cobro').update({
+    await updateCondominioRow('campanas_cobro', c.id, {
       estado: 'enviada', enviadas: c.total_destinatarios,
       enviada_por: autorNombre, fecha_envio: new Date().toISOString(),
-    }).eq('id', c.id)
+    })
     toast.success('Campaña enviada')
     onRefresh()
   }
 
   async function completar(id: string) {
-    await supabase.from('campanas_cobro').update({ estado: 'completada' }).eq('id', id)
+    await updateCondominioRow('campanas_cobro', id, { estado: 'completada' })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const { isConfirmed } = await confirm({ title: '¿Eliminar campaña?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!isConfirmed) return
-    await supabase.from('campanas_cobro').delete().eq('id', id)
+    await deleteCondominioRow('campanas_cobro', id)
     onRefresh()
   }
 

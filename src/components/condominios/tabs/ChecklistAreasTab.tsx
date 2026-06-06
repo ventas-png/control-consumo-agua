@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ChecklistArea, ChecklistItem } from '../../../types'
 import { confirm, notify } from '../../shared/Dialog'
 
@@ -88,8 +88,8 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
       items: formItems, estado,
     }
     const { error } = editId
-      ? await supabase.from('checklist_areas').update(payload).eq('id', editId)
-      : await supabase.from('checklist_areas').insert(payload)
+      ? await updateCondominioRow('checklist_areas', editId, payload)
+      : await createCondominioRow('checklist_areas', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -98,7 +98,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   const toggleItem = async (c: ChecklistArea, idx: number) => {
     const items = c.items.map((it, i) => i === idx ? { ...it, ok: !it.ok } : it)
     const estado = calcEstado(items)
-    const { error } = await supabase.from('checklist_areas').update({ items, estado }).eq('id', c.id)
+    const { error } = await updateCondominioRow('checklist_areas', c.id, { items, estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === c.id ? { ...sel, items, estado } : sel)
@@ -107,7 +107,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   const handleDelete = async (c: ChecklistArea) => {
     const r = await confirm({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('checklist_areas').delete().eq('id', c.id)
+    await deleteCondominioRow('checklist_areas', c.id)
     if (selected?.id === c.id) setSelected(null)
     onRefresh()
   }

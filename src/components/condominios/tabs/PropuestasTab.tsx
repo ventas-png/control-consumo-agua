@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PropuestaInversion, CategoriaPropuesta, EstadoPropuesta, PrioridadPropuesta } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -87,8 +87,8 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
       propuesto_por: userId || null, notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('propuestas_inversion').update(payload).eq('id', editId)
-      : await supabase.from('propuestas_inversion').insert(payload)
+      ? await updateCondominioRow('propuestas_inversion', editId, payload)
+      : await createCondominioRow('propuestas_inversion', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
   }
@@ -97,7 +97,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     const p = propuestas.find(x => x.id === id)
     if (!p) return
     const upd = tipo === 'favor' ? { votos_favor: p.votos_favor + 1 } : { votos_contra: p.votos_contra + 1 }
-    const { error } = await supabase.from('propuestas_inversion').update(upd).eq('id', id)
+    const { error } = await updateCondominioRow('propuestas_inversion', id, upd)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -106,7 +106,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
     const updates: Partial<PropuestaInversion> = { estado }
     if (estado === 'aprobada') updates.fecha_aprobacion = new Date().toISOString().slice(0, 10)
     if (estado === 'en_ejecucion') updates.fecha_ejecucion = new Date().toISOString().slice(0, 10)
-    const { error } = await supabase.from('propuestas_inversion').update(updates).eq('id', id)
+    const { error } = await updateCondominioRow('propuestas_inversion', id, updates)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -114,7 +114,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar propuesta?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    const { error } = await supabase.from('propuestas_inversion').delete().eq('id', id)
+    const { error } = await deleteCondominioRow('propuestas_inversion', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }

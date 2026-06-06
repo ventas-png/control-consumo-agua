@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ObraMejora, EstadoObra } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -54,9 +54,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('obras_mejoras').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('obras_mejoras', editId, payload))
     } else {
-      ({ error } = await supabase.from('obras_mejoras').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('obras_mejoras', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -66,7 +66,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar obra?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('obras_mejoras').delete().eq('id', id)
+    await deleteCondominioRow('obras_mejoras', id)
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
@@ -75,7 +75,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
     const autoEstado = progreso === 100 ? 'completada' : undefined
     const update: Record<string, unknown> = { progreso }
     if (autoEstado) update.estado = autoEstado
-    await supabase.from('obras_mejoras').update(update).eq('id', id)
+    await updateCondominioRow('obras_mejoras', id, update)
     onRefresh()
   }
 

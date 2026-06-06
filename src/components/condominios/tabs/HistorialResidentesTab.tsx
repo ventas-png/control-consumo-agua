@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { HistorialResidente, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -72,8 +72,8 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
       estado: form.estado, notas: form.notas || null,
     }
     const { error } = editId
-      ? await supabase.from('historial_residentes').update(payload).eq('id', editId)
-      : await supabase.from('historial_residentes').insert(payload)
+      ? await updateCondominioRow('historial_residentes', editId, payload)
+      : await createCondominioRow('historial_residentes', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -81,14 +81,14 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
 
   const marcarAnterior = async (h: HistorialResidente) => {
     const hoy = new Date().toISOString().slice(0, 10)
-    await supabase.from('historial_residentes').update({ estado: 'anterior', fecha_hasta: h.fecha_hasta ?? hoy }).eq('id', h.id)
+    await updateCondominioRow('historial_residentes', h.id, { estado: 'anterior', fecha_hasta: h.fecha_hasta ?? hoy })
     onRefresh()
   }
 
   const handleDelete = async (h: HistorialResidente) => {
     const r = await confirm({ title: '¿Eliminar registro?', text: h.nombre_completo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('historial_residentes').delete().eq('id', h.id)
+    await deleteCondominioRow('historial_residentes', h.id)
     onRefresh()
   }
 

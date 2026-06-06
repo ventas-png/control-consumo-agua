@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { GarantiaEquipo, EstadoGarantia } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -62,9 +62,9 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('garantias_equipo').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('garantias_equipo', editId, payload))
     } else {
-      ({ error } = await supabase.from('garantias_equipo').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('garantias_equipo', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
@@ -74,12 +74,12 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
   async function handleDelete(id: string) {
     const r = await confirm({ title: t('condominios.garantias.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
-    await supabase.from('garantias_equipo').delete().eq('id', id)
+    await deleteCondominioRow('garantias_equipo', id)
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: EstadoGarantia) {
-    await supabase.from('garantias_equipo').update({ estado }).eq('id', id)
+    await updateCondominioRow('garantias_equipo', id, { estado })
     onRefresh()
   }
 

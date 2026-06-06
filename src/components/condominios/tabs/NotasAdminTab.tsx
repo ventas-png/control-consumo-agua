@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { NotaAdmin, CategoriaNota, PrioridadNota } from '../../../types'
 
@@ -63,16 +63,16 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
     }
     setSaving(true)
     if (editando && selected) {
-      const { error } = await supabase.from('notas_admin').update({
+      const { error } = await updateCondominioRow('notas_admin', selected.id, {
         titulo: form.titulo.trim(), contenido: form.contenido.trim(),
         categoria: form.categoria, prioridad: form.prioridad,
         fijada: form.fijada,
         fecha_recordatorio: form.fecha_recordatorio || null,
-      }).eq('id', selected.id)
+      })
       setSaving(false)
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
-      const { error } = await supabase.from('notas_admin').insert({
+      const { error } = await createCondominioRow('notas_admin', {
         company_id: companyId, project_id: proyectoId,
         titulo: form.titulo.trim(), contenido: form.contenido.trim(),
         categoria: form.categoria, prioridad: form.prioridad,
@@ -93,7 +93,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function toggleFijada(n: NotaAdmin) {
-    await supabase.from('notas_admin').update({ fijada: !n.fijada }).eq('id', n.id)
+    await updateCondominioRow('notas_admin', n.id, { fijada: !n.fijada })
     if (selected?.id === n.id) setSelected(prev => prev ? { ...prev, fijada: !prev.fijada } : null)
     onRefresh()
   }
@@ -101,7 +101,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   async function resolver(n: NotaAdmin) {
     const res = await confirm({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', confirmText: 'Resolver' })
     if (!res.isConfirmed) return
-    await supabase.from('notas_admin').update({ resuelta: true, fijada: false }).eq('id', n.id)
+    await updateCondominioRow('notas_admin', n.id, { resuelta: true, fijada: false })
     if (selected?.id === n.id) setSelected(null)
     onRefresh()
   }
@@ -109,7 +109,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   async function eliminar(n: NotaAdmin) {
     const res = await confirm({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!res.isConfirmed) return
-    await supabase.from('notas_admin').delete().eq('id', n.id)
+    await deleteCondominioRow('notas_admin', n.id)
     if (selected?.id === n.id) setSelected(null)
     onRefresh()
   }
