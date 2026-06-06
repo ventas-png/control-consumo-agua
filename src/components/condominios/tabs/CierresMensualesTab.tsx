@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { exportarPDFTabla } from '../exportUtils'
@@ -60,7 +60,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
     })
     if (!r.isConfirmed) return
     setSaving(true)
-    const { error } = await supabase.from('cierres_mensuales').insert({
+    const { error } = await createCondominioRow('cierres_mensuales', {
       company_id: companyId, project_id: proyectoId, periodo: periodoNuevo,
       total_cuotas_emitidas: calc.totalEmitidas, total_cuotas_cobradas: calc.totalCobradas,
       total_gastos: calc.totalGastos, saldo_periodo: calc.saldo,
@@ -98,14 +98,14 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
       const r = await confirm({ title: `¿Cerrar período ${c.periodo}?`, text: 'Un cierre finalizado bloquea modificaciones.', icon: 'warning', variant: 'danger', confirmText: 'Cerrar período' })
       if (!r.isConfirmed) return
     }
-    await supabase.from('cierres_mensuales').update({ estado: nuevoEstado }).eq('id', c.id)
+    await updateCondominioRow('cierres_mensuales', c.id, { estado: nuevoEstado })
     onRefresh()
   }
 
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar cierre?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('cierres_mensuales').delete().eq('id', id)
+    await deleteCondominioRow('cierres_mensuales', id)
     onRefresh()
   }
 

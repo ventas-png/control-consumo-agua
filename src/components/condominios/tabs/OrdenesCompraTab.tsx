@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
 
 interface Props {
@@ -70,8 +70,8 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       estado: 'borrador' as EstadoOC,
     }
     const { error } = editId
-      ? await supabase.from('ordenes_compra').update(payload).eq('id', editId)
-      : await supabase.from('ordenes_compra').insert(payload)
+      ? await updateCondominioRow('ordenes_compra', editId, payload)
+      : await createCondominioRow('ordenes_compra', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
@@ -100,7 +100,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       updates.monto_real = montoReal ? parseFloat(montoReal) : orden.monto_estimado
       updates.fecha_entrega_esperada = new Date().toISOString().slice(0, 10)
     }
-    const { error } = await supabase.from('ordenes_compra').update(updates).eq('id', orden.id)
+    const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -108,14 +108,14 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   async function cancelar(orden: OrdenCompra) {
     const r = await confirm({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', variant: 'danger', confirmText: 'Cancelar OC' })
     if (!r.isConfirmed) return
-    await supabase.from('ordenes_compra').update({ estado: 'cancelada' }).eq('id', orden.id)
+    await updateCondominioRow('ordenes_compra', orden.id, { estado: 'cancelada' })
     onRefresh()
   }
 
   async function eliminar(orden: OrdenCompra) {
     const r = await confirm({ title: '¿Eliminar borrador?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('ordenes_compra').delete().eq('id', orden.id)
+    await deleteCondominioRow('ordenes_compra', orden.id)
     onRefresh()
   }
 

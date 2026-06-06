@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ReclamoCondominio } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -71,9 +71,9 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
     }
     let error
     if (editId) {
-      ({ error } = await supabase.from('reclamos_condominio').update(payload).eq('id', editId))
+      ({ error } = await updateCondominioRow('reclamos_condominio', editId, payload))
     } else {
-      ({ error } = await supabase.from('reclamos_condominio').insert({ ...payload, company_id: companyId, project_id: proyectoId }))
+      ({ error } = await createCondominioRow('reclamos_condominio', { ...payload, company_id: companyId, project_id: proyectoId }))
     }
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
@@ -83,25 +83,25 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   async function handleDelete(id: string) {
     const r = await confirm({ title: '¿Eliminar reclamo?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('reclamos_condominio').delete().eq('id', id)
+    await deleteCondominioRow('reclamos_condominio', id)
     if (selected?.id === id) setSelected(null)
     onRefresh()
   }
 
   async function cambiarEstado(id: string, estado: string) {
-    await supabase.from('reclamos_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('reclamos_condominio', id, { estado })
     onRefresh()
   }
 
   async function handleResponder() {
     if (!selected) return
     if (!formResp.respuesta_admin.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'Escriba una respuesta.' })
-    await supabase.from('reclamos_condominio').update({
+    await updateCondominioRow('reclamos_condominio', selected.id, {
       respuesta_admin: formResp.respuesta_admin.trim(),
       respondido_por: formResp.respondido_por || null,
       fecha_respuesta: new Date().toISOString().slice(0, 10),
       estado: 'respondido',
-    }).eq('id', selected.id)
+    })
     setShowRespForm(false); setFormResp({ ...BLANK_RESP }); onRefresh()
   }
 

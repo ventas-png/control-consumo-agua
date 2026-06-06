@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PermisoObraUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -80,8 +80,8 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
       observaciones: form.observaciones || null,
     }
     const { error } = editId
-      ? await supabase.from('permisos_obra_unidad').update(payload).eq('id', editId)
-      : await supabase.from('permisos_obra_unidad').insert(payload)
+      ? await updateCondominioRow('permisos_obra_unidad', editId, payload)
+      : await createCondominioRow('permisos_obra_unidad', payload)
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setShowForm(false); onRefresh()
@@ -90,7 +90,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   const avanzarEstado = async (p: PermisoObraUnidad) => {
     const cfg = ESTADO_FLOW[p.estado]
     if (!cfg.next) return
-    const { error } = await supabase.from('permisos_obra_unidad').update({ estado: cfg.next }).eq('id', p.id)
+    const { error } = await updateCondominioRow('permisos_obra_unidad', p.id, { estado: cfg.next })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
     setSelected(sel => sel?.id === p.id ? { ...sel, estado: cfg.next as PermisoObraUnidad['estado'] } : sel)
@@ -99,14 +99,14 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   const rechazar = async (p: PermisoObraUnidad) => {
     const r = await confirm({ title: '¿Rechazar permiso?', icon: 'warning', variant: 'danger', confirmText: 'Rechazar' })
     if (!r.isConfirmed) return
-    await supabase.from('permisos_obra_unidad').update({ estado: 'rechazado' }).eq('id', p.id)
+    await updateCondominioRow('permisos_obra_unidad', p.id, { estado: 'rechazado' })
     onRefresh()
   }
 
   const handleDelete = async (p: PermisoObraUnidad) => {
     const r = await confirm({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('permisos_obra_unidad').delete().eq('id', p.id)
+    await deleteCondominioRow('permisos_obra_unidad', p.id)
     if (selected?.id === p.id) setSelected(null)
     onRefresh()
   }

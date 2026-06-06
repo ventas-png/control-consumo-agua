@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -41,7 +41,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
     if (!form.unidad_id || !form.concepto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'Unidad y concepto son obligatorios.' })
     if (form.monto <= 0) return notify({ variant: 'warning', title: 'Requerido', text: 'El monto debe ser mayor a 0.' })
     setSaving(true)
-    const { error } = await supabase.from('sanciones_condominio').insert({
+    const { error } = await createCondominioRow('sanciones_condominio', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id, infraccion_id: form.infraccion_id || null,
       concepto: form.concepto.trim(), monto: form.monto,
@@ -58,7 +58,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
       const r = await confirm({ title: msg, icon: 'question', confirmText: 'Confirmar' })
       if (!r.isConfirmed) return
     }
-    await supabase.from('sanciones_condominio').update({ estado }).eq('id', id)
+    await updateCondominioRow('sanciones_condominio', id, { estado })
     onRefresh()
   }
 

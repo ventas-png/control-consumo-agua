@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
@@ -91,7 +91,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
       proximo_mantenimiento: form.proximo_mantenimiento || null,
       notas: form.notas.trim() || null,
     }
-    const { error } = await supabase.from('equipos_comunes').insert(payload)
+    const { error } = await createCondominioRow('equipos_comunes', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm()
@@ -100,7 +100,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   }
 
   async function actualizarEstado(equipo: EquipoComun, estado: EstadoEquipo) {
-    const { error } = await supabase.from('equipos_comunes').update({ estado }).eq('id', equipo.id)
+    const { error } = await updateCondominioRow('equipos_comunes', equipo.id, { estado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === equipo.id) setSelected(prev => prev ? { ...prev, estado } : null)
     onRefresh()
@@ -119,11 +119,11 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     })
     if (!result) return
     const proxima = result.proxima || null
-    const { error } = await supabase.from('equipos_comunes').update({
+    const { error } = await updateCondominioRow('equipos_comunes', equipo.id, {
       ultimo_mantenimiento: new Date().toISOString().split('T')[0],
       proximo_mantenimiento: proxima,
       estado: 'operativo' as EstadoEquipo,
-    }).eq('id', equipo.id)
+    })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === equipo.id) {
       setSelected(prev => prev ? { ...prev, ultimo_mantenimiento: new Date().toISOString().split('T')[0], proximo_mantenimiento: proxima || undefined, estado: 'operativo' } : null)

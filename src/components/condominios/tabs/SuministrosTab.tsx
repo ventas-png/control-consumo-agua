@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -61,7 +61,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
     setSaving(true)
-    const { error } = await supabase.from('suministros_condominio').insert({
+    const { error } = await createCondominioRow('suministros_condominio', {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre.trim(), categoria: form.categoria,
       unidad_medida: form.unidad_medida,
@@ -85,7 +85,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     if (isNaN(cant) || cant <= 0) { notify({ variant: 'warning', title: 'Inválido', text: 'Cantidad debe ser positiva' }); return }
 
     setSaving(true)
-    const { error: errMov } = await supabase.from('movimientos_suministro').insert({
+    const { error: errMov } = await createCondominioRow('movimientos_suministro', {
       company_id: companyId, suministro_id: selected.id,
       tipo: movForm.tipo, cantidad: cant,
       motivo: movForm.motivo.trim() || null, area_destino: movForm.area_destino.trim() || null,
@@ -100,7 +100,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     else if (movForm.tipo === 'salida') nuevoStock = Math.max(0, nuevoStock - cant)
     else nuevoStock = cant // ajuste directo
 
-    const { error: errStock } = await supabase.from('suministros_condominio').update({ stock_actual: nuevoStock }).eq('id', selected.id)
+    const { error: errStock } = await updateCondominioRow('suministros_condominio', selected.id, { stock_actual: nuevoStock })
     setSaving(false)
     if (errStock) { notify({ variant: 'error', title: 'Error', text: errStock.message }); return }
 
@@ -110,7 +110,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   }
 
   async function toggleActivo(s: SuministroCondominio) {
-    await supabase.from('suministros_condominio').update({ activo: !s.activo }).eq('id', s.id)
+    await updateCondominioRow('suministros_condominio', s.id, { activo: !s.activo })
     onRefresh()
   }
 

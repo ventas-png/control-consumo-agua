@@ -1,6 +1,6 @@
 import { useState, useCallback, type CSSProperties} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { condominiosKeys } from '../../../domain/condominios/keys'
@@ -130,7 +130,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     const monto = montoPreview
     if (!monto || monto <= 0) { notify({ variant: 'warning', title: 'Error', text: 'El monto calculado debe ser mayor a 0' }); return }
     setSaving(true)
-    const { error } = await supabase.from('recargos_mora').insert({
+    const { error } = await createCondominioRow('recargos_mora', {
       company_id: companyId, project_id: proyectoId,
       unidad_id: form.unidad_id,
       cuota_id: form.cuota_id || null,
@@ -148,7 +148,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   async function cambiarEstado(r: RecargoMora, estado: EstadoRecargo) {
     const update: Record<string, unknown> = { estado }
     if (estado === 'anulado') update.fecha_anulacion = new Date().toISOString()
-    await supabase.from('recargos_mora').update(update).eq('id', r.id)
+    await updateCondominioRow('recargos_mora', r.id, update)
     refrescar()
   }
 
@@ -241,7 +241,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       return
     }
 
-    const { error } = await supabase.from('recargos_mora').insert(rows)
+    const { error } = await createCondominioRow('recargos_mora', rows)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, duration: 2200 })

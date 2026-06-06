@@ -1,5 +1,5 @@
 import { useState, useMemo, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import {
   VencimientoExtra, CategoriaVencimiento,
@@ -115,7 +115,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
       notify({ variant: 'warning', title: 'Error', text: 'Título y fecha son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('vencimientos_extra').insert({
+    const { error } = await createCondominioRow('vencimientos_extra', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), categoria: form.categoria,
       fecha_vencimiento: form.fecha_vencimiento,
@@ -130,7 +130,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
   }
 
   async function marcarRenovado(id: string) {
-    await supabase.from('vencimientos_extra').update({ renovado: true }).eq('id', id)
+    await updateCondominioRow('vencimientos_extra', id, { renovado: true })
     onRefresh()
   }
 

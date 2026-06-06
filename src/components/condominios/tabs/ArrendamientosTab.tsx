@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -86,8 +86,8 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       notas: form.notas.trim() || null,
     }
     const { error } = editingId
-      ? await supabase.from('contratos_arrendamiento').update(data).eq('id', editingId)
-      : await supabase.from('contratos_arrendamiento').insert(data)
+      ? await updateCondominioRow('contratos_arrendamiento', editingId, data)
+      : await createCondominioRow('contratos_arrendamiento', data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: editingId ? 'Contrato actualizado' : 'Contrato registrado', duration: 1400 })
@@ -116,14 +116,14 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   }
 
   async function cambiarEstado(id: string, estado: EstadoContrato) {
-    await supabase.from('contratos_arrendamiento').update({ estado }).eq('id', id)
+    await updateCondominioRow('contratos_arrendamiento', id, { estado })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: '¿Eliminar contrato?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('contratos_arrendamiento').delete().eq('id', id)
+    await deleteCondominioRow('contratos_arrendamiento', id)
     onRefresh()
   }
 

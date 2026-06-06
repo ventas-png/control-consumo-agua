@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { confirm, notify } from '../../shared/Dialog'
@@ -97,22 +97,22 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       monto_total_estimado: usarRubros ? montoTotal : null,
     }
     const { error } = editingId
-      ? await supabase.from('plantillas_cuota').update(data).eq('id', editingId)
-      : await supabase.from('plantillas_cuota').insert(data)
+      ? await updateCondominioRow('plantillas_cuota', editingId, data)
+      : await createCondominioRow('plantillas_cuota', data)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     resetForm(); onRefresh()
   }
 
   async function toggleActiva(p: PlantillaCuota) {
-    await supabase.from('plantillas_cuota').update({ activa: !p.activa }).eq('id', p.id)
+    await updateCondominioRow('plantillas_cuota', p.id, { activa: !p.activa })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: '¿Eliminar plantilla?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('plantillas_cuota').delete().eq('id', id)
+    await deleteCondominioRow('plantillas_cuota', id)
     onRefresh()
   }
 

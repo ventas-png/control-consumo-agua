@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { MantenimientoCisterna, TipoMantenimientoCisterna, EstadoCisterna } from '../../../types'
 
@@ -71,7 +71,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
       notify({ variant: 'warning', title: 'Faltan datos', text: 'El nombre de la cisterna es obligatorio' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('mantenimiento_cisterna').insert({
+    const { error } = await createCondominioRow('mantenimiento_cisterna', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, cisterna: form.cisterna.trim(),
       tipo: form.tipo,
@@ -93,7 +93,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
   }
 
   async function cambiarEstado(r: MantenimientoCisterna, estado: EstadoCisterna) {
-    await supabase.from('mantenimiento_cisterna').update({ estado }).eq('id', r.id)
+    await updateCondominioRow('mantenimiento_cisterna', r.id, { estado })
     onRefresh()
   }
 
