@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { fetchPortalPaymentConfig } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { StripeCheckoutModal } from './StripeCheckoutModal'
@@ -35,11 +35,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
 
   async function cargarConfig() {
     if (!currentUser.company_id) return
-    const { data } = await supabase
-      .from('companies')
-      .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo')
-      .eq('id', currentUser.company_id)
-      .single()
+    const data = await fetchPortalPaymentConfig(currentUser.company_id)
     if (data) {
       setPaymentConfig({
         stripe_configured: data.stripe_configured || false,

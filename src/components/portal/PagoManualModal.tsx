@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent} from 'react'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { createPago, uploadComprobantePago } from '../../domain/cobros/mutations'
 import type { Registro, UserSession, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
@@ -66,9 +66,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
       let comprobantePath: string | null = null
       if (adjunto) {
         const path = `comprobantes/${currentUser.user_id}/${Date.now()}`
-        const { error: uploadError } = await supabase.storage
-          .from('pagos-comprobantes')
-          .upload(path, adjunto, { contentType: adjunto.type })
+        const { error: uploadError } = await uploadComprobantePago(path, adjunto, adjunto.type)
 
         if (!uploadError) {
           comprobantePath = path
@@ -76,7 +74,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
       }
 
       // Crear pago con estado "pendiente_verificacion"
-      const { error } = await supabase.from('pagos').insert({
+      const { error } = await createPago({
         registro_id: registro.id,
         cliente_id: registro.cliente_id,
         project_id: null,
@@ -93,7 +91,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         created_by: currentUser.user_id,
       })
 
-      if (error) throw error
+      if (error) throw new Error(error)
 
       notify({
         variant: 'success',
