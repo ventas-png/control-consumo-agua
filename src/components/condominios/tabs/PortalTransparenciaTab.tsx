@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import {
+  fetchFondoReservaAprobado,
+  fetchFondoReservaMovimientos,
+  fetchPresupuestosAnio,
+  fetchGastosAnioMontos,
+} from '../../../domain/condominios/tabQueries'
 import { EmptyState } from '../../shared/EmptyState'
 import { StatTile } from '../../shared/StatTile'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
@@ -48,15 +53,7 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     setLoading(true)
 
     // Fondo de reserva (legacy approvals model)
-    const { data: fondo } = await supabase
-      .from('fondo_reserva')
-      .select('*')
-      .eq('project_id', proyectoId)
-      .eq('estado', 'aprobado')
-      .order('fecha', { ascending: false })
-      .limit(50)
-
-    const fondoList = (fondo as FondoReserva[]) ?? []
+    const fondoList = await fetchFondoReservaAprobado<FondoReserva>(proyectoId)
     let saldoLegacy = 0
     let aportesL = 0, retirosL = 0
     let ultimoAporte: string | null = null
@@ -66,13 +63,7 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     })
 
     // Modern movimientos (fondo_reserva_movimientos table) — más reciente
-    const { data: movs } = await supabase
-      .from('fondo_reserva_movimientos')
-      .select('*')
-      .eq('project_id', proyectoId)
-      .order('fecha', { ascending: false })
-      .limit(50)
-    const movsList = (movs as FondoReservaMovimiento[]) ?? []
+    const movsList = await fetchFondoReservaMovimientos<FondoReservaMovimiento>(proyectoId)
     setMovimientos(movsList)
 
     let saldoModern = 0
@@ -84,24 +75,13 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
 
     // Presupuestos
     const yearActual = new Date().getFullYear()
-    const { data: pres } = await supabase
-      .from('presupuestos_condominio')
-      .select('*')
-      .eq('project_id', proyectoId)
-      .eq('anio', yearActual)
-      .order('categoria')
-    const presList = (pres as PresupuestoCondominio[]) ?? []
+    const presList = await fetchPresupuestosAnio<PresupuestoCondominio>(proyectoId, yearActual)
     setPresupuestos(presList)
 
     const presupuestoAnual = presList.reduce((s, p) => s + (p.monto_presupuestado ?? 0), 0)
     // Ejecutado: sumar gastos del año por categoría (cuando exista la tabla)
-    const { data: gastos } = await supabase
-      .from('gastos_condominio')
-      .select('monto')
-      .eq('project_id', proyectoId)
-      .gte('fecha', `${yearActual}-01-01`)
-      .lte('fecha', `${yearActual}-12-31`)
-    const ejecutado = (gastos as { monto: number }[] ?? []).reduce((s, g) => s + (g.monto ?? 0), 0)
+    const gastos = await fetchGastosAnioMontos(proyectoId, yearActual)
+    const ejecutado = gastos.reduce((s, g) => s + (g.monto ?? 0), 0)
 
     setKpis({
       saldoFondo: saldoLegacy + saldoModern,

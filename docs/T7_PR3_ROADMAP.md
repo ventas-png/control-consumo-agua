@@ -4,9 +4,8 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 34**. **Sección B (fuera de
-> condominios) COMPLETA** — 0 archivos. Lo que resta son los **34** tabs "complejos" de
-> `condominios/` (sección A).
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 30**. **Sección B COMPLETA.**
+> Sección A en curso: **4** tabs "complejos" hechos (Portal read-only), restan **30**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -54,6 +53,10 @@ signIn, updatePassword, updateUserEmail) + `domain/auth/mfaActions` (enroll/chal
 verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 `domain/facturacion/billing` (subscription/plans/RPC desglose). **Cierra la sección B.**
 
+**Condominios tabs complejos (sección A) — lote Portal read-only:** `DirectorioTab`,
+`MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab` →
+`domain/condominios/tabQueries.ts` (selects propios con join/counts/rango + `activarPortalUnidad`).
+
 **Helpers de dominio reutilizables** (úsalos en vez de re-crear):
 - `domain/usuarios/queries`: `fetchActiveAppUsers()`, `fetchAppUserNamesByIds(ids)`.
 - `domain/contadores/queries.resolveDefaultProjectCompany(userId, fallbackCompanyId)`.
@@ -86,7 +89,10 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 
 ## ⬜ Backlog restante (50 archivos)
 
-### A) `condominios/tabs` "complejos" — 34 tabs
+### A) `condominios/tabs` "complejos" — 30 tabs (4 hechos)
+
+> ✅ **Portal read-only** (lote 8): `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`,
+> `PortalTransparenciaTab` → `domain/condominios/tabQueries.ts`.
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -106,7 +112,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
 | Rentas/STR | `STRTab`, `PortalRentasTab`, `SolicitudesMudanzaTab` |
 | Mantenimiento/otros | `MantenimientoPrevTab`, `AutomatizacionesTab`, `TareasPersonalTab` |
-| Portal read-only | `DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab` |
+| ~~Portal read-only~~ ✅ | ~~`DirectorioTab`, `MultiCondominioTab`, `PortalResidenteTab`, `PortalTransparenciaTab`~~ → `tabQueries.ts` |
 
 > Para los `select` de estos tabs: si leen datos que **CondominiosSection ya carga**, evaluá
 > pasarlos por props; si son lecturas propias (filtros distintos), creá `fetch…()` en

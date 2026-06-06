@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { fetchMensajesPortal, activarPortalUnidad } from '../../../domain/condominios/tabQueries'
 import type {
   Unidad, CuotaCondominio, TicketMantenimiento,
   Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, AnuncioComunidad, MensajePortal,
@@ -50,15 +50,13 @@ export function PortalResidenteTab({
 
   useEffect(() => {
     if (!selectedUnidadId) { setMensajes([]); return }
-    supabase.from('mensajes_portal')
-      .select('*').eq('unidad_id', selectedUnidadId).order('created_at', { ascending: false })
-      .then(({ data }) => setMensajes(data ?? []))
+    void fetchMensajesPortal<MensajePortal>(selectedUnidadId).then(setMensajes)
   }, [selectedUnidadId])
 
   async function generarToken() {
     if (!unidad) return
     const token = crypto.randomUUID().replace(/-/g, '')
-    await supabase.from('unidades').update({ token_portal: token, portal_activo: true }).eq('id', unidad.id)
+    await activarPortalUnidad(unidad.id, token)
     onRefresh()
   }
 
@@ -180,9 +178,7 @@ export function PortalResidenteTab({
                 companyId={companyId}
                 isAdmin={canEdit}
                 onRefresh={() => {
-                  supabase.from('mensajes_portal')
-                    .select('*').eq('unidad_id', selectedUnidadId).order('created_at', { ascending: false })
-                    .then(({ data }) => setMensajes(data ?? []))
+                  void fetchMensajesPortal<MensajePortal>(selectedUnidadId).then(setMensajes)
                   onRefresh()
                 }}
                 onGenerarToken={generarToken}

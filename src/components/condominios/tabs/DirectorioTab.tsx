@@ -1,6 +1,6 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { fetchDirectorioResidentes } from '../../../domain/condominios/tabQueries'
 import type { PersonalCondominio, ContactoEmergencia } from '../../../types'
 
 interface ResidenteEntry {
@@ -34,23 +34,19 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
   useEffect(() => {
     if (activeTab !== 'residentes' || !proyectoId) return
     setLoading(true)
-    supabase.from('unidades')
-      .select('nombre, clientes(nombre, telefono, email, identificacion)')
-      .eq('project_id', proyectoId)
-      .order('nombre')
-      .then(({ data }) => {
-        setResidentes((data ?? []).map((r: Record<string, unknown>) => {
-          const c = r.clientes as Record<string, unknown> | null
-          return {
-            unidad_nombre: r.nombre as string,
-            nombre:        c?.nombre        as string | undefined,
-            telefono:      c?.telefono      as string | undefined,
-            email:         c?.email         as string | undefined,
-            identificacion:c?.identificacion as string | undefined,
-          }
-        }))
-        setLoading(false)
-      })
+    void fetchDirectorioResidentes(proyectoId).then(data => {
+      setResidentes(data.map((r: Record<string, unknown>) => {
+        const c = r.clientes as Record<string, unknown> | null
+        return {
+          unidad_nombre: r.nombre as string,
+          nombre:        c?.nombre        as string | undefined,
+          telefono:      c?.telefono      as string | undefined,
+          email:         c?.email         as string | undefined,
+          identificacion:c?.identificacion as string | undefined,
+        }
+      }))
+      setLoading(false)
+    })
   }, [activeTab, proyectoId])
 
   const filterStr = search.toLowerCase()

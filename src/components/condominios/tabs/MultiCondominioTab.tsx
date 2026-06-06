@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { fetchProyectoResumen } from '../../../domain/condominios/tabQueries'
 import { Proyecto } from '../../../types'
 
 interface Props {
@@ -34,14 +34,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
     async function cargar() {
       setLoading(true)
       const resultado = await Promise.all(proyectosActivos.map(async p => {
-        const [cuotasRes, ticketsRes, unidadesRes, visitantesRes] = await Promise.all([
-          supabase.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', p.id).eq('company_id', companyId).is('deleted_at', null),
-          supabase.from('tickets_mantenimiento').select('estado').eq('project_id', p.id).eq('company_id', companyId).is('deleted_at', null),
-          supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('project_id', p.id).eq('company_id', companyId),
-          supabase.from('visitantes').select('id', { count: 'exact', head: true }).eq('project_id', p.id).eq('company_id', companyId).gte('hora_entrada', hoy),
-        ])
-        const cuotas = cuotasRes.data ?? []
-        const tickets = ticketsRes.data ?? []
+        const { cuotas, tickets, unidadesCount, visitantesCount } = await fetchProyectoResumen(p.id, companyId, hoy)
         return {
           proyecto: p,
           cuotasTotales: cuotas.length,
@@ -51,8 +44,8 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
           montoVencido: cuotas.filter(c => (c.estado === 'pendiente' || c.estado === 'moroso') && c.fecha_vencimiento && c.fecha_vencimiento < hoy).reduce((s, c) => s + (c.monto ?? 0), 0),
           ticketsAbiertos: tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length,
           ticketsTotal: tickets.length,
-          unidades: unidadesRes.count ?? 0,
-          visitantesHoy: visitantesRes.count ?? 0,
+          unidades: unidadesCount,
+          visitantesHoy: visitantesCount,
         } as ResumenProyecto
       }))
       setResumenes(resultado)
