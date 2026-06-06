@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { FlujoAprobacionCond, TipoFlujoAprobacion, EstadoFlujoAprobacion } from '../../../types'
 
 interface Props {
@@ -46,7 +46,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   async function crear() {
     if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Campo requerido', text: 'El título es obligatorio.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('flujo_aprobacion_cond').insert({
+    const { error } = await createCondominioRow('flujo_aprobacion_cond', {
       company_id: companyId,
       project_id: proyectoId,
       tipo: form.tipo,
@@ -79,12 +79,12 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
     })
     if (!result) return
     const comentario = result.comentario
-    const { error } = await supabase.from('flujo_aprobacion_cond').update({
+    const { error } = await updateCondominioRow('flujo_aprobacion_cond', flujo.id, {
       estado: nuevoEstado,
       aprobado_por: autorNombre || null,
       fecha_resolucion: new Date().toISOString().slice(0, 10),
       comentario_resolucion: comentario || null,
-    }).eq('id', flujo.id)
+    })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }
@@ -92,7 +92,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   async function eliminar(flujo: FlujoAprobacionCond) {
     const r = await confirm({ title: '¿Eliminar solicitud?', text: flujo.titulo, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('flujo_aprobacion_cond').delete().eq('id', flujo.id)
+    await deleteCondominioRow('flujo_aprobacion_cond', flujo.id)
     onRefresh()
   }
 

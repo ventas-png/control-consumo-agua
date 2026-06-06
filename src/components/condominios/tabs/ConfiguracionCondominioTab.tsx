@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { ConfigCondominio } from '../../../types'
 
 interface Props {
@@ -72,8 +72,8 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
       updated_at: new Date().toISOString(),
     }
     const { error } = config
-      ? await supabase.from('config_condominio').update(payload).eq('id', config.id)
-      : await supabase.from('config_condominio').insert(payload)
+      ? await updateCondominioRow('config_condominio', config.id, payload)
+      : await createCondominioRow('config_condominio', payload)
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Configuración guardada', duration: 1500 })

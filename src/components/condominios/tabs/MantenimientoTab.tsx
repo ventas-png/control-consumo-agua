@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -121,7 +121,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   async function handleGuardar() {
     if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título del ticket.' }); return }
     setSaving(true)
-    const { error } = await supabase.from('tickets_mantenimiento').insert({
+    const { error } = await createCondominioRow('tickets_mantenimiento', {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: form.unidad_id || null,
@@ -146,7 +146,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     if (!canEdit) return
     const updates: Record<string, unknown> = { estado }
     if (estado === 'cerrado') updates.fecha_cierre = new Date().toISOString()
-    const { error } = await supabase.from('tickets_mantenimiento').update(updates).eq('id', id)
+    const { error } = await updateCondominioRow('tickets_mantenimiento', id, updates)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     onRefresh()
   }

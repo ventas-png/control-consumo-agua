@@ -1,5 +1,5 @@
 import { useState, type CSSProperties} from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import { ControlSistemaIncendio, TipoSistemaIncendio, TipoInspeccionIncendio, ResultadoInspeccionIncendio } from '../../../types'
 
@@ -78,7 +78,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
       notify({ variant: 'warning', title: 'Faltan datos', text: 'Identificador y ubicación son obligatorios' }); return
     }
     setSaving(true)
-    const { error } = await supabase.from('control_sistema_incendio').insert({
+    const { error } = await createCondominioRow('control_sistema_incendio', {
       company_id: companyId, project_id: proyectoId,
       fecha: form.fecha, tipo_sistema: form.tipo_sistema,
       identificador: form.identificador.trim(), ubicacion: form.ubicacion.trim(),
