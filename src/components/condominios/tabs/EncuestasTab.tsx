@@ -1,6 +1,11 @@
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import {
+  createCondominioRow,
+  updateCondominioRow,
+  deleteCondominioRow,
+  deleteCondominioRowBy,
+} from '../../../domain/condominios/tabMutations'
 import type { Encuesta, RespuestaEncuesta, EstadoEncuesta, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -68,8 +73,8 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
       fecha_fin: formEnc.fecha_fin || null, estado: formEnc.estado ?? 'borrador',
     }
     const { error } = editEncuestaId
-      ? await supabase.from('encuestas').update(payload).eq('id', editEncuestaId)
-      : await supabase.from('encuestas').insert(payload)
+      ? await updateCondominioRow('encuestas', editEncuestaId, payload)
+      : await createCondominioRow('encuestas', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingEnc(false); return }
     setSavingEnc(false); cancelEncuestaForm(); onRefresh()
   }
@@ -77,15 +82,15 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   async function handleDeleteEncuesta(id: string) {
     const r = await confirm({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('respuestas_encuesta').delete().eq('encuesta_id', id)
-    const { error } = await supabase.from('encuestas').delete().eq('id', id)
+    await deleteCondominioRowBy('respuestas_encuesta', 'encuesta_id', id)
+    const { error } = await deleteCondominioRow('encuestas', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }
 
   async function handleEstadoEncuesta(id: string, estado: EstadoEncuesta) {
-    const { error } = await supabase.from('encuestas').update({ estado }).eq('id', id)
+    const { error } = await updateCondominioRow('encuestas', id, { estado })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -107,7 +112,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
       nombre_respondente: respForm.nombre || null,
       respuestas: respForm.answers,
     }
-    const { error } = await supabase.from('respuestas_encuesta').insert(payload)
+    const { error } = await createCondominioRow('respuestas_encuesta', payload)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSavingResp(false); return }
     setSavingResp(false); setShowRespForm(false); onRefresh()
   }

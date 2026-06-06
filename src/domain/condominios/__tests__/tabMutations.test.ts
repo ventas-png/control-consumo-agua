@@ -17,6 +17,7 @@ import {
   upsertCondominioRow,
   updateCondominioRow,
   deleteCondominioRow,
+  deleteCondominioRowBy,
   marcarCuotasMorosas,
 } from '../tabMutations'
 
@@ -71,5 +72,15 @@ describe('tabMutations (CRUD genérico)', () => {
   it('upsertCondominioRow propaga el error con .message', async () => {
     h.state.result = { error: { message: 'conflict' } }
     expect(await upsertCondominioRow('x', {})).toEqual({ error: { message: 'conflict' } })
+  })
+
+  it('deleteCondominioRowBy borra por columna distinta de id', async () => {
+    h.state.result = { error: null }
+    expect(await deleteCondominioRowBy('respuestas_encuesta', 'encuesta_id', 'e1')).toEqual({ error: null })
+  })
+
+  it('deleteCondominioRowBy propaga el error', async () => {
+    h.state.result = { error: { message: 'fk' } }
+    expect(await deleteCondominioRowBy('x', 'col', 'v')).toEqual({ error: { message: 'fk' } })
   })
 })

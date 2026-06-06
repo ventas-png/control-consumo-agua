@@ -10,7 +10,7 @@ const h = vi.hoisted(() => {
   }
   function makeBuilder(table: string) {
     const b: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'is', 'order', 'limit', 'gte', 'lte', 'update']) b[m] = () => b
+    for (const m of ['select', 'eq', 'in', 'is', 'order', 'limit', 'gte', 'lte', 'update']) b[m] = () => b
     b.then = (resolve: (v: unknown) => void) => resolve(state.byTable[table] ?? state.fallback)
     return b
   }
@@ -29,6 +29,11 @@ import {
   fetchPresupuestosAnio,
   fetchGastosAnioMontos,
   fetchEjecucionesMantenimiento,
+  fetchPuntosAsambleaConVotos,
+  fetchAsambleasDigital,
+  fetchPuntosByAsambleaIds,
+  fetchVotosUnidad,
+  fetchVotosVotacion,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -102,5 +107,30 @@ describe('fetchEjecucionesMantenimiento', () => {
   })
   it('sin data → []', async () => {
     expect(await fetchEjecucionesMantenimiento('plan1')).toEqual([])
+  })
+})
+
+describe('asambleas / votaciones', () => {
+  it('fetchPuntosAsambleaConVotos devuelve filas con join', async () => {
+    h.state.byTable.puntos_asamblea = { data: [{ id: 'p1', votos_asamblea: [] }], error: null }
+    expect(await fetchPuntosAsambleaConVotos('a1')).toEqual([{ id: 'p1', votos_asamblea: [] }])
+  })
+  it('fetchPuntosAsambleaConVotos sin data → []', async () => {
+    expect(await fetchPuntosAsambleaConVotos('a1')).toEqual([])
+  })
+  it('fetchAsambleasDigital devuelve filas', async () => {
+    h.state.byTable.asambleas_digital = { data: [{ id: 'a1' }], error: null }
+    expect(await fetchAsambleasDigital('proj1')).toEqual([{ id: 'a1' }])
+  })
+  it('fetchPuntosByAsambleaIds (.in) devuelve filas', async () => {
+    h.state.byTable.puntos_asamblea = { data: [{ id: 'p1', asamblea_id: 'a1' }], error: null }
+    expect(await fetchPuntosByAsambleaIds(['a1'])).toEqual([{ id: 'p1', asamblea_id: 'a1' }])
+  })
+  it('fetchVotosUnidad degrada a []', async () => {
+    expect(await fetchVotosUnidad('u1')).toEqual([])
+  })
+  it('fetchVotosVotacion devuelve filas con join', async () => {
+    h.state.byTable.votos = { data: [{ id: 'v1', unidades: { nombre: 'A-1' } }], error: null }
+    expect(await fetchVotosVotacion('vot1')).toEqual([{ id: 'v1', unidades: { nombre: 'A-1' } }])
   })
 })

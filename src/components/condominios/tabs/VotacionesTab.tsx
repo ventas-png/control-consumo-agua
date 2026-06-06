@@ -1,6 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchVotosVotacion } from '../../../domain/condominios/tabQueries'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 
@@ -48,20 +49,19 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   useEffect(() => {
     if (!selected) return
     setLoadingVotos(true)
-    supabase.from('votos').select('*, unidades(nombre)').eq('votacion_id', selected)
-      .then(({ data }) => {
-        setVotos((data ?? []).map((r: Record<string, unknown>) => ({
-          ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
-        } as Voto)))
-        setLoadingVotos(false)
-      })
+    void fetchVotosVotacion(selected).then(data => {
+      setVotos(data.map((r: Record<string, unknown>) => ({
+        ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
+      } as Voto)))
+      setLoadingVotos(false)
+    })
   }, [selected])
 
   async function handleSave() {
     if (!form.titulo.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El título es obligatorio.' })
     if (form.opciones.some(o => !o.texto.trim())) return notify({ variant: 'warning', title: 'Requerido', text: 'Completa todas las opciones.' })
     setSaving(true)
-    const { error } = await supabase.from('votaciones').insert({
+    const { error } = await createCondominioRow('votaciones', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), descripcion: form.descripcion || null,
       tipo: form.tipo, opciones: form.opciones.map(o => ({ id: o.id, texto: o.texto.trim() })),
@@ -80,12 +80,12 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     if (!selected || !selUnidad || !selOpcion) return notify({ variant: 'warning', title: 'Requerido', text: 'Selecciona unidad y opción.' })
     if (votos.some(v => v.unidad_id === selUnidad)) return notify({ variant: 'info', title: 'Ya votó', text: 'Esta unidad ya registró su voto.' })
     setRegistering(true)
-    const { error } = await supabase.from('votos').insert({ company_id: companyId, votacion_id: selected, unidad_id: selUnidad, opcion_id: selOpcion })
+    const { error } = await createCondominioRow('votos', { company_id: companyId, votacion_id: selected, unidad_id: selUnidad, opcion_id: selOpcion })
     setRegistering(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     setSelUnidad(''); setSelOpcion('')
-    const { data } = await supabase.from('votos').select('*, unidades(nombre)').eq('votacion_id', selected)
-    setVotos((data ?? []).map((r: Record<string, unknown>) => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as Voto)))
+    const data = await fetchVotosVotacion(selected)
+    setVotos(data.map((r: Record<string, unknown>) => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as Voto)))
   }
 
   async function handleCerrar(id: string) {
@@ -96,7 +96,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     const max = Math.max(...counts.map(c => c.count), 0)
     const winners = counts.filter(c => c.count === max && c.count > 0)
     const resultado = winners.length === 0 ? 'sin votos' : winners.length > 1 ? 'empate' : winners[0].texto.slice(0, 60)
-    await supabase.from('votaciones').update({ estado: 'cerrada', fecha_cierre: new Date().toISOString(), resultado }).eq('id', id)
+    await updateCondominioRow('votaciones', id, { estado: 'cerrada', fecha_cierre: new Date().toISOString(), resultado })
     onRefresh()
   }
 

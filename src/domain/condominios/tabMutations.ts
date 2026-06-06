@@ -66,6 +66,16 @@ export async function deleteCondominioRow(
   return { error }
 }
 
+/** Elimina filas de `table` por una columna distinta de `id` (ej. encuesta_id). */
+export async function deleteCondominioRowBy(
+  table: string,
+  column: string,
+  value: string,
+): Promise<{ error: RowError }> {
+  const { error } = await supabase.from(table).delete().eq(column, value)
+  return { error }
+}
+
 /**
  * Marca un conjunto de cuotas de condominio como 'moroso' por id (acción de la
  * automatización "marcar_moroso"). Bespoke por el `.in(...)`. Mismo shape de

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow, deleteCondominioRow, upsertCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchPuntosAsambleaConVotos } from '../../../domain/condominios/tabQueries'
 import { toast } from '../../../lib/toast'
 import { confirm } from '../../shared/Dialog'
 import type { Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto } from '../../../types'
@@ -57,7 +58,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     if (!form.titulo.trim()) { toast.error('Ingrese el título.'); return }
     if (!form.fecha || !form.hora_inicio) { toast.error('Ingrese fecha y hora de inicio.'); return }
     setSaving(true)
-    const { error } = await supabase.from('asambleas').insert({
+    const { error } = await createCondominioRow('asambleas', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), tipo: form.tipo,
       fecha: form.fecha, hora_inicio: form.hora_inicio,
@@ -72,19 +73,15 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function cambiarEstado(id: string, estado: EstadoAsamblea) {
-    await supabase.from('asambleas').update({ estado }).eq('id', id)
+    await updateCondominioRow('asambleas', id, { estado })
     onRefresh()
   }
 
   async function cargarPuntos(asambleaId: string) {
     setSelectedId(asambleaId)
     setLoadingPuntos(true)
-    const { data: puntosData } = await supabase
-      .from('puntos_asamblea')
-      .select('*, votos_asamblea(*, unidades(nombre))')
-      .eq('asamblea_id', asambleaId)
-      .order('orden')
-    setPuntos((puntosData ?? []).map((p: Record<string, unknown>) => ({
+    const puntosData = await fetchPuntosAsambleaConVotos(asambleaId)
+    setPuntos(puntosData.map((p: Record<string, unknown>) => ({
       ...p,
       votos: ((p.votos_asamblea as Record<string, unknown>[]) ?? []).map((v: Record<string, unknown>) => ({
         ...v,
@@ -97,7 +94,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   async function agregarPunto() {
     if (!puntoForm.titulo.trim() || !selectedId) return
     const maxOrden = puntos.length > 0 ? Math.max(...puntos.map(p => p.orden)) + 1 : 1
-    const { error } = await supabase.from('puntos_asamblea').insert({
+    const { error } = await createCondominioRow('puntos_asamblea', {
       asamblea_id: selectedId, orden: maxOrden,
       titulo: puntoForm.titulo.trim(), descripcion: puntoForm.descripcion.trim() || null, tipo: puntoForm.tipo,
     })
@@ -108,21 +105,21 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function registrarVoto(puntoId: string, unidadId: string, voto: TipoVoto) {
-    await supabase.from('votos_asamblea').upsert({
+    await upsertCondominioRow('votos_asamblea', {
       punto_id: puntoId, unidad_id: unidadId, voto, registrado_por: userId,
-    }, { onConflict: 'punto_id,unidad_id' })
+    }, 'punto_id,unidad_id')
     if (selectedId) cargarPuntos(selectedId)
   }
 
   async function guardarActa(id: string, acta: string) {
-    await supabase.from('asambleas').update({ acta }).eq('id', id)
+    await updateCondominioRow('asambleas', id, { acta })
     onRefresh()
   }
 
   async function eliminar(id: string) {
     const r = await confirm({ title: '¿Eliminar asamblea?', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
     if (!r.isConfirmed) return
-    await supabase.from('asambleas').delete().eq('id', id)
+    await deleteCondominioRow('asambleas', id)
     if (selectedId === id) setSelectedId(null)
     onRefresh()
   }

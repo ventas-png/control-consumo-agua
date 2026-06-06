@@ -4,9 +4,9 @@
 > todo el acceso a datos vive en `src/domain/<módulo>/`. **Incremental, un PR atómico
 > por módulo/lote, sin migraciones (solo front).**
 >
-> **Métrica:** componentes que importan `lib/supabase`: **190 → 24**. **Sección B COMPLETA.**
-> Sección A en curso: **10** tabs hechos (grupos Portal read-only, Mantenimiento/otros y
-> Amenidades/reservas completos); restan **24**.
+> **Métrica:** componentes que importan `lib/supabase`: **190 → 20**. **Sección B COMPLETA.**
+> Sección A en curso: **14** tabs hechos (grupos Portal read-only, Mantenimiento/otros,
+> Amenidades/reservas y Asambleas/votaciones completos); restan **20**.
 >
 > `grep -rlE "from '.*lib/supabase'" src/components | wc -l`  → debe ir a 0.
 
@@ -102,6 +102,10 @@ verify/unenroll/list) + `domain/shared/mutations` (checkout/billing-portal) +
 > ✅ **AmenidadesTab** (lote 11, ~1.7k líneas): todo CRUD por id (amenidades/reservas/bloqueos)
 > + cuotas vía `createCondominioRowReturning`. Cierra el grupo Amenidades/reservas. Sin
 > funciones de dominio nuevas (reusa genéricos).
+> ✅ **Asambleas/votaciones** (lote 12): `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`,
+> `EncuestasTab` → genéricos + nuevos en tabQueries (`fetchPuntosAsambleaConVotos`,
+> `fetchAsambleasDigital`, `fetchPuntosByAsambleaIds`, `fetchVotosUnidad`, `fetchVotosVotacion`)
+> y `deleteCondominioRowBy` (delete por columna ≠ id) + `upsertCondominioRow`.
 
 Los tabs **simples** (CRUD por id, datos por props) ya están migrados con los 3 helpers
 genéricos de **`domain/condominios/tabMutations`** (`createCondominioRow` (+`Returning`),
@@ -115,7 +119,7 @@ necesita **funciones de dominio específicas** en `domain/condominios/` (queries
 | Sub-feature (lote sugerido) | Tabs |
 |---|---|
 | Cuotas/cobranza | `CuotasTab`, `GeneracionCuotasTab`, `GeneradorCuotasTab`, `PlanPagoCondTab`, `CierreAnualTab`, `HistorialSaldosTab`, `InformeMensualTab`, `ConciliacionCobrosTab`, `SolicitudesRentaTab` |
-| Asambleas/votaciones | `AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab` |
+| ~~Asambleas/votaciones~~ ✅ | ~~`AsambleasTab`, `PortalAsambleasTab`, `VotacionesTab`, `EncuestasTab`~~ → genéricos + selects/`deleteCondominioRowBy` |
 | ~~Amenidades/reservas~~ ✅ | ~~`AmenidadesTab`, `PortalReservasTab`, `EventosComunidadTab`~~ → genéricos + `upsertCondominioRow` |
 | Seguridad/rondas | `SeguridadTab`, `RutasRondaTab`, `VisitantesTab`, `EstacionamientoVisitaTab` |
 | Paquetería/storage | `PaqueteriaTab`, `PaqueteriaSalientesTab`, `PortalPaquetesTab` (rpc+storage), `PortalMudanzaTab` (storage) |
