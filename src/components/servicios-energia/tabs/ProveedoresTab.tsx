@@ -184,7 +184,8 @@ export default function ProveedoresTab({
       {proveedoresEnergia.length === 0 ? (
         <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay proveedores registrados</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem' }}>
+        <div className="table-scroll-wrapper">
+        <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse', marginTop: '1.5rem' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
               <th style={{ padding: '0.75rem', textAlign: 'left' }}>Nombre</th>
@@ -219,6 +220,7 @@ export default function ProveedoresTab({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )
