@@ -129,8 +129,8 @@ export function Topbar({ activeSection, onMenuToggle, onNavigate, sidebarOpen = 
           </svg>
         </button>
 
-        {/* Page title with icon */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Page title with icon — oculto en móvil (≤640px) para una topbar de una sola fila */}
+        <div className="app-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             width: '30px',
             height: '30px',

@@ -77,9 +77,27 @@
   .app-backdrop { display: block !important; }
   .app-hamburger { display: flex !important; }
   .app-main { padding: 16px !important; }
-  .app-topbar { padding: 0 14px !important; }
+  /* Topbar en móvil: el alto fijo de 62px (inline) + flex-wrap hacía que la
+   * 2ª fila (campana/tema/usuario) se desbordara y quedara SUPERPUESTA sobre el
+   * contenido. height:auto + min-height deja que crezca al envolver; el grupo
+   * derecho se alinea a la derecha en su fila. */
+  .app-topbar {
+    height: auto !important;
+    min-height: 62px;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 14px !important;
+    padding-top: max(8px, env(safe-area-inset-top, 0)) !important;
+  }
+  .app-topbar > div:last-child { margin-left: auto; }
   .app-breadcrumbs { padding: 7px 14px !important; }
   .app-alert-banner { padding: 10px 14px !important; flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 640px) {
+  /* En teléfonos, ocultar el título de página de la topbar: el hamburguesa ya
+   * abre el menú y cada vista trae su propio encabezado. Deja la topbar en una
+   * sola fila limpia (hamburguesa a la izquierda, controles a la derecha). */
+  .app-topbar-title { display: none !important; }
 }
 @media (max-width: 480px) {
   .app-online-badge { display: none !important; }
