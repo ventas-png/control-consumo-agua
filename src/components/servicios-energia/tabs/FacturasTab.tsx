@@ -157,7 +157,8 @@ export default function FacturasTab({
         {filteredFacturas.length === 0 ? (
           <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>No hay facturas con los filtros aplicados</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <div className="table-scroll-wrapper">
+          <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 <th style={{ padding: '0.5rem', textAlign: 'left' }}>Fuente</th>
@@ -235,6 +236,7 @@ export default function FacturasTab({
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

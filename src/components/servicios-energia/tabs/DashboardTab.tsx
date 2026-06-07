@@ -161,7 +161,8 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
         {totalsPorFuente.length === 0 ? (
           <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>No hay datos de facturas</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-scroll-wrapper">
+          <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fuente</th>
@@ -196,6 +197,7 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
               </tr>
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

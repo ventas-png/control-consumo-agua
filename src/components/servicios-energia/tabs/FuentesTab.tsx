@@ -239,7 +239,8 @@ export default function FuentesTab({
       {fuentesEnergia.length === 0 ? (
         <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay fuentes de energía registradas</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
+        <div className="table-scroll-wrapper">
+        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', marginTop: '1.5rem', fontSize: '0.9rem' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
               <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nombre</th>
@@ -279,6 +280,7 @@ export default function FuentesTab({
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )

@@ -162,7 +162,8 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
 
       {/* Tabla mes a mes */}
       <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+        <div className="table-scroll-wrapper">
+        <table style={{ width: '100%', minWidth: 820, borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
             <tr style={{ background: 'var(--at-surface-2)' }}>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Mes</th>
@@ -225,6 +226,7 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
     </div>
   )
