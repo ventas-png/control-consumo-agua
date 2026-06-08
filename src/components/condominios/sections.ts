@@ -2,22 +2,23 @@
 // Fuente única compartida por CondominiosSection (cuerpo del módulo) y el
 // Sidebar global (que ahora expone las 9 secciones bajo "Manejo Condominios").
 // IMPORTANTE: mantener este módulo libre de dependencias pesadas (no importar
-// tabRegistry) para no inflar el bundle inicial del sidebar.
+// tabRegistry) para no inflar el bundle inicial del sidebar. Los íconos SVG de
+// cada sección viven en ./sectionIcons (.tsx); aquí solo datos de navegación.
 
 export type SectionKey =
   | 'panel' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones'
   | 'seguridad' | 'comunidad' | 'administracion' | 'especiales'
 
-export interface SectionDef { id: SectionKey; label: string; icon: string; tabs: string[] }
+export interface SectionDef { id: SectionKey; label: string; tabs: string[] }
 
 export const SECTIONS: SectionDef[] = [
-  { id: 'panel', label: 'Panel', icon: '📊', tabs: [
+  { id: 'panel', label: 'Panel', tabs: [
     'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
     'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
     'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
     'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado',
   ]},
-  { id: 'finanzas', label: 'Finanzas', icon: '💰', tabs: [
+  { id: 'finanzas', label: 'Finanzas', tabs: [
     'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
     'campanas_cobro', 'reporte_deudores', 'mapa_calor_cuotas', 'conciliacion_cobros',
     'estado_cuenta_residente', 'estadocuenta', 'convenios_cuota', 'plan_pago', 'avisos_cobro',
@@ -27,44 +28,44 @@ export const SECTIONS: SectionDef[] = [
     'cierres', 'cierre_anual', 'historial_saldos', 'notificaciones_enviadas', 'proformas',
     'exportacion', 'centro_costos', 'analisis_cartera',
   ]},
-  { id: 'residentes', label: 'Residentes', icon: '🏠', tabs: [
+  { id: 'residentes', label: 'Residentes', tabs: [
     'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
     'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
     'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
     'scoring_unidades',
   ]},
-  { id: 'operaciones', label: 'Operaciones', icon: '🔧', tabs: [
+  { id: 'operaciones', label: 'Operaciones', tabs: [
     'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
     'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
     'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
     'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas',
     'prestamos',
   ]},
-  { id: 'instalaciones', label: 'Instalaciones', icon: '🏗️', tabs: [
+  { id: 'instalaciones', label: 'Instalaciones', tabs: [
     'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'bodegas', 'llaves',
     'equipos', 'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
     'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
   ]},
-  { id: 'seguridad', label: 'Seguridad', icon: '🛡️', tabs: [
+  { id: 'seguridad', label: 'Seguridad', tabs: [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
     'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
     'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia',
     'panel_turno', 'emergencias',
   ]},
-  { id: 'comunidad', label: 'Comunidad', icon: '🏘️', tabs: [
+  { id: 'comunidad', label: 'Comunidad', tabs: [
     'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
     'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
     'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
     'comunicados', 'recordatorios', 'comunicacion_condominios',
   ]},
-  { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
+  { id: 'administracion', label: 'Administración', tabs: [
     'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
     'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
     'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
     'automatizaciones', 'plantillas_mensaje', 'flujo_aprobacion', 'envio_masivo',
     'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',
   ]},
-  { id: 'especiales', label: 'Especiales', icon: '⭐', tabs: [
+  { id: 'especiales', label: 'Especiales', tabs: [
     'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'sostenibilidad',
   ]},
 ]

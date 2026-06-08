@@ -6,6 +6,7 @@ import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConf
 import { getDisplayRoleLabel } from '../../lib/permissions'
 import { CompanyBrandMark } from '../shared/CompanyBrandMark'
 import { SECTIONS, condoTabPath, type SectionKey, type SectionDef } from '../condominios/sections'
+import { SECTION_ICONS } from '../condominios/sectionIcons'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 
 interface Tab {
@@ -508,18 +509,17 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '7px',
-            fontSize: '15px',
-            lineHeight: 1,
             background: isActive
               ? 'rgba(185,106,63,0.30)'
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
+            color: isActive ? 'white' : isHovered ? '#B4C5BB' : '#8FA398',
             transition: 'all 0.14s ease',
           }}
           aria-hidden="true"
         >
-          {sec.icon}
+          {SECTION_ICONS[sec.id]}
         </span>
         {sec.label}
         {isActive && (
