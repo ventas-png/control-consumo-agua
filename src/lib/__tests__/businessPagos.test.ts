@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   resolverConfigPagoEfectiva,
+  normalizarMonedaISO,
   MONEDA_PAGO_DEFAULT,
   PROVEEDOR_PAGO_DEFAULT,
 } from '../businessPagos'
@@ -48,5 +49,32 @@ describe('resolverConfigPagoEfectiva', () => {
     const c = resolverConfigPagoEfectiva({ proveedorPago: 'QPayPro', monedaDefault: 'gtq' })
     expect(c.proveedorPago).toBe('qpaypro')
     expect(c.moneda).toBe('GTQ')
+  })
+})
+
+describe('normalizarMonedaISO', () => {
+  it("mapea el símbolo 'Q' (projects.moneda) a GTQ", () => {
+    expect(normalizarMonedaISO('Q')).toBe('GTQ')
+    expect(normalizarMonedaISO('q')).toBe('GTQ')
+    expect(normalizarMonedaISO('Q.')).toBe('GTQ')
+    expect(normalizarMonedaISO('GTQ')).toBe('GTQ')
+  })
+
+  it("mapea '$' / 'usd' a USD", () => {
+    expect(normalizarMonedaISO('$')).toBe('USD')
+    expect(normalizarMonedaISO('usd')).toBe('USD')
+    expect(normalizarMonedaISO('US$')).toBe('USD')
+  })
+
+  it('respeta un código ISO de 3 letras (en mayúsculas)', () => {
+    expect(normalizarMonedaISO('MXN')).toBe('MXN')
+    expect(normalizarMonedaISO('eur')).toBe('EUR')
+  })
+
+  it('vacío / null / símbolo desconocido → GTQ (default seguro)', () => {
+    expect(normalizarMonedaISO('')).toBe('GTQ')
+    expect(normalizarMonedaISO(null)).toBe('GTQ')
+    expect(normalizarMonedaISO(undefined)).toBe('GTQ')
+    expect(normalizarMonedaISO('€')).toBe('GTQ')
   })
 })

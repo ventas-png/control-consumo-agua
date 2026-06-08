@@ -25,6 +25,7 @@ import { captureEdgeException } from '../_shared/sentry.ts'
 import {
   getPaymentProvider,
   resolverConfigPagoEfectiva,
+  normalizarMonedaISO,
   type AmbientePago,
   type CobroCanonico,
   type ConfigPagoEmpresa,
@@ -135,11 +136,11 @@ Deno.serve(async (req: Request) => {
     if (compErr) return json({ error: compErr.message }, 500)
     if (!company) return json({ error: 'Empresa no encontrada' }, 404)
 
-    let projectRow: { proveedor_pago?: string | null } | null = null
+    let projectRow: { proveedor_pago?: string | null; moneda?: string | null } | null = null
     if (projectId) {
       const { data: proj } = await admin
         .from('projects')
-        .select('proveedor_pago')
+        .select('proveedor_pago, moneda')
         .eq('id', projectId)
         .maybeSingle()
       projectRow = (proj as typeof projectRow) ?? null
@@ -152,6 +153,16 @@ Deno.serve(async (req: Request) => {
     const config = resolverConfigPagoEfectiva(
       empresaConfig,
       projectRow ? ({ proveedorPago: projectRow.proveedor_pago ?? null } as ConfigPagoLocacion) : null,
+    )
+
+    // Moneda del COBRO: la del RECIBO (projects.moneda, p. ej. 'Q' = GTQ), NO el
+    // default genérico de la empresa (companies.default_currency, que puede estar
+    // en otra moneda como 'usd'). La normalizamos al código ISO 4217 que el payfac
+    // espera (x_currency_code en QPayPro). Fallback: default de la empresa → 'GTQ'.
+    const monedaCobro = normalizarMonedaISO(
+      projectRow?.moneda ??
+        (company as { default_currency?: string | null }).default_currency ??
+        config.moneda,
     )
 
     // Stripe usa su flujo dedicado: no pasa por el adapter genérico.
@@ -178,7 +189,7 @@ Deno.serve(async (req: Request) => {
     const base = APP_URL || origin || ''
     const cobro: CobroCanonico = {
       monto,
-      moneda: config.moneda,
+      moneda: monedaCobro,
       descripcion: body.descripcion?.trim() || `Pago de servicio — ${cli?.nombre ?? 'Cliente'}`,
       referenciaInterna: registroId ?? clienteId,
       pagador: {
@@ -197,7 +208,7 @@ Deno.serve(async (req: Request) => {
       companyId,
       proveedor: config.proveedorPago,
       ambiente,
-      moneda: config.moneda,
+      moneda: monedaCobro,
       credenciales,
     })
 
