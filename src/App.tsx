@@ -9,6 +9,7 @@ import { usePresence } from './hooks/usePresence'
 import { Toaster } from 'sonner'
 import type { AppSection, Cliente, Contador, Empresa, FuenteAgua, Registro, RegistroCalidad, Ruta, Tarifa, Unidad, UserSession } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
+import { sectionForPath, type SectionKey } from './components/condominios/sections'
 import { lazyWithPreload } from './lib/lazyWithPreload'
 import { supabase } from './lib/supabase'
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
@@ -529,6 +530,9 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeSection: AppSection = pathToSection(location.pathname) ?? 'clientes'
+  // Sección activa del Módulo Completo de Condominios (las 9 secciones viven en
+  // el sidebar global). null cuando no estamos en una sección del módulo.
+  const activeCondominiosSection: SectionKey | null = sectionForPath(location.pathname)
   const navigateSection = useCallback((section: AppSection) => {
     navigate(sectionToPath(section))
   }, [navigate])
@@ -789,7 +793,9 @@ export default function App() {
         />
       <Sidebar
         activeSection={activeSection}
+        activeCondominiosSection={activeCondominiosSection}
         onSelect={(section) => { navigateSection(section); setSidebarOpen(false) }}
+        onNavigatePath={(path) => { navigate(path); setSidebarOpen(false) }}
         onPrefetch={prefetchSection}
         onLogout={handleLogout}
         isOpen={sidebarOpen}

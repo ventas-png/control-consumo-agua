@@ -1,10 +1,12 @@
-import { useState, useEffect, type ReactNode} from 'react'
+import { useState, useEffect, useMemo, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 import { getDisplayRoleLabel } from '../../lib/permissions'
 import { CompanyBrandMark } from '../shared/CompanyBrandMark'
+import { SECTIONS, condoTabPath, type SectionKey, type SectionDef } from '../condominios/sections'
+import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 
 interface Tab {
   id: AppSection
@@ -230,51 +232,11 @@ const NAV: NavEntry[] = [
     tabs: [
       {
         id: 'condominios_dashboard',
-        label: 'Panel',
+        label: 'Panel general',
         roles: ['admin', 'super_admin', 'company_owner', 'operator'],
         icon: (
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        ),
-      },
-      {
-        id: 'condominios_visitantes',
-        label: 'Visitantes',
-        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        ),
-      },
-      {
-        id: 'condominios_cuotas',
-        label: 'Cuotas',
-        roles: ['admin', 'super_admin', 'company_owner'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        ),
-      },
-      {
-        id: 'condominios_mantenimiento',
-        label: 'Mantenimiento',
-        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        ),
-      },
-      {
-        id: 'condominios',
-        label: 'Módulo Completo',
-        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
         ),
       },
@@ -299,7 +261,13 @@ const NAV: NavEntry[] = [
 
 interface Props {
   activeSection: AppSection
+  // Sección activa del Módulo Completo de Condominios (derivada de la URL en
+  // App.tsx). null = no estamos en una sección del módulo.
+  activeCondominiosSection?: SectionKey | null
   onSelect: (section: AppSection) => void
+  // Navegación a una ruta arbitraria (usada por las secciones de condominios,
+  // que apuntan al primer tab de su sección). Cierra el drawer en móvil.
+  onNavigatePath?: (path: string) => void
   // agua:A8 — prefetch del chunk de una sección al mostrar intención de navegar
   // (hover/focus de su item), para que el código ya esté en caché al hacer click.
   onPrefetch?: (section: AppSection) => void
@@ -358,13 +326,24 @@ function findActiveGroupId(activeSection: AppSection): string | null {
   return null
 }
 
-export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
+export function Sidebar({ activeSection, activeCondominiosSection = null, onSelect, onNavigatePath, onPrefetch, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
   const currentUser = useSession()
   const { canViewModule } = usePermissionsContext()
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null)
+  const [hoveredSection, setHoveredSection] = useState<SectionKey | null>(null)
+
+  // Las 9 secciones del Módulo Completo, filtradas por permiso, para exponerlas
+  // dentro del grupo "Manejo Condominios". El gating del servicio se hace con
+  // isServiceEnabled('condominios', …); el por-sección, con permisos de tab.
+  const visibleCondominiosSections = useMemo<SectionDef[]>(() => {
+    if (!isServiceEnabled('condominios', currentUser)) return []
+    return SECTIONS
+      .map(s => ({ ...s, tabs: s.tabs.filter(t => canViewCondominiosTabByPermission(currentUser, t)) }))
+      .filter(s => s.tabs.length > 0)
+  }, [currentUser])
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initialActiveGroupId = findActiveGroupId(activeSection)
@@ -398,11 +377,11 @@ export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen,
 
   // Auto-expand group when active section is inside a collapsed group
   useEffect(() => {
-    const gid = findActiveGroupId(activeSection)
+    const gid = findActiveGroupId(activeSection) ?? (activeCondominiosSection ? 'condominios_grp' : null)
     if (gid) {
       setExpanded(prev => prev[gid] ? prev : { ...prev, [gid]: true })
     }
-  }, [activeSection])
+  }, [activeSection, activeCondominiosSection])
 
   const toggleGroup = (groupId: string) => {
     setExpanded(prev => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -481,6 +460,83 @@ export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen,
     )
   }
 
+  // Botón de una sección del Módulo Completo (Panel, Finanzas, …). Navega al
+  // primer tab permitido de la sección y se resalta según la URL activa.
+  const renderCondominiosSectionButton = (sec: SectionDef) => {
+    const isActive = activeCondominiosSection === sec.id
+    const isHovered = hoveredSection === sec.id
+    return (
+      <button
+        key={`condo-sec-${sec.id}`}
+        aria-label={`Ir a ${sec.label}`}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={() => onNavigatePath?.(condoTabPath(sec.tabs[0]))}
+        onMouseEnter={() => { setHoveredSection(sec.id); onPrefetch?.('condominios') }}
+        onMouseLeave={() => setHoveredSection(null)}
+        onFocus={() => onPrefetch?.('condominios')}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          minHeight: '44px',
+          border: 'none',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          textAlign: 'left',
+          marginBottom: '1px',
+          transition: 'all 0.14s ease',
+          background: isActive
+            ? 'rgba(255,255,255,0.12)'
+            : isHovered
+            ? 'rgba(255,255,255,0.05)'
+            : 'transparent',
+          color: isActive ? 'white' : isHovered ? '#DCE6E0' : '#B4C5BB',
+          fontWeight: isActive ? 600 : 400,
+          fontSize: '13.5px',
+          letterSpacing: isActive ? '-0.1px' : '0',
+          outline: 'none',
+        }}
+      >
+        <span
+          style={{
+            flexShrink: 0,
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '7px',
+            fontSize: '15px',
+            lineHeight: 1,
+            background: isActive
+              ? 'rgba(185,106,63,0.30)'
+              : isHovered
+              ? 'rgba(255,255,255,0.07)'
+              : 'transparent',
+            transition: 'all 0.14s ease',
+          }}
+          aria-hidden="true"
+        >
+          {sec.icon}
+        </span>
+        {sec.label}
+        {isActive && (
+          <span style={{
+            marginLeft: 'auto',
+            width: '5px',
+            height: '5px',
+            borderRadius: '50%',
+            background: 'var(--at-accent)',
+            boxShadow: '0 0 6px rgba(185,106,63,0.7)',
+            flexShrink: 0,
+          }} />
+        )}
+      </button>
+    )
+  }
+
   return (
     <aside
       id="app-sidebar"
@@ -531,7 +587,9 @@ export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen,
           const visibleTabs = entry.tabs.filter(t =>
             isTabVisible(t, currentUser.role, canViewModule) && isServiceEnabled(t.id, currentUser)
           )
-          if (visibleTabs.length === 0) return null
+          // El grupo de condominios además expone las 9 secciones del módulo.
+          const condoSections = entry.id === 'condominios_grp' ? visibleCondominiosSections : []
+          if (visibleTabs.length === 0 && condoSections.length === 0) return null
 
           const isExpanded = expanded[entry.id] ?? true
           const isHG = hoveredGroup === entry.id
@@ -599,6 +657,7 @@ export function Sidebar({ activeSection, onSelect, onPrefetch, onLogout, isOpen,
                 }}
               >
                 {visibleTabs.map(tab => renderTabButton(tab))}
+                {condoSections.map(sec => renderCondominiosSectionButton(sec))}
               </div>
             </div>
           )
