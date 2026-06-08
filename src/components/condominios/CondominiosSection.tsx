@@ -9,6 +9,7 @@ import {
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
+import { SECTIONS, sectionForTab } from './sections'
 import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
@@ -83,68 +84,8 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] =
   TAB_REGISTRY.map(({ id, label, icon }) => ({ id, label, icon }))
 
 // ── Secciones de navegación de 2 niveles ─────────────────────────────────────
-type SectionKey = 'panel' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones' | 'seguridad' | 'comunidad' | 'administracion' | 'especiales'
-
-interface SectionDef { id: SectionKey; label: string; icon: string; tabs: string[] }
-
-const SECTIONS: SectionDef[] = [
-  { id: 'panel', label: 'Panel', icon: '📊', tabs: [
-    'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
-    'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
-    'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
-    'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado',
-  ]},
-  { id: 'finanzas', label: 'Finanzas', icon: '💰', tabs: [
-    'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
-    'campanas_cobro', 'reporte_deudores', 'mapa_calor_cuotas', 'conciliacion_cobros',
-    'estado_cuenta_residente', 'estadocuenta', 'convenios_cuota', 'plan_pago', 'avisos_cobro',
-    'cobranza', 'cobranza_judicial', 'presupuesto', 'contabilidad', 'comparativo_presupuesto',
-    'comparativo_anual', 'pronostico_financiero', 'simulador_cuotas', 'caja_chica',
-    'gestion_fondo', 'fondo_reserva', 'tarifas', 'cargos_adicionales', 'recibos_digitales',
-    'cierres', 'cierre_anual', 'historial_saldos', 'notificaciones_enviadas', 'proformas',
-    'exportacion', 'centro_costos', 'analisis_cartera',
-  ]},
-  { id: 'residentes', label: 'Residentes', icon: '🏠', tabs: [
-    'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
-    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
-    'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
-    'scoring_unidades',
-  ]},
-  { id: 'operaciones', label: 'Operaciones', icon: '🔧', tabs: [
-    'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
-    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
-    'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
-    'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas',
-    'prestamos',
-  ]},
-  { id: 'instalaciones', label: 'Instalaciones', icon: '🏗️', tabs: [
-    'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'bodegas', 'llaves',
-    'equipos', 'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
-    'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
-  ]},
-  { id: 'seguridad', label: 'Seguridad', icon: '🛡️', tabs: [
-    'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
-    'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
-    'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia',
-    'panel_turno', 'emergencias',
-  ]},
-  { id: 'comunidad', label: 'Comunidad', icon: '🏘️', tabs: [
-    'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
-    'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
-    'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
-    'comunicados', 'recordatorios', 'comunicacion_condominios',
-  ]},
-  { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
-    'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
-    'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
-    'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
-    'automatizaciones', 'plantillas_mensaje', 'flujo_aprobacion', 'envio_masivo',
-    'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',
-  ]},
-  { id: 'especiales', label: 'Especiales', icon: '⭐', tabs: [
-    'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'sostenibilidad',
-  ]},
-]
+// SECTIONS + helpers viven ahora en ./sections (fuente única compartida con el
+// Sidebar global, que expone las 9 secciones bajo "Manejo Condominios").
 
 
 interface Props {
@@ -189,10 +130,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   const activeTab: CondominioTab = pathParamToTab(tabParam)
   const navigate = useNavigate()
   const setActiveTab = useCallback((next: CondominioTab) => navigate(tabToPath(next)), [navigate])
-  const [activeSection, setActiveSection] = useState<SectionKey>('panel')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 768
-  )
+  // La sección activa se deriva del tab en la URL (fuente única). Cambiar de
+  // sección = navegar a su primer tab; ya no hay state local ni riel interno
+  // (las 9 secciones viven en el sidebar global).
+  const activeSection = sectionForTab(activeTab)
   // cond:B5/B6 — El condominio activo vive ahora en ActiveCondominioContext
   // (estado global persistido + filtrado por rol). `selectedProyectoId` se
   // mantiene como alias local para no tocar las ~190 referencias aguas abajo
@@ -769,7 +710,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
           icon: t.icon,
           group: sec.label,
           onSelect: () => {
-            setActiveSection(sec.id)
             setActiveTab(t.id)
           },
         }))
@@ -826,74 +766,9 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
 
       </div>
 
-      {/* Body: sidebar + content */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-
-        {/* Sidebar de sub-tabs */}
-        <aside style={{
-          width: sidebarCollapsed ? 0 : 200,
-          minWidth: sidebarCollapsed ? 0 : 200,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          background: 'var(--at-surface-2)',
-          borderRight: '1px solid var(--at-line)',
-          transition: 'width 0.18s ease, min-width 0.18s ease',
-          flexShrink: 0,
-        }}>
-          {!sidebarCollapsed && (
-            <nav style={{ padding: '6px 0' }} aria-label="Secciones del módulo condominios">
-              <div style={{ padding: '6px 14px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>
-                Secciones
-              </div>
-              {visibleSections.map(sec => {
-                const activa = activeSection === sec.id
-                return (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    aria-current={activa ? 'page' : undefined}
-                    onClick={() => {
-                      setActiveSection(sec.id)
-                      if (!sec.tabs.includes(activeTab)) {
-                        const primero = sec.tabs.find(tid => TABS.some(t => t.id === tid))
-                        if (primero) setActiveTab(primero as CondominioTab)
-                      }
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      width: '100%', padding: '8px 14px', border: 'none',
-                      background: activa ? 'var(--at-primary-soft)' : 'transparent',
-                      color: activa ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
-                      borderLeft: `3px solid ${activa ? 'var(--at-primary)' : 'transparent'}`,
-                      cursor: 'pointer', fontSize: '13px',
-                      fontWeight: activa ? 700 : 500,
-                      textAlign: 'left',
-                    }}>
-                    <span aria-hidden="true">{sec.icon}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {sec.label}
-                    </span>
-                  </button>
-                )
-              })}
-            </nav>
-          )}
-        </aside>
-
-        {/* Toggle collapse */}
-        <button onClick={() => setSidebarCollapsed(p => !p)}
-          title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-          style={{
-            flexShrink: 0, width: '18px',
-            background: 'var(--at-chip)', border: 'none', borderRight: '1px solid var(--at-line)',
-            cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-          {sidebarCollapsed ? '›' : '‹'}
-        </button>
-
-        {/* Tab content */}
-        <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+      {/* Body: contenido a todo el ancho. Las 9 secciones viven en el sidebar
+          global; arriba quedan las pestañas de la sección activa. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}
         <MediaScopeProvider projectId={selectedProyectoId}>
         <Suspense fallback={<TabFallback />}>
@@ -911,7 +786,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
         )}
         </Suspense>
         </MediaScopeProvider>
-        </div>
       </div>
     </div>
   )
