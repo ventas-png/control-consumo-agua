@@ -796,31 +796,32 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
           <CondominioContextBar loading={loading} />
         </div>
 
-        {/* Barra de secciones (nivel 1) */}
-        <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }}>
-          {visibleSections.map(sec => {
-            const activa = activeSection === sec.id
-            return (
-              <button key={sec.id} onClick={() => {
-                setActiveSection(sec.id)
-                if (!sec.tabs.includes(activeTab)) {
-                  const primero = sec.tabs.find(tid => TABS.some(t => t.id === tid))
-                  if (primero) setActiveTab(primero as CondominioTab)
-                }
-              }}
-                style={{
-                  padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                  fontSize: 12, fontWeight: activa ? 700 : 500,
-                  background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
-                  color: activa ? 'white' : 'var(--at-ink-3)',
-                  borderRadius: '6px 6px 0 0',
-                  borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
-                  marginBottom: -2,
-                }}>
-                {sec.icon} {sec.label}
-              </button>
-            )
-          })}
+        {/* Barra de pestañas de la sección activa (nivel 2) — scroll horizontal */}
+        <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }} role="tablist" aria-label="Pestañas de la sección activa">
+          {visibleSections.find(s => s.id === activeSection)?.tabs
+            .map(tid => TABS.find(t => t.id === tid))
+            .filter(Boolean)
+            .map(tab => {
+              if (!tab) return null
+              const activa = activeTab === tab.id
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
+                  type="button" role="tab" aria-selected={activa} aria-current={activa ? 'page' : undefined}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    fontSize: 12, fontWeight: activa ? 700 : 500,
+                    background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
+                    color: activa ? 'white' : 'var(--at-ink-3)',
+                    borderRadius: '6px 6px 0 0',
+                    borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
+                    marginBottom: -2,
+                  }}>
+                  <span aria-hidden="true">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              )
+            })}
         </div>
 
       </div>
@@ -840,32 +841,41 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
           flexShrink: 0,
         }}>
           {!sidebarCollapsed && (
-            <nav style={{ padding: '6px 0' }} aria-label="Pestañas del módulo condominios">
-              {visibleSections.find(s => s.id === activeSection)?.tabs
-                .map(tid => TABS.find(t => t.id === tid))
-                .filter(Boolean)
-                .map(tab => tab && (
+            <nav style={{ padding: '6px 0' }} aria-label="Secciones del módulo condominios">
+              <div style={{ padding: '6px 14px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>
+                Secciones
+              </div>
+              {visibleSections.map(sec => {
+                const activa = activeSection === sec.id
+                return (
                   <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as CondominioTab)}
+                    key={sec.id}
                     type="button"
-                    aria-current={activeTab === tab.id ? 'page' : undefined}
+                    aria-current={activa ? 'page' : undefined}
+                    onClick={() => {
+                      setActiveSection(sec.id)
+                      if (!sec.tabs.includes(activeTab)) {
+                        const primero = sec.tabs.find(tid => TABS.some(t => t.id === tid))
+                        if (primero) setActiveTab(primero as CondominioTab)
+                      }
+                    }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
-                      width: '100%', padding: '7px 14px', border: 'none',
-                      background: activeTab === tab.id ? 'var(--at-primary-soft)' : 'transparent',
-                      color: activeTab === tab.id ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
-                      borderLeft: `3px solid ${activeTab === tab.id ? 'var(--at-primary)' : 'transparent'}`,
-                      cursor: 'pointer', fontSize: '12px',
-                      fontWeight: activeTab === tab.id ? 700 : 400,
+                      width: '100%', padding: '8px 14px', border: 'none',
+                      background: activa ? 'var(--at-primary-soft)' : 'transparent',
+                      color: activa ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
+                      borderLeft: `3px solid ${activa ? 'var(--at-primary)' : 'transparent'}`,
+                      cursor: 'pointer', fontSize: '13px',
+                      fontWeight: activa ? 700 : 500,
                       textAlign: 'left',
                     }}>
-                    <span aria-hidden="true">{tab.icon}</span>
+                    <span aria-hidden="true">{sec.icon}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {tab.label}
+                      {sec.label}
                     </span>
                   </button>
-                ))}
+                )
+              })}
             </nav>
           )}
         </aside>
