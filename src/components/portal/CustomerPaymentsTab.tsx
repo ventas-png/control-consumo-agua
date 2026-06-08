@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
-import { fetchPortalPaymentConfig } from '../../domain/portal/queries'
+import { fetchPortalPaymentConfig, iniciarCobroPayfac } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { StripeCheckoutModal } from './StripeCheckoutModal'
@@ -19,22 +19,27 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     stripe_activo: boolean
     paypal_configured: boolean
     paypal_activo: boolean
+    proveedor_pago: string
   }>({
     stripe_configured: false,
     stripe_activo: false,
     paypal_configured: false,
     paypal_activo: false,
+    proveedor_pago: 'sandbox',
   })
   const [loading, setLoading] = useState(true)
   const [stripeModal, setStripeModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
+  // Cobro payfac en vuelo (id del registro que se está redirigiendo al checkout).
+  const [chargingId, setChargingId] = useState<string | null>(null)
 
   useEffect(() => {
     cargarConfig()
   }, [currentUser.company_id])
 
   async function cargarConfig() {
-    if (!currentUser.company_id) return
+    // Sin company_id no hay config que leer: salimos del loading igual (no colgar).
+    if (!currentUser.company_id) { setLoading(false); return }
     const data = await fetchPortalPaymentConfig(currentUser.company_id)
     if (data) {
       setPaymentConfig({
@@ -42,9 +47,46 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         stripe_activo: data.stripe_activo !== false,
         paypal_configured: data.paypal_configured || false,
         paypal_activo: data.paypal_activo !== false,
+        proveedor_pago: data.proveedor_pago || 'sandbox',
       })
     }
     setLoading(false)
+  }
+
+  /**
+   * Cobro en línea con el payfac efectivo del tenant (hoy QPayPro). Llama al edge
+   * `create-charge` y, para checkout hospedado, redirige al cliente a pagar en la
+   * página del payfac (no pasan datos de tarjeta por la app). La reconciliación
+   * automática del recibo (marcarlo pagado al volver) es follow-up; por ahora se
+   * concilia como un pago manual.
+   */
+  async function onPagarPayfac(registro: Registro, saldo: number) {
+    if (!currentUser.company_id || saldo <= 0 || chargingId) return
+    setChargingId(registro.id)
+    try {
+      const res = await iniciarCobroPayfac({
+        clienteId: registro.cliente_id,
+        registroId: registro.id,
+        companyId: currentUser.company_id,
+        projectId: registro.project_id ?? null,
+        monto: saldo,
+        ambiente: 'prod',
+      })
+      if (res.redirectUrl) {
+        window.location.href = res.redirectUrl
+        return
+      }
+      if (res.ok && res.estado === 'aprobado') {
+        notify({ variant: 'success', title: 'Pago aprobado', text: 'Tu pago se procesó correctamente.' })
+        void cargarConfig()
+        return
+      }
+      notify({ variant: 'warning', title: 'No se pudo iniciar el pago', text: res.error ?? 'Intenta nuevamente en unos minutos.' })
+    } catch (e) {
+      notify({ variant: 'error', title: 'Error', text: (e as Error).message })
+    } finally {
+      setChargingId(null)
+    }
   }
 
   // Registros pendientes (no pagados)
@@ -204,6 +246,25 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                       }}
                     >
                       🅿️ Pagar PayPal
+                    </button>
+                  )}
+                  {paymentConfig.proveedor_pago === 'qpaypro' && (
+                    <button
+                      onClick={() => void onPagarPayfac(registro, saldo)}
+                      disabled={chargingId === registro.id || saldo <= 0}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: chargingId === registro.id ? 'var(--at-ink-3)' : 'linear-gradient(135deg, #0a7d3c, #0a5c2c)',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: chargingId === registro.id ? 'wait' : 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {chargingId === registro.id ? '⏳ Redirigiendo…' : '💳 Pagar con QPayPro'}
                     </button>
                   )}
                   <button
