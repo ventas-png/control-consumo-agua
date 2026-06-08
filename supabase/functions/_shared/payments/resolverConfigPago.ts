@@ -54,3 +54,22 @@ export function resolverConfigPagoEfectiva(
     desdeLocacion: proveedorLoc != null,
   }
 }
+
+/**
+ * Normaliza una moneda guardada al código ISO 4217 que esperan los payfacs
+ * (ej. QPayPro `x_currency_code`). Acepta tanto SÍMBOLOS de display (como 'Q',
+ * que es lo que guarda projects.moneda) como códigos ISO ya formados:
+ *   'Q' | 'Q.' | 'GTQ' → 'GTQ'
+ *   '$' | 'US$' | 'USD' → 'USD'
+ *   'MX$' | 'MXN'       → 'MXN'
+ * Un código de 3 letras se respeta en mayúsculas; vacío/desconocido → 'GTQ'.
+ */
+export function normalizarMonedaISO(v: string | null | undefined): string {
+  const up = (v ?? '').trim().toUpperCase()
+  if (up === '') return MONEDA_PAGO_DEFAULT
+  if (up === 'Q' || up === 'Q.' || up === 'GTQ' || up === 'QTZ') return 'GTQ'
+  if (up === '$' || up === 'US$' || up === 'USD' || up === 'US') return 'USD'
+  if (up === 'MX$' || up === 'MXN') return 'MXN'
+  if (/^[A-Z]{3}$/.test(up)) return up
+  return MONEDA_PAGO_DEFAULT
+}

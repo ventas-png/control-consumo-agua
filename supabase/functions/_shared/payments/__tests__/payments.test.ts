@@ -8,7 +8,7 @@ import { SandboxPaymentProvider } from '../sandboxProvider.ts'
 import { QPayProProvider } from '../qpayproProvider.ts'
 import { getPaymentProvider } from '../getPaymentProvider.ts'
 import { PayfacNoConfiguradoError } from '../provider.ts'
-import { resolverConfigPagoEfectiva } from '../resolverConfigPago.ts'
+import { resolverConfigPagoEfectiva, normalizarMonedaISO } from '../resolverConfigPago.ts'
 import type { CobroCanonico } from '../types.ts'
 
 function cobroEjemplo(over: Partial<CobroCanonico> = {}): CobroCanonico {
@@ -179,5 +179,20 @@ describe('resolverConfigPagoEfectiva (espejo Deno)', () => {
     const c = resolverConfigPagoEfectiva(null, null)
     expect(c.proveedorPago).toBe('sandbox')
     expect(c.moneda).toBe('GTQ')
+  })
+})
+
+describe('normalizarMonedaISO (espejo Deno)', () => {
+  it("'Q' (projects.moneda) → GTQ; '$'/'usd' → USD", () => {
+    expect(normalizarMonedaISO('Q')).toBe('GTQ')
+    expect(normalizarMonedaISO('GTQ')).toBe('GTQ')
+    expect(normalizarMonedaISO('$')).toBe('USD')
+    expect(normalizarMonedaISO('usd')).toBe('USD')
+  })
+
+  it('respeta ISO de 3 letras; vacío/desconocido → GTQ', () => {
+    expect(normalizarMonedaISO('mxn')).toBe('MXN')
+    expect(normalizarMonedaISO('')).toBe('GTQ')
+    expect(normalizarMonedaISO('€')).toBe('GTQ')
   })
 })
