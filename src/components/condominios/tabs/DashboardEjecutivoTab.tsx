@@ -3,6 +3,16 @@ import type {
   PresupuestoCondominio, SancionCondominio, PlanMantenimiento,
   InfraccionCondominio, Unidad,
 } from '../../../types'
+import { KpiCard as HeroKpi } from '../../shared/KpiCard'
+
+/** Variación % entre el penúltimo y el último punto de una serie (delta KPI). */
+function pctDelta(serie: number[]): number | undefined {
+  if (serie.length < 2) return undefined
+  const prev = serie[serie.length - 2]
+  const curr = serie[serie.length - 1]
+  if (prev === 0) return undefined
+  return Math.round(((curr - prev) / prev) * 100)
+}
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -80,6 +90,9 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
     })
   }
   const maxTrend = Math.max(...trend.map(t => t.emitido), 1)
+  const serieEmitido  = trend.map(t => t.emitido)
+  const serieCobrado  = trend.map(t => t.cobrado)
+  const serieCobranza = trend.map(t => (t.emitido > 0 ? Math.round((t.cobrado / t.emitido) * 100) : 0))
 
   // ── Mantenimiento ─────────────────────────────────────────────────────────
   const ticketsAbiertos = tickets.filter(t => t.estado === 'abierto').length
@@ -107,6 +120,40 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Dashboard Ejecutivo</h2>
         <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{proyectoNombre ?? 'Proyecto'} · {periodoActual}</p>
+      </div>
+
+      {/* KPIs hero con tendencia de 6 meses (sparkline + delta vs mes anterior) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+        <HeroKpi
+          label="Cobranza del mes"
+          value={`${tasaCobranza}%`}
+          unit={`${moneda} ${totalCobrado.toFixed(0)} cobrado`}
+          icon="💰"
+          gradient="linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))"
+          sparkline={serieCobranza}
+          delta={pctDelta(serieCobranza)}
+          deltaLabel="vs mes ant."
+        />
+        <HeroKpi
+          label="Emitido del mes"
+          value={`${moneda} ${(totalEmitido / 1000).toFixed(1)}k`}
+          unit={`${cuotasMes.length} cuotas`}
+          icon="🧾"
+          gradient="linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))"
+          sparkline={serieEmitido}
+          delta={pctDelta(serieEmitido)}
+          deltaLabel="vs mes ant."
+        />
+        <HeroKpi
+          label="Cobrado del mes"
+          value={`${moneda} ${(totalCobrado / 1000).toFixed(1)}k`}
+          unit="acumulado del mes"
+          icon="✅"
+          gradient="linear-gradient(135deg, var(--at-primary-2), var(--at-primary-mint))"
+          sparkline={serieCobrado}
+          delta={pctDelta(serieCobrado)}
+          deltaLabel="vs mes ant."
+        />
       </div>
 
       {/* Financiero */}
