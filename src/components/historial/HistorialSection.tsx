@@ -192,22 +192,22 @@ export function HistorialSection({
       render: r => r.cliente_nombre ?? '—',
     },
     {
-      key: 'lectAnt', header: 'Lect. Ant.', align: 'right',
+      key: 'lectAnt', header: 'Lect. Ant.', numeric: true,
       accessor: r => r.lectura_anterior,
       render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
     },
     {
-      key: 'lectAct', header: 'Lect. Act.', align: 'right',
+      key: 'lectAct', header: 'Lect. Act.', numeric: true,
       accessor: r => r.lectura_actual,
       render: r => <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>{r.lectura_actual}</span>,
     },
     {
-      key: 'consumo', header: 'Consumo (m³)', sortable: true, align: 'right',
+      key: 'consumo', header: 'Consumo (m³)', sortable: true, numeric: true,
       accessor: r => r.consumo,
-      render: r => <span style={{ fontWeight: 600 }}>💧 {formatNumber(r.consumo)}</span>,
+      render: r => <span style={{ fontWeight: 600 }}>{formatNumber(r.consumo)}</span>,
     },
     {
-      key: 'total', header: `Total (${moneda})`, sortable: true, align: 'right',
+      key: 'total', header: `Total (${moneda})`, sortable: true, numeric: true,
       accessor: r => getTotal(r),
       render: r => <span style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(getTotal(r), moneda)}</span>,
     },

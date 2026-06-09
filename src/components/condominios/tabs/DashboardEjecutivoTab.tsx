@@ -159,7 +159,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
 
       {/* Financiero */}
       <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Financiero</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}><Icon name="coins" size={15} />Financiero</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '16px' }}>
           <KpiCard label="Cobranza del mes" value={`${tasaCobranza}%`}
             sub={`${moneda} ${totalCobrado.toFixed(0)} / ${totalEmitido.toFixed(0)}`}
@@ -205,7 +205,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
         {/* Mantenimiento */}
         <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>🔧 Mantenimiento</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}><Icon name="wrench" size={16} />Mantenimiento</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
               <div style={{ fontSize: '20px', fontWeight: 800, color: ticketsAbiertos > 0 ? 'var(--at-warning)' : 'var(--at-success)' }}>{ticketsAbiertos}</div>
@@ -228,7 +228,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
 
         {/* Convivencia */}
         <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>👥 Convivencia</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}><Icon name="users" size={16} />Convivencia</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
               <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--at-primary)' }}>{visitantesEsteMes}</div>
@@ -246,7 +246,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
 
         {/* Resumen ejecutivo */}
         <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>📋 Resumen ejecutivo</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}><Icon name="inbox" size={16} />Resumen ejecutivo</div>
           {[
             { label: `Cobranza ${periodoActual}`, pct: tasaCobranza, color: tasaCobranza >= 80 ? 'var(--at-success)' : 'var(--at-warning)' },
             { label: 'Ejecución presupuesto', pct: ejecucionPpto, color: ejecucionPpto <= 90 ? 'var(--at-primary)' : 'var(--at-danger)' },
