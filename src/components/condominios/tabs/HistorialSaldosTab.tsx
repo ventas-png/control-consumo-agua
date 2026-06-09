@@ -137,13 +137,13 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
             render: (h) => <span style={{ fontWeight: 600 }}>{unidades.find(u => u.id === h.unidad_id)?.nombre ?? h.unidad_nombre ?? '—'}</span>,
           },
           { key: 'periodo', header: 'Período', sortable: true },
-          { key: 'saldo_anterior', header: 'Saldo anterior', align: 'right', hideOnMobile: true,
+          { key: 'saldo_anterior', header: 'Saldo anterior', numeric: true, hideOnMobile: true,
             render: (h) => `${moneda} ${h.saldo_anterior.toFixed(2)}` },
-          { key: 'cargos_periodo', header: 'Cargos', align: 'right', hideOnMobile: true,
+          { key: 'cargos_periodo', header: 'Cargos', numeric: true, hideOnMobile: true,
             render: (h) => <span style={{ color: 'var(--at-danger)' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</span> },
-          { key: 'pagos_periodo', header: 'Pagos', align: 'right', hideOnMobile: true,
+          { key: 'pagos_periodo', header: 'Pagos', numeric: true, hideOnMobile: true,
             render: (h) => <span style={{ color: 'var(--at-success)' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</span> },
-          { key: 'saldo_final', header: 'Saldo final', align: 'right', sortable: true,
+          { key: 'saldo_final', header: 'Saldo final', numeric: true, sortable: true,
             render: (h) => {
               const deudor = h.saldo_final > 0
               return <span style={{ fontWeight: 700, color: deudor ? 'var(--at-danger)' : 'var(--at-success)' }}>

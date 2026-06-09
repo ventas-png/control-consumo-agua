@@ -68,7 +68,7 @@ export function InputField({
       >
         {label}
         {required && (
-          <span aria-hidden="true" style={{ color: 'var(--at-danger)', marginLeft: '4px' }}>*</span>
+          <span aria-hidden="true" style={{ color: 'var(--at-danger)', marginLeft: 'var(--at-space-1)' }}>*</span>
         )}
       </label>
       <div style={{ position: 'relative' }}>
@@ -129,7 +129,7 @@ export function InputField({
       {helpText && !error && (
         <p
           id={helpId}
-          style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}
+          style={{ margin: 'var(--at-space-1) 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}
         >
           {helpText}
         </p>
@@ -138,7 +138,7 @@ export function InputField({
         <p
           id={errorId}
           role="alert"
-          style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}
+          style={{ margin: 'var(--at-space-1) 0 0', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}
         >
           {error}
         </p>

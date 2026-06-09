@@ -87,7 +87,7 @@ export function FilterChips<T extends string>(props: FilterChipsProps<T>) {
             aria-checked={active}
             onClick={() => handleClick(opt)}
             style={{
-              padding: '4px 12px',
+              padding: 'var(--at-space-1) var(--at-space-3)',
               borderRadius: 20,
               border: `1px solid ${active ? baseColor : 'var(--at-line)'}`,
               fontSize: 11,
@@ -95,10 +95,10 @@ export function FilterChips<T extends string>(props: FilterChipsProps<T>) {
               cursor: 'pointer',
               background: active ? baseColor : baseBg,
               color: active ? '#fff' : baseColor,
-              transition: 'background 0.12s, color 0.12s',
+              transition: 'background var(--at-motion-fast), color var(--at-motion-fast)',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 'var(--at-space-1)',
             }}
           >
             {opt.icon}

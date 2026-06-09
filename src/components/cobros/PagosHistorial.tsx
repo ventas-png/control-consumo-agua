@@ -96,6 +96,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         data={pagosFiltrados}
         rowKey="id"
         pageSize={50}
+        maxHeight="65vh"
         defaultSort={{ key: 'fecha', direction: 'desc' }}
         emptyState={{ icon: '💸', title: 'No hay pagos registrados' }}
         columns={[
@@ -122,7 +123,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
             },
           },
           {
-            key: 'monto', header: 'Monto', sortable: true,
+            key: 'monto', header: 'Monto', sortable: true, numeric: true,
             accessor: p => p.monto,
             render: p => (
               <span style={{ fontWeight: 700, color: 'var(--at-success)', whiteSpace: 'nowrap' }}>

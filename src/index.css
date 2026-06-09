@@ -40,6 +40,62 @@
   --at-nav-bg: #102622; --at-nav-ink: #ECEFE8;
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ─── Escala de espaciado (base 4/8px) ──────────────────────────────────
+     Escala única para padding/gap/margin. Migrar valores ad-hoc a estos
+     tokens da ritmo vertical consistente sin tocar el aspecto actual. */
+  --at-space-0: 0;
+  --at-space-1: 4px;   /* gaps internos, iconos */
+  --at-space-2: 8px;   /* padding compacto / base */
+  --at-space-3: 12px;  /* padding de botones, chips */
+  --at-space-4: 16px;  /* padding de tarjetas */
+  --at-space-5: 24px;  /* separación entre grupos */
+  --at-space-6: 32px;  /* secciones */
+  --at-space-7: 48px;  /* bloques mayores */
+  --at-space-8: 64px;  /* layout */
+  --at-space-9: 80px;
+
+  /* ─── Escala de elevación (alineada a las sombras ya en uso) ─────────────
+     --at-elevation-3 == la sombra actual de KpiCard (0 4px 16px /.08). */
+  --at-elevation-0: none;
+  --at-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.06);   /* tiles, botones */
+  --at-elevation-2: 0 2px 8px rgba(0, 0, 0, 0.07);   /* tarjetas */
+  --at-elevation-3: 0 4px 16px rgba(0, 0, 0, 0.08);  /* dropdowns, popovers */
+  --at-elevation-4: 0 12px 32px rgba(0, 0, 0, 0.12); /* modales, Dialog */
+
+  /* ─── Tokens de movimiento ──────────────────────────────────────────────
+     Duraciones + curvas estándar para homologar transiciones/animaciones. */
+  --at-motion-fast: 120ms;   /* hover, focus, toggles */
+  --at-motion-base: 180ms;   /* tarjetas, chips */
+  --at-motion-slow: 320ms;   /* modales, page transitions */
+  --at-ease-entrance: cubic-bezier(0, 0, 0.2, 1);
+  --at-ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --at-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ─── Tabla (DataTable): jerarquía densa ─────────────────────────────────
+     Bordes/hover derivados de la marca (color-mix sobre --at-primary): se
+     adaptan solos a dark (primary pasa a verde menta), más suaves que un gris
+     duro. header-bg sólido para que el encabezado fijo tape las filas al
+     hacer scroll. color-mix tiene soporte universal en navegadores modernos. */
+  --at-table-row-border: color-mix(in srgb, var(--at-primary) 12%, transparent);
+  --at-table-row-hover:  color-mix(in srgb, var(--at-primary) 6%, transparent);
+  --at-table-header-bg:  var(--at-surface-tint);
+
+  /* ─── Datos / KPIs ───────────────────────────────────────────────────────
+     Terracota destacado = --at-accent (existente, NO se duplica). positive
+     sigue a --at-primary (adapta a dark). negative para deltas críticos
+     (override más claro en dark para contraste — ver bloques dark). */
+  --at-data-positive: var(--at-primary);
+  --at-data-negative: #B23A3A;
+
+  /* ─── Profundidad orgánica (color-mix derivado de marca) ─────────────────
+     Bordes/superficies decorativas teñidas de marca en vez de gris plano.
+     Fallback sólido por doble-declaración: si el navegador no soporta
+     color-mix (muy antiguo) usa el hex; los modernos usan el color-mix. */
+  --at-border-organic: #D0D2CB;
+  --at-border-organic: color-mix(in srgb, var(--at-primary) 16%, transparent);
+  --at-surface-tint: #E9EBE2;
+  --at-surface-tint: color-mix(in srgb, var(--at-accent-2) 8%, var(--at-bg));
 }
 
 /* ─── Dark theme ──────────────────────────────────────────────────────────
@@ -48,7 +104,7 @@
    Los mismos valores se declaran en ambos selectores. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821;
+    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
     --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
     --at-line: #28352D; --at-line-strong: #3A4A40;
     --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;
@@ -63,7 +119,7 @@
     --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
     --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
     --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
-    --at-on-status: #0B1410;
+    --at-on-status: #0B1410; --at-data-negative: #E8736B;
     color-scheme: dark;
   }
 }
@@ -83,8 +139,22 @@
   --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
   --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
   --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
-  --at-on-status: #0B1410;
+  --at-on-status: #0B1410; --at-data-negative: #E8736B;
   color-scheme: dark;
+}
+
+/* ─── Densidad por contexto (admin / residente) ──────────────────────────────
+   El shell admin marca data-context="admin" (denso, eficiente); el portal del
+   residente data-context="resident" (más respiro, mobile-first). Los
+   consumidores leen var(--at-density-*, fallback): fuera de un contexto el
+   fallback preserva el aspecto actual (cero regresión). */
+[data-context="admin"] {
+  --at-density-pad: var(--at-space-2);   /* 8px  — filas compactas */
+  --at-density-row: 36px;
+}
+[data-context="resident"] {
+  --at-density-pad: var(--at-space-4);   /* 16px — más aire */
+  --at-density-row: 48px;
 }
 
 /* ─── Global Reset & Base ─────────────────────────────────────────────────── */
@@ -416,6 +486,9 @@ button:focus:not(:focus-visible) {
     justify-content: space-between;
     gap: 12px;
     padding: 6px 0 !important;
+    /* Anula la altura de densidad (--at-density-row) en el layout de tarjetas:
+       en móvil cada celda es una fila etiqueta/valor, no una celda de tabla. */
+    height: auto !important;
     border: none !important;
     font-size: 13px !important;
     text-align: right;
@@ -533,6 +606,20 @@ button:focus:not(:focus-visible) {
 ::placeholder {
   color: #64748b;
   opacity: 1;
+}
+
+/* ─── Reduced Motion (a11y) ───────────────────────────────────────────────
+ * Respeta la preferencia del SO. Neutraliza animaciones y transiciones para
+ * quienes la activan (mareos, vestibular). animation-iteration-count:1 evita
+ * que las animaciones infinitas (shimmer/pulse) queden parpadeando rápido al
+ * reducir su duración. No afecta a usuarios sin la preferencia. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ─── Print Stylesheet ──────────────────────────────────────────────────── */

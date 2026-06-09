@@ -11,6 +11,8 @@ import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/val
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
 import { SecureImage } from '../shared/SecureImage'
+import { EmptyState } from '../shared/EmptyState'
+import { Icon } from '../shared/Icon'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
@@ -821,18 +823,22 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           })()}
           {/* Gráfico o estado vacío */}
           {lecturasTotal === 0 ? (
-            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', gap: '8px', background: 'var(--at-surface-2)', borderRadius: '10px' }}>
-              <span style={{ fontSize: '32px' }}>📊</span>
-              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas registradas aún</span>
-              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '280px' }}>Los datos aparecerán cuando se ingresen lecturas de consumo</span>
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px' }}>
+              <EmptyState
+                audience="resident"
+                icon={<Icon name="gauge" size={28} />}
+                title="Sin lecturas registradas aún"
+                description="Aquí verás la evolución de tu consumo en cuanto se registren las primeras lecturas de tu medidor."
+              />
             </div>
           ) : filteredLecturasCount === 0 ? (
-            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', gap: '8px', background: 'var(--at-surface-2)', borderRadius: '10px' }}>
-              <span style={{ fontSize: '32px' }}>🔍</span>
-              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas para los contadores activos</span>
-              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '320px' }}>
-                Hay {lecturasTotal} lectura{lecturasTotal !== 1 ? 's' : ''} en el sistema pero no coinciden con los contadores vinculados
-              </span>
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px' }}>
+              <EmptyState
+                audience="resident"
+                icon={<Icon name="search" size={26} />}
+                title="Sin lecturas para los contadores activos"
+                description={`Hay ${lecturasTotal} lectura${lecturasTotal !== 1 ? 's' : ''} en el sistema, pero no coinciden con los contadores vinculados.`}
+              />
             </div>
           ) : (
             <div style={{ height: chartDatasets.length > 1 ? '300px' : '260px' }}><canvas ref={chartRef} /></div>
@@ -1015,7 +1021,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   // ── Full portal ──────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--at-primary-tint)' }}>
+    <div data-context="resident" style={{ minHeight: '100vh', background: 'var(--at-primary-tint)' }}>
       {/* Estilos .kpi-skeleton/.portal-* (y keyframes) en src/styles/runtime.css (I24). */}
 
       {/* Header */}
@@ -1266,9 +1272,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                         {isExpanded && (
                           <div style={{ borderTop: '1px solid var(--at-chip)' }}>
                             {contLecturas.length === 0 ? (
-                              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-                                No hay lecturas registradas para este contador.
-                              </div>
+                              <EmptyState
+                                compact
+                                audience="resident"
+                                icon={<Icon name="gauge" size={24} />}
+                                title="No hay lecturas registradas para este contador."
+                              />
                             ) : (
                               <div className="table-scroll-wrapper">
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>

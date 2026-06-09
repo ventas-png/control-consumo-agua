@@ -23,6 +23,9 @@ export interface DataTableColumn<T> {
   /** Si true, el header es clickable y ordena por esta columna. */
   sortable?: boolean
   align?: 'left' | 'right' | 'center'
+  /** Si true: alinea a la derecha + fuente monoespaciada con tabular-nums
+   *  (montos Q/USD, consumos m³, lecturas, IDs → dígitos que alinean). */
+  numeric?: boolean
   width?: number | string
   /** Ocultar esta columna en mobile (< 640px). */
   hideOnMobile?: boolean
@@ -137,6 +140,13 @@ export interface DataTableProps<T> {
    * habilitado mientras la página esté llena).
    */
   totalRows?: number
+
+  /**
+   * Si se pasa, el cuerpo scrollea verticalmente dentro de este alto máximo y
+   * el encabezado queda fijo (sticky) arriba. Sin esto, la tabla crece y
+   * scrollea con la página (comportamiento previo, sin cambios).
+   */
+  maxHeight?: number | string
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -164,6 +174,7 @@ export function DataTable<T>({
   currentPage,
   onPageChange,
   totalRows,
+  maxHeight,
 }: DataTableProps<T>) {
   const isServer = paginationMode === 'server'
   const [search, setSearch] = useState('')
@@ -346,7 +357,10 @@ export function DataTable<T>({
             emptyState ?? <EmptyState title="No hay datos para mostrar" />
           )
         ) : (
-          <div className="table-scroll-wrapper">
+          <div
+            className="table-scroll-wrapper"
+            style={maxHeight != null ? { maxHeight, overflowY: 'auto' } : undefined}
+          >
             <table
               className={mobileCardLayout ? 'table-cards-on-mobile' : undefined}
               style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}
@@ -369,7 +383,7 @@ export function DataTable<T>({
                         onClick={() => handleHeaderClick(col)}
                         style={{
                           padding: '12px 14px',
-                          textAlign: col.align ?? 'left',
+                          textAlign: col.align ?? (col.numeric ? 'right' : 'left'),
                           fontWeight: 600,
                           color: 'var(--at-ink-2)',
                           fontSize: '12px',
@@ -380,9 +394,14 @@ export function DataTable<T>({
                           userSelect: col.sortable ? 'none' : 'auto',
                           width: col.width,
                           whiteSpace: 'nowrap',
-                          // background sobreescrito por la clase sticky para que
-                          // los headers no queden transparentes encima del scroll.
-                          background: isStickyCol ? 'var(--at-surface-2)' : undefined,
+                          // Encabezado fijo: se pega arriba cuando el cuerpo
+                          // scrollea (maxHeight). Fondo sólido para tapar las
+                          // filas que pasan por debajo. z-index 3 > columna
+                          // sticky (z-index 2) para que la esquina quede encima.
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 3,
+                          background: 'var(--at-table-header-bg)',
                         }}
                       >
                         {col.header}{arrow}
@@ -401,12 +420,12 @@ export function DataTable<T>({
                       key={rowKey}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                       style={{
-                        borderBottom: expandContent ? 'none' : '1px solid var(--at-chip)',
+                        borderBottom: expandContent ? 'none' : '1px solid var(--at-table-row-border)',
                         cursor: onRowClick ? 'pointer' : 'default',
-                        transition: 'background 0.12s',
+                        transition: 'background var(--at-motion-fast)',
                         ...(rowStyle ? rowStyle(row) : {}),
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-surface-2)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-table-row-hover)' }}
                       onMouseLeave={e => { e.currentTarget.style.background = '' }}
                     >
                       {columns.map((col, colIdx) => {
@@ -426,13 +445,15 @@ export function DataTable<T>({
                               isStickyCol ? 'table-col-sticky' : '',
                             ].filter(Boolean).join(' ') || undefined}
                             style={{
-                              padding: '10px 14px',
-                              textAlign: col.align ?? 'left',
+                              padding: 'var(--at-density-pad, 10px) 14px',
+                              height: 'var(--at-density-row, auto)',
+                              textAlign: col.align ?? (col.numeric ? 'right' : 'left'),
                               color: 'var(--at-ink)',
+                              fontFamily: col.numeric ? 'var(--at-font-mono)' : undefined,
+                              fontVariantNumeric: col.numeric ? 'tabular-nums' : undefined,
                               // background hereda del tr (var(--at-surface) o
-                              // surface-2 hover). En sticky-col forzamos surface
-                              // para que el contenido no se vea transparente
-                              // sobre el scroll.
+                              // hover). En sticky-col forzamos surface para que el
+                              // contenido no se vea transparente sobre el scroll.
                               background: isStickyCol ? 'var(--at-surface)' : undefined,
                             }}
                           >
@@ -448,7 +469,7 @@ export function DataTable<T>({
                     <tr
                       key={`${rowKey}-expanded`}
                       style={{
-                        borderBottom: '1px solid var(--at-chip)',
+                        borderBottom: '1px solid var(--at-table-row-border)',
                         background: 'var(--at-surface-2)',
                       }}
                     >
