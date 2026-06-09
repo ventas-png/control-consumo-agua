@@ -30,7 +30,7 @@ export function StatTile({ label, value, tone, hint, icon, style }: Props) {
         ...style,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: 'var(--at-space-1)' }}>
         {icon}
         {label}
       </div>

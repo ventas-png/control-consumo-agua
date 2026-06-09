@@ -100,7 +100,7 @@ export function EditModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '12px',
+        padding: 'var(--at-space-3)',
       }}
       onClick={e => {
         if (!closeOnBackdropClick) return
@@ -128,7 +128,7 @@ export function EditModal({
             padding: '16px 20px 14px',
             borderBottom: '1px solid var(--at-line)',
             flexShrink: 0,
-            gap: '12px',
+            gap: 'var(--at-space-3)',
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -136,13 +136,13 @@ export function EditModal({
               {title}
             </h2>
             {subtitle && (
-              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: 'var(--at-space-1)' }}>
                 {subtitle}
               </div>
             )}
           </div>
           {headerActions && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--at-space-2)', flexShrink: 0 }}>
               {headerActions}
             </div>
           )}
@@ -156,7 +156,7 @@ export function EditModal({
               color: 'var(--at-ink-3)',
               fontSize: '22px',
               lineHeight: 1,
-              padding: '8px',
+              padding: 'var(--at-space-2)',
               minWidth: '44px',
               minHeight: '44px',
               borderRadius: '8px',
@@ -183,7 +183,7 @@ export function EditModal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: '8px',
+              gap: 'var(--at-space-2)',
               padding: '14px 20px',
               borderTop: '1px solid var(--at-line)',
               flexShrink: 0,

@@ -81,7 +81,7 @@ function ConfirmRoot() {
           position: 'fixed', inset: 0,
           background: 'rgba(0, 0, 0, 0.4)',
           zIndex: 9998,
-          animation: 'at-dialog-overlay-in 120ms ease-out',
+          animation: 'at-dialog-overlay-in var(--at-motion-fast) ease-out',
         }} />
         <AlertDialog.Content
           aria-describedby={options.text ? 'at-confirm-desc' : undefined}
@@ -91,13 +91,13 @@ function ConfirmRoot() {
             background: 'var(--at-surface)',
             borderRadius: '16px',
             padding: '24px 28px',
-            maxWidth: '440px', width: 'calc(100vw - 32px)',
+            maxWidth: '440px', width: 'calc(100vw - var(--at-space-6))',
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
             zIndex: 9999,
             animation: 'at-dialog-content-in 160ms ease-out',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: options.text ? '16px' : '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: options.text ? 'var(--at-space-4)' : '20px' }}>
             {options.icon && (
               <span aria-hidden="true" style={{ fontSize: '24px', lineHeight: 1, flexShrink: 0 }}>{iconMap[options.icon]}</span>
             )}
@@ -212,7 +212,7 @@ function NotifyRoot() {
               borderRadius: '12px',
               padding: '14px 18px',
               boxShadow: '0 8px 28px rgba(0,0,0,0.12)',
-              display: 'flex', alignItems: 'flex-start', gap: '12px',
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--at-space-3)',
               minWidth: '280px', maxWidth: '380px',
             }}
           >
@@ -222,7 +222,7 @@ function NotifyRoot() {
                 {entry.options.title}
               </Toast.Title>
               {entry.options.text && (
-                <Toast.Description style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.4 }}>
+                <Toast.Description style={{ margin: 'var(--at-space-1) 0 0', fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.4 }}>
                   {entry.options.text}
                 </Toast.Description>
               )}

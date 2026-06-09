@@ -44,7 +44,7 @@ export function KpiCard({ label, value, unit, icon, gradient, loading = false, o
         color: 'white',
         padding: '20px 22px',
         borderRadius: '16px',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+        boxShadow: 'var(--at-elevation-3)',
         cursor: isInteractive ? 'pointer' : 'default',
         position: 'relative',
         overflow: 'hidden',
@@ -57,7 +57,7 @@ export function KpiCard({ label, value, unit, icon, gradient, loading = false, o
       onMouseEnter={e => { if (isInteractive) e.currentTarget.style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { if (isInteractive) e.currentTarget.style.transform = 'translateY(0)' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--at-space-3)' }}>
         <div style={{ fontSize: '13px', fontWeight: 600, opacity: 0.92 }}>{label}</div>
         {icon && <div style={{ fontSize: '24px', opacity: 0.9 }}>{icon}</div>}
       </div>
@@ -68,7 +68,7 @@ export function KpiCard({ label, value, unit, icon, gradient, loading = false, o
           <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
         )}
         {unit && (
-          <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '4px' }}>{unit}</div>
+          <div style={{ fontSize: '12px', opacity: 0.85, marginTop: 'var(--at-space-1)' }}>{unit}</div>
         )}
       </div>
     </div>

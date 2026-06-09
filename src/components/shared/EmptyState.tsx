@@ -30,7 +30,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
     <div
       style={{
         textAlign: 'center',
-        padding: compact ? '24px 16px' : '48px 16px',
+        padding: compact ? 'var(--at-space-5) var(--at-space-4)' : 'var(--at-space-7) var(--at-space-4)',
         color: 'var(--at-ink-3)',
         ...style,
       }}
@@ -38,7 +38,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
       <div
         style={{
           fontSize: compact ? '32px' : '48px',
-          marginBottom: compact ? '8px' : '14px',
+          marginBottom: compact ? 'var(--at-space-2)' : '14px',
           lineHeight: 1,
         }}
       >
@@ -68,7 +68,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
           {description}
         </p>
       )}
-      {action && <div style={{ marginTop: compact ? '12px' : '20px' }}>{action}</div>}
+      {action && <div style={{ marginTop: compact ? 'var(--at-space-3)' : '20px' }}>{action}</div>}
     </div>
   )
 }
