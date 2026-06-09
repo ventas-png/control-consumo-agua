@@ -1,10 +1,10 @@
-import { useState, useMemo, type CSSProperties } from 'react'
+import { useState, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
-import { DataTable, type DataTableColumn } from '../shared'
+import { DataTable, type DataTableColumn, Icon } from '../shared'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 
 interface Props {
@@ -282,12 +282,12 @@ export function HistorialSection({
 
       {/* Stats — derivados del filtered set */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="var(--at-primary)" icon="📝" moneda={moneda} />
-        <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="var(--at-accent-2)" icon="💧" moneda={moneda} />
-        <StatCard label="Total Monto" value={stats.totalMonto} color="var(--at-accent)" icon="💰" moneda={moneda} />
-        <StatCard label="Pagado" value={stats.pagado} color="var(--at-success)" icon="✓" moneda={moneda} />
-        <StatCard label="Pendiente" value={stats.pendiente} color="var(--at-warning)" icon={`⏳ (${stats.countPendiente})`} moneda={moneda} />
-        <StatCard label="En Mora" value={stats.mora} color="var(--at-danger)" icon={`⚠️ (${stats.countMora})`} moneda={moneda} />
+        <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="var(--at-primary)" icon={<Icon name="inbox" size={14} />} moneda={moneda} />
+        <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="var(--at-accent-2)" icon={<Icon name="droplet" size={14} />} moneda={moneda} />
+        <StatCard label="Total Monto" value={stats.totalMonto} color="var(--at-accent)" icon={<Icon name="coins" size={14} />} moneda={moneda} />
+        <StatCard label="Pagado" value={stats.pagado} color="var(--at-success)" icon={<Icon name="check" size={14} />} moneda={moneda} />
+        <StatCard label={`Pendiente (${stats.countPendiente})`} value={stats.pendiente} color="var(--at-warning)" icon={<Icon name="calendar" size={14} />} moneda={moneda} />
+        <StatCard label={`En Mora (${stats.countMora})`} value={stats.mora} color="var(--at-danger)" icon={<Icon name="alert" size={14} />} moneda={moneda} />
       </div>
 
       {/* Filters Panel */}
@@ -473,7 +473,7 @@ export function HistorialSection({
 // ── Sub-componentes locales ───────────────────────────────────────────────
 
 function StatCard({ label, value, color, icon, moneda }: {
-  label: string; value: string | number; color: string; icon: string; moneda: string
+  label: string; value: string | number; color: string; icon: ReactNode; moneda: string
 }) {
   return (
     <div style={{
@@ -482,7 +482,7 @@ function StatCard({ label, value, color, icon, moneda }: {
       borderLeft: `4px solid ${color}`,
       borderRadius: 12, border: `1px solid ${color}40`,
     }}>
-      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 8 }}>
         {icon} {label}
       </div>
       <div style={{ fontSize: 24, fontWeight: 700, color }}>
