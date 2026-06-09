@@ -832,12 +832,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               />
             </div>
           ) : filteredLecturasCount === 0 ? (
-            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', gap: '8px', background: 'var(--at-surface-2)', borderRadius: '10px' }}>
-              <span style={{ fontSize: '32px' }}>🔍</span>
-              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas para los contadores activos</span>
-              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '320px' }}>
-                Hay {lecturasTotal} lectura{lecturasTotal !== 1 ? 's' : ''} en el sistema pero no coinciden con los contadores vinculados
-              </span>
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px' }}>
+              <EmptyState
+                audience="resident"
+                icon={<Icon name="search" size={26} />}
+                title="Sin lecturas para los contadores activos"
+                description={`Hay ${lecturasTotal} lectura${lecturasTotal !== 1 ? 's' : ''} en el sistema, pero no coinciden con los contadores vinculados.`}
+              />
             </div>
           ) : (
             <div style={{ height: chartDatasets.length > 1 ? '300px' : '260px' }}><canvas ref={chartRef} /></div>
@@ -1271,9 +1272,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                         {isExpanded && (
                           <div style={{ borderTop: '1px solid var(--at-chip)' }}>
                             {contLecturas.length === 0 ? (
-                              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-                                No hay lecturas registradas para este contador.
-                              </div>
+                              <EmptyState
+                                compact
+                                audience="resident"
+                                icon={<Icon name="gauge" size={24} />}
+                                title="No hay lecturas registradas para este contador."
+                              />
                             ) : (
                               <div className="table-scroll-wrapper">
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
