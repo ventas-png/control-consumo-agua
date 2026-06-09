@@ -80,6 +80,13 @@
   --at-table-row-border: color-mix(in srgb, var(--at-primary) 12%, transparent);
   --at-table-row-hover:  color-mix(in srgb, var(--at-primary) 6%, transparent);
   --at-table-header-bg:  var(--at-surface-2);
+
+  /* ─── Datos / KPIs ───────────────────────────────────────────────────────
+     Terracota destacado = --at-accent (existente, NO se duplica). positive
+     sigue a --at-primary (adapta a dark). negative para deltas críticos
+     (override más claro en dark para contraste — ver bloques dark). */
+  --at-data-positive: var(--at-primary);
+  --at-data-negative: #B23A3A;
 }
 
 /* ─── Dark theme ──────────────────────────────────────────────────────────
@@ -103,7 +110,7 @@
     --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
     --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
     --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
-    --at-on-status: #0B1410;
+    --at-on-status: #0B1410; --at-data-negative: #E8736B;
     color-scheme: dark;
   }
 }
@@ -123,7 +130,7 @@
   --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
   --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
   --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
-  --at-on-status: #0B1410;
+  --at-on-status: #0B1410; --at-data-negative: #E8736B;
   color-scheme: dark;
 }
 
