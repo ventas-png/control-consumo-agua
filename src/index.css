@@ -71,6 +71,15 @@
   --at-ease-entrance: cubic-bezier(0, 0, 0.2, 1);
   --at-ease-exit:     cubic-bezier(0.4, 0, 1, 1);
   --at-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ─── Tabla (DataTable): jerarquía densa ─────────────────────────────────
+     Bordes/hover derivados de la marca (color-mix sobre --at-primary): se
+     adaptan solos a dark (primary pasa a verde menta), más suaves que un gris
+     duro. header-bg sólido para que el encabezado fijo tape las filas al
+     hacer scroll. color-mix tiene soporte universal en navegadores modernos. */
+  --at-table-row-border: color-mix(in srgb, var(--at-primary) 12%, transparent);
+  --at-table-row-hover:  color-mix(in srgb, var(--at-primary) 6%, transparent);
+  --at-table-header-bg:  var(--at-surface-2);
 }
 
 /* ─── Dark theme ──────────────────────────────────────────────────────────
