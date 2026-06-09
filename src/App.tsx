@@ -777,7 +777,7 @@ export default function App() {
 
       {/* El CSS responsive del shell (.app-sidebar, etc.) vive ahora en
           src/styles/runtime.css (I24: CSP sin 'unsafe-inline' en style-src). */}
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--at-bg)' }}>
+      <div data-context="admin" style={{ display: 'flex', minHeight: '100vh', background: 'var(--at-bg)' }}>
         <div
           className="app-backdrop"
           onClick={() => setSidebarOpen(false)}

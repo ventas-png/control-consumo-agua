@@ -4,6 +4,7 @@ import type {
   InfraccionCondominio, Unidad,
 } from '../../../types'
 import { KpiCard as HeroKpi } from '../../shared/KpiCard'
+import { Icon } from '../../shared/Icon'
 
 /** Variación % entre el penúltimo y el último punto de una serie (delta KPI). */
 function pctDelta(serie: number[]): number | undefined {
@@ -128,7 +129,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
           label="Cobranza del mes"
           value={`${tasaCobranza}%`}
           unit={`${moneda} ${totalCobrado.toFixed(0)} cobrado`}
-          icon="💰"
+          icon={<Icon name="coins" size={22} />}
           gradient="linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))"
           sparkline={serieCobranza}
           delta={pctDelta(serieCobranza)}
@@ -138,7 +139,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
           label="Emitido del mes"
           value={`${moneda} ${(totalEmitido / 1000).toFixed(1)}k`}
           unit={`${cuotasMes.length} cuotas`}
-          icon="🧾"
+          icon={<Icon name="receipt" size={22} />}
           gradient="linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))"
           sparkline={serieEmitido}
           delta={pctDelta(serieEmitido)}
@@ -148,7 +149,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
           label="Cobrado del mes"
           value={`${moneda} ${(totalCobrado / 1000).toFixed(1)}k`}
           unit="acumulado del mes"
-          icon="✅"
+          icon={<Icon name="check" size={22} />}
           gradient="linear-gradient(135deg, var(--at-primary-2), var(--at-primary-mint))"
           sparkline={serieCobrado}
           delta={pctDelta(serieCobrado)}
