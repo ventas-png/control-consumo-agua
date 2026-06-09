@@ -5,6 +5,7 @@ import type {
 } from '../../../types'
 import { KpiCard as HeroKpi } from '../../shared/KpiCard'
 import { Icon } from '../../shared/Icon'
+import { Sparkline } from '../../shared/Sparkline'
 
 /** Variación % entre el penúltimo y el último punto de una serie (delta KPI). */
 function pctDelta(serie: number[]): number | undefined {
@@ -29,12 +30,17 @@ interface Props {
   proyectoNombre?: string
 }
 
-function KpiCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+function KpiCard({ label, value, sub, color, spark }: { label: string; value: string; sub?: string; color: string; spark?: number[] }) {
   return (
     <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
       <div style={{ fontSize: '22px', fontWeight: 800, color }}>{value}</div>
       <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink)', marginTop: '2px' }}>{label}</div>
       {sub && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{sub}</div>}
+      {spark && spark.length > 1 && (
+        <div style={{ marginTop: '8px', height: 22 }}>
+          <Sparkline data={spark} height={22} ariaLabel={`Tendencia de ${label}`} />
+        </div>
+      )}
     </div>
   )
 }
@@ -94,6 +100,11 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
   const serieEmitido  = trend.map(t => t.emitido)
   const serieCobrado  = trend.map(t => t.cobrado)
   const serieCobranza = trend.map(t => (t.emitido > 0 ? Math.round((t.cobrado / t.emitido) * 100) : 0))
+  const serieGastos = Array.from({ length: 6 }, (_, k) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - (5 - k), 1)
+    const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return gastos.filter(g => g.fecha.startsWith(p)).reduce((s, g) => s + g.monto, 0)
+  })
 
   // ── Mantenimiento ─────────────────────────────────────────────────────────
   const ticketsAbiertos = tickets.filter(t => t.estado === 'abierto').length
@@ -166,7 +177,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
             color={tasaCobranza >= 80 ? 'var(--at-success)' : tasaCobranza >= 60 ? 'var(--at-warning)' : 'var(--at-danger)'} />
           <KpiCard label="Morosos" value={String(morosos)} sub="unidades" color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
           <KpiCard label="Gastos del año" value={`${moneda} ${(totalGastos / 1000).toFixed(1)}k`}
-            sub={presupuestoTotal > 0 ? `${ejecucionPpto}% del ppto.` : 'Sin presupuesto'} color='var(--at-accent)' />
+            sub={presupuestoTotal > 0 ? `${ejecucionPpto}% del ppto.` : 'Sin presupuesto'} color='var(--at-accent)' spark={serieGastos} />
           <KpiCard label="Sanciones pend." value={`${moneda} ${montoSanciones.toFixed(0)}`}
             sub={`${sancionesPendientes.length} sanciones`} color={montoSanciones > 0 ? 'var(--at-warning)' : 'var(--at-success)'} />
         </div>
