@@ -445,7 +445,8 @@ export function DataTable<T>({
                               isStickyCol ? 'table-col-sticky' : '',
                             ].filter(Boolean).join(' ') || undefined}
                             style={{
-                              padding: '10px 14px',
+                              padding: 'var(--at-density-pad, 10px) 14px',
+                              height: 'var(--at-density-row, auto)',
                               textAlign: col.align ?? (col.numeric ? 'right' : 'left'),
                               color: 'var(--at-ink)',
                               fontFamily: col.numeric ? 'var(--at-font-mono)' : undefined,

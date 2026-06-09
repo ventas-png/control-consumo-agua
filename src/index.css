@@ -134,6 +134,20 @@
   color-scheme: dark;
 }
 
+/* ─── Densidad por contexto (admin / residente) ──────────────────────────────
+   El shell admin marca data-context="admin" (denso, eficiente); el portal del
+   residente data-context="resident" (más respiro, mobile-first). Los
+   consumidores leen var(--at-density-*, fallback): fuera de un contexto el
+   fallback preserva el aspecto actual (cero regresión). */
+[data-context="admin"] {
+  --at-density-pad: var(--at-space-2);   /* 8px  — filas compactas */
+  --at-density-row: 36px;
+}
+[data-context="resident"] {
+  --at-density-pad: var(--at-space-4);   /* 16px — más aire */
+  --at-density-row: 48px;
+}
+
 /* ─── Global Reset & Base ─────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -463,6 +477,9 @@ button:focus:not(:focus-visible) {
     justify-content: space-between;
     gap: 12px;
     padding: 6px 0 !important;
+    /* Anula la altura de densidad (--at-density-row) en el layout de tarjetas:
+       en móvil cada celda es una fila etiqueta/valor, no una celda de tabla. */
+    height: auto !important;
     border: none !important;
     font-size: 13px !important;
     text-align: right;
