@@ -79,7 +79,7 @@
      hacer scroll. color-mix tiene soporte universal en navegadores modernos. */
   --at-table-row-border: color-mix(in srgb, var(--at-primary) 12%, transparent);
   --at-table-row-hover:  color-mix(in srgb, var(--at-primary) 6%, transparent);
-  --at-table-header-bg:  var(--at-surface-2);
+  --at-table-header-bg:  var(--at-surface-tint);
 
   /* ─── Datos / KPIs ───────────────────────────────────────────────────────
      Terracota destacado = --at-accent (existente, NO se duplica). positive
@@ -87,6 +87,15 @@
      (override más claro en dark para contraste — ver bloques dark). */
   --at-data-positive: var(--at-primary);
   --at-data-negative: #B23A3A;
+
+  /* ─── Profundidad orgánica (color-mix derivado de marca) ─────────────────
+     Bordes/superficies decorativas teñidas de marca en vez de gris plano.
+     Fallback sólido por doble-declaración: si el navegador no soporta
+     color-mix (muy antiguo) usa el hex; los modernos usan el color-mix. */
+  --at-border-organic: #D0D2CB;
+  --at-border-organic: color-mix(in srgb, var(--at-primary) 16%, transparent);
+  --at-surface-tint: #E9EBE2;
+  --at-surface-tint: color-mix(in srgb, var(--at-accent-2) 8%, var(--at-bg));
 }
 
 /* ─── Dark theme ──────────────────────────────────────────────────────────
@@ -95,7 +104,7 @@
    Los mismos valores se declaran en ambos selectores. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821;
+    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821; --at-surface: color-mix(in oklch, var(--at-bg) 95%, var(--at-primary)); --at-surface-2: color-mix(in oklch, var(--at-bg) 92%, var(--at-primary));
     --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
     --at-line: #28352D; --at-line-strong: #3A4A40;
     --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;

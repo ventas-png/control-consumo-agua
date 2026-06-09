@@ -30,7 +30,7 @@ export function StatTile({ label, value, tone, hint, icon, style, sparkline, del
         flex: '1 1 140px',
         minWidth: 140,
         background: v ? v.bg : 'var(--at-surface)',
-        border: `1px solid ${v ? v.border : 'var(--at-line)'}`,
+        border: `1px solid ${v ? v.border : 'var(--at-border-organic)'}`,
         borderRadius: 12,
         padding: '12px 14px',
         ...style,
