@@ -303,13 +303,17 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
           const registro = registros.find(r => r.id === pago.registro_id)
           if (registro) {
             const nuevoMontoPagado = (registro.monto_pagado ?? 0) + pago.monto
-            const total = registro.monto_calculado ?? 0
+            // El saldo se mide contra el TOTAL de la factura (incluye IVA + mora),
+            // no contra monto_calculado (subtotal). Si no hay factura emitida, se
+            // cae al subtotal como antes. Tolerancia de medio centavo por floats.
+            const total = facturaById.get(pago.registro_id)?.total_a_pagar ?? registro.monto_calculado ?? 0
             const saldo = total - nuevoMontoPagado
+            const nuevoEstado: Registro['estado'] = saldo <= 0.005 ? 'pagado' : 'pendiente'
 
             // Update registro state and status
             const { error: updateError } = await updateRegistro(pago.registro_id, {
               monto_pagado: nuevoMontoPagado,
-              estado: saldo <= 0 ? 'pagado' : 'pendiente',
+              estado: nuevoEstado,
             })
 
             if (updateError) throw new Error(updateError)
@@ -317,7 +321,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
             if (onRegistroUpdated) {
               onRegistroUpdated(pago.registro_id, {
                 monto_pagado: nuevoMontoPagado,
-                estado: saldo <= 0 ? 'pagado' : 'pendiente',
+                estado: nuevoEstado,
               })
             }
           }
