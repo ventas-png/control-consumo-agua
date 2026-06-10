@@ -6,12 +6,16 @@ import { CatalogoCuentasTab } from './CatalogoCuentasTab'
 import { AsientosTab } from './AsientosTab'
 import { BalanzaTab } from './BalanzaTab'
 import { MapeoCuentasTab } from './MapeoCuentasTab'
+import { ProveedoresTab } from './ProveedoresTab'
+import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 
-type SubTab = 'polizas' | 'balanza' | 'catalogo' | 'configuracion'
+type SubTab = 'polizas' | 'balanza' | 'cxp' | 'proveedores' | 'catalogo' | 'configuracion'
 
 const TABS: { id: SubTab; label: string }[] = [
   { id: 'polizas', label: 'Pólizas' },
   { id: 'balanza', label: 'Balanza' },
+  { id: 'cxp', label: 'Cuentas por pagar' },
+  { id: 'proveedores', label: 'Proveedores' },
   { id: 'catalogo', label: 'Catálogo de cuentas' },
   { id: 'configuracion', label: 'Configuración' },
 ]
@@ -77,6 +81,12 @@ export function ContabilidadSection() {
       )}
       {tab === 'balanza' && (
         <BalanzaTab companyId={companyId} proyectos={proyectos} monedaBase={monedaBase} />
+      )}
+      {tab === 'cxp' && (
+        <CuentasPorPagarTab companyId={companyId} proyectos={proyectos} monedaBase={monedaBase} />
+      )}
+      {tab === 'proveedores' && (
+        <ProveedoresTab companyId={companyId} />
       )}
       {tab === 'catalogo' && (
         <CatalogoCuentasTab companyId={companyId} monedaBase={monedaBase} />
