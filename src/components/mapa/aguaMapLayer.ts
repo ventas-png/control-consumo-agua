@@ -1,5 +1,6 @@
 import type { Cliente, Registro } from '../../types'
 import type { MapLayer, MapMarker } from './MapView'
+import { escapeHtml } from '../../lib/printHtml'
 
 // serv:S13 — Lógica específica de agua para alimentar el <MapView> genérico.
 // Mantenerla aparte del componente la hace testeable sin Leaflet/DOM y deja a
@@ -48,9 +49,11 @@ export function buildMedidoresLayer(
       color,
       // serv:S18 — peso para el mapa de calor: consumo de la última lectura.
       weight: ultima.consumo ?? 0,
+      // Leaflet bindPopup renderiza este string como HTML → escapamos los datos
+      // del cliente (nombre/estado) para evitar XSS al abrir el popup del pin.
       popupHtml:
-        `<strong>${cliente.nombre}</strong><br>` +
-        `Estado: <b style="color:${color}">${ultima.estado.toUpperCase()}</b><br>` +
+        `<strong>${escapeHtml(cliente.nombre)}</strong><br>` +
+        `Estado: <b style="color:${color}">${escapeHtml(ultima.estado.toUpperCase())}</b><br>` +
         `Consumo: ${ultima.consumo} m³<br>` +
         `<small>${new Date(ultima.fecha).toLocaleDateString()}</small>`,
     }]
