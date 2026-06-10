@@ -42,12 +42,14 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - UI: tab Presupuesto en Contabilidad — editor mensualizado (cuentas × 12 meses con "repartir anual") y comparativo con filtro por mes.
 - Pendiente para fases posteriores: alertas de desviación vía `notification_outbox` y control presupuestario en el alta de gastos (advertir/bloquear partida excedida).
 
-## Fase 4 — Bancos y conciliación
+## Fase 4 — Bancos y conciliación ✅
 
-- `cuentas_bancarias` (banco, número enmascarado, moneda, cuenta contable asociada) — da hogar formal a los bancos multimoneda de Fase 1.
-- Importación de extractos (CSV/Excel) a `banco_movimientos`.
-- **Conciliación**: matching automático por monto/fecha/referencia contra `pagos` y órdenes de pago, con pantalla de matching manual para el resto; ajustes de conciliación generan asientos (comisiones, intereses).
-- Estado de conciliación por cuenta/mes (saldo banco vs saldo libro).
+- `cuentas_bancarias`: banco, número enmascarado (solo últimos dígitos), moneda, atada 1:1 a su cuenta contable de detalle — da hogar formal a los bancos multimoneda de Fase 1.
+- Importación de extractos (XLSX) a `banco_movimientos` con dedup por (cuenta, fecha, monto, referencia) y parsers tolerantes (símbolos de moneda, paréntesis negativos, DD/MM/YYYY).
+- **Conciliación**: sugerencias automáticas por monto exacto ±3 días contra `pagos` (ingresos) y `ordenes_pago` (egresos), vía RPCs que validan tenant y bloquean conciliar el mismo documento dos veces; desconciliación controlada.
+- **Ajustes** (comisiones/intereses): generan póliza automática contra la cuenta contable del banco (gasto_otros / ingreso_otros) y concilian el movimiento; `conta_generar_asiento` v2 acepta `cuenta_id` directo en las líneas.
+- Estado de conciliación por cuenta/periodo: saldo libro (moneda base y origen) vs saldo extracto, pendientes y diferencia.
+- Pendiente para después: matching difuso (montos parciales/agrupados) e importación de formatos bancarios propietarios.
 
 ## Fase 5 — Estados financieros y cierre
 
