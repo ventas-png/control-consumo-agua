@@ -3,7 +3,7 @@
 
 export type TipoCuenta = 'activo' | 'pasivo' | 'capital' | 'ingreso' | 'gasto'
 export type NaturalezaCuenta = 'deudora' | 'acreedora'
-export type TipoAsiento = 'diario' | 'ingreso' | 'egreso' | 'apertura'
+export type TipoAsiento = 'diario' | 'ingreso' | 'egreso' | 'apertura' | 'cierre'
 export type EstadoAsiento = 'borrador' | 'publicado' | 'anulado'
 export type OrigenAsiento = 'manual' | 'automatico'
 
@@ -172,6 +172,7 @@ export const TIPO_ASIENTO_LABELS: Record<TipoAsiento, string> = {
   ingreso: 'Ingreso',
   egreso: 'Egreso',
   apertura: 'Apertura',
+  cierre: 'Cierre',
 }
 
 /** Naturaleza default por tipo de cuenta (editable cuenta a cuenta). */

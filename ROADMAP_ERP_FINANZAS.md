@@ -51,14 +51,12 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - Estado de conciliación por cuenta/periodo: saldo libro (moneda base y origen) vs saldo extracto, pendientes y diferencia.
 - Pendiente para después: matching difuso (montos parciales/agrupados) e importación de formatos bancarios propietarios.
 
-## Fase 5 — Estados financieros y cierre
+## Fase 5 — Estados financieros y cierre ✅ (núcleo)
 
-- **Estado de resultados (P&L)**, **balance general** y **flujo de efectivo** generados desde la balanza, por empresa y por proyecto, exportables (PDF/Excel) y con comparativo vs periodo anterior y vs presupuesto.
-- Reporte para asamblea/junta directiva (resumen ejecutivo financiero).
-- **Cierre contable formal**: integrar `cierres_mensuales` con la contabilidad (cerrar periodo bloquea publicación de asientos); cierre anual con traslado de resultados (4xxx/5xxx → 3201/3101).
-- Unificación de módulos legacy: caja chica como cuenta 1103 con sus movimientos contabilizados; fondo de reserva como cuenta 1301.
-- Revaluación periódica de saldos en moneda extranjera (diferencial cambiario 3301).
-- Performance: tabla materializada `conta_saldos_mensuales` actualizada al publicar asientos.
+- **Estado de resultados (P&L)** por rango de meses, **balance general** al cierre de un periodo (con el resultado sin cerrar integrado al capital para que siempre cuadre) y **flujo de efectivo** por cuenta de dinero (caja/bancos/pasarelas) — todo server-side desde los asientos publicados, por empresa o por proyecto, exportable a Excel.
+- **Cierre anual** (`conta_cierre_anual` + `conta_cierres_anuales`): asiento publicado al 31/12 con tipo propio `cierre` que salda ingresos/gastos contra 3201 Resultado del ejercicio; un cierre por año, y el P&L excluye los asientos de cierre para que los años cerrados sigan siendo consultables.
+- El bloqueo de asientos en periodos cerrados de proyecto (vía `cierres_mensuales`) viene de la Fase 1.
+- Pendiente para iteraciones posteriores: reporte ejecutivo para asamblea (PDF), unificación de caja chica (1103) y fondo de reserva (1301) legacy, revaluación FX periódica (3301), comparativo vs periodo anterior, y `conta_saldos_mensuales` materializada si el volumen lo exige.
 
 ## Dependencias y orden
 
