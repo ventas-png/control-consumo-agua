@@ -47,20 +47,23 @@ export function TrialExpirationBanner({ companyId }: Props) {
     return () => { alive = false }
   }, [companyId])
 
-  if (loading || dismissed || !subscription) return null
+  if (loading || !subscription) return null
   if (subscription.status !== 'trialing' || !subscription.trial_end) return null
 
   const trialEnd = new Date(subscription.trial_end)
   const now = new Date()
   const msLeft = trialEnd.getTime() - now.getTime()
   const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000))
+  const isExpired = msLeft <= 0
 
-  // Expirado o muy lejos: no mostramos. Lejos = el usuario no necesita aun el
-  // recordatorio; expirado = el subscription deberia haber pasado a active o
-  // past_due (otro componente maneja esos casos).
-  if (daysLeft > TRIAL_WARN_DAYS || daysLeft < 0) return null
+  // Lejos del vencimiento: no molestamos. EXPIRADO sí se muestra (la cuenta queda
+  // en modo SOLO LECTURA por el enforcement server-side, migración
+  // billing_trial_and_readonly_enforcement) y no es descartable, para conducir a
+  // la reactivación.
+  if (!isExpired && daysLeft > TRIAL_WARN_DAYS) return null
+  if (dismissed && !isExpired) return null
 
-  const isUrgent = daysLeft <= 2
+  const isUrgent = isExpired || daysLeft <= 2
   const bgColor = isUrgent ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)'
   const borderColor = isUrgent ? 'var(--at-danger)' : 'var(--at-warning)'
   const textColor = isUrgent ? 'var(--at-danger)' : 'var(--at-warning)'
@@ -103,7 +106,9 @@ export function TrialExpirationBanner({ companyId }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
         <span style={{ fontSize: '20px' }} aria-hidden="true">{isUrgent ? '⏰' : 'ℹ️'}</span>
         <span style={{ color: textColor, fontWeight: 600, fontSize: '14px' }}>
-          Tu trial termina <strong>{daysText}</strong>. Configura un método de pago para no perder acceso.
+          {isExpired
+            ? <>Tu trial expiró — la cuenta está en <strong>modo solo lectura</strong>. Configura un método de pago para reactivar.</>
+            : <>Tu trial termina <strong>{daysText}</strong>. Configura un método de pago para no perder acceso.</>}
         </span>
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>
@@ -122,21 +127,23 @@ export function TrialExpirationBanner({ companyId }: Props) {
         >
           Configurar pago
         </button>
-        <button
-          onClick={handleDismiss}
-          aria-label="Ocultar este aviso por esta sesión"
-          style={{
-            padding: '6px 10px',
-            borderRadius: '8px',
-            border: '1px solid var(--at-line-strong)',
-            background: 'transparent',
-            color: textColor,
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          Después
-        </button>
+        {!isExpired && (
+          <button
+            onClick={handleDismiss}
+            aria-label="Ocultar este aviso por esta sesión"
+            style={{
+              padding: '6px 10px',
+              borderRadius: '8px',
+              border: '1px solid var(--at-line-strong)',
+              background: 'transparent',
+              color: textColor,
+              fontSize: '13px',
+              cursor: 'pointer',
+            }}
+          >
+            Después
+          </button>
+        )}
       </div>
     </div>
   )

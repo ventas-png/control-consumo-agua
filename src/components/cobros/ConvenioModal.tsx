@@ -17,8 +17,11 @@ interface Props {
 }
 
 export function ConvenioModal({ registros, clientes, moneda, currentUserId, onClose, onSuccess }: Props) {
+  // Saldo (no el cargo bruto): se descuenta lo ya abonado para no incluir en el
+  // convenio montos que el cliente ya pagó parcialmente.
   const totalCargos = registros.reduce((acc, r) => {
-    return acc + (r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total)
+    const cargo = r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
+    return acc + Math.max(0, cargo - (r.monto_pagado ?? 0))
   }, 0)
 
   // Un convenio es sobre un solo cliente (todos los seleccionados deben ser del mismo)

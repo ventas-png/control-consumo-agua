@@ -3,6 +3,7 @@ import {
   CuotaCondominio, RecargoMora, ReservaAmenidad,
   AnuncioComunidad, TicketMantenimiento, Unidad,
 } from '../../../types'
+import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -71,7 +72,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
   const cuotaMes = cuotasUnidad.find(c => c.periodo === mesActual)
 
   function imprimir() {
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Resumen Residente — ${unidad?.nombre}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#15291F;font-size:13px}
@@ -98,12 +99,12 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
-    ${cuotasUnidad.map(c => `<tr><td>${c.concepto}</td><td>${c.periodo}</td><td>${moneda} ${c.monto.toFixed(2)}</td><td>${c.estado}</td></tr>`).join('')}
+    ${raw(cuotasUnidad.map(c => printHtml`<tr><td>${c.concepto}</td><td>${c.periodo}</td><td>${moneda} ${c.monto.toFixed(2)}</td><td>${c.estado}</td></tr>`).join(''))}
     </table></section>
-    ${ticketsUnidad.length > 0 ? `<section><h3>Tickets activos</h3>
+    ${ticketsUnidad.length > 0 ? raw(printHtml`<section><h3>Tickets activos</h3>
     <table><tr><th>Título</th><th>Tipo</th><th>Prioridad</th><th>Estado</th></tr>
-    ${ticketsUnidad.map(t => `<tr><td>${t.titulo}</td><td>${t.tipo}</td><td>${t.prioridad}</td><td>${t.estado}</td></tr>`).join('')}
-    </table></section>` : ''}
+    ${raw(ticketsUnidad.map(t => printHtml`<tr><td>${t.titulo}</td><td>${t.tipo}</td><td>${t.prioridad}</td><td>${t.estado}</td></tr>`).join(''))}
+    </table></section>`) : ''}
     <div class="footer">Documento informativo generado por el sistema de administración.</div>
     </body></html>`
     const win = window.open('', '_blank')

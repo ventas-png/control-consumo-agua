@@ -54,6 +54,28 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Authorization: el caller solo puede iniciar un flujo de conexión de Gmail
+    // para un scope que realmente le pertenece — nunca se confía solo en el body.
+    // is_superadmin → debe ser super_admin; un company_id → debe ser admin/owner
+    // de ESA empresa (o super_admin). Cierra el secuestro de la config de email
+    // de otro tenant o del superadmin de plataforma.
+    {
+      const { data: prof } = await supabase
+        .from('app_users').select('role, company_id').eq('id', user.id).maybeSingle()
+      const role = (prof as { role?: string } | null)?.role ?? ''
+      const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
+      const isSuper = role === 'super_admin' || role === 'superadmin'
+      const authorized = is_superadmin
+        ? isSuper
+        : isSuper || (['admin', 'company_owner'].includes(role) && callerCompany === company_id)
+      if (!authorized) {
+        return new Response(
+          JSON.stringify({ error: 'No autorizado para conectar el correo de este scope' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Rate limit server-side (infra:I2). El caller está autenticado, pero topamos el inicio
     // de OAuth por usuario e IP: evita generación masiva de state tokens / consent loops
     // (abuso o bug de reintentos) hacia el endpoint de Google. `supabase` es service_role,

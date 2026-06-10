@@ -312,7 +312,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   // Fase 35
   const [plantillasMensaje, setPlantillasMensaje] = useState<PlantillaMensajeCond[]>([])
   const [flujoAprobacion, setFlujoAprobacion] = useState<FlujoAprobacionCond[]>([])
-  // Fase 36 — GeneracionCuotasLog loaded on demand inside GeneracionCuotasTab
+  // Fase 36 — GeneracionCuotasLog loaded on demand inside GeneradorCuotasTab
   // Fase 37
   const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
   const [asambleasDigital, setAsambleasDigital] = useState<AsambleaDigital[]>([])

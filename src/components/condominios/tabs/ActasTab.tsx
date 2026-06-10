@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ActaReunion, TipoActa } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   actas: ActaReunion[]
@@ -117,23 +118,23 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   function handlePrint(a: ActaReunion) {
     const win = window.open('', '_blank')
     if (!win) return
-    const asist = (a.asistentes as AsistenteFila[]).map(x => `<li>${x.nombre}${x.unidad ? ` — ${x.unidad}` : ''}${x.rol ? ` (${x.rol})` : ''}</li>`).join('')
-    const agenda = (a.orden_del_dia as PuntoAgenda[]).map((p, i) => `
+    const asist = (a.asistentes as AsistenteFila[]).map(x => printHtml`<li>${x.nombre}${x.unidad ? ` — ${x.unidad}` : ''}${x.rol ? ` (${x.rol})` : ''}</li>`).join('')
+    const agenda = (a.orden_del_dia as PuntoAgenda[]).map((p, i) => printHtml`
       <div style="margin-bottom:14px"><strong>${i+1}. ${p.punto}</strong>
-      ${p.descripcion ? `<p style="margin:4px 0;color:#444">${p.descripcion}</p>` : ''}
-      ${p.acuerdo ? `<p style="margin:4px 0;background:var(--at-success-tint);padding:6px;border-left:3px solid var(--at-success)"><strong>Acuerdo:</strong> ${p.acuerdo}</p>` : ''}
+      ${p.descripcion ? raw(printHtml`<p style="margin:4px 0;color:#444">${p.descripcion}</p>`) : ''}
+      ${p.acuerdo ? raw(printHtml`<p style="margin:4px 0;background:var(--at-success-tint);padding:6px;border-left:3px solid var(--at-success)"><strong>Acuerdo:</strong> ${p.acuerdo}</p>`) : ''}
       </div>`).join('')
-    win.document.write(`<html><head><title>${a.titulo}</title>
+    win.document.write(printHtml`<html><head><title>${a.titulo}</title>
     <style>body{font-family:serif;max-width:750px;margin:40px auto;font-size:13px;line-height:1.7}h1{font-size:17px;text-align:center}h2{font-size:14px;border-bottom:1px solid #ccc;padding-bottom:4px}ul{margin:0;padding-left:20px}.meta{color:#666;font-size:12px;text-align:center;margin-bottom:24px}</style>
     </head><body>
     <h1>${a.titulo}</h1>
     <div class="meta">${TIPO_LABELS[a.tipo].label} — ${a.fecha}${a.lugar ? ` — ${a.lugar}` : ''}${a.hora_inicio ? ` — ${a.hora_inicio}` : ''}${a.quorum != null ? ` — Quórum: ${a.quorum}/${a.quorum_requerido ?? '?'}` : ''}</div>
-    ${asist ? `<h2>Asistentes</h2><ul>${asist}</ul>` : ''}
-    ${agenda ? `<h2>Orden del Día</h2>${agenda}` : ''}
-    ${a.acuerdos ? `<h2>Acuerdos Generales</h2><p>${a.acuerdos}</p>` : ''}
-    ${a.observaciones ? `<h2>Observaciones</h2><p>${a.observaciones}</p>` : ''}
-    ${a.redactada_por ? `<div style="margin-top:40px;text-align:right;color:#666;font-size:12px">Redactada por: ${a.redactada_por}</div>` : ''}
-    ${a.aprobada ? '<div style="margin-top:10px;text-align:center;color:var(--at-success);font-weight:bold">✓ ACTA APROBADA</div>' : ''}
+    ${asist ? raw(printHtml`<h2>Asistentes</h2><ul>${raw(asist)}</ul>`) : ''}
+    ${agenda ? raw(printHtml`<h2>Orden del Día</h2>${raw(agenda)}`) : ''}
+    ${a.acuerdos ? raw(printHtml`<h2>Acuerdos Generales</h2><p>${a.acuerdos}</p>`) : ''}
+    ${a.observaciones ? raw(printHtml`<h2>Observaciones</h2><p>${a.observaciones}</p>`) : ''}
+    ${a.redactada_por ? raw(printHtml`<div style="margin-top:40px;text-align:right;color:#666;font-size:12px">Redactada por: ${a.redactada_por}</div>`) : ''}
+    ${a.aprobada ? raw('<div style="margin-top:10px;text-align:center;color:var(--at-success);font-weight:bold">✓ ACTA APROBADA</div>') : ''}
     </body></html>`)
     win.document.close(); win.print()
   }

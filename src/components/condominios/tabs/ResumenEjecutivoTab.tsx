@@ -4,6 +4,7 @@ import {
   Unidad, IncidenteSeguridad, PolizaSeguro, ContratoProveedor,
   InspeccionNormativa, VencimientoExtra, SugerenciaCondominio,
 } from '../../../types'
+import { escapeHtml } from '../../../lib/printHtml'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -72,7 +73,7 @@ export default function ResumenEjecutivoTab({
   function imprimir() {
     const ejecucionPct = financiero.presupMes > 0 ? Math.round((financiero.gastosMes / financiero.presupMes) * 100) : 0
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumen Ejecutivo — ${proyectoNombre ?? ''}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumen Ejecutivo — ${escapeHtml(proyectoNombre ?? '')}</title>
 <style>
   *{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#15291F;padding:24px;max-width:900px;margin:0 auto}
   h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:var(--at-ink-3);font-size:11px}
@@ -87,7 +88,7 @@ export default function ResumenEjecutivoTab({
   @media print{.btn{display:none}}
 </style></head><body>
 <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-<h1>Resumen Ejecutivo — ${proyectoNombre ?? 'Condominio'}</h1>
+<h1>Resumen Ejecutivo — ${escapeHtml(proyectoNombre ?? 'Condominio')}</h1>
 <p>Generado el ${fechaLarga}</p>
 
 <h2>Finanzas y cobro</h2>
@@ -112,7 +113,7 @@ ${top5Morosos.length > 0 ? `
   <thead><tr><th>Unidad</th><th>Cuotas vencidas</th><th>Monto en mora</th></tr></thead>
   <tbody>
     ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}">
-      <td><strong>${m.unidad.nombre}</strong></td>
+      <td><strong>${escapeHtml(m.unidad.nombre)}</strong></td>
       <td style="color:var(--at-danger);font-weight:700">${m.count}</td>
       <td style="color:var(--at-danger);font-weight:700">${moneda} ${m.monto.toFixed(2)}</td>
     </tr>`).join('')}
@@ -125,9 +126,9 @@ ${ticketsCriticos.length > 0 ? `
   <thead><tr><th>Título</th><th>Unidad</th><th>Prioridad</th></tr></thead>
   <tbody>
     ${ticketsCriticos.slice(0, 8).map(t => `<tr>
-      <td>${t.titulo}</td>
-      <td>${t.unidad_nombre ?? '—'}</td>
-      <td><span class="badge" style="background:${t.prioridad === 'urgente' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)'};color:${t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)'}">${t.prioridad}</span></td>
+      <td>${escapeHtml(t.titulo)}</td>
+      <td>${escapeHtml(t.unidad_nombre ?? '—')}</td>
+      <td><span class="badge" style="background:${t.prioridad === 'urgente' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)'};color:${t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)'}">${escapeHtml(t.prioridad)}</span></td>
     </tr>`).join('')}
   </tbody>
 </table>` : '<h2>Tickets críticos</h2><p style="color:var(--at-success)">✓ Sin tickets urgentes o de alta prioridad abiertos</p>'}
@@ -140,7 +141,7 @@ ${venc30.length > 0 ? `
     ${venc30.map(v => {
       const dias = Math.ceil((new Date(v.fecha).getTime() - Date.now()) / 86400000)
       return `<tr>
-        <td>${v.titulo}</td>
+        <td>${escapeHtml(v.titulo)}</td>
         <td>${v.fecha}</td>
         <td style="color:${dias <= 7 ? 'var(--at-danger)' : 'var(--at-warning)'};font-weight:700">${dias} días</td>
       </tr>`
@@ -149,7 +150,7 @@ ${venc30.length > 0 ? `
 </table>` : ''}
 
 <p style="margin-top:20px;font-size:9px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px">
-  ${proyectoNombre} · Reporte generado el ${fechaLarga} · Total de unidades: ${unidades.length}
+  ${escapeHtml(proyectoNombre)} · Reporte generado el ${fechaLarga} · Total de unidades: ${unidades.length}
 </p>
 </body></html>`
 

@@ -22,6 +22,8 @@ const CONCEPTOS = ['Mantenimiento', 'Administración', 'Fondo de reserva', 'Áre
 
 function mesProximo(): string {
   const d = new Date()
+  d.setDate(1) // fijar el día 1 antes de avanzar el mes evita el desborde de
+               // fin de mes (May 31 + 1 mes => 'Jun 31' => Jul 1 => mes equivocado)
   d.setMonth(d.getMonth() + 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }

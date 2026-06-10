@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EntregaUnidad, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   entregas: EntregaUnidad[]
@@ -103,7 +104,10 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     const unidad = unidades.find(u => u.id === e.unidad_id)
     const inv = (e.inventario_items ?? []) as ItemInventario[]
     const cond = CONDICION_STYLE[e.condicion_general]
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
+    const inventarioHtml = inv.length > 0
+      ? printHtml`<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condición</th><th>Notas</th></tr>${raw(inv.map(it => printHtml`<tr><td>${it.item}</td><td>${CONDICION_STYLE[it.condicion]?.label ?? it.condicion}</td><td>${it.notas || '—'}</td></tr>`).join(''))}</table>`
+      : ''
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
 <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:var(--at-surface-2)}
 .sig{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.sig-box{border-top:1px solid #000;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} de Unidad</h1>
@@ -112,8 +116,8 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
 <table><tr><th>Unidad</th><td>${unidad?.nombre ?? '—'}</td><th>Condición general</th><td>${cond?.label ?? e.condicion_general}</td></tr>
 <tr><th>Inquilino</th><td>${e.inquilino ?? '—'}</td><th>Propietario</th><td>${e.propietario ?? '—'}</td></tr>
 <tr><th>Representante Admin.</th><td colspan="3">${e.representante_admin ?? '—'}</td></tr></table>
-${e.observaciones ? `<h2>Observaciones</h2><p>${e.observaciones}</p>` : ''}
-${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condición</th><th>Notas</th></tr>${inv.map(it => `<tr><td>${it.item}</td><td>${CONDICION_STYLE[it.condicion]?.label ?? it.condicion}</td><td>${it.notas || '—'}</td></tr>`).join('')}</table>` : ''}
+${e.observaciones ? raw(printHtml`<h2>Observaciones</h2><p>${e.observaciones}</p>`) : ''}
+${raw(inventarioHtml)}
 <div class="sig"><div class="sig-box">Propietario${e.firmado_propietario ? ' ✓' : ''}<br>${e.propietario ?? ''}</div><div class="sig-box">Inquilino${e.firmado_inquilino ? ' ✓' : ''}<br>${e.inquilino ?? ''}</div><div class="sig-box">Admin. Condominio<br>${e.representante_admin ?? ''}</div></div>
 </body></html>`
     const w = window.open('', '_blank'); if (!w) return; w.document.write(html); w.document.close(); w.print()

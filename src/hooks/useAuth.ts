@@ -6,6 +6,7 @@ import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
 import { measureSLO, reportSLOError } from '../lib/slo'
+import { queryClient } from '../domain/queryClient'
 // agua:A9 — session-storage y rate-limit de login vivían inline aquí
 // (responsabilidades mezcladas); ahora son módulos puros y testeables.
 import { getStoredSession, storeSession, clearSession } from '../lib/authSession'
@@ -478,6 +479,17 @@ export function useAuth() {
         // ignore sign out errors
       }
       clearSession()
+      // Equipos compartidos: al salir hay que borrar TODO rastro del tenant.
+      // signOut() + clearSession() limpian la sesión, pero los datos ya
+      // descargados siguen en memoria (React Query, gcTime 24h) y en Cache
+      // Storage (el SW cachea /rest/ y /storage/ de Supabase). Purgamos ambos
+      // para que el siguiente usuario en el mismo navegador no los vea.
+      queryClient.clear()
+      if (typeof caches !== 'undefined') {
+        void Promise.all(
+          ['supabase-rest', 'supabase-storage'].map(n => caches.delete(n).catch(() => false)),
+        )
+      }
       setCurrentUser(null)
     }
   }, [currentUser])

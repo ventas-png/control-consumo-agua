@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LibroNovedad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml, raw, escapeHtml } from '../../../lib/printHtml'
 
 interface Props {
   novedades: LibroNovedad[]
@@ -76,13 +77,19 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
   function handlePrint(n: LibroNovedad) {
     const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
+    const incidentes = n.incidentes as Incidente[]
+    const incidentesHtml = incidentes.length > 0
+      ? printHtml`<h2 style="font-size:14px">Incidentes</h2><table><tr><th>Hora</th><th>Tipo</th><th>Descripción</th></tr>${raw(incidentes.map(i => printHtml`<tr><td>${i.hora}</td><td>${i.tipo}</td><td>${i.descripcion}</td></tr>`).join(''))}</table>`
+      : ''
+    // novedades es texto libre: escapamos y SOLO entonces convertimos \n en <br>.
+    const novedadesHtml = escapeHtml(n.novedades).replace(/\n/g, '<br>')
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
     <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid var(--at-line)}th{background:var(--at-surface-2)}</style>
     </head><body>
     <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
     <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>
-    <h2 style="font-size:14px">Novedades del turno</h2><p>${n.novedades.replace(/\n/g, '<br>')}</p>
-    ${(n.incidentes as Incidente[]).length > 0 ? `<h2 style="font-size:14px">Incidentes</h2><table><tr><th>Hora</th><th>Tipo</th><th>Descripción</th></tr>${(n.incidentes as Incidente[]).map(i => `<tr><td>${i.hora}</td><td>${i.tipo}</td><td>${i.descripcion}</td></tr>`).join('')}</table>` : ''}
+    <h2 style="font-size:14px">Novedades del turno</h2><p>${raw(novedadesHtml)}</p>
+    ${raw(incidentesHtml)}
     <p style="margin-top:40px;font-size:12px;color:var(--at-ink-3)">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
     </body></html>`
     const w = window.open('', '_blank')

@@ -182,7 +182,14 @@ export function aplicarTransicionCuota(
 
 /** Fecha local en formato YYYY-MM-DD (mismo formato que usa la UI hoy). */
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10)
+  // Componentes LOCALES, no UTC: toISOString() da la fecha en UTC y en husos
+  // negativos (GT/MX, UTC-6) salta al día siguiente desde las 18:00, corriendo
+  // un día la mora y las fechas de pago. Construir desde get*() locales lo evita.
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export function cuotaVencida(

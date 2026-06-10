@@ -4,6 +4,7 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { AvisoCobro } from '../../../types'
 import type { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   avisos: AvisoCobro[]
@@ -97,7 +98,7 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
     const unidad = unidades.find(u => u.id === a.unidad_id)
     const tipo = TIPO_STYLE[a.tipo]
     const items = (a.detalle ?? []) as DetalleItem[]
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Aviso de Cobro</title>
 <style>body{font-family:Arial,sans-serif;padding:40px;font-size:13px;max-width:600px;margin:0 auto}
 h1{font-size:20px;margin-bottom:2px}
@@ -113,15 +114,15 @@ th{background:var(--at-surface-2)}
 <h1>Aviso de Cobro</h1>
 <div class="badge">${tipo?.label ?? a.tipo}</div>
 <p><strong>Unidad:</strong> ${unidad?.nombre ?? '—'}</p>
-<p><strong>Fecha de emisión:</strong> ${a.fecha_emision}${a.fecha_limite ? `&nbsp;&nbsp;<strong>Fecha límite:</strong> ${a.fecha_limite}` : ''}</p>
+<p><strong>Fecha de emisión:</strong> ${a.fecha_emision}${a.fecha_limite ? raw(printHtml`&nbsp;&nbsp;<strong>Fecha límite:</strong> ${a.fecha_limite}`) : ''}</p>
 <table>
   <tr><th>Concepto</th><th>Período</th><th style="text-align:right">Monto</th></tr>
-  ${items.map(it => `<tr><td>${it.concepto}</td><td>${it.periodo || '—'}</td><td style="text-align:right">${fmt(parseFloat(it.monto || '0'), moneda)}</td></tr>`).join('')}
+  ${raw(items.map(it => printHtml`<tr><td>${it.concepto}</td><td>${it.periodo || '—'}</td><td style="text-align:right">${fmt(parseFloat(it.monto || '0'), moneda)}</td></tr>`).join(''))}
 </table>
 <div class="total">Total: ${fmt(Number(a.monto_total), moneda)}</div>
-${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
+${a.notas ? raw(printHtml`<p style="margin-top:16px;font-style:italic">${a.notas}</p>`) : ''}
 <div class="sig">
-  <div class="sig-box">Administración${a.enviado_por ? `<br>${a.enviado_por}` : ''}</div>
+  <div class="sig-box">Administración${a.enviado_por ? raw(printHtml`<br>${a.enviado_por}`) : ''}</div>
   <div class="sig-box">Recibido por (residente)</div>
 </div>
 <div class="footer">Este documento constituye notificación oficial de deuda pendiente. En caso de no regularizar su situación antes de la fecha límite indicada, se procederá a los mecanismos legales correspondientes.</div>

@@ -13,7 +13,11 @@ import { supabase } from '../../lib/supabase'
  */
 export async function fetchCondominiosSectionData(pid: string, cid: string) {
   return Promise.all([
-    supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(500),
+    // limit(5000): salvaguarda interina contra truncado de totales/saldos en
+    // condominios grandes (las cuotas crecen por-unidad por-mes y este arreglo
+    // alimenta totales de CuotasTab, snapshot de HistorialSaldos y mora masiva).
+    // TODO(Fase 6): mover los totales a agregados server-side / fetch por-tab.
+    supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
     supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
     supabase.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     supabase.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),

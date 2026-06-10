@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ComunicadoCondominio, TipoComunicado, DestinatarioComunicado, Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml } from '../../../lib/printHtml'
 
 interface Props {
   comunicados: ComunicadoCondominio[]
@@ -115,7 +116,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   function handlePrint(c: ComunicadoCondominio) {
     const win = window.open('', '_blank')
     if (!win) return
-    win.document.write(`
+    win.document.write(printHtml`
       <html><head><title>${c.titulo}</title>
       <style>body{font-family:serif;max-width:700px;margin:40px auto;padding:20px;font-size:14px;line-height:1.7}h1{font-size:18px;text-align:center;margin-bottom:30px}.meta{color:#666;font-size:12px;margin-bottom:30px;border-bottom:1px solid #ccc;padding-bottom:10px}.content{white-space:pre-wrap}.footer{margin-top:60px;border-top:1px solid #ccc;padding-top:20px;text-align:center;color:#666;font-size:12px}</style>
       </head><body>

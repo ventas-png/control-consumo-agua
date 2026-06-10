@@ -62,7 +62,10 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
       const cargos = cuotasU.reduce((s, c) => s + c.monto, 0)
       const pagos = cuotasU.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.monto, 0)
       const vencidas = cuotasU.filter(c => c.estado === 'moroso').length
-      const prevSnap = historial.filter(h => h.unidad_id === u.id).sort((a, b) => b.periodo.localeCompare(a.periodo))[0]
+      // Solo períodos ANTERIORES al que se genera: sin este filtro, regenerar el
+      // período P leería su propio snapshot como saldo_anterior y duplicaría los
+      // cargos en cada regeneración (100 -> 250 -> 400 …).
+      const prevSnap = historial.filter(h => h.unidad_id === u.id && h.periodo < periodo).sort((a, b) => b.periodo.localeCompare(a.periodo))[0]
       const saldo_anterior = prevSnap?.saldo_final ?? 0
       return {
         company_id: companyId, project_id: proyectoId,

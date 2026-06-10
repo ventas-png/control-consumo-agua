@@ -1,0 +1,107 @@
+name: Auth hardening (GoTrue config)
+
+# Endurece la configuración de Supabase Auth vía Management API — cierra el
+# follow-up "rate-limit de login" SIN pasar por el dashboard.
+#
+# Contexto verificado (docs de rate limits de Supabase, 2026-06):
+#   - El login con contraseña (/auth/v1/token) YA tiene rate limit FIJO por IP
+#     en GoTrue (token bucket, burst 30, responde 429) y NO es configurable.
+#     O sea: la protección anti fuerza bruta de red existe de fábrica.
+#   - Lo que SÍ es configurable y este workflow fija:
+#       password_hibp_enabled  → rechaza contraseñas filtradas (HaveIBeenPwned).
+#       password_min_length    → mínimo de caracteres para contraseñas nuevas
+#                                (no afecta logins de cuentas existentes).
+#       rate_limit_otp         → OTPs/magic links por hora (proyecto entero).
+#       rate_limit_email_sent  → correos de auth por hora (aplica con SMTP custom).
+#
+# Disparo: manual (workflow_dispatch) con defaults sanos. Reaplicarlo es
+# idempotente. Mismos secrets que apply-migration.yml / security-guard.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      password_min_length:
+        description: 'Largo mínimo de contraseñas nuevas'
+        required: false
+        default: '8'
+      password_hibp_enabled:
+        description: 'Rechazar contraseñas filtradas (HIBP) — true/false'
+        required: false
+        default: 'true'
+      rate_limit_otp:
+        description: 'OTPs / magic links por hora (proyecto)'
+        required: false
+        default: '30'
+      rate_limit_email_sent:
+        description: 'Correos de auth por hora (requiere SMTP custom)'
+        required: false
+        default: '30'
+
+permissions:
+  contents: read
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    env:
+      API_URL: https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/config/auth
+      ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Verify Supabase secrets are set
+        run: |
+          missing=""
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Faltan secrets de GitHub:$missing"
+            exit 1
+          fi
+
+      # Solo claves rate_limit_*/password_*: la config completa incluye material
+      # sensible (smtp_pass, secrets de hooks) que NO debe ir al log.
+      - name: Show current config (filtered)
+        run: |
+          curl -sf -X GET "$API_URL" -H "Authorization: Bearer $ACCESS_TOKEN" \
+            | jq 'to_entries
+                  | map(select(.key | startswith("rate_limit_") or startswith("password_")))
+                  | from_entries'
+
+      - name: Apply hardened config
+        env:
+          MIN_LEN: ${{ github.event.inputs.password_min_length }}
+          HIBP: ${{ github.event.inputs.password_hibp_enabled }}
+          OTP: ${{ github.event.inputs.rate_limit_otp }}
+          EMAIL: ${{ github.event.inputs.rate_limit_email_sent }}
+        run: |
+          body=$(jq -n \
+            --argjson min_len "${MIN_LEN:-8}" \
+            --argjson hibp "${HIBP:-true}" \
+            --argjson otp "${OTP:-30}" \
+            --argjson email "${EMAIL:-30}" \
+            '{password_min_length: $min_len,
+              password_hibp_enabled: $hibp,
+              rate_limit_otp: $otp,
+              rate_limit_email_sent: $email}')
+          echo "PATCH body: $body"
+          resp=$(curl -s -w '\n%{http_code}' -X PATCH "$API_URL" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$body")
+          code=$(tail -n1 <<<"$resp")
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::PATCH /config/auth devolvió HTTP $code"
+            head -n -1 <<<"$resp" | head -c 1000
+            exit 1
+          fi
+          echo "Config aplicada (HTTP $code)."
+
+      - name: Verify resulting config (filtered)
+        run: |
+          curl -sf -X GET "$API_URL" -H "Authorization: Bearer $ACCESS_TOKEN" \
+            | jq 'to_entries
+                  | map(select(.key | startswith("rate_limit_") or startswith("password_")))
+                  | from_entries' \
+            | tee /tmp/after.json
+          jq -e '.password_hibp_enabled == true' /tmp/after.json > /dev/null \
+            || { echo "::error::password_hibp_enabled no quedó en true"; exit 1; }
+          echo "✅ Auth config endurecida y verificada."

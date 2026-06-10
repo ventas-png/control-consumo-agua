@@ -7,6 +7,7 @@ import { exportarPDFEstadoCuenta } from '../exportUtils'
 // cuota_estado/mora_monto/total_a_pagar en runtime aunque el tipo CuotaCondominio
 // no las declare; las leemos con esta proyección de la capa de dominio.
 import type { CuotaConEstado } from '../../../domain/condominios/queries'
+import { printHtml, raw } from '../../../lib/printHtml'
 import { CuotaEstadoBadge } from './CuotasUi'
 
 interface Props {
@@ -125,7 +126,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
   const unidad = unidades.find(u => u.id === unidadId)
 
   function imprimir() {
-    const filas = movimientos.map(m => `
+    const filas = movimientos.map(m => printHtml`
       <tr>
         <td>${m.fecha}</td>
         <td>${m.descripcion}</td>
@@ -134,7 +135,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
         <td style="text-align:center"><span style="padding:2px 8px;border-radius:12px;background:${ESTADO_CFG[m.estado]?.bg ?? 'var(--at-chip)'};color:${ESTADO_CFG[m.estado]?.color ?? 'var(--at-ink-2)'};font-size:11px">${m.estado}</span></td>
       </tr>`).join('')
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Estado de Cuenta — ${unidad?.nombre}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;max-width:900px;margin:auto;color:#15291F}
@@ -160,7 +161,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
     </div>
     <table>
       <thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Cargo</th><th style="text-align:right">Abono</th><th style="text-align:center">Estado</th></tr></thead>
-      <tbody>${filas}</tbody>
+      <tbody>${raw(filas)}</tbody>
       <tfoot>
         <tr>
           <td colspan="2">TOTALES</td>

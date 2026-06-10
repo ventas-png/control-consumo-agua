@@ -52,7 +52,11 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
       notify({ variant: 'warning', title: 'Monto inválido', text: 'El monto debe ser mayor a 0' })
       return
     }
-    if (montoNum > saldo) {
+    // Tolerancia de medio centavo: `saldo` es float (p.ej. 112.10 - 37.37 =
+    // 74.72999…) y el input se prellena con saldo.toFixed(2) = '74.73'. Sin la
+    // tolerancia, 74.73 > 74.7299… bloquearía el pago total exacto y la factura
+    // nunca se podría liquidar. Un sobrepago real (≥ 0.01) sí se rechaza.
+    if (montoNum > saldo + 0.005) {
       notify({ variant: 'warning', title: 'Monto excede el saldo', text: `El saldo pendiente es ${moneda} ${saldo.toFixed(2)}` })
       return
     }

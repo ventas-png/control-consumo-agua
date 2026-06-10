@@ -1,6 +1,7 @@
 import { useState, useCallback, type CSSProperties} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { supabase } from '../../../lib/supabase'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { condominiosKeys } from '../../../domain/condominios/keys'
@@ -155,10 +156,14 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   async function aplicarMasivo() {
     const hoy = new Date().toISOString().slice(0, 10)
     const reglaActiva = reglas.find(r => r.activa)
-    // cuotas vencidas: moroso o pendiente con fecha_vencimiento superada
+    // cuotas vencidas: moroso o pendiente con fecha_vencimiento superada.
+    // IDEMPOTENCIA: se excluyen las cuotas que YA tienen mora aplicada
+    // (mora_aplicada_at) — sea por el cron o por una corrida previa de este
+    // masivo — para no cobrar la mora dos veces.
     const cuotasVenc = cuotas.filter(c =>
-      c.estado === 'moroso' ||
-      (c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
+      !(c as { mora_aplicada_at?: string | null }).mora_aplicada_at &&
+      (c.estado === 'moroso' ||
+        (c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy))
     )
     const unidadesMorosas = [...new Set(cuotasVenc.map(c => c.unidad_id).filter(Boolean))]
     if (unidadesMorosas.length === 0) { notify({ variant: 'info', title: 'Sin cuotas vencidas', text: 'No hay cuotas vencidas a las que aplicar recargo.' }); return }
@@ -220,18 +225,22 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     // cond:C4 — el recargo por unidad es la SUMA del recargo de cada cuota
     // vencida, calculado con calcularMoraCuota (respeta vencimiento/gracia de la
     // regla). Para monto_fijo, la regla aplica el fijo por cuota.
+    // Recolectamos además las cuotas que realmente generan mora (> 0) para
+    // marcarlas luego con mora_aplicada_at (las en gracia / mora 0 NO se marcan,
+    // para que se cobren cuando salgan de gracia).
+    const cuotasCobradas: string[] = []
     const rows = unidadesMorosas.map(uid => {
       const cuotasU = cuotasVenc.filter(c => c.unidad_id === uid)
-      const monto_calculado = parseFloat(
-        cuotasU.reduce((s, c) => {
-          const dias = diasTranscurridosCuota(c, today)
-          return s + calcularMoraCuota(reglaEfectiva, dias, c.monto).monto
-        }, 0).toFixed(2),
-      )
+      let suma = 0
+      for (const c of cuotasU) {
+        const dias = diasTranscurridosCuota(c, today)
+        const m = calcularMoraCuota(reglaEfectiva, dias, c.monto).monto
+        if (m > 0) { suma += m; cuotasCobradas.push(c.id) }
+      }
       return {
         company_id: companyId, project_id: proyectoId,
         unidad_id: uid, tipo: tipoRecargo, valor: pct,
-        monto_calculado, fecha_aplicacion: today, motivo,
+        monto_calculado: parseFloat(suma.toFixed(2)), fecha_aplicacion: today, motivo,
       }
     }).filter(r => r.monto_calculado > 0) // omite unidades cuya mora resultó 0 (en gracia)
 
@@ -242,8 +251,18 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     }
 
     const { error } = await createCondominioRow('recargos_mora', rows)
+    if (error) { setSaving(false); notify({ variant: 'error', title: 'Error', text: error.message }); return }
+
+    // Marca las cuotas recargadas con mora_aplicada_at (la misma señal que usa el
+    // cron de mora) para que re-ejecutar el masivo — o el cron — no las re-cobre.
+    if (cuotasCobradas.length > 0) {
+      const { error: markErr } = await supabase
+        .from('cuotas_condominio')
+        .update({ mora_aplicada_at: new Date().toISOString() })
+        .in('id', cuotasCobradas)
+      if (markErr) console.error('[recargo masivo] no se pudo marcar mora_aplicada_at:', markErr.message)
+    }
     setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, duration: 2200 })
     refrescar()
   }

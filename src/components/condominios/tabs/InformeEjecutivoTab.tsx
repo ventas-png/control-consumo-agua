@@ -1,4 +1,5 @@
 import { CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, Unidad, PolizaSeguro, ContratoProveedor, InspeccionNormativa, SugerenciaCondominio } from '../../../types'
+import { escapeHtml } from '../../../lib/printHtml'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -69,7 +70,7 @@ export default function InformeEjecutivoTab({
       `<div style="width:24px;height:${Math.round((v/maxHist)*BAR_H)}px;background:${color};border-radius:3px 3px 0 0;margin:auto;min-height:${v>0?2:0}px"></div>`
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Informe Ejecutivo — ${proyectoNombre ?? 'Condominio'}</title>
+<title>Informe Ejecutivo — ${escapeHtml(proyectoNombre ?? 'Condominio')}</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:#15291F;font-size:13px;line-height:1.5}
@@ -98,7 +99,7 @@ export default function InformeEjecutivoTab({
 </head><body>
 <div class="header">
   <div>
-    <h1>${proyectoNombre ?? 'Condominio'}</h1>
+    <h1>${escapeHtml(proyectoNombre ?? 'Condominio')}</h1>
     <div style="font-size:12px;color:var(--at-ink-3);margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
   </div>
   <div style="text-align:right;font-size:11px;color:var(--at-ink-3)">
@@ -190,7 +191,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
 ` : ''}
 
 <div class="footer">
-  <span>${proyectoNombre ?? 'Condominio'} · Informe generado automáticamente</span>
+  <span>${escapeHtml(proyectoNombre ?? 'Condominio')} · Informe generado automáticamente</span>
   <span>Sistema de Administración Condominios</span>
 </div>
 </body></html>`
