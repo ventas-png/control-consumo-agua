@@ -25,13 +25,14 @@ La base de todo el ERP. Sin esto, las demás fases no tienen dónde registrar su
 
 Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfill de documentos históricos (se arranca con la apertura), sin revaluación FX periódica, cierre mensual existente aún no congela la contabilidad.
 
-## Fase 2 — Cuentas por pagar / Proveedores
+## Fase 2 — Cuentas por pagar / Proveedores ✅
 
-- Tabla `proveedores` (NIT/RFC, contacto, condiciones de pago, cuenta contable por defecto); migrar `gastos_condominio.proveedor_nombre` → FK con backfill por nombre.
-- `facturas_proveedor` (CxP) con estados (registrada → aprobada → pagada parcial/total → anulada) y vencimientos; `ordenes_pago` que liquidan una o varias facturas.
-- Antigüedad de saldos por pagar (aging 30/60/90) y proyección de pagos.
-- Asientos automáticos: registro de factura (gasto/activo contra CxP), orden de pago (CxP contra banco).
-- Flujo de aprobación de pagos (solicitado por operador, aprobado por admin/owner).
+- Tabla `proveedores` (NIT/RFC, contacto, días de crédito, categoría de gasto habitual); `gastos_condominio.proveedor_nombre` migrado → FK `proveedor_id` con backfill por nombre.
+- `facturas_proveedor` (CxP) con estados (registrada → aprobada → pagada parcial/total → anulada) y vencimientos; `ordenes_pago` que liquidan facturas (pagos parciales soportados: varias órdenes por factura).
+- Antigüedad de saldos por pagar (aging corriente/30/60/90+) server-side (`cxp_antiguedad_saldos`).
+- Asientos automáticos: factura aprobada (devengo: gasto contra 2104 Proveedores por pagar), orden pagada (CxP contra banco/caja según método), reversos al anular. Multimoneda heredada de Fase 1.
+- Flujo de aprobación: el operador puede registrar facturas/órdenes (RLS INSERT); aprobar, pagar y anular es de admin/owner (RLS UPDATE). Guardas de inmutabilidad: factura aprobada no cambia de monto, factura con pagos vivos no se anula, orden pagada solo se anula.
+- Pendiente para fases posteriores: desglose de IVA crédito fiscal, órdenes multi-factura, proyección de pagos.
 
 ## Fase 3 — Presupuesto avanzado
 
