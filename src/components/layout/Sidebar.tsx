@@ -74,6 +74,16 @@ const NAV: NavEntry[] = [
         ),
       },
       {
+        id: 'contabilidad',
+        label: 'Contabilidad',
+        roles: ['admin', 'super_admin', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 7h6m-6 4h6m-6 4h3M5 3h14a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" />
+          </svg>
+        ),
+      },
+      {
         id: 'perfil',
         label: 'Mi Cuenta',
         roles: ['admin', 'super_admin', 'operator', 'viewer'],
