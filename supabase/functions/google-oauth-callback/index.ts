@@ -99,6 +99,28 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Authorization: re-validamos el scope contra el rol/empresa REAL del caller
+    // (no contra el state, que va sin firmar). Aunque alguien fabrique un state
+    // con is_superadmin:true o el company_id de otro tenant, aquí se rechaza si
+    // el caller no es super_admin / admin-owner de esa empresa. Es la barrera
+    // que impide sobrescribir la config de Gmail de otro tenant o del superadmin.
+    {
+      const { data: prof } = await supabase
+        .from('app_users').select('role, company_id').eq('id', user.id).maybeSingle()
+      const role = (prof as { role?: string } | null)?.role ?? ''
+      const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
+      const isSuper = role === 'super_admin' || role === 'superadmin'
+      const authorized = stateData.is_superadmin
+        ? isSuper
+        : isSuper || (['admin', 'company_owner'].includes(role) && callerCompany === stateData.company_id)
+      if (!authorized) {
+        return new Response(
+          JSON.stringify({ error: 'No autorizado para conectar el correo de este scope' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Exchange authorization code for tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',

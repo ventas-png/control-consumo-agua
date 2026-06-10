@@ -318,6 +318,38 @@ function applyVars(template: string, vars: Record<string, string>): string {
 }
 
 // ---------------------------------------------------------------------------
+// HTML-safe variable rendering (anti HTML/link injection in the email body)
+// ---------------------------------------------------------------------------
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Solo se permiten esquemas http(s) y mailto en vars de URL; cualquier otra
+// cosa (javascript:, data:, etc.) se neutraliza a '#'.
+function sanitizeUrl(s: string): string {
+  const t = s.trim()
+  return /^(https?:\/\/|mailto:)/i.test(t) ? t : '#'
+}
+
+// Escapa cada var para interpolarla en el CUERPO HTML. Las claves que son URLs
+// (terminan en _link/_url, o logo) además se validan por esquema.
+function sanitizeVars(vars: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(vars ?? {})) {
+    const val = v == null ? '' : String(v)
+    const isUrl = /(_link|_url)$/.test(k) || k === 'empresa_logo' || k === 'logo'
+    out[k] = escapeHtml(isUrl ? sanitizeUrl(val) : val)
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
@@ -381,10 +413,48 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // ── Authorization: el "scope" del envío (qué cuenta de Gmail manda — la de
+    // un tenant o la del superadmin de plataforma) se ata al rol/empresa REAL
+    // del caller leído de app_users; NUNCA se confía en company_id/is_superadmin
+    // del body. Sin esto, cualquier usuario autenticado (incl. un residente)
+    // podría enviar correo como cualquier empresa o como el superadmin
+    // (open relay / suplantación). Los reintentos internos (process-email-queue)
+    // ya fueron autorizados al encolar, así que conservan el scope del payload.
+    const effIsSuperadmin = !!is_superadmin
+    let effCompanyId: string | null = company_id ?? null
+
+    if (!internalRetry) {
+      const { data: prof } = await supabase
+        .from('app_users').select('role, company_id').eq('id', userId).maybeSingle()
+      const role = (prof as { role?: string } | null)?.role ?? ''
+      const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
+      const isSuper = role === 'super_admin' || role === 'superadmin'
+
+      if (effIsSuperadmin) {
+        if (!isSuper) {
+          return new Response(
+            JSON.stringify({ error: 'Solo un super administrador puede enviar correo de plataforma' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      } else if (!isSuper) {
+        // Staff de tenant: solo roles que envían correo, y SIEMPRE acotado a su
+        // propia empresa (se ignora cualquier company_id del body).
+        if (!['admin', 'company_owner', 'operator', 'operador'].includes(role) || !callerCompany) {
+          return new Response(
+            JSON.stringify({ error: 'No autorizado para enviar correo' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        effCompanyId = callerCompany
+      }
+      // Un super_admin con is_superadmin=false puede enviar a nombre del company_id pedido.
+    }
+
     // Fetch Gmail config — Supabase query builder is immutable so we apply the
     // ownership filter in a ternary to ensure it's always chained properly.
     const { data: config } = await (
-      is_superadmin
+      effIsSuperadmin
         ? supabase.from('company_email_configs')
             .select('id, email, access_token, refresh_token, token_expiry, from_name, reply_to')
             .eq('is_active', true)
@@ -392,7 +462,7 @@ Deno.serve(async (req: Request) => {
         : supabase.from('company_email_configs')
             .select('id, email, access_token, refresh_token, token_expiry, from_name, reply_to')
             .eq('is_active', true)
-            .eq('company_id', company_id!)
+            .eq('company_id', effCompanyId!)
     ).maybeSingle()
 
     if (!config) {
@@ -402,11 +472,15 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const mergedVars: Record<string, string> = { to_name: to_name ?? '', ...vars }
+    // El ASUNTO es texto plano (header MIME) y el CUERPO es HTML. Usamos vars
+    // crudas para el asunto (para no mostrar entidades como &amp;) y vars
+    // escapadas para el cuerpo (anti HTML/enlaces inyectados + validación de URL).
+    const rawVars: Record<string, string> = { to_name: to_name ?? '', ...vars }
+    const htmlVars = sanitizeVars(rawVars)
 
     // Check for custom template override in DB (immutable builder — use ternary)
     const { data: customTpl } = await (
-      is_superadmin
+      effIsSuperadmin
         ? supabase.from('email_templates')
             .select('subject, html_body')
             .eq('template_key', template_key)
@@ -416,25 +490,26 @@ Deno.serve(async (req: Request) => {
             .select('subject, html_body')
             .eq('template_key', template_key)
             .eq('is_active', true)
-            .eq('company_id', company_id!)
+            .eq('company_id', effCompanyId!)
     ).maybeSingle()
 
     let subject: string
     let htmlBody: string
 
     if (customTpl) {
-      subject = applyVars(customTpl.subject, mergedVars)
-      htmlBody = applyVars(customTpl.html_body, mergedVars)
+      subject = applyVars(customTpl.subject, rawVars)
+      htmlBody = applyVars(customTpl.html_body, htmlVars)
     } else {
-      const rendered = renderTemplate(template_key, mergedVars)
-      if (!rendered) {
+      const renderedRaw = renderTemplate(template_key, rawVars)
+      const renderedHtml = renderTemplate(template_key, htmlVars)
+      if (!renderedRaw || !renderedHtml) {
         return new Response(
           JSON.stringify({ error: `Template desconocido: ${template_key}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      subject = rendered.subject
-      htmlBody = rendered.html
+      subject = renderedRaw.subject
+      htmlBody = renderedHtml.html
     }
 
     // Send + log. Log writes con service_role (bypassea RLS); fire-and-forget
@@ -447,11 +522,14 @@ Deno.serve(async (req: Request) => {
     // retoma con backoff exponencial. Errores permanentes (400, 403 token
     // revoked) responden 500 — no tiene sentido reintentar.
     const typedConfig = config as EmailConfig
+    // El payload re-encolado para reintentos usa el scope EFECTIVO ya validado,
+    // no el del body original (que pudo venir manipulado).
+    const scopedPayload = { ...payload, company_id: effIsSuperadmin ? null : effCompanyId, is_superadmin: effIsSuperadmin }
     try {
       await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
       supabase.from('email_send_log').insert({
-        company_id: is_superadmin ? null : company_id,
-        is_superadmin: !!is_superadmin,
+        company_id: effIsSuperadmin ? null : effCompanyId,
+        is_superadmin: effIsSuperadmin,
         template_key,
         to_email,
         from_email: typedConfig.email,
@@ -472,15 +550,15 @@ Deno.serve(async (req: Request) => {
       // failed_permanent. Devolver el error directo al worker.
       if (retriable && !internalRetry) {
         const { data: queueRow } = await supabase.rpc('enqueue_email', {
-          p_payload: payload,
-          p_company_id: is_superadmin ? null : company_id,
-          p_is_superadmin: !!is_superadmin,
+          p_payload: scopedPayload,
+          p_company_id: effIsSuperadmin ? null : effCompanyId,
+          p_is_superadmin: effIsSuperadmin,
           p_triggered_by: userId,
           p_first_error: errMsg.slice(0, 1000),
         })
         supabase.from('email_send_log').insert({
-          company_id: is_superadmin ? null : company_id,
-          is_superadmin: !!is_superadmin,
+          company_id: effIsSuperadmin ? null : effCompanyId,
+          is_superadmin: effIsSuperadmin,
           template_key,
           to_email,
           from_email: typedConfig.email,
@@ -496,8 +574,8 @@ Deno.serve(async (req: Request) => {
       }
 
       supabase.from('email_send_log').insert({
-        company_id: is_superadmin ? null : company_id,
-        is_superadmin: !!is_superadmin,
+        company_id: effIsSuperadmin ? null : effCompanyId,
+        is_superadmin: effIsSuperadmin,
         template_key,
         to_email,
         from_email: typedConfig.email,
