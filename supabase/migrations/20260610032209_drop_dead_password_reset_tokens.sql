@@ -1,0 +1,11 @@
+-- =====================================================================
+-- Fase 1 (#1.5) — Eliminar la tabla password_reset_tokens (muerta).
+-- Hallazgo original: guardaba el token de reset en TEXTO PLANO + PII
+-- (account takeover si se filtra). Investigación: 0 filas en prod, jamás
+-- escrita, y SIN lecturas/escrituras en el código — el restablecimiento
+-- de contraseña usa el flujo NATIVO de Supabase/GoTrue (PASSWORD_RECOVERY).
+-- Es una tabla hoja (ninguna FK apunta a ella). Eliminarla cierra el
+-- pasivo de raíz en vez de hashear un flujo inexistente.
+-- Rollback: recrear desde 20260317000001 + RLS de 20260318000002 (git).
+-- =====================================================================
+DROP TABLE IF EXISTS public.password_reset_tokens;
