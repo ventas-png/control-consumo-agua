@@ -7,10 +7,13 @@ import { cumplimientoPorcentaje } from './calidadTendencia'
 // registros ya filtrados. La descarga vive en el componente.
 
 // Escapa una celda: entrecomilla si contiene coma, comilla o salto de línea, y
-// duplica las comillas internas.
+// duplica las comillas internas. Además neutraliza CSV/formula injection
+// (celdas que empiezan con = + - @ / tab / CR) prefijándolas con comilla simple
+// para que la hoja las trate como texto. https://owasp.org/www-community/attacks/CSV_Injection
 function celda(valor: string | number): string {
   const s = String(valor)
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 export function registrosCalidadToCSV(registros: RegistroCalidad[]): string {
