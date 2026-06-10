@@ -1,0 +1,273 @@
+import { useMemo, useState } from 'react'
+import { FilterChips } from '../shared/FilterChips'
+import { confirm, notify } from '../shared/Dialog'
+import {
+  useBalanceGeneralQuery,
+  useCierresAnualesQuery,
+  useEstadoResultadosQuery,
+  useFlujoEfectivoQuery,
+} from '../../domain/eeff/queries'
+import { useCierreAnualMutation } from '../../domain/eeff/mutations'
+import { resumirBalance, resumirPyG } from '../../domain/eeff/calculos'
+import { exportarExcel } from '../condominios/exportUtils'
+import { formatCurrency } from '../../lib/format'
+import type { Proyecto } from '../../types'
+import { btnPrimario, btnSecundario, input } from './ui'
+
+interface Props {
+  companyId: string
+  proyectos: Proyecto[]
+  monedaBase: string
+}
+
+type Vista = 'pyg' | 'balance' | 'flujo'
+
+function periodoActual(): string {
+  return new Date().toISOString().slice(0, 7)
+}
+
+export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Props) {
+  const [vista, setVista] = useState<Vista>('pyg')
+  const [projectId, setProjectId] = useState('')
+  const [periodo, setPeriodo] = useState(periodoActual())
+  const [desde, setDesde] = useState(`${new Date().getFullYear()}-01`)
+
+  const pid = projectId || null
+  const { data: pygFilas = [], isLoading: cargandoPyG } = useEstadoResultadosQuery(companyId, pid, desde, periodo)
+  const { data: balanceFilas = [], isLoading: cargandoBalance } = useBalanceGeneralQuery(companyId, pid, periodo)
+  const { data: flujoFilas = [], isLoading: cargandoFlujo } = useFlujoEfectivoQuery(companyId, pid, periodo)
+  const { data: cierres = [] } = useCierresAnualesQuery(companyId)
+  const cierre = useCierreAnualMutation()
+
+  const pyg = useMemo(() => resumirPyG(pygFilas), [pygFilas])
+  const balance = useMemo(() => resumirBalance(balanceFilas), [balanceFilas])
+
+  const anioCerrable = new Date().getFullYear() - 1
+  const anioCerrado = cierres.some((c) => c.anio === anioCerrable)
+
+  const fmt = (n: number) => formatCurrency(n, monedaBase)
+
+  function exportar() {
+    if (vista === 'pyg') {
+      exportarExcel(`estado-resultados-${desde}-a-${periodo}.xlsx`, [{
+        name: 'Estado de resultados',
+        headers: ['Código', 'Cuenta', 'Tipo', `Monto (${monedaBase})`],
+        rows: [
+          ...pyg.ingresos.map((f) => [f.codigo, f.nombre, 'Ingreso', f.monto]),
+          ['', 'Total ingresos', '', pyg.totalIngresos],
+          ...pyg.gastos.map((f) => [f.codigo, f.nombre, 'Gasto', f.monto]),
+          ['', 'Total gastos', '', pyg.totalGastos],
+          ['', 'RESULTADO', '', pyg.resultado],
+        ],
+      }])
+    } else if (vista === 'balance') {
+      exportarExcel(`balance-general-${periodo}.xlsx`, [{
+        name: 'Balance general',
+        headers: ['Código', 'Cuenta', 'Tipo', `Saldo (${monedaBase})`],
+        rows: [
+          ...balance.activo.map((f) => [f.codigo, f.nombre, 'Activo', f.saldo]),
+          ['', 'Total activo', '', balance.totalActivo],
+          ...balance.pasivo.map((f) => [f.codigo, f.nombre, 'Pasivo', f.saldo]),
+          ['', 'Total pasivo', '', balance.totalPasivo],
+          ...balance.capital.map((f) => [f.codigo, f.nombre, 'Capital', f.saldo]),
+          ['', 'Total capital', '', balance.totalCapital],
+        ],
+      }])
+    } else {
+      exportarExcel(`flujo-efectivo-${periodo}.xlsx`, [{
+        name: 'Flujo de efectivo',
+        headers: ['Código', 'Cuenta', 'Saldo inicial', 'Entradas', 'Salidas', 'Saldo final'],
+        rows: flujoFilas.map((f) => [f.codigo, f.nombre, f.saldo_inicial, f.entradas, f.salidas, f.saldo_final]),
+      }])
+    }
+  }
+
+  async function onCierreAnual() {
+    const { isConfirmed } = await confirm({
+      title: `¿Cerrar el ejercicio ${anioCerrable}?`,
+      text: 'Se publica el asiento que salda todos los ingresos y gastos del año contra 3201 Resultado del ejercicio. Esta operación se hace una sola vez por año (revertirla requiere anular la póliza de cierre).',
+      confirmText: 'Cerrar ejercicio',
+      variant: 'danger',
+    })
+    if (!isConfirmed) return
+    try {
+      await cierre.mutateAsync(anioCerrable)
+      notify({ variant: 'success', title: 'Ejercicio cerrado', text: `El cierre ${anioCerrable} quedó publicado.` })
+    } catch (e) {
+      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo cerrar el ejercicio.' })
+    }
+  }
+
+  const th: React.CSSProperties = { padding: 6, fontSize: 11, color: 'var(--at-ink-soft)', borderBottom: '1px solid var(--at-line)' }
+  const td: React.CSSProperties = { padding: 6, borderBottom: '1px solid var(--at-line)' }
+  const tdNum: React.CSSProperties = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const totalRow: React.CSSProperties = { fontWeight: 700, background: 'var(--at-surface-2)' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <FilterChips<Vista>
+          options={[
+            { value: 'pyg', label: 'Estado de resultados' },
+            { value: 'balance', label: 'Balance general' },
+            { value: 'flujo', label: 'Flujo de efectivo' },
+          ]}
+          value={vista}
+          onChange={setVista}
+          ariaLabel="Estado financiero"
+        />
+        <span style={{ flex: 1 }} />
+        {vista === 'pyg' && (
+          <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
+            Desde
+            <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ ...input, width: 140 }} />
+          </label>
+        )}
+        <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
+          {vista === 'pyg' ? 'Hasta' : 'Al cierre de'}
+          <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 140 }} />
+        </label>
+        {proyectos.length > 1 && (
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ ...input, width: 190 }} aria-label="Proyecto">
+            <option value="">Toda la empresa</option>
+            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        )}
+        <button onClick={exportar} style={btnSecundario}>Exportar Excel</button>
+        {!anioCerrado && (
+          <button onClick={() => void onCierreAnual()} disabled={cierre.isPending} style={btnPrimario}>
+            Cerrar ejercicio {anioCerrable}
+          </button>
+        )}
+      </div>
+
+      {vista === 'pyg' && (
+        cargandoPyG ? <p style={{ color: 'var(--at-ink-soft)' }}>Cargando…</p> : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'left' }}>
+                <th style={th}>Cuenta</th>
+                <th style={{ ...th, textAlign: 'right' }}>Monto ({monedaBase})</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan={2} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>INGRESOS</td></tr>
+              {pyg.ingresos.map((f) => (
+                <tr key={f.cuenta_id}><td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td><td style={tdNum}>{fmt(f.monto)}</td></tr>
+              ))}
+              <tr style={totalRow}><td style={td}>Total ingresos</td><td style={tdNum}>{fmt(pyg.totalIngresos)}</td></tr>
+              <tr><td colSpan={2} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>GASTOS</td></tr>
+              {pyg.gastos.map((f) => (
+                <tr key={f.cuenta_id}><td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td><td style={tdNum}>{fmt(f.monto)}</td></tr>
+              ))}
+              <tr style={totalRow}><td style={td}>Total gastos</td><td style={tdNum}>{fmt(pyg.totalGastos)}</td></tr>
+              <tr style={{ ...totalRow, color: pyg.resultado >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
+                <td style={td}>{pyg.resultado >= 0 ? 'UTILIDAD' : 'PÉRDIDA'} DEL PERIODO</td>
+                <td style={tdNum}>{fmt(pyg.resultado)}</td>
+              </tr>
+            </tbody>
+          </table>
+        )
+      )}
+
+      {vista === 'balance' && (
+        cargandoBalance ? <p style={{ color: 'var(--at-ink-soft)' }}>Cargando…</p> : (
+          <>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: 'left' }}>
+                  <th style={th}>Cuenta</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Saldo ({monedaBase})</th>
+                </tr>
+              </thead>
+              <tbody>
+                {([
+                  ['ACTIVO', balance.activo, balance.totalActivo],
+                  ['PASIVO', balance.pasivo, balance.totalPasivo],
+                  ['CAPITAL', balance.capital, balance.totalCapital],
+                ] as const).map(([titulo, filas, total]) => (
+                  <FragmentoBalance key={titulo} titulo={titulo} filas={filas} total={total} fmt={fmt} td={td} tdNum={tdNum} totalRow={totalRow} />
+                ))}
+              </tbody>
+            </table>
+            <p style={{ fontSize: 12, fontWeight: 700, color: balance.descuadre === 0 ? 'var(--at-success)' : 'var(--at-danger)', margin: 0 }}>
+              {balance.descuadre === 0
+                ? `✓ Cuadrado: Activo ${fmt(balance.totalActivo)} = Pasivo ${fmt(balance.totalPasivo)} + Capital ${fmt(balance.totalCapital)}`
+                : `⚠ Descuadre de ${fmt(balance.descuadre)}`}
+            </p>
+          </>
+        )
+      )}
+
+      {vista === 'flujo' && (
+        cargandoFlujo ? <p style={{ color: 'var(--at-ink-soft)' }}>Cargando…</p> : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'right' }}>
+                <th style={{ ...th, textAlign: 'left' }}>Cuenta de efectivo</th>
+                <th style={th}>Saldo inicial</th>
+                <th style={th}>Entradas</th>
+                <th style={th}>Salidas</th>
+                <th style={th}>Saldo final</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flujoFilas.map((f) => (
+                <tr key={f.cuenta_id}>
+                  <td style={{ ...td, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td>
+                  <td style={tdNum}>{fmt(f.saldo_inicial)}</td>
+                  <td style={{ ...tdNum, color: 'var(--at-success)' }}>{fmt(f.entradas)}</td>
+                  <td style={{ ...tdNum, color: 'var(--at-danger)' }}>{fmt(f.salidas)}</td>
+                  <td style={{ ...tdNum, fontWeight: 700 }}>{fmt(f.saldo_final)}</td>
+                </tr>
+              ))}
+              {flujoFilas.length > 0 && (
+                <tr style={totalRow}>
+                  <td style={td}>Total efectivo</td>
+                  <td style={tdNum}>{fmt(flujoFilas.reduce((s, f) => s + f.saldo_inicial, 0))}</td>
+                  <td style={tdNum}>{fmt(flujoFilas.reduce((s, f) => s + f.entradas, 0))}</td>
+                  <td style={tdNum}>{fmt(flujoFilas.reduce((s, f) => s + f.salidas, 0))}</td>
+                  <td style={tdNum}>{fmt(flujoFilas.reduce((s, f) => s + f.saldo_final, 0))}</td>
+                </tr>
+              )}
+              {flujoFilas.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 16, textAlign: 'center', color: 'var(--at-ink-soft)' }}>Sin cuentas de efectivo con movimiento.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )
+      )}
+
+      {cierres.length > 0 && (
+        <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: 0 }}>
+          Ejercicios cerrados: {cierres.map((c) => c.anio).join(', ')}.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function FragmentoBalance({ titulo, filas, total, fmt, td, tdNum, totalRow }: {
+  titulo: string
+  filas: { cuenta_id: string | null; codigo: string; nombre: string; saldo: number }[]
+  total: number
+  fmt: (n: number) => string
+  td: React.CSSProperties
+  tdNum: React.CSSProperties
+  totalRow: React.CSSProperties
+}) {
+  return (
+    <>
+      <tr><td colSpan={2} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>{titulo}</td></tr>
+      {filas.map((f) => (
+        <tr key={f.cuenta_id ?? f.codigo}>
+          <td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)', fontStyle: f.cuenta_id ? undefined : 'italic' }}>
+            {f.cuenta_id ? `${f.codigo} — ` : ''}{f.nombre}
+          </td>
+          <td style={tdNum}>{fmt(f.saldo)}</td>
+        </tr>
+      ))}
+      <tr style={totalRow}><td style={td}>Total {titulo.toLowerCase()}</td><td style={tdNum}>{fmt(total)}</td></tr>
+    </>
+  )
+}

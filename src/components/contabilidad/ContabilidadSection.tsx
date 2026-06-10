@@ -10,12 +10,14 @@ import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
 import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
+import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'balanza' | 'bancos' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
+type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
 
 const TABS: { id: SubTab; label: string }[] = [
   { id: 'polizas', label: 'Pólizas' },
   { id: 'balanza', label: 'Balanza' },
+  { id: 'eeff', label: 'Estados financieros' },
   { id: 'bancos', label: 'Bancos' },
   { id: 'cxp', label: 'Cuentas por pagar' },
   { id: 'proveedores', label: 'Proveedores' },
@@ -85,6 +87,9 @@ export function ContabilidadSection() {
       )}
       {tab === 'balanza' && (
         <BalanzaTab companyId={companyId} proyectos={proyectos} monedaBase={monedaBase} />
+      )}
+      {tab === 'eeff' && (
+        <EstadosFinancierosTab companyId={companyId} proyectos={proyectos} monedaBase={monedaBase} />
       )}
       {tab === 'bancos' && (
         <BancosTab companyId={companyId} monedaBase={monedaBase} />

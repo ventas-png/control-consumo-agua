@@ -146,7 +146,7 @@ export function AsientoFormModal({ companyId, proyectos, monedaBase, onClose }: 
           <Campo label="Tipo">
             <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoAsiento)} style={input}>
               {(Object.keys(TIPO_ASIENTO_LABELS) as TipoAsiento[])
-                .filter((t) => t !== 'apertura')
+                .filter((t) => t !== 'apertura' && t !== 'cierre')
                 .map((t) => <option key={t} value={t}>{TIPO_ASIENTO_LABELS[t]}</option>)}
             </select>
           </Campo>
