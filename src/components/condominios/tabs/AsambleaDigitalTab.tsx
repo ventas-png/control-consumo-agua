@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml } from '../../../lib/printHtml'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { AsambleaDigital, Unidad } from '../../../types'
 
@@ -130,7 +131,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   function imprimirActa(a: AsambleaDigital) {
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:auto}
     h1{font-size:22px;color:#15291F}h2{font-size:14px;color:var(--at-ink-3);font-weight:normal}
     .meta{background:var(--at-surface-2);padding:12px;border-radius:8px;margin:16px 0;font-size:12px}

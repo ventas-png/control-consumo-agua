@@ -3,6 +3,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { BitacoraManto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
+import { printHtml, raw } from '../../../lib/printHtml'
 
 interface Props {
   registros: BitacoraManto[]
@@ -96,18 +97,21 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     const ts = TURNO_STYLE[r.turno] ?? TURNO_STYLE['mañana']
     const tareasList = (r.tareas ?? []) as TareaItem[]
     const completadas = tareasList.filter(t => t.completado).length
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bitácora Mantenimiento</title>
+    const tareasHtml = tareasList.length > 0
+      ? printHtml`<table><tr><th style="width:30px">✓</th><th>Tarea</th><th>Observaciones</th></tr>
+${raw(tareasList.map(t => printHtml`<tr><td class="check">${t.completado ? '✓' : '○'}</td><td>${t.tarea}</td><td>${t.observaciones || '—'}</td></tr>`).join(''))}
+</table>`
+      : ''
+    const html = printHtml`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bitácora Mantenimiento</title>
 <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px}
 table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:var(--at-surface-2)}
 .check{color:${ts.color};font-weight:700}.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig{border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Bitácora de Mantenimiento — ${ts.icon} ${ts.label}</h1>
-<p><strong>Fecha:</strong> ${r.fecha} &nbsp;&nbsp; <strong>Responsable:</strong> ${r.responsable}${r.area ? ` &nbsp;&nbsp; <strong>Área:</strong> ${r.area}` : ''}</p>
+<p><strong>Fecha:</strong> ${r.fecha} &nbsp;&nbsp; <strong>Responsable:</strong> ${r.responsable}${r.area ? raw(printHtml` &nbsp;&nbsp; <strong>Área:</strong> ${r.area}`) : ''}</p>
 <p><strong>Tareas completadas:</strong> ${completadas}/${tareasList.length}</p>
-${tareasList.length > 0 ? `<table><tr><th style="width:30px">✓</th><th>Tarea</th><th>Observaciones</th></tr>
-${tareasList.map(t => `<tr><td class="check">${t.completado ? '✓' : '○'}</td><td>${t.tarea}</td><td>${t.observaciones || '—'}</td></tr>`).join('')}
-</table>` : ''}
-${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observaciones}</p>` : ''}
+${raw(tareasHtml)}
+${r.observaciones ? raw(printHtml`<p><strong>Observaciones generales:</strong> ${r.observaciones}</p>`) : ''}
 <div class="footer">
 <div><div class="sig">Responsable de turno<br>${r.responsable}</div></div>
 <div><div class="sig">Supervisión / Visto Bueno</div></div>
