@@ -29,6 +29,7 @@ export const SECTION_TO_PATH: Record<AppSection, string> = {
   condominios_cuotas: '/condominios/cuotas',
   condominios_mantenimiento: '/condominios/mantenimiento',
   paquetes: '/paquetes',
+  contabilidad: '/contabilidad',
 }
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.fromEntries(

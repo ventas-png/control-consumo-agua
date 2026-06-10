@@ -42,6 +42,7 @@ export const SECTION_CRUMBS: Record<AppSection, SectionCrumbMeta> = {
   empresa_proyectos: { label: 'Mis Proyectos', group: GROUP_PLATAFORMA },
   clientes: { label: 'Clientes', group: GROUP_PLATAFORMA },
   unidades: { label: 'Unidades', group: GROUP_PLATAFORMA },
+  contabilidad: { label: 'Contabilidad', group: GROUP_PLATAFORMA },
   perfil: { label: 'Mi Cuenta', group: GROUP_PLATAFORMA },
 
   // ── Manejo Agua ──

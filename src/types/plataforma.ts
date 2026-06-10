@@ -248,4 +248,5 @@ export type AppSection =
   | 'condominios_visitantes'
   | 'condominios_cuotas'
   | 'condominios_mantenimiento'
-  | 'paquetes';
+  | 'paquetes'
+  | 'contabilidad';

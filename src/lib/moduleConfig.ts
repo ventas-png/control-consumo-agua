@@ -29,6 +29,7 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'configuracion',     label: 'Configuración',      actions: ['view', 'edit'] },
   { key: 'comunicacion',      label: 'Comunicación',       actions: ['view', 'create', 'edit'] },
   { key: 'condominios',       label: 'Condominios',        actions: ['view', 'create', 'edit', 'change_status'] },
+  { key: 'contabilidad',      label: 'Contabilidad',       actions: ['view', 'create', 'edit', 'change_status'] },
 ] as const
 
 /** Keys de módulos agrupados por línea de servicio (usados en Sidebar y modal de permisos). */

@@ -500,7 +500,9 @@ export const TAB_REGISTRY: TabDef[] = [
     <CumpleanosTab personal={ctx.personal} clientesBirthday={ctx.clientesBirthday} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'inventario', label: 'Inventario', icon: '🗃️', render: (ctx) =>
     <InventarioTab inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
-  { id: 'polizas', label: 'Pólizas', icon: '🛡️', render: (ctx) =>
+  // Etiqueta "Seguros": el id/tab gestiona pólizas de SEGURO; el nombre "Pólizas"
+  // ahora pertenece a los asientos del módulo Contabilidad (partida doble).
+  { id: 'polizas', label: 'Seguros', icon: '🛡️', render: (ctx) =>
     <PolizasTab polizas={ctx.polizas} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'inspecciones', label: 'Inspecciones', icon: '🏛️', render: (ctx) =>
     <InspeccionesTab inspecciones={ctx.inspecciones} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
@@ -536,7 +538,9 @@ export const TAB_REGISTRY: TabDef[] = [
     <LlavesTab llaves={ctx.llaves} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'encuestas', label: 'Encuestas', icon: '📊', render: (ctx) =>
     <EncuestasTab encuestas={ctx.encuestas} respuestas={ctx.respuestasEncuesta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
-  { id: 'contabilidad', label: 'Contabilidad', icon: '🧾', render: (ctx) =>
+  // Etiqueta "Gastos": el tab es CRUD de gastos_condominio; "Contabilidad" es
+  // ahora la sección de partida doble a nivel plataforma.
+  { id: 'contabilidad', label: 'Gastos', icon: '🧾', render: (ctx) =>
     <ContabilidadTab gastos={ctx.gastos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'presupuesto', label: 'Presupuesto', icon: '📋', render: (ctx) =>
     <PresupuestoTab presupuestos={ctx.presupuestos} gastos={ctx.gastos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },

@@ -83,6 +83,7 @@ const ComunicacionSection = lazyWithPreload(() => import('./components/comunicac
 const ServiciosEnergiaSection = lazyWithPreload(() => import('./components/servicios-energia/ServiciosEnergiaSection'))
 const CondominiosSection = lazyWithPreload(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
 const CondominiosDashboard = lazyWithPreload(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
+const ContabilidadSection = lazyWithPreload(() => import('./components/contabilidad/ContabilidadSection').then(m => ({ default: m.ContabilidadSection })))
 
 // agua:A8 — mapa AppSection → preload del chunk de su sección. Lo consume el
 // Sidebar en hover/focus de cada item para descargar el código por anticipado.
@@ -111,6 +112,7 @@ const SECTION_PRELOADERS: Partial<Record<AppSection, () => void>> = {
   condominios_visitantes: () => { CondominiosSection.preload() },
   condominios_cuotas: () => { CondominiosSection.preload() },
   condominios_mantenimiento: () => { CondominiosSection.preload() },
+  contabilidad: () => { ContabilidadSection.preload() },
 }
 
 function prefetchSection(section: AppSection): void {
@@ -938,6 +940,13 @@ export default function App() {
                 {canViewModule('dashboard') ? (
                   <DashboardSection registros={registros} moneda={moneda} isLoading={dataLoading} />
                 ) : <AccessDenied />}
+              </ErrorBoundary>
+            } />
+            <Route path="/contabilidad" element={
+              <ErrorBoundary sectionName="contabilidad">
+                <RoleGuard allowedRoles={['admin', 'super_admin', 'company_owner']}>
+                  {canViewModule('contabilidad') ? <ContabilidadSection /> : <AccessDenied />}
+                </RoleGuard>
               </ErrorBoundary>
             } />
             <Route path="/admin-dashboard" element={
