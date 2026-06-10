@@ -1,0 +1,60 @@
+// Presupuesto — Hooks de LECTURA.
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
+import { runQuery } from '../queryFetch'
+import { presupuestoKeys } from './keys'
+import type {
+  PresupuestoConPartidas,
+  PresupuestoPartida,
+  PresupuestoVsRealFila,
+} from '../../types/presupuesto'
+
+/** Presupuestos de la empresa con sus montos (para totalizar en la lista). */
+export function usePresupuestosQuery(companyId?: string, anio?: number) {
+  return useQuery({
+    queryKey: presupuestoKeys.lista(companyId, anio),
+    enabled: !!companyId,
+    queryFn: async () => {
+      let q = supabase
+        .from('presupuestos')
+        .select('*, presupuesto_partidas(monto)')
+        .eq('company_id', companyId!)
+        .order('anio', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (anio) q = q.eq('anio', anio)
+      return (await runQuery<PresupuestoConPartidas[]>((signal) => q.abortSignal(signal))) ?? []
+    },
+  })
+}
+
+/** Partidas de un presupuesto (para el editor mensualizado). */
+export function usePartidasQuery(presupuestoId?: string) {
+  return useQuery({
+    queryKey: presupuestoKeys.partidas(presupuestoId),
+    enabled: !!presupuestoId,
+    queryFn: async () =>
+      (await runQuery<PresupuestoPartida[]>((signal) =>
+        supabase
+          .from('presupuesto_partidas')
+          .select('*')
+          .eq('presupuesto_id', presupuestoId!)
+          .order('periodo')
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Comparativo presupuesto vs real (RPC server-side desde la balanza). */
+export function usePresupuestoVsRealQuery(presupuestoId?: string) {
+  return useQuery({
+    queryKey: presupuestoKeys.vsReal(presupuestoId),
+    enabled: !!presupuestoId,
+    queryFn: async () =>
+      (await runQuery<PresupuestoVsRealFila[]>((signal) =>
+        supabase
+          .rpc('presupuesto_vs_real', { p_presupuesto_id: presupuestoId! })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}

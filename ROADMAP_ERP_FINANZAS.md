@@ -34,13 +34,13 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - Flujo de aprobación: el operador puede registrar facturas/órdenes (RLS INSERT); aprobar, pagar y anular es de admin/owner (RLS UPDATE). Guardas de inmutabilidad: factura aprobada no cambia de monto, factura con pagos vivos no se anula, orden pagada solo se anula.
 - Pendiente para fases posteriores: desglose de IVA crédito fiscal, órdenes multi-factura, proyección de pagos.
 
-## Fase 3 — Presupuesto avanzado
+## Fase 3 — Presupuesto avanzado ✅
 
-- Partidas presupuestarias **mensualizadas y ligadas a cuentas contables** (reemplaza el año+categoría actual): tabla `presupuesto_partidas` (cuenta_id, periodo YYYY-MM, monto).
-- Comparativo presupuesto vs real calculado **desde la balanza** (no desde tablas operativas), con variación absoluta y %.
-- Flujo de aprobación del presupuesto anual (borrador → propuesto → aprobado por junta) y versionado.
-- Alertas de desviación (umbral % por partida) vía el sistema de notificaciones existente (`notification_outbox`).
-- Control presupuestario opcional en gastos: advertir/bloquear gasto que excede partida disponible.
+- Partidas presupuestarias **mensualizadas y ligadas a cuentas contables**: `presupuestos` (cabecera por empresa/proyecto/año) + `presupuesto_partidas` (cuenta_id, periodo YYYY-MM, monto). El modelo legacy `presupuesto_condominio` (año+categoría) sigue intacto en condominios.
+- Comparativo presupuesto vs real calculado **desde la balanza** (asientos publicados, RPC `presupuesto_vs_real`), con variación absoluta, % de ejecución y marca de excedido.
+- Flujo de aprobación (borrador → propuesto → aprobado → archivado) con **versionado**: aprobar una nueva versión archiva automáticamente la vigente; aprobados/archivados son de solo lectura.
+- UI: tab Presupuesto en Contabilidad — editor mensualizado (cuentas × 12 meses con "repartir anual") y comparativo con filtro por mes.
+- Pendiente para fases posteriores: alertas de desviación vía `notification_outbox` y control presupuestario en el alta de gastos (advertir/bloquear partida excedida).
 
 ## Fase 4 — Bancos y conciliación
 
