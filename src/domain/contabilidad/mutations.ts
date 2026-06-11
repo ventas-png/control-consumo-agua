@@ -11,7 +11,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
-import type { AsientoContable, CuentaContable } from '../../types/contabilidad'
+import type { AsientoContable, CuentaContable, RevaluacionFxFila } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 
 // ── Catálogo de cuentas ─────────────────────────────────────────────────────
@@ -207,6 +207,29 @@ export function useGuardarTipoCambioMutation(companyId?: string) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.tiposCambio(companyId) })
+    },
+  })
+}
+
+// ── Revaluación FX ──────────────────────────────────────────────────────────
+
+/**
+ * Revaluación de saldos en moneda extranjera contra 3301 (RPC
+ * conta_revaluar_fx). Con aplicar=false solo previsualiza; con aplicar=true
+ * genera los asientos de ajuste (idempotente por cuenta+fecha en servidor).
+ */
+export function useRevaluarFxMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { fecha: string; aplicar: boolean }) =>
+      await runQuery<RevaluacionFxFila[]>((signal) =>
+        supabase
+          .rpc('conta_revaluar_fx', { p_fecha: vars.fecha, p_aplicar: vars.aplicar })
+          .abortSignal(signal),
+      ),
+    onSuccess: (_data, vars) => {
+      // Solo la aplicación toca asientos/saldos; la previsualización es lectura.
+      if (vars.aplicar) void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
     },
   })
 }

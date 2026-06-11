@@ -6,6 +6,7 @@ import { formatCurrency } from '../../lib/format'
 import { EmptyState } from '../shared'
 import type { Proyecto } from '../../types'
 import { btnSecundario, input } from './ui'
+import { RevaluacionFxModal } from './RevaluacionFxModal'
 
 interface Props {
   companyId: string
@@ -20,6 +21,7 @@ function periodoActual(): string {
 export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
   const [periodo, setPeriodo] = useState(periodoActual())
   const [projectId, setProjectId] = useState('')
+  const [showRevaluacion, setShowRevaluacion] = useState(false)
 
   const { data: cuentas = [] } = useCuentasQuery(companyId)
   const { data: filas = [], isLoading } = useBalanzaQuery(companyId, projectId || null, periodo)
@@ -72,8 +74,15 @@ export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
           </select>
         )}
         <span style={{ flex: 1 }} />
+        <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra 3301">
+          💱 Revaluar FX
+        </button>
         <button onClick={exportar} disabled={nodos.length === 0} style={btnSecundario}>Exportar Excel</button>
       </div>
+
+      {showRevaluacion && (
+        <RevaluacionFxModal monedaBase={monedaBase} onClose={() => setShowRevaluacion(false)} />
+      )}
 
       {isLoading ? (
         <p style={{ color: 'var(--at-ink-soft)' }}>Cargando balanza…</p>
