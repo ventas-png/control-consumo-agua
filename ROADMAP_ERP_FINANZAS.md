@@ -60,7 +60,14 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - El bloqueo de asientos en periodos cerrados de proyecto (vía `cierres_mensuales`) viene de la Fase 1.
 - **Revaluación FX periódica ✅ (2026-06-11)**: RPC `conta_revaluar_fx(fecha, aplicar)` — previsualiza/aplica el ajuste de cuentas con moneda propia contra 3301 a la tasa vigente (idempotente por cuenta+fecha; sin tasa → no ajusta). UI: botón "Revaluar FX" en la Balanza.
 - **Comparativo vs periodo anterior ✅ (2026-06-11)**: toggle en el Estado de resultados que trae el mismo P&L del rango inmediato anterior de igual longitud y muestra Anterior + Variación (absoluta y %, favorable en verde) por cuenta y en totales; exportable a Excel.
-- Pendiente para iteraciones posteriores: reporte ejecutivo para asamblea (PDF), unificación de caja chica (1103) y fondo de reserva (1301) legacy, y `conta_saldos_mensuales` materializada si el volumen lo exige.
+- **Reporte ejecutivo para asamblea (PDF) ✅ (2026-06-11)**: botón "Informe asamblea" en EEFF — un PDF con resumen ejecutivo (ingresos/gastos/resultado/efectivo), estado de resultados, balance general (con verificación de cuadre) y flujo de efectivo del periodo.
+
+### Pendientes diferidos a demanda (cierre del roadmap, 2026-06-11)
+
+- **Unificación de caja chica (1103) y fondo de reserva (1301) legacy**: contabilizarlos automáticamente requiere definir la política operativa (fondo fijo vs reposición, migración de saldos legacy) con el cliente; el patrón de triggers ya está probado y se aplica cuando se decida.
+- **`conta_saldos_mensuales` materializada**: el volumen actual no lo exige — los RPCs server-side (balanza/EEFF) agregan en milisegundos; se materializa si el tenant más grande lo pide.
+- **Depósitos agrupados en conciliación y formatos bancarios propietarios**: ver Fase 4.
+- **Órdenes multi-factura**: ver Fase 2.
 
 ## Dependencias y orden
 
