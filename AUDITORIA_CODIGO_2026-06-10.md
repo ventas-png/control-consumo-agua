@@ -35,7 +35,7 @@ Tamaño auditado: ~689 archivos TypeScript (~143k LOC), 271 migraciones SQL, 37 
 
 | # | Hallazgo | Evidencia |
 |---|----------|-----------|
-| 7 | Sin `database.types.ts` generado de Supabase; tipos a mano (Zod compensa pero no garantiza sincronía con la BD) | `supabase gen types typescript` + CI check |
+| 7 | Sin `database.types.ts` generado de Supabase; tipos a mano (Zod compensa pero no garantiza sincronía con la BD) — *ATENDIDO 2026-06-11*: `src/types/database.types.ts` generado desde producción (232 tablas/vistas, ERP incluido) + script `npm run gen:db-types`; el check de CI requiere configurar el secreto `SUPABASE_ACCESS_TOKEN` (pendiente, manual) y la adopción de `createClient<Database>` es incremental | `supabase gen types typescript` + CI check |
 | 8 | E2E limitado: 6 happy paths en `e2e/` | Falta cobertura de violaciones RLS, edge cases de dinero |
 | 9 | `formatCurrency` duplicado en `ReporteConsolidadoTab.tsx:28` — *RESUELTO 2026-06-11* | Reusar `src/lib/format.ts` |
 | 10 | Ternarios anidados de 3 niveles — *RESUELTO 2026-06-11* (helpers con if) | `DataTable.tsx:273,278`, `ReportesTab.tsx:123`, `GeneradorCuotasTab.tsx:282,286` |
