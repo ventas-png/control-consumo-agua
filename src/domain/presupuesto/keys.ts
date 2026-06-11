@@ -8,4 +8,6 @@ export const presupuestoKeys = {
     [...presupuestoKeys.all, 'partidas', presupuestoId ?? null] as const,
   vsReal: (presupuestoId?: string) =>
     [...presupuestoKeys.all, 'vs-real', presupuestoId ?? null] as const,
+  partidaEstado: (projectId?: string, categoria?: string, fecha?: string) =>
+    [...presupuestoKeys.all, 'partida-estado', projectId ?? null, categoria ?? null, fecha ?? null] as const,
 } as const

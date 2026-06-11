@@ -5,6 +5,7 @@ import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { FilterChips } from '../../shared/FilterChips'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { usePartidaEstadoQuery } from '../../../domain/presupuesto/queries'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -51,6 +52,16 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Control presupuestario (Fase 3 ERP): estado de la partida del mes para la
+  // categoría seleccionada. Solo consulta con el form abierto.
+  const { data: partida } = usePartidaEstadoQuery(
+    showForm ? proyectoId : undefined,
+    form.categoria ?? 'otros',
+    form.fecha ?? undefined,
+  )
+  const excedePartida = !!partida && partida.presupuestado > 0 &&
+    (partida.ejecutado + (form.monto ?? 0)) > partida.presupuestado
 
   const thisMonth = new Date().toISOString().slice(0, 7)
   const thisYear  = new Date().getFullYear().toString()
@@ -219,6 +230,23 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                   <input style={inputStyle} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
                 </div>
               </div>
+              {/* Control presupuestario (Fase 3 ERP): advierte si el gasto excede
+                  la partida del mes de la cuenta mapeada a la categoría. No
+                  bloquea — la decisión operativa es del admin. */}
+              {partida && partida.presupuestado > 0 && (
+                excedePartida ? (
+                  <div style={{ marginTop: '12px', background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning)', borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
+                    ⚠️ <strong>Partida excedida</strong> — {partida.cuenta_codigo} {partida.cuenta_nombre} ({partida.periodo}):
+                    presupuestado {moneda} {partida.presupuestado.toFixed(2)}, ejecutado {moneda} {partida.ejecutado.toFixed(2)}.
+                    Con este gasto quedaría en {moneda} {(partida.ejecutado + (form.monto ?? 0)).toFixed(2)}
+                    {' '}({moneda} {((partida.ejecutado + (form.monto ?? 0)) - partida.presupuestado).toFixed(2)} sobre el presupuesto).
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                    Partida {partida.cuenta_codigo} ({partida.periodo}): disponible {moneda} {(partida.presupuestado - partida.ejecutado - (form.monto ?? 0)).toFixed(2)} de {moneda} {partida.presupuestado.toFixed(2)}.
+                  </div>
+                )
+              )}
               <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
                 <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
                 <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
