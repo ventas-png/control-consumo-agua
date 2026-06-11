@@ -10,19 +10,19 @@ import type {
   SugerenciaConciliacion,
 } from '../../types/bancos'
 
-export function useCuentasBancariasQuery(companyId?: string) {
+export function useCuentasBancariasQuery(companyId?: string, projectId?: string | null) {
   return useQuery({
-    queryKey: bancosKeys.cuentas(companyId),
+    queryKey: bancosKeys.cuentas(companyId, projectId),
     enabled: !!companyId,
-    queryFn: async () =>
-      (await runQuery<CuentaBancaria[]>((signal) =>
-        supabase
-          .from('cuentas_bancarias')
-          .select('*')
-          .eq('company_id', companyId!)
-          .order('nombre')
-          .abortSignal(signal),
-      )) ?? [],
+    queryFn: async () => {
+      let q = supabase
+        .from('cuentas_bancarias')
+        .select('*')
+        .eq('company_id', companyId!)
+        .order('nombre')
+      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+      return (await runQuery<CuentaBancaria[]>((signal) => q.abortSignal(signal))) ?? []
+    },
   })
 }
 

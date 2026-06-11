@@ -69,6 +69,10 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - **Depósitos agrupados en conciliación y formatos bancarios propietarios**: ver Fase 4.
 - **Órdenes multi-factura**: ver Fase 2.
 
+## Contabilidad por entidad (ledger) ✅ (2026-06-12)
+
+La contabilidad pasó de "una por empresa" a una ENTIDAD CONTABLE por (empresa, proyecto): la empresa lleva sus libros y **cada proyecto lleva los suyos, en su moneda predominante** (la ya configurada del proyecto), con **catálogo, mapeos, folios, apertura, cierre anual y revaluación FX propios**. Decisiones: contabilidades aisladas (sin consolidación — puede agregarse como reporte después), tipos de cambio compartidos por empresa con conversión cruzada vía pivote (`conta_tasa_entre`), bancos asignables a un ledger, y los asientos pre-ledger migrados a los libros de la empresa con nota `[pre-ledger]`. La UI tiene un **selector de contabilidad** (Empresa | proyecto) que fija el ledger activo para los 9 tabs. Migraciones `20260612*`.
+
 ## Dependencias y orden
 
 ```

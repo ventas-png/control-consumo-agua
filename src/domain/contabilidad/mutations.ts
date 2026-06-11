@@ -16,7 +16,7 @@ import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './s
 
 // ── Catálogo de cuentas ─────────────────────────────────────────────────────
 
-export function useCrearCuentaMutation(companyId?: string) {
+export function useCrearCuentaMutation(companyId?: string, projectId?: string | null) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: CuentaFormInput) => {
@@ -24,19 +24,19 @@ export function useCrearCuentaMutation(companyId?: string) {
       const rows = await runQuery<CuentaContable[]>((signal) =>
         supabase
           .from('conta_cuentas')
-          .insert({ ...input, company_id: companyId })
+          .insert({ ...input, company_id: companyId, project_id: projectId ?? null })
           .select()
           .abortSignal(signal),
       )
       return rows?.[0] ?? null
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId, projectId) })
     },
   })
 }
 
-export function useActualizarCuentaMutation(companyId?: string) {
+export function useActualizarCuentaMutation(companyId?: string, projectId?: string | null) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (vars: { id: string; patch: Partial<CuentaFormInput> & { activa?: boolean } }) => {
@@ -51,7 +51,7 @@ export function useActualizarCuentaMutation(companyId?: string) {
       return rows?.[0] ?? null
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId, projectId) })
     },
   })
 }
@@ -221,10 +221,14 @@ export function useGuardarTipoCambioMutation(companyId?: string) {
 export function useRevaluarFxMutation() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { fecha: string; aplicar: boolean }) =>
+    mutationFn: async (vars: { fecha: string; aplicar: boolean; projectId: string | null }) =>
       await runQuery<RevaluacionFxFila[]>((signal) =>
         supabase
-          .rpc('conta_revaluar_fx', { p_fecha: vars.fecha, p_aplicar: vars.aplicar })
+          .rpc('conta_revaluar_fx', {
+            p_fecha: vars.fecha,
+            p_aplicar: vars.aplicar,
+            p_project_id: vars.projectId,
+          })
           .abortSignal(signal),
       ),
     onSuccess: (_data, vars) => {

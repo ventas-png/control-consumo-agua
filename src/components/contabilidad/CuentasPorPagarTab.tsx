@@ -31,12 +31,12 @@ import {
   type MetodoPagoCxP,
   type OrdenPagoConRelaciones,
 } from '../../types/cxp'
-import type { Proyecto } from '../../types'
 import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -47,15 +47,15 @@ const TONO_FACTURA = {
 } as const
 const TONO_ORDEN = { borrador: 'info', aprobada: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
-export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) {
+export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) {
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
 
   const { data: facturas = [], isLoading: cargandoFacturas } = useFacturasProveedorQuery(companyId)
   const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesPagoQuery(companyId)
-  const { data: aging = [] } = useAgingQuery(companyId, null)
-  const { data: proyeccion = [] } = useProyeccionPagosQuery(vista === 'proyeccion' ? companyId : undefined, null)
+  const { data: aging = [] } = useAgingQuery(companyId, projectId)
+  const { data: proyeccion = [] } = useProyeccionPagosQuery(vista === 'proyeccion' ? companyId : undefined, projectId)
   const totalProyectado = proyeccion.reduce((s, f) => s + f.total, 0)
 
   const aprobarFactura = useAprobarFacturaMutation(companyId)
@@ -339,7 +339,7 @@ export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) 
       )}
 
       {nuevaFactura && (
-        <FacturaFormModal companyId={companyId} proyectos={proyectos} monedaBase={monedaBase} onClose={() => setNuevaFactura(false)} />
+        <FacturaFormModal companyId={companyId} projectId={projectId} monedaBase={monedaBase} onClose={() => setNuevaFactura(false)} />
       )}
       {ordenPara && (
         <OrdenFormModal companyId={companyId} factura={ordenPara} monedaBase={monedaBase} onClose={() => setOrdenPara(null)} />
@@ -350,16 +350,16 @@ export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) 
 
 // ── Modal: registrar factura ────────────────────────────────────────────────
 
-function FacturaFormModal({ companyId, proyectos, monedaBase, onClose }: {
+function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
   companyId: string
-  proyectos: Proyecto[]
+  projectId: string | null
   monedaBase: string
   onClose: () => void
 }) {
   const { data: proveedores = [] } = useProveedoresQuery(companyId)
   const crear = useCrearFacturaProveedorMutation(companyId)
   const [f, setF] = useState({
-    proveedor_id: '', project_id: '', numero_factura: '',
+    proveedor_id: '', numero_factura: '',
     fecha_emision: new Date().toISOString().slice(0, 10), fecha_vencimiento: '',
     concepto: '', categoria: 'otros', moneda: '', monto_total: '', iva_monto: '', notas: '',
   })
@@ -378,7 +378,7 @@ function FacturaFormModal({ companyId, proyectos, monedaBase, onClose }: {
   async function guardar() {
     const parsed = facturaProveedorFormSchema.safeParse({
       proveedor_id: f.proveedor_id,
-      project_id: f.project_id || null,
+      project_id: projectId,
       numero_factura: f.numero_factura.trim() || null,
       fecha_emision: f.fecha_emision,
       fecha_vencimiento: f.fecha_vencimiento || null,
@@ -423,12 +423,7 @@ function FacturaFormModal({ companyId, proyectos, monedaBase, onClose }: {
         <Campo label="No. de factura">
           <input value={f.numero_factura} onChange={(e) => setF({ ...f, numero_factura: e.target.value })} style={input} />
         </Campo>
-        <Campo label="Proyecto (opcional)">
-          <select value={f.project_id} onChange={(e) => setF({ ...f, project_id: e.target.value })} style={input}>
-            <option value="">Nivel empresa</option>
-            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
-        </Campo>
+
         <Campo label="Fecha de emisión">
           <input type="date" value={f.fecha_emision} onChange={(e) => setF({ ...f, fecha_emision: e.target.value })} style={input} />
         </Campo>

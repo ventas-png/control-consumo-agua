@@ -9,6 +9,8 @@ import { Campo, btnPrimario, input } from './ui'
 
 interface Props {
   companyId: string
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -18,9 +20,9 @@ interface Props {
  * overrides por proyecto si se insertan con project_id) y (2) tipos de cambio
  * manuales para las monedas distintas a la base.
  */
-export function MapeoCuentasTab({ companyId, monedaBase }: Props) {
-  const { data: cuentas = [] } = useCuentasQuery(companyId)
-  const { data: mapeos = [] } = useMapeoQuery(companyId)
+export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
+  const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
+  const { data: mapeos = [] } = useMapeoQuery(companyId, projectId)
   const { data: tiposCambio = [] } = useTiposCambioQuery(companyId)
   const guardarMapeo = useGuardarMapeoMutation(companyId)
   const guardarTC = useGuardarTipoCambioMutation(companyId)

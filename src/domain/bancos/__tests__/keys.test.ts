@@ -13,7 +13,7 @@ describe('bancosKeys', () => {
   })
 
   it('normaliza scope ausente a null', () => {
-    expect(bancosKeys.cuentas()).toEqual(['bancos', 'cuentas', null])
+    expect(bancosKeys.cuentas()).toEqual(['bancos', 'cuentas', null, null])
     expect(bancosKeys.movimientos()).toEqual(['bancos', 'movimientos', null, null])
     expect(bancosKeys.estadoConciliacion()).toEqual(['bancos', 'estado-conciliacion', null, null])
   })

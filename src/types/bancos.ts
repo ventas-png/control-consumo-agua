@@ -7,6 +7,8 @@ export type MatchTipoBanco = 'pago' | 'orden_pago' | 'ajuste'
 export interface CuentaBancaria {
   id: string
   company_id: string
+  /** Ledger dueño: null = contabilidad de la empresa; uuid = la del proyecto. */
+  project_id: string | null
   nombre: string
   banco: string
   /** Solo los últimos dígitos; nunca el número completo. */

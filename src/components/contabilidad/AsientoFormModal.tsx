@@ -11,12 +11,12 @@ import {
 } from '../../domain/contabilidad/schemas'
 import { formatCurrency } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type TipoAsiento } from '../../types/contabilidad'
-import type { Proyecto } from '../../types'
 import { Campo, btnPrimario, btnSecundario, btnLink, input } from './ui'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
   onClose: () => void
 }
@@ -32,14 +32,13 @@ interface LineaForm {
 
 const LINEA_VACIA: LineaForm = { cuenta_id: '', descripcion: '', lado: 'debe', monto: '', tipo_cambio: '' }
 
-export function AsientoFormModal({ companyId, proyectos, monedaBase, onClose }: Props) {
+export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: Props) {
   const { data: cuentas = [] } = useCuentasQuery(companyId)
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
   const [tipo, setTipo] = useState<TipoAsiento>('diario')
-  const [projectId, setProjectId] = useState('')
   const [concepto, setConcepto] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }, { ...LINEA_VACIA, lado: 'haber' }])
   const [guardando, setGuardando] = useState(false)
@@ -90,7 +89,7 @@ export function AsientoFormModal({ companyId, proyectos, monedaBase, onClose }: 
       fecha,
       tipo,
       concepto,
-      project_id: projectId || null,
+      project_id: projectId,
       lineas: construirLineas(),
     })
     if (!parsed.success) {
@@ -150,12 +149,7 @@ export function AsientoFormModal({ companyId, proyectos, monedaBase, onClose }: 
                 .map((t) => <option key={t} value={t}>{TIPO_ASIENTO_LABELS[t]}</option>)}
             </select>
           </Campo>
-          <Campo label="Proyecto (opcional)">
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={input}>
-              <option value="">Nivel empresa</option>
-              {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          </Campo>
+
         </div>
         <Campo label="Concepto *">
           <input value={concepto} onChange={(e) => setConcepto(e.target.value)} style={input} placeholder="Descripción de la operación" />

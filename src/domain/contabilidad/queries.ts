@@ -17,51 +17,48 @@ import type {
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
-export function useMonedaBaseQuery(companyId?: string) {
+export function useMonedaBaseQuery(companyId?: string, projectId?: string | null) {
   return useQuery({
-    queryKey: [...contabilidadKeys.all, 'moneda-base', companyId ?? null] as const,
+    queryKey: [...contabilidadKeys.all, 'moneda-base', companyId ?? null, projectId ?? null] as const,
     enabled: !!companyId,
     queryFn: async () => {
-      const rows = await runQuery<{ default_currency: string | null }[]>((signal) =>
+      // Fuente única con BD: el RPC resuelve empresa (default_currency) o
+      // proyecto (su moneda predominante) según el ledger.
+      const moneda = await runQuery<string>((signal) =>
         supabase
-          .from('companies')
-          .select('default_currency')
-          .eq('id', companyId!)
-          .limit(1)
+          .rpc('conta_moneda_base', { p_company_id: companyId!, p_project_id: projectId ?? null })
           .abortSignal(signal),
       )
-      return normalizarMoneda(rows?.[0]?.default_currency) ?? 'GTQ'
+      return normalizarMoneda(moneda) ?? 'GTQ'
     },
   })
 }
 
-/** Catálogo completo de la empresa (activas e inactivas; la UI filtra). */
-export function useCuentasQuery(companyId?: string) {
+/** Catálogo del LEDGER (empresa con projectId null, o proyecto). */
+export function useCuentasQuery(companyId?: string, projectId?: string | null) {
   return useQuery({
-    queryKey: contabilidadKeys.cuentas(companyId),
+    queryKey: contabilidadKeys.cuentas(companyId, projectId),
     enabled: !!companyId,
-    queryFn: async () =>
-      (await runQuery<CuentaContable[]>((signal) =>
-        supabase
-          .from('conta_cuentas')
-          .select('*')
-          .eq('company_id', companyId!)
-          // Puente ledger (PR1): la UI actual opera el ledger EMPRESA; el
-          // selector de contabilidad por proyecto llega en el PR de frontend.
-          .is('project_id', null)
-          .order('codigo')
-          .abortSignal(signal),
-      )) ?? [],
+    queryFn: async () => {
+      let q = supabase
+        .from('conta_cuentas')
+        .select('*')
+        .eq('company_id', companyId!)
+        .order('codigo')
+      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+      return (await runQuery<CuentaContable[]>((signal) => q.abortSignal(signal))) ?? []
+    },
   })
 }
 
-export interface AsientosFiltro {
+/** Filtros de la lista de pólizas. projectId null/ausente = ledger EMPRESA. */
+interface AsientosFiltro {
   projectId?: string | null
   periodo?: string
   estado?: string
 }
 
-/** Pólizas de la empresa, más recientes primero (filtros opcionales). */
+/** Pólizas del ledger, más recientes primero (filtros opcionales). */
 export function useAsientosQuery(companyId?: string, filtro: AsientosFiltro = {}) {
   return useQuery({
     queryKey: contabilidadKeys.asientos(companyId, filtro.projectId, filtro.periodo, filtro.estado),
@@ -74,7 +71,8 @@ export function useAsientosQuery(companyId?: string, filtro: AsientosFiltro = {}
         .order('fecha', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(500)
-      if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
+      // Ledger estricto: null/undefined = contabilidad de la EMPRESA.
+      q = filtro.projectId ? q.eq('project_id', filtro.projectId) : q.is('project_id', null)
       if (filtro.periodo) q = q.eq('periodo', filtro.periodo)
       if (filtro.estado) q = q.eq('estado', filtro.estado)
       return (await runQuery<AsientoContable[]>((signal) => q.abortSignal(signal))) ?? []
@@ -142,20 +140,18 @@ export function useLibroMayorQuery(cuentaId?: string, desde?: string, hasta?: st
 }
 
 /** Mapeos evento→cuenta de la empresa (defaults + overrides de proyectos). */
-export function useMapeoQuery(companyId?: string) {
+export function useMapeoQuery(companyId?: string, projectId?: string | null) {
   return useQuery({
-    queryKey: contabilidadKeys.mapeo(companyId),
+    queryKey: contabilidadKeys.mapeo(companyId, projectId),
     enabled: !!companyId,
-    queryFn: async () =>
-      (await runQuery<MapeoCuenta[]>((signal) =>
-        supabase
-          .from('conta_mapeo_cuentas')
-          .select('*')
-          .eq('company_id', companyId!)
-          // Puente ledger (PR1): mapeos del ledger EMPRESA hasta el PR de frontend.
-          .is('project_id', null)
-          .abortSignal(signal),
-      )) ?? [],
+    queryFn: async () => {
+      let q = supabase
+        .from('conta_mapeo_cuentas')
+        .select('*')
+        .eq('company_id', companyId!)
+      q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+      return (await runQuery<MapeoCuenta[]>((signal) => q.abortSignal(signal))) ?? []
+    },
   })
 }
 

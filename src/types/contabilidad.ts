@@ -10,6 +10,8 @@ export type OrigenAsiento = 'manual' | 'automatico'
 export interface CuentaContable {
   id: string
   company_id: string
+  /** Ledger dueño: null = contabilidad de la empresa; uuid = la del proyecto. */
+  project_id: string | null
   codigo: string
   nombre: string
   tipo: TipoCuenta
