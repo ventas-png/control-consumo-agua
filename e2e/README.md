@@ -13,6 +13,7 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 | `agua-lectura-validaciones.e2e.ts` | Edge cases de dinero: lectura sin unidad y consumo negativo rechazados |
 | `condominios-cuota.e2e.ts` | Emitir cuota → registrar pago (condominios) |
 | `fiscal-timbrar.e2e.ts` | Timbrar comprobante FEL/CFDI contra **Sandbox** |
+| `contabilidad-ledger.e2e.ts` | Selector de contabilidad: la empresa y cada proyecto llevan libros propios |
 
 > Los specs usan extensión `*.e2e.ts` (no `*.spec.ts`) a propósito: así el glob por
 > defecto de Vitest (`**/*.{test,spec}.ts`) no los recoge. Sólo Playwright los corre.
