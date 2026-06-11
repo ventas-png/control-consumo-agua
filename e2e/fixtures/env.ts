@@ -28,10 +28,20 @@ export const hasInviteToken = Boolean(INVITE_TOKEN)
 // fiscal lista. Es un flag explícito porque depende de credenciales del PAC.
 export const FISCAL_SANDBOX_READY = env('E2E_FISCAL_SANDBOX_READY') === '1'
 
+// Usuario de rol RESTRINGIDO (viewer/operator — NO admin ni owner) para los
+// tests de acceso denegado autenticado (P2 #8). Debe pertenecer al mismo
+// tenant sembrado que E2E_LOGIN_*.
+export const RESTRICTED = {
+  email: env('E2E_RESTRICTED_EMAIL'),
+  password: env('E2E_RESTRICTED_PASSWORD'),
+}
+export const hasRestrictedCreds = Boolean(RESTRICTED.email && RESTRICTED.password)
+
 // Helpers de gating para usar en `test.skip(...)`.
 export const reasons = {
   baseUrl: 'define E2E_BASE_URL (preview/sandbox) — ver e2e/README.md',
   login: 'define E2E_LOGIN_EMAIL / E2E_LOGIN_PASSWORD — ver e2e/README.md',
   invite: 'define E2E_INVITE_TOKEN (token fresco) — ver e2e/README.md',
   fiscal: 'define E2E_FISCAL_SANDBOX_READY=1 (+ login) — ver e2e/README.md',
+  restricted: 'define E2E_RESTRICTED_EMAIL / E2E_RESTRICTED_PASSWORD (rol viewer/operator) — ver e2e/README.md',
 }
