@@ -4,7 +4,7 @@ import { createCondominioRow, createCondominioRowReturning, updateCondominioRow 
 import { softDelete } from '../../../lib/softDelete'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
-import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from './AmenidadesTab'
+import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from '../../../lib/amenidadesReglas'
 
 // Card de amenidad con background-image signed-URL. La URL viene firmada
 // del padre vía useSignedUrls (batch) — antes cada card llamaba al hook
