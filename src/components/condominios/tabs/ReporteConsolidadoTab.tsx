@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode} from 'react'
+import { formatCurrency } from '../../../lib/format'
 import type {
   CuotaCondominio, GastoCondominio, TicketMantenimiento, PresupuestoCondominio,
   Visitante, NovedadSeguridad, RondaSeguridad, AnuncioComunidad,
@@ -24,8 +25,6 @@ interface Props {
 }
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-
-function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
 
 function pct(a: number, b: number): string { return b === 0 ? '—' : `${Math.round(a / b * 100)}%` }
 
@@ -173,8 +172,8 @@ export function ReporteConsolidadoTab({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Unidades totales"   value={String(totalUnidades)} sub={`${ocupadas} ocupadas`} />
             <KpiBox label="Tasa ocupación"     value={`${tasaOcupacion}%`} color={tasaOcupacion > 85 ? 'var(--at-success)' : 'var(--at-warning)'} />
-            <KpiBox label="Cobrado"             value={fmt(cobrado, moneda)} color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
-            <KpiBox label="Pendiente"           value={fmt(pendiente, moneda)} color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} bg={pendiente > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)'} border={pendiente > 0 ? 'var(--at-danger-border)' : 'var(--at-success-border)'} />
+            <KpiBox label="Cobrado"             value={formatCurrency(cobrado, moneda)} color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
+            <KpiBox label="Pendiente"           value={formatCurrency(pendiente, moneda)} color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} bg={pendiente > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)'} border={pendiente > 0 ? 'var(--at-danger-border)' : 'var(--at-success-border)'} />
             <KpiBox label="Tickets abiertos"   value={String(ticketsAbiertos.length)} color={ticketsAbiertos.length > 5 ? 'var(--at-danger)' : 'var(--at-warning)'} />
             <KpiBox label="Rondas realizadas"  value={String(rondasCompletadas)} sub={`de ${rondasPeriodo.length}`} />
           </div>
@@ -183,11 +182,11 @@ export function ReporteConsolidadoTab({
         {/* 2. Financiero */}
         <Section title="Financiero" icon="💰">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px', marginBottom: '14px' }}>
-            <KpiBox label="Cobrado período"      value={fmt(cobrado, moneda)}    color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
-            <KpiBox label="Pendiente período"    value={fmt(pendiente, moneda)}  color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
+            <KpiBox label="Cobrado período"      value={formatCurrency(cobrado, moneda)}    color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
+            <KpiBox label="Pendiente período"    value={formatCurrency(pendiente, moneda)}  color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
             <KpiBox label="Cuotas morosas"       value={String(morosos)}          color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
-            <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='var(--at-accent-hover)' />
-            <KpiBox label="Ppto. mensual est."   value={presupuestoPeriodo > 0 ? fmt(presupuestoPeriodo, moneda) : '—'} sub='Pro-rata anual' />
+            <KpiBox label="Total gastos"         value={formatCurrency(totalGastos, moneda)} color='var(--at-accent-hover)' />
+            <KpiBox label="Ppto. mensual est."   value={presupuestoPeriodo > 0 ? formatCurrency(presupuestoPeriodo, moneda) : '—'} sub='Pro-rata anual' />
             <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? 'var(--at-success)' : 'var(--at-danger)'} />
           </div>
           {Object.keys(gastosXCat).length > 0 && (
@@ -197,7 +196,7 @@ export function ReporteConsolidadoTab({
                 {Object.entries(gastosXCat).sort((a,b) => b[1]-a[1]).map(([cat, monto]) => (
                   <div key={cat} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
                     <span style={{ color: 'var(--at-ink-3)' }}>{cat.replace(/_/g, ' ')}: </span>
-                    <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{fmt(monto, moneda)}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{formatCurrency(monto, moneda)}</span>
                   </div>
                 ))}
               </div>

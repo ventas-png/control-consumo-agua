@@ -29,7 +29,7 @@ Tamaño auditado: ~689 archivos TypeScript (~143k LOC), 271 migraciones SQL, 37 
 | 3 | **Componentes monolíticos** (top por LOC): `AmenidadesTab.tsx` (1932), `VisitantesTab.tsx` (1530), `CustomerPortal.tsx` (1511), `ClientesSection.tsx` (1302), `UnidadesSection.tsx` (1226), `RutasSection.tsx` (1169), `SeguridadTab.tsx` (1128), `ContadoresSection.tsx` (1069) | Mantenimiento costoso, alto riesgo en cada cambio. El refactor de `EmpresaSection` (1259 → 112 LOC + domain) es el patrón a replicar |
 | 4 | **`App.tsx` con 1151 líneas** (router + providers + lazy imports) | Extraer la definición de rutas a un registro declarativo |
 | 5 | **`useAuth.ts` (524 L)** mezcla sesión, permisos y empresa | Pendiente P13 del tracker |
-| 6 | **`types/condominios.ts` con 2950 líneas** | Dividir por sub-dominio (amenidades, seguridad, finanzas…) |
+| 6 | **`types/condominios.ts` con 2950 líneas** — *RESUELTO 2026-06-11*: particionado en `types/condominios/{core,seguridad,operaciones,residentes,comercial,gobernanza,finanzas}.ts` con barrel `index.ts` (superficie pública intacta) | Dividir por sub-dominio (amenidades, seguridad, finanzas…) |
 
 ### P2 — Mejoras de bajo riesgo
 
@@ -37,8 +37,8 @@ Tamaño auditado: ~689 archivos TypeScript (~143k LOC), 271 migraciones SQL, 37 
 |---|----------|-----------|
 | 7 | Sin `database.types.ts` generado de Supabase; tipos a mano (Zod compensa pero no garantiza sincronía con la BD) | `supabase gen types typescript` + CI check |
 | 8 | E2E limitado: 6 happy paths en `e2e/` | Falta cobertura de violaciones RLS, edge cases de dinero |
-| 9 | `formatCurrency` duplicado en `ReporteConsolidadoTab.tsx:28` | Reusar `src/lib/format.ts` |
-| 10 | Ternarios anidados de 3 niveles | `DataTable.tsx:273,278`, `ReportesTab.tsx:123`, `GeneradorCuotasTab.tsx:282,286` |
+| 9 | `formatCurrency` duplicado en `ReporteConsolidadoTab.tsx:28` — *RESUELTO 2026-06-11* | Reusar `src/lib/format.ts` |
+| 10 | Ternarios anidados de 3 niveles — *RESUELTO 2026-06-11* (helpers con if) | `DataTable.tsx:273,278`, `ReportesTab.tsx:123`, `GeneradorCuotasTab.tsx:282,286` |
 | 11 | Comparación de service-role key sin tiempo constante | `notify-package`, `route-reminders` (informativo) |
 | 12 | Nombres confusos en condominios: tab "Contabilidad" es CRUD de gastos y "Pólizas" son seguros | Renombrado en esta rama (ver módulo Contabilidad nuevo) |
 

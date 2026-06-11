@@ -36,6 +36,14 @@ function KpiGrid({ items }: { items: { label: string; value: string; color?: str
   )
 }
 
+
+// Semáforo de ejecución presupuestaria: ≥100% rojo, ≥80% ámbar, resto verde.
+function tonoEjecucion(pct: number): string {
+  if (pct >= 100) return 'var(--at-danger)'
+  if (pct >= 80) return 'var(--at-warning)'
+  return 'var(--at-success)'
+}
+
 export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, presupuestos, moneda, proyectoNombre }: Props) {
   const now = new Date()
   const currentYear = now.getFullYear()
@@ -120,7 +128,7 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
           { label: 'Cuotas pagadas',     value: String(cuotasPagadas),                color: 'var(--at-success)' },
           { label: `Gastos ${currentYear}`, value: `${moneda} ${fmt(totalGastosAnio)}`, color: 'var(--at-danger)' },
           { label: 'Presupuesto anual',  value: `${moneda} ${fmt(totalPresupuesto)}`, color: 'var(--at-primary)' },
-          { label: '% Ejecución ppto.',  value: `${pctEjec}%`,                        color: pctEjec >= 100 ? 'var(--at-danger)' : pctEjec >= 80 ? 'var(--at-warning)' : 'var(--at-success)' },
+          { label: '% Ejecución ppto.',  value: `${pctEjec}%`,                        color: tonoEjecucion(pctEjec) },
         ]} />
 
         {topCategorias.length > 0 && (
