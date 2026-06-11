@@ -59,6 +59,19 @@ interface ResultadoGeneracion {
   total: number
 }
 
+
+// Colores del stepper de generación: completado > activo > pendiente.
+function fondoPaso(completado: boolean, activo: boolean): string {
+  if (completado) return 'var(--at-success)'
+  if (activo) return 'var(--at-primary)'
+  return 'var(--at-line)'
+}
+function tintaPaso(completado: boolean, activo: boolean): string {
+  if (activo) return 'var(--at-primary)'
+  if (completado) return 'var(--at-success)'
+  return 'var(--at-ink-3)'
+}
+
 export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, onRefresh, onVerCuotas }: Props) {
   const [paso, setPaso] = useState<Paso>('config')
   const [tab, setTab] = useState<'generar' | 'historial'>('generar')
@@ -275,11 +288,11 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                      background: completado ? 'var(--at-success)' : activo ? 'var(--at-primary)' : 'var(--at-line)',
+                      background: fondoPaso(completado, activo),
                       color: completado || activo ? 'white' : 'var(--at-ink-3)' }}>
                       {completado ? '✓' : i + 1}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-primary)' : completado ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
+                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: tintaPaso(completado, activo) }}>
                       {labels[i]}
                     </span>
                   </div>

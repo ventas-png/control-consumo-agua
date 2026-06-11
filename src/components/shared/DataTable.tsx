@@ -369,7 +369,15 @@ export function DataTable<T>({
                 <tr style={{ background: 'var(--at-surface-2)' }}>
                   {columns.map((col, colIdx) => {
                     const isSorted = sortConfig?.key === col.key
-                    const arrow = !isSorted ? '' : sortConfig.direction === 'asc' ? ' ↑' : ' ↓'
+                    // Flecha y aria-sort derivados del estado de orden, sin
+                    // ternarios anidados (auditoría P2 #10).
+                    const sortedAsc = isSorted && sortConfig.direction === 'asc'
+                    let arrow = ''
+                    let ariaSort: 'none' | 'ascending' | 'descending' = 'none'
+                    if (isSorted) {
+                      arrow = sortedAsc ? ' ↑' : ' ↓'
+                      if (col.sortable) ariaSort = sortedAsc ? 'ascending' : 'descending'
+                    }
                     const isStickyCol = stickyFirstColumn && colIdx === 0
                     return (
                       <th
@@ -379,7 +387,7 @@ export function DataTable<T>({
                           col.hideOnMobile ? 'table-col-secondary' : '',
                           isStickyCol ? 'table-col-sticky' : '',
                         ].filter(Boolean).join(' ') || undefined}
-                        aria-sort={!col.sortable ? 'none' : isSorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        aria-sort={ariaSort}
                         onClick={() => handleHeaderClick(col)}
                         style={{
                           padding: '12px 14px',
