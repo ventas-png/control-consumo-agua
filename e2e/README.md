@@ -7,8 +7,10 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 |---|---|
 | `auth-login.e2e.ts` | Login email/password (Supabase) + rechazo de credenciales inválidas |
 | `unauthorized-access.e2e.ts` | Visitante anónimo: rutas protegidas caen al landing público, no al shell |
+| `role-restricted-access.e2e.ts` | Usuario autenticado de rol restringido: secciones admin responden "Acceso Denegado" |
 | `invitation-accept.e2e.ts` | Alta por invitación (`/aceptar-invitacion?token=…`) |
 | `agua-lectura-cobro.e2e.ts` | Captura de lectura → emitir factura (agua) |
+| `agua-lectura-validaciones.e2e.ts` | Edge cases de dinero: lectura sin unidad y consumo negativo rechazados |
 | `condominios-cuota.e2e.ts` | Emitir cuota → registrar pago (condominios) |
 | `fiscal-timbrar.e2e.ts` | Timbrar comprobante FEL/CFDI contra **Sandbox** |
 
@@ -57,6 +59,7 @@ npx playwright test --config e2e/playwright.config.ts
 | `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | login/agua/condominios/fiscal |
 | `E2E_INVITE_TOKEN` | token fresco de invitación | sólo invitation-accept |
 | `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | sólo fiscal-timbrar |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | sólo role-restricted-access |
 
 ## CI
 
