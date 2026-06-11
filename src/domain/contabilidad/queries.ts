@@ -46,6 +46,9 @@ export function useCuentasQuery(companyId?: string) {
           .from('conta_cuentas')
           .select('*')
           .eq('company_id', companyId!)
+          // Puente ledger (PR1): la UI actual opera el ledger EMPRESA; el
+          // selector de contabilidad por proyecto llega en el PR de frontend.
+          .is('project_id', null)
           .order('codigo')
           .abortSignal(signal),
       )) ?? [],
@@ -149,6 +152,8 @@ export function useMapeoQuery(companyId?: string) {
           .from('conta_mapeo_cuentas')
           .select('*')
           .eq('company_id', companyId!)
+          // Puente ledger (PR1): mapeos del ledger EMPRESA hasta el PR de frontend.
+          .is('project_id', null)
           .abortSignal(signal),
       )) ?? [],
   })
