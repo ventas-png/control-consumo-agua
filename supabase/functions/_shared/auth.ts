@@ -142,3 +142,24 @@ export async function requireRole(
 
   return { ...base, role: profile.role }
 }
+
+/**
+ * Comparación en TIEMPO CONSTANTE de un token recibido contra un secreto
+ * esperado (auditoría P2 #11: `token === SERVICE_ROLE_KEY` filtra por timing
+ * cuántos caracteres iniciales coinciden). Se comparan los digests SHA-256
+ * (longitud fija → tampoco se filtra la longitud del secreto) con XOR
+ * acumulado sin cortocircuito.
+ */
+export async function timingSafeEqualSecret(recibido: string, esperado: string): Promise<boolean> {
+  if (!recibido || !esperado) return false
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(recibido)),
+    crypto.subtle.digest('SHA-256', enc.encode(esperado)),
+  ])
+  const va = new Uint8Array(a)
+  const vb = new Uint8Array(b)
+  let diff = 0
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i]
+  return diff === 0
+}
