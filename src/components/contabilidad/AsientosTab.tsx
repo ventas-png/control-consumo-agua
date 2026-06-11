@@ -5,7 +5,6 @@ import { StatusBadge } from '../shared/StatusBadge'
 import { useAsientosQuery } from '../../domain/contabilidad/queries'
 import { formatCurrency, formatDateShort } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type AsientoContable } from '../../types/contabilidad'
-import type { Proyecto } from '../../types'
 import { AsientoFormModal } from './AsientoFormModal'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
 import { AperturaSaldosModal } from './AperturaSaldosModal'
@@ -13,7 +12,8 @@ import { btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -25,10 +25,9 @@ function periodoActual(): string {
 
 const TONO_ESTADO = { borrador: 'warning', publicado: 'success', anulado: 'neutral' } as const
 
-export function AsientosTab({ companyId, proyectos, monedaBase }: Props) {
+export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
   const [periodo, setPeriodo] = useState(periodoActual())
   const [estado, setEstado] = useState<FiltroEstado>('todos')
-  const [projectId, setProjectId] = useState('')
   const [nuevo, setNuevo] = useState(false)
   const [apertura, setApertura] = useState(false)
   const [detalleId, setDetalleId] = useState<string | null>(null)
@@ -36,7 +35,7 @@ export function AsientosTab({ companyId, proyectos, monedaBase }: Props) {
   const { data: asientos = [], isLoading } = useAsientosQuery(companyId, {
     periodo: periodo || undefined,
     estado: estado === 'todos' ? undefined : estado,
-    projectId: projectId || undefined,
+    projectId,
   })
 
   const hayApertura = useMemo(
@@ -103,12 +102,6 @@ export function AsientosTab({ companyId, proyectos, monedaBase }: Props) {
           style={{ ...input, width: 150 }}
           aria-label="Periodo"
         />
-        {proyectos.length > 1 && (
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ ...input, width: 200 }} aria-label="Proyecto">
-            <option value="">Todos los proyectos</option>
-            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
-        )}
         <FilterChips<FiltroEstado>
           options={[
             { value: 'todos', label: 'Todas' },
@@ -150,7 +143,7 @@ export function AsientosTab({ companyId, proyectos, monedaBase }: Props) {
       {nuevo && (
         <AsientoFormModal
           companyId={companyId}
-          proyectos={proyectos}
+          projectId={projectId}
           monedaBase={monedaBase}
           onClose={() => setNuevo(false)}
         />
@@ -158,7 +151,7 @@ export function AsientosTab({ companyId, proyectos, monedaBase }: Props) {
       {apertura && (
         <AperturaSaldosModal
           companyId={companyId}
-          proyectos={proyectos}
+          projectId={projectId}
           monedaBase={monedaBase}
           onClose={() => setApertura(false)}
         />

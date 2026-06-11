@@ -24,6 +24,8 @@ import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   proyectos: Proyecto[]
   monedaBase: string
 }
@@ -32,12 +34,17 @@ type Vista = 'presupuestos' | 'comparativo'
 
 const TONO_ESTADO = { borrador: 'info', propuesto: 'warning', aprobado: 'success', archivado: 'neutral' } as const
 
-export function PresupuestoTab({ companyId, proyectos, monedaBase }: Props) {
+export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: Props) {
   const [vista, setVista] = useState<Vista>('presupuestos')
   const [nuevo, setNuevo] = useState(false)
   const [editorId, setEditorId] = useState<string | null>(null)
 
-  const { data: presupuestos = [], isLoading } = usePresupuestosQuery(companyId)
+  const { data: todosPresupuestos = [], isLoading } = usePresupuestosQuery(companyId)
+  // Solo los presupuestos del LEDGER activo (empresa o el proyecto).
+  const presupuestos = useMemo(
+    () => todosPresupuestos.filter((p) => (p.project_id ?? null) === projectId),
+    [todosPresupuestos, projectId],
+  )
   const cambiarEstado = useCambiarEstadoPresupuestoMutation(companyId)
 
   const editor = presupuestos.find((p) => p.id === editorId) ?? null
@@ -150,7 +157,7 @@ export function PresupuestoTab({ companyId, proyectos, monedaBase }: Props) {
       )}
 
       {nuevo && (
-        <NuevoPresupuestoModal companyId={companyId} proyectos={proyectos} onClose={() => setNuevo(false)} onCreado={(id) => { setNuevo(false); setEditorId(id) }} />
+        <NuevoPresupuestoModal companyId={companyId} projectId={projectId} onClose={() => setNuevo(false)} onCreado={(id) => { setNuevo(false); setEditorId(id) }} />
       )}
       {editor && (
         <PartidasEditorModal companyId={companyId} presupuesto={editor} monedaBase={monedaBase} onClose={() => setEditorId(null)} />
@@ -161,22 +168,22 @@ export function PresupuestoTab({ companyId, proyectos, monedaBase }: Props) {
 
 // ── Modal: crear presupuesto ────────────────────────────────────────────────
 
-function NuevoPresupuestoModal({ companyId, proyectos, onClose, onCreado }: {
+function NuevoPresupuestoModal({ companyId, projectId, onClose, onCreado }: {
   companyId: string
-  proyectos: Proyecto[]
+  projectId: string | null
   onClose: () => void
   onCreado: (id: string) => void
 }) {
   const crear = useCrearPresupuestoMutation(companyId)
   const anioActual = new Date().getFullYear()
-  const [f, setF] = useState({ anio: String(anioActual + (new Date().getMonth() >= 9 ? 1 : 0)), nombre: '', project_id: '', notas: '' })
+  const [f, setF] = useState({ anio: String(anioActual + (new Date().getMonth() >= 9 ? 1 : 0)), nombre: '', notas: '' })
 
   async function guardar() {
     const anio = parseInt(f.anio, 10)
     const parsed = presupuestoFormSchema.safeParse({
       anio,
       nombre: f.nombre.trim() || `Presupuesto ${anio}`,
-      project_id: f.project_id || null,
+      project_id: projectId,
       notas: f.notas.trim() || null,
     })
     if (!parsed.success) {
@@ -210,12 +217,7 @@ function NuevoPresupuestoModal({ companyId, proyectos, onClose, onCreado }: {
             <input value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} style={input} placeholder={`Presupuesto ${f.anio}`} />
           </Campo>
         </div>
-        <Campo label="Ámbito">
-          <select value={f.project_id} onChange={(e) => setF({ ...f, project_id: e.target.value })} style={input}>
-            <option value="">Toda la empresa</option>
-            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
-        </Campo>
+
         <Campo label="Notas">
           <textarea value={f.notas} onChange={(e) => setF({ ...f, notas: e.target.value })} style={{ ...input, minHeight: 50 }} />
         </Campo>
@@ -232,7 +234,8 @@ function PartidasEditorModal({ companyId, presupuesto, monedaBase, onClose }: {
   monedaBase: string
   onClose: () => void
 }) {
-  const { data: cuentas = [] } = useCuentasQuery(companyId)
+  // Cuentas del LEDGER del presupuesto (la BD valida partida↔cuenta del mismo ledger).
+  const { data: cuentas = [] } = useCuentasQuery(companyId, presupuesto.project_id ?? null)
   const { data: partidas = [], isLoading } = usePartidasQuery(presupuesto.id)
   const guardar = useGuardarPartidasMutation(companyId)
 

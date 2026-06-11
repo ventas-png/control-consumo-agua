@@ -13,9 +13,11 @@ import type { AsientoContable } from '../../types/contabilidad'
 export function useCierreAnualMutation() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (anio: number) =>
+    mutationFn: async (vars: { anio: number; projectId: string | null }) =>
       await runQuery<AsientoContable>((signal) =>
-        supabase.rpc('conta_cierre_anual', { p_anio: anio }).abortSignal(signal),
+        supabase
+          .rpc('conta_cierre_anual', { p_anio: vars.anio, p_project_id: vars.projectId })
+          .abortSignal(signal),
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: eeffKeys.all })

@@ -7,7 +7,8 @@ describe('contabilidadKeys', () => {
   })
 
   it('cuentas scopea por companyId', () => {
-    expect(contabilidadKeys.cuentas('c1')).toEqual(['contabilidad', 'cuentas', 'c1'])
+    expect(contabilidadKeys.cuentas('c1')).toEqual(['contabilidad', 'cuentas', 'c1', null])
+    expect(contabilidadKeys.cuentas('c1', 'p1')).toEqual(['contabilidad', 'cuentas', 'c1', 'p1'])
   })
 
   it('asientos incluye company/proyecto/periodo/estado en el scope', () => {
@@ -17,7 +18,7 @@ describe('contabilidadKeys', () => {
   })
 
   it('normaliza scope ausente a null para que la key sea estable', () => {
-    expect(contabilidadKeys.cuentas()).toEqual(['contabilidad', 'cuentas', null])
+    expect(contabilidadKeys.cuentas()).toEqual(['contabilidad', 'cuentas', null, null])
     expect(contabilidadKeys.asientos()).toEqual([
       'contabilidad', 'asientos', null, null, null, null,
     ])

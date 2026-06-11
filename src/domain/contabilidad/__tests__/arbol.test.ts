@@ -5,6 +5,7 @@ import type { BalanzaFila, CuentaContable } from '../../../types/contabilidad'
 function cuenta(partial: Partial<CuentaContable> & Pick<CuentaContable, 'id' | 'codigo' | 'nombre'>): CuentaContable {
   return {
     company_id: 'c1',
+    project_id: null,
     tipo: 'activo',
     naturaleza: 'deudora',
     padre_id: null,

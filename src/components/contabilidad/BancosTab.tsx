@@ -32,6 +32,8 @@ import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -43,8 +45,8 @@ function periodoActual(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
-export function BancosTab({ companyId, monedaBase }: Props) {
-  const { data: cuentasBancarias = [], isLoading: cargandoCuentas } = useCuentasBancariasQuery(companyId)
+export function BancosTab({ companyId, projectId, monedaBase }: Props) {
+  const { data: cuentasBancarias = [], isLoading: cargandoCuentas } = useCuentasBancariasQuery(companyId, projectId)
   const [cuentaId, setCuentaId] = useState('')
   const [filtro, setFiltro] = useState<FiltroEstado>('pendiente')
   const [periodo, setPeriodo] = useState(periodoActual())
@@ -261,6 +263,7 @@ export function BancosTab({ companyId, monedaBase }: Props) {
       {formCuenta && (
         <CuentaBancariaModal
           companyId={companyId}
+          projectId={projectId}
           monedaBase={monedaBase}
           cuenta={formCuenta === 'nueva' ? null : formCuenta}
           onClose={() => setFormCuenta(null)}
@@ -308,14 +311,15 @@ function Tarjeta({ titulo, valor, tono }: { titulo: string; valor: string; tono?
 
 // ── Modal: alta/edición de cuenta bancaria ──────────────────────────────────
 
-function CuentaBancariaModal({ companyId, monedaBase, cuenta, onClose }: {
+function CuentaBancariaModal({ companyId, projectId, monedaBase, cuenta, onClose }: {
   companyId: string
+  projectId: string | null
   monedaBase: string
   cuenta: CuentaBancaria | null
   onClose: () => void
 }) {
-  const { data: cuentasContables = [] } = useCuentasQuery(companyId)
-  const guardar = useGuardarCuentaBancariaMutation(companyId)
+  const { data: cuentasContables = [] } = useCuentasQuery(companyId, projectId)
+  const guardar = useGuardarCuentaBancariaMutation(companyId, projectId)
   const [f, setF] = useState({
     nombre: cuenta?.nombre ?? '',
     banco: cuenta?.banco ?? '',

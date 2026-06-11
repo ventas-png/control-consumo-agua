@@ -5,8 +5,8 @@
 // parámetros ausentes a `null` para que la key sea estable entre renders.
 export const contabilidadKeys = {
   all: ['contabilidad'] as const,
-  cuentas: (companyId?: string) =>
-    [...contabilidadKeys.all, 'cuentas', companyId ?? null] as const,
+  cuentas: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'cuentas', companyId ?? null, projectId ?? null] as const,
   asientos: (companyId?: string, projectId?: string | null, periodo?: string, estado?: string) =>
     [...contabilidadKeys.all, 'asientos',
       companyId ?? null, projectId ?? null, periodo ?? null, estado ?? null] as const,

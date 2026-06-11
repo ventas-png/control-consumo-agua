@@ -26,7 +26,7 @@ function hoyISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function RevaluacionFxModal({ monedaBase, onClose }: { monedaBase: string; onClose: () => void }) {
+export function RevaluacionFxModal({ projectId, monedaBase, onClose }: { projectId: string | null; monedaBase: string; onClose: () => void }) {
   const [fecha, setFecha] = useState(hoyISO())
   const [filas, setFilas] = useState<RevaluacionFxFila[] | null>(null)
   const [aplicado, setAplicado] = useState(false)
@@ -34,7 +34,7 @@ export function RevaluacionFxModal({ monedaBase, onClose }: { monedaBase: string
 
   async function ejecutar(aplicar: boolean) {
     try {
-      const data = await revaluar.mutateAsync({ fecha, aplicar })
+      const data = await revaluar.mutateAsync({ fecha, aplicar, projectId })
       setFilas(data ?? [])
       setAplicado(aplicar)
       if (aplicar) {

@@ -12,12 +12,14 @@ import { compararPyG, rangoAnterior, resumirBalance, resumirPyG, type PyGCompara
 import { exportarExcel } from '../condominios/exportUtils'
 import { generarReporteAsamblea } from './reporteAsamblea'
 import { formatCurrency } from '../../lib/format'
-import type { Proyecto } from '../../types'
 import { btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
+  /** Nombre del ledger (Empresa o el proyecto) para el informe. */
+  ledgerNombre: string
   monedaBase: string
 }
 
@@ -27,15 +29,14 @@ function periodoActual(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
-export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Props) {
+export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, monedaBase }: Props) {
   const [vista, setVista] = useState<Vista>('pyg')
-  const [projectId, setProjectId] = useState('')
   const [periodo, setPeriodo] = useState(periodoActual())
   const [desde, setDesde] = useState(`${new Date().getFullYear()}-01`)
 
   const [comparar, setComparar] = useState(false)
 
-  const pid = projectId || null
+  const pid = projectId
   const { data: pygFilas = [], isLoading: cargandoPyG } = useEstadoResultadosQuery(companyId, pid, desde, periodo)
   // Comparativo vs periodo anterior (pendiente Fase 5): mismo P&L sobre el
   // rango inmediato anterior de la misma longitud; solo consulta al activarlo.
@@ -111,7 +112,7 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
     })
     if (!isConfirmed) return
     try {
-      await cierre.mutateAsync(anioCerrable)
+      await cierre.mutateAsync({ anio: anioCerrable, projectId })
       notify({ variant: 'success', title: 'Ejercicio cerrado', text: `El cierre ${anioCerrable} quedó publicado.` })
     } catch (e) {
       notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo cerrar el ejercicio.' })
@@ -153,15 +154,9 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
           {vista === 'pyg' ? 'Hasta' : 'Al cierre de'}
           <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 140 }} />
         </label>
-        {proyectos.length > 1 && (
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ ...input, width: 190 }} aria-label="Proyecto">
-            <option value="">Toda la empresa</option>
-            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
-        )}
         <button
           onClick={() => generarReporteAsamblea({
-            entidadNombre: proyectos.find((p) => p.id === projectId)?.nombre ?? 'Toda la empresa',
+            entidadNombre: ledgerNombre,
             desde, hasta: periodo, monedaBase,
             pyg: pygBase, balance, flujo: flujoFilas,
           })}

@@ -21,7 +21,7 @@ function useInvalidarBancos() {
   }
 }
 
-export function useGuardarCuentaBancariaMutation(companyId?: string) {
+export function useGuardarCuentaBancariaMutation(companyId?: string, projectId?: string | null) {
   const invalidar = useInvalidarBancos()
   return useMutation({
     mutationFn: async (vars: { id?: string; input: CuentaBancariaFormInput }) => {
@@ -40,7 +40,7 @@ export function useGuardarCuentaBancariaMutation(companyId?: string) {
       const rows = await runQuery<CuentaBancaria[]>((signal) =>
         supabase
           .from('cuentas_bancarias')
-          .insert({ ...vars.input, company_id: companyId })
+          .insert({ ...vars.input, company_id: companyId, project_id: projectId ?? null })
           .select()
           .abortSignal(signal),
       )

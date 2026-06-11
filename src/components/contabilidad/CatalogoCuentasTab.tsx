@@ -12,6 +12,8 @@ import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -32,10 +34,10 @@ const FORM_VACIO: FormState = {
   padre_id: '', es_detalle: true, moneda: '', descripcion: '',
 }
 
-export function CatalogoCuentasTab({ companyId, monedaBase }: Props) {
-  const { data: cuentas = [], isLoading } = useCuentasQuery(companyId)
-  const crear = useCrearCuentaMutation(companyId)
-  const actualizar = useActualizarCuentaMutation(companyId)
+export function CatalogoCuentasTab({ companyId, projectId, monedaBase }: Props) {
+  const { data: cuentas = [], isLoading } = useCuentasQuery(companyId, projectId)
+  const crear = useCrearCuentaMutation(companyId, projectId)
+  const actualizar = useActualizarCuentaMutation(companyId, projectId)
 
   const [form, setForm] = useState<FormState | null>(null)
   const [mostrarInactivas, setMostrarInactivas] = useState(false)

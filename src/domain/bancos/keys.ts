@@ -2,8 +2,8 @@
 // Convención del repo: raíz para invalidación masiva; scope normalizado a null.
 export const bancosKeys = {
   all: ['bancos'] as const,
-  cuentas: (companyId?: string) =>
-    [...bancosKeys.all, 'cuentas', companyId ?? null] as const,
+  cuentas: (companyId?: string, projectId?: string | null) =>
+    [...bancosKeys.all, 'cuentas', companyId ?? null, projectId ?? null] as const,
   movimientos: (cuentaBancariaId?: string, estado?: string) =>
     [...bancosKeys.all, 'movimientos', cuentaBancariaId ?? null, estado ?? null] as const,
   sugerencias: (cuentaBancariaId?: string) =>

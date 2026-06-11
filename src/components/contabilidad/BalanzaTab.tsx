@@ -4,13 +4,13 @@ import { balanzaConRollups, type BalanzaNodo } from '../../domain/contabilidad/a
 import { exportarExcel } from '../condominios/exportUtils'
 import { formatCurrency } from '../../lib/format'
 import { EmptyState } from '../shared'
-import type { Proyecto } from '../../types'
 import { btnSecundario, input } from './ui'
 import { RevaluacionFxModal } from './RevaluacionFxModal'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
 }
 
@@ -18,13 +18,12 @@ function periodoActual(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
-export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
+export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
   const [periodo, setPeriodo] = useState(periodoActual())
-  const [projectId, setProjectId] = useState('')
   const [showRevaluacion, setShowRevaluacion] = useState(false)
 
-  const { data: cuentas = [] } = useCuentasQuery(companyId)
-  const { data: filas = [], isLoading } = useBalanzaQuery(companyId, projectId || null, periodo)
+  const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
+  const { data: filas = [], isLoading } = useBalanzaQuery(companyId, projectId, periodo)
 
   const nodos = useMemo(() => balanzaConRollups(cuentas, filas), [cuentas, filas])
 
@@ -38,7 +37,7 @@ export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
   }, [nodos])
 
   function exportar() {
-    exportarExcel(`balanza-${periodo}${projectId ? '-proyecto' : ''}.xlsx`, [
+    exportarExcel(`balanza-${periodo}${projectId ? '-proyecto' : '-empresa'}.xlsx`, [
       {
         name: `Balanza ${periodo}`,
         headers: ['Código', 'Cuenta', 'Saldo inicial', 'Cargos', 'Abonos', 'Saldo final', 'Saldo moneda origen'],
@@ -67,12 +66,6 @@ export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 150 }} aria-label="Periodo" />
-        {proyectos.length > 1 && (
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ ...input, width: 200 }} aria-label="Proyecto">
-            <option value="">Toda la empresa</option>
-            {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
-        )}
         <span style={{ flex: 1 }} />
         <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra 3301">
           💱 Revaluar FX
@@ -81,7 +74,7 @@ export function BalanzaTab({ companyId, proyectos, monedaBase }: Props) {
       </div>
 
       {showRevaluacion && (
-        <RevaluacionFxModal monedaBase={monedaBase} onClose={() => setShowRevaluacion(false)} />
+        <RevaluacionFxModal projectId={projectId} monedaBase={monedaBase} onClose={() => setShowRevaluacion(false)} />
       )}
 
       {isLoading ? (

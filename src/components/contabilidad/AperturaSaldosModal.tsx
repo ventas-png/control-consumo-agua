@@ -5,12 +5,12 @@ import { useCuentasQuery } from '../../domain/contabilidad/queries'
 import { useCrearAsientoBorradorMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
 import { convertirMontoBase, round2, type AsientoLineaFormInput } from '../../domain/contabilidad/schemas'
 import { formatCurrency } from '../../lib/format'
-import type { Proyecto } from '../../types'
 import { Campo, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
   companyId: string
-  proyectos: Proyecto[]
+  /** Ledger activo: null = contabilidad de la empresa. */
+  projectId: string | null
   monedaBase: string
   onClose: () => void
 }
@@ -22,13 +22,12 @@ interface Props {
  * Resultados acumulados (3101) con un clic. Solo puede existir una apertura
  * publicada por empresa+proyecto (índice único en BD).
  */
-export function AperturaSaldosModal({ companyId, proyectos, monedaBase, onClose }: Props) {
+export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose }: Props) {
   const { data: cuentas = [] } = useCuentasQuery(companyId)
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
-  const [projectId, setProjectId] = useState('')
   const [saldos, setSaldos] = useState<Record<string, { monto: string; tipo_cambio: string }>>({})
   const [guardando, setGuardando] = useState(false)
 
@@ -110,7 +109,7 @@ export function AperturaSaldosModal({ companyId, proyectos, monedaBase, onClose 
         fecha,
         tipo: 'apertura',
         concepto: 'Asiento de apertura — saldos iniciales',
-        project_id: projectId || null,
+        project_id: projectId,
         lineas,
         moneda_base: monedaBase,
       })
@@ -155,12 +154,7 @@ export function AperturaSaldosModal({ companyId, proyectos, monedaBase, onClose 
           <Campo label="Fecha de corte">
             <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={input} />
           </Campo>
-          <Campo label="Ámbito">
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={input}>
-              <option value="">Toda la empresa</option>
-              {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          </Campo>
+
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
