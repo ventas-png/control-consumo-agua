@@ -183,3 +183,34 @@ export const NATURALEZA_POR_TIPO: Record<TipoCuenta, NaturalezaCuenta> = {
   capital: 'acreedora',
   ingreso: 'acreedora',
 }
+
+// ── Revaluación FX (RPC conta_revaluar_fx) ──────────────────────────────────
+
+export type RevaluacionFxResultado =
+  | 'previsualizacion'
+  | 'ajustado'
+  | 'ya_revaluado'
+  | 'sin_cambio'
+  | 'sin_tasa'
+
+export interface RevaluacionFxFila {
+  cuenta_id: string
+  codigo: string
+  nombre: string
+  moneda: string
+  saldo_origen: number
+  tasa: number | null
+  saldo_libro: number
+  saldo_revaluado: number | null
+  ajuste: number | null
+  resultado: RevaluacionFxResultado
+  asiento_id: string | null
+}
+
+export const REVALUACION_RESULTADO_LABELS: Record<RevaluacionFxResultado, string> = {
+  previsualizacion: 'Por ajustar',
+  ajustado: 'Ajustado',
+  ya_revaluado: 'Ya revaluado hoy',
+  sin_cambio: 'Sin cambio',
+  sin_tasa: 'Sin tipo de cambio',
+}
