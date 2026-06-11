@@ -51,7 +51,7 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - **Conciliación**: sugerencias automáticas por monto exacto ±3 días contra `pagos` (ingresos) y `ordenes_pago` (egresos), vía RPCs que validan tenant y bloquean conciliar el mismo documento dos veces; desconciliación controlada.
 - **Ajustes** (comisiones/intereses): generan póliza automática contra la cuenta contable del banco (gasto_otros / ingreso_otros) y concilian el movimiento; `conta_generar_asiento` v2 acepta `cuenta_id` directo en las líneas.
 - Estado de conciliación por cuenta/periodo: saldo libro (moneda base y origen) vs saldo extracto, pendientes y diferencia.
-- Pendiente para después: matching difuso (montos parciales/agrupados) e importación de formatos bancarios propietarios.
+- **Matching difuso ✅ (2026-06-11)**: las sugerencias clasifican su `confianza` — exacta (mismo monto ±3 días) o aproximada (mismo monto a 4–7 días, o diferencia ≤ max(1.00, 0.5%) a ±3 días para comisiones descontadas); la UI distingue ✓/≈. Diferido a demanda: depósitos agrupados (un abono = varios pagos; requiere relación movimiento↔documentos M:N) e importación de formatos bancarios propietarios (se agregan parsers cuando haya muestras reales de los bancos del cliente).
 
 ## Fase 5 — Estados financieros y cierre ✅ (núcleo)
 

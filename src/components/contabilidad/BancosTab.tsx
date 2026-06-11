@@ -130,10 +130,10 @@ export function BancosTab({ companyId, monedaBase }: Props) {
                   () => conciliar.mutateAsync({ movimientoId: m.id, matchTipo: s.candidato_tipo, matchId: s.candidato_id }),
                   'Movimiento conciliado.',
                 )}
-                style={{ ...btnLink, color: 'var(--at-success)' }}
-                title={`${s.candidato_descripcion ?? ''} (${formatDateShort(s.candidato_fecha)})`}
+                style={{ ...btnLink, color: s.confianza === 'exacta' ? 'var(--at-success)' : 'var(--at-warning-strong)' }}
+                title={`${s.candidato_descripcion ?? ''} (${formatDateShort(s.candidato_fecha)})${s.confianza === 'aproximada' ? ` — match aproximado: ${formatCurrency(s.candidato_monto, monedaBase)}` : ''}`}
               >
-                ✓ Conciliar con {MATCH_TIPO_LABELS[s.candidato_tipo].toLowerCase()}
+                {s.confianza === 'exacta' ? '✓' : '≈'} Conciliar con {MATCH_TIPO_LABELS[s.candidato_tipo].toLowerCase()}
               </button>
             ))}
             {m.estado === 'pendiente' && (
