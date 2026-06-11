@@ -27,7 +27,7 @@ Tamaño auditado: ~689 archivos TypeScript (~143k LOC), 271 migraciones SQL, 37 
 | # | Hallazgo | Evidencia |
 |---|----------|-----------|
 | 3 | **Componentes monolíticos** — *RESUELTO COMPLETO 2026-06-11*: los 8 god-components refactorizados con el mismo patrón (reglas puras en `src/lib/` con tests + vistas/modales extraídos con ctx tipado, JSX intacto): AmenidadesTab 1,932 → ~710 L, VisitantesTab 1,530 → 525 L, CustomerPortal 1,511 → 485 L, ClientesSection 1,302 → 625 L, UnidadesSection 1,226 → 542 L, RutasSection 1,169 → 416 L, SeguridadTab 1,128 → 386 L y ContadoresSection 1,069 → 385 L | El refactor de `EmpresaSection` (1259 → 112 LOC + domain) fue el patrón replicado |
-| 4 | **`App.tsx` con 1151 líneas** (router + providers + lazy imports) | Extraer la definición de rutas a un registro declarativo |
+| 4 | **`App.tsx` con 1151 líneas** (router + providers + lazy imports) — *RESUELTO 2026-06-11*: 1,160 → 512 L. Rutas en registro declarativo `components/app/routes.tsx` (`APP_ROUTES` con guards de módulo/rol/ErrorBoundary declarativos + 6 tests de invariantes), lazy imports y preloaders en `components/app/lazySections.ts`, shell auxiliar en `components/app/shell.tsx`, capa de datos agua en `hooks/useAguaData.ts`, OAuth Gmail en `lib/gmailOAuth.ts` | Extraer la definición de rutas a un registro declarativo |
 | 5 | **`useAuth.ts` (524 L)** mezcla sesión, permisos y empresa | Pendiente P13 del tracker |
 | 6 | **`types/condominios.ts` con 2950 líneas** — *RESUELTO 2026-06-11*: particionado en `types/condominios/{core,seguridad,operaciones,residentes,comercial,gobernanza,finanzas}.ts` con barrel `index.ts` (superficie pública intacta) | Dividir por sub-dominio (amenidades, seguridad, finanzas…) |
 
