@@ -8,7 +8,7 @@ import {
   useFlujoEfectivoQuery,
 } from '../../domain/eeff/queries'
 import { useCierreAnualMutation } from '../../domain/eeff/mutations'
-import { resumirBalance, resumirPyG } from '../../domain/eeff/calculos'
+import { compararPyG, rangoAnterior, resumirBalance, resumirPyG, type PyGComparadaFila } from '../../domain/eeff/calculos'
 import { exportarExcel } from '../condominios/exportUtils'
 import { formatCurrency } from '../../lib/format'
 import type { Proyecto } from '../../types'
@@ -32,32 +32,51 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
   const [periodo, setPeriodo] = useState(periodoActual())
   const [desde, setDesde] = useState(`${new Date().getFullYear()}-01`)
 
+  const [comparar, setComparar] = useState(false)
+
   const pid = projectId || null
   const { data: pygFilas = [], isLoading: cargandoPyG } = useEstadoResultadosQuery(companyId, pid, desde, periodo)
+  // Comparativo vs periodo anterior (pendiente Fase 5): mismo P&L sobre el
+  // rango inmediato anterior de la misma longitud; solo consulta al activarlo.
+  const rangoAnt = useMemo(() => rangoAnterior(desde, periodo), [desde, periodo])
+  const { data: pygAntFilas = [] } = useEstadoResultadosQuery(
+    comparar ? companyId : undefined, pid, rangoAnt.desde, rangoAnt.hasta,
+  )
   const { data: balanceFilas = [], isLoading: cargandoBalance } = useBalanceGeneralQuery(companyId, pid, periodo)
   const { data: flujoFilas = [], isLoading: cargandoFlujo } = useFlujoEfectivoQuery(companyId, pid, periodo)
   const { data: cierres = [] } = useCierresAnualesQuery(companyId)
   const cierre = useCierreAnualMutation()
 
-  const pyg = useMemo(() => resumirPyG(pygFilas), [pygFilas])
+  const pygBase = useMemo(() => resumirPyG(pygFilas), [pygFilas])
+  const pygComp = useMemo(
+    () => (comparar ? compararPyG(pygFilas, pygAntFilas) : null),
+    [comparar, pygFilas, pygAntFilas],
+  )
+  const pyg = pygComp ?? pygBase
   const balance = useMemo(() => resumirBalance(balanceFilas), [balanceFilas])
 
   const anioCerrable = new Date().getFullYear() - 1
   const anioCerrado = cierres.some((c) => c.anio === anioCerrable)
 
   const fmt = (n: number) => formatCurrency(n, monedaBase)
+  const nCols = pygComp ? 4 : 2
 
   function exportar() {
     if (vista === 'pyg') {
+      const colsComp = (f: PyGComparadaFila | null, tot?: [number, number]) =>
+        pygComp ? (f ? [f.montoAnterior, f.variacion] : tot ? [tot[0], tot[1]] : ['', '']) : []
       exportarExcel(`estado-resultados-${desde}-a-${periodo}.xlsx`, [{
         name: 'Estado de resultados',
-        headers: ['Código', 'Cuenta', 'Tipo', `Monto (${monedaBase})`],
+        headers: [
+          'Código', 'Cuenta', 'Tipo', `Monto (${monedaBase})`,
+          ...(pygComp ? [`Anterior (${rangoAnt.desde} a ${rangoAnt.hasta})`, 'Variación'] : []),
+        ],
         rows: [
-          ...pyg.ingresos.map((f) => [f.codigo, f.nombre, 'Ingreso', f.monto]),
-          ['', 'Total ingresos', '', pyg.totalIngresos],
-          ...pyg.gastos.map((f) => [f.codigo, f.nombre, 'Gasto', f.monto]),
-          ['', 'Total gastos', '', pyg.totalGastos],
-          ['', 'RESULTADO', '', pyg.resultado],
+          ...pyg.ingresos.map((f) => [f.codigo, f.nombre, 'Ingreso', f.monto, ...colsComp(f as PyGComparadaFila)]),
+          ['', 'Total ingresos', '', pyg.totalIngresos, ...colsComp(null, pygComp ? [pygComp.totalIngresosAnterior, pyg.totalIngresos - pygComp.totalIngresosAnterior] : undefined)],
+          ...pyg.gastos.map((f) => [f.codigo, f.nombre, 'Gasto', f.monto, ...colsComp(f as PyGComparadaFila)]),
+          ['', 'Total gastos', '', pyg.totalGastos, ...colsComp(null, pygComp ? [pygComp.totalGastosAnterior, pyg.totalGastos - pygComp.totalGastosAnterior] : undefined)],
+          ['', 'RESULTADO', '', pyg.resultado, ...colsComp(null, pygComp ? [pygComp.resultadoAnterior, pyg.resultado - pygComp.resultadoAnterior] : undefined)],
         ],
       }])
     } else if (vista === 'balance') {
@@ -118,10 +137,16 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
         />
         <span style={{ flex: 1 }} />
         {vista === 'pyg' && (
-          <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
-            Desde
-            <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ ...input, width: 140 }} />
-          </label>
+          <>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={comparar} onChange={(e) => setComparar(e.target.checked)} />
+              Comparar con periodo anterior
+            </label>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
+              Desde
+              <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ ...input, width: 140 }} />
+            </label>
+          </>
         )}
         <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
           {vista === 'pyg' ? 'Hasta' : 'Al cierre de'}
@@ -148,22 +173,42 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
               <tr style={{ textAlign: 'left' }}>
                 <th style={th}>Cuenta</th>
                 <th style={{ ...th, textAlign: 'right' }}>Monto ({monedaBase})</th>
+                {pygComp && <th style={{ ...th, textAlign: 'right' }}>Anterior ({rangoAnt.desde} a {rangoAnt.hasta})</th>}
+                {pygComp && <th style={{ ...th, textAlign: 'right' }}>Variación</th>}
               </tr>
             </thead>
             <tbody>
-              <tr><td colSpan={2} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>INGRESOS</td></tr>
+              <tr><td colSpan={nCols} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>INGRESOS</td></tr>
               {pyg.ingresos.map((f) => (
-                <tr key={f.cuenta_id}><td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td><td style={tdNum}>{fmt(f.monto)}</td></tr>
+                <tr key={f.cuenta_id}>
+                  <td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td>
+                  <td style={tdNum}>{fmt(f.monto)}</td>
+                  {pygComp && <CeldasComparativo fila={f as PyGComparadaFila} fmt={fmt} tdNum={tdNum} />}
+                </tr>
               ))}
-              <tr style={totalRow}><td style={td}>Total ingresos</td><td style={tdNum}>{fmt(pyg.totalIngresos)}</td></tr>
-              <tr><td colSpan={2} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>GASTOS</td></tr>
+              <tr style={totalRow}>
+                <td style={td}>Total ingresos</td><td style={tdNum}>{fmt(pyg.totalIngresos)}</td>
+                {pygComp && <td style={tdNum}>{fmt(pygComp.totalIngresosAnterior)}</td>}
+                {pygComp && <td style={tdNum}>{fmt(pyg.totalIngresos - pygComp.totalIngresosAnterior)}</td>}
+              </tr>
+              <tr><td colSpan={nCols} style={{ ...td, fontWeight: 700, color: 'var(--at-ink-soft)' }}>GASTOS</td></tr>
               {pyg.gastos.map((f) => (
-                <tr key={f.cuenta_id}><td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td><td style={tdNum}>{fmt(f.monto)}</td></tr>
+                <tr key={f.cuenta_id}>
+                  <td style={{ ...td, paddingLeft: 20, fontFamily: 'var(--at-mono, monospace)' }}>{f.codigo} — {f.nombre}</td>
+                  <td style={tdNum}>{fmt(f.monto)}</td>
+                  {pygComp && <CeldasComparativo fila={f as PyGComparadaFila} fmt={fmt} tdNum={tdNum} />}
+                </tr>
               ))}
-              <tr style={totalRow}><td style={td}>Total gastos</td><td style={tdNum}>{fmt(pyg.totalGastos)}</td></tr>
+              <tr style={totalRow}>
+                <td style={td}>Total gastos</td><td style={tdNum}>{fmt(pyg.totalGastos)}</td>
+                {pygComp && <td style={tdNum}>{fmt(pygComp.totalGastosAnterior)}</td>}
+                {pygComp && <td style={tdNum}>{fmt(pyg.totalGastos - pygComp.totalGastosAnterior)}</td>}
+              </tr>
               <tr style={{ ...totalRow, color: pyg.resultado >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                 <td style={td}>{pyg.resultado >= 0 ? 'UTILIDAD' : 'PÉRDIDA'} DEL PERIODO</td>
                 <td style={tdNum}>{fmt(pyg.resultado)}</td>
+                {pygComp && <td style={tdNum}>{fmt(pygComp.resultadoAnterior)}</td>}
+                {pygComp && <td style={tdNum}>{fmt(pyg.resultado - pygComp.resultadoAnterior)}</td>}
               </tr>
             </tbody>
           </table>
@@ -268,6 +313,28 @@ function FragmentoBalance({ titulo, filas, total, fmt, td, tdNum, totalRow }: {
         </tr>
       ))}
       <tr style={totalRow}><td style={td}>Total {titulo.toLowerCase()}</td><td style={tdNum}>{fmt(total)}</td></tr>
+    </>
+  )
+}
+
+function CeldasComparativo({ fila, fmt, tdNum }: {
+  fila: PyGComparadaFila
+  fmt: (n: number) => string
+  tdNum: React.CSSProperties
+}) {
+  // Verde = movimiento favorable: ingresos que suben o gastos que bajan.
+  const favorable = (fila.tipo === 'ingreso') === (fila.variacion >= 0)
+  return (
+    <>
+      <td style={tdNum}>{fmt(fila.montoAnterior)}</td>
+      <td style={{ ...tdNum, color: fila.variacion === 0 ? undefined : favorable ? 'var(--at-success)' : 'var(--at-danger)' }}>
+        {fmt(fila.variacion)}
+        {fila.variacionPct !== null && (
+          <span style={{ fontSize: 11, marginLeft: 4, opacity: 0.8 }}>
+            ({fila.variacionPct > 0 ? '+' : ''}{fila.variacionPct.toFixed(1)}%)
+          </span>
+        )}
+      </td>
     </>
   )
 }

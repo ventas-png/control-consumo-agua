@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resumirBalance, resumirPyG } from '../calculos'
+import { resumirBalance, resumirPyG, rangoAnterior, compararPyG } from '../calculos'
 import type { BalanceFila, EstadoResultadosFila } from '../../../types/eeff'
 
 const pyg: EstadoResultadosFila[] = [
@@ -46,5 +46,45 @@ describe('resumirBalance', () => {
   it('detecta descuadre cuando A ≠ P + C', () => {
     const r = resumirBalance(balance.slice(0, 3))
     expect(r.descuadre).toBe(200)
+  })
+})
+
+describe('rangoAnterior', () => {
+  it('rango multi-mes: el bloque inmediato anterior de la misma longitud', () => {
+    expect(rangoAnterior('2026-01', '2026-03')).toEqual({ desde: '2025-10', hasta: '2025-12' })
+    expect(rangoAnterior('2026-01', '2026-12')).toEqual({ desde: '2025-01', hasta: '2025-12' })
+  })
+
+  it('un solo mes: el mes anterior (con cruce de año)', () => {
+    expect(rangoAnterior('2026-05', '2026-05')).toEqual({ desde: '2026-04', hasta: '2026-04' })
+    expect(rangoAnterior('2026-01', '2026-01')).toEqual({ desde: '2025-12', hasta: '2025-12' })
+  })
+})
+
+describe('compararPyG', () => {
+  const fila = (cuenta_id: string, codigo: string, tipo: 'ingreso' | 'gasto', monto: number) =>
+    ({ cuenta_id, codigo, nombre: codigo, tipo, monto })
+
+  it('fusiona por cuenta con variación absoluta y %', () => {
+    const r = compararPyG(
+      [fila('a', '4101', 'ingreso', 1200), fila('b', '5101', 'gasto', 300)],
+      [fila('a', '4101', 'ingreso', 1000), fila('b', '5101', 'gasto', 400)],
+    )
+    expect(r.ingresos[0]).toMatchObject({ monto: 1200, montoAnterior: 1000, variacion: 200, variacionPct: 20 })
+    expect(r.gastos[0]).toMatchObject({ monto: 300, montoAnterior: 400, variacion: -100, variacionPct: -25 })
+    expect(r.totalIngresos).toBe(1200)
+    expect(r.totalIngresosAnterior).toBe(1000)
+    expect(r.resultado).toBe(900)
+    expect(r.resultadoAnterior).toBe(600)
+  })
+
+  it('full outer: cuentas solo en uno de los dos periodos aparecen', () => {
+    const r = compararPyG(
+      [fila('nueva', '4102', 'ingreso', 50)],
+      [fila('vieja', '4103', 'ingreso', 80)],
+    )
+    expect(r.ingresos.map((f) => f.codigo)).toEqual(['4102', '4103'])
+    expect(r.ingresos[0]).toMatchObject({ monto: 50, montoAnterior: 0, variacionPct: null })
+    expect(r.ingresos[1]).toMatchObject({ monto: 0, montoAnterior: 80, variacion: -80, variacionPct: -100 })
   })
 })
