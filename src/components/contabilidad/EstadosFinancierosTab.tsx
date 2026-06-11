@@ -10,6 +10,7 @@ import {
 import { useCierreAnualMutation } from '../../domain/eeff/mutations'
 import { compararPyG, rangoAnterior, resumirBalance, resumirPyG, type PyGComparadaFila } from '../../domain/eeff/calculos'
 import { exportarExcel } from '../condominios/exportUtils'
+import { generarReporteAsamblea } from './reporteAsamblea'
 import { formatCurrency } from '../../lib/format'
 import type { Proyecto } from '../../types'
 import { btnPrimario, btnSecundario, input } from './ui'
@@ -158,6 +159,17 @@ export function EstadosFinancierosTab({ companyId, proyectos, monedaBase }: Prop
             {proyectos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
         )}
+        <button
+          onClick={() => generarReporteAsamblea({
+            entidadNombre: proyectos.find((p) => p.id === projectId)?.nombre ?? 'Toda la empresa',
+            desde, hasta: periodo, monedaBase,
+            pyg: pygBase, balance, flujo: flujoFilas,
+          })}
+          style={btnSecundario}
+          title="PDF con resumen ejecutivo, estado de resultados, balance y flujo del periodo"
+        >
+          📄 Informe asamblea
+        </button>
         <button onClick={exportar} style={btnSecundario}>Exportar Excel</button>
         {!anioCerrado && (
           <button onClick={() => void onCierreAnual()} disabled={cierre.isPending} style={btnPrimario}>
