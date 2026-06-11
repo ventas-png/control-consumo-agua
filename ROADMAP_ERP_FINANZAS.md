@@ -32,7 +32,9 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - Antigüedad de saldos por pagar (aging corriente/30/60/90+) server-side (`cxp_antiguedad_saldos`).
 - Asientos automáticos: factura aprobada (devengo: gasto contra 2104 Proveedores por pagar), orden pagada (CxP contra banco/caja según método), reversos al anular. Multimoneda heredada de Fase 1.
 - Flujo de aprobación: el operador puede registrar facturas/órdenes (RLS INSERT); aprobar, pagar y anular es de admin/owner (RLS UPDATE). Guardas de inmutabilidad: factura aprobada no cambia de monto, factura con pagos vivos no se anula, orden pagada solo se anula.
-- Pendiente para fases posteriores: desglose de IVA crédito fiscal, órdenes multi-factura, proyección de pagos.
+- **Desglose de IVA crédito fiscal ✅ (2026-06-11)**: cuenta 1105 + mapeo `iva_credito` (seed con backfill); el devengo separa gasto (base) + IVA (1105) contra CxP cuando la factura trae `iva_monto` (sin mapeo, comportamiento anterior).
+- **Proyección de pagos ✅ (2026-06-11)**: RPC `cxp_proyeccion_pagos` (vencido / 0–7 / 8–14 / 15–30 / +30 / sin fecha por proveedor) + vista "Proyección de pagos" en CxP — complemento forward-looking del aging.
+- Diferido a demanda: órdenes multi-factura (una orden liquidando varias facturas). El caso común — pagos parciales y varias órdenes por factura — ya está cubierto; el lote multi-factura requiere rediseñar la relación orden↔factura y se hará cuando la operación lo pida.
 
 ## Fase 3 — Presupuesto avanzado ✅
 

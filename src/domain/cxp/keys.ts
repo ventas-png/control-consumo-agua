@@ -8,6 +8,8 @@ export const cxpKeys = {
     [...cxpKeys.all, 'facturas', companyId ?? null, projectId ?? null, estado ?? null] as const,
   ordenes: (companyId?: string, projectId?: string | null, estado?: string) =>
     [...cxpKeys.all, 'ordenes', companyId ?? null, projectId ?? null, estado ?? null] as const,
+  proyeccion: (companyId?: string, projectId?: string | null) =>
+    [...cxpKeys.all, 'proyeccion', companyId ?? null, projectId ?? null] as const,
   aging: (companyId?: string, projectId?: string | null) =>
     [...cxpKeys.all, 'aging', companyId ?? null, projectId ?? null] as const,
 } as const
