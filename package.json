@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "gen:db-types": "supabase gen types typescript --project-id nnsqmeigtgewatameexo --schema public > src/types/database.types.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
