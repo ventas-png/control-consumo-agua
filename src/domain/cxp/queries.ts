@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { cxpKeys } from './keys'
 import type {
+  ProyeccionPagosFila,
   AgingProveedor,
   FacturaProveedorConProveedor,
   OrdenPagoConRelaciones,
@@ -76,6 +77,23 @@ export function useAgingQuery(companyId?: string, projectId?: string | null) {
       (await runQuery<AgingProveedor[]>((signal) =>
         supabase
           .rpc('cxp_antiguedad_saldos', {
+            p_company_id: companyId!,
+            p_project_id: projectId ?? null,
+          })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Proyección de pagos por proveedor según vencimientos (RPC, forward-looking). */
+export function useProyeccionPagosQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: cxpKeys.proyeccion(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<ProyeccionPagosFila[]>((signal) =>
+        supabase
+          .rpc('cxp_proyeccion_pagos', {
             p_company_id: companyId!,
             p_project_id: projectId ?? null,
           })

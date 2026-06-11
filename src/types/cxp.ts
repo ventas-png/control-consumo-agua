@@ -129,3 +129,16 @@ export const METODOS_PAGO_CXP: { value: MetodoPagoCxP; label: string }[] = [
 export const CATEGORIAS_GASTO_CXP = [
   'mantenimiento', 'servicios', 'administrativo', 'seguridad', 'limpieza', 'obras', 'otros',
 ] as const
+
+/** Fila de cxp_proyeccion_pagos: flujo de pagos por proveedor según vencimientos. */
+export interface ProyeccionPagosFila {
+  proveedor_id: string
+  proveedor: string
+  total: number
+  vencido: number
+  d0_7: number
+  d8_14: number
+  d15_30: number
+  d31_mas: number
+  sin_fecha: number
+}

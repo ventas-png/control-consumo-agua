@@ -9,6 +9,7 @@ import {
   useOrdenesPagoQuery,
   useProveedoresQuery,
   useAgingQuery,
+  useProyeccionPagosQuery,
 } from '../../domain/cxp/queries'
 import {
   useAnularFacturaMutation,
@@ -39,7 +40,7 @@ interface Props {
   monedaBase: string
 }
 
-type Vista = 'facturas' | 'ordenes' | 'antiguedad'
+type Vista = 'facturas' | 'ordenes' | 'antiguedad' | 'proyeccion'
 
 const TONO_FACTURA = {
   registrada: 'info', aprobada: 'warning', pagada_parcial: 'warning', pagada: 'success', anulada: 'neutral',
@@ -54,6 +55,8 @@ export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) 
   const { data: facturas = [], isLoading: cargandoFacturas } = useFacturasProveedorQuery(companyId)
   const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesPagoQuery(companyId)
   const { data: aging = [] } = useAgingQuery(companyId, null)
+  const { data: proyeccion = [] } = useProyeccionPagosQuery(vista === 'proyeccion' ? companyId : undefined, null)
+  const totalProyectado = proyeccion.reduce((s, f) => s + f.total, 0)
 
   const aprobarFactura = useAprobarFacturaMutation(companyId)
   const anularFactura = useAnularFacturaMutation(companyId)
@@ -204,6 +207,7 @@ export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) 
           { value: 'facturas', label: 'Facturas', count: facturas.filter((f) => f.estado !== 'anulada').length },
           { value: 'ordenes', label: 'Órdenes de pago', count: ordenes.filter((o) => o.estado !== 'anulada').length },
           { value: 'antiguedad', label: 'Antigüedad de saldos' },
+          { value: 'proyeccion', label: 'Proyección de pagos' },
         ]}
         value={vista}
         onChange={setVista}
@@ -283,6 +287,53 @@ export function CuentasPorPagarTab({ companyId, proyectos, monedaBase }: Props) 
           </table>
           <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: '8px 0 0' }}>
             Saldos de facturas aprobadas o pagadas parcialmente, por días vencidos contra su fecha de vencimiento.
+          </p>
+        </div>
+      )}
+
+      {vista === 'proyeccion' && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'right', color: 'var(--at-ink-soft)', fontSize: 11, borderBottom: '1px solid var(--at-line)' }}>
+                <th style={{ padding: 6, textAlign: 'left' }}>Proveedor</th>
+                <th style={{ padding: 6 }}>Vencido</th>
+                <th style={{ padding: 6 }}>0–7 días</th>
+                <th style={{ padding: 6 }}>8–14</th>
+                <th style={{ padding: 6 }}>15–30</th>
+                <th style={{ padding: 6 }}>+30</th>
+                <th style={{ padding: 6 }}>Sin fecha</th>
+                <th style={{ padding: 6 }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {proyeccion.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: 'var(--at-ink-soft)' }}>Sin pagos por proyectar.</td></tr>
+              ) : proyeccion.map((f) => (
+                <tr key={f.proveedor_id} style={{ borderBottom: '1px solid var(--at-line)' }}>
+                  <td style={{ padding: 6 }}>{f.proveedor}</td>
+                  <td style={{ padding: 6, textAlign: 'right', color: f.vencido > 0 ? 'var(--at-danger)' : undefined, fontWeight: f.vencido > 0 ? 700 : 400 }}>{formatCurrency(f.vencido, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right', color: f.d0_7 > 0 ? 'var(--at-warning)' : undefined }}>{formatCurrency(f.d0_7, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right' }}>{formatCurrency(f.d8_14, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right' }}>{formatCurrency(f.d15_30, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right' }}>{formatCurrency(f.d31_mas, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right', color: 'var(--at-ink-soft)' }}>{formatCurrency(f.sin_fecha, monedaBase)}</td>
+                  <td style={{ padding: 6, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(f.total, monedaBase)}</td>
+                </tr>
+              ))}
+            </tbody>
+            {proyeccion.length > 0 && (
+              <tfoot>
+                <tr style={{ fontWeight: 700, borderTop: '2px solid var(--at-line)' }}>
+                  <td style={{ padding: 6 }}>Total proyectado</td>
+                  <td colSpan={6} />
+                  <td style={{ padding: 6, textAlign: 'right' }}>{formatCurrency(totalProyectado, monedaBase)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+          <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: '8px 0 0' }}>
+            Saldos pendientes agrupados por cuándo VENCEN (hacia adelante): lo vencido exige pago inmediato; el resto proyecta el efectivo a reservar.
           </p>
         </div>
       )}
