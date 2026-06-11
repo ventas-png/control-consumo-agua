@@ -57,7 +57,8 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - **Cierre anual** (`conta_cierre_anual` + `conta_cierres_anuales`): asiento publicado al 31/12 con tipo propio `cierre` que salda ingresos/gastos contra 3201 Resultado del ejercicio; un cierre por año, y el P&L excluye los asientos de cierre para que los años cerrados sigan siendo consultables.
 - El bloqueo de asientos en periodos cerrados de proyecto (vía `cierres_mensuales`) viene de la Fase 1.
 - **Revaluación FX periódica ✅ (2026-06-11)**: RPC `conta_revaluar_fx(fecha, aplicar)` — previsualiza/aplica el ajuste de cuentas con moneda propia contra 3301 a la tasa vigente (idempotente por cuenta+fecha; sin tasa → no ajusta). UI: botón "Revaluar FX" en la Balanza.
-- Pendiente para iteraciones posteriores: reporte ejecutivo para asamblea (PDF), unificación de caja chica (1103) y fondo de reserva (1301) legacy, comparativo vs periodo anterior, y `conta_saldos_mensuales` materializada si el volumen lo exige.
+- **Comparativo vs periodo anterior ✅ (2026-06-11)**: toggle en el Estado de resultados que trae el mismo P&L del rango inmediato anterior de igual longitud y muestra Anterior + Variación (absoluta y %, favorable en verde) por cuenta y en totales; exportable a Excel.
+- Pendiente para iteraciones posteriores: reporte ejecutivo para asamblea (PDF), unificación de caja chica (1103) y fondo de reserva (1301) legacy, y `conta_saldos_mensuales` materializada si el volumen lo exige.
 
 ## Dependencias y orden
 
