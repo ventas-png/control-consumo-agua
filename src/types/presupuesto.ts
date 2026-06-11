@@ -62,3 +62,15 @@ export const MESES_CORTOS = [
 export function periodosDelAnio(anio: number): string[] {
   return Array.from({ length: 12 }, (_, i) => `${anio}-${String(i + 1).padStart(2, '0')}`)
 }
+
+// ── Control presupuestario en el alta de gastos (RPC presupuesto_estado_partida) ──
+
+export interface PartidaEstado {
+  cuenta_id: string
+  cuenta_codigo: string
+  cuenta_nombre: string
+  periodo: string
+  presupuestado: number
+  ejecutado: number
+  disponible: number
+}

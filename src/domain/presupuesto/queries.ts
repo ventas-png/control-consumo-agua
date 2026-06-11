@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { presupuestoKeys } from './keys'
 import type {
+  PartidaEstado,
   PresupuestoConPartidas,
   PresupuestoPartida,
   PresupuestoVsRealFila,
@@ -56,5 +57,30 @@ export function usePresupuestoVsRealQuery(presupuestoId?: string) {
           .rpc('presupuesto_vs_real', { p_presupuesto_id: presupuestoId! })
           .abortSignal(signal),
       )) ?? [],
+  })
+}
+
+/**
+ * Control presupuestario en el alta de gastos: estado de la partida de la
+ * cuenta mapeada a la categoría en el mes de la fecha (RPC). Vacío si no hay
+ * mapeo contable o presupuesto aprobado del año.
+ */
+export function usePartidaEstadoQuery(projectId?: string, categoria?: string, fecha?: string) {
+  return useQuery({
+    queryKey: presupuestoKeys.partidaEstado(projectId, categoria, fecha),
+    enabled: !!projectId && !!categoria && !!fecha,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const filas = await runQuery<PartidaEstado[]>((signal) =>
+        supabase
+          .rpc('presupuesto_estado_partida', {
+            p_project_id: projectId!,
+            p_categoria: categoria!,
+            p_fecha: fecha!,
+          })
+          .abortSignal(signal),
+      )
+      return filas?.[0] ?? null
+    },
   })
 }

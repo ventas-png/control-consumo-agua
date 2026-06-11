@@ -40,7 +40,7 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 - Comparativo presupuesto vs real calculado **desde la balanza** (asientos publicados, RPC `presupuesto_vs_real`), con variación absoluta, % de ejecución y marca de excedido.
 - Flujo de aprobación (borrador → propuesto → aprobado → archivado) con **versionado**: aprobar una nueva versión archiva automáticamente la vigente; aprobados/archivados son de solo lectura.
 - UI: tab Presupuesto en Contabilidad — editor mensualizado (cuentas × 12 meses con "repartir anual") y comparativo con filtro por mes.
-- Pendiente para fases posteriores: alertas de desviación vía `notification_outbox` y control presupuestario en el alta de gastos (advertir/bloquear partida excedida).
+- **Control presupuestario y alertas ✅ (2026-06-11)**: RPC `presupuesto_estado_partida` advierte en el alta de gastos cuando la partida del mes quedaría excedida (no bloquea: decisión del admin); trigger `presupuesto_tg_alerta_gasto` notifica in-app a admin/owner vía `notifications_outbox` al contabilizarse el gasto que excede la partida (dedupe por cuenta+periodo).
 
 ## Fase 4 — Bancos y conciliación ✅
 
