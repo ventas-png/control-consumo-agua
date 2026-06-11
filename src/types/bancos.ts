@@ -46,6 +46,8 @@ export interface SugerenciaConciliacion {
   candidato_fecha: string
   candidato_monto: number
   candidato_descripcion: string | null
+  /** 'exacta' = mismo monto ±3d; 'aproximada' = mismo monto 4-7d o diferencia ≤ max(1, 0.5%) ±3d. */
+  confianza: 'exacta' | 'aproximada'
 }
 
 /** Fila de banco_estado_conciliacion (RPC). */
