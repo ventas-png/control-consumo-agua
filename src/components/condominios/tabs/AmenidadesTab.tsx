@@ -1,4 +1,4 @@
-import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
+import { useState, Fragment, type ReactNode } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -31,180 +31,25 @@ interface Props {
 
 type Vista = 'amenidades' | 'reservas' | 'calendario' | 'bloqueos' | 'recordatorios'
 
-const MOTIVO_LABEL: Record<MotivoBloqueoAmenidad, string> = {
-  mantenimiento: 'Mantenimiento',
-  limpieza: 'Limpieza profunda',
-  evento_privado: 'Evento privado',
-  reparacion: 'Reparación',
-  otro: 'Otro',
-}
-
-export function bloqueoSolapaReserva(b: BloqueoAmenidad, fecha: string, hi: string, hf: string): boolean {
-  if (fecha < b.fecha_inicio || fecha > b.fecha_fin) return false
-  if (!b.hora_inicio || !b.hora_fin) return true   // día completo
-  return hi < b.hora_fin && hf > b.hora_inicio
-}
-
-export function esFinDeSemana(fecha: string): boolean {
-  if (!fecha) return false
-  const dow = new Date(fecha + 'T12:00:00').getDay()
-  return dow === 0 || dow === 6
-}
-
-export function tarifaAplicable(amen: Amenidad, fecha: string): number {
-  if (!amen.requiere_tarifa) return 0
-  const base = Number(amen.tarifa_uso ?? 0)
-  if (esFinDeSemana(fecha) && amen.tarifa_uso_finde != null) {
-    return Number(amen.tarifa_uso_finde)
-  }
-  return base
-}
-
-function diferenciaHoras(hi: string, hf: string): number {
-  const [h1, m1] = hi.split(':').map(Number)
-  const [h2, m2] = hf.split(':').map(Number)
-  return ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60
-}
-
-export function addMinutosToTime(hhmm: string, minutos: number): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const total = h * 60 + m + minutos
-  const hh = Math.floor(Math.max(0, total) / 60) % 24
-  const mm = Math.max(0, total) % 60
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
-}
-
-export function validarReglasAmenidad(
-  amen: Amenidad,
-  fecha: string,
-  horaInicio: string,
-  horaFin: string,
-  unidadId: string,
-  reservasExistentes: ReservaAmenidad[],
-): string | null {
-  if (amen.duracion_max_horas != null && amen.duracion_max_horas > 0) {
-    const horas = diferenciaHoras(horaInicio, horaFin)
-    if (horas > amen.duracion_max_horas + 1e-6) {
-      return `La duración máxima permitida es de ${amen.duracion_max_horas} horas.`
-    }
-  }
-  if (amen.horas_minimas_antelacion != null && amen.horas_minimas_antelacion > 0) {
-    const inicio = new Date(`${fecha}T${horaInicio}:00`)
-    const ahora = new Date()
-    const horasAntelacion = (inicio.getTime() - ahora.getTime()) / 3600000
-    if (horasAntelacion < amen.horas_minimas_antelacion) {
-      return `Debes reservar con al menos ${amen.horas_minimas_antelacion} h de anticipación.`
-    }
-  }
-  if (amen.max_reservas_mes_unidad != null && amen.max_reservas_mes_unidad > 0) {
-    const mes = fecha.slice(0, 7)
-    const usadas = reservasExistentes.filter(r =>
-      r.amenidad_id === amen.id &&
-      r.unidad_id === unidadId &&
-      r.estado !== 'cancelada' &&
-      r.fecha.startsWith(mes)
-    ).length
-    if (usadas >= amen.max_reservas_mes_unidad) {
-      return `Esta unidad ya alcanzó el límite de ${amen.max_reservas_mes_unidad} reserva(s) en ${mes} para esta amenidad.`
-    }
-  }
-  return null
-}
-
-const DIAS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-
-function lunesDeSemana(ref: Date): Date {
-  const d = new Date(ref)
-  d.setHours(0, 0, 0, 0)
-  const dow = d.getDay() === 0 ? 6 : d.getDay() - 1
-  d.setDate(d.getDate() - dow)
-  return d
-}
-
-function diasDeSemana(lunes: Date): Date[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(lunes)
-    d.setDate(d.getDate() + i)
-    return d
-  })
-}
-
-const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
-  confirmada: { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
-  pendiente:  { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  cancelada:  { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
-}
-
-function pillStyle(bg: string, border: string, color: string): CSSProperties {
-  return {
-    padding: '3px 9px',
-    borderRadius: 999,
-    border: `1px solid ${border}`,
-    background: bg,
-    color,
-    fontSize: 10.5,
-    fontWeight: 700,
-    whiteSpace: 'nowrap',
-  }
-}
-
-const CHIP_STYLES: Record<string, { bg: string; border: string; color: string }> = {
-  confirmada:        { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
-  pendiente:         { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: 'var(--at-warning-strong)' },
-  cancelada:         { bg: 'var(--at-chip)', border: 'var(--at-line-strong)', color: 'var(--at-ink-2)' },
-  no_show:           { bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', color: 'var(--at-danger-strong)' },
-  pagado:            { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
-  cobro_pendiente:   { bg: 'var(--at-warning-border)', border: '#fb923c', color: 'var(--at-warning-strong)' },
-}
-
-function chipStyle(estado: string): CSSProperties {
-  const c = CHIP_STYLES[estado] ?? CHIP_STYLES.cancelada
-  return {
-    padding: '3px 10px',
-    borderRadius: 999,
-    border: `1px solid ${c.border}`,
-    background: c.bg,
-    color: c.color,
-    fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: '0.01em',
-    whiteSpace: 'nowrap',
-  }
-}
-
-function btnAction(bg: string, border: string, color: string): CSSProperties {
-  return {
-    padding: '6px 12px',
-    background: bg,
-    color,
-    border: `1px solid ${border}`,
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontSize: 12,
-    fontWeight: 700,
-    transition: 'transform 0.12s ease, filter 0.12s ease',
-  }
-}
-
-const btnHero: CSSProperties = {
-  padding: '10px 18px',
-  background: 'rgba(255,255,255,0.18)',
-  color: 'white',
-  border: '1.5px solid rgba(255,255,255,0.45)',
-  borderRadius: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-  fontSize: 13.5,
-  backdropFilter: 'blur(6px)',
-}
-
-const RESERVA_CAL_COLORS = [
-  { bg: 'var(--at-primary-soft)', border: 'var(--at-accent-2)', color: 'var(--at-ink-deep)' },
-  { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
-  { bg: 'var(--at-accent-tint)', border: 'var(--at-accent-soft)', color: '#4c1d95' },
-  { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
-  { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: 'var(--at-warning-strong)' },
-]
+import {
+  bloqueoSolapaReserva,
+  esFinDeSemana,
+  tarifaAplicable,
+  addMinutosToTime,
+  validarReglasAmenidad,
+  lunesDeSemana,
+  diasDeSemana,
+  DIAS_ES,
+} from '../../../lib/amenidadesReglas'
+import {
+  MOTIVO_LABEL,
+  ESTADO_COLORS,
+  pillStyle,
+  chipStyle,
+  btnAction,
+  btnHero,
+  RESERVA_CAL_COLORS,
+} from './amenidades/ui'
 
 export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [vista, setVista] = useState<Vista>('amenidades')
