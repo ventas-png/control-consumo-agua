@@ -19,8 +19,8 @@ Tamaño auditado: ~689 archivos TypeScript (~143k LOC), 271 migraciones SQL, 37 
 
 | # | Hallazgo | Evidencia | Riesgo |
 |---|----------|-----------|--------|
-| 1 | **Cobertura de tests ~0% en dominios críticos**: condominios domain (C3) y auth/RBAC/RLS (P15) | `ESTADO_Y_TRACKS_PARALELOS_2026-06-04_cierre.md` (T8); ratio global test:source ≈ 25% pero concentrado en shared/lib | Regresiones de permisos o dinero sin red de seguridad |
-| 2 | **CORS wildcard fallback en 3 edge functions** | `supabase/functions/google-oauth-initiate`, `google-oauth-callback`, `send-email` (líneas 17–18); pendiente de `CODE_REVIEW_2026-05-25.md` | Cualquier origen puede invocar endpoints sensibles desde navegador |
+| 1 | **Cobertura de tests ~0% en dominios críticos**: condominios domain (C3) y auth/RBAC/RLS (P15) — *parcialmente atendido*: existen `src/lib/__tests__/{permissions,aguaPermissions,authSession}.test.ts`, `usePermissions.test.ts` y el harness RLS server-side; el harness se EXTENDIÓ (2026-06-11) con las 14 tablas y 6 RPCs del ERP financiero | `ESTADO_Y_TRACKS_PARALELOS_2026-06-04_cierre.md` (T8); ratio global test:source ≈ 25% pero concentrado en shared/lib | Regresiones de permisos o dinero sin red de seguridad |
+| 2 | **CORS wildcard fallback en 3 edge functions** — *RESUELTO 2026-06-11*: las 3 funciones consolidadas en `_shared/cors.ts` (fallback = primer origen permitido, nunca `*`) | `supabase/functions/google-oauth-initiate`, `google-oauth-callback`, `send-email` (líneas 17–18); pendiente de `CODE_REVIEW_2026-05-25.md` | Cualquier origen puede invocar endpoints sensibles desde navegador |
 
 ### P1 — Deuda estructural
 

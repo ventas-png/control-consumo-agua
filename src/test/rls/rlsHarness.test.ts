@@ -52,6 +52,9 @@ const SECRET_TABLES = [
   'fiscal_pac_secrets',
   'company_payment_secrets',
   'payfac_secrets',
+  // No es un secreto, pero es deny-all por diseño: el folio correlativo de
+  // pólizas solo lo asignan las funciones SECURITY DEFINER al publicar.
+  'conta_folios',
 ] as const
 
 // anon no debe leer NINGUNA fila de estas tablas de negocio (no hay policy anon;
@@ -66,6 +69,20 @@ const ANON_DENY_TABLES = [
   'pagos',
   'notification_preferences',
   'user_preferences',
+  // ERP financiero (fases 1–5): catálogo, pólizas, CxP, presupuesto, bancos.
+  'conta_cuentas',
+  'conta_asientos',
+  'conta_asiento_lineas',
+  'conta_mapeo_cuentas',
+  'conta_tipos_cambio',
+  'conta_cierres_anuales',
+  'proveedores',
+  'facturas_proveedor',
+  'ordenes_pago',
+  'presupuestos',
+  'presupuesto_partidas',
+  'cuentas_bancarias',
+  'banco_movimientos',
 ] as const
 
 // Tablas calientes que exponen company_id directo → aislamiento por tenant
@@ -75,6 +92,14 @@ const TENANT_SCOPED_TABLES = [
   'documentos_fiscales',
   'notifications_outbox',
   'user_invitations',
+  // ERP financiero: el dinero es lo más sensible al cross-tenant.
+  'conta_cuentas',
+  'conta_asientos',
+  'proveedores',
+  'facturas_proveedor',
+  'presupuestos',
+  'cuentas_bancarias',
+  'banco_movimientos',
 ] as const
 
 // Tablas con scope POR USUARIO (no por empresa): RLS = user_id = auth.uid().
@@ -102,6 +127,24 @@ const SENSITIVE_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown
   },
   { name: 'run_notifications_dispatcher', args: {} },
 ]
+
+// RPCs del ERP financiero: anon DEBE ser rechazado siempre (REVOKE FROM anon).
+// Para authenticated solo probamos las que reciben un id inexistente (fallan con
+// "no encontrado"/"no autorizado" SIN efectos secundarios posibles); el cierre
+// anual se omite para authenticated porque un admin legítimo SÍ puede ejecutarlo.
+const ERP_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+  { name: 'conta_publicar_asiento', args: { p_asiento_id: FOREIGN_COMPANY_ID } },
+  { name: 'conta_anular_asiento', args: { p_asiento_id: FOREIGN_COMPANY_ID, p_motivo: null } },
+  { name: 'conta_cierre_anual', args: { p_anio: 2000 } },
+  {
+    name: 'banco_conciliar_movimiento',
+    args: { p_movimiento_id: FOREIGN_COMPANY_ID, p_match_tipo: 'pago', p_match_id: FOREIGN_COMPANY_ID },
+  },
+  { name: 'banco_desconciliar_movimiento', args: { p_movimiento_id: FOREIGN_COMPANY_ID } },
+  { name: 'banco_ajuste_conciliacion', args: { p_movimiento_id: FOREIGN_COMPANY_ID, p_descripcion: null } },
+]
+
+const ERP_RPCS_AUTH_SIN_EFECTOS = ERP_RPCS_ANON.filter((r) => r.name !== 'conta_cierre_anual')
 
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
@@ -282,6 +325,51 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       expect(error, 'el INSERT cross-tenant debe ser rechazado').not.toBeNull()
       expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
     })
+
+    it('conta_cuentas: INSERT con company_id ajeno es rechazado (ERP)', async () => {
+      const { data, error } = await userA
+        .from('conta_cuentas')
+        .insert({
+          company_id: FOREIGN_COMPANY_ID,
+          codigo: '9999-RLS',
+          nombre: 'Cuenta intrusa',
+          tipo: 'activo',
+          naturaleza: 'deudora',
+          nivel: 1,
+        })
+        .select('id')
+
+      if (data && data.length > 0) {
+        const ids = data.map((r) => (r as { id: string }).id)
+        await userA.from('conta_cuentas').delete().in('id', ids)
+      }
+      expect(error, 'el INSERT cross-tenant debe ser rechazado').not.toBeNull()
+      expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
+    })
+
+    it('conta_asientos: INSERT directo con estado publicado es rechazado (guard de BD)', async () => {
+      // Aunque el tenant fuera el propio, publicar SIN la RPC debe fallar por el
+      // trigger conta_proteger_asiento (CONTA_PUBLICAR_RPC).
+      const { data, error } = await userA
+        .from('conta_asientos')
+        .insert({
+          company_id: aOwnedCompanyId ?? FOREIGN_COMPANY_ID,
+          fecha: '2099-01-01',
+          tipo: 'diario',
+          concepto: 'Intento de publicación directa',
+          estado: 'publicado',
+          origen: 'manual',
+          moneda_base: 'GTQ',
+        })
+        .select('id')
+
+      if (data && data.length > 0) {
+        const ids = data.map((r) => (r as { id: string }).id)
+        await userA.from('conta_asientos').delete().in('id', ids)
+      }
+      expect(error, 'publicar sin la RPC debe ser rechazado').not.toBeNull()
+      expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
+    })
   })
 
   describe('guard anon: RPCs sensibles de notificaciones (#378/#380) RECHAZADOS', () => {
@@ -298,6 +386,27 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         const { data, error } = await userA.rpc(name, args)
         expect(error, `authenticated no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a authenticated`).toBeNull()
+      })
+    }
+  })
+
+  describe('guard RPCs del ERP financiero (REVOKE anon + validación interna)', () => {
+    for (const { name, args } of ERP_RPCS_ANON) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args)
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+    }
+
+    // authenticated con un id INEXISTENTE: la RPC debe fallar ("no encontrado"
+    // o "no autorizado") sin efectos. conta_cierre_anual se excluye porque un
+    // admin legítimo SÍ puede ejecutarlo (sería un falso positivo).
+    for (const { name, args } of ERP_RPCS_AUTH_SIN_EFECTOS) {
+      it(`authenticated con id inexistente NO obtiene éxito de ${name}`, async () => {
+        const { data, error } = await userA.rpc(name, args)
+        expect(error, `${name} con id inexistente debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
   })

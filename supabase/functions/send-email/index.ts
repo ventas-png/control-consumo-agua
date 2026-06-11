@@ -1,25 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { isRetriable } from '../_shared/emailRetryable.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-
-function getAllowedOrigins(): string[] {
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) return envOrigins.split(',').map(o => o.trim())
-  return ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  return {
-    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Types
