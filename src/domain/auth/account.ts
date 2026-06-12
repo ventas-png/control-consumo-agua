@@ -39,6 +39,8 @@ export interface SignupCompanyPayload {
   full_name: string
   company_name: string
   phone?: string
+  /** Moneda de cobro de la empresa (ISO 4217 minúsculas, ej. 'gtq'). */
+  default_currency?: string
   servicio_agua: boolean
   servicio_condominios: boolean
   legal_accepted: boolean

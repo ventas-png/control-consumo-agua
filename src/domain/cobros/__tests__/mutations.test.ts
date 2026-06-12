@@ -39,4 +39,26 @@ describe('buildConfigPagoPatch', () => {
   it('locación: undefined = no tocar (patch vacío)', () => {
     expect(buildConfigPagoPatch({ tipo: 'locacion', projectId: 'p1' }, undefined)).toEqual({})
   })
+
+  it('empresa: monedaDefault se guarda en minúsculas (default_currency)', () => {
+    expect(buildConfigPagoPatch({ tipo: 'empresa' }, 'qpaypro', 'GTQ')).toEqual({
+      proveedor_pago: 'qpaypro',
+      default_currency: 'gtq',
+    })
+  })
+
+  it('empresa: monedaDefault sin proveedor también genera patch', () => {
+    expect(buildConfigPagoPatch({ tipo: 'empresa' }, undefined, 'usd')).toEqual({ default_currency: 'usd' })
+  })
+
+  it('empresa: monedaDefault vacía/undefined = no tocar la moneda', () => {
+    expect(buildConfigPagoPatch({ tipo: 'empresa' }, 'qpaypro', '')).toEqual({ proveedor_pago: 'qpaypro' })
+    expect(buildConfigPagoPatch({ tipo: 'empresa' }, 'qpaypro', undefined)).toEqual({ proveedor_pago: 'qpaypro' })
+  })
+
+  it('locación: monedaDefault se ignora (la moneda es de la empresa)', () => {
+    expect(buildConfigPagoPatch({ tipo: 'locacion', projectId: 'p1' }, 'visanet', 'GTQ')).toEqual({
+      proveedor_pago: 'visanet',
+    })
+  })
 })

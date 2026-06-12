@@ -7,6 +7,10 @@ export interface SignupPayload {
   full_name?: string
   company_name?: string
   phone?: string
+  // Moneda de cobro de la empresa (ISO 4217 minusculas). Opcional: el handler
+  // cae a 'gtq' si no viene. Debe estar en MONEDAS_SIGNUP (espejo del CHECK
+  // valid_currency + catalogo src/lib/monedas.ts).
+  default_currency?: string
   // Modulo inicial elegido en el formulario para personalizar el dashboard
   servicio_agua?: boolean
   servicio_condominios?: boolean
@@ -14,6 +18,12 @@ export interface SignupPayload {
   // evidencia (version + IP + timestamp + user-agent) en legal_acceptances.
   legal_accepted?: boolean
 }
+
+/** Monedas elegibles en el alta self-service (subset del CHECK valid_currency). */
+export const MONEDAS_SIGNUP = new Set([
+  'gtq', 'usd', 'mxn', 'hnl', 'nio', 'crc', 'pab', 'dop',
+  'cop', 'pen', 'clp', 'ars', 'brl', 'bob', 'pyg', 'uyu', 'eur',
+])
 
 /** Devuelve un mensaje de error (es) si el payload es inválido, o `null` si es válido. */
 export function validatePayload(p: SignupPayload): string | null {
@@ -33,6 +43,11 @@ export function validatePayload(p: SignupPayload): string | null {
   }
   if (p.servicio_agua !== true && p.servicio_condominios !== true) {
     return 'Selecciona al menos un servicio (agua o condominios)'
+  }
+  if (p.default_currency !== undefined) {
+    if (typeof p.default_currency !== 'string' || !MONEDAS_SIGNUP.has(p.default_currency.trim().toLowerCase())) {
+      return 'Moneda de cobro invalida'
+    }
   }
   if (p.legal_accepted !== true) {
     return 'Debes aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA'

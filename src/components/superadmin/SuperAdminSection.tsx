@@ -10,6 +10,7 @@ import { EmpresasTable } from './EmpresasTable'
 import { EmpresaDetailDrawer } from './EmpresaDetailDrawer'
 import { type EmpresaSuperadminRow } from '../../domain/superadmin/queries'
 import { superadminKeys } from '../../domain/superadmin/keys'
+import { MONEDAS_ISO } from '../../lib/monedas'
 
 // ============================================================================
 // SuperAdminSection — shell del panel de plataforma (super_admin).
@@ -48,6 +49,14 @@ export function SuperAdminSection() {
         { name: 'telefono', label: 'Teléfono', type: 'tel', helpText: 'Opcional' },
         { name: 'maxProj', label: 'Límite de proyectos', type: 'number', min: 1, initialValue: '5' },
         { name: 'maxUnits', label: 'Límite de unidades', type: 'number', min: 1, initialValue: '50' },
+        {
+          name: 'moneda',
+          label: 'Moneda de cobro',
+          control: 'select',
+          options: MONEDAS_ISO.map(m => ({ value: m.code, label: m.label })),
+          initialValue: 'gtq',
+          helpText: 'Moneda de los cobros del tenant y base de su contabilidad.',
+        },
         { name: 'ownerNombre', label: 'Nombre del administrador', required: true },
         { name: 'ownerEmail', label: 'Email del administrador', type: 'email', required: true },
         { name: 'ownerPass', label: 'Contraseña temporal', type: 'password', required: true, helpText: 'Mínimo 8 caracteres' },
@@ -71,6 +80,7 @@ export function SuperAdminSection() {
       ownerPass: result.ownerPass,
       maxProj: parseInt(result.maxProj) || 5,
       maxUnits: parseInt(result.maxUnits) || 50,
+      moneda: result.moneda || 'gtq',
     } : null
 
     if (!formValues) return
@@ -83,6 +93,7 @@ export function SuperAdminSection() {
       telefono: formValues.telefono,
       max_projects: formValues.maxProj,
       max_units: formValues.maxUnits,
+      default_currency: formValues.moneda,
     })
 
     if (empresaError || !nuevaEmpresa) {

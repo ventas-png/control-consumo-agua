@@ -13,8 +13,10 @@ import {
 import {
   useEmpresaUsuariosQuery,
   useEmpresaBillingQuery,
+  useEmpresaMonedaQuery,
   type EmpresaSuperadminRow,
 } from '../../domain/superadmin/queries'
+import { MONEDAS_ISO, monedaLabel } from '../../lib/monedas'
 import { ToggleSwitch } from './ToggleSwitch'
 import { subscriptionBadge } from './EmpresasTable'
 import {
@@ -51,6 +53,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 
   const { data: usuarios = [], isLoading: usuariosLoading } = useEmpresaUsuariosQuery(emp.id)
   const { data: billing } = useEmpresaBillingQuery(emp.id)
+  const { data: moneda } = useEmpresaMonedaQuery(emp.id)
 
   const patch = (changes: Partial<EmpresaSuperadminRow>) => setEmp(prev => ({ ...prev, ...changes }))
 
@@ -62,6 +65,14 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
         { name: 'nit', label: 'NIT', initialValue: emp.nit ?? '' },
         { name: 'email', label: 'Email de contacto', type: 'email', initialValue: emp.email ?? '' },
         { name: 'telefono', label: 'Teléfono', type: 'tel', initialValue: emp.telefono ?? '' },
+        {
+          name: 'moneda',
+          label: 'Moneda de cobro',
+          control: 'select',
+          options: MONEDAS_ISO.map(m => ({ value: m.code, label: m.label })),
+          initialValue: moneda ?? 'usd',
+          helpText: 'Cobros del tenant y moneda base contable. Cambiarla no reconvierte montos históricos.',
+        },
       ],
       submitText: 'Guardar',
       validate: (data) => data.nombre?.trim() ? null : 'El nombre es obligatorio',
@@ -72,13 +83,14 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       nit: result.nit?.trim() || null,
       email: result.email?.trim() || null,
       telefono: result.telefono?.trim() || null,
+      default_currency: result.moneda,
     }
     const { error } = await updateEmpresaCampo(emp.id, values)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      patch(values)
+      patch({ nombre: values.nombre, nit: values.nit, email: values.email, telefono: values.telefono })
       onChanged()
     }
   }
@@ -228,6 +240,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
             ['Email', emp.email ?? '—'],
             ['Teléfono', emp.telefono ?? '—'],
             ['NIT', emp.nit ?? '—'],
+            ['Moneda de cobro', monedaLabel(moneda)],
             ['Creada', emp.created_at ? new Date(emp.created_at).toLocaleDateString('es-GT') : '—'],
           ]} />
         </Section>
