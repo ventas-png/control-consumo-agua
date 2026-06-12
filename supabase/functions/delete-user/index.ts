@@ -152,6 +152,17 @@ Deno.serve(async (req) => {
       })
     }
 
+    // 1b) Remove the user's individual-adjustments role (roles.user_override_for),
+    //     for the same audit-ordering reason: its delete_role audit entry must be
+    //     written while the app_users row still exists. The FK ON DELETE CASCADE
+    //     on user_override_for is the backstop if this step is skipped.
+    const { error: overrideDelError } = await adminClient.from('roles').delete().eq('user_override_for', targetId)
+    if (overrideDelError) {
+      return new Response(JSON.stringify({ error: 'No se pudo eliminar el rol de ajustes del usuario: ' + overrideDelError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // 2) Delete the profile row. Audit/author links across the schema are
     //    cleared to NULL (see migration 20260522000001).
     const { error: profileDelError } = await adminClient.from('app_users').delete().eq('id', targetId)

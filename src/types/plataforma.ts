@@ -70,6 +70,10 @@ export interface RoleDef {
   description: string | null;
   is_system: boolean;
   color: string;
+  service?: string | null;
+  // Plantilla de la que nació esta copia de empresa (linaje). null/ausente en
+  // roles del sistema y en roles personalizados creados desde cero.
+  cloned_from_role_id?: string | null;
 }
 
 export interface RoleWithPermissions extends RoleDef {

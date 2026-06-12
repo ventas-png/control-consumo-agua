@@ -99,16 +99,25 @@ export function useEmpresaSectionDataQuery(companyId?: string, currentUserId?: s
           (await runQuery((signal) =>
             supabase
               .from('user_roles')
-              .select('user_id, role:roles(id, name, color, service)')
+              .select('user_id, role:roles(id, name, color, service, user_override_for)')
               .in('user_id', userIds)
               .abortSignal(signal),
           )) ?? []
-        type Row = { user_id: string; role: { id: string; name: string; color: string; service: string | null } | null }
-        const byUser = new Map<string, NonNullable<Row['role']>[]>()
+        type Row = {
+          user_id: string
+          role: { id: string; name: string; color: string; service: string | null; user_override_for?: string | null } | null
+        }
+        const byUser = new Map<string, Array<{ id: string; name: string; color: string; service: string | null }>>()
         for (const r of userRolesData as unknown as Row[]) {
           if (!r.role) continue
           const arr = byUser.get(r.user_id) ?? []
-          arr.push(r.role)
+          // El rol oculto de ajustes individuales se muestra como un chip
+          // neutro "Ajustes" (señala fine-tuning sin exponer su nombre interno).
+          arr.push(
+            r.role.user_override_for
+              ? { id: r.role.id, name: 'Ajustes', color: '#7E9389', service: null }
+              : { id: r.role.id, name: r.role.name, color: r.role.color, service: r.role.service },
+          )
           byUser.set(r.user_id, arr)
         }
         for (const u of usuarios) {
