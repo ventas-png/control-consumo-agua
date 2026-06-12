@@ -7,6 +7,8 @@ export const eeffKeys = {
     [...eeffKeys.all, 'balance', companyId ?? null, projectId ?? null, periodo ?? null] as const,
   flujo: (companyId?: string, projectId?: string | null, periodo?: string) =>
     [...eeffKeys.all, 'flujo', companyId ?? null, projectId ?? null, periodo ?? null] as const,
+  consolidado: (companyId?: string, desde?: string, hasta?: string) =>
+    [...eeffKeys.all, 'consolidado', companyId ?? null, desde ?? null, hasta ?? null] as const,
   cierres: (companyId?: string) =>
     [...eeffKeys.all, 'cierres', companyId ?? null] as const,
 } as const

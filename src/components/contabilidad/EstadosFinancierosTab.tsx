@@ -4,11 +4,12 @@ import { confirm, notify } from '../shared/Dialog'
 import {
   useBalanceGeneralQuery,
   useCierresAnualesQuery,
+  useConsolidadoQuery,
   useEstadoResultadosQuery,
   useFlujoEfectivoQuery,
 } from '../../domain/eeff/queries'
 import { useCierreAnualMutation } from '../../domain/eeff/mutations'
-import { compararPyG, rangoAnterior, resumirBalance, resumirPyG, type PyGComparadaFila } from '../../domain/eeff/calculos'
+import { compararPyG, rangoAnterior, resumirBalance, resumirConsolidado, resumirPyG, type PyGComparadaFila } from '../../domain/eeff/calculos'
 import { exportarExcel } from '../condominios/exportUtils'
 import { generarReporteAsamblea } from './reporteAsamblea'
 import { formatCurrency } from '../../lib/format'
@@ -23,7 +24,7 @@ interface Props {
   monedaBase: string
 }
 
-type Vista = 'pyg' | 'balance' | 'flujo'
+type Vista = 'pyg' | 'balance' | 'flujo' | 'consolidado'
 
 function periodoActual(): string {
   return new Date().toISOString().slice(0, 7)
@@ -47,6 +48,14 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
   const { data: balanceFilas = [], isLoading: cargandoBalance } = useBalanceGeneralQuery(companyId, pid, periodo)
   const { data: flujoFilas = [], isLoading: cargandoFlujo } = useFlujoEfectivoQuery(companyId, pid, periodo)
   const { data: cierres = [] } = useCierresAnualesQuery(companyId)
+  // Consolidado (solo lectura): ignora el ledger activo — abarca empresa +
+  // todos los proyectos, convertidos a la moneda de la EMPRESA. Solo consulta
+  // con la vista abierta.
+  const { data: consolidadoFilas = [], isLoading: cargandoConsolidado } = useConsolidadoQuery(
+    vista === 'consolidado' ? companyId : undefined, desde, periodo,
+  )
+  const consolidado = useMemo(() => resumirConsolidado(consolidadoFilas), [consolidadoFilas])
+  const monedaEmpresa = consolidadoFilas.find((f) => f.ledger_project_id === null)?.moneda ?? monedaBase
   const cierre = useCierreAnualMutation()
 
   const pygBase = useMemo(() => resumirPyG(pygFilas), [pygFilas])
@@ -94,11 +103,34 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
           ['', 'Total capital', '', balance.totalCapital],
         ],
       }])
-    } else {
+    } else if (vista === 'flujo') {
       exportarExcel(`flujo-efectivo-${periodo}.xlsx`, [{
         name: 'Flujo de efectivo',
         headers: ['Código', 'Cuenta', 'Saldo inicial', 'Entradas', 'Salidas', 'Saldo final'],
         rows: flujoFilas.map((f) => [f.codigo, f.nombre, f.saldo_inicial, f.entradas, f.salidas, f.saldo_final]),
+      }])
+    } else {
+      exportarExcel(`consolidado-${desde}-a-${periodo}.xlsx`, [{
+        name: 'Consolidado',
+        headers: [
+          'Entidad', 'Moneda', `Tasa → ${monedaEmpresa}`,
+          `Ingresos (${monedaEmpresa})`, `Gastos (${monedaEmpresa})`, `Resultado (${monedaEmpresa})`,
+          `Activo (${monedaEmpresa})`, `Pasivo (${monedaEmpresa})`, `Capital (${monedaEmpresa})`,
+        ],
+        rows: [
+          ...consolidadoFilas.map((f) => [
+            f.ledger_nombre, f.moneda, f.tasa ?? 'SIN TASA',
+            f.ingresos ?? `${f.ingresos_origen} ${f.moneda}`,
+            f.gastos ?? `${f.gastos_origen} ${f.moneda}`,
+            f.resultado ?? `${f.resultado_origen} ${f.moneda}`,
+            f.activo ?? `${f.activo_origen} ${f.moneda}`,
+            f.pasivo ?? `${f.pasivo_origen} ${f.moneda}`,
+            f.capital ?? `${f.capital_origen} ${f.moneda}`,
+          ]),
+          ['TOTAL CONSOLIDADO', monedaEmpresa, '',
+           consolidado.totalIngresos, consolidado.totalGastos, consolidado.totalResultado,
+           consolidado.totalActivo, consolidado.totalPasivo, consolidado.totalCapital],
+        ],
       }])
     }
   }
@@ -132,6 +164,7 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
             { value: 'pyg', label: 'Estado de resultados' },
             { value: 'balance', label: 'Balance general' },
             { value: 'flujo', label: 'Flujo de efectivo' },
+            { value: 'consolidado', label: 'Consolidado' },
           ]}
           value={vista}
           onChange={setVista}
@@ -139,19 +172,19 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
         />
         <span style={{ flex: 1 }} />
         {vista === 'pyg' && (
-          <>
-            <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" checked={comparar} onChange={(e) => setComparar(e.target.checked)} />
-              Comparar con periodo anterior
-            </label>
-            <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
-              Desde
-              <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ ...input, width: 140 }} />
-            </label>
-          </>
+          <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={comparar} onChange={(e) => setComparar(e.target.checked)} />
+            Comparar con periodo anterior
+          </label>
+        )}
+        {(vista === 'pyg' || vista === 'consolidado') && (
+          <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
+            Desde
+            <input type="month" value={desde} onChange={(e) => setDesde(e.target.value)} style={{ ...input, width: 140 }} />
+          </label>
         )}
         <label style={{ fontSize: 12, color: 'var(--at-ink-soft)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {vista === 'pyg' ? 'Hasta' : 'Al cierre de'}
+          {vista === 'pyg' || vista === 'consolidado' ? 'Hasta' : 'Al cierre de'}
           <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 140 }} />
         </label>
         <button
@@ -287,6 +320,80 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
               )}
             </tbody>
           </table>
+        )
+      )}
+
+      {vista === 'consolidado' && (
+        cargandoConsolidado ? <p style={{ color: 'var(--at-ink-soft)' }}>Cargando consolidado…</p> : (
+          <>
+            <p style={{ fontSize: 12, color: 'var(--at-ink-soft)', margin: 0 }}>
+              Reporte de solo lectura: abarca la EMPRESA y TODOS los proyectos (independiente de la
+              contabilidad seleccionada arriba), con P&L de {desde} a {periodo} y balance al cierre
+              de {periodo}, convertidos a <strong>{monedaEmpresa}</strong> con la tasa de cierre del
+              periodo. Los libros de cada entidad no cambian.
+            </p>
+            {consolidado.sinTasa.length > 0 && (
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: 8, padding: '8px 12px', margin: 0 }}>
+                ⚠ {consolidado.sinTasa.map((f) => `${f.ledger_nombre} (${f.moneda})`).join(', ')} sin tipo de
+                cambio registrado al cierre del periodo: se muestran en su moneda y quedan FUERA del total.
+                Capture la tasa en Configuración → Tipos de cambio.
+              </p>
+            )}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: 'right' }}>
+                  <th style={{ ...th, textAlign: 'left' }}>Entidad</th>
+                  <th style={th}>Moneda · tasa</th>
+                  <th style={th}>Ingresos</th>
+                  <th style={th}>Gastos</th>
+                  <th style={th}>Resultado</th>
+                  <th style={th}>Activo</th>
+                  <th style={th}>Pasivo</th>
+                  <th style={th}>Capital</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consolidadoFilas.map((f) => {
+                  const sinTasa = f.tasa === null
+                  const cell = (conv: number | null, origen: number) => (
+                    <td style={{ ...tdNum, color: sinTasa ? 'var(--at-warning-strong)' : undefined }}>
+                      {sinTasa ? formatCurrency(origen, f.moneda) : formatCurrency(conv ?? 0, monedaEmpresa)}
+                    </td>
+                  )
+                  return (
+                    <tr key={f.ledger_project_id ?? 'empresa'} style={sinTasa ? { background: 'var(--at-warning-tint)' } : undefined}>
+                      <td style={{ ...td, fontWeight: f.ledger_project_id === null ? 700 : 500 }}>
+                        {f.ledger_project_id === null ? '🏢 ' : '📍 '}{f.ledger_nombre}
+                      </td>
+                      <td style={{ ...tdNum, fontSize: 12, color: 'var(--at-ink-soft)' }}>
+                        {f.moneda}{f.tasa !== null ? ` @ ${f.tasa}` : ' · sin tasa'}
+                      </td>
+                      {cell(f.ingresos, f.ingresos_origen)}
+                      {cell(f.gastos, f.gastos_origen)}
+                      <td style={{ ...tdNum, fontWeight: 600, color: sinTasa ? 'var(--at-warning-strong)' : (f.resultado ?? f.resultado_origen) >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
+                        {sinTasa ? formatCurrency(f.resultado_origen, f.moneda) : formatCurrency(f.resultado ?? 0, monedaEmpresa)}
+                      </td>
+                      {cell(f.activo, f.activo_origen)}
+                      {cell(f.pasivo, f.pasivo_origen)}
+                      {cell(f.capital, f.capital_origen)}
+                    </tr>
+                  )
+                })}
+                <tr style={totalRow}>
+                  <td style={td}>TOTAL CONSOLIDADO</td>
+                  <td style={{ ...tdNum, fontSize: 12 }}>{monedaEmpresa}</td>
+                  <td style={tdNum}>{formatCurrency(consolidado.totalIngresos, monedaEmpresa)}</td>
+                  <td style={tdNum}>{formatCurrency(consolidado.totalGastos, monedaEmpresa)}</td>
+                  <td style={{ ...tdNum, color: consolidado.totalResultado >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
+                    {formatCurrency(consolidado.totalResultado, monedaEmpresa)}
+                  </td>
+                  <td style={tdNum}>{formatCurrency(consolidado.totalActivo, monedaEmpresa)}</td>
+                  <td style={tdNum}>{formatCurrency(consolidado.totalPasivo, monedaEmpresa)}</td>
+                  <td style={tdNum}>{formatCurrency(consolidado.totalCapital, monedaEmpresa)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
         )
       )}
 

@@ -115,3 +115,40 @@ export function compararPyG(
     resultadoAnterior: prevResumen.resultado,
   }
 }
+
+// ── Vista consolidada (reporte de solo lectura) ─────────────────────────────
+import type { ConsolidadoFila } from '../../types/eeff'
+
+export interface ResumenConsolidado {
+  /** Filas convertidas (con tasa), en el orden recibido. */
+  convertidas: ConsolidadoFila[]
+  /** Ledgers excluidos del total por no tener tasa registrada. */
+  sinTasa: ConsolidadoFila[]
+  totalIngresos: number
+  totalGastos: number
+  totalResultado: number
+  totalActivo: number
+  totalPasivo: number
+  totalCapital: number
+}
+
+/**
+ * Totaliza el consolidado sumando SOLO las entidades convertidas a la moneda
+ * de la empresa; las sin tasa se reportan aparte (la UI las advierte).
+ */
+export function resumirConsolidado(filas: ConsolidadoFila[]): ResumenConsolidado {
+  const convertidas = filas.filter((f) => f.tasa !== null)
+  const sinTasa = filas.filter((f) => f.tasa === null)
+  const suma = (sel: (f: ConsolidadoFila) => number | null) =>
+    r2(convertidas.reduce((s, f) => s + (sel(f) ?? 0), 0))
+  return {
+    convertidas,
+    sinTasa,
+    totalIngresos: suma((f) => f.ingresos),
+    totalGastos: suma((f) => f.gastos),
+    totalResultado: suma((f) => f.resultado),
+    totalActivo: suma((f) => f.activo),
+    totalPasivo: suma((f) => f.pasivo),
+    totalCapital: suma((f) => f.capital),
+  }
+}

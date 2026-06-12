@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resumirBalance, resumirPyG, rangoAnterior, compararPyG } from '../calculos'
+import { resumirBalance, resumirPyG, rangoAnterior, compararPyG, resumirConsolidado } from '../calculos'
+import type { ConsolidadoFila } from '../../../types/eeff'
 import type { BalanceFila, EstadoResultadosFila } from '../../../types/eeff'
 
 const pyg: EstadoResultadosFila[] = [
@@ -86,5 +87,39 @@ describe('compararPyG', () => {
     expect(r.ingresos.map((f) => f.codigo)).toEqual(['4102', '4103'])
     expect(r.ingresos[0]).toMatchObject({ monto: 50, montoAnterior: 0, variacionPct: null })
     expect(r.ingresos[1]).toMatchObject({ monto: 0, montoAnterior: 80, variacion: -80, variacionPct: -100 })
+  })
+})
+
+describe('resumirConsolidado', () => {
+  const fila = (nombre: string, tasa: number | null, conv: number | null): ConsolidadoFila => ({
+    ledger_project_id: nombre === 'Empresa' ? null : nombre,
+    ledger_nombre: nombre, moneda: tasa === 1 ? 'GTQ' : 'USD', tasa,
+    ingresos_origen: 100, gastos_origen: 40, resultado_origen: 60,
+    activo_origen: 500, pasivo_origen: 200, capital_origen: 300,
+    ingresos: conv, gastos: conv === null ? null : conv * 0.4,
+    resultado: conv === null ? null : conv * 0.6,
+    activo: conv === null ? null : conv * 5, pasivo: conv === null ? null : conv * 2,
+    capital: conv === null ? null : conv * 3,
+  })
+
+  it('suma solo las entidades convertidas y separa las sin tasa', () => {
+    const r = resumirConsolidado([fila('Empresa', 1, 100), fila('P1', 7.95, 795), fila('P2', null, null)])
+    expect(r.convertidas.map((f) => f.ledger_nombre)).toEqual(['Empresa', 'P1'])
+    expect(r.sinTasa.map((f) => f.ledger_nombre)).toEqual(['P2'])
+    expect(r.totalIngresos).toBe(895)
+    expect(r.totalGastos).toBe(358)
+    expect(r.totalResultado).toBe(537)
+    expect(r.totalActivo).toBe(4475)
+    expect(r.totalPasivo).toBe(1790)
+    expect(r.totalCapital).toBe(2685)
+    // Identidad contable del total: A = P + C
+    expect(r.totalActivo).toBe(r.totalPasivo + r.totalCapital)
+  })
+
+  it('vacío y todo-sin-tasa producen totales en cero', () => {
+    expect(resumirConsolidado([]).totalActivo).toBe(0)
+    const r = resumirConsolidado([fila('P2', null, null)])
+    expect(r.totalIngresos).toBe(0)
+    expect(r.sinTasa).toHaveLength(1)
   })
 })

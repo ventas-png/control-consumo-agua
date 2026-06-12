@@ -5,6 +5,7 @@ import { runQuery } from '../queryFetch'
 import { eeffKeys } from './keys'
 import type {
   BalanceFila,
+  ConsolidadoFila,
   CierreEjercicio,
   EstadoResultadosFila,
   FlujoEfectivoFila,
@@ -82,3 +83,30 @@ export function useCierresAnualesQuery(companyId?: string) {
       )) ?? [],
   })
 }
+
+/**
+ * Vista consolidada (solo lectura): una fila por entidad contable (empresa +
+ * proyectos) con P&L del rango y balance al corte, convertidos a la moneda de
+ * la empresa con la tasa de cierre del periodo. Ledger sin tasa → tasa null.
+ */
+export function useConsolidadoQuery(
+  companyId?: string,
+  desde?: string,
+  hasta?: string,
+) {
+  return useQuery({
+    queryKey: eeffKeys.consolidado(companyId, desde, hasta),
+    enabled: !!companyId && !!desde && !!hasta,
+    queryFn: async () =>
+      (await runQuery<ConsolidadoFila[]>((signal) =>
+        supabase
+          .rpc('conta_consolidado', {
+            p_company_id: companyId!,
+            p_desde: desde!,
+            p_hasta: hasta!,
+          })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
