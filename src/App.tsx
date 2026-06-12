@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
+import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
 import { CompanySuspendedBanner } from './components/shared/CompanySuspendedBanner'
 import { BrandingApplier } from './components/branding/BrandingApplier'
@@ -210,6 +210,15 @@ export default function App() {
     const handler = () => navigate(sectionToPath('perfil'))
     window.addEventListener(OPEN_BILLING_EVENT, handler)
     return () => window.removeEventListener(OPEN_BILLING_EVENT, handler)
+  }, [navigate])
+
+  // Límite de proyectos/unidades alcanzado: promptUpgrade dispatcha este
+  // evento al elegir "Ampliar plan" → navegar a Empresa, donde
+  // EmpresaProyectosSection abre el modal de ampliación (flag sessionStorage).
+  useEffect(() => {
+    const handler = () => navigate(sectionToPath('empresa_proyectos'))
+    window.addEventListener(OPEN_AMPLIAR_EVENT, handler)
+    return () => window.removeEventListener(OPEN_AMPLIAR_EVENT, handler)
   }, [navigate])
 
   // Set default section based on role after login.

@@ -18540,6 +18540,13 @@ export type Database = {
       run_email_queue_worker: { Args: never; Returns: undefined }
       run_notifications_dispatcher: { Args: never; Returns: undefined }
       run_route_reminders: { Args: never; Returns: undefined }
+      solicitar_ampliacion_limites: {
+        Args: { p_max_projects: number; p_max_units: number }
+        Returns: {
+          max_projects: number
+          max_units: number
+        }[]
+      }
       sso_lookup_domain: {
         Args: { p_domain: string }
         Returns: {

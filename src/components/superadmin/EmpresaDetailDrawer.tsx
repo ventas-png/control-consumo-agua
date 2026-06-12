@@ -282,6 +282,10 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 
         {/* ── Límites del tenant ── */}
         <Section title="Límites">
+          <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+            Estos límites son los que ve y aplica la empresa. El dueño puede ampliarlos
+            self-service hasta el tope de su plan (el cobro es por uso).
+          </p>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <LimitInput
               label={`Proyectos (en uso: ${emp.project_count})`}
