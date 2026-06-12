@@ -42,6 +42,17 @@ export async function reactivarEmpresa(empresaId: string): Promise<{ error: stri
 }
 
 /**
+ * Export JSON de los datos operativos de una empresa (RPC export_company_data,
+ * acotada a super_admin). Respaldo recomendado antes de la purga definitiva.
+ */
+export async function exportEmpresaData(
+  companyId: string,
+): Promise<{ data: unknown | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('export_company_data', { p_company_id: companyId })
+  return { data: data ?? null, error: error?.message ?? null }
+}
+
+/**
  * Purga definitiva de una empresa vía el edge `delete-company` (requiere
  * service role; el edge valida super_admin + nombre de confirmación + período
  * de gracia de suspensión). NO lanza: quien llama inspecciona `ok`.

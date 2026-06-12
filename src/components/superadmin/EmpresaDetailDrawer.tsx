@@ -8,6 +8,7 @@ import {
   suspendEmpresa,
   reactivarEmpresa,
   deleteEmpresa,
+  exportEmpresaData,
 } from '../../domain/superadmin/mutations'
 import {
   useEmpresaUsuariosQuery,
@@ -155,6 +156,25 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       patch({ activa: true, suspended_at: null, suspended_reason: null })
       onChanged()
     }
+  }
+
+  async function exportarDatos() {
+    setBusy(true)
+    const { data, error } = await exportEmpresaData(emp.id)
+    setBusy(false)
+    if (error || !data) {
+      notify({ variant: 'error', title: 'No se pudo exportar', text: error ?? 'Error desconocido' })
+      return
+    }
+    const slug = emp.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'empresa'
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `export-${slug}-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    notify({ variant: 'success', title: 'Export descargado', duration: 1500 })
   }
 
   async function purgar() {
@@ -306,6 +326,15 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 
         {/* ── Zona de peligro: ciclo de vida ── */}
         <Section title="Zona de peligro" danger>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '14px', borderBottom: '1px solid var(--at-line)', paddingBottom: '14px' }}>
+            <div style={{ flex: '1 1 280px', fontSize: '13px', color: 'var(--at-ink-2)' }}>
+              <strong>Exportar datos (JSON).</strong> Respaldo completo de proyectos, unidades,
+              lecturas, pagos y usuarios — recomendado antes de cualquier purga.
+            </div>
+            <button onClick={() => void exportarDatos()} disabled={busy} style={secondaryBtnStyle}>
+              Exportar datos
+            </button>
+          </div>
           {emp.activa ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 280px', fontSize: '13px', color: 'var(--at-ink-2)' }}>

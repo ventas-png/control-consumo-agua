@@ -18224,6 +18224,10 @@ export type Database = {
         }[]
       }
       get_my_user_id: { Args: never; Returns: string }
+      export_company_data: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
       get_superadmin_empresas: {
         Args: {
           p_limit?: number
