@@ -8,9 +8,15 @@
 -- auditoría trg_audit_user_roles (que solo cubre INSERT/DELETE) deje rastro
 -- del cambio en permission_audit_log (actor_id NULL = migración).
 --
--- Usuarios sin company_id (p. ej. super admins) conservan sus asignaciones
--- directas: no hay empresa donde crear la copia y la UI tolera ese estado
--- (badge "Plantilla (heredado)" con conversión manual).
+-- Quedan SIN convertir (la UI los tolera como "Plantilla (heredado)" con
+-- conversión manual):
+--   * usuarios sin company_id (p. ej. super admins);
+--   * usuarios cuyo company_id no existe en companies (huérfanos —
+--     app_users.company_id no tiene FK, y crear el rol copia con esa empresa
+--     violaría roles_company_id_fkey).
+--
+-- (Reemplaza a la fallida 20260612100200, retirada sin haberse aplicado: le
+-- faltaba el join a companies y reventaba con huérfanos en el preview branch.)
 
 DO $$
 DECLARE
@@ -24,7 +30,7 @@ BEGIN
     FROM public.user_roles ur
     JOIN public.roles r ON r.id = ur.role_id AND r.is_system = true
     JOIN public.app_users u ON u.id = ur.user_id
-    WHERE u.company_id IS NOT NULL
+    JOIN public.companies c ON c.id = u.company_id
   LOOP
     SELECT * INTO tpl FROM public.roles WHERE id = pair.template_id;
 
