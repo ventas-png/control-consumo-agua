@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
+import { CompanySuspendedBanner } from './components/shared/CompanySuspendedBanner'
 import { BrandingApplier } from './components/branding/BrandingApplier'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta } from './types'
@@ -489,6 +490,8 @@ export default function App() {
         <Breadcrumbs activeSection={activeSection} onNavigate={navigateSection} />
         <PresenceBar activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
+        {/* Ciclo de vida: aviso de empresa suspendida para sesiones ya abiertas. */}
+        <CompanySuspendedBanner companyId={currentUser.company_id ?? null} />
         {/* plat:P20 — aplica el color de marca de la empresa a toda la app (efecto, no UI). */}
         <BrandingApplier companyId={currentUser.company_id ?? null} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
