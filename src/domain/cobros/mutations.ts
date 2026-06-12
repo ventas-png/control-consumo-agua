@@ -29,19 +29,27 @@ function limpiar(v: string | null | undefined): string | null | undefined {
  * Construye el patch de columnas para companies/projects desde el proveedor
  * elegido. PURO/testeable. A nivel EMPRESA proveedor_pago es NOT NULL (no se
  * limpia a null: se cae a 'sandbox'); a nivel LOCACIÓN null = "hereda".
+ * `monedaDefault` (ISO 4217) solo aplica a nivel empresa: companies.default_currency
+ * — la BD la guarda en minúsculas; la locación no tiene moneda propia.
  */
 export function buildConfigPagoPatch(
   ambito: AmbitoPago,
   proveedorPago: string | null | undefined,
+  monedaDefault?: string | null,
 ): Record<string, unknown> {
   const v = limpiar(proveedorPago)
-  if (v === undefined) return {}
-  // Empresa: la columna es NOT NULL → un vacío cae a 'sandbox' (default seguro).
-  if (ambito.tipo === 'empresa') {
-    return { proveedor_pago: v ?? 'sandbox' }
+  const patch: Record<string, unknown> = {}
+  if (v !== undefined) {
+    // Empresa: la columna es NOT NULL → un vacío cae a 'sandbox' (default seguro).
+    if (ambito.tipo === 'empresa') patch.proveedor_pago = v ?? 'sandbox'
+    // Locación: null = hereda de la empresa.
+    else patch.proveedor_pago = v
   }
-  // Locación: null = hereda de la empresa.
-  return { proveedor_pago: v }
+  const moneda = limpiar(monedaDefault)
+  if (ambito.tipo === 'empresa' && moneda != null) {
+    patch.default_currency = moneda.toLowerCase()
+  }
+  return patch
 }
 
 /**
@@ -53,8 +61,8 @@ export function buildConfigPagoPatch(
 export function useGuardarConfigPagoMutation(companyId?: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { ambito: AmbitoPago; proveedorPago: string | null | undefined }) => {
-      const patch = buildConfigPagoPatch(vars.ambito, vars.proveedorPago)
+    mutationFn: async (vars: { ambito: AmbitoPago; proveedorPago: string | null | undefined; monedaDefault?: string | null }) => {
+      const patch = buildConfigPagoPatch(vars.ambito, vars.proveedorPago, vars.monedaDefault)
       if (Object.keys(patch).length === 0) return { ambito: vars.ambito }
       if (vars.ambito.tipo === 'empresa') {
         if (!companyId) throw new Error('Falta companyId para guardar la config de empresa.')

@@ -30,6 +30,7 @@ import {
   camposCredencial,
   estadoConexionStyle,
 } from '../../lib/payfacCatalogo'
+import { MONEDAS_ISO } from '../../lib/monedas'
 
 interface Props {
   /** Locaciones del tenant para el override por proyecto. Vacío = solo empresa. */
@@ -93,6 +94,13 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
     }
   }, [config, rawOverride, esEmpresa, ambitoProjectId])
 
+  // ── Moneda de cobro (companies.default_currency, solo a nivel empresa) ──
+  // Se siembra de la config efectiva (ISO mayúsculas) y se guarda en minúsculas.
+  const [monedaForm, setMonedaForm] = useState('')
+  useEffect(() => {
+    if (esEmpresa) setMonedaForm((config?.moneda ?? 'GTQ').toLowerCase())
+  }, [config, esEmpresa, ambitoProjectId])
+
   // Payfac efectivo del control (en locación sin override, refleja el heredado).
   const proveedorEfectivo = proveedorForm.trim() !== '' ? proveedorForm : config?.proveedorPago ?? 'sandbox'
   const opcion = payfacPorValue(proveedorEfectivo)
@@ -131,8 +139,13 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
   async function onGuardarPayfac() {
     if (!canEdit) return
     try {
-      await guardarConfig.mutateAsync({ ambito, proveedorPago: proveedorForm })
-      notify({ variant: 'success', title: 'Payfac guardado', duration: 1600 })
+      await guardarConfig.mutateAsync({
+        ambito,
+        proveedorPago: proveedorForm,
+        // La moneda solo existe a nivel empresa (las locaciones la heredan).
+        monedaDefault: esEmpresa ? monedaForm : undefined,
+      })
+      notify({ variant: 'success', title: 'Configuración de cobros guardada', duration: 1600 })
     } catch (err) {
       notify({ variant: 'error', title: 'Error', text: (err as Error).message })
     }
@@ -266,13 +279,29 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
             {opcion?.nota && (
               <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>{opcion.nota}</p>
             )}
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
-              Moneda de cobro: <strong style={{ color: 'var(--at-ink)' }}>{config?.moneda ?? 'GTQ'}</strong> (de la empresa)
-            </p>
+            {esEmpresa ? (
+              <div style={{ width: 420, maxWidth: '100%', marginTop: 14 }}>
+                <label style={lbl}>Moneda de cobro</label>
+                <select style={inp} value={monedaForm} disabled={!canEdit} onChange={(e) => setMonedaForm(e.target.value)}>
+                  {MONEDAS_ISO.map((m) => (
+                    <option key={m.code} value={m.code}>{m.label}</option>
+                  ))}
+                </select>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
+                  Se usa para los cobros a tus clientes y como moneda base de Contabilidad. Cambiarla{' '}
+                  <strong>no reconvierte montos históricos</strong>; si Stripe no soporta la moneda, los cobros con
+                  tarjeta se procesan en USD.
+                </p>
+              </div>
+            ) : (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
+                Moneda de cobro: <strong style={{ color: 'var(--at-ink)' }}>{config?.moneda ?? 'GTQ'}</strong> (heredada de la empresa)
+              </p>
+            )}
             {canEdit && (
               <div style={{ marginTop: 16 }}>
                 <button onClick={() => void onGuardarPayfac()} disabled={guardandoPayfac} style={btnPrimary(guardandoPayfac)}>
-                  {guardandoPayfac ? 'Guardando…' : 'Guardar payfac'}
+                  {guardandoPayfac ? 'Guardando…' : esEmpresa ? 'Guardar payfac y moneda' : 'Guardar payfac'}
                 </button>
               </div>
             )}

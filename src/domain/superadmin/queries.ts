@@ -195,6 +195,28 @@ export function useEmpresaUsuariosQuery(companyId: string | null, enabled = true
   })
 }
 
+/**
+ * Moneda de cobro de una empresa (companies.default_currency, ISO minúsculas).
+ * Query puntual para el drawer: el listado (RPC v2) no la incluye y así se
+ * evita recrear la firma de get_superadmin_empresas por un solo campo.
+ */
+export function useEmpresaMonedaQuery(companyId: string | null, enabled = true) {
+  return useQuery<string | null>({
+    queryKey: superadminKeys.empresaMoneda(companyId ?? ''),
+    queryFn: async () => {
+      const rows = ((await runQuery((signal) =>
+        supabase
+          .from('companies')
+          .select('default_currency')
+          .eq('id', companyId as string)
+          .limit(1)
+          .abortSignal(signal))) ?? []) as unknown as Array<{ default_currency: string | null }>
+      return rows[0]?.default_currency ?? null
+    },
+    enabled: enabled && !!companyId,
+  })
+}
+
 /** Desglose del total mensual de una empresa (RPC calculate_monthly_total_cents). */
 export interface EmpresaBillingBreakdown {
   total_cents: number
