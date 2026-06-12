@@ -759,7 +759,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'automatizaciones', label: 'Automatizaciones', icon: '⚙️', render: (ctx) =>
     <FeatureGate
       feature="automation"
-      fallback={<UpgradeCTA feature="Automatizaciones" description="Workflows automáticos para generación de cuotas, notificaciones, recordatorios de mora y escalamientos por SLA." requiredPlan="Enterprise (contacta ventas)" />}
+      fallback={<UpgradeCTA feature="Automatizaciones" description="Workflows automáticos para generación de cuotas, notificaciones, recordatorios de mora y escalamientos por SLA." requiredPlan="Próximamente — contacta a ventas" />}
     >
       <AutomatizacionesTab automatizaciones={ctx.automatizaciones} cuotas={ctx.cuotas} tickets={ctx.tickets} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} />
     </FeatureGate>

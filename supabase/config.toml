@@ -10,6 +10,11 @@ verify_jwt = false
 [functions.delete-user]
 verify_jwt = false
 
+# Purga definitiva de empresas: valida el JWT del super_admin manualmente via
+# _shared/auth.requireUser, igual que delete-user.
+[functions.delete-company]
+verify_jwt = false
+
 [functions.log-security-event]
 verify_jwt = false
 

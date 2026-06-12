@@ -1,148 +1,41 @@
-import { useState, useEffect, type ChangeEvent} from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { updateEmpresaCampo, createEmpresa, createCompanyOwner } from '../../domain/superadmin/mutations'
+import { createEmpresa, createCompanyOwner } from '../../domain/superadmin/mutations'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 import { SystemHealthModal } from './SystemHealthModal'
-import { SuperAdminMetricsCard } from './SuperAdminMetricsCard'
-import { useEmpresasSuperadminQuery, type EmpresaSuperadminRow } from '../../domain/superadmin/queries'
+import { SuperAdminDashboardTab } from './SuperAdminDashboardTab'
+import { EmpresasTable } from './EmpresasTable'
+import { EmpresaDetailDrawer } from './EmpresaDetailDrawer'
+import { type EmpresaSuperadminRow } from '../../domain/superadmin/queries'
 import { superadminKeys } from '../../domain/superadmin/keys'
 
-type Empresa = EmpresaSuperadminRow
+// ============================================================================
+// SuperAdminSection — shell del panel de plataforma (super_admin).
+// ============================================================================
+// Tres pestañas:
+//   · Dashboard      — KPIs (MRR/activas/churn) + gráficas de tendencia.
+//   · Empresas       — DataTable server-side + drawer de detalle/gestión.
+//   · Configuración  — correo del superadmin + salud del sistema.
+// La gestión por empresa (editar, límites, módulos, suspender/eliminar) vive
+// en EmpresaDetailDrawer; aquí solo queda el alta de empresas.
 
-const PAGE_SIZE = 25
+type TabId = 'dashboard' | 'empresas' | 'configuracion'
+
+const TABS: Array<{ id: TabId; label: string }> = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'empresas', label: 'Empresas' },
+  { id: 'configuracion', label: 'Configuración' },
+]
 
 export function SuperAdminSection() {
   const queryClient = useQueryClient()
-  const [editingMax, setEditingMax] = useState<Record<string, number>>({})
-  const [editingMaxUnits, setEditingMaxUnits] = useState<Record<string, number>>({})
+  const [tab, setTab] = useState<TabId>('dashboard')
   const [showHealth, setShowHealth] = useState(false)
-
-  // plat:P14 — paginación + búsqueda server-side (RPC sobre la MV de conteos).
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
-
-  // Debounce de la búsqueda (300 ms) y reseteo a la primera página al buscar.
-  useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(0) }, 300)
-    return () => clearTimeout(t)
-  }, [searchInput])
-
-  const { data, isLoading, isFetching } = useEmpresasSuperadminQuery({
-    search: search || undefined,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
-  })
-  const empresas: Empresa[] = data?.rows ?? []
-  const total = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-  // Las columnas de límites siempre existen en companies; sin fallback legacy.
-  const maxUnitsSupported = true
+  const [selected, setSelected] = useState<EmpresaSuperadminRow | null>(null)
 
   const invalidar = () => { void queryClient.invalidateQueries({ queryKey: superadminKeys.all }) }
-
-  async function actualizarMaxProyectos(empresaId: string) {
-    const nuevoMax = editingMax[empresaId]
-    if (nuevoMax === undefined || nuevoMax < 1) {
-      notify({ variant: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 proyecto.' })
-      return
-    }
-    const { error } = await updateEmpresaCampo(empresaId, { max_projects: nuevoMax })
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite.' })
-    } else {
-      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      setEditingMax(prev => { const n = { ...prev }; delete n[empresaId]; return n })
-      invalidar()
-    }
-  }
-
-  async function actualizarMaxUnidades(empresaId: string) {
-    const nuevoMax = editingMaxUnits[empresaId]
-    const empresa = empresas.find(e => e.id === empresaId)
-    if (nuevoMax === undefined || nuevoMax < 1) {
-      notify({ variant: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 unidad.' })
-      return
-    }
-    if (empresa && nuevoMax < (empresa.unit_count ?? 0)) {
-      notify({
-        variant: 'warning', title: 'Límite menor al uso actual',
-        text: `Esta empresa ya tiene ${empresa.unit_count} unidades creadas. El nuevo límite debe ser igual o mayor.`,
-      })
-      return
-    }
-    const { error } = await updateEmpresaCampo(empresaId, { max_units: nuevoMax })
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el límite de unidades.' })
-    } else {
-      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      setEditingMaxUnits(prev => { const n = { ...prev }; delete n[empresaId]; return n })
-      invalidar()
-    }
-  }
-
-  async function toggleServicio(empresaId: string, campo: 'servicio_agua' | 'servicio_condominios', nuevoValor: boolean) {
-    const { error } = await updateEmpresaCampo(empresaId, { [campo]: nuevoValor })
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
-    } else {
-      invalidar()
-    }
-  }
-
-  async function editarEmpresa(empresa: Empresa) {
-    const result = await openPromptDialog({
-      title: 'Editar Empresa',
-      fields: [
-        { name: 'nombre', label: 'Nombre de la empresa', required: true, initialValue: empresa.nombre, autoFocus: true },
-        { name: 'nit', label: 'NIT', initialValue: empresa.nit ?? '' },
-        { name: 'email', label: 'Email de contacto', type: 'email', initialValue: empresa.email ?? '' },
-        { name: 'telefono', label: 'Teléfono', type: 'tel', initialValue: empresa.telefono ?? '' },
-        {
-          name: 'plan',
-          label: 'Plan',
-          control: 'select',
-          options: [
-            { value: 'basico', label: 'Plan Básico' },
-            { value: 'profesional', label: 'Plan Profesional' },
-            { value: 'enterprise', label: 'Plan Enterprise' },
-          ],
-          initialValue: empresa.plan ?? 'basico',
-        },
-        {
-          name: 'activa',
-          label: 'Empresa activa',
-          control: 'checkbox',
-          helpText: 'Desmarca para desactivar la empresa (no podrá ingresar al sistema)',
-          initialValue: empresa.activa ? 'true' : '',
-        },
-      ],
-      submitText: 'Guardar',
-      validate: (data) => data.nombre?.trim() ? null : 'El nombre es obligatorio',
-    })
-
-    if (!result) return
-    const formValues = {
-      nombre: result.nombre.trim(),
-      nit: result.nit?.trim() || null,
-      email: result.email?.trim() || null,
-      telefono: result.telefono?.trim() || null,
-      plan: result.plan,
-      activa: result.activa === 'true',
-    }
-
-    const { error } = await updateEmpresaCampo(empresa.id, formValues)
-
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
-    } else {
-      notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      invalidar()
-    }
-  }
 
   async function crearEmpresa() {
     const result = await openPromptDialog({
@@ -183,16 +76,14 @@ export function SuperAdminSection() {
     if (!formValues) return
 
     // 1. Crear la empresa
-    const insertPayload: Record<string, unknown> = {
+    const { data: nuevaEmpresa, error: empresaError } = await createEmpresa({
       nombre: formValues.empresaNombre,
       nit: formValues.nit,
       email: formValues.emailEmpresa,
       telefono: formValues.telefono,
       max_projects: formValues.maxProj,
-    }
-    if (maxUnitsSupported) insertPayload.max_units = formValues.maxUnits
-
-    const { data: nuevaEmpresa, error: empresaError } = await createEmpresa(insertPayload)
+      max_units: formValues.maxUnits,
+    })
 
     if (empresaError || !nuevaEmpresa) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo crear la empresa.' })
@@ -215,341 +106,96 @@ export function SuperAdminSection() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>Cargando...</span>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{
         background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
-        borderRadius: '16px', padding: '28px 32px', marginBottom: '28px',
+        borderRadius: '16px', padding: '24px 28px', marginBottom: '20px',
         border: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
       }}>
-        <div>
-          <h1 style={{ color: 'var(--at-chip)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
-            Panel Superadministrador
-          </h1>
-          <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', marginTop: '4px' }}>
-            {total} empresa(s){search ? ' encontrada(s)' : ' registrada(s)'}{isFetching ? ' · actualizando…' : ''}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setShowHealth(true)}
-            title="Verificar salud del sistema (edge function /health)"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '10px 16px', borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
-              cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-            }}
-          >
-            🩺 Salud del sistema
-          </button>
-          <button
-            onClick={() => void crearEmpresa()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 18px', borderRadius: '8px', border: 'none',
-              background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-              color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-            }}
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Nueva Empresa
-          </button>
-        </div>
-      </div>
-
-      {/* F4.5.3: KPIs globales del SaaS (MRR, activas, churn, distribución por plan) */}
-      <SuperAdminMetricsCard />
-
-      {/* plat:P14 — Búsqueda server-side por nombre / NIT / email */}
-      <div style={{ marginBottom: '16px' }}>
-        <input
-          type="search"
-          value={searchInput}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
-          placeholder="Buscar empresa por nombre, NIT o email…"
-          style={{
-            width: '100%', padding: '11px 14px', borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.04)', color: 'var(--at-chip)',
-            fontSize: '14px', boxSizing: 'border-box',
-          }}
-        />
-      </div>
-
-      {/* Lista de empresas */}
-      {empresas.length === 0 ? (
-        <div style={{
-          background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
-          borderRadius: '12px', padding: '48px', textAlign: 'center',
-        }}>
-          <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>
-            {search ? `No hay empresas que coincidan con "${search}".` : 'No hay empresas registradas.'}
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {empresas.map(e => {
-            const isEditingProj = editingMax[e.id] !== undefined
-            const isEditingUnits = editingMaxUnits[e.id] !== undefined
-            const unitsUsoPct = Math.round(((e.unit_count ?? 0) / e.max_units) * 100)
-            const unitsAlerta = unitsUsoPct >= 80
+        <h1 style={{ color: 'var(--at-chip)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
+          Panel Superadministrador
+        </h1>
+        <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', margin: '4px 0 16px' }}>
+          Operación de la plataforma: métricas, empresas y configuración.
+        </p>
+        <div role="tablist" aria-label="Secciones del panel" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {TABS.map(t => {
+            const active = tab === t.id
             return (
-              <div key={e.id} style={{
-                background: 'var(--at-ink)', borderRadius: '14px', padding: '20px 24px',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}>
-                {/* Fila superior: info + botón editar */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <div style={{ color: 'var(--at-chip)', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
-                      {!e.activa && (
-                        <span style={{ background: 'var(--at-danger)22', color: 'var(--at-danger)', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', border: '1px solid var(--at-danger)44' }}>
-                          Inactiva
-                        </span>
-                      )}
-                      <span style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--at-ink-3)', fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>
-                        {e.plan}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
-                        <span style={{ color: 'var(--at-accent-2)', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
-                      </span>
-                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
-                        <span style={{ color: unitsAlerta ? 'var(--at-warning)' : 'var(--at-success)', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
-                      </span>
-                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
-                        <span style={{ color: 'var(--at-accent-light)', fontWeight: 600 }}>{e.user_count}</span> usuarios
-                      </span>
-                      {e.nit && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>NIT: {e.nit}</span>}
-                      {e.email && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>{e.email}</span>}
-                      {e.telefono && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>{e.telefono}</span>}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => void editarEmpresa(e)}
-                    style={{
-                      padding: '6px 14px', borderRadius: '6px',
-                      border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
-                      color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                    }}
-                  >
-                    Editar
-                  </button>
-                </div>
-
-                {/* Barra de progreso de unidades */}
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--at-ink-2)' }}>Uso de unidades</span>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? 'var(--at-warning)' : 'var(--at-success)' }}>
-                      {unitsUsoPct}%
-                    </span>
-                  </div>
-                  <div style={{ height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${Math.min(unitsUsoPct, 100)}%`,
-                      background: unitsUsoPct >= 100 ? 'var(--at-danger)' : unitsAlerta ? 'var(--at-warning)' : 'var(--at-success)',
-                      borderRadius: '3px',
-                      transition: 'width 0.3s',
-                    }} />
-                  </div>
-                </div>
-
-                {/* Fila de controles de límites */}
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* Límite proyectos */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: 'var(--at-ink-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>Proyectos:</span>
-                    <input
-                      type="number" min={1}
-                      value={isEditingProj ? editingMax[e.id] : e.max_projects}
-                      onChange={(ev: ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
-                      style={{
-                        width: '60px', padding: '5px 7px', borderRadius: '6px',
-                        border: `1px solid ${isEditingProj ? 'var(--at-primary)' : 'rgba(255,255,255,0.1)'}`,
-                        background: 'var(--at-ink)', color: 'var(--at-chip)', fontSize: '13px', textAlign: 'center',
-                      }}
-                    />
-                    {isEditingProj && (
-                      <>
-                        <button onClick={() => void actualizarMaxProyectos(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
-                          Guardar
-                        </button>
-                        <button onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '11px' }}>
-                          ✕
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Límite unidades */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: 'var(--at-ink-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
-                    <input
-                      type="number" min={1}
-                      value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
-                      onChange={(ev: ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
-                      style={{
-                        width: '60px', padding: '5px 7px', borderRadius: '6px',
-                        border: `1px solid ${isEditingUnits ? 'var(--at-success)' : 'rgba(255,255,255,0.1)'}`,
-                        background: 'var(--at-ink)', color: 'var(--at-chip)', fontSize: '13px', textAlign: 'center',
-                      }}
-                    />
-                    {isEditingUnits && (
-                      <>
-                        <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', color: 'var(--at-on-status)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
-                          Guardar
-                        </button>
-                        <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '11px' }}>
-                          ✕
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Líneas de servicio */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ color: 'var(--at-ink-2)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>Servicios:</span>
-
-                  {/* Toggle Control Agua */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-                    <span style={{
-                      position: 'relative', display: 'inline-block',
-                      width: '36px', height: '20px', flexShrink: 0,
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={e.servicio_agua}
-                        onChange={ev => void toggleServicio(e.id, 'servicio_agua', ev.target.checked)}
-                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                      />
-                      <span style={{
-                        position: 'absolute', inset: 0,
-                        background: e.servicio_agua ? 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))' : 'rgba(255,255,255,0.1)',
-                        borderRadius: '20px',
-                        transition: 'background 0.2s',
-                        boxShadow: e.servicio_agua ? '0 0 8px rgba(27, 59, 54,0.4)' : 'none',
-                      }} />
-                      <span style={{
-                        position: 'absolute',
-                        top: '3px',
-                        left: e.servicio_agua ? '19px' : '3px',
-                        width: '14px', height: '14px',
-                        background: 'var(--at-surface)',
-                        borderRadius: '50%',
-                        transition: 'left 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                      }} />
-                    </span>
-                    <span style={{ fontSize: '12px', color: e.servicio_agua ? 'var(--at-accent-2)' : 'var(--at-ink-2)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      Control Agua
-                    </span>
-                  </label>
-
-                  {/* Toggle Condominios */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-                    <span style={{
-                      position: 'relative', display: 'inline-block',
-                      width: '36px', height: '20px', flexShrink: 0,
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={e.servicio_condominios}
-                        onChange={ev => void toggleServicio(e.id, 'servicio_condominios', ev.target.checked)}
-                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                      />
-                      <span style={{
-                        position: 'absolute', inset: 0,
-                        background: e.servicio_condominios ? 'linear-gradient(135deg,var(--at-accent-light),var(--at-accent-hover))' : 'rgba(255,255,255,0.1)',
-                        borderRadius: '20px',
-                        transition: 'background 0.2s',
-                        boxShadow: e.servicio_condominios ? '0 0 8px rgba(167,139,250,0.4)' : 'none',
-                      }} />
-                      <span style={{
-                        position: 'absolute',
-                        top: '3px',
-                        left: e.servicio_condominios ? '19px' : '3px',
-                        width: '14px', height: '14px',
-                        background: 'var(--at-surface)',
-                        borderRadius: '50%',
-                        transition: 'left 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                      }} />
-                    </span>
-                    <span style={{ fontSize: '12px', color: e.servicio_condominios ? 'var(--at-accent-light)' : 'var(--at-ink-2)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      Condominios
-                    </span>
-                  </label>
-                </div>
-              </div>
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                  cursor: 'pointer',
+                  border: active ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                  background: active
+                    ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))'
+                    : 'rgba(255,255,255,0.06)',
+                  color: active ? 'white' : 'var(--at-chip)',
+                }}
+              >
+                {t.label}
+              </button>
             )
           })}
         </div>
+      </div>
+
+      {tab === 'dashboard' && <SuperAdminDashboardTab />}
+
+      {tab === 'empresas' && (
+        <EmpresasTable
+          onRowClick={setSelected}
+          onNuevaEmpresa={() => void crearEmpresa()}
+        />
       )}
 
-      {/* plat:P14 — Paginación server-side */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '20px' }}>
-          <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0 || isFetching}
-            style={{
-              padding: '8px 16px', borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
-              cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.5 : 1,
-              fontSize: '13px', fontWeight: 600,
-            }}
-          >
-            ← Anterior
-          </button>
-          <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
-            Página {page + 1} de {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1 || isFetching}
-            style={{
-              padding: '8px 16px', borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.06)', color: 'var(--at-chip)',
-              cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page >= totalPages - 1 ? 0.5 : 1,
-              fontSize: '13px', fontWeight: 600,
-            }}
-          >
-            Siguiente →
-          </button>
+      {tab === 'configuracion' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{
+            background: 'var(--at-surface)', borderRadius: '16px', padding: '24px 28px',
+            border: '1px solid var(--at-line)', boxShadow: '0 2px 12px rgba(0,0,0,.04)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px',
+          }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>Salud del sistema</div>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                Verifica el estado de la infraestructura Supabase (edge function /health).
+              </div>
+            </div>
+            <button
+              onClick={() => setShowHealth(true)}
+              style={{
+                padding: '9px 16px', borderRadius: '8px',
+                border: '1px solid var(--at-line)', background: 'var(--at-surface)',
+                color: 'var(--at-ink-2)', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              🩺 Verificar ahora
+            </button>
+          </div>
+
+          <div style={{
+            background: 'var(--at-surface)', borderRadius: '16px', padding: '28px',
+            border: '1px solid var(--at-line)', boxShadow: '0 2px 12px rgba(0,0,0,.04)',
+          }}>
+            <GoogleEmailConfig isSuperadmin={true} />
+          </div>
         </div>
       )}
 
-      {/* Configuración de correo del superadministrador */}
-      <div style={{
-        background: 'var(--at-surface)',
-        borderRadius: '16px', padding: '28px',
-        border: '1px solid var(--at-line)',
-        marginTop: '32px',
-        boxShadow: '0 2px 12px rgba(0,0,0,.04)',
-      }}>
-        <GoogleEmailConfig isSuperadmin={true} />
-      </div>
+      {selected && (
+        <EmpresaDetailDrawer
+          empresa={selected}
+          onClose={() => setSelected(null)}
+          onChanged={invalidar}
+        />
+      )}
 
       {showHealth && <SystemHealthModal onClose={() => setShowHealth(false)} />}
     </div>
