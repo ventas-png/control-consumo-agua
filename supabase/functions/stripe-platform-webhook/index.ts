@@ -55,6 +55,19 @@ async function upsertSubscriptionFromStripe(
     return
   }
 
+  // La empresa pudo haber sido purgada (edge delete-company) entre el evento
+  // y su entrega — p.ej. el subscription.deleted que dispara la propia purga.
+  // Insertar contra una company inexistente violaría la FK; skip silencioso.
+  const { data: companyExists } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .maybeSingle()
+  if (!companyExists) {
+    console.warn('[webhook] company inexistente (eliminada), skipeando sub:', stripeSub.id)
+    return
+  }
+
   const planCode = stripeSub.metadata?.plan_code
   const billingCycle = stripeSub.metadata?.billing_cycle === 'yearly' ? 'yearly' : 'monthly'
 

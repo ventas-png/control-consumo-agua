@@ -61,18 +61,20 @@ export async function buildSessionFromSupabase(
   // to prevent login from hanging if Supabase is slow or the nested join stalls
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
+  let empresaSuspendida = false
   try {
     const batch2: Promise<void> = (async () => {
       if (companyId) {
         const { data } = await supabase
           .from('companies')
-          .select('servicio_agua, servicio_condominios')
+          .select('servicio_agua, servicio_condominios, activa')
           .eq('id', companyId)
           .single()
         if (data) {
-          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean }
+          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean }
           servicio_agua = flags.servicio_agua
           servicio_condominios = flags.servicio_condominios
+          empresaSuspendida = flags.activa === false
         }
       } else if (clienteId) {
         type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
@@ -95,6 +97,15 @@ export async function buildSessionFromSupabase(
     await Promise.race([batch2, new Promise<void>(resolve => setTimeout(resolve, 4000))])
   } catch {
     // service flags remain undefined — portal falls back to agua portal safely
+  }
+
+  // Suspensión de empresa (companies.activa=false): bloquear el login de todos
+  // sus usuarios salvo super_admin. El mensaje contiene "desactivada" para que
+  // useCredentialsLogin lo muestre tal cual. Si la consulta falla/expira, el
+  // login procede (fail-open): los triggers COMPANY_SUSPENDED en BD siguen
+  // bloqueando las escrituras.
+  if (empresaSuspendida && uiRole !== 'super_admin') {
+    throw new Error('Empresa desactivada. Comuníquese con soporte de AdministraTodo.')
   }
 
   return {

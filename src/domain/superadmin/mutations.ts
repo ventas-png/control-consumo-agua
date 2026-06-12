@@ -24,6 +24,50 @@ export async function createEmpresa(
   return { data: (data as Record<string, unknown>) ?? null, error: error?.message ?? null }
 }
 
+/**
+ * Suspende una empresa: activa=false + motivo. El trigger
+ * stamp_company_suspension (20260612180000) sella suspended_at; los triggers
+ * de escritura y el login pasan a rechazar a sus usuarios.
+ */
+export async function suspendEmpresa(
+  empresaId: string,
+  motivo: string,
+): Promise<{ error: string | null }> {
+  return updateEmpresaCampo(empresaId, { activa: false, suspended_reason: motivo || null })
+}
+
+/** Reactiva una empresa suspendida (el trigger limpia suspended_at/reason). */
+export async function reactivarEmpresa(empresaId: string): Promise<{ error: string | null }> {
+  return updateEmpresaCampo(empresaId, { activa: true })
+}
+
+/**
+ * Purga definitiva de una empresa vía el edge `delete-company` (requiere
+ * service role; el edge valida super_admin + nombre de confirmación + período
+ * de gracia de suspensión). NO lanza: quien llama inspecciona `ok`.
+ */
+export async function deleteEmpresa(
+  companyId: string,
+  confirmName: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  const { data: session } = await supabase.auth.getSession()
+  const token = session.session?.access_token
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+  const res = await fetch(`${supabaseUrl}/functions/v1/delete-company`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token ?? ''}`,
+    },
+    body: JSON.stringify({ company_id: companyId, confirm_name: confirmName }),
+  })
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string }
+    return { ok: false, error: err.error ?? 'Error desconocido' }
+  }
+  return { ok: true, error: null }
+}
+
 /** Datos del company_owner a crear junto con la empresa. */
 export interface CreateCompanyOwnerInput {
   email: string

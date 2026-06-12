@@ -2590,7 +2590,6 @@ export type Database = {
           paypal_client_id: string | null
           paypal_configured: boolean | null
           paypal_currency_code: string | null
-          plan: string
           proveedor_pago: string
           proveedor_timbrado: string
           regimen_fiscal: string
@@ -2601,6 +2600,8 @@ export type Database = {
           stripe_activo: boolean | null
           stripe_configured: boolean | null
           stripe_public_key: string | null
+          suspended_at: string | null
+          suspended_reason: string | null
           tax_id: string | null
           tax_id_type: string | null
           telefono: string | null
@@ -2630,7 +2631,6 @@ export type Database = {
           paypal_client_id?: string | null
           paypal_configured?: boolean | null
           paypal_currency_code?: string | null
-          plan?: string
           proveedor_pago?: string
           proveedor_timbrado?: string
           regimen_fiscal?: string
@@ -2641,6 +2641,8 @@ export type Database = {
           stripe_activo?: boolean | null
           stripe_configured?: boolean | null
           stripe_public_key?: string | null
+          suspended_at?: string | null
+          suspended_reason?: string | null
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
@@ -2670,7 +2672,6 @@ export type Database = {
           paypal_client_id?: string | null
           paypal_configured?: boolean | null
           paypal_currency_code?: string | null
-          plan?: string
           proveedor_pago?: string
           proveedor_timbrado?: string
           regimen_fiscal?: string
@@ -2681,6 +2682,8 @@ export type Database = {
           stripe_activo?: boolean | null
           stripe_configured?: boolean | null
           stripe_public_key?: string | null
+          suspended_at?: string | null
+          suspended_reason?: string | null
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
@@ -18219,23 +18222,51 @@ export type Database = {
       }
       get_my_user_id: { Args: never; Returns: string }
       get_superadmin_empresas: {
-        Args: { p_limit?: number; p_offset?: number; p_search?: string }
+        Args: {
+          p_limit?: number
+          p_module?: string
+          p_offset?: number
+          p_search?: string
+          p_sort?: string
+          p_status?: string
+        }
         Returns: {
           activa: boolean
+          created_at: string
           email: string
           id: string
           max_projects: number
           max_units: number
+          monthly_total_cents: number
           nit: string
           nombre: string
-          plan: string
+          plan_code: string
           project_count: number
           servicio_agua: boolean
           servicio_condominios: boolean
+          subscription_status: string
+          suspended_at: string
+          suspended_reason: string
           telefono: string
           total_count: number
           unit_count: number
           user_count: number
+        }[]
+      }
+      get_superadmin_mrr_trend: {
+        Args: { p_days?: number }
+        Returns: {
+          day: string
+          empresas_activas: number
+          mrr_cents: number
+        }[]
+      }
+      get_superadmin_trends: {
+        Args: { p_months?: number }
+        Returns: {
+          altas: number
+          bajas: number
+          mes: string
         }[]
       }
       get_superadmin_plataforma_kpis: {
