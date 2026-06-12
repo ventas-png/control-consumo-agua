@@ -36,3 +36,18 @@ export async function fetchMonthlyTotalBreakdown<T>(companyId: string): Promise<
   const { data } = await supabase.rpc('calculate_monthly_total_cents', { p_company_id: companyId })
   return ((data as T[] | null)?.[0]) ?? null
 }
+
+/**
+ * Componentes de precio + topes del billing plan ACTIVO del tenant (para la
+ * proyección de costo del modal de ampliación de límites). `null` sin
+ * suscripción viva. La RLS billing_plans_select es pública para authenticated.
+ */
+export async function fetchPlanPricing<T>(companyId: string): Promise<T | null> {
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('plan:billing_plans!inner(base_activation_cents, extra_project_cents, unit_primary_cents, unit_extra_cents, max_projects, max_units)')
+    .eq('company_id', companyId)
+    .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
+    .maybeSingle()
+  return ((data as { plan: T } | null)?.plan) ?? null
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { DialogProvider } from '../../shared/Dialog'
-import { OPEN_BILLING_EVENT } from '../../shared/promptUpgrade'
+import { OPEN_AMPLIAR_EVENT } from '../../shared/promptUpgrade'
 import { PlanUsageCard } from '../PlanUsageCard'
 
 // Mock usePlanLimits para controlar el estado del hook en cada test.
@@ -61,28 +61,36 @@ describe('PlanUsageCard', () => {
     expect(screen.getAllByRole('progressbar')).toHaveLength(1)
   })
 
-  it('muestra CTA "Mejorar plan" cuando current >= max', async () => {
+  it('muestra CTA "Ampliar plan" cuando current >= max', async () => {
     withDefaults({ projects_count: 5, max_projects: 5, units_count: 10, max_units: 100 })
     render(<DialogProvider><PlanUsageCard companyId="c1" /></DialogProvider>)
-    expect(screen.getByRole('button', { name: 'Mejorar plan' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ampliar plan' })).toBeTruthy()
   })
 
   it('NO muestra CTA cuando current < max', () => {
     withDefaults({ projects_count: 3, max_projects: 5, units_count: 10, max_units: 100 })
     render(<DialogProvider><PlanUsageCard companyId="c1" /></DialogProvider>)
-    expect(screen.queryByRole('button', { name: 'Mejorar plan' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ampliar plan' })).toBeNull()
   })
 
-  it('CTA "Mejorar plan" dispara promptUpgrade flow', async () => {
+  it('CTA "Ampliar plan" abre el modal in-situ cuando hay onAmpliar', () => {
+    withDefaults({ projects_count: 5, max_projects: 5, units_count: 10, max_units: 100 })
+    const onAmpliar = vi.fn()
+    render(<DialogProvider><PlanUsageCard companyId="c1" onAmpliar={onAmpliar} /></DialogProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Ampliar plan' }))
+    expect(onAmpliar).toHaveBeenCalledTimes(1)
+  })
+
+  it('sin onAmpliar cae al flow promptUpgrade (evento de ampliación)', async () => {
     withDefaults({ projects_count: 5, max_projects: 5, units_count: 10, max_units: 100 })
     const handler = vi.fn()
-    window.addEventListener(OPEN_BILLING_EVENT, handler)
+    window.addEventListener(OPEN_AMPLIAR_EVENT, handler)
     render(<DialogProvider><PlanUsageCard companyId="c1" /></DialogProvider>)
-    fireEvent.click(screen.getByRole('button', { name: 'Mejorar plan' }))
-    await waitFor(() => expect(screen.getByText('Límite del plan alcanzado')).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'Ver planes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ampliar plan' }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ampliar plan' }))
     await waitFor(() => expect(handler).toHaveBeenCalledTimes(1))
-    window.removeEventListener(OPEN_BILLING_EVENT, handler)
+    window.removeEventListener(OPEN_AMPLIAR_EVENT, handler)
   })
 
   it('error en el hook resulta en card oculta (no rompe la UI)', () => {

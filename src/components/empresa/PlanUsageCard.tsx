@@ -18,9 +18,11 @@ import { promptUpgrade, type UpgradeResource } from '../shared/promptUpgrade'
 
 interface Props {
   companyId: string | null | undefined
+  /** Abre el modal de ampliación self-service. Sin él, CTA legacy (promptUpgrade). */
+  onAmpliar?: () => void
 }
 
-export function PlanUsageCard({ companyId }: Props) {
+export function PlanUsageCard({ companyId, onAmpliar }: Props) {
   const limits = usePlanLimits(companyId)
 
   if (!companyId) return null
@@ -45,12 +47,14 @@ export function PlanUsageCard({ companyId }: Props) {
         current={limits.projects_count}
         max={limits.max_projects}
         resource="project"
+        onAmpliar={onAmpliar}
       />
       <UsageBar
         label="Unidades"
         current={limits.units_count}
         max={limits.max_units}
         resource="unit"
+        onAmpliar={onAmpliar}
       />
     </div>
   )
@@ -61,9 +65,10 @@ interface UsageBarProps {
   current: number
   max: number | null
   resource: UpgradeResource
+  onAmpliar?: () => void
 }
 
-function UsageBar({ label, current, max, resource }: UsageBarProps) {
+function UsageBar({ label, current, max, resource, onAmpliar }: UsageBarProps) {
   // Plan ilimitado: sin barra, solo contador
   if (max === null) {
     return (
@@ -126,10 +131,13 @@ function UsageBar({ label, current, max, resource }: UsageBarProps) {
       {reachedLimit && (
         <button
           type="button"
-          onClick={() => { void promptUpgrade({ resource, current, limit: max }) }}
+          onClick={() => {
+            if (onAmpliar) onAmpliar()
+            else void promptUpgrade({ resource, current, limit: max })
+          }}
           style={ctaStyle}
         >
-          Mejorar plan
+          Ampliar plan
         </button>
       )}
     </div>
