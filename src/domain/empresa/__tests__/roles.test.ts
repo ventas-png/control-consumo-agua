@@ -5,12 +5,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
-  const state: { result: unknown } = { result: { data: null, error: null } }
+  // `queue`: resultados consumidos en orden para funciones multi-query
+  // (ensureCompanyRoleFromTemplate); vacía → siempre `result`.
+  const state: { result: unknown; queue: unknown[] } = { result: { data: null, error: null }, queue: [] }
   const builder: Record<string, unknown> = {}
-  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'or', 'order', 'single']) {
+  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'or', 'is', 'order', 'limit', 'single', 'maybeSingle']) {
     builder[m] = () => builder
   }
-  builder.then = (resolve: (v: unknown) => void) => resolve(state.result)
+  builder.then = (resolve: (v: unknown) => void) =>
+    resolve(state.queue.length > 0 ? state.queue.shift() : state.result)
   return { state, builder }
 })
 
@@ -35,10 +38,15 @@ import {
   createRole,
   deleteRolePermissions,
   insertRolePermissions,
+  fetchRolePermissionsWithEffect,
+  fetchUserOverrideRole,
+  createOverrideRole,
+  ensureCompanyRoleFromTemplate,
 } from '../roles'
 
-beforeEach(() => { h.state.result = { data: null, error: null } })
+beforeEach(() => { h.state.result = { data: null, error: null }; h.state.queue = [] })
 function setResult(r: unknown) { h.state.result = r }
+function setQueue(...rs: unknown[]) { h.state.queue = rs }
 
 describe('lecturas RBAC', () => {
   it('fetchCompanyRoles éxito → { data, error: null }', async () => {
@@ -128,5 +136,55 @@ describe('mutaciones RBAC', () => {
   it('insertRolePermissions error → mensaje legible', async () => {
     setResult({ error: { message: 'fk' } })
     expect(await insertRolePermissions([{ role_id: 'r1', permission_key: 'k', effect: 'allow' }])).toEqual({ error: 'fk' })
+  })
+})
+
+describe('plantillas y ajustes individuales', () => {
+  it('fetchRolePermissionsWithEffect éxito (incluye deny)', async () => {
+    setResult({ data: [{ permission_key: 'k', effect: 'deny' }], error: null })
+    expect(await fetchRolePermissionsWithEffect('r1')).toEqual({
+      data: [{ permission_key: 'k', effect: 'deny' }], error: null,
+    })
+  })
+
+  it('fetchUserOverrideRole con rol → { id }', async () => {
+    setResult({ data: { id: 'ov1' }, error: null })
+    expect(await fetchUserOverrideRole('u1')).toEqual({ data: { id: 'ov1' }, error: null })
+  })
+
+  it('fetchUserOverrideRole sin rol → data null', async () => {
+    setResult({ data: null, error: null })
+    expect(await fetchUserOverrideRole('u1')).toEqual({ data: null, error: null })
+  })
+
+  it('createOverrideRole éxito → devuelve el id', async () => {
+    setResult({ data: { id: 'ov9' }, error: null })
+    expect(await createOverrideRole('co1', 'u1', 'Ajustes — Juan (1a2b3c4d)')).toEqual({
+      data: { id: 'ov9' }, error: null,
+    })
+  })
+
+  it('ensureCompanyRoleFromTemplate reutiliza la adopción existente', async () => {
+    setQueue(
+      { data: { name: 'Cobrador', description: 'd', color: '#f59e0b', service: 'agua' }, error: null }, // plantilla
+      { data: [{ id: 'copy1' }], error: null }, // adopción fiel encontrada
+    )
+    expect(await ensureCompanyRoleFromTemplate('co1', 'tpl1')).toEqual({ data: { id: 'copy1' }, error: null })
+  })
+
+  it('ensureCompanyRoleFromTemplate crea la copia y copia los permisos', async () => {
+    setQueue(
+      { data: { name: 'Cobrador', description: 'd', color: '#f59e0b', service: 'agua' }, error: null }, // plantilla
+      { data: [], error: null },                  // sin adopción previa
+      { data: { id: 'new1' }, error: null },      // insert del rol copia
+      { data: [{ permission_key: 'agua.cobros.view', effect: 'allow' }], error: null }, // permisos plantilla
+      { error: null },                            // insert role_permissions
+    )
+    expect(await ensureCompanyRoleFromTemplate('co1', 'tpl1')).toEqual({ data: { id: 'new1' }, error: null })
+  })
+
+  it('ensureCompanyRoleFromTemplate plantilla inexistente → error legible', async () => {
+    setQueue({ data: null, error: { message: 'not found' } })
+    expect(await ensureCompanyRoleFromTemplate('co1', 'tplX')).toEqual({ data: null, error: 'not found' })
   })
 })

@@ -15,18 +15,28 @@ interface Props {
   companyId: string
   /** null = create new; uuid = edit existing */
   roleId: string | null
-  /** When provided, the new/edited role's permissions are pre-populated from this role (for "clone"). */
+  /** When provided, the new role is pre-populated (name, description, color and
+   * permissions) from this role — "duplicar y personalizar" / plantillas. */
   cloneFromRoleId?: string
+  /** Semilla directa de permisos (sin rol de origen) — p. ej. "guardar los
+   * ajustes individuales como rol reutilizable". */
+  initialKeys?: string[]
+  /** Nombre sugerido cuando se crea desde initialKeys. */
+  suggestedName?: string
   onClose: () => void
-  onSaved: () => void
+  /** Recibe el id del rol creado/editado para que el caller pueda seleccionarlo. */
+  onSaved: (savedRoleId: string) => void
 }
 
 const PALETTE = ['var(--at-primary)', 'var(--at-accent)', 'var(--at-success)', 'var(--at-warning)', 'var(--at-danger)', 'var(--at-accent-2)', '#ec4899', 'var(--at-ink-3)', 'var(--at-accent)', '#84cc16']
 
-export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, onSaved }: Props) {
+export function CustomRoleEditor({
+  companyId, roleId, cloneFromRoleId, initialKeys, suggestedName, onClose, onSaved,
+}: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(PALETTE[0])
+  const [cloneSourceName, setCloneSourceName] = useState<string | null>(null)
   const [permissions, setPermissions] = useState<PermissionDef[]>([])
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
@@ -52,15 +62,31 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
         const { data: rpData } = await fetchRolePermissionKeys(roleId)
         setSelectedKeys(new Set((rpData ?? []).map(r => r.permission_key)))
       } else if (cloneFromRoleId) {
+        // Clonado: precarga nombre/descripción/color además de los permisos,
+        // para partir de la plantilla o rol más cercano en vez de cero.
+        const { data: sourceData } = await fetchRoleById(cloneFromRoleId)
+        const source = sourceData as RoleDef | null
+        if (source) {
+          setCloneSourceName(source.name)
+          setName(suggestedName ?? `Copia de ${source.name}`)
+          setDescription(source.description ?? '')
+          setColor(source.color ?? PALETTE[0])
+        }
         const { data: rpData } = await fetchRolePermissionKeys(cloneFromRoleId)
         setSelectedKeys(new Set((rpData ?? []).map(r => r.permission_key)))
+      } else if (initialKeys && initialKeys.length > 0) {
+        // Semilla directa (p. ej. perfil efectivo de un usuario → rol reutilizable).
+        setSelectedKeys(new Set(initialKeys))
+        if (suggestedName) setName(suggestedName)
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error cargando datos.')
     } finally {
       setLoading(false)
     }
-  }, [roleId, cloneFromRoleId])
+    // initialKeys llega como prop estable del caller (estado del padre).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleId, cloneFromRoleId, suggestedName])
 
   useEffect(() => { void load() }, [load])
 
@@ -109,6 +135,9 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
       } else {
         const { data: insData, error: insErr } = await createRole({
           company_id: companyId, name: name.trim(), description: description.trim() || null, is_system: false, color,
+          // Linaje: los clones registran su rol/plantilla de origen (habilita la
+          // expansión de assigned_role_ids en la sesión y el reuso de adopciones).
+          cloned_from_role_id: cloneFromRoleId ?? null,
         })
         if (insErr) throw new Error(insErr)
         savedRoleId = insData!.id
@@ -130,7 +159,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
         if (insErr) throw new Error(insErr)
       }
 
-      onSaved()
+      onSaved(savedRoleId)
       onClose()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el rol.')
@@ -159,7 +188,11 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>
-            {roleId ? 'Editar rol personalizado' : 'Crear rol personalizado'}
+            {roleId
+              ? 'Editar rol personalizado'
+              : cloneSourceName
+                ? `Crear rol personalizado (a partir de «${cloneSourceName}»)`
+                : 'Crear rol personalizado'}
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',

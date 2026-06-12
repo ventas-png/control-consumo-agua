@@ -80,6 +80,30 @@ describe('buildAssignedRoleIds', () => {
       buildAssignedRoleIds({ data: [{ role_id: 'r1' }, { role_id: 'r2' }], error: null }),
     ).toEqual(['r1', 'r2'])
   })
+
+  it('expande el linaje: incluye el cloned_from_role_id de las copias de plantilla', () => {
+    expect(
+      buildAssignedRoleIds({
+        data: [
+          { role_id: 'copy1', role: { cloned_from_role_id: 'tpl1' } },
+          { role_id: 'r2', role: { cloned_from_role_id: null } },
+        ],
+        error: null,
+      }),
+    ).toEqual(['copy1', 'tpl1', 'r2'])
+  })
+
+  it('no duplica ids cuando dos copias nacen de la misma plantilla', () => {
+    expect(
+      buildAssignedRoleIds({
+        data: [
+          { role_id: 'a', role: { cloned_from_role_id: 'tpl1' } },
+          { role_id: 'b', role: { cloned_from_role_id: 'tpl1' } },
+        ],
+        error: null,
+      }),
+    ).toEqual(['a', 'tpl1', 'b'])
+  })
 })
 
 describe('buildAssignedRoles', () => {
@@ -112,5 +136,16 @@ describe('buildAssignedRoles', () => {
       error: null,
     })
     expect(out).toEqual([{ id: 'r1', name: 'Y', service: 'general', color: '#abc' }])
+  })
+
+  it('filtra el rol oculto de ajustes individuales (user_override_for)', () => {
+    const out = buildAssignedRoles({
+      data: [
+        { role_id: 'r1', role: { id: 'r1', name: 'Cobrador', service: 'agua', color: '#fff' } },
+        { role_id: 'ov', role: { id: 'ov', name: 'Ajustes — Juan', service: null, color: null, user_override_for: 'u1' } },
+      ],
+      error: null,
+    })
+    expect(out).toEqual([{ id: 'r1', name: 'Cobrador', service: 'agua', color: '#fff' }])
   })
 })

@@ -1,80 +1,146 @@
+// Modal de roles y permisos por usuario (RBAC). Modelo en 3 niveles:
+//   1. Plantillas — los roles del sistema ya no se asignan directamente: "Usar
+//      plantilla" busca-o-crea la copia de empresa (linaje cloned_from_role_id)
+//      y la selecciona; "Personalizar" abre el editor clonando.
+//   2. Roles de la empresa — copias de plantillas + roles hechos a mano:
+//      asignables (checkbox), editables, duplicables, con expiración. Las
+//      asignaciones directas a roles del sistema previas al modelo se muestran
+//      como "heredadas" con conversión opcional.
+//   3. Ajustes individuales — el panel de permisos efectivos permite conceder
+//      o bloquear permisos puntuales solo a este usuario (rol oculto con filas
+//      allow/deny; el servidor ya resta deny de allow en get_user_permissions).
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   fetchCompanyRoles,
   fetchAllRolePermissions,
+  fetchPermissionsCatalog,
   fetchUserRoleAssignments,
   fetchUserRoleIds,
+  fetchUserOverrideRole,
+  fetchRolePermissionsWithEffect,
+  ensureCompanyRoleFromTemplate,
+  createOverrideRole,
   deleteUserRoles,
   insertUserRoles,
   updateUserRoleExpiration,
   deleteRole,
+  deleteRolePermissions,
+  insertRolePermissions,
 } from '../../domain/empresa/roles'
-import type { RoleDef } from '../../types'
-import { CONDOMINIOS_SECTION_GROUPS } from '../../lib/condominiosRoles'
+import type { PermissionDef, RoleDef } from '../../types'
+import { CONDOMINIOS_SECTION_GROUPS, type SectionGroup } from '../../lib/condominiosRoles'
 import { AGUA_MODULE_GROUPS } from '../../lib/aguaPermissions'
-import { condominiosTabPermission } from '../../lib/permissions'
+import { PLATFORM_MODULE_GROUPS } from '../../lib/platformPermissions'
+import { condominiosTabPermission, isExemptPlatformRole } from '../../lib/permissions'
+import {
+  buildRolePermIndex,
+  computeEffective,
+  type PermissionEffect,
+  type RolePermissionRow,
+} from '../../lib/effectivePermissions'
+import { Banner, CollapsibleSection, RoleCard, SectionHeader, TemplateCard } from './rolesUi'
+import { PermissionMatrixPanel, type MatrixSectionBlock } from './PermissionMatrixPanel'
+
+/** Petición de apertura del editor de roles desde este modal. */
+export interface CustomEditorRequest {
+  roleId: string | null
+  cloneFromRoleId?: string
+  initialKeys?: string[]
+  /** 'reusable': el rol nace de los ajustes individuales; al volver se
+   * selecciona y los ajustes en memoria se limpian (se borran al guardar). */
+  intent?: 'reusable'
+  suggestedName?: string
+}
 
 interface Props {
   usuarioId: string
   usuarioNombre: string
+  /** Tier de plataforma del usuario (app_users.role) — para avisar si es exento. */
+  usuarioTier?: string
   companyId: string
+  servicioAgua?: boolean
+  servicioCondominios?: boolean
   /** Bump this counter to force a re-fetch of the roles list (preserves current selection) */
   rolesRefreshKey?: number
+  /** Rol recién creado en el editor que debe quedar seleccionado al volver. */
+  autoSelect?: { roleId: string; clearOverrides: boolean } | null
   onClose: () => void
   onSaved: () => void
-  onOpenCustomEditor: (roleId: string | null) => void
+  onOpenCustomEditor: (req: CustomEditorRequest) => void
 }
 
-interface RoleRow extends RoleDef {
-  permission_keys: string[]
-  service?: string | null
-}
+// Grupos de condominios con claves de permiso completas (los SECTION_GROUPS
+// traen ids de tab; agua/plataforma ya vienen como claves completas).
+const CONDOMINIOS_KEY_GROUPS: SectionGroup[] = CONDOMINIOS_SECTION_GROUPS.map(g => ({
+  ...g,
+  tabs: g.tabs.map(condominiosTabPermission),
+}))
 
 export function RolPermisosModal({
-  usuarioId, usuarioNombre, companyId, rolesRefreshKey = 0, onClose, onSaved, onOpenCustomEditor,
+  usuarioId, usuarioNombre, usuarioTier, companyId,
+  servicioAgua, servicioCondominios,
+  rolesRefreshKey = 0, autoSelect, onClose, onSaved, onOpenCustomEditor,
 }: Props) {
-  const [roles, setRoles] = useState<RoleRow[]>([])
+  const [roles, setRoles] = useState<RoleDef[]>([])
+  const [rolePerms, setRolePerms] = useState<RolePermissionRow[]>([])
+  const [permLabels, setPermLabels] = useState<Map<string, string>>(new Map())
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set())
   // role_id -> expiration ISO date (yyyy-mm-dd) or null for permanent
   const [expirations, setExpirations] = useState<Map<string, string | null>>(new Map())
   // Snapshot of initial state, used to detect changes for UPDATE
   const [initialExpirations, setInitialExpirations] = useState<Map<string, string | null>>(new Map())
+  // Roles del sistema asignados directamente al cargar (estado heredado).
+  const [inheritedSystemIds, setInheritedSystemIds] = useState<Set<string>>(new Set())
+  // Ajustes individuales: rol oculto + mapa clave → allow/deny editado y snapshot.
+  const [overrideRoleId, setOverrideRoleId] = useState<string | null>(null)
+  const [overrides, setOverrides] = useState<Map<string, PermissionEffect>>(new Map())
+  const [initialOverrides, setInitialOverrides] = useState<Map<string, PermissionEffect>>(new Map())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [ensuringTemplateId, setEnsuringTemplateId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const loadRoles = useCallback(async () => {
-    const [{ data: rolesData, error: rolesErr }, { data: rolePermsData }] = await Promise.all([
-      fetchCompanyRoles(companyId),
-      fetchAllRolePermissions(),
-    ])
+  const loadRoles = useCallback(async (): Promise<RoleDef[]> => {
+    const [{ data: rolesData, error: rolesErr }, { data: rolePermsData }, { data: catalogData }] =
+      await Promise.all([
+        fetchCompanyRoles(companyId),
+        fetchAllRolePermissions(),
+        fetchPermissionsCatalog(),
+      ])
     if (rolesErr) throw new Error(rolesErr)
-
-    const permMap = new Map<string, string[]>()
-    for (const rp of (rolePermsData ?? []) as Array<{ role_id: string; permission_key: string; effect: string }>) {
-      if (rp.effect !== 'allow') continue
-      const arr = permMap.get(rp.role_id) ?? []
-      arr.push(rp.permission_key)
-      permMap.set(rp.role_id, arr)
-    }
-    const enriched: RoleRow[] = ((rolesData ?? []) as RoleDef[]).map(r => ({
-      ...r,
-      permission_keys: permMap.get(r.id) ?? [],
-    }))
-    setRoles(enriched)
+    const loaded = (rolesData ?? []) as RoleDef[]
+    setRoles(loaded)
+    setRolePerms((rolePermsData ?? []) as RolePermissionRow[])
+    setPermLabels(new Map(((catalogData ?? []) as PermissionDef[]).map(p => [p.key, p.label])))
+    return loaded
   }, [companyId])
 
-  // Initial: fetch roles + user's current assignments. Re-runs only on user/company change.
+  // Initial: fetch roles + user's current assignments + override role. Re-runs
+  // only on user/company change.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     void (async () => {
       try {
-        await loadRoles()
-        const { data: userRolesData } = await fetchUserRoleAssignments(usuarioId)
+        const loadedRoles = await loadRoles()
+        const [{ data: userRolesData }, { data: overrideRole }] = await Promise.all([
+          fetchUserRoleAssignments(usuarioId),
+          fetchUserOverrideRole(usuarioId),
+        ])
+        let overrideMap = new Map<string, PermissionEffect>()
+        if (overrideRole) {
+          const { data: ovrPerms } = await fetchRolePermissionsWithEffect(overrideRole.id)
+          overrideMap = new Map(
+            ((ovrPerms ?? []) as Array<{ permission_key: string; effect: string }>)
+              .filter(p => p.effect === 'allow' || p.effect === 'deny')
+              .map(p => [p.permission_key, p.effect as PermissionEffect]),
+          )
+        }
         if (cancelled) return
-        const rows = (userRolesData ?? []) as Array<{ role_id: string; expires_at: string | null }>
+        const rows = ((userRolesData ?? []) as Array<{ role_id: string; expires_at: string | null }>)
+          // El rol de ajustes se gestiona aparte (no participa de la selección).
+          .filter(r => r.role_id !== overrideRole?.id)
         setSelectedRoleIds(new Set(rows.map(ur => ur.role_id)))
         const expMap = new Map<string, string | null>()
         for (const r of rows) {
@@ -82,6 +148,13 @@ export function RolPermisosModal({
         }
         setExpirations(expMap)
         setInitialExpirations(new Map(expMap))
+        // Snapshot de asignaciones directas a roles del sistema (heredadas del
+        // modelo anterior): se muestran en "Roles de la empresa" con conversión.
+        const systemIds = new Set(loadedRoles.filter(r => r.is_system).map(r => r.id))
+        setInheritedSystemIds(new Set(rows.map(r => r.role_id).filter(id => systemIds.has(id))))
+        setOverrideRoleId(overrideRole?.id ?? null)
+        setOverrides(overrideMap)
+        setInitialOverrides(new Map(overrideMap))
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'No se pudieron cargar los roles.')
       } finally {
@@ -97,6 +170,14 @@ export function RolPermisosModal({
     if (rolesRefreshKey === 0) return
     void loadRoles().catch(e => setError(e instanceof Error ? e.message : 'Error al refrescar roles.'))
   }, [rolesRefreshKey, loadRoles])
+
+  // Rol recién creado en el editor → seleccionarlo; si nació de los ajustes
+  // individuales ('reusable'), limpiar los ajustes en memoria (se borran al guardar).
+  useEffect(() => {
+    if (!autoSelect) return
+    setSelectedRoleIds(prev => new Set(prev).add(autoSelect.roleId))
+    if (autoSelect.clearOverrides) setOverrides(new Map())
+  }, [autoSelect])
 
   function toggleRole(roleId: string) {
     setSelectedRoleIds(prev => {
@@ -123,40 +204,108 @@ export function RolPermisosModal({
     })
   }
 
-  // Effective permissions = union of selected roles' permission keys
-  const effectivePermissions = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of roles) {
-      if (selectedRoleIds.has(r.id)) for (const k of r.permission_keys) set.add(k)
+  const rolesById = useMemo(() => new Map(roles.map(r => [r.id, r])), [roles])
+  const permIndex = useMemo(() => buildRolePermIndex(rolePerms), [rolePerms])
+  const effectiveResult = useMemo(
+    () => computeEffective(selectedRoleIds, permIndex, overrides),
+    [selectedRoleIds, permIndex, overrides],
+  )
+
+  const companyRoles = roles.filter(r => !r.is_system)
+  const systemRoles = roles.filter(r => r.is_system)
+  const inheritedRoles = systemRoles.filter(r => inheritedSystemIds.has(r.id))
+  const templateRoles = systemRoles.filter(r => !inheritedSystemIds.has(r.id))
+
+  const showCondominios = servicioCondominios !== false
+  const showAgua = servicioAgua !== false
+
+  const templateSections = [
+    showCondominios && {
+      key: 'condominios',
+      title: 'Plantillas — Condominios',
+      roles: templateRoles.filter(r => r.service === 'condominios' || r.service == null),
+    },
+    showAgua && {
+      key: 'agua',
+      title: 'Plantillas — Agua',
+      roles: templateRoles.filter(r => r.service === 'agua'),
+    },
+    {
+      key: 'general',
+      title: 'Plantillas — Plataforma',
+      roles: templateRoles.filter(r => r.service === 'general'),
+    },
+  ].filter((s): s is { key: string; title: string; roles: RoleDef[] } => !!s && s.roles.length > 0)
+
+  const matrixSections: MatrixSectionBlock[] = [
+    ...(showCondominios ? [{ label: 'Condominios', groups: CONDOMINIOS_KEY_GROUPS }] : []),
+    ...(showAgua ? [{ label: 'Agua', groups: AGUA_MODULE_GROUPS }] : []),
+    { label: 'Plataforma', groups: PLATFORM_MODULE_GROUPS },
+  ]
+
+  const selectedChips = [...selectedRoleIds]
+    .map(id => rolesById.get(id))
+    .filter((r): r is RoleDef => !!r)
+
+  // Toggle involutivo de un permiso puntual: con ajuste → quitarlo; otorgado
+  // por roles → bloquear (deny); no otorgado → conceder (allow).
+  function togglePermission(key: string) {
+    const base = effectiveResult.base
+    setOverrides(prev => {
+      const next = new Map(prev)
+      if (next.has(key)) next.delete(key)
+      else if (base.has(key)) next.set(key, 'deny')
+      else next.set(key, 'allow')
+      return next
+    })
+  }
+
+  async function handleUseTemplate(templateId: string) {
+    setEnsuringTemplateId(templateId)
+    setError(null)
+    try {
+      const { data, error: ensureErr } = await ensureCompanyRoleFromTemplate(companyId, templateId)
+      if (ensureErr || !data) throw new Error(ensureErr ?? 'No se pudo crear el rol desde la plantilla.')
+      await loadRoles()
+      setSelectedRoleIds(prev => new Set(prev).add(data.id))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo usar la plantilla.')
+    } finally {
+      setEnsuringTemplateId(null)
     }
-    return set
-  }, [roles, selectedRoleIds])
+  }
 
-  const condominiosStatus = useMemo(() =>
-    CONDOMINIOS_SECTION_GROUPS.map(group => {
-      const total = group.tabs.length
-      const count = group.tabs.filter(t => effectivePermissions.has(condominiosTabPermission(t))).length
-      const level = count === 0 ? 'ninguno' as const : count === total ? 'completo' as const : 'parcial' as const
-      return { key: group.key, label: group.label, level, count, total }
-    }),
-    [effectivePermissions]
-  )
-
-  const aguaStatus = useMemo(() =>
-    AGUA_MODULE_GROUPS.map(group => {
-      const total = group.tabs.length
-      // For agua, "tabs" are already full permission keys, not tab IDs
-      const count = group.tabs.filter(k => effectivePermissions.has(k)).length
-      const level = count === 0 ? 'ninguno' as const : count === total ? 'completo' as const : 'parcial' as const
-      return { key: group.key, label: group.label, level, count, total }
-    }),
-    [effectivePermissions]
-  )
-
-  const condominiosSystemRoles = roles.filter(r => r.is_system && (r.service === 'condominios' || r.service == null))
-  const aguaSystemRoles         = roles.filter(r => r.is_system && r.service === 'agua')
-  const platformSystemRoles     = roles.filter(r => r.is_system && r.service === 'general')
-  const customRoles             = roles.filter(r => !r.is_system)
+  // Convierte una asignación heredada (rol del sistema) en la copia de empresa:
+  // intercambia la selección y conserva la expiración; persiste al Guardar con
+  // el diff normal (delete+insert → queda auditado).
+  async function handleConvertInherited(systemRoleId: string) {
+    setEnsuringTemplateId(systemRoleId)
+    setError(null)
+    try {
+      const { data, error: ensureErr } = await ensureCompanyRoleFromTemplate(companyId, systemRoleId)
+      if (ensureErr || !data) throw new Error(ensureErr ?? 'No se pudo convertir el rol.')
+      await loadRoles()
+      setSelectedRoleIds(prev => {
+        const next = new Set(prev)
+        if (next.delete(systemRoleId)) next.add(data.id)
+        return next
+      })
+      setExpirations(prev => {
+        const next = new Map(prev)
+        const exp = next.get(systemRoleId)
+        next.delete(systemRoleId)
+        if (exp !== undefined) next.set(data.id, exp)
+        return next
+      })
+      setInheritedSystemIds(prev => {
+        const next = new Set(prev); next.delete(systemRoleId); return next
+      })
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo convertir el rol.')
+    } finally {
+      setEnsuringTemplateId(null)
+    }
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -164,6 +313,8 @@ export function RolPermisosModal({
     try {
       const { data: existing } = await fetchUserRoleIds(usuarioId)
       const existingIds = new Set((existing ?? []).map(r => r.role_id))
+      // El rol de ajustes se persiste aparte; no participa del diff de roles.
+      if (overrideRoleId) existingIds.delete(overrideRoleId)
 
       const toAdd = [...selectedRoleIds].filter(id => !existingIds.has(id))
       const toRemove = [...existingIds].filter(id => !selectedRoleIds.has(id))
@@ -195,6 +346,47 @@ export function RolPermisosModal({
         if (updErr) throw new Error(updErr)
       }
 
+      // ── Ajustes individuales: poda de redundantes + diff contra el snapshot ──
+      const desired = new Map(
+        [...overrides].filter(([k]) => !effectiveResult.redundantOverrides.has(k)),
+      )
+      if (desired.size > 0) {
+        let ovId = overrideRoleId
+        if (!ovId) {
+          const name = `Ajustes individuales — ${usuarioNombre} (${usuarioId.slice(0, 8)})`
+          const { data: created, error: createErr } = await createOverrideRole(companyId, usuarioId, name)
+          if (createErr || !created) throw new Error(createErr ?? 'No se pudo crear el rol de ajustes.')
+          ovId = created.id
+          // Asignación permanente: la expiración no aplica a los ajustes.
+          const { error: asgErr } = await insertUserRoles([{ user_id: usuarioId, role_id: ovId, expires_at: null }])
+          if (asgErr) throw new Error(asgErr)
+        }
+        // Cambio de effect = delete + insert (la PK es role_id + permission_key).
+        const keysToRemove: string[] = []
+        const rowsToAdd: Array<{ role_id: string; permission_key: string; effect: PermissionEffect }> = []
+        for (const [key, eff] of initialOverrides) {
+          const want = desired.get(key)
+          if (want === undefined || want !== eff) keysToRemove.push(key)
+        }
+        for (const [key, eff] of desired) {
+          const had = initialOverrides.get(key)
+          if (had === undefined || had !== eff) rowsToAdd.push({ role_id: ovId, permission_key: key, effect: eff })
+        }
+        if (keysToRemove.length > 0) {
+          const { error: delPermErr } = await deleteRolePermissions(ovId, keysToRemove)
+          if (delPermErr) throw new Error(delPermErr)
+        }
+        if (rowsToAdd.length > 0) {
+          const { error: insPermErr } = await insertRolePermissions(rowsToAdd)
+          if (insPermErr) throw new Error(insPermErr)
+        }
+      } else if (overrideRoleId) {
+        // Sin ajustes deseados: el rol oculto sobra (el cascade limpia
+        // role_permissions y user_roles; queda auditado como delete_role).
+        const { error: delOvErr } = await deleteRole(overrideRoleId)
+        if (delOvErr) throw new Error(delOvErr)
+      }
+
       onSaved()
       onClose()
     } catch (e: unknown) {
@@ -211,6 +403,8 @@ export function RolPermisosModal({
     void loadRoles()
   }
 
+  const exemptTier = isExemptPlatformRole(usuarioTier)
+
   return (
     <div
       style={{
@@ -222,7 +416,7 @@ export function RolPermisosModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '780px',
+        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '980px',
         boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
         display: 'flex', flexDirection: 'column', maxHeight: '90vh',
       }}>
@@ -243,63 +437,50 @@ export function RolPermisosModal({
 
         {/* Body */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {/* Left: roles */}
+          {/* Left: roles de la empresa + plantillas */}
           <div style={{
-            flex: '0 0 58%', borderRight: '1px solid var(--at-line)',
+            flex: '0 0 46%', borderRight: '1px solid var(--at-line)',
             overflowY: 'auto', padding: '16px',
           }}>
             {loading ? (
               <div style={{ color: 'var(--at-ink-3)', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>Cargando…</div>
             ) : (
               <>
-                <SectionHeader>Condominios — roles del sistema</SectionHeader>
-                {condominiosSystemRoles.map(r => (
-                  <RoleCard
-                    key={r.id}
-                    role={r}
-                    checked={selectedRoleIds.has(r.id)}
-                    expiresAt={expirations.get(r.id) ?? null}
-                    onToggle={() => toggleRole(r.id)}
-                    onExpirationChange={(v) => setExpiration(r.id, v)}
-                  />
-                ))}
+                {exemptTier && (
+                  <Banner color="var(--at-warning)">
+                    Este usuario tiene un nivel de plataforma exento (administrador): los roles y
+                    ajustes de esta pantalla no restringen su acceso mientras conserve ese nivel.
+                  </Banner>
+                )}
 
-                {aguaSystemRoles.length > 0 && (
-                  <div style={{ marginTop: '14px' }}>
-                    <SectionHeader>Agua — roles del sistema</SectionHeader>
-                    {aguaSystemRoles.map(r => (
-                      <RoleCard
-                        key={r.id}
-                        role={r}
-                        checked={selectedRoleIds.has(r.id)}
-                        expiresAt={expirations.get(r.id) ?? null}
-                        onToggle={() => toggleRole(r.id)}
-                        onExpirationChange={(v) => setExpiration(r.id, v)}
-                      />
+                {selectedChips.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
+                    {selectedChips.map(r => (
+                      <span key={r.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                        background: r.color + '22', color: r.color,
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: r.color }} />
+                        {r.name}
+                        {expirations.get(r.id) && <span title="Temporal">⏱</span>}
+                        <button
+                          onClick={() => toggleRole(r.id)}
+                          title="Quitar rol"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer', color: 'inherit',
+                            fontSize: '11px', padding: 0, lineHeight: 1,
+                          }}
+                        >×</button>
+                      </span>
                     ))}
                   </div>
                 )}
 
-                {platformSystemRoles.length > 0 && (
-                  <div style={{ marginTop: '14px' }}>
-                    <SectionHeader>Plataforma — roles del sistema</SectionHeader>
-                    {platformSystemRoles.map(r => (
-                      <RoleCard
-                        key={r.id}
-                        role={r}
-                        checked={selectedRoleIds.has(r.id)}
-                        expiresAt={expirations.get(r.id) ?? null}
-                        onToggle={() => toggleRole(r.id)}
-                        onExpirationChange={(v) => setExpiration(r.id, v)}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <SectionHeader>Roles personalizados</SectionHeader>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <SectionHeader>Roles de la empresa</SectionHeader>
                   <button
-                    onClick={() => onOpenCustomEditor(null)}
+                    onClick={() => onOpenCustomEditor({ roleId: null })}
                     style={{
                       fontSize: '11px', fontWeight: 600, color: 'var(--at-primary-2)',
                       background: 'transparent', border: '1px solid var(--at-accent-2)', borderRadius: '6px',
@@ -307,52 +488,97 @@ export function RolPermisosModal({
                     }}
                   >+ Crear</button>
                 </div>
-                {customRoles.length === 0 ? (
+                {companyRoles.length === 0 && inheritedRoles.length === 0 ? (
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', textAlign: 'center', padding: '14px 0' }}>
-                    Sin roles personalizados.<br />Crea uno desde "Crear".
+                    Aún no hay roles de empresa.<br />Usa una plantilla de abajo o crea uno desde "Crear".
                   </div>
                 ) : (
-                  customRoles.map(r => (
-                    <RoleCard
-                      key={r.id}
-                      role={r}
-                      checked={selectedRoleIds.has(r.id)}
-                      expiresAt={expirations.get(r.id) ?? null}
-                      onToggle={() => toggleRole(r.id)}
-                      onExpirationChange={(v) => setExpiration(r.id, v)}
-                      onEdit={() => onOpenCustomEditor(r.id)}
-                      onDelete={() => void handleDeleteCustomRole(r.id)}
-                    />
-                  ))
+                  <>
+                    {companyRoles.map(r => (
+                      <RoleCard
+                        key={r.id}
+                        role={r}
+                        checked={selectedRoleIds.has(r.id)}
+                        expiresAt={expirations.get(r.id) ?? null}
+                        onToggle={() => toggleRole(r.id)}
+                        onExpirationChange={(v) => setExpiration(r.id, v)}
+                        onEdit={() => onOpenCustomEditor({ roleId: r.id })}
+                        onDelete={() => void handleDeleteCustomRole(r.id)}
+                        onClone={() => onOpenCustomEditor({ roleId: null, cloneFromRoleId: r.id })}
+                      />
+                    ))}
+                    {inheritedRoles.map(r => (
+                      <RoleCard
+                        key={r.id}
+                        role={r}
+                        checked={selectedRoleIds.has(r.id)}
+                        expiresAt={expirations.get(r.id) ?? null}
+                        onToggle={() => toggleRole(r.id)}
+                        onExpirationChange={(v) => setExpiration(r.id, v)}
+                        onClone={() => onOpenCustomEditor({ roleId: null, cloneFromRoleId: r.id })}
+                        inherited
+                        onConvert={() => void handleConvertInherited(r.id)}
+                      />
+                    ))}
+                  </>
                 )}
+
+                <div style={{ marginTop: '14px' }}>
+                  <SectionHeader>Plantillas</SectionHeader>
+                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '8px', lineHeight: 1.4 }}>
+                    Puntos de partida del sistema. "Usar plantilla" crea (o reutiliza) el rol de tu
+                    empresa con esos permisos; "Personalizar" te deja ajustarlo antes de crearlo.
+                  </div>
+                  {templateSections.map((section, idx) => (
+                    <CollapsibleSection
+                      key={section.key}
+                      title={section.title}
+                      badge={`${section.roles.length}`}
+                      defaultOpen={companyRoles.length === 0 && idx === 0}
+                    >
+                      {section.roles.map(r => (
+                        <TemplateCard
+                          key={r.id}
+                          role={r}
+                          busy={ensuringTemplateId === r.id}
+                          onUse={() => void handleUseTemplate(r.id)}
+                          onCustomize={() => onOpenCustomEditor({ roleId: null, cloneFromRoleId: r.id })}
+                        />
+                      ))}
+                    </CollapsibleSection>
+                  ))}
+                </div>
               </>
             )}
           </div>
 
-          {/* Right: preview */}
+          {/* Right: permisos efectivos (explorables y editables) */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-            <SectionHeader>Permisos efectivos</SectionHeader>
-            {selectedRoleIds.size === 0 ? (
-              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', textAlign: 'center', marginTop: '32px', lineHeight: '1.6' }}>
-                Sin roles asignados.<br />El usuario no tendrá<br />acceso a ningún módulo.
-              </div>
-            ) : (
+            {!loading && (
               <>
-                {selectedRoleIds.size > 1 && (
-                  <Banner color="var(--at-primary)">{selectedRoleIds.size} roles activos — permisos combinados</Banner>
+                {overrides.size === 0 && initialOverrides.size > 0 && (
+                  <Banner color="var(--at-primary)">
+                    Los ajustes individuales guardados se quitarán al guardar.
+                  </Banner>
                 )}
-
-                <SubsectionHeader>Condominios</SubsectionHeader>
-                {condominiosStatus.map(s => (
-                  <PreviewRow key={s.key} label={s.label} level={s.level} count={s.count} total={s.total} />
-                ))}
-
-                <div style={{ marginTop: '16px' }}>
-                  <SubsectionHeader>Agua</SubsectionHeader>
-                  {aguaStatus.map(s => (
-                    <PreviewRow key={s.key} label={s.label} level={s.level} count={s.count} total={s.total} />
-                  ))}
-                </div>
+                <PermissionMatrixPanel
+                  sections={matrixSections}
+                  effective={effectiveResult.effective}
+                  grantedBy={effectiveResult.grantedBy}
+                  rolesById={rolesById}
+                  permLabels={permLabels}
+                  overrides={overrides}
+                  redundantOverrides={effectiveResult.redundantOverrides}
+                  selectedCount={selectedRoleIds.size}
+                  onTogglePermission={togglePermission}
+                  onResetOverrides={() => setOverrides(new Map())}
+                  onSaveAsRole={() => onOpenCustomEditor({
+                    roleId: null,
+                    initialKeys: [...effectiveResult.effective],
+                    intent: 'reusable',
+                    suggestedName: `Perfil de ${usuarioNombre}`,
+                  })}
+                />
               </>
             )}
           </div>
@@ -378,172 +604,5 @@ export function RolPermisosModal({
         </div>
       </div>
     </div>
-  )
-}
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)',
-      letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase',
-    }}>{children}</div>
-  )
-}
-
-function SubsectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)',
-      letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase',
-      paddingBottom: '4px', borderBottom: '1px solid var(--at-line)',
-    }}>{children}</div>
-  )
-}
-
-function PreviewRow({ label, level, count, total }: { label: string; level: 'completo'|'parcial'|'ninguno'; count: number; total: number }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '7px 0', borderBottom: '1px solid var(--at-chip)',
-    }}>
-      <span style={{ fontSize: '13px', color: 'var(--at-ink-2)', fontWeight: 500 }}>{label}</span>
-      <AccessBadge level={level} count={count} total={total} />
-    </div>
-  )
-}
-
-function RoleCard({
-  role, checked, expiresAt, onToggle, onExpirationChange, onEdit, onDelete,
-}: {
-  role: RoleRow; checked: boolean; expiresAt?: string | null;
-  onToggle: () => void; onExpirationChange?: (v: string | null) => void;
-  onEdit?: () => void; onDelete?: () => void
-}) {
-  const expiresSoon = expiresAt ? new Date(expiresAt) < new Date(Date.now() + 7 * 86400000) : false
-  const expired = expiresAt ? new Date(expiresAt) < new Date() : false
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      width: '100%', marginBottom: '6px', borderRadius: '8px',
-      border: `1px solid ${checked ? role.color + '55' : 'var(--at-line)'}`,
-      background: checked ? role.color + '12' : 'transparent',
-      transition: 'border-color 0.15s, background 0.15s',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '9px 11px' }}>
-        <button
-          type="button"
-          onClick={onToggle}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, marginTop: '1px' }}
-        >
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '16px', height: '16px', borderRadius: '4px',
-            border: `2px solid ${checked ? role.color : 'var(--at-line-strong)'}`,
-            background: checked ? role.color : 'transparent',
-          }}>
-            {checked && <span style={{ color: 'white', fontSize: '11px', lineHeight: 1 }}>✓</span>}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={onToggle}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role.color, flexShrink: 0 }} />
-            <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>{role.name}</span>
-            {!role.is_system && (
-              <span style={{
-                fontSize: '9px', fontWeight: 700, color: 'var(--at-accent-hover)',
-                background: 'rgba(156, 87, 51,0.1)', padding: '1px 5px', borderRadius: '4px',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}>Custom</span>
-            )}
-            {expiresAt && (
-              <span style={{
-                fontSize: '9px', fontWeight: 700,
-                color: expired ? 'var(--at-danger)' : expiresSoon ? 'var(--at-warning)' : 'var(--at-primary)',
-                background: expired ? 'rgba(239,68,68,0.1)' : expiresSoon ? 'rgba(245,158,11,0.1)' : 'rgba(27, 59, 54,0.1)',
-                padding: '1px 5px', borderRadius: '4px',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}>{expired ? 'Expirado' : 'Temporal'}</span>
-            )}
-          </div>
-          {role.description && (
-            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
-          )}
-        </button>
-        {!role.is_system && (
-          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-            <button onClick={onEdit} title="Editar" style={iconBtnStyle('var(--at-primary-2)')}>✎</button>
-            <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('var(--at-danger)')}>🗑</button>
-          </div>
-        )}
-      </div>
-      {checked && onExpirationChange && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '0 11px 9px', borderTop: `1px dashed ${role.color}22`, paddingTop: '8px', marginTop: '0',
-        }}>
-          <label style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Expira:</label>
-          <input
-            type="date"
-            value={expiresAt ?? ''}
-            onChange={(e) => onExpirationChange(e.target.value || null)}
-            min={new Date().toISOString().slice(0, 10)}
-            style={{
-              fontSize: '11px', padding: '3px 6px',
-              border: '1px solid var(--at-line-strong)', borderRadius: '4px',
-              color: 'var(--at-ink-2)', background: 'var(--at-surface)',
-            }}
-          />
-          {expiresAt && (
-            <button
-              onClick={() => onExpirationChange(null)}
-              title="Quitar expiración (permanente)"
-              style={{
-                fontSize: '10px', padding: '3px 7px', borderRadius: '4px',
-                border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)', color: 'var(--at-ink-3)',
-                cursor: 'pointer', fontWeight: 600,
-              }}
-            >Permanente</button>
-          )}
-          {!expiresAt && (
-            <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>(sin expiración)</span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function iconBtnStyle(color: string): React.CSSProperties {
-  return {
-    background: 'transparent', border: 'none', cursor: 'pointer',
-    color, fontSize: '13px', padding: '2px 5px', borderRadius: '4px',
-  }
-}
-
-function Banner({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: '11px', color, background: color + '14',
-      border: `1px solid ${color}33`, borderRadius: '6px',
-      padding: '6px 10px', marginBottom: '10px', lineHeight: '1.4',
-    }}>{children}</div>
-  )
-}
-
-function AccessBadge({ level, count, total }: { level: 'completo' | 'parcial' | 'ninguno'; count: number; total: number }) {
-  const cfg = level === 'completo'
-    ? { color: 'var(--at-success)', label: 'Completo' }
-    : level === 'parcial'
-      ? { color: 'var(--at-warning)', label: `Parcial ${count}/${total}` }
-      : { color: 'var(--at-ink-3)', label: 'Sin acceso' }
-  return (
-    <span style={{
-      fontSize: '11px', fontWeight: 600, color: cfg.color,
-      background: cfg.color + '1a', padding: '2px 8px', borderRadius: '999px',
-    }}>{cfg.label}</span>
   )
 }

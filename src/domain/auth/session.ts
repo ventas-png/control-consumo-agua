@@ -29,7 +29,7 @@ export async function buildSessionFromSupabase(
 
   const userRolesQuery = supabase
     .from('user_roles')
-    .select('role_id, role:roles(id, name, service, color)')
+    .select('role_id, role:roles(id, name, service, color, cloned_from_role_id, user_override_for)')
     .eq('user_id', userId)
 
   const [profileResult, rbacPermsResult, userRolesResult] = await Promise.race([
@@ -130,20 +130,39 @@ export function buildPermissionsSet(result: { data: unknown; error: unknown }): 
 
 export function buildAssignedRoleIds(result: { data: unknown; error: unknown }): string[] | undefined {
   if (result.error || !result.data) return undefined
-  const rows = result.data as Array<{ role_id: string }>
-  return rows.map(r => r.role_id)
+  const rows = result.data as Array<{ role_id: string; role?: { cloned_from_role_id?: string | null } | null }>
+  // Expansión por linaje: las copias de empresa heredan los gates gruesos que
+  // dependen de UUIDs de roles del sistema (RESTRICTED_COND_ROLE_IDS en
+  // proyectosAccess, ADMIN_GENERAL_ROLE_ID en ComunicacionSection) incluyendo
+  // el id de su plantilla de origen junto al propio.
+  const ids = new Set<string>()
+  for (const r of rows) {
+    ids.add(r.role_id)
+    const origin = r.role?.cloned_from_role_id
+    if (origin) ids.add(origin)
+  }
+  return [...ids]
 }
 
 export function buildAssignedRoles(result: { data: unknown; error: unknown }): AssignedRoleInfo[] | undefined {
   if (result.error || !result.data) return undefined
   type Row = {
     role_id: string
-    role: { id: string; name: string; service: string | null; color: string | null } | null
+    role: {
+      id: string
+      name: string
+      service: string | null
+      color: string | null
+      user_override_for?: string | null
+    } | null
   }
   const rows = result.data as Row[]
   const allowed = new Set(['condominios', 'agua', 'general'])
   return rows
     .filter((r): r is Row & { role: NonNullable<Row['role']> } => r.role !== null)
+    // El rol oculto de ajustes individuales no es un rol "visible": no debe
+    // aparecer como chip en topbar/perfil (pickPrimaryAssignedRole).
+    .filter(r => !r.role.user_override_for)
     .map(r => ({
       id: r.role.id,
       name: r.role.name,

@@ -9,14 +9,17 @@
 import { supabase } from '../../lib/supabase'
 import type { PermissionDef, RoleDef } from '../../types'
 
-/** Roles del sistema + los personalizados de la company (para el selector RBAC). */
+/** Roles del sistema (plantillas) + los personalizados de la company (para el
+ * selector RBAC). Excluye los roles de ajustes individuales por usuario
+ * (user_override_for), que se gestionan aparte desde el panel de permisos. */
 export async function fetchCompanyRoles(
   companyId: string,
 ): Promise<{ data: RoleDef[] | null; error: string | null }> {
   const { data, error } = await supabase
     .from('roles')
-    .select('id, company_id, name, description, is_system, color, service')
+    .select('id, company_id, name, description, is_system, color, service, cloned_from_role_id')
     .or(`is_system.eq.true,company_id.eq.${companyId}`)
+    .is('user_override_for', null)
     .order('is_system', { ascending: false })
     .order('name')
   return { data: (data as RoleDef[]) ?? null, error: error?.message ?? null }
@@ -117,13 +120,13 @@ export async function fetchPermissionsCatalog(): Promise<{
   return { data: (data as PermissionDef[]) ?? null, error: error?.message ?? null }
 }
 
-/** Un rol por id (para precargar el editor en modo edición). */
+/** Un rol por id (para precargar el editor en modo edición o clonado). */
 export async function fetchRoleById(
   roleId: string,
 ): Promise<{ data: RoleDef | null; error: string | null }> {
   const { data, error } = await supabase
     .from('roles')
-    .select('id, company_id, name, description, is_system, color')
+    .select('id, company_id, name, description, is_system, color, service, cloned_from_role_id')
     .eq('id', roleId)
     .single()
   return { data: (data as RoleDef) ?? null, error: error?.message ?? null }
@@ -189,4 +192,133 @@ export async function insertRolePermissions(
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('role_permissions').insert(rows)
   return { error: error?.message ?? null }
+}
+
+// ── Plantillas y ajustes individuales (modelo plantilla → rol de empresa) ──
+
+/** Permisos de un rol CON su effect (allow/deny) — para copiar plantillas y
+ * cargar los ajustes individuales (fetchRolePermissionKeys filtra solo allow). */
+export async function fetchRolePermissionsWithEffect(
+  roleId: string,
+): Promise<{ data: Array<{ permission_key: string; effect: string }> | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('role_permissions')
+    .select('permission_key, effect')
+    .eq('role_id', roleId)
+  return {
+    data: (data as Array<{ permission_key: string; effect: string }>) ?? null,
+    error: error?.message ?? null,
+  }
+}
+
+/**
+ * Busca-o-crea la copia de empresa de una plantilla (rol del sistema).
+ * Reutiliza solo adopciones FIELES (linaje + nombre de la plantilla, con o sin
+ * sufijo " (plantilla)"); las copias personalizadas/renombradas no cuentan,
+ * así "Usar plantilla" siempre entrega la versión íntegra. La colisión con
+ * UNIQUE(company_id, name) — rol homónimo hecho a mano o adopción concurrente
+ * de otro admin — se resuelve re-consultando y/o con nombres alternativos.
+ */
+export async function ensureCompanyRoleFromTemplate(
+  companyId: string,
+  templateRoleId: string,
+): Promise<{ data: { id: string } | null; error: string | null }> {
+  const { data: tpl, error: tplErr } = await supabase
+    .from('roles')
+    .select('name, description, color, service')
+    .eq('id', templateRoleId)
+    .single()
+  if (tplErr || !tpl) return { data: null, error: tplErr?.message ?? 'Plantilla no encontrada.' }
+
+  const t = tpl as { name: string; description: string | null; color: string | null; service: string | null }
+  const adoptionNames = [t.name, `${t.name} (plantilla)`]
+
+  const findAdoption = async (): Promise<string | null> => {
+    const { data: existing } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('cloned_from_role_id', templateRoleId)
+      .in('name', adoptionNames)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    return (existing as Array<{ id: string }> | null)?.[0]?.id ?? null
+  }
+
+  const found = await findAdoption()
+  if (found) return { data: { id: found }, error: null }
+
+  const candidates = [...adoptionNames, `${t.name} (${templateRoleId.slice(0, 8)})`]
+  let createdId: string | null = null
+  let lastError: string | null = null
+  for (const name of candidates) {
+    const { data: ins, error: insErr } = await supabase
+      .from('roles')
+      .insert({
+        company_id: companyId,
+        name,
+        description: t.description,
+        is_system: false,
+        color: t.color,
+        service: t.service,
+        cloned_from_role_id: templateRoleId,
+      })
+      .select('id')
+      .single()
+    if (!insErr && ins) {
+      createdId = (ins as { id: string }).id
+      break
+    }
+    lastError = insErr?.message ?? null
+    // 23505 = unique_violation: nombre tomado. Otro error → abortar.
+    if (insErr?.code !== '23505') return { data: null, error: lastError }
+    // Pudo ganar una adopción concurrente con ese nombre — reutilizarla.
+    const concurrent = await findAdoption()
+    if (concurrent) return { data: { id: concurrent }, error: null }
+  }
+  if (!createdId) return { data: null, error: lastError ?? 'No se pudo crear el rol desde la plantilla.' }
+
+  const { data: perms, error: permsErr } = await fetchRolePermissionsWithEffect(templateRoleId)
+  if (permsErr) return { data: null, error: permsErr }
+  if (perms && perms.length > 0) {
+    const { error: insPermErr } = await insertRolePermissions(
+      perms.map(p => ({ role_id: createdId, permission_key: p.permission_key, effect: p.effect })),
+    )
+    if (insPermErr) return { data: null, error: insPermErr }
+  }
+  return { data: { id: createdId }, error: null }
+}
+
+/** Rol de ajustes individuales de un usuario (o null si no tiene). */
+export async function fetchUserOverrideRole(
+  userId: string,
+): Promise<{ data: { id: string } | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('user_override_for', userId)
+    .maybeSingle()
+  return { data: (data as { id: string } | null) ?? null, error: error?.message ?? null }
+}
+
+/** Crea el rol oculto de ajustes individuales de un usuario (lazy, al primer
+ * ajuste). El índice único parcial sobre user_override_for impide duplicados. */
+export async function createOverrideRole(
+  companyId: string,
+  userId: string,
+  name: string,
+): Promise<{ data: { id: string } | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('roles')
+    .insert({
+      company_id: companyId,
+      name,
+      description: 'Ajustes finos asignados directamente al usuario',
+      is_system: false,
+      color: '#7E9389',
+      user_override_for: userId,
+    })
+    .select('id')
+    .single()
+  return { data: (data as { id: string }) ?? null, error: error?.message ?? null }
 }

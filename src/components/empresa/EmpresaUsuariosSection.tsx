@@ -8,10 +8,10 @@ import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { createCompanyUser, deleteCompanyUser, setUsuarioActivo } from '../../domain/empresa/usuarios'
-import { insertUserRoles } from '../../domain/empresa/roles'
+import { insertUserRoles, ensureCompanyRoleFromTemplate } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
-import { RolPermisosModal } from './RolPermisosModal'
+import { RolPermisosModal, type CustomEditorRequest } from './RolPermisosModal'
 import { CustomRoleEditor } from './CustomRoleEditor'
 import { AuditLogModal } from './AuditLogModal'
 import { FinancialAuditModal } from './FinancialAuditModal'
@@ -31,8 +31,10 @@ interface Props {
 export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onReload }: Props) {
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
   const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
-  const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
+  const [customRoleEditor, setCustomRoleEditor] = useState<CustomEditorRequest | null>(null)
   const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
+  // Rol recién creado en el editor → el modal de roles lo selecciona al volver.
+  const [autoSelectRole, setAutoSelectRole] = useState<{ roleId: string; clearOverrides: boolean } | null>(null)
   const [showAuditLog, setShowAuditLog] = useState(false)
   const [showFinancialAudit, setShowFinancialAudit] = useState(false)
   const [showPapelera, setShowPapelera] = useState(false)
@@ -129,19 +131,31 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
       if (!userId) return
 
       // Assign RBAC roles via user_roles. With the legacy columns dropped,
-      // user_roles is the sole source of truth for permissions.
-      const newAssignments: { user_id: string; role_id: string }[] = []
+      // user_roles is the sole source of truth for permissions. Con el modelo
+      // de plantillas, los roles del sistema no se asignan directamente: se
+      // asigna la copia de empresa (busca-o-crea por linaje).
+      const templateIds: string[] = []
       if (formValues.aguaRol && formValues.aguaRol in SYSTEM_ROLE_IDS.agua) {
-        newAssignments.push({
-          user_id: userId,
-          role_id: SYSTEM_ROLE_IDS.agua[formValues.aguaRol as AguaSystemRoleKey],
-        })
+        templateIds.push(SYSTEM_ROLE_IDS.agua[formValues.aguaRol as AguaSystemRoleKey])
       }
       if (formValues.condRol && formValues.condRol in SYSTEM_ROLE_IDS.condominios) {
-        newAssignments.push({
-          user_id: userId,
-          role_id: SYSTEM_ROLE_IDS.condominios[formValues.condRol as CondominiosSystemRoleKey],
-        })
+        templateIds.push(SYSTEM_ROLE_IDS.condominios[formValues.condRol as CondominiosSystemRoleKey])
+      }
+      const newAssignments: { user_id: string; role_id: string }[] = []
+      for (const templateId of templateIds) {
+        const { data: companyRole, error: ensureErr } = await ensureCompanyRoleFromTemplate(
+          currentUser.company_id!,
+          templateId,
+        )
+        if (ensureErr || !companyRole) {
+          notify({
+            variant: 'error',
+            title: 'Usuario creado, pero falta un rol',
+            text: `No se pudo preparar el rol desde la plantilla: ${ensureErr ?? 'error desconocido'}. Asígnalo desde "Roles y permisos".`,
+          })
+          continue
+        }
+        newAssignments.push({ user_id: userId, role_id: companyRole.id })
       }
       if (newAssignments.length > 0) {
         await insertUserRoles(newAssignments)
@@ -298,9 +312,10 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
             <span style={{ color: 'var(--at-accent-light)', fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>💡</span>
             <div>
               <strong style={{ color: 'var(--at-ink)' }}>Personalización fina de permisos:</strong>{' '}
-              Asigna un rol del sistema desde el botón <em>Roles y permisos</em> en cada usuario.
-              Si necesitas un perfil distinto, crea un <em>rol personalizado</em> desde el mismo modal y
-              ajusta exactamente qué tabs/acciones permite. Los cambios se auditan en{' '}
+              Desde <em>Roles y permisos</em> usa una <em>plantilla</em> como punto de partida para
+              crear los roles de tu empresa (o personalízala antes de crearla). Para excepciones de
+              una sola persona, concede o bloquea permisos puntuales directamente en el panel de
+              permisos efectivos, sin crear más roles. Los cambios se auditan en{' '}
               <span style={{ color: 'var(--at-accent-light)' }}>📜 Auditoría</span>.
             </div>
           </div>
@@ -436,11 +451,15 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
         <RolPermisosModal
           usuarioId={rolCondModal.id}
           usuarioNombre={rolCondModal.full_name}
+          usuarioTier={rolCondModal.role}
           companyId={currentUser.company_id}
+          servicioAgua={currentUser.servicio_agua !== false}
+          servicioCondominios={currentUser.servicio_condominios !== false}
           rolesRefreshKey={rolesRefreshKey}
-          onClose={() => setRolCondModal(null)}
+          autoSelect={autoSelectRole}
+          onClose={() => { setRolCondModal(null); setAutoSelectRole(null) }}
           onSaved={() => onReload()}
-          onOpenCustomEditor={(roleId) => setCustomRoleEditor({ roleId })}
+          onOpenCustomEditor={(req) => setCustomRoleEditor(req)}
         />
       )}
 
@@ -449,8 +468,18 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
         <CustomRoleEditor
           companyId={currentUser.company_id}
           roleId={customRoleEditor.roleId}
+          cloneFromRoleId={customRoleEditor.cloneFromRoleId}
+          initialKeys={customRoleEditor.initialKeys}
+          suggestedName={customRoleEditor.suggestedName}
           onClose={() => setCustomRoleEditor(null)}
-          onSaved={() => setRolesRefreshKey(k => k + 1)}
+          onSaved={(savedRoleId) => {
+            // Los roles nuevos quedan seleccionados al volver al modal; si el
+            // rol nació de los ajustes individuales, además los reemplaza.
+            if (customRoleEditor.roleId === null) {
+              setAutoSelectRole({ roleId: savedRoleId, clearOverrides: customRoleEditor.intent === 'reusable' })
+            }
+            setRolesRefreshKey(k => k + 1)
+          }}
         />
       )}
 
