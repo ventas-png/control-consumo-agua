@@ -17690,7 +17690,10 @@ export type Database = {
       mv_superadmin_empresa_counts: {
         Row: {
           company_id: string | null
+          monthly_total_cents: number | null
+          plan_code: string | null
           project_count: number | null
+          subscription_status: string | null
           unit_count: number | null
           user_count: number | null
         }
