@@ -27,11 +27,27 @@ const DEFAULT_TTL = 3600
 const REFRESH_LEAD_MS = 5 * 60 * 1000
 
 /**
+ * Opciones de transformación de imagen (resize on-the-fly de Supabase Storage,
+ * disponible en planes de pago). Sirve una versión redimensionada/comprimida en
+ * vez del original: una miniatura de ~30 KB en lugar de bajar el JPEG de ~1.5 MB.
+ */
+export interface SignedUrlTransform {
+  width?: number
+  height?: number
+  resize?: 'cover' | 'contain' | 'fill'
+  quality?: number
+}
+
+/**
  * React hook that returns a signed URL for the given value (path or legacy URL).
  * Re-signs ~5 min before expiration so a long-open tab never hits a 403.
  *
  *   const url = useSignedUrl(visitante.foto_url, 'condominios-media')
  *   return url ? <img src={url} /> : <Placeholder />
+ *
+ * `transform` (opcional) pide a Storage una versión redimensionada de la imagen
+ * (miniatura), reduciendo drásticamente los bytes descargados. Solo aplica a
+ * objetos del bucket; los data-URI/URLs externas pasan tal cual.
  *
  * Returns:
  *   - the signed URL (when value is a bucket path or bucket URL)
@@ -42,9 +58,12 @@ export function useSignedUrl(
   value: string | null | undefined,
   bucket: string,
   ttl = DEFAULT_TTL,
+  transform?: SignedUrlTransform,
 ): string | null {
   const [url, setUrl] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Serializa transform para una dependencia estable del efecto.
+  const transformKey = transform ? JSON.stringify(transform) : ''
 
   useEffect(() => {
     let cancelled = false
@@ -60,14 +79,15 @@ export function useSignedUrl(
     }
 
     async function sign() {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path!, ttl)
+      const { data, error } = await supabase.storage.from(bucket)
+        .createSignedUrl(path!, ttl, transform ? { transform } : undefined)
       if (cancelled) return
       if (error || !data?.signedUrl) {
         // Fall back to the legacy publicUrl so the image still loads while
         // the bucket is still public. Once the bucket goes private this
         // fallback will 403 and the caller sees an empty image — but the
         // hook itself stays simple.
-        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path!)
+        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path!, transform ? { transform } : undefined)
         setUrl(pub?.publicUrl ?? null)
         return
       }
@@ -81,7 +101,8 @@ export function useSignedUrl(
       cancelled = true
       if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
     }
-  }, [value, bucket, ttl])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, bucket, ttl, transformKey])
 
   return url
 }
