@@ -34,7 +34,7 @@ export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBoo
       .eq('activo', true),
     supabase
       .from('registros')
-      .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+      .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas')
       .eq('cliente_id', clienteId)
       .order('fecha', { ascending: false }),
     supabase
@@ -66,8 +66,12 @@ export async function fetchPortalProjectsByCompanies(companyIds: string[]): Prom
   return data
 }
 
+// NUNCA incluir `foto` en estos listados: es un data-URI base64 de hasta ~15 MB
+// por fila (TOAST). Traerlo para TODAS las lecturas del cliente infla el payload a
+// cientos de MB y vuelve lento el portal (mismo motivo que REGISTROS_LIST_COLS en
+// domain/agua). Las fotos se bajan una a una bajo demanda con fetchRegistroFoto.
 const REGISTROS_SELECT =
-  'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
+  'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas'
 
 /** Fallback de lecturas por contador (cuando cliente_id es incorrecto/null). */
 export async function fetchRegistrosByContadores(contadorIds: string[]): Promise<unknown[] | null> {
@@ -87,6 +91,49 @@ export async function fetchRegistrosByProjects(projectIds: string[]): Promise<un
     .in('project_id', projectIds)
     .order('fecha', { ascending: false })
   return data
+}
+
+/**
+ * IDs de los registros del cliente que SÍ tienen foto. Se consulta aparte y se
+ * proyecta solo `id` (jamás `foto`) para no bajar el base64: el portal usa este
+ * set para saber qué lecturas tienen foto y bajar los bytes uno a uno bajo
+ * demanda (fetchRegistroFoto). Espeja el scoping de las lecturas (cliente/
+ * contador/proyecto) para cubrir los mismos fallbacks; RLS acota a lo propio.
+ */
+export async function fetchPortalFotoIds(
+  clienteId: string,
+  contadorIds: string[],
+  projectIds: string[],
+): Promise<string[]> {
+  const queries = [
+    supabase.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null),
+  ]
+  if (contadorIds.length > 0) {
+    queries.push(supabase.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null))
+  }
+  if (projectIds.length > 0) {
+    queries.push(supabase.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null))
+  }
+  const results = await Promise.all(queries)
+  const ids = new Set<string>()
+  for (const res of results) {
+    for (const row of ((res.data as { id: string }[] | null) ?? [])) ids.add(row.id)
+  }
+  return [...ids]
+}
+
+/**
+ * Baja el `foto` de UN registro bajo demanda (data-URI base64 o, en lecturas
+ * nuevas, un path de Storage). Solo se llama para las fotos que se van a mostrar
+ * (miniaturas visibles y el lightbox), nunca para el listado completo.
+ */
+export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('registros')
+    .select('foto')
+    .eq('id', registroId)
+    .maybeSingle()
+  return (data as { foto: string | null } | null)?.foto ?? null
 }
 
 // ── CustomerPaymentsTab ────────────────────────────────────────────────────

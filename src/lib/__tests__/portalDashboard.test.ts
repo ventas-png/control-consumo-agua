@@ -111,6 +111,34 @@ describe('construirDashboardData', () => {
     expect(meter.consumoMesLabel).toBe('Abr 2026')
   })
 
+  it('fotoActual/fotoAnterior se toman de fotoRegistroIds (más recientes con foto)', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})],
+      unidades: [unidad({})],
+      lecturas: [
+        lectura({ id: 'mas-nueva', fecha: '2026-06-12' }),       // sin foto
+        lectura({ id: 'con-foto-1', fecha: '2026-06-10' }),       // con foto (más reciente con foto)
+        lectura({ id: 'con-foto-2', fecha: '2026-05-10' }),       // con foto (anterior)
+        lectura({ id: 'vieja', fecha: '2026-04-10' }),            // sin foto
+      ],
+      fotoRegistroIds: new Set(['con-foto-1', 'con-foto-2']),
+    }))
+    const meter = d.unidadBreakdown[0].meters[0]
+    expect(meter.fotoActual?.id).toBe('con-foto-1')
+    expect(meter.fotoAnterior?.id).toBe('con-foto-2')
+  })
+
+  it('sin fotoRegistroIds: no hay fotoActual/fotoAnterior aunque la lectura traiga `foto`', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})],
+      unidades: [unidad({})],
+      lecturas: [lectura({ id: 'x', foto: 'data:image/jpeg;base64,AAAA' })],
+    }))
+    const meter = d.unidadBreakdown[0].meters[0]
+    expect(meter.fotoActual).toBeNull()
+    expect(meter.fotoAnterior).toBeNull()
+  })
+
   it('resuelve el proyecto vía unidad cuando el project_id del contador está desfasado', () => {
     const d = construirDashboardData(inputs({
       contadores: [contador({ project_id: 'p-viejo' })],

@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'react'
 import type { PortalCtx } from './ctx'
 import type { ContadorInfo, LecturaInfo, UnidadInfo } from '../../../lib/portalDashboard'
-import { SecureImage } from '../../shared/SecureImage'
+import { RegistroFotoThumb } from './RegistroFotoThumb'
 import { EmptyState } from '../../shared/EmptyState'
 import { Icon } from '../../shared/Icon'
 import { parseFecha } from '../../../lib/format'
@@ -379,13 +379,11 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
                               ].map(({ lectura, label }) => (
                                 <div key={label} style={{ flex: 1 }}>
                                   <div style={{ fontSize: '9.5px', color: 'var(--at-ink-3)', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
-                                  {lectura?.foto ? (
-                                    <SecureImage
-                                      bucket="registro-fotos"
-                                      src={lectura.foto}
-                                      alt={label}
-                                      onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
-                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid var(--at-line)', cursor: 'zoom-in' }}
+                                  {lectura ? (
+                                    <RegistroFotoThumb
+                                      registroId={lectura.id}
+                                      label={label}
+                                      onClick={() => setPhotoModal({ registroId: lectura.id, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
                                     />
                                   ) : (
                                     <div style={{ width: '100%', aspectRatio: '1', background: 'var(--at-chip)', borderRadius: '7px', border: '1.5px dashed var(--at-line-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: 'var(--at-ink-3)', fontSize: '10px' }}>
