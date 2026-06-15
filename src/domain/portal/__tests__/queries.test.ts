@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => {
   const state: { results: unknown[] } = { results: [] }
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'gte', 'lt', 'is', 'order', 'limit', 'single', 'maybeSingle']) {
+  for (const m of ['select', 'eq', 'in', 'gte', 'lt', 'is', 'not', 'order', 'limit', 'single', 'maybeSingle']) {
     b[m] = () => b
   }
   b.then = (resolve: (v: unknown) => void) => resolve(state.results.shift())
@@ -18,6 +18,8 @@ import {
   fetchPortalBootstrap,
   fetchPortalContadores,
   fetchPortalPaymentConfig,
+  fetchPortalFotoIds,
+  fetchRegistroFoto,
   fetchRegistrosByContadores,
   fetchCondominiosPortalData,
 } from '../queries'
@@ -54,6 +56,31 @@ describe('lecturas de portal (data cruda nullable)', () => {
   it('fetchRegistrosByContadores con data null → null', async () => {
     h.state.results = [{ data: null }]
     expect(await fetchRegistrosByContadores(['c1'])).toBeNull()
+  })
+  it('fetchRegistroFoto devuelve el valor de foto del registro', async () => {
+    h.state.results = [{ data: { foto: 'cli1/123' } }]
+    expect(await fetchRegistroFoto('r1')).toBe('cli1/123')
+  })
+  it('fetchRegistroFoto sin fila → null', async () => {
+    h.state.results = [{ data: null }]
+    expect(await fetchRegistroFoto('r1')).toBeNull()
+  })
+})
+
+describe('fetchPortalFotoIds', () => {
+  it('une los ids con foto de cliente + contador + proyecto (sin duplicar)', async () => {
+    // 3 queries en paralelo (cliente, contador, proyecto) — una por dataset en cola.
+    h.state.results = [
+      { data: [{ id: 'a' }, { id: 'b' }] },
+      { data: [{ id: 'b' }, { id: 'c' }] },
+      { data: [{ id: 'd' }] },
+    ]
+    const ids = await fetchPortalFotoIds('cli1', ['c1'], ['p1'])
+    expect([...ids].sort()).toEqual(['a', 'b', 'c', 'd'])
+  })
+  it('solo consulta por cliente cuando no hay contadores ni proyectos', async () => {
+    h.state.results = [{ data: [{ id: 'a' }] }]
+    expect(await fetchPortalFotoIds('cli1', [], [])).toEqual(['a'])
   })
 })
 

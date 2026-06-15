@@ -53,7 +53,7 @@ export interface PortalCtx {
   setExpandedContador: Dispatch<SetStateAction<string | null>>
   selectedProjectId: string | null
   setSelectedProjectId: Dispatch<SetStateAction<string | null>>
-  setPhotoModal: Dispatch<SetStateAction<{ url: string; label: string } | null>>
+  setPhotoModal: Dispatch<SetStateAction<{ registroId: string; label: string } | null>>
   chartMonthsBack: number
   setChartMonthsBack: Dispatch<SetStateAction<number>>
   chartCustomStart: string

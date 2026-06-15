@@ -62,6 +62,8 @@ export interface PortalDashboardInputs {
   lecturas: LecturaInfo[]
   contadores: ContadorInfo[]
   unidades: UnidadInfo[]
+  /** IDs de registros que tienen foto (la foto se baja aparte, bajo demanda). */
+  fotoRegistroIds?: Set<string>
   selectedProjectId: string | null
   selectedUnidadId: string | null
   selectedTipoAgua: string | null
@@ -80,6 +82,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
     selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd,
     chartRangeMode, chartMetric,
   } = inputs
+    const fotoRegistroIds = inputs.fotoRegistroIds ?? new Set<string>()
     const now = inputs.ahora ?? new Date()
     const curY = now.getFullYear()
     const curM = now.getMonth()
@@ -247,8 +250,10 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
             .reduce((s, l) => s + (l.consumo || 0), 0)
           consumoMesLabel = `${MESES_LABELS[lastD.getMonth()]} ${lastD.getFullYear()}`
         }
-        // Fotos: última y penúltima lectura con foto
-        const withFoto = cLec.filter(l => l.foto)
+        // Fotos: última y penúltima lectura con foto. La presencia de foto viene
+        // del set `fotoRegistroIds` (consultado aparte); los bytes se bajan bajo
+        // demanda al renderizar la miniatura, no aquí.
+        const withFoto = cLec.filter(l => fotoRegistroIds.has(l.id))
         return { contador, consumoMes, consumo12m, consumoMesDisplay, consumoMesLabel, ultimaLectura, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
       })
       return { unidad, meters }
