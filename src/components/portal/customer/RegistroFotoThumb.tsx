@@ -40,7 +40,8 @@ export function RegistroFotoThumb({ registroId, label, onClick }: { registroId: 
     return () => { cancelled = true }
   }, [registroId])
 
-  const url = useSignedUrl(fotoValue, 'registro-fotos')
+  // Miniatura redimensionada (~30 KB) en vez del original de ~1.5 MB.
+  const url = useSignedUrl(fotoValue, 'registro-fotos', 3600, { width: 320, height: 320, resize: 'cover', quality: 65 })
 
   if (failed) return <PlaceholderBox icon="🚫" text="No disponible" />
   if (!url) return <PlaceholderBox icon="⏳" text="Cargando…" />

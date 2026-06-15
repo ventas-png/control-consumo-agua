@@ -50,7 +50,9 @@ function PhotoLightbox({ modal, onClose }: { modal: { registroId: string; label:
     return () => { cancelled = true }
   }, [modal.registroId])
 
-  const signedUrl = useSignedUrl(fotoValue, 'registro-fotos')
+  // Versión mediana (ancho 1400, q80): nítida para ver en pantalla pero mucho más
+  // liviana que el original (~1.5 MB) — la carga del visor es casi inmediata.
+  const signedUrl = useSignedUrl(fotoValue, 'registro-fotos', 3600, { width: 1400, quality: 80 })
   return (
     <div
       onClick={onClose}
