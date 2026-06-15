@@ -3,7 +3,7 @@ import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { createRegistro } from '../../domain/agua/mutations'
+import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -47,7 +47,11 @@ export function LecturasSection({
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState<string | null>(null)
+  // `foto` es SOLO la vista previa (data-URL); el archivo real va en `fotoFile` y
+  // se sube a Storage al guardar. NUNCA se persiste el base64 en registros.foto
+  // (es de hasta ~15 MB por fila y vuelve lentísimo el portal del cliente).
   const [foto, setFoto] = useState<string | null>(null)
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
@@ -184,6 +188,7 @@ export function LecturasSection({
   function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
+    setFotoFile(f)
     const reader = new FileReader()
     reader.onload = ev => setFoto(ev.target?.result as string)
     reader.readAsDataURL(f)
@@ -211,6 +216,7 @@ export function LecturasSection({
     setFechaAnteriorManual('')
     setNotas('')
     setFoto(null)
+    setFotoFile(null)
   }
 
   async function handleGuardar() {
@@ -238,10 +244,27 @@ export function LecturasSection({
       return
     }
 
+    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
+    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
+    const clienteIdRegistro = unidadSeleccionada.cliente_id ?? null
+    setSaving(true)
+    let fotoPath: string | null = null
+    if (fotoFile && clienteIdRegistro) {
+      const path = `${clienteIdRegistro}/${Date.now()}`
+      const { error: uploadError } = await uploadRegistroFoto(path, fotoFile, fotoFile.type)
+      if (uploadError) {
+        notify({ variant: 'warning', title: 'Foto no guardada', text: 'No se pudo subir la foto; la lectura se guardará sin ella.' })
+      } else {
+        fotoPath = path
+      }
+    } else if (fotoFile && !clienteIdRegistro) {
+      notify({ variant: 'warning', title: 'Foto no guardada', text: 'La unidad no tiene cliente asociado; la lectura se guardará sin foto.' })
+    }
+
     const registro = {
       // El cliente se toma de la unidad (siempre cargada), no de la lista `clientes`
       // en memoria: un operador puede no tenerla por RLS y se perdía el cliente_id.
-      cliente_id: unidadSeleccionada.cliente_id ?? null,
+      cliente_id: clienteIdRegistro,
       cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
       contador_id: contadorSeleccionado.id,
       project_id: projectId,
@@ -259,10 +282,9 @@ export function LecturasSection({
       dias_servicio: diasServicio,
       notas,
       gps,
-      foto,
+      foto: fotoPath,
     }
 
-    setSaving(true)
     const { data, error } = await createRegistro(registro)
     setSaving(false)
 
@@ -329,6 +351,7 @@ export function LecturasSection({
           setLecturaActual('')
           setNotas('')
           setFoto(null)
+          setFotoFile(null)
           return
         }
       }
@@ -342,6 +365,7 @@ export function LecturasSection({
         setLecturaActual('')
         setNotas('')
         setFoto(null)
+        setFotoFile(null)
       } else {
         if (rutaActiva) {
           const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
