@@ -218,3 +218,13 @@ export async function createContactosEmergencia(
   const { error } = await supabase.from('contactos_emergencia').insert(rows)
   return { error: error?.message ?? null }
 }
+
+// ── Importación de inventario ──────────────────────────────────────────────
+
+/** Inserta items de inventario en lote (import; payload ya armado por la UI). */
+export async function createInventarioItems(
+  rows: Record<string, unknown>[],
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('inventario_condominio').insert(rows)
+  return { error: error?.message ?? null }
+}

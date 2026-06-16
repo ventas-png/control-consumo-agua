@@ -483,6 +483,7 @@ export const en: Translations = {
     inventario: {
       title: 'Inventory',
       new_button: '+ Add Item',
+      import_button: '⬆ Bulk upload',
       valor_activo: 'Active inventory value:',
       alerta_stock: '{{count}} item(s) with low or depleted stock',
       alerta_vencer: '{{count}} item(s) expiring within 30 days',
