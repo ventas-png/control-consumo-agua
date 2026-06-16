@@ -14,7 +14,7 @@ const h = vi.hoisted(() => {
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b } }))
 
 import { fetchCondominioStatsForProject, fetchCondominioStatsRows } from '../queries'
-import { createContactosEmergencia } from '../mutations'
+import { createContactosEmergencia, createInventarioItems } from '../mutations'
 
 beforeEach(() => { h.state.results = [] })
 
@@ -52,5 +52,16 @@ describe('createContactosEmergencia', () => {
   it('error → mensaje legible', async () => {
     h.state.results = [{ error: { message: 'rls' } }]
     expect(await createContactosEmergencia([])).toEqual({ error: 'rls' })
+  })
+})
+
+describe('createInventarioItems', () => {
+  it('éxito → { error: null }', async () => {
+    h.state.results = [{ error: null }]
+    expect(await createInventarioItems([{ nombre: 'x' }])).toEqual({ error: null })
+  })
+  it('error → mensaje legible', async () => {
+    h.state.results = [{ error: { message: 'rls' } }]
+    expect(await createInventarioItems([])).toEqual({ error: 'rls' })
   })
 })
