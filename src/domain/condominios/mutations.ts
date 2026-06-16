@@ -228,3 +228,13 @@ export async function createInventarioItems(
   const { error } = await supabase.from('inventario_condominio').insert(rows)
   return { error: error?.message ?? null }
 }
+
+// ── Importación de tareas ──────────────────────────────────────────────────
+
+/** Inserta tareas de condominio en lote (import; payload ya armado por la UI). */
+export async function createTareasCondominio(
+  rows: Record<string, unknown>[],
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('tareas_condominio').insert(rows)
+  return { error: error?.message ?? null }
+}
