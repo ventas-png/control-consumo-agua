@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
+import { ImportTareasModal } from '../ImportTareasModal'
 
 interface Props {
   tareas: TareaCondominio[]
@@ -46,6 +47,7 @@ function diasRestantes(fecha?: string | null): number | null {
 export default function TareasCondominioTab({ tareas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<TareaCondominio | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoTarea | ''>('')
   const [filtroPrio, setFiltroPrio] = useState<PrioridadTarea | ''>('')
@@ -135,10 +137,16 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Tareas ({lista.length})</span>
             {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nueva
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+                  style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  ⬆ Masiva
+                </button>
+                <button onClick={() => { setMostrarForm(true); setSelected(null) }}
+                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  + Nueva
+                </button>
+              </div>
             )}
           </div>
           {/* KPIs */}
@@ -347,6 +355,15 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           </div>
         )}
       </div>
+
+      {showImportModal && (
+        <ImportTareasModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }
