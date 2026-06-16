@@ -685,16 +685,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   ])
 
 
-  if (proyectosActivos.length === 0) {
-    return (
-      <EmptyState
-        icon="🏢"
-        title="No hay proyectos activos"
-        description='Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.'
-      />
-    )
-  }
-
   // F3.14: Command palette items — solo tabs visibles para el usuario.
   // Permite búsqueda y salto rápido a cualquiera de los 191 tabs via Cmd+K.
   const commandItems: CommandItem[] = useMemo(() => {
@@ -722,6 +712,21 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   useEffect(() => {
     return registerCommands(commandItems)
   }, [commandItems])
+
+  // Early return DESPUÉS de todos los hooks: las Rules of Hooks exigen que el
+  // número y orden de hooks sea idéntico en cada render. Cuando este return
+  // estaba antes de los hooks de arriba (commandItems / registerCommands), pasar
+  // de "sin proyectos" a "con proyectos" cambiaba la cantidad de hooks → React
+  // error #310 ("Rendered more hooks than during the previous render").
+  if (proyectosActivos.length === 0) {
+    return (
+      <EmptyState
+        icon="🏢"
+        title="No hay proyectos activos"
+        description='Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.'
+      />
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
