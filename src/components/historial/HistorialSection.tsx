@@ -329,7 +329,7 @@ export function HistorialSection({
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
-          {unidades.length > 0 && (
+          {unidadesDisponibles.length > 0 && (
             <select value={filtroUnidad} onChange={e => { setFiltroUnidad(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todas las Unidades</option>
               {unidadesDisponibles.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
