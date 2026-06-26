@@ -6,6 +6,12 @@ import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 import { DataTable, type DataTableColumn, Icon } from '../shared'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
+import {
+  registroCoincide,
+  numeroContadorDeRegistro,
+  unidadesDelProyecto,
+  type HistorialFiltros,
+} from '../../lib/historialFiltros'
 
 interface Props {
   registros: Registro[]
@@ -71,22 +77,22 @@ export function HistorialSection({
   )
 
   const filtrados = useMemo(() => {
-    const needle = filtroTexto.toLowerCase().trim()
+    const filtros: HistorialFiltros = {
+      texto: filtroTexto, estado: filtroEstado, proyecto: filtroProyecto,
+      unidad: filtroUnidad, tipoAgua: filtroTipoAgua,
+      fechaInicio: filtroFechaInicio, fechaFin: filtroFechaFin,
+    }
     return registros
-      .filter(r => {
-        const matchTxt = !needle || (r.cliente_nombre ?? '').toLowerCase().includes(needle)
-        const matchEst = !filtroEstado || r.estado === filtroEstado
-        const fecha = new Date(r.fecha)
-        const matchFechaInicio = !filtroFechaInicio || fecha >= new Date(filtroFechaInicio)
-        const matchFechaFin = !filtroFechaFin || fecha <= new Date(filtroFechaFin + 'T23:59:59')
-        const matchProyecto = !filtroProyecto || (r as Registro & { project_id?: string }).project_id === filtroProyecto
-        const contador = r.contador_id ? contadoresById.get(r.contador_id) : undefined
-        const matchUnidad = !filtroUnidad || contador?.unidad_id === filtroUnidad
-        const matchTipoAgua = !filtroTipoAgua || contador?.tipo_agua === filtroTipoAgua
-        return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad && matchTipoAgua
-      })
+      .filter(r => registroCoincide(r, filtros, contadoresById))
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
   }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadoresById])
+
+  // Unidades del dropdown limitadas al proyecto seleccionado (si hay uno), para
+  // que el filtro de unidad no liste unidades de otros proyectos.
+  const unidadesDisponibles = useMemo(
+    () => unidadesDelProyecto(unidades, filtroProyecto),
+    [unidades, filtroProyecto]
+  )
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / itemsPerPage))
   const paginados = useMemo(
@@ -192,6 +198,16 @@ export function HistorialSection({
       render: r => r.cliente_nombre ?? '—',
     },
     {
+      key: 'contador', header: '# Contador', sortable: true,
+      accessor: r => numeroContadorDeRegistro(r, contadoresById) ?? '',
+      render: r => {
+        const numero = numeroContadorDeRegistro(r, contadoresById)
+        return numero
+          ? <span style={{ color: 'var(--at-ink-2)', fontVariantNumeric: 'tabular-nums' }}>{numero}</span>
+          : <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+      },
+    },
+    {
       key: 'lectAnt', header: 'Lect. Ant.', numeric: true,
       accessor: r => r.lectura_anterior,
       render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
@@ -249,7 +265,7 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, onRegistroDeleted])
+  ], [moneda, canEdit, onRegistroDeleted, contadoresById])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
@@ -273,7 +289,8 @@ export function HistorialSection({
           <button
             onClick={async () => {
               const { exportarPDFGlobal } = await import('../../lib/pdf')
-              exportarPDFGlobal(filtrados)
+              const numeroContadorById = new Map(contadores.map(c => [c.id, c.numero_serie]))
+              exportarPDFGlobal(filtrados, numeroContadorById)
             }}
             style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
           >📄 PDF</button>
@@ -295,7 +312,7 @@ export function HistorialSection({
         <div style={{ background: 'var(--at-surface-2)', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input
             type="text"
-            placeholder="🔍 Buscar cliente..."
+            placeholder="🔍 Buscar cliente o # de contador..."
             value={filtroTexto}
             onChange={e => { setFiltroTexto(e.target.value); setCurrentPage(1) }}
             style={filterFieldStyle}
@@ -307,15 +324,15 @@ export function HistorialSection({
             <option value="mora">⚠️ Mora</option>
           </select>
           {proyectos.length > 1 && (
-            <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
+            <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setFiltroUnidad(''); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todos los Proyectos</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
-          {unidades.length > 0 && (
+          {unidadesDisponibles.length > 0 && (
             <select value={filtroUnidad} onChange={e => { setFiltroUnidad(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todas las Unidades</option>
-              {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+              {unidadesDisponibles.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
           )}
           {(() => {
@@ -374,7 +391,13 @@ export function HistorialSection({
               >
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-ink)' }}>{r.cliente_nombre}</div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>📅 {formatDate(r.fecha)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                    📅 {formatDate(r.fecha)}
+                    {(() => {
+                      const numero = numeroContadorDeRegistro(r, contadoresById)
+                      return numero ? <span> · 🔢 {numero}</span> : null
+                    })()}
+                  </div>
                 </div>
                 <div style={{ background: 'var(--at-surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
                   <div><span style={{ color: 'var(--at-ink-3)' }}>Anterior</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_anterior}</div></div>
