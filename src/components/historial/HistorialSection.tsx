@@ -65,7 +65,17 @@ export function HistorialSection({
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [currentPage, setCurrentPage] = useState(1)
+  // IDs de lecturas con el detalle desplegado (tabla y cards comparten el set).
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
   const itemsPerPage = 20
+
+  function toggleDetalle(id: string) {
+    setExpandidas(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  }
 
   const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
 
@@ -188,6 +198,21 @@ export function HistorialSection({
   // ── Tabla via DataTable ─────────────────────────────────────────────────
   const columns: DataTableColumn<Registro>[] = useMemo(() => [
     {
+      key: 'expand', header: '', width: 44,
+      render: r => {
+        const abierto = expandidas.has(r.id)
+        return (
+          <button
+            onClick={() => toggleDetalle(r.id)}
+            aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
+            aria-expanded={abierto}
+            title={abierto ? 'Ocultar detalles' : 'Ver detalles'}
+            style={expandBtnStyle(abierto)}
+          >{abierto ? '▲' : '▼'}</button>
+        )
+      },
+    },
+    {
       key: 'fecha', header: 'Fecha', sortable: true,
       accessor: r => r.fecha,
       render: r => `📅 ${formatDate(r.fecha)}`,
@@ -265,7 +290,7 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, onRegistroDeleted, contadoresById])
+  ], [moneda, canEdit, onRegistroDeleted, contadoresById, expandidas])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
@@ -368,6 +393,15 @@ export function HistorialSection({
             rowKey="id"
             pageSize={0}  // paginación la hacemos en el padre para que cards también use la misma
             emptyState={{ icon: '📭', title: 'Sin registros' }}
+            isRowExpanded={r => expandidas.has(r.id)}
+            expandedContent={r => (
+              <RegistroDetalle
+                registro={r}
+                moneda={moneda}
+                total={getTotal(r)}
+                numeroContador={numeroContadorDeRegistro(r, contadoresById)}
+              />
+            )}
           />
         </div>
       )}
@@ -417,6 +451,35 @@ export function HistorialSection({
                     )}
                   </div>
                 </div>
+                {/* Toggle de detalles — mismo set que la tabla */}
+                {(() => {
+                  const abierto = expandidas.has(r.id)
+                  return (
+                    <>
+                      <button
+                        onClick={() => toggleDetalle(r.id)}
+                        aria-expanded={abierto}
+                        aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
+                        style={{
+                          marginTop: 12, width: '100%', padding: '8px',
+                          background: abierto ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+                          color: 'var(--at-ink-2)', border: '1px solid var(--at-line)',
+                          borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        }}
+                      >{abierto ? '▲ Ocultar detalles' : '▼ Ver detalles'}</button>
+                      {abierto && (
+                        <div style={{ marginTop: 10 }}>
+                          <RegistroDetalle
+                            registro={r}
+                            moneda={moneda}
+                            total={total}
+                            numeroContador={numeroContadorDeRegistro(r, contadoresById)}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             )
           })}
@@ -495,6 +558,83 @@ export function HistorialSection({
 
 // ── Sub-componentes locales ───────────────────────────────────────────────
 
+// Panel de detalle de una lectura — muestra todos los campos que no caben en
+// la fila/card (período de servicio, desglose de tarifa, pago, notas, GPS…).
+// `foto` no se incluye: el listado nunca la trae (es base64 pesado; ver
+// REGISTROS_LIST_COLS en domain/agua/queries.ts).
+function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
+  registro: Registro; moneda: string; total: number; numeroContador: string | null
+}) {
+  const periodo = r.fecha_lectura_anterior
+    ? `${formatDate(r.fecha_lectura_anterior)} → ${formatDate(r.fecha)}`
+    : formatDate(r.fecha)
+  const gps = r.gps
+
+  return (
+    <div style={{
+      background: 'var(--at-surface)', border: '1px solid var(--at-line)',
+      borderRadius: 10, padding: 16, marginTop: 4,
+      display: 'flex', flexDirection: 'column', gap: 14,
+    }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14,
+      }}>
+        <DetailField label="Período de servicio" value={periodo} />
+        {r.dias_servicio != null && <DetailField label="Días de servicio" value={`${formatNumber(r.dias_servicio, 0)} días`} />}
+        {r.mes && <DetailField label="Mes facturado" value={r.mes} />}
+        {numeroContador && <DetailField label="# Contador" value={numeroContador} />}
+
+        <DetailField label="Lectura anterior" value={formatNumber(r.lectura_anterior, 0)} />
+        <DetailField label="Lectura actual" value={formatNumber(r.lectura_actual, 0)} accent="var(--at-primary)" />
+        <DetailField label="Consumo" value={`${formatNumber(r.consumo)} m³`} accent="var(--at-accent)" />
+
+        {r.tipo_cobro && <DetailField label="Tipo de cobro" value={r.tipo_cobro} />}
+        <DetailField label="Tarifa aplicada" value={`${formatCurrency(r.tarifa_aplicada, moneda)} / m³`} />
+        {r.tarifa_exceso_aplicada ? <DetailField label="Tarifa de exceso" value={`${formatCurrency(r.tarifa_exceso_aplicada, moneda)} / m³`} /> : null}
+        <DetailField label="Canon / cargo fijo" value={formatCurrency(r.canon_aplicado, moneda)} />
+        <DetailField label="Total calculado" value={formatCurrency(total, moneda)} accent="var(--at-primary)" />
+
+        {r.monto_pagado != null && <DetailField label="Monto pagado" value={formatCurrency(r.monto_pagado, moneda)} accent="var(--at-success-strong)" />}
+        {r.fecha_pago && <DetailField label="Fecha de pago" value={formatDate(r.fecha_pago)} />}
+      </div>
+
+      {r.notas && (
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={detailLabelStyle}>📝 Notas</div>
+          <div style={{ fontSize: 13.5, color: 'var(--at-ink)', whiteSpace: 'pre-wrap' }}>{r.notas}</div>
+        </div>
+      )}
+
+      {gps && (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+            fontSize: 13, fontWeight: 600, color: 'var(--at-primary)', textDecoration: 'none',
+          }}
+        >
+          📍 Ver ubicación en el mapa ({gps.lat.toFixed(5)}, {gps.lng.toFixed(5)})
+        </a>
+      )}
+
+      <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>ID de lectura: {r.id}</div>
+    </div>
+  )
+}
+
+function DetailField({ label, value, accent }: {
+  label: string; value: ReactNode; accent?: string
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={detailLabelStyle}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: accent ?? 'var(--at-ink)', wordBreak: 'break-word' }}>{value}</div>
+    </div>
+  )
+}
+
 function StatCard({ label, value, color, icon, moneda }: {
   label: string; value: string | number; color: string; icon: ReactNode; moneda: string
 }) {
@@ -561,6 +701,21 @@ function Pagination({ currentPage, totalPages, onChange }: {
 
 function pillStyle(p: { bg: string; color: string }): CSSProperties {
   return { padding: '6px 14px', borderRadius: 12, fontSize: 12, fontWeight: 600, ...p }
+}
+
+function expandBtnStyle(abierto: boolean): CSSProperties {
+  return {
+    width: 30, height: 30, padding: 0, lineHeight: 1,
+    background: abierto ? 'var(--at-primary)' : 'var(--at-surface-2)',
+    color: abierto ? 'white' : 'var(--at-ink-2)',
+    border: '1px solid', borderColor: abierto ? 'var(--at-primary)' : 'var(--at-line)',
+    borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+  }
+}
+
+const detailLabelStyle: CSSProperties = {
+  fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3,
 }
 
 function viewBtnStyle(active: boolean): CSSProperties {
