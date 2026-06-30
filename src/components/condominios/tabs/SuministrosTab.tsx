@@ -3,6 +3,7 @@ import { createCondominioRow, updateCondominioRow } from '../../../domain/condom
 import { notify } from '../../shared/Dialog'
 import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { ImportSuministrosModal } from '../ImportSuministrosModal'
 
 interface Props {
   suministros: SuministroCondominio[]
@@ -38,6 +39,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   const [saving, setSaving] = useState(false)
   const [filtro, setFiltro] = useState<CategoriaSupministro | ''>('')
   const [soloAlertas, setSoloAlertas] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const [form, setForm] = useState({
     nombre: '', categoria: 'limpieza' as CategoriaSupministro,
@@ -125,10 +127,16 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Suministros</span>
             {canCreate && (
-              <button onClick={() => { setVista('nuevo'); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+                  style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  ⬆ Masiva
+                </button>
+                <button onClick={() => { setVista('nuevo'); setSelected(null) }}
+                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  + Nuevo
+                </button>
+              </div>
             )}
           </div>
           <select style={{ ...inp, marginBottom: 6 }} value={filtro} onChange={e => setFiltro(e.target.value as CategoriaSupministro | '')}>
@@ -362,6 +370,15 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           </div>
         )}
       </div>
+
+      {showImportModal && (
+        <ImportSuministrosModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }
