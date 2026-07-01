@@ -645,7 +645,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'presencia', label: 'Presencia', icon: '📋', render: (ctx) =>
     <PresenciaPersonalTab registros={ctx.presenciaPersonal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'suministros', label: 'Suministros', icon: '🗃️', render: (ctx) =>
-    <SuministrosTab suministros={ctx.suministros} movimientos={ctx.movimientosSuministro} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
+    <SuministrosTab suministros={ctx.suministros} movimientos={ctx.movimientosSuministro} proveedores={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'tareas_cond', label: 'Tareas', icon: '✅', render: (ctx) =>
     <TareasCondominioTab tareas={ctx.tareasCond} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('condominios')} canEdit={ctx.canEdit('condominios')} onRefresh={ctx.onRefresh} /> },
   { id: 'cobranza', label: 'Cobranza', icon: '💰', render: (ctx) =>

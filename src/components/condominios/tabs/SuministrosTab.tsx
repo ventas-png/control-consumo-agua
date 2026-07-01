@@ -1,13 +1,14 @@
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
-import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
+import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum, ContratoProveedor } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { ImportSuministrosModal } from '../ImportSuministrosModal'
 
 interface Props {
   suministros: SuministroCondominio[]
   movimientos: MovimientoSuministro[]
+  proveedores: ContratoProveedor[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -33,7 +34,7 @@ const TIPOS_MOV: { value: TipoMovimientoSum; label: string; color: string }[] = 
   { value: 'ajuste',  label: 'Ajuste',  color: 'var(--at-warning)' },
 ]
 
-export default function SuministrosTab({ suministros, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function SuministrosTab({ suministros, movimientos, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<SuministroCondominio | null>(null)
   const [vista, setVista] = useState<'lista' | 'nuevo' | 'movimiento'>('lista')
   const [saving, setSaving] = useState(false)
@@ -59,6 +60,18 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
   const alertas = suministros.filter(s => s.activo && s.stock_actual <= s.stock_minimo)
   const movsDelSelected = selected ? movimientos.filter(m => m.suministro_id === selected.id) : []
+
+  // Proveedores autorizados/definidos (pestaña Proveedores) — únicas opciones
+  // válidas para el campo Proveedor del suministro. Nombres distintos, con los
+  // contratos activos primero.
+  const proveedoresDisponibles = Array.from(
+    new Set(
+      [...proveedores]
+        .sort((a, b) => (a.estado === 'activo' ? 0 : 1) - (b.estado === 'activo' ? 0 : 1))
+        .map(p => p.proveedor_nombre.trim())
+        .filter(Boolean)
+    )
+  )
 
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
@@ -213,7 +226,17 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               </div>
               <div>
                 <label style={lbl}>Proveedor</label>
-                <input style={inp} value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} />
+                <select style={inp} value={form.proveedor}
+                  onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))}
+                  disabled={proveedoresDisponibles.length === 0}>
+                  <option value="">— Sin proveedor —</option>
+                  {proveedoresDisponibles.map(nombre => <option key={nombre} value={nombre}>{nombre}</option>)}
+                </select>
+                {proveedoresDisponibles.length === 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                    Define proveedores en la pestaña <strong>Proveedores</strong> para poder elegirlos aquí.
+                  </div>
+                )}
               </div>
               <div>
                 <label style={lbl}>Costo unitario ({moneda})</label>
@@ -375,6 +398,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         <ImportSuministrosModal
           proyectoId={proyectoId}
           companyId={companyId}
+          proveedoresValidos={proveedoresDisponibles}
           onClose={() => setShowImportModal(false)}
           onImportado={() => { setShowImportModal(false); onRefresh() }}
         />
