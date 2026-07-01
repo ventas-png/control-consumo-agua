@@ -30,11 +30,20 @@ const COLUMNS: ImportColumn[] = [
   { key: 'stock_minimo',   width: 14, exampleValues: [5, 1, 4] },
   { key: 'costo_unitario', width: 16, exampleValues: [35.50, 80, 22.75] },
   { key: 'ubicacion',      width: 22, exampleValues: ['Cuarto de limpieza', 'Bodega general', 'Cuarto de máquinas'] },
-  { key: 'proveedor',      width: 20, exampleValues: ['Distribuidora XYZ', '', 'Químicos S.A.'] },
+  { key: 'proveedor',      width: 20, exampleValues: ['', '', ''] },
   { key: 'notas',          width: 28, exampleValues: ['Diluir 1:10', '', 'Manejar con guantes'] },
 ]
 
-function validateRow(row: Record<string, unknown>): RowValidationResult<SuministroRow> {
+/**
+ * Crea el validador de fila. `proveedoresValidos` son los nombres de proveedores
+ * definidos/autorizados (pestaña Proveedores): la columna `proveedor` es opcional,
+ * pero si trae valor debe coincidir (sin distinguir mayúsculas) con uno de ellos —
+ * así la importación masiva respeta la misma restricción que el formulario.
+ */
+function makeValidateRow(proveedoresValidos: string[]) {
+  const proveedorLookup = new Map(proveedoresValidos.map(n => [n.trim().toLowerCase(), n.trim()]))
+
+  return function validateRow(row: Record<string, unknown>): RowValidationResult<SuministroRow> {
   const errors: string[] = []
 
   const nombre = sanitizeInput(String(row['nombre'] ?? '').trim())
@@ -82,6 +91,15 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<Suminist
     if (isNaN(costo_unitario) || costo_unitario < 0) errors.push('costo_unitario debe ser un número ≥ 0')
   }
 
+  // proveedor → opcional, pero si viene debe ser un proveedor autorizado.
+  let proveedor: string | undefined
+  const rawProveedor = sanitizeInput(String(row['proveedor'] ?? '').trim())
+  if (rawProveedor) {
+    const match = proveedorLookup.get(rawProveedor.toLowerCase())
+    if (!match) errors.push(`proveedor no autorizado: "${row['proveedor']}" — debe ser un proveedor definido en la pestaña Proveedores`)
+    else proveedor = match
+  }
+
   if (errors.length > 0) return { ok: false, errors }
 
   return {
@@ -94,20 +112,24 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<Suminist
       stock_minimo,
       costo_unitario: costo_unitario ?? undefined,
       ubicacion:  sanitizeInput(String(row['ubicacion'] ?? '').trim()) || undefined,
-      proveedor:  sanitizeInput(String(row['proveedor'] ?? '').trim()) || undefined,
+      proveedor:  proveedor ?? undefined,
       notas:      sanitizeInput(String(row['notas'] ?? '').trim()) || undefined,
     },
+  }
   }
 }
 
 interface Props {
   proyectoId: string
   companyId: string
+  /** Nombres de proveedores autorizados (pestaña Proveedores). La columna
+   *  `proveedor` del archivo debe coincidir con uno de estos si trae valor. */
+  proveedoresValidos: string[]
   onClose: () => void
   onImportado: () => void
 }
 
-export function ImportSuministrosModal({ proyectoId, companyId, onClose, onImportado }: Props) {
+export function ImportSuministrosModal({ proyectoId, companyId, proveedoresValidos, onClose, onImportado }: Props) {
   return (
     <ImportModal<SuministroRow>
       entityLabel="suministro"
@@ -115,7 +137,7 @@ export function ImportSuministrosModal({ proyectoId, companyId, onClose, onImpor
       sheetName="Suministros"
       templateFilename="plantilla_suministros"
       columns={COLUMNS}
-      validateRow={validateRow}
+      validateRow={makeValidateRow(proveedoresValidos)}
       onInsertBatch={async (batch) => {
         const payload = batch.map(s => ({
           ...s,
