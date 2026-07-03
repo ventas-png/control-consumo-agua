@@ -88,6 +88,25 @@ describe('módulos de agua → clave agua.<modulo>.<accion>', () => {
   it('create sin view → false (no basta la acción suelta)', () => {
     expect(api(session('operator', ['agua.cobros.create'])).canCreate('cobros')).toBe(false)
   })
+
+  it('approve/delete exigen view + la acción (mismas reglas que el resto)', () => {
+    const soloView = api(session('operator', ['agua.cobros.view']))
+    expect(soloView.canApprove('cobros')).toBe(false)
+    expect(soloView.canDelete('cobros')).toBe(false)
+
+    const completo = api(session('operator', ['agua.cobros.view', 'agua.cobros.approve', 'agua.cobros.delete']))
+    expect(completo.canApprove('cobros')).toBe(true)
+    expect(completo.canDelete('cobros')).toBe(true)
+
+    // sin view, la acción suelta no habilita
+    expect(api(session('operator', ['agua.cobros.delete'])).canDelete('cobros')).toBe(false)
+  })
+
+  it('roles exentos también aprueban/eliminan (bypass)', () => {
+    const p = api(session('admin'))
+    expect(p.canApprove('cobros')).toBe(true)
+    expect(p.canDelete('clientes')).toBe(true)
+  })
 })
 
 describe('módulos de plataforma → clave platform.<modulo>.<accion>', () => {

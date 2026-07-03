@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 import type { RoleDef } from '../../types'
 import type { SectionGroup } from '../../lib/condominiosRoles'
 import { groupStatus, type PermissionEffect } from '../../lib/effectivePermissions'
+import { MODULE_ACTION_LABELS } from '../../lib/moduleConfig'
 import { AccessBadge, Banner, SectionHeader, SubsectionHeader } from './rolesUi'
 
 export interface MatrixSectionBlock {
@@ -28,16 +29,12 @@ interface Props {
   onSaveAsRole: () => void
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  view: 'Ver',
-  create: 'Crear',
-  edit: 'Editar',
-  change_status: 'Cambiar estado',
-}
+// Fuente única de etiquetas de acción: MODULE_ACTION_LABELS (moduleConfig).
+const ACTION_LABELS: Record<string, string> = MODULE_ACTION_LABELS
 
 function lineLabel(key: string, permLabels: Map<string, string>): string {
   // agua.<mod>.<action> / platform.<mod>.<action> → etiqueta corta de la acción;
-  // condominios.tab.<id> y resto → etiqueta del catálogo.
+  // condominios.tab.<id>[.<action>] y resto → etiqueta del catálogo.
   const parts = key.split('.')
   const action = parts[parts.length - 1]
   if ((parts[0] === 'agua' || parts[0] === 'platform') && ACTION_LABELS[action]) {

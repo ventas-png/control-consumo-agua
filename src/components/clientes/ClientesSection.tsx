@@ -75,6 +75,8 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
   const [activoMap, setActivoMap] = useState<Record<string, { ccId: string; activo: boolean }>>({})
 
   const canEdit = perms.canEdit('clientes') && currentUser.role !== 'viewer'
+  // RBAC granular: quitar cliente de la empresa requiere permiso de eliminar
+  const canDelete = perms.canDelete('clientes') && currentUser.role !== 'viewer'
 
   // Load account status and company_clientes.activo whenever clientes list changes
   useEffect(() => {
@@ -467,38 +469,42 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
         },
       },
     ]
-    if (canEdit) {
+    if (canEdit || canDelete) {
       cols.push({
         key: 'acciones',
         header: 'Acciones',
         align: 'center',
         render: c => (
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-            <button
-              onClick={() => startEdit(c)}
-              style={{
-                padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)',
-                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-              }}
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => handleEliminar(c)}
-              style={{
-                padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
-                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-              }}
-            >
-              Eliminar
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => startEdit(c)}
+                style={{
+                  padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                }}
+              >
+                Editar
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={() => handleEliminar(c)}
+                style={{
+                  padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                }}
+              >
+                Eliminar
+              </button>
+            )}
           </div>
         ),
       })
     }
     return cols
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit, accountMap, activoMap, unidades])
+  }, [canEdit, canDelete, accountMap, activoMap, unidades])
 
   const modalTitle = (() => {
     if (!isModalOpen) return ''
@@ -616,6 +622,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
           unidades={unidades}
           companyId={companyId}
           canEdit={canEdit}
+          canDelete={canDelete}
           onClose={() => setRentasClienteId(null)}
         />
       )}

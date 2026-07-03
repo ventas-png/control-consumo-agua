@@ -66,6 +66,7 @@ export function TarifasSection({
 
   const canCreate = perms.canCreate('tarifas') && currentUser.role !== 'viewer'
   const canEdit = perms.canEdit('tarifas') && currentUser.role !== 'viewer'
+  const canDelete = perms.canDelete('tarifas') && currentUser.role !== 'viewer'
 
   function startCreate() {
     setForm(EMPTY_FORM)
@@ -515,7 +516,7 @@ export function TarifasSection({
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cons. Mínimo</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Estado</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Revisión</th>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Acciones</th>
                   )}
                 </tr>
@@ -633,39 +634,43 @@ export function TarifasSection({
                         )
                       })()}
                     </td>
-                    {canEdit && (
+                    {(canEdit || canDelete) && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button
-                            onClick={() => startEdit(t)}
-                            style={{
-                              padding: '5px 12px',
-                              background: 'var(--at-primary-tint)',
-                              color: 'var(--at-primary-hover)',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleEliminar(t)}
-                            style={{
-                              padding: '5px 12px',
-                              background: 'var(--at-danger-tint)',
-                              color: 'var(--at-danger)',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                            }}
-                          >
-                            Eliminar
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => startEdit(t)}
+                              style={{
+                                padding: '5px 12px',
+                                background: 'var(--at-primary-tint)',
+                                color: 'var(--at-primary-hover)',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '12px',
+                              }}
+                            >
+                              Editar
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleEliminar(t)}
+                              style={{
+                                padding: '5px 12px',
+                                background: 'var(--at-danger-tint)',
+                                color: 'var(--at-danger)',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '12px',
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}

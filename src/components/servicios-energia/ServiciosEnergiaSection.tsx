@@ -20,6 +20,9 @@ export default function ServiciosEnergiaSection() {
   const perms = usePermissionsContext()
   const canCreate = perms.canCreate('servicios_energia')
   const canEdit = perms.canEdit('servicios_energia')
+  // RBAC granular: eliminar (facturas, tarifas, proveedores, fuentes) requiere
+  // el permiso delete del módulo. Crear/editar no cambian.
+  const canDelete = perms.canDelete('servicios_energia')
 
   const { tab: tabParam } = useParams<{ tab?: string }>()
   const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
@@ -83,6 +86,7 @@ export default function ServiciosEnergiaSection() {
             companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -95,6 +99,7 @@ export default function ServiciosEnergiaSection() {
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -108,6 +113,7 @@ export default function ServiciosEnergiaSection() {
             companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -122,6 +128,7 @@ export default function ServiciosEnergiaSection() {
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 

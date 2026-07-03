@@ -80,7 +80,7 @@ export default function App() {
   }
 
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
-  const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
+  const { canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete } = usePermissions(currentUser)
 
   // agua:A1 — navegación basada en URL (react-router-dom v6). El sidebar/topbar
   // siguen hablando AppSection; aquí derivamos sección desde location y
@@ -384,7 +384,7 @@ export default function App() {
   // Contexto que consumen los renders del registro declarativo de rutas (P1 #4).
   const routesCtx: AppRoutesCtx = {
     currentUser,
-    canViewModule, canCreate, canEdit, canChangeStatus,
+    canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete,
     agua,
     condominiosSinProyecto,
     navigateSection,

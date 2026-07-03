@@ -12,6 +12,10 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Permiso granular para eliminar solicitudes (default true para no romper usos existentes) */
+  canDelete?: boolean
+  /** Permiso granular para resolver/rechazar solicitudes (default: mismo gating que canEdit) */
+  canApprove?: boolean
   onRefresh: () => void
 }
 
@@ -48,7 +52,7 @@ const BLANK = {
   prioridad: 'normal' as PrioridadSolicitud, fecha_limite: '',
 }
 
-export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, canCreate, canEdit, canDelete = true, canApprove = canEdit, onRefresh }: Props) {
   const { t } = useTranslation()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
@@ -259,7 +263,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
           },
           {
             key: 'actions', header: '', align: 'right',
-            render: s => canEdit ? (
+            render: s => canDelete ? (
               <button onClick={e => { e.stopPropagation(); handleDelete(s.id) }} aria-label={t('condominios.comun.delete')}
                 style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
             ) : null,
@@ -275,26 +279,31 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
                 <div style={{ fontSize: '12px', color: 'var(--at-ink)' }}>{s.respuesta}</div>
               </div>
             )}
-            {canEdit && (s.estado === 'pendiente' || s.estado === 'en_proceso') && (
+            {(canEdit || canApprove) && (s.estado === 'pendiente' || s.estado === 'en_proceso') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} onClick={e => e.stopPropagation()}>
                 <textarea value={respuesta} onChange={e => setRespuesta(e.target.value)}
                   placeholder={t('condominios.solicitudes.response_placeholder')}
                   rows={2} style={{ padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', resize: 'vertical', fontFamily: 'inherit' }} />
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {s.estado === 'pendiente' && (
+                  {canEdit && s.estado === 'pendiente' && (
                     <button onClick={() => handleEstado(s.id, 'en_proceso')}
                       style={{ padding: '5px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                       {t('condominios.solicitudes.action_en_proceso')}
                     </button>
                   )}
-                  <button onClick={() => handleEstado(s.id, 'resuelto')}
-                    style={{ padding: '5px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                    {t('condominios.solicitudes.action_resolver')}
-                  </button>
-                  <button onClick={() => handleEstado(s.id, 'rechazado')}
-                    style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                    {t('condominios.solicitudes.action_rechazar')}
-                  </button>
+                  {/* Resolver/rechazar requieren permiso de aprobación (canApprove) */}
+                  {canApprove && (
+                    <>
+                      <button onClick={() => handleEstado(s.id, 'resuelto')}
+                        style={{ padding: '5px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        {t('condominios.solicitudes.action_resolver')}
+                      </button>
+                      <button onClick={() => handleEstado(s.id, 'rechazado')}
+                        style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                        {t('condominios.solicitudes.action_rechazar')}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

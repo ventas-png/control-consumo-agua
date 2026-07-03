@@ -6,6 +6,7 @@ import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/m
 import { updateRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente, Pago, ConvenioPago, FormaPago } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
@@ -84,6 +85,9 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const [verificando, setVerificando] = useState<string | null>(null)
 
   const canEdit = currentUser.role !== 'viewer'
+  // RBAC por acción: verificar/rechazar pagos es un flujo de aprobación
+  // (agua.cobros.approve), separado del edit/change_status genérico.
+  const canApprove = usePermissionsContext().canApprove('cobros')
   const companyId = currentUser.company_id
   const qc = useQueryClient()
 
@@ -717,6 +721,8 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                           )}
                         </div>
 
+                        {/* Autorizar/denegar el pago: solo con permiso de aprobación (RBAC). */}
+                        {canApprove && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
                           <button
                             onClick={() => void handleVerificarPago(pago.id, true)}
@@ -754,6 +760,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                             ❌ Rechazar
                           </button>
                         </div>
+                        )}
                       </div>
                     </div>
                   )

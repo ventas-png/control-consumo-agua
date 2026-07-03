@@ -36,6 +36,7 @@ export interface RutasCtx {
   unidades: Unidad[]
   proyectos: Proyecto[]
   canEdit: boolean
+  canDelete: boolean
   onEjecutarRuta: (ruta: Ruta) => void
 
   // ── Estado compartido ──

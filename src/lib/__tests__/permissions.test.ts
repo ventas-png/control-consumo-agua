@@ -4,6 +4,8 @@ import {
   hasPermission,
   hasAnyPermission,
   condominiosTabPermission,
+  condominiosTabActionPermission,
+  canActInCondominiosTab,
   getDisplayRoleLabel,
   getDisplayRoleColor,
   canViewCondominiosTabByPermission,
@@ -175,6 +177,54 @@ describe('getDisplayRoleColor', () => {
   it('rol asignado SIN color → cae al color del rol de plataforma', () => {
     const s = session({ role: 'operator', assigned_roles: [assignedRole({ service: 'condominios', color: null })] })
     expect(getDisplayRoleColor(s)).toBe(PLATFORM_ROLE_COLORS.operator)
+  })
+})
+
+describe('condominiosTabActionPermission', () => {
+  it('construye la clave condominios.tab.<id>.<action>', () => {
+    expect(condominiosTabActionPermission('cuotas', 'create')).toBe('condominios.tab.cuotas.create')
+    expect(condominiosTabActionPermission('visitantes', 'delete')).toBe('condominios.tab.visitantes.delete')
+  })
+})
+
+describe('canActInCondominiosTab', () => {
+  it('sin sesión → false; rol exento → true', () => {
+    expect(canActInCondominiosTab(null, 'cuotas', 'create')).toBe(false)
+    expect(canActInCondominiosTab(session({ role: 'admin' }), 'cuotas', 'delete')).toBe(true)
+  })
+
+  it('exige visibilidad del tab: la acción sola no basta', () => {
+    const s = session({ role: 'operator', permissions: new Set(['condominios.tab.cuotas.create']) })
+    expect(canActInCondominiosTab(s, 'cuotas', 'create')).toBe(false)
+  })
+
+  it('visibilidad + clave por tab → true; otra acción → false', () => {
+    const s = session({
+      role: 'operator',
+      permissions: new Set(['condominios.tab.cuotas', 'condominios.tab.cuotas.create']),
+    })
+    expect(canActInCondominiosTab(s, 'cuotas', 'create')).toBe(true)
+    expect(canActInCondominiosTab(s, 'cuotas', 'edit')).toBe(false)
+    expect(canActInCondominiosTab(s, 'cuotas', 'delete')).toBe(false)
+  })
+
+  it('fallback legado: visibilidad + platform.condominios.view + .<action> → true', () => {
+    const s = session({
+      role: 'operator',
+      permissions: new Set(['condominios.tab.cuotas', 'platform.condominios.view', 'platform.condominios.edit']),
+    })
+    expect(canActInCondominiosTab(s, 'cuotas', 'edit')).toBe(true)
+    // el fallback no cruza acciones ni aplica a tabs sin visibilidad
+    expect(canActInCondominiosTab(s, 'cuotas', 'create')).toBe(false)
+    expect(canActInCondominiosTab(s, 'visitantes', 'edit')).toBe(false)
+  })
+
+  it('fallback legado exige platform.condominios.view (paridad con usePermissions)', () => {
+    const s = session({
+      role: 'operator',
+      permissions: new Set(['condominios.tab.cuotas', 'platform.condominios.edit']),
+    })
+    expect(canActInCondominiosTab(s, 'cuotas', 'edit')).toBe(false)
   })
 })
 
