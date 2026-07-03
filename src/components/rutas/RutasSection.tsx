@@ -33,6 +33,7 @@ interface Props {
   onEjecutarRuta: (ruta: Ruta) => void
   canCreate?: boolean
   canEdit?: boolean
+  canDelete?: boolean
 }
 
 export function RutasSection({
@@ -49,6 +50,7 @@ export function RutasSection({
   onEjecutarRuta,
   canCreate: _canCreate = true,
   canEdit: _canEdit = true,
+  canDelete: canDeleteProp = true,
 }: Props) {
   const [editando, setEditando] = useState<Ruta | null>(null)
   const [creando, setCreando] = useState(false)
@@ -66,6 +68,8 @@ export function RutasSection({
   const dragOver = useRef<number | null>(null)
 
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
+  // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
+  const canDelete = canEdit && canDeleteProp
 
   useEffect(() => {
     void fetchActiveAppUsers().then(setUsuarios)
@@ -366,7 +370,7 @@ export function RutasSection({
   const hoy = new Date().toISOString().split('T')[0]
 
   const ctx: RutasCtx = {
-    clientes, contadores, unidades, proyectos, canEdit, onEjecutarRuta,
+    clientes, contadores, unidades, proyectos, canEdit, canDelete, onEjecutarRuta,
     editando, form, setForm, tipoRuta, setTipoRuta,
     clientesEnRuta, contadoresEnRuta, setContadoresEnRuta,
     unidadesEnRuta, setUnidadesEnRuta,

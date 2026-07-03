@@ -31,6 +31,8 @@ describe('PermissionsContext', () => {
     expect(result.current.canCreate('clientes')).toBe(true)
     expect(result.current.canEdit('tarifas')).toBe(true)
     expect(result.current.canChangeStatus('cobros')).toBe(true)
+    expect(result.current.canApprove('cobros')).toBe(true)
+    expect(result.current.canDelete('clientes')).toBe(true)
   })
 
   it('lanza (fail loud) si se usa fuera de <PermissionsProvider>', () => {

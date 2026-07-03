@@ -37,6 +37,39 @@ export function condominiosTabPermission(tabId: string): string {
   return `condominios.tab.${tabId}`
 }
 
+// ─── Acciones por tab de condominios ─────────────────────────────────────────
+// Claves sembradas por la migración 20260703000000:
+//   condominios.tab.<tab>            → visibilidad (Ver) — clave legada intacta
+//   condominios.tab.<tab>.<action>   → create / edit / change_status / approve / delete
+// Para no romper roles creados antes de la granularidad por tab, cada acción
+// también se satisface con el permiso legado de módulo completo
+// platform.condominios.<action>.
+
+export type CondominiosTabAction = 'create' | 'edit' | 'change_status' | 'approve' | 'delete'
+
+export function condominiosTabActionPermission(tabId: string, action: CondominiosTabAction): string {
+  return `condominios.tab.${tabId}.${action}`
+}
+
+/**
+ * Returns true if the session can perform `action` inside the given
+ * condominios tab. Requires tab visibility, plus either the per-tab action
+ * key or the legacy module-wide pair platform.condominios.view + .<action>
+ * (misma semántica que el gating previo de usePermissions: view && acción).
+ */
+export function canActInCondominiosTab(
+  session: UserSession | null | undefined,
+  tabId: string,
+  action: CondominiosTabAction,
+): boolean {
+  if (!session) return false
+  if (isExemptPlatformRole(session.role)) return true
+  if (!hasPermission(session, condominiosTabPermission(tabId))) return false
+  if (hasPermission(session, condominiosTabActionPermission(tabId, action))) return true
+  return hasPermission(session, 'platform.condominios.view')
+    && hasPermission(session, `platform.condominios.${action}`)
+}
+
 // ─── Role display ────────────────────────────────────────────────────────────
 // Shared labels and color palette for rendering the current user's role chip.
 // Kept here so Topbar/Sidebar/PerfilSection don't drift apart.

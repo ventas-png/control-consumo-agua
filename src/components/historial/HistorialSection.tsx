@@ -25,6 +25,7 @@ interface Props {
   onRegistroDeleted?: (id: string) => void
   canEdit?: boolean
   canChangeStatus?: boolean
+  canDelete?: boolean
 }
 
 const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> = {
@@ -52,6 +53,7 @@ export function HistorialSection({
   onRegistroDeleted,
   canEdit: canEditProp = true,
   canChangeStatus: canChangeStatusProp = true,
+  canDelete: canDeleteProp = true,
 }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
@@ -78,6 +80,8 @@ export function HistorialSection({
   }
 
   const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
+  // Eliminar lecturas se controla con el permiso de eliminar (no el de editar).
+  const canDelete = canDeleteProp && userRole !== 'viewer'
 
   // Index contadores por id para evitar buscar el unidad_id / tipo_agua en
   // cada iteración del filter.
@@ -280,7 +284,7 @@ export function HistorialSection({
             aria-label="Enviar por WhatsApp"
             style={btnWaStyle}
           >💬 WhatsApp</button>
-          {canEdit && onRegistroDeleted && (
+          {canDelete && onRegistroDeleted && (
             <button
               onClick={() => eliminarRegistro(r)}
               aria-label="Eliminar lectura"
@@ -290,7 +294,7 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, onRegistroDeleted, contadoresById, expandidas])
+  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, expandidas])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
@@ -446,7 +450,7 @@ export function HistorialSection({
                       <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
                     <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
-                    {canEdit && onRegistroDeleted && (
+                    {canDelete && onRegistroDeleted && (
                       <button onClick={() => eliminarRegistro(r)} aria-label="Eliminar lectura" style={{ padding: '6px 10px', background: 'var(--at-danger)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🗑️</button>
                     )}
                   </div>

@@ -29,6 +29,7 @@ interface Props {
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
   onContadorDeleted: (id: string) => void
+  canDelete?: boolean
 }
 
 export function ContadoresSection({
@@ -39,6 +40,7 @@ export function ContadoresSection({
   onContadorAdded,
   onContadorUpdated,
   onContadorDeleted,
+  canDelete: canDeleteProp = true,
 }: Props) {
   const currentUser = useSession()
   const [form, setForm] = useState<ContadorForm>(EMPTY_FORM)
@@ -51,6 +53,8 @@ export function ContadoresSection({
   const [showImport, setShowImport] = useState(false)
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
+  // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
+  const canDelete = canEdit && canDeleteProp
 
   function startCreate() {
     setForm(EMPTY_FORM)
@@ -204,7 +208,7 @@ export function ContadoresSection({
   const filtered = filtrarContadores(contadores, search, filterTipo, filterUnidad)
 
   const ctx: ContadoresCtx = {
-    tarifas, unidades, moneda, canEdit,
+    tarifas, unidades, moneda, canEdit, canDelete,
     form, setForm, editingId, loading,
     cancelForm, handleGuardar, startEdit, handleEliminar, handleToggleActivo,
   }
@@ -213,7 +217,7 @@ export function ContadoresSection({
   // del padre y permite que React.memo en sub-componentes funcione.
   const columns = useMemo(() => buildContadoresColumns(ctx),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canEdit, unidades, tarifas])
+    [canEdit, canDelete, unidades, tarifas])
 
   // Summary by tipo_agua
   const resumen = resumenPorTipo(contadores, TIPOS_AGUA)

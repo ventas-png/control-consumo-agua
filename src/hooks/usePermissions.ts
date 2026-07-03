@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { UserSession } from '../types'
-import { EXEMPT_ROLES, NON_CONFIGURABLE_MODULES, WATER_MODULE_KEYS } from '../lib/moduleConfig'
+import { EXEMPT_ROLES, NON_CONFIGURABLE_MODULES, WATER_MODULE_KEYS, type ModuleAction } from '../lib/moduleConfig'
 
 export interface PermissionsAPI {
   /** ¿El usuario puede ver este módulo en el sidebar? */
@@ -11,6 +11,10 @@ export interface PermissionsAPI {
   canEdit: (moduleKey: string) => boolean
   /** ¿El usuario puede cambiar estados en este módulo? */
   canChangeStatus: (moduleKey: string) => boolean
+  /** ¿El usuario puede autorizar/denegar (aprobaciones) en este módulo? */
+  canApprove: (moduleKey: string) => boolean
+  /** ¿El usuario puede eliminar registros en este módulo? */
+  canDelete: (moduleKey: string) => boolean
 }
 
 // Sidebar keys for condominios shortcuts → corresponding condominios tab ids.
@@ -45,12 +49,12 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
 
     const isExempt = !!role && EXEMPT_ROLES.includes(role)
 
-    function permissionKey(moduleKey: string, action: 'view' | 'create' | 'edit' | 'change_status'): string {
+    function permissionKey(moduleKey: string, action: ModuleAction): string {
       const prefix = WATER_MODULE_KEYS.has(moduleKey) ? 'agua' : 'platform'
       return `${prefix}.${moduleKey}.${action}`
     }
 
-    function has(moduleKey: string, action: 'view' | 'create' | 'edit' | 'change_status'): boolean {
+    function has(moduleKey: string, action: ModuleAction): boolean {
       return perms?.has(permissionKey(moduleKey, action)) ?? false
     }
 
@@ -80,21 +84,17 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
       return has(moduleKey, 'view')
     }
 
-    function canCreate(moduleKey: string): boolean {
-      if (isExempt) return true
-      return has(moduleKey, 'view') && has(moduleKey, 'create')
-    }
+    // Regla común de acciones: exento pasa; si no, exige .view + la acción.
+    const canDo = (action: ModuleAction) => (moduleKey: string): boolean =>
+      isExempt || (has(moduleKey, 'view') && has(moduleKey, action))
 
-    function canEdit(moduleKey: string): boolean {
-      if (isExempt) return true
-      return has(moduleKey, 'view') && has(moduleKey, 'edit')
+    return {
+      canViewModule,
+      canCreate: canDo('create'),
+      canEdit: canDo('edit'),
+      canChangeStatus: canDo('change_status'),
+      canApprove: canDo('approve'),
+      canDelete: canDo('delete'),
     }
-
-    function canChangeStatus(moduleKey: string): boolean {
-      if (isExempt) return true
-      return has(moduleKey, 'view') && has(moduleKey, 'change_status')
-    }
-
-    return { canViewModule, canCreate, canEdit, canChangeStatus }
   }, [session?.role, session?.permissions])
 }

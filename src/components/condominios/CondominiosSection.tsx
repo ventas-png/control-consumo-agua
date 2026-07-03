@@ -8,7 +8,7 @@ import {
   fetchClientesConCumple,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
-import { canViewCondominiosTabByPermission } from '../../lib/permissions'
+import { canViewCondominiosTabByPermission, canActInCondominiosTab } from '../../lib/permissions'
 import { SECTIONS, sectionForTab } from './sections'
 import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
@@ -92,8 +92,6 @@ interface Props {
   proyectos: Proyecto[]
   unidades: Unidad[]
   currentUser: UserSession
-  canCreate: (section: string) => boolean
-  canEdit: (section: string) => boolean
 }
 
 /**
@@ -111,7 +109,20 @@ export function CondominiosSection(props: Props) {
   )
 }
 
-function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
+  // Permisos por tab (RBAC granular, migración 20260703000000): cada tab
+  // resuelve condominios.tab.<tab>.<action>, con fallback al permiso legado de
+  // módulo completo platform.condominios.<action>. Los tabs llaman con su
+  // propio id (ctx.canCreate('cuotas')), no con 'condominios'.
+  // 'cliente' (portal del residente) conserva el bypass que tenía en
+  // usePermissions (EXEMPT_ROLES incluye cliente; isExemptPlatformRole no).
+  const esCliente = currentUser.role === 'cliente'
+  const canCreate = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'create'), [currentUser, esCliente])
+  const canEdit = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'edit'), [currentUser, esCliente])
+  const canChangeStatus = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'change_status'), [currentUser, esCliente])
+  const canApprove = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'approve'), [currentUser, esCliente])
+  const canDelete = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'delete'), [currentUser, esCliente])
+
   const visibleSections = useMemo(() =>
     SECTIONS
       .map(sec => ({
@@ -619,7 +630,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   // useMemo: estabiliza la referencia entre renders mientras los inputs no
   // cambien (tabs reciben el mismo objeto, pueden memorizar si lo necesitan).
   const tabCtx: CondominiosTabContext = useMemo(() => ({
-    canCreate, canEdit, onRefresh: cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, onRefresh: cargarDatos,
     proyectoId: selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
@@ -651,7 +662,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
     flujoAprobacion, ordenesCompra, asambleasDigital, proformas, conciliaciones,
     fondoReservaMovs, configCondominio,
   }), [
-    canCreate, canEdit, cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, cargarDatos,
     selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
@@ -784,7 +795,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
             comentarios={comentariosTicket}
             companyId={cid}
             autorNombre={currentUser.name ?? ''}
-            canCreate={canCreate('condominios')}
+            canCreate={canCreate('mantenimiento')}
             onRefresh={cargarDatos}
             onClose={() => setTicketSeleccionado(null)}
           />

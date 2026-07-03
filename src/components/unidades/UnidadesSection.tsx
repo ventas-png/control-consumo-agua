@@ -3,6 +3,7 @@ import { confirm, notify } from '../shared/Dialog'
 import { promptUpgrade } from '../shared/promptUpgrade'
 import type { Unidad, TipoUnidad, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { resolveUnidadProjectCompany, checkUnidadesLimit } from '../../domain/unidades/queries'
 import { createUnidad, updateUnidad, setUnidadActiva, deleteUnidad, assignContadoresToUnidad, unlinkContadores } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
@@ -39,6 +40,7 @@ export function UnidadesSection({
   onContadorUpdated,
 }: Props) {
   const currentUser = useSession()
+  const perms = usePermissionsContext()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -92,6 +94,9 @@ export function UnidadesSection({
   }, [filterProyecto, proyectos, maxUnidadesPorTipo])
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
+  // RBAC granular: eliminar unidad requiere el permiso delete del módulo
+  // (además de la condición de rol existente). Crear/editar no cambian.
+  const canDelete = canEdit && perms.canDelete('unidades')
 
   function startCreate() {
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
@@ -489,6 +494,7 @@ export function UnidadesSection({
                 proyectoNombre={proyectos.length > 1 ? proyectos.find(p => p.id === u.project_id)?.nombre : undefined}
                 clienteAsignado={u.cliente_id ? clientes.find(c => c.id === u.cliente_id) : undefined}
                 canEdit={canEdit}
+                canDelete={canDelete}
                 onEdit={() => startEdit(u)}
                 onToggleActivo={() => handleToggleActivo(u)}
                 onEliminar={() => handleEliminar(u)}

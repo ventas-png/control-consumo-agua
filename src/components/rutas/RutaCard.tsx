@@ -6,7 +6,7 @@ import { describirRecurrencia, estadoRuta } from '../../lib/rutasReglas'
 
 export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
   const {
-    clientes, contadores, unidades, proyectos, canEdit, hoy,
+    clientes, contadores, unidades, proyectos, canEdit, canDelete, hoy,
     recordandoId, onEjecutarRuta, handleRecordarAhora, abrirEditar, handleEliminar,
   } = ctx
 
@@ -82,13 +82,15 @@ export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
             >
               Editar
             </button>
-            <button
-              onClick={() => handleEliminar(ruta)}
-              style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
-            >
-              Eliminar
-            </button>
           </>
+        )}
+        {canDelete && (
+          <button
+            onClick={() => handleEliminar(ruta)}
+            style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+          >
+            Eliminar
+          </button>
         )}
       </div>
     </div>
