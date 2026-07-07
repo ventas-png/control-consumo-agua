@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+
+// LandingPage dispara el warm-up de Supabase al montar; el módulo real exige
+// las env vars VITE_SUPABASE_* que no existen en el entorno de test.
+vi.mock('../../../lib/supabase', () => ({
+  warmUpSupabase: vi.fn(),
+}))
+
 import { LandingPage } from '../LandingPage'
 import { checkA11y } from '../../../test/a11y'
 
