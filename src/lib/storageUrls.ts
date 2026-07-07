@@ -149,7 +149,7 @@ export function useSignedUrls(
         const { data, error } = await supabase.storage.from(bucket)
           .createSignedUrls(toSign.map(e => e.path), ttl)
         if (!error && data) {
-          data.forEach((sig: { signedUrl?: string; error?: string | null; path?: string | null }, i: number) => {
+          data.forEach((sig, i) => {
             const entry = toSign[i]
             if (sig.signedUrl && !sig.error) {
               result[entry.idx] = sig.signedUrl

@@ -9,7 +9,7 @@
  *    cada call site tenga que instrumentar manualmente.
  *
  * **Targets de latencia** (p95, cliente):
- * - Login flow:           < 2.0s (incluye round-trip a Supabase Auth)
+ * - Login flow:           < 3.0s (incluye round-trip a Supabase Auth)
  * - Cobro/pago:           < 3.0s (Stripe Checkout o pago manual)
  * - DataTable initial:    < 800ms (tabla principal, sin filtros)
  * - Tab switch:           < 500ms (cambiar de tab en condominios)
@@ -37,7 +37,11 @@ import { logger } from './logger'
 
 export const SLO_CATALOG = {
   // Latencia (ms)
-  'login.complete':           { type: 'latency', target_p95_ms: 2000, severity: 'critical' },
+  // 3.0s (antes 2.0s): baseline de 30 días mostró p50 de ~1.9s medido en
+  // cliente — el servidor de Auth responde en 130-260ms, el resto es red del
+  // usuario (móviles en GT). Con target de 2s, el 46% de logins "breachaba"
+  // sin que hubiera nada accionable. Ver PR #543 y la revisión de infra.
+  'login.complete':           { type: 'latency', target_p95_ms: 3000, severity: 'critical' },
   'auth.oauth.callback':      { type: 'latency', target_p95_ms: 3000, severity: 'critical' },
   'payment.checkout.open':    { type: 'latency', target_p95_ms: 3000, severity: 'critical' },
   'payment.manual.submit':    { type: 'latency', target_p95_ms: 2500, severity: 'critical' },

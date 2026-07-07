@@ -71,9 +71,11 @@ export function useCredentialsLogin(setCurrentUser: (s: UserSession) => void) {
 
     try {
       // signInWithPassword has no built-in timeout — wrap it so a stalled
-      // network connection doesn't keep "Autenticando..." on screen forever.
-      // 20 s covers Supabase free-tier cold starts (~15-20 s).
-      // infra:I3 — measureSLO emite breach si excede 2s p95.
+      // request doesn't keep "Autenticando..." on screen forever. Los cuelgues
+      // reales observados NO son cold starts del servidor (plan Pro, Auth
+      // responde en 130-260ms): son la red del cliente o el candado de auth
+      // de supabase-js retenido por otra pestaña (Web Locks API).
+      // infra:I3 — measureSLO emite breach si excede el target p95.
       const authResult = await measureSLO('login.complete', () =>
         Promise.race([
           supabase.auth.signInWithPassword({
