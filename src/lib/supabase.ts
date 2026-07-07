@@ -37,3 +37,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: { 'x-application-name': 'aquacontrol' },
   },
 })
+
+// Mitigación de cold starts (Sentry PINK-RIBBON-2/-8/-4): con la instancia
+// inactiva, el primer signInWithPassword puede tardar 15-20s y morir en el
+// auth_timeout de useCredentialsLogin (~10% de los logins medidos en 30 días).
+// Un GET barato al health de Auth despierta la instancia mientras el usuario
+// todavía está tecleando sus credenciales, en vez de pagarlo en el submit.
+let lastWarmupAt = 0
+
+/** Despierta la instancia de Supabase. Deduplicado a 1 ping por 5 minutos. */
+export function warmUpSupabase(): void {
+  const now = Date.now()
+  if (now - lastWarmupAt < 5 * 60_000) return
+  lastWarmupAt = now
+  void fetch(`${supabaseUrl}/auth/v1/health`, {
+    headers: { apikey: supabaseAnonKey },
+  }).catch(() => undefined)
+}

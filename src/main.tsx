@@ -27,6 +27,21 @@ initMonitoring()
 initAnalytics()
 applyStoredConsent()
 
+// Chunks viejos tras un deploy (Sentry PINK-RIBBON-1/-7): un tab abierto con el
+// index.html anterior intenta lazy-load un chunk hasheado que ya no existe y el
+// servidor responde index.html (MIME text/html) → pantalla rota. Recargar trae
+// el index nuevo con los hashes vigentes. El guard de sessionStorage evita un
+// loop de recargas si el fallo persiste (p. ej. sin conexión): en ese caso
+// dejamos que Vite lance el error y lo capture el ErrorBoundary.
+window.addEventListener('vite:preloadError', (event) => {
+  const KEY = 'at-chunk-reload-at'
+  const last = Number(sessionStorage.getItem(KEY) ?? 0)
+  if (Date.now() - last < 30_000) return
+  sessionStorage.setItem(KEY, String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
+
 // One-time migration: remove stale v1 cache key
 localStorage.removeItem('aquacontrol_data_v1')
 

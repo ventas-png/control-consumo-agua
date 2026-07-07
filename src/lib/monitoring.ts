@@ -49,6 +49,11 @@ export function initMonitoring(): void {
       // Resto: 10%.
       return 0.1
     },
+    // Ruido conocido sin impacto en el usuario (Sentry PINK-RIBBON-A):
+    // supabase-js coordina la sesión entre pestañas con la Web Locks API; cuando
+    // otra pestaña adquiere el candado con `steal` (p. ej. al cerrar/abrir
+    // pestañas), la que lo pierde lanza este AbortError y sigue funcionando.
+    ignoreErrors: ["Lock broken by another request with the 'steal' option."],
     // Don't attach IP / cookies. We set a minimal user (id/company/role) explicitly.
     sendDefaultPii: false,
   })
