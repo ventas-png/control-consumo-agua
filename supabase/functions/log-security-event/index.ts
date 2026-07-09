@@ -1,23 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserOrNull } from '../_shared/auth.ts'
-
-// Event types allowed without a valid JWT (fired before login completes)
-const PRE_AUTH_EVENTS = new Set([
-  'failed_login_attempt',
-  'login_error',
-  'login_success',
-  'password_reset_requested',
-])
-
-function getClientIP(req: Request): string {
-  const cf = req.headers.get('cf-connecting-ip')
-  if (cf) return cf
-  const xff = req.headers.get('x-forwarded-for')
-  if (xff) return xff.split(',')[0].trim()
-  const fly = req.headers.get('fly-client-ip')
-  if (fly) return fly
-  return 'unknown'
-}
+// Lógica pura (whitelist pre-auth, extracción de IP, fila de security_logs)
+// extraída a ./validate.ts para testearla en vitest (infra:I22).
+import { buildSecurityLogRow, getClientIP, isPreAuthEvent } from './validate.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -88,7 +73,7 @@ Deno.serve(async (req) => {
     const verifiedUserId = auth?.user.id ?? null
 
     // Post-auth events require a valid JWT
-    if (!PRE_AUTH_EVENTS.has(event_type) && !verifiedUserId) {
+    if (!isPreAuthEvent(event_type) && !verifiedUserId) {
       return new Response(JSON.stringify({ error: 'Authentication required' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -99,15 +84,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const { error } = await adminClient.from('security_logs').insert({
-      // Always use JWT-verified user_id — never trust body to prevent spoofing
-      user_id: verifiedUserId ?? null,
-      event_type,
-      details,
-      ip_address: getClientIP(req),
-      user_agent: user_agent ?? '',
-      timestamp: new Date().toISOString(),
-    })
+    // Always use JWT-verified user_id — never trust body to prevent spoofing
+    const { error } = await adminClient.from('security_logs').insert(
+      buildSecurityLogRow({
+        verifiedUserId,
+        eventType: event_type,
+        details,
+        ip: getClientIP(req.headers),
+        userAgent: user_agent,
+        timestamp: new Date().toISOString(),
+      }),
+    )
 
     if (error) throw error
 

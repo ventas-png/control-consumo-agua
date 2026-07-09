@@ -1,5 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireUser } from '../_shared/auth.ts'
+// Lógica pura (gate del caller, gate del target, fila de auditoría) extraída
+// a ./validate.ts para testearla en vitest (infra:I22).
+import {
+  buildUserDeletedAudit,
+  canManageUsers,
+  checkDeleteTargetGate,
+  isSuperAdminRole,
+  type TargetUserRow,
+} from './validate.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -49,10 +58,6 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
   return null
 }
 
-// Roles a non-superadmin may delete. Mirrors create-user: company_owner / admin
-// can manage these tiers, but never other owners or superadmins.
-const DELETABLE_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
-
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
   const corsHeaders = getCorsHeaders(origin)
@@ -79,11 +84,9 @@ Deno.serve(async (req) => {
     const callerRole: string = (callerProfile as { role: string; company_id: string } | null)?.role ?? ''
     const callerCompanyId: string | null = (callerProfile as { role: string; company_id: string } | null)?.company_id ?? null
 
-    const isSuperAdmin = callerRole === 'super_admin' || callerRole === 'superadmin'
-    const isCompanyOwner = callerRole === 'company_owner'
-    const isAdmin = callerRole === 'admin'
+    const isSuperAdmin = isSuperAdminRole(callerRole)
 
-    if (!isSuperAdmin && !isCompanyOwner && !isAdmin) {
+    if (!canManageUsers(callerRole)) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -123,20 +126,14 @@ Deno.serve(async (req) => {
       })
     }
 
-    const targetRow = target as { id: string; role: string; company_id: string | null; full_name: string }
+    const targetRow = target as TargetUserRow
 
     // Non-superadmins: only within their own company, and never an owner/superadmin.
-    if (!isSuperAdmin) {
-      if (targetRow.company_id !== callerCompanyId) {
-        return new Response(JSON.stringify({ error: 'No puedes eliminar usuarios de otra empresa' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      if (!DELETABLE_ROLES.includes(targetRow.role)) {
-        return new Response(JSON.stringify({ error: 'No tienes permiso para eliminar a este usuario' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+    const gate = checkDeleteTargetGate({ isSuperAdmin, callerCompanyId, target: targetRow })
+    if (!gate.ok) {
+      return new Response(JSON.stringify({ error: gate.error }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // 1) Remove RBAC role assignments first. The audit trigger on user_roles
@@ -184,17 +181,9 @@ Deno.serve(async (req) => {
 
     // 4) Audit (best-effort). target_user_id is intentionally null — the row is
     //    gone — so the identity is preserved in details instead.
-    await adminClient.from('permission_audit_log').insert({
-      actor_id: caller.id,
-      target_user_id: null,
-      action: 'user_deleted',
-      details: {
-        deleted_user_id: targetId,
-        full_name: targetRow.full_name,
-        role: targetRow.role,
-        company_id: targetRow.company_id,
-      },
-    })
+    await adminClient.from('permission_audit_log').insert(
+      buildUserDeletedAudit(caller.id, targetId, targetRow),
+    )
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

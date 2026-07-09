@@ -1,6 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireUser } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
+// Lógica pura (whitelist de roles, gate del caller, normalización de email,
+// mapping RBAC) extraída a ./validate.ts para testearla en vitest (infra:I22).
+import {
+  canManageUsers,
+  hasMissingRequiredFields,
+  isRoleAllowedForNonSuper,
+  isSuperAdminRole,
+  normalizeEmail,
+  platformRoleIdFor,
+} from './validate.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -78,11 +88,9 @@ Deno.serve(async (req) => {
     const callerRole: string = (callerProfile as { role: string; company_id: string } | null)?.role ?? ''
     const callerCompanyId: string | null = (callerProfile as { role: string; company_id: string } | null)?.company_id ?? null
 
-    const isSuperAdmin = callerRole === 'super_admin' || callerRole === 'superadmin'
-    const isCompanyOwner = callerRole === 'company_owner'
-    const isAdmin = callerRole === 'admin'
+    const isSuperAdmin = isSuperAdminRole(callerRole)
 
-    if (!isSuperAdmin && !isCompanyOwner && !isAdmin) {
+    if (!canManageUsers(callerRole)) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -101,18 +109,17 @@ Deno.serve(async (req) => {
     // Normalize email (trim + lowercase) so a stray trailing space or different
     // capitalization can't create an account the user is then unable to log in to:
     // login normalizes the email, so the stored value must be normalized too.
-    const email = (rawEmail ?? '').trim().toLowerCase()
+    const email = normalizeEmail(rawEmail)
 
-    if (!email || !password || !full_name || !role || !company_id) {
+    if (hasMissingRequiredFields({ email, password, full_name, role, company_id })) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     // Non-superadmins can only create users within their own company
-    const allowedRolesForNonSuper = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
     if (!isSuperAdmin) {
-      if (!allowedRolesForNonSuper.includes(role)) {
+      if (!isRoleAllowedForNonSuper(role)) {
         return new Response(JSON.stringify({ error: 'Solo puedes crear usuarios con rol admin/operador/visualizador/cobros' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -168,15 +175,7 @@ Deno.serve(async (req) => {
 
     // Assign the matching platform system role in user_roles (RBAC).
     // Mirrors the mapping in migration 20260518000013_rbac_platform_modules.sql.
-    const PLATFORM_ROLE_ID: Record<string, string> = {
-      admin:     '00000000-0000-0000-0000-000000000201',
-      operator:  '00000000-0000-0000-0000-000000000202',
-      operador:  '00000000-0000-0000-0000-000000000202',
-      viewer:    '00000000-0000-0000-0000-000000000203',
-      visor:     '00000000-0000-0000-0000-000000000203',
-      collector: '00000000-0000-0000-0000-000000000204',
-    }
-    const platformRoleId = PLATFORM_ROLE_ID[role]
+    const platformRoleId = platformRoleIdFor(role)
     if (platformRoleId) {
       const { error: roleError } = await adminClient.from('user_roles').insert({
         user_id:     newUser.user.id,
