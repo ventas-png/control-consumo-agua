@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { buildGoogleAuthUrl, buildOAuthState, canConnectEmailScope } from './logic.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? ''
@@ -50,10 +51,10 @@ Deno.serve(async (req: Request) => {
         .from('app_users').select('role, company_id').eq('id', user.id).maybeSingle()
       const role = (prof as { role?: string } | null)?.role ?? ''
       const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
-      const isSuper = role === 'super_admin' || role === 'superadmin'
-      const authorized = is_superadmin
-        ? isSuper
-        : isSuper || (['admin', 'company_owner'].includes(role) && callerCompany === company_id)
+      const authorized = canConnectEmailScope(
+        { companyId: company_id, isSuperadmin: is_superadmin },
+        { role, companyId: callerCompany },
+      )
       if (!authorized) {
         return new Response(
           JSON.stringify({ error: 'No autorizado para conectar el correo de este scope' }),
@@ -80,30 +81,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // State: base64 JSON with type tag + company info + timestamp (CSRF protection)
-    const statePayload = {
-      t: 'gmail_connect',
-      company_id: company_id ?? null,
-      is_superadmin: is_superadmin ?? false,
-      ts: Date.now(),
-    }
-    const state = btoa(JSON.stringify(statePayload))
+    const state = buildOAuthState({ companyId: company_id, isSuperadmin: is_superadmin })
     const redirectUri = `${APP_URL}/`
-
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: [
-        'https://www.googleapis.com/auth/gmail.send',
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ].join(' '),
-      access_type: 'offline',
-      prompt: 'consent select_account',
-      state,
-    })
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+    const authUrl = buildGoogleAuthUrl(GOOGLE_CLIENT_ID, redirectUri, state)
 
     return new Response(
       JSON.stringify({ url: authUrl, state }),

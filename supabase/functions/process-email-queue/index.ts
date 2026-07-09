@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { isRetriable } from '../_shared/emailRetryable.ts'
+import { isCronAuthorized, isTokenExpired, validateQueuePayload } from './logic.ts'
 
 // process-email-queue: worker que process el batch de emails pendientes.
 // Disparado por pg_cron cada 5 minutos. Toma hasta 50 rows pendientes,
@@ -80,9 +81,8 @@ async function attemptSend(
   supabase: ReturnType<typeof createClient>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { payload } = row
-  if (!payload.template_key || !payload.to_email) {
-    return { ok: false, error: 'payload invalido (template_key/to_email)' }
-  }
+  const valid = validateQueuePayload(payload)
+  if (!valid.ok) return valid
 
   // Fetch email config segun is_superadmin.
   const cfgQuery = row.is_superadmin
@@ -97,8 +97,7 @@ async function attemptSend(
 
   const config = cfgData as EmailConfig
   let accessToken = config.access_token
-  const isExpired = config.token_expiry != null &&
-    new Date(config.token_expiry).getTime() - Date.now() < 5 * 60 * 1000
+  const isExpired = isTokenExpired(config.token_expiry)
   if (isExpired && config.refresh_token) {
     const fresh = await refreshAccessToken(config.refresh_token, supabase, config.id)
     if (fresh) accessToken = fresh
@@ -148,9 +147,9 @@ Deno.serve(async (req: Request) => {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  // Auth: solo el cron (con CRON_SECRET) puede invocar.
+  // Auth: solo el cron (con CRON_SECRET) puede invocar. Fail-closed (logic.ts).
   const auth = req.headers.get('x-cron-secret')
-  if (!CRON_SECRET || auth !== CRON_SECRET) {
+  if (!isCronAuthorized(auth, CRON_SECRET)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { 'Content-Type': 'application/json' },
     })
