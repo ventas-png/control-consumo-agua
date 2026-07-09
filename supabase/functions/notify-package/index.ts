@@ -1,5 +1,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
+// Helpers puros (sanitización, plantilla, rows in-app, payloads/selección de
+// WhatsApp) extraídos a ./logic.ts para testearlos con vitest (infra:I22 ·
+// Track T8). Aquí queda solo el I/O (Gmail, WhatsApp APIs, queries).
+import {
+  type Row,
+  applyVars,
+  autorizadoParaEmpresa,
+  buildMetaWaPayload,
+  buildPaqueteInAppRows,
+  buildTwilioWaParams,
+  renderPaquete,
+  resolveWhatsAppProvider,
+  tipoLabel,
+} from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -44,8 +58,6 @@ function getCorsHeaders(origin: string | null) {
 
 // deno-lint-ignore no-explicit-any
 type Client = ReturnType<typeof createClient>
-// deno-lint-ignore no-explicit-any
-type Row = Record<string, any>
 
 // ---------------------------------------------------------------------------
 // Gmail helpers (mismo enfoque que la función send-email / route-reminders)
@@ -120,75 +132,14 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
   }
 }
 
-function applyVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? '')
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
-  ))
-}
-
-function baseLayout(content: string, empresa: string): string {
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(empresa)}</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;"><tr><td align="center">
-  <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:600px;">
-    <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0d9488);padding:28px 32px;text-align:center;">
-      <span style="color:#fff;font-size:22px;font-weight:700;">${escapeHtml(empresa)}</span></td></tr>
-    <tr><td style="padding:32px;">${content}</td></tr>
-    <tr><td style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="margin:0;font-size:12px;color:#94a3b8;">Aviso automático de ${escapeHtml(empresa)}. Por favor no responda directamente.</p></td></tr>
-  </table>
-</td></tr></table></body></html>`
-}
-
-function renderPaquete(vars: Record<string, string>): { subject: string; html: string } {
-  const empresa = vars.empresa_nombre || 'AdministraTodo'
-  const content = `
-    <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">📦 ${escapeHtml(vars.tipo_label)} en portería</h2>
-    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${escapeHtml(vars.to_name || '')}</strong>, recibimos un envío para tu unidad y está disponible para que lo retires.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
-      <tr style="background:#0d9488;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLE DEL ENVÍO</td></tr>
-      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Unidad</td><td style="padding:10px 18px;font-size:14px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.unidad || '—')}</td></tr>
-      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Descripción</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.descripcion || '—')}</td></tr>
-      ${vars.remitente ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Remitente</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.remitente)}</td></tr>` : ''}
-      ${vars.empresa_mensajeria ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Mensajería</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(vars.empresa_mensajeria)}</td></tr>` : ''}
-    </table>
-    <div style="text-align:center;margin:28px 0;"><a href="${vars.app_url || APP_URL}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#fff;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:700;">Ver y firmar recepción</a></div>
-    <p style="margin:0;font-size:13px;color:#64748b;">Al retirarlo podrás firmar la recepción desde tu portal.</p>`
-  return {
-    subject: `📦 ${vars.tipo_label} disponible en portería · ${vars.unidad || ''}`.trim(),
-    html: baseLayout(content, empresa),
-  }
-}
-
 // ---------------------------------------------------------------------------
-// WhatsApp (abstracción de proveedor; no-op si no está configurado)
+// WhatsApp (I/O; payloads y selección de proveedor en ./logic.ts)
 // ---------------------------------------------------------------------------
-
-function digits(phone: string): string { return phone.replace(/[^\d]/g, '') }
 
 async function sendWhatsAppMeta(to: string, vars: Record<string, string>): Promise<void> {
   const url = `https://graph.facebook.com/v19.0/${WA_META_PHONE_ID}/messages`
   // Mensaje iniciado por la empresa => requiere plantilla aprobada.
-  const body = {
-    messaging_product: 'whatsapp',
-    to: digits(to),
-    type: 'template',
-    template: {
-      name: WA_META_TEMPLATE,
-      language: { code: WA_META_LANG },
-      components: [{
-        type: 'body',
-        parameters: [
-          { type: 'text', text: vars.unidad },
-          { type: 'text', text: vars.descripcion },
-        ],
-      }],
-    },
-  }
+  const body = buildMetaWaPayload(to, vars, WA_META_TEMPLATE, WA_META_LANG)
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_META_TOKEN}`, 'Content-Type': 'application/json' },
@@ -199,12 +150,7 @@ async function sendWhatsAppMeta(to: string, vars: Record<string, string>): Promi
 
 async function sendWhatsAppTwilio(to: string, vars: Record<string, string>): Promise<void> {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`
-  const toFmt = `whatsapp:+${digits(to)}`
-  const params = new URLSearchParams({
-    From: TWILIO_FROM,
-    To: toFmt,
-    Body: `📦 Tienes ${vars.tipo_label} en portería para ${vars.unidad}: ${vars.descripcion}. Pasa a recogerlo cuando gustes.`,
-  })
+  const params = new URLSearchParams(buildTwilioWaParams(to, vars, TWILIO_FROM))
   const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)
   const res = await fetch(url, {
     method: 'POST',
@@ -217,10 +163,19 @@ async function sendWhatsAppTwilio(to: string, vars: Record<string, string>): Pro
 async function sendWhatsApp(to: string | null, vars: Record<string, string>): Promise<'sent' | 'not_configured' | 'error'> {
   if (!to) return 'not_configured'
   try {
-    if (WHATSAPP_PROVIDER === 'meta' && WA_META_TOKEN && WA_META_PHONE_ID && WA_META_TEMPLATE) {
+    const provider = resolveWhatsAppProvider({
+      provider: WHATSAPP_PROVIDER,
+      metaToken: WA_META_TOKEN,
+      metaPhoneId: WA_META_PHONE_ID,
+      metaTemplate: WA_META_TEMPLATE,
+      twilioSid: TWILIO_SID,
+      twilioToken: TWILIO_TOKEN,
+      twilioFrom: TWILIO_FROM,
+    })
+    if (provider === 'meta') {
       await sendWhatsAppMeta(to, vars); return 'sent'
     }
-    if (WHATSAPP_PROVIDER === 'twilio' && TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM) {
+    if (provider === 'twilio') {
       await sendWhatsAppTwilio(to, vars); return 'sent'
     }
     return 'not_configured'
@@ -228,10 +183,6 @@ async function sendWhatsApp(to: string | null, vars: Record<string, string>): Pr
     console.error('[notify-package] whatsapp failed', String(err))
     return 'error'
   }
-}
-
-const TIPO_LABEL: Record<string, string> = {
-  paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío',
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +231,7 @@ Deno.serve(async (req: Request) => {
     if (!pkg) return json({ error: 'Paquete no encontrado' }, 404)
 
     // Autorización por empresa para el camino con JWT.
-    if (!internal && !callerIsSuperAdmin && (pkg as Row).company_id !== callerCompanyId) {
+    if (!autorizadoParaEmpresa({ internal, callerIsSuperAdmin, callerCompanyId }, (pkg as Row).company_id)) {
       return json({ error: 'Forbidden' }, 403)
     }
 
@@ -291,7 +242,7 @@ Deno.serve(async (req: Request) => {
     const clienteId: string | null = unidad?.cliente_id ?? null
     const unidadNombre: string = unidad?.nombre ?? ''
     const empresaNombre: string = ((pkg as Row).companies as Row | null)?.nombre ?? 'AdministraTodo'
-    const tipoLabel = TIPO_LABEL[(pkg as Row).tipo as string] ?? 'Envío'
+    const tipo = tipoLabel((pkg as Row).tipo as string)
 
     if (!clienteId) return json({ success: true, skipped: 'no_cliente' })
 
@@ -314,7 +265,7 @@ Deno.serve(async (req: Request) => {
       remitente: (pkg as Row).remitente ?? '',
       empresa_mensajeria: (pkg as Row).empresa_mensajeria ?? '',
       empresa_nombre: empresaNombre,
-      tipo_label: tipoLabel,
+      tipo_label: tipo,
       app_url: APP_URL,
     }
 
@@ -323,15 +274,11 @@ Deno.serve(async (req: Request) => {
     let whatsapp: 'sent' | 'not_configured' | 'error' = 'not_configured'
 
     // ── In-app ──
-    const rows = (appUsers ?? []).map((u: Row) => ({
-      user_id: u.id,
-      company_id: (pkg as Row).company_id,
-      tipo: 'paquete_pendiente',
-      titulo: `📦 ${tipoLabel} en portería`,
-      cuerpo: `${vars.descripcion}${vars.remitente ? ` · De: ${vars.remitente}` : ''} para ${unidadNombre}. Pasa a recogerlo cuando gustes.`,
-      seccion: 'paquetes',
-      paquete_id: (pkg as Row).id,
-    }))
+    const rows = buildPaqueteInAppRows(
+      (appUsers ?? []).map((u: Row) => u.id as string),
+      vars,
+      { companyId: (pkg as Row).company_id, paqueteId: (pkg as Row).id },
+    )
     if (rows.length > 0) {
       const { error } = await admin.from('user_notifications').insert(rows)
       if (error) console.error('[notify-package] in-app insert failed', error.message)
@@ -357,7 +304,7 @@ Deno.serve(async (req: Request) => {
           .maybeSingle()
         const rendered = customTpl
           ? { subject: applyVars((customTpl as Row).subject as string, vars), html: applyVars((customTpl as Row).html_body as string, vars) }
-          : renderPaquete(vars)
+          : renderPaquete(vars, APP_URL)
         try {
           await sendViaGmail(cfg as unknown as EmailConfig, email, rendered.subject, rendered.html, admin)
           emailed = 1
