@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+// Lógica pura (CORS y gate de rol) extraída a ./logic.ts para testearla en
+// vitest (infra:I22).
+import { buildAllowedOrigins, canManageBilling, corsHeadersFor } from './logic.ts'
 
 // ============================================================================
 // create-billing-portal-session — Stripe Billing Portal (plat:P1, F2.12)
@@ -14,31 +17,10 @@ import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 // create-checkout-session al menos una vez). Si no lo tiene, devuelve 404.
 // ============================================================================
 
-function getAllowedOrigins(): string[] {
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-  }
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) { try { origins.add(new URL(appUrl).origin) } catch { /* ignore */ } }
-  return [...origins]
-}
-
+// Whitelist + headers CORS viven en ./logic.ts; aquí solo se inyecta el env.
 function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  return {
-    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : allowed[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
+  const allowed = buildAllowedOrigins(Deno.env.get('ALLOWED_ORIGINS'), Deno.env.get('APP_URL'))
+  return corsHeadersFor(origin, allowed)
 }
 
 Deno.serve(async (req: Request) => {
@@ -84,7 +66,7 @@ Deno.serve(async (req: Request) => {
       .select('role, company_id')
       .eq('id', user.id)
       .single()
-    if (!appUser || !['company_owner', 'admin'].includes((appUser as { role: string }).role)) {
+    if (!appUser || !canManageBilling((appUser as { role: string }).role)) {
       return new Response(JSON.stringify({ error: 'Solo company_owner o admin' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

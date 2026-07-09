@@ -22,29 +22,20 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+// Helpers puros (CSV, filtros aplicables, path de Storage, vars y filas de la
+// cola de correo) extraídos a ./logic.ts para testearlos con vitest
+// (infra:I22 · Track T8/T5). Aquí queda solo el I/O.
+import {
+  type ReportTemplate,
+  applicableFilters,
+  buildQueueRows,
+  buildReportVars,
+  buildStoragePath,
+  serializeCsv,
+} from './logic.ts'
 
 interface RequestBody {
   template_id: string
-}
-
-interface ReportTemplate {
-  id: string
-  company_id: string
-  name: string
-  description: string | null
-  source_table: string
-  columns: Array<{ header: string; accessor: string }>
-  filters: Record<string, string | number | null>
-  recipients: string[]
-  default_format: 'xlsx' | 'csv' | 'pdf'
-}
-
-const SOURCE_LABEL_MAP: Record<string, string> = {
-  cuotas_condominio:        'Cuotas de condominio',
-  pagos:                    'Pagos',
-  tickets_mantenimiento:    'Tickets de mantenimiento',
-  gastos_condominio:        'Gastos',
-  fondo_reserva_condominio: 'Fondo de reserva',
 }
 
 Deno.serve(async (req: Request) => {
@@ -103,10 +94,8 @@ Deno.serve(async (req: Request) => {
   // arbitrario, asi que es seguro pasarlo directo.
   let q = admin.from(template.source_table).select('*').eq('company_id', template.company_id)
   q = q.is('deleted_at', null)
-  for (const [k, v] of Object.entries(template.filters)) {
-    if (v !== null && v !== '' && v !== undefined) {
-      q = q.eq(k, v)
-    }
+  for (const [k, v] of applicableFilters(template.filters)) {
+    q = q.eq(k, v)
   }
   const { data: rows, error: rowsErr } = await q
   if (rowsErr) {
@@ -120,8 +109,7 @@ Deno.serve(async (req: Request) => {
   const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
   // ── 4. Upload a Storage ──
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const path = `${template.company_id}/${template.id}/${timestamp}.csv`
+  const path = buildStoragePath(template.company_id, template.id)
   const { error: uploadErr } = await admin.storage
     .from('report-attachments')
     .upload(path, csvBlob, { contentType: 'text/csv;charset=utf-8' })
@@ -140,25 +128,13 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── 6. INSERT en email_send_queue por cada recipient ──
-  const sourceLabel = SOURCE_LABEL_MAP[template.source_table] ?? template.source_table
-  const vars = {
-    report_name:    template.name,
-    rows_count:     String(dataRows.length),
-    format:         'CSV',
-    source_table:   sourceLabel,
-    attachment_url: signed.signedUrl,
-    generated_at:   new Date().toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }),
-  }
-  const enqueueRows = template.recipients.map(email => ({
-    payload: {
-      company_id:   template.company_id,
-      template_key: 'saved_report_delivery',
-      to_email:     email,
-      vars,
-    },
-    company_id:    template.company_id,
-    status:        'pending',
-  }))
+  const vars = buildReportVars(
+    template,
+    dataRows.length,
+    signed.signedUrl,
+    new Date().toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }),
+  )
+  const enqueueRows = buildQueueRows(template, vars)
   const { error: queueErr } = await admin.from('email_send_queue').insert(enqueueRows)
   if (queueErr) {
     await logRun(admin, template, dataRows.length, 'failed', `queue: ${queueErr.message}`)
@@ -185,30 +161,6 @@ function jsonResponse(body: unknown, status: number, cors: HeadersInit): Respons
     status,
     headers: { ...cors, 'Content-Type': 'application/json' },
   })
-}
-
-function serializeCsv(
-  columns: Array<{ header: string; accessor: string }>,
-  rows: Array<Record<string, unknown>>,
-): string {
-  const headerLine = columns.map(c => escapeCsv(c.header)).join(',')
-  const dataLines = rows.map(row =>
-    columns.map(c => {
-      const v = row[c.accessor]
-      if (v === null || v === undefined) return ''
-      if (typeof v === 'object') return escapeCsv(JSON.stringify(v))
-      return escapeCsv(String(v))
-    }).join(',')
-  )
-  // BOM UTF-8 para que Excel detecte encoding con acentos.
-  return '﻿' + [headerLine, ...dataLines].join('\n')
-}
-
-function escapeCsv(s: string): string {
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-    return `"${s.replace(/"/g, '""')}"`
-  }
-  return s
 }
 
 async function logRun(

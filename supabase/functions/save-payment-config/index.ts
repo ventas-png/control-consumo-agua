@@ -1,4 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Lógica pura (gate de rol, whitelist de proveedor, validación de campos y
+// construcción de los updates público/secreto) extraída a ./logic.ts para poder
+// testearla en vitest (infra:I22).
+import {
+  buildConfigUpdates,
+  buildRollbackUpdate,
+  esProveedorValido,
+  faltanCampos,
+  puedeConfigurarPagos,
+} from './logic.ts'
 
 // CORS utilities for Edge Functions
 function getAllowedOrigins(): string[] {
@@ -97,7 +107,7 @@ Deno.serve(async (req) => {
     const callerCompanyId = (callerProfile as { role: string; company_id: string } | null)?.company_id
 
     // Only allow company owners and admins
-    if (callerRole !== 'company_owner' && callerRole !== 'admin') {
+    if (!puedeConfigurarPagos(callerRole)) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -112,20 +122,20 @@ Deno.serve(async (req) => {
 
     const { companyId, provider, publicKey, secretKey } = body
 
-    if (!companyId || !provider || !publicKey || !secretKey) {
+    if (faltanCampos({ companyId, provider, publicKey, secretKey })) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    if (provider !== 'stripe' && provider !== 'paypal') {
+    if (!esProveedorValido(provider)) {
       return new Response(JSON.stringify({ error: 'Invalid provider' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     // company_owner and admin can only configure their own company
-    if ((callerRole === 'company_owner' || callerRole === 'admin') && companyId !== callerCompanyId) {
+    if (puedeConfigurarPagos(callerRole) && companyId !== callerCompanyId) {
       return new Response(JSON.stringify({ error: 'Cannot configure payment for other companies' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -138,32 +148,7 @@ Deno.serve(async (req) => {
     )
 
     // 1. Update public config in companies table
-    let companyUpdate: Record<string, unknown>
-    let secretsUpdate: Record<string, unknown>
-
-    if (provider === 'stripe') {
-      companyUpdate = {
-        stripe_public_key: publicKey,
-        stripe_configured: true,
-        stripe_activo: true,
-      }
-      secretsUpdate = {
-        company_id: companyId,
-        stripe_secret_key: secretKey,
-        updated_at: new Date().toISOString(),
-      }
-    } else {
-      companyUpdate = {
-        paypal_client_id: publicKey,
-        paypal_configured: true,
-        paypal_activo: true,
-      }
-      secretsUpdate = {
-        company_id: companyId,
-        paypal_client_secret: secretKey,
-        updated_at: new Date().toISOString(),
-      }
-    }
+    const { companyUpdate, secretsUpdate } = buildConfigUpdates(provider, companyId, publicKey, secretKey)
 
     const { error: companyError } = await adminClient
       .from('companies')
@@ -185,10 +170,7 @@ Deno.serve(async (req) => {
     if (secretError) {
       console.error('Error saving payment secret:', secretError)
       // Rollback: unmark as configured since secret wasn't saved
-      const rollback: Record<string, unknown> = provider === 'stripe'
-        ? { stripe_configured: false, stripe_activo: false }
-        : { paypal_configured: false, paypal_activo: false }
-      await adminClient.from('companies').update(rollback).eq('id', companyId)
+      await adminClient.from('companies').update(buildRollbackUpdate(provider)).eq('id', companyId)
 
       return new Response(JSON.stringify({ error: 'Failed to save secret key' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -14,6 +14,8 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 | `condominios-cuota.e2e.ts` | Emitir cuota → registrar pago (condominios) |
 | `fiscal-timbrar.e2e.ts` | Timbrar comprobante FEL/CFDI contra **Sandbox** |
 | `contabilidad-ledger.e2e.ts` | Selector de contabilidad: la empresa y cada proyecto llevan libros propios |
+| `billing-upgrade.e2e.ts` | Cobro del SaaS a la empresa: modal "Ampliar plan" (tarifas) + checkout de cambio de plan (redirección a Stripe o 503 "Stripe no configurado") |
+| `portal-pago.e2e.ts` | Portal del cliente final: tab "Mis Pagos" → modal de checkout Stripe de un cargo pendiente (**sin pagar**) |
 
 > Los specs usan extensión `*.e2e.ts` (no `*.spec.ts`) a propósito: así el glob por
 > defecto de Vitest (`**/*.{test,spec}.ts`) no los recoge. Sólo Playwright los corre.
@@ -44,23 +46,32 @@ export E2E_LOGIN_PASSWORD="********"
 # opcionales por flujo:
 export E2E_INVITE_TOKEN="<token-fresco>"        # para invitation-accept
 export E2E_FISCAL_SANDBOX_READY=1               # para fiscal-timbrar
+export E2E_PORTAL_EMAIL="cliente@example.com"   # para portal-pago (usuario rol cliente)
+export E2E_PORTAL_PASSWORD="********"
 
 npx playwright test --config e2e/playwright.config.ts
 ```
 
-> El login/agua/condominios usan `E2E_LOGIN_*`. La invitación consume un token
-> **efímero** (one-shot): generá uno fresco por corrida. El timbrado necesita PAC
-> sandbox configurado en el preview.
+> El login/agua/condominios/billing usan `E2E_LOGIN_*` (para `billing-upgrade`
+> conviene un **company_owner**: `/empresa` y el botón "Cambiar plan" son de
+> owner/admin). El portal del cliente final usa `E2E_PORTAL_*` (usuario rol
+> `cliente`, idealmente con un cargo pendiente y Stripe activo — si falta, los
+> pasos se skipean). La invitación consume un token **efímero** (one-shot):
+> generá uno fresco por corrida. El timbrado necesita PAC sandbox configurado
+> en el preview. `billing-upgrade` **nunca completa un pago**: acepta como
+> éxito la redirección a Stripe o el 503 "Stripe no configurado" del preview
+> sin secrets.
 
 ## Variables de entorno
 
 | Var | Para | Obligatoria |
 |---|---|---|
 | `E2E_BASE_URL` | base URL del preview/sandbox | sí (sin ella, todo skip) |
-| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | login/agua/condominios/fiscal |
+| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | login/agua/condominios/fiscal/billing-upgrade |
 | `E2E_INVITE_TOKEN` | token fresco de invitación | sólo invitation-accept |
 | `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | sólo fiscal-timbrar |
 | `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | sólo role-restricted-access |
+| `E2E_PORTAL_EMAIL` / `E2E_PORTAL_PASSWORD` | usuario rol `cliente` (portal del cliente final) | sólo portal-pago |
 
 ## CI
 

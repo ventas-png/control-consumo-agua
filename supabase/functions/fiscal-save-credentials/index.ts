@@ -24,12 +24,21 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+// Lógica pura (validación de payload, resolución de tenant, gate de
+// autorización y MERGE por ambiente) extraída a ./validate.ts para testearla
+// con vitest (infra:I22 · Track T8/T5). Aquí queda solo el I/O.
+import {
+  type CredencialesAmbiente,
+  autorizadoParaTenant,
+  esObjeto,
+  mergeCredenciales,
+  normalizarProveedor,
+  resolverCompanyId,
+  tieneCredenciales,
+} from './validate.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-
-/** Credenciales de un ambiente: objeto opaco (usuario/clave/token/cert, según PAC). */
-type CredencialesAmbiente = Record<string, unknown>
 
 interface ReqBody {
   /** Tenant dueño de las credenciales. Opcional para admin/owner (se infiere del JWT). */
@@ -43,11 +52,6 @@ interface ReqBody {
     sandbox?: CredencialesAmbiente | null
     prod?: CredencialesAmbiente | null
   }
-}
-
-/** ¿Es un objeto plano (no array/null) usable como credenciales de ambiente? */
-function esObjeto(v: unknown): v is CredencialesAmbiente {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
 Deno.serve(async (req: Request) => {
@@ -109,21 +113,18 @@ Deno.serve(async (req: Request) => {
       projectCompanyId = (proj as { company_id?: string }).company_id ?? null
     }
 
-    const companyId =
-      projectCompanyId ?? body.company_id ?? callerCompanyId ?? null
+    const companyId = resolverCompanyId(projectCompanyId, body.company_id, callerCompanyId)
     if (!companyId) return json({ error: 'Falta company_id' }, 400)
 
     // Autorización por tenant: admin/owner solo escribe en su propia empresa.
-    if (!internal && !callerIsSuperAdmin && callerCompanyId !== companyId) {
+    if (!autorizadoParaTenant({ internal, callerIsSuperAdmin, callerCompanyId }, companyId)) {
       return json({ error: 'No autorizado para guardar credenciales de otro tenant' }, 403)
     }
 
     // ── 2) Validar el cuerpo: al menos un ambiente con credenciales no vacías ──
     const sandbox = body.credenciales?.sandbox
     const prod = body.credenciales?.prod
-    const traeSandbox = esObjeto(sandbox) && Object.keys(sandbox).length > 0
-    const traeProd = esObjeto(prod) && Object.keys(prod).length > 0
-    if (!traeSandbox && !traeProd) {
+    if (!tieneCredenciales(sandbox) && !tieneCredenciales(prod)) {
       return json(
         { error: 'Envía credenciales para al menos un ambiente (sandbox o prod).' },
         400,
@@ -131,7 +132,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Proveedor: snapshot informativo de a qué PAC pertenecen las credenciales.
-    const proveedor = (body.proveedor ?? '').trim() || 'sandbox'
+    const proveedor = normalizarProveedor(body.proveedor)
 
     // ── 3) MERGE con lo ya guardado (preservar el ambiente no enviado) ──
     // Leemos SOLO `credenciales` con service_role para hacer el merge por
@@ -152,9 +153,7 @@ Deno.serve(async (req: Request) => {
       credActuales = (existente as { credenciales: Record<string, unknown> }).credenciales
     }
 
-    const nuevasCredenciales: Record<string, unknown> = { ...credActuales }
-    if (traeSandbox) nuevasCredenciales.sandbox = sandbox
-    if (traeProd) nuevasCredenciales.prod = prod
+    const nuevasCredenciales = mergeCredenciales(credActuales, sandbox, prod)
 
     // ── 4) Upsert (cambiar credenciales invalida el último "probar conexión") ──
     const { error: upErr } = await admin

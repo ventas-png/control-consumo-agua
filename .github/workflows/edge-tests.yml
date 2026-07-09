@@ -71,11 +71,14 @@ jobs:
           deno-version: v1.x
 
       # Typecheck Deno de los helpers puros (sin I/O ni supabase-js). Detecta drift
-      # de tipos que `tsc` no ve (tsconfig solo incluye src/).
+      # de tipos que `tsc` no ve (tsconfig solo incluye src/). Los globs cubren la
+      # convención logic.ts/validate.ts por función (I22 lote 2: billing, pagos,
+      # auth/lifecycle, correo/OAuth, crons/fiscal); el shell los expande, así que
+      # cada helper nuevo que siga la convención entra solo.
       - name: deno check pure helpers
         run: |
           deno check \
             supabase/functions/notifications-dispatcher/render.ts \
-            supabase/functions/invite-user/validate.ts \
-            supabase/functions/accept-invitation/validate.ts \
-            supabase/functions/_shared/uploadValidation.ts
+            supabase/functions/_shared/uploadValidation.ts \
+            supabase/functions/*/logic.ts \
+            supabase/functions/*/validate.ts

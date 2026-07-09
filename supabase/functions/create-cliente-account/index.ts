@@ -1,5 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
+// Lógica pura (validación de entrada, match de identidad 3-de-3, mapeo de
+// errores, filas de perfil/evidencia legal) extraída a ./logic.ts para
+// testearla en vitest (infra:I22).
+import {
+  IDENTITY_ERROR,
+  buildClienteProfileRow,
+  buildLegalAcceptanceRows,
+  isIdentityMatch,
+  mapAuthCreateError,
+  normalizeEmail,
+  validateSignupInput,
+  type LegalDoc,
+  type OnboardingLookup,
+  type SignupBody,
+} from './logic.ts'
 
 function getAllowedOrigins(): string[] {
   // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
@@ -38,10 +53,6 @@ function getCorsHeaders(origin: string | null) {
   }
 }
 
-// Generic identity error — same message for "not found" and "already verified" to prevent enumeration
-const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.'
-
-
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
   const corsHeaders = getCorsHeaders(origin)
@@ -65,28 +76,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json() as {
+    const body = await req.json() as SignupBody & {
       full_name: string
       email: string
       cui_dui: string
       fecha_nacimiento: string
       password: string
-      legal_accepted?: boolean
     }
 
     const { full_name, email, cui_dui, fecha_nacimiento, password } = body
 
-    if (!full_name || !email || !cui_dui || !fecha_nacimiento || !password) {
-      return err('Todos los campos son requeridos.')
-    }
-
-    // Click-wrap obligatorio (RGPD/CCPA): el cliente debe aceptar los documentos legales.
-    if (body.legal_accepted !== true) {
-      return err('Debes aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA.')
-    }
-
-    if (password.length < 8) {
-      return err('La contraseña debe tener al menos 8 caracteres.')
+    // Campos requeridos + click-wrap obligatorio (RGPD/CCPA) + contraseña mínima.
+    const validation = validateSignupInput(body)
+    if (!validation.ok) {
+      return err(validation.error)
     }
 
     // Service-role client to bypass RLS
@@ -99,7 +102,7 @@ Deno.serve(async (req) => {
     // vector de abuso (enumeración de identidad vía buscar_cliente_para_onboarding + spam de
     // cuentas). Keyeado por IP y por email para que ni una IP rotando correos ni un correo
     // rotando IPs evada el tope. El de IP corta primero (no quema el contador del email).
-    const normalizedEmail = email.toLowerCase().trim()
+    const normalizedEmail = normalizeEmail(email)
     const rl = await enforceRateLimits(adminClient, [
       { subject: `ip:${getClientIp(req)}`, action: 'create_cliente_account', max: 10 },
       { subject: `email:${normalizedEmail}`, action: 'create_cliente_account:email', max: 5 },
@@ -117,13 +120,13 @@ Deno.serve(async (req) => {
       return err('Error al verificar su identidad. Intente nuevamente.')
     }
 
-    const result = lookupResult as { match_count: number; cliente_id: string | null }
+    const result = lookupResult as OnboardingLookup
 
-    if (result.match_count < 3 || !result.cliente_id) {
+    if (!isIdentityMatch(result)) {
       return err(IDENTITY_ERROR)
     }
 
-    const clienteId = result.cliente_id
+    const clienteId = result.cliente_id as string
 
     // Step 2: Verify that the client has permission to create an account
     const { data: clienteRecord, error: clienteError } = await adminClient
@@ -153,7 +156,7 @@ Deno.serve(async (req) => {
 
     // Step 4: Create Supabase Auth user
     const { data: newAuthUser, error: createError } = await adminClient.auth.admin.createUser({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { full_name },
@@ -161,24 +164,15 @@ Deno.serve(async (req) => {
 
     if (createError || !newAuthUser?.user) {
       console.error('Auth create error:', createError)
-      const message = createError?.message?.includes('already registered')
-        ? 'El correo electrónico ya está registrado.'
-        : 'No se pudo crear la cuenta. Intente nuevamente.'
-      return err(message)
+      return err(mapAuthCreateError(createError?.message))
     }
 
     const newUserId = newAuthUser.user.id
 
-    // Step 5: Insert profile in app_users
+    // Step 5: Insert profile in app_users (rol SIEMPRE 'cliente')
     const { error: profileError } = await adminClient
       .from('app_users')
-      .insert({
-        id: newUserId,
-        full_name: full_name.trim(),
-        role: 'cliente',
-        cliente_id: clienteId,
-        activo: true,
-      })
+      .insert(buildClienteProfileRow(newUserId, full_name, clienteId))
 
     if (profileError) {
       console.error('Profile insert error:', profileError)
@@ -203,19 +197,12 @@ Deno.serve(async (req) => {
       } else if (!legalDocs || legalDocs.length === 0) {
         console.error('no current legal_documents (es); acceptance not recorded')
       } else {
-        const acceptedAt = new Date().toISOString()
-        const clientIp = getClientIp(req)
-        const userAgent = req.headers.get('user-agent')
-        const rows = (legalDocs as Array<{ doc_type: string; version: string }>).map((d) => ({
-          user_id: newUserId,
-          company_id: null,
-          doc_type: d.doc_type,
-          version: d.version,
-          locale: 'es',
-          accepted_at: acceptedAt,
-          client_ip: clientIp,
-          user_agent: userAgent,
-        }))
+        const rows = buildLegalAcceptanceRows(legalDocs as LegalDoc[], {
+          userId: newUserId,
+          acceptedAt: new Date().toISOString(),
+          clientIp: getClientIp(req),
+          userAgent: req.headers.get('user-agent'),
+        })
         const { error: legalErr } = await adminClient
           .from('legal_acceptances')
           .upsert(rows, { onConflict: 'user_id,doc_type,version,locale', ignoreDuplicates: true })

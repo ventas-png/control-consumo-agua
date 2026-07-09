@@ -30,8 +30,15 @@ import {
   type CobroCanonico,
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
-  type EstadoCobroProveedor,
 } from '../_shared/payments/index.ts'
+// Lógica pura (mapeo de estados, credenciales por ambiente, construcción del
+// CobroCanonico) extraída a ./logic.ts para poder testearla en vitest (infra:I22).
+import {
+  buildCobroCanonico,
+  credsDeAmbiente,
+  estadoPaymentRequest,
+  parseAmbiente,
+} from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -48,27 +55,6 @@ interface ReqBody {
   descripcion?: string
   url_retorno?: string
   url_cancelacion?: string
-}
-
-/** Mapea el estado normalizado del provider al estado de payment_requests. */
-function estadoPaymentRequest(estado: EstadoCobroProveedor): string {
-  switch (estado) {
-    case 'aprobado':
-      return 'succeeded'
-    case 'rechazado':
-    case 'error':
-      return 'failed'
-    default:
-      // 'pendiente' | 'requiere_accion' → esperando confirmación/retorno.
-      return 'pending'
-  }
-}
-
-/** Credenciales del ambiente desde el jsonb opaco de la bóveda. */
-function credsDeAmbiente(credenciales: unknown, ambiente: AmbientePago): Record<string, unknown> | null {
-  if (typeof credenciales !== 'object' || credenciales === null) return null
-  const v = (credenciales as Record<string, unknown>)[ambiente]
-  return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
 
 Deno.serve(async (req: Request) => {
@@ -115,7 +101,7 @@ Deno.serve(async (req: Request) => {
     const registroId = body.registro_id ?? null
     const projectId = body.project_id ?? null
     const monto = Number(body.monto)
-    const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
+    const ambiente: AmbientePago = parseAmbiente(body.ambiente)
 
     if (!clienteId || !body.company_id || !(monto > 0)) {
       return json({ error: 'Parámetros inválidos (cliente_id, company_id, monto > 0).' }, 400)
@@ -187,21 +173,18 @@ Deno.serve(async (req: Request) => {
     const cli = (cliente as { nombre?: string; email?: string; telefono?: string; nit?: string } | null) ?? null
 
     const base = APP_URL || origin || ''
-    const cobro: CobroCanonico = {
+    const cobro: CobroCanonico = buildCobroCanonico({
       monto,
       moneda: monedaCobro,
-      descripcion: body.descripcion?.trim() || `Pago de servicio — ${cli?.nombre ?? 'Cliente'}`,
-      referenciaInterna: registroId ?? clienteId,
-      pagador: {
-        nombre: cli?.nombre ?? null,
-        email: cli?.email ?? null,
-        telefono: cli?.telefono ?? null,
-        identificador: cli?.nit ?? null,
-      },
-      urlRetorno: body.url_retorno ?? (base ? `${base}/portal?pago=ok` : null),
-      urlCancelacion: body.url_cancelacion ?? (base ? `${base}/portal?pago=cancelado` : null),
-      metadata: { company_id: companyId, cliente_id: clienteId, ...(registroId ? { registro_id: registroId } : {}) },
-    }
+      descripcion: body.descripcion,
+      registroId,
+      clienteId,
+      companyId,
+      cli,
+      base,
+      urlRetorno: body.url_retorno,
+      urlCancelacion: body.url_cancelacion,
+    })
 
     // ── 4) Crear el cobro con el payfac efectivo ──
     const provider = getPaymentProvider({

@@ -1,14 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
+// Helpers puros (fechas/ventanas GT, dedupe de destinatarios, plantilla, rows
+// in-app, mensaje MIME) extraídos a ./logic.ts para testearlos con vitest
+// (infra:I22 · Track T8). Aquí queda solo el I/O (Gmail, queries, RPC).
+import {
+  type Recipient,
+  type Row,
+  applyVars,
+  autorizadoParaEmpresa,
+  batchHorizonDate,
+  buildInAppRows,
+  buildRawMessage,
+  buildReminderVars,
+  dedupeRecipients,
+  fmtFecha,
+  hhmm,
+  isDue,
+  itemInfo,
+  renderRecordatorio,
+  todayGT,
+} from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
-
-// Guatemala is UTC-6 year-round (no DST), so a fixed offset is safe.
-const GT_OFFSET_MS = 6 * 60 * 60 * 1000
 
 // CORS con validación de origen (mismo enfoque que _shared/cors.ts y send-email).
 function getCorsHeaders(origin: string | null) {
@@ -36,14 +53,6 @@ function getCorsHeaders(origin: string | null) {
 
 // deno-lint-ignore no-explicit-any
 type Client = ReturnType<typeof createClient>
-// deno-lint-ignore no-explicit-any
-type Row = Record<string, any>
-
-interface Recipient {
-  email: string | null
-  userId: string | null
-  rol: 'operador' | 'administrador'
-}
 
 // ---------------------------------------------------------------------------
 // Gmail helpers (mismo enfoque que la función send-email)
@@ -77,27 +86,6 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
   return data.access_token
 }
 
-function buildRawMessage(from: string, to: string, subject: string, htmlBody: string): string {
-  const boundary = `----=_Part_${Date.now()}`
-  const lines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    '',
-    btoa(unescape(encodeURIComponent(htmlBody))),
-    '',
-    `--${boundary}--`,
-  ]
-  return btoa(unescape(encodeURIComponent(lines.join('\r\n'))))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
 async function sendViaGmail(config: EmailConfig, to: string, subject: string, htmlBody: string, supabase: Client): Promise<void> {
   let accessToken = config.access_token
   const isExpired = config.token_expiry != null &&
@@ -119,86 +107,11 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
 }
 
 // ---------------------------------------------------------------------------
-// Plantilla de recordatorio
+// Helpers de dominio (I/O; la decisión pura vive en ./logic.ts)
 // ---------------------------------------------------------------------------
-
-function baseLayout(content: string, empresa: string): string {
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${empresa}</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;"><tr><td align="center">
-  <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:600px;">
-    <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0d9488);padding:28px 32px;text-align:center;">
-      <span style="color:#fff;font-size:22px;font-weight:700;">${empresa}</span></td></tr>
-    <tr><td style="padding:32px;">${content}</td></tr>
-    <tr><td style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="margin:0;font-size:12px;color:#94a3b8;">Recordatorio automático de ${empresa}. Por favor no responda directamente.</p></td></tr>
-  </table>
-</td></tr></table></body></html>`
-}
-
-function renderRecordatorio(vars: Record<string, string>): { subject: string; html: string } {
-  const empresa = vars.empresa_nombre || 'AdministraTodo'
-  const content = `
-    <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">Recordatorio de Ruta</h2>
-    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${vars.to_name || ''}</strong>, este es un recordatorio de una ruta de lecturas programada${vars.rol_destinatario ? ` (${vars.rol_destinatario})` : ''}.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
-      <tr style="background:#0d9488;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLES DE LA RUTA</td></tr>
-      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Nombre</td><td style="padding:10px 18px;font-size:14px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.ruta_nombre || '—'}</td></tr>
-      ${vars.ruta_descripcion ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Descripción</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.ruta_descripcion}</td></tr>` : ''}
-      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Fecha</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.fecha_ocurrencia || '—'}${vars.hora_ocurrencia ? ` · ${vars.hora_ocurrencia}` : ''}</td></tr>
-      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Por leer</td><td style="padding:10px 18px;font-size:14px;color:#0d9488;font-weight:700;text-align:right;">${vars.total_items || '0'} ${vars.tipo_items || ''}</td></tr>
-    </table>
-    <div style="text-align:center;margin:28px 0;"><a href="${vars.app_url || APP_URL}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#fff;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:700;">Abrir AdministraTodo</a></div>
-    <p style="margin:0;font-size:13px;color:#64748b;">Por favor asegúrate de completarla en la fecha indicada.</p>`
-  return {
-    subject: `Recordatorio de ruta: ${vars.ruta_nombre || 'Ruta'} | ${empresa}`,
-    html: baseLayout(content, empresa),
-  }
-}
-
-function applyVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? '')
-}
-
-// ---------------------------------------------------------------------------
-// Helpers de dominio
-// ---------------------------------------------------------------------------
-
-function todayGT(): string {
-  return new Date(Date.now() - GT_OFFSET_MS).toISOString().slice(0, 10)
-}
-
-function fmtFecha(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
-
-function hhmm(t: string | null | undefined): string {
-  return t ? String(t).slice(0, 5) : ''
-}
-
-function isDue(occ: Row, route: Row): boolean {
-  const hora = hhmm(occ.hora) || hhmm(route.hora_programada) || '08:00'
-  const occInstant = Date.parse(`${occ.fecha}T${hora}:00-06:00`)
-  if (Number.isNaN(occInstant)) return true
-  const anticip = (route.recordatorio_anticipacion_min ?? 1440) * 60000
-  return Date.now() >= occInstant - anticip
-}
-
-function itemInfo(route: Row): { total: number; tipo: string } {
-  const tipo = route.tipo_ruta ?? 'clientes'
-  if (tipo === 'contadores') return { total: (route.contador_ids ?? []).length, tipo: 'contadores' }
-  if (tipo === 'unidades') return { total: (route.unidad_ids ?? []).length, tipo: 'unidades' }
-  return { total: (route.cliente_ids ?? []).length, tipo: 'clientes' }
-}
 
 async function resolveRecipients(admin: Client, route: Row): Promise<Recipient[]> {
-  const byKey = new Map<string, Recipient>()
-  const add = (r: Recipient) => {
-    const key = r.userId ?? r.email ?? ''
-    if (!key) return
-    if (!byKey.has(key)) byKey.set(key, r)
-  }
+  const candidates: Recipient[] = []
 
   // Operador asignado
   let operadorEmail: string | null = route.asignado_email ?? null
@@ -208,7 +121,7 @@ async function resolveRecipients(admin: Client, route: Row): Promise<Recipient[]
     operadorEmail = data?.user?.email ?? null
   }
   if (operadorEmail || operadorUserId) {
-    add({ email: operadorEmail, userId: operadorUserId, rol: 'operador' })
+    candidates.push({ email: operadorEmail, userId: operadorUserId, rol: 'operador' })
   }
 
   // Administradores de la empresa
@@ -221,11 +134,11 @@ async function resolveRecipients(admin: Client, route: Row): Promise<Recipient[]
       .eq('activo', true)
     for (const a of admins ?? []) {
       const { data } = await admin.auth.admin.getUserById(a.id as string)
-      add({ email: data?.user?.email ?? null, userId: a.id as string, rol: 'administrador' })
+      candidates.push({ email: data?.user?.email ?? null, userId: a.id as string, rol: 'administrador' })
     }
   }
 
-  return [...byKey.values()]
+  return dedupeRecipients(candidates)
 }
 
 async function processOccurrence(admin: Client, occ: Row, route: Row): Promise<{ emailed: number; notified: number }> {
@@ -265,21 +178,12 @@ async function processOccurrence(admin: Client, occ: Row, route: Row): Promise<{
 
       for (const r of recipients) {
         if (!r.email) continue
-        const vars: Record<string, string> = {
-          to_name: r.rol === 'administrador' ? 'Administrador' : (route.asignado_nombre ?? r.email),
-          ruta_nombre: route.nombre ?? '',
-          ruta_descripcion: route.descripcion ?? '',
-          fecha_ocurrencia: fechaFmt,
-          hora_ocurrencia: horaFmt,
-          total_items: String(total),
-          tipo_items: tipo,
-          empresa_nombre: empresaNombre,
-          rol_destinatario: r.rol,
-          app_url: APP_URL,
-        }
+        const vars = buildReminderVars(r, route, {
+          fechaFmt, horaFmt, total, tipo, empresaNombre, appUrl: APP_URL,
+        })
         const rendered = customTpl
           ? { subject: applyVars(customTpl.subject as string, vars), html: applyVars(customTpl.html_body as string, vars) }
-          : renderRecordatorio(vars)
+          : renderRecordatorio(vars, APP_URL)
         try {
           await sendViaGmail(cfg as unknown as EmailConfig, r.email, rendered.subject, rendered.html, admin)
           emailed++
@@ -294,18 +198,7 @@ async function processOccurrence(admin: Client, occ: Row, route: Row): Promise<{
 
   // ── In-app ──
   if (wantApp) {
-    const rows = recipients
-      .filter(r => r.userId)
-      .map(r => ({
-        user_id: r.userId,
-        company_id: route.company_id ?? null,
-        tipo: 'ruta_recordatorio',
-        titulo: `Ruta programada: ${route.nombre ?? ''}`,
-        cuerpo: `Tienes la ruta "${route.nombre ?? ''}" programada para el ${fechaFmt}${horaFmt ? ` a las ${horaFmt}` : ''}. ${total} ${tipo} por leer.`,
-        seccion: 'rutas',
-        ruta_id: route.id,
-        ocurrencia_id: occ.id,
-      }))
+    const rows = buildInAppRows(recipients, route, occ, { fechaFmt, horaFmt, total, tipo })
     if (rows.length > 0) {
       const { error } = await admin.from('user_notifications').insert(rows)
       if (error) console.error('[route-reminders] in-app insert failed', error.message)
@@ -363,7 +256,7 @@ Deno.serve(async (req: Request) => {
 
     if (internal && body.mode === 'batch') {
       // Lote: ocurrencias pendientes sin recordatorio dentro de la ventana.
-      const horizon = new Date(Date.now() - GT_OFFSET_MS + 2 * 86400000).toISOString().slice(0, 10)
+      const horizon = batchHorizonDate()
       const { data: occs, error } = await admin
         .from('ruta_ocurrencias')
         .select('*, ruta:rutas(*)')
@@ -410,7 +303,7 @@ Deno.serve(async (req: Request) => {
       if (!route || !occ) return json({ error: 'No hay una ocurrencia pendiente para esta ruta' }, 404)
 
       // Autorización por empresa para el camino admin.
-      if (!internal && !callerIsSuperAdmin && route.company_id !== callerCompanyId) {
+      if (!autorizadoParaEmpresa({ internal, callerIsSuperAdmin, callerCompanyId }, route.company_id)) {
         return json({ error: 'Forbidden' }, 403)
       }
 
