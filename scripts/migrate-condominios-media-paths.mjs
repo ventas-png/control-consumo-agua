@@ -59,6 +59,17 @@ const SOURCES = [
   { table: 'reservas_str',       cols: [{ name: 'foto_url', kind: 'scalar' }, { name: 'foto_documento_url', kind: 'scalar' }],              project: 'direct' },
   { table: 'paquetes_recibidos', cols: [{ name: 'fotos', kind: 'array' }, { name: 'firma_path', kind: 'scalar' }],                          project: 'direct' },
   { table: 'huespedes_str',      cols: [{ name: 'foto_url', kind: 'scalar' }, { name: 'foto_documento_url', kind: 'scalar' }],              project: 'via_reserva' },
+  // Lote 2 (auditoría #335 post-aplicación): uploaders que también escriben a este
+  // bucket y no estaban indexados — sus objetos legacy caían a _orphans/ en vez de
+  // re-pathearse. En prod ya se reconciliaron (ver SECURITY_ADVISORS.md, Fase 3);
+  // el índice completo evita repetirlo si el one-off corre en otro entorno.
+  { table: 'tickets_mantenimiento',   cols: [{ name: 'foto_urls', kind: 'array' }],                                                         project: 'direct' },
+  { table: 'personal_condominio',     cols: [{ name: 'foto_url', kind: 'scalar' }],                                                         project: 'direct' },
+  { table: 'polizas_seguro',          cols: [{ name: 'documento_url', kind: 'scalar' }],                                                    project: 'direct' },
+  { table: 'mascotas',                cols: [{ name: 'foto_url', kind: 'scalar' }],                                                         project: 'direct' },
+  { table: 'proveedores',             cols: [{ name: 'documento_url', kind: 'scalar' }],                                                    project: 'direct' },
+  { table: 'inspecciones_normativas', cols: [{ name: 'certificado_url', kind: 'scalar' }],                                                  project: 'direct' },
+  { table: 'reservas_amenidades',     cols: [{ name: 'checkin_foto_url', kind: 'scalar' }, { name: 'checkout_foto_url', kind: 'scalar' }],  project: 'direct' },
 ]
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
