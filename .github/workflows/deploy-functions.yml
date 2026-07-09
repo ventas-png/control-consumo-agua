@@ -177,3 +177,6 @@ jobs:
 
       - name: Deploy create-broadcast (no JWT — valida JWT admin/owner a mano)
         run: bash .github/scripts/deploy-fn.sh create-broadcast --no-verify-jwt
+
+      - name: Deploy track-email-open (no JWT — píxel público; autoriza el token HMAC firmado con CRON_SECRET)
+        run: bash .github/scripts/deploy-fn.sh track-email-open --no-verify-jwt

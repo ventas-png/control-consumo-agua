@@ -129,3 +129,74 @@ export async function markBroadcastRead(recipientId: string, readAt: string): Pr
     .eq('id', recipientId)
     .is('read_at', null)
 }
+
+// ── Tracking de entrega de emails por comunicado (com:N4) ──────────────────────
+// Los emails de un comunicado viajan por notifications_outbox (encolados por la
+// edge create-broadcast con payload.broadcast_id). El estado de cada fila es el
+// ciclo de vida del envío: queued/sending → sent → read (píxel) | bounced.
+// La RLS del outbox limita la lectura a owner/admin del tenant: para otros roles
+// la query devuelve 0 filas y la UI simplemente no muestra stats (degradación).
+
+export interface BroadcastEmailStats {
+  /** Aún en cola o en reintento (queued/sending). */
+  pendientes: number
+  /** Aceptados por Gmail (sent/delivered/read). */
+  enviados: number
+  /** Con apertura confirmada por el píxel (cota superior: proxies prefetchean). */
+  abiertos: number
+  /** Rebote duro reportado (bounced). */
+  rebotados: number
+  /** Fallo terminal del envío (failed) o suprimido por preferencia. */
+  fallidos: number
+}
+
+interface OutboxStatusRow {
+  status: string
+  broadcast_id: string | null
+}
+
+/** Agregador puro (testeable): filas del outbox → stats por broadcast_id. */
+export function computeEmailStatsByBroadcast(rows: OutboxStatusRow[]): Record<string, BroadcastEmailStats> {
+  const out: Record<string, BroadcastEmailStats> = {}
+  for (const row of rows) {
+    if (!row.broadcast_id) continue
+    const s = (out[row.broadcast_id] ??= { pendientes: 0, enviados: 0, abiertos: 0, rebotados: 0, fallidos: 0 })
+    switch (row.status) {
+      case 'queued':
+      case 'sending':
+        s.pendientes++
+        break
+      case 'sent':
+      case 'delivered':
+        s.enviados++
+        break
+      case 'read':
+        s.enviados++
+        s.abiertos++
+        break
+      case 'bounced':
+        s.rebotados++
+        break
+      case 'failed':
+      case 'suppressed':
+        s.fallidos++
+        break
+      default:
+        break
+    }
+  }
+  return out
+}
+
+/** Stats de entrega de los emails de un lote de comunicados. Degrada a {}. */
+export async function fetchBroadcastEmailStats(broadcastIds: string[]): Promise<Record<string, BroadcastEmailStats>> {
+  if (broadcastIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from('notifications_outbox')
+    .select('status, broadcast_id:payload->>broadcast_id')
+    .eq('channel', 'email')
+    .in('payload->>broadcast_id', broadcastIds)
+
+  if (error || !data) return {}
+  return computeEmailStatsByBroadcast(data as unknown as OutboxStatusRow[])
+}

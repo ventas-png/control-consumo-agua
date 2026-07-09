@@ -1,6 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+// Tracking de apertura (com:N4): píxel firmado que track-email-open verifica
+// para marcar opened_at en email_send_log (correlación por tracking_id).
+import {
+  appendTrackingPixel,
+  buildPixelUrl,
+  buildTrackingToken,
+} from '../_shared/deliveryTracking.ts'
 import {
   applyVars,
   buildRawMessage,
@@ -82,7 +89,7 @@ async function sendViaGmail(
   subject: string,
   htmlBody: string,
   supabase: ReturnType<typeof createClient>
-): Promise<void> {
+): Promise<string | null> {
   let accessToken = config.access_token
   const isExpired = isTokenExpired(config.token_expiry)
   if (isExpired && config.refresh_token) {
@@ -99,6 +106,10 @@ async function sendViaGmail(
     const err = await res.json()
     throw new Error(`Gmail API: ${JSON.stringify(err)}`)
   }
+  // messages.send devuelve { id, threadId, ... }: el id correlaciona el envío
+  // con futuros eventos de entrega/bounce (com:N4). Best-effort si no parsea.
+  const data = await res.json().catch(() => ({})) as { id?: string }
+  return data.id ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -269,8 +280,19 @@ Deno.serve(async (req: Request) => {
     // El payload re-encolado para reintentos usa el scope EFECTIVO ya validado,
     // no el del body original (que pudo venir manipulado).
     const scopedPayload = { ...payload, company_id: effIsSuperadmin ? null : effCompanyId, is_superadmin: effIsSuperadmin }
+
+    // Píxel de apertura (com:N4): tracking_id efímero firmado con CRON_SECRET;
+    // track-email-open lo verifica y marca opened_at. Sin secreto configurado
+    // no se inyecta nada (degradación graceful, el correo sale igual).
+    let trackingId: string | null = null
+    if (cronSecret) {
+      trackingId = crypto.randomUUID()
+      const token = await buildTrackingToken('t', trackingId, cronSecret)
+      htmlBody = appendTrackingPixel(htmlBody, buildPixelUrl(SUPABASE_URL, token))
+    }
+
     try {
-      await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
+      const gmailMessageId = await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
       supabase.from('email_send_log').insert({
         company_id: effIsSuperadmin ? null : effCompanyId,
         is_superadmin: effIsSuperadmin,
@@ -279,6 +301,8 @@ Deno.serve(async (req: Request) => {
         from_email: typedConfig.email,
         status: 'sent',
         triggered_by: userId,
+        gmail_message_id: gmailMessageId,
+        tracking_id: trackingId,
       }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
 
       return new Response(

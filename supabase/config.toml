@@ -124,3 +124,10 @@ verify_jwt = false
 # verify_jwt=false: valida el token a mano (service_role o JWT admin/owner).
 [functions.sso-admin]
 verify_jwt = false
+
+# Pixel de apertura de correos (T2/com:N4): publico por diseño — los clientes de
+# correo cargan el <img> sin auth. La autorizacion es el token HMAC firmado con
+# CRON_SECRET (verificado server-side); token invalido → mismo GIF 1x1, cero
+# efectos. Nunca expone datos: solo marca read/opened_at idempotente.
+[functions.track-email-open]
+verify_jwt = false
