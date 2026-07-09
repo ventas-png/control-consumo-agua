@@ -1,5 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+// Lógica pura (CORS, gate de rol, line items por uso, trial, return_path)
+// extraída a ./logic.ts para testearla en vitest (infra:I22).
+import {
+  buildAllowedOrigins,
+  buildCheckoutLineItems,
+  buildCustomerAddress,
+  canManageBilling,
+  computeTrialPeriodDays,
+  corsHeadersFor,
+  resolveReturnPath,
+} from './logic.ts'
 
 // ============================================================================
 // create-checkout-session — Platform Stripe (plat:P1 part 2, F2.12)
@@ -18,31 +29,10 @@ import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 // Devuelve la URL de Stripe Checkout. Frontend hace window.location.href.
 // ============================================================================
 
-function getAllowedOrigins(): string[] {
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-  }
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) { try { origins.add(new URL(appUrl).origin) } catch { /* ignore */ } }
-  return [...origins]
-}
-
+// Whitelist + headers CORS viven en ./logic.ts; aquí solo se inyecta el env.
 function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  return {
-    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : allowed[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
+  const allowed = buildAllowedOrigins(Deno.env.get('ALLOWED_ORIGINS'), Deno.env.get('APP_URL'))
+  return corsHeadersFor(origin, allowed)
 }
 
 interface Payload {
@@ -96,7 +86,7 @@ Deno.serve(async (req: Request) => {
       .select('role, company_id, email')
       .eq('id', user.id)
       .single()
-    if (!appUser || !['company_owner', 'admin'].includes((appUser as { role: string }).role)) {
+    if (!appUser || !canManageBilling((appUser as { role: string }).role)) {
       return new Response(JSON.stringify({ error: 'Solo company_owner o admin pueden gestionar la suscripcion' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -164,23 +154,16 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 5b. Calcular quantities iniciales basado en uso real actual
+    // 5b. Calcular quantities iniciales basado en uso real actual. La decisión
+    // (mínimos de Stripe, líneas con 0 omitidas) vive en buildCheckoutLineItems.
     const { data: usageRows } = await supabase.rpc('calculate_monthly_total_cents', { p_company_id: companyId })
     const usage = (usageRows as Array<{ extra_projects_count: number; primary_units_count: number; extra_units_count: number }> | null)?.[0]
-    const qty = {
-      activation: 1,
-      extra_project: usage?.extra_projects_count ?? 0,
-      unit_primary: Math.max(1, usage?.primary_units_count ?? 0),
-      unit_extra: usage?.extra_units_count ?? 0,
-    }
-    // Stripe Checkout requiere quantity >= 1 en cada line_item. Lines con 0 se
-    // omiten. activation y unit_primary siempre van; los otros 2 solo si > 0.
-    const lineItems: Array<{ price: string; quantity: number }> = [
-      { price: p.stripe_price_id_activation, quantity: qty.activation },
-      { price: p.stripe_price_id_unit_primary, quantity: qty.unit_primary },
-    ]
-    if (qty.extra_project > 0) lineItems.push({ price: p.stripe_price_id_extra_project, quantity: qty.extra_project })
-    if (qty.unit_extra > 0) lineItems.push({ price: p.stripe_price_id_unit_extra, quantity: qty.unit_extra })
+    const lineItems = buildCheckoutLineItems(usage, {
+      activation: p.stripe_price_id_activation,
+      unit_primary: p.stripe_price_id_unit_primary,
+      extra_project: p.stripe_price_id_extra_project,
+      unit_extra: p.stripe_price_id_unit_extra,
+    })
 
     // 6. Get or create Stripe customer for this company
     const { data: existingSub } = await supabase
@@ -219,15 +202,8 @@ Deno.serve(async (req: Request) => {
         name: c?.nombre ?? undefined,
         metadata: { company_id: companyId, user_id: user.id },
       }
-      if (c?.country) {
-        customerParams.address = {
-          country: c.country,
-          ...(c.address_line1 ? { line1: c.address_line1 } : {}),
-          ...(c.address_city ? { city: c.address_city } : {}),
-          ...(c.address_state ? { state: c.address_state } : {}),
-          ...(c.address_postal_code ? { postal_code: c.address_postal_code } : {}),
-        }
-      }
+      const address = buildCustomerAddress(c)
+      if (address) customerParams.address = address
       const customer = await stripe.customers.create(customerParams)
       customerId = customer.id
 
@@ -246,15 +222,11 @@ Deno.serve(async (req: Request) => {
     // 7. Preserve trial: si la sub tiene trial_end en el futuro, le decimos
     // a Stripe que respete ese trial.
     const existingTrialEnd = (existingSub as { trial_end: string | null } | null)?.trial_end
-    let trialPeriodDays: number | undefined
-    if (existingTrialEnd) {
-      const trialMs = new Date(existingTrialEnd).getTime() - Date.now()
-      if (trialMs > 0) trialPeriodDays = Math.ceil(trialMs / (24 * 60 * 60 * 1000))
-    }
+    const trialPeriodDays = computeTrialPeriodDays(existingTrialEnd)
 
     // 8. Build Checkout Session
     const appUrl = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
-    const returnPath = payload.return_path?.startsWith('/') ? payload.return_path : '/perfil'
+    const returnPath = resolveReturnPath(payload.return_path)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
