@@ -37,13 +37,9 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
 
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
-// Supported currencies for Stripe
-const STRIPE_SUPPORTED_CURRENCIES = new Set([
-  'usd', 'eur', 'gbp', 'jpy', 'aud', 'cad', 'chf', 'cny', 'inr', 'mxn',
-  'nzd', 'sgd', 'hkd', 'nok', 'sek', 'dkk', 'pln', 'czk', 'huf', 'ron',
-  'bgn', 'hrk', 'rub', 'try', 'brl', 'ars', 'clp', 'cop', 'pen', 'uyu',
-  'idr', 'myr', 'php', 'thb', 'vnd', 'zar', 'kes', 'egp', 'aed', 'qar'
-])
+// Lógica pura (validación de request, moneda, centavos, params del intent)
+// extraída a ./logic.ts para poder testearla en vitest (infra:I22).
+import { buildPaymentIntentParams, esRequestValido, resolveCurrency } from './logic.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -88,7 +84,7 @@ Deno.serve(async (req) => {
 
     const { cliente_id, registro_id, company_id, monto } = body
 
-    if (!cliente_id || !registro_id || !company_id || !monto || monto <= 0) {
+    if (!esRequestValido({ cliente_id, registro_id, company_id, monto })) {
       return new Response(JSON.stringify({ error: 'Invalid request parameters' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -126,9 +122,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate and use currency (fallback to USD if not set or invalid)
-    const currency = (company.default_currency && STRIPE_SUPPORTED_CURRENCIES.has(company.default_currency.toLowerCase()))
-      ? company.default_currency.toLowerCase()
-      : 'usd'
+    const currency = resolveCurrency(company.default_currency)
 
     // Read secret from isolated table (only service_role can access)
     const { data: secrets, error: secretsError } = await adminClient
@@ -155,16 +149,16 @@ Deno.serve(async (req) => {
       .single()
 
     // Create PaymentIntent with dynamic currency
-    const paymentIntent = await stripeClient.paymentIntents.create({
-      amount: Math.round(monto * 100), // Convert to cents
-      currency: currency,
-      metadata: {
+    const paymentIntent = await stripeClient.paymentIntents.create(
+      buildPaymentIntentParams({
         cliente_id,
         registro_id,
         company_id,
-      },
-      description: `Pago de agua - ${cliente?.nombre ?? 'Cliente'}`,
-    })
+        monto,
+        currency,
+        clienteNombre: cliente?.nombre,
+      })
+    )
 
     // Create payment_request record for tracking
     const { error: paymentRequestError } = await adminClient

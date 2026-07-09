@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Construcción de la fila de `pagos` (lógica pura) extraída a ./logic.ts para
+// poder testearla en vitest (infra:I22).
+import { buildPagoRow } from './logic.ts'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
@@ -139,23 +142,7 @@ Deno.serve(async (req) => {
         // Create pago record with 'verificado' status (auto-verified via webhook)
         const { error: pagoError } = await adminClient
           .from('pagos')
-          .insert({
-            registro_id: paymentRequest.registro_id,
-            cliente_id: paymentRequest.cliente_id,
-            project_id: null,
-            monto: paymentRequest.monto,
-            metodo: 'tarjeta_credito', // Stripe is credit card
-            tipo_aplicacion: 'pago_total',
-            verification_status: 'verificado',
-            estado: 'verificado',
-            stripe_payment_intent_id: paymentIntent.id,
-            comprobante_url: null,
-            comprobante_tipo: null,
-            verified_at: new Date().toISOString(),
-            verified_by: 'stripe_webhook',
-            notas: `Pago automático de Stripe - ${paymentIntent.id}`,
-            created_by: null,
-          })
+          .insert(buildPagoRow(paymentRequest, paymentIntent.id))
 
         if (pagoError) {
           console.error('Error creating pago from webhook:', pagoError)
