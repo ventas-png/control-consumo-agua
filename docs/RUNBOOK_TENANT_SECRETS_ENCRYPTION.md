@@ -1,9 +1,10 @@
 # Runbook — Cifrado en reposo de secretos por tenant (P0 #7)
 
-> **Estado.** Fase EXPAND en curso. La ruta de **pagos** (`company_payment_secrets`)
-> ya está cableada al cifrado. Las rutas **fiscal**, **payfac** y **email** siguen
-> pendientes (mismo patrón). El cifrado está **inactivo** (passthrough) hasta que un
-> operador provisione la llave `TENANT_SECRETS_ENC_KEY`.
+> **Estado.** Fase EXPAND **completa en código**: las **cuatro** tablas de categoría E
+> (`company_payment_secrets`, `fiscal_pac_secrets`, `payfac_secrets`,
+> `company_email_configs`) están cableadas al cifrado. El cifrado sigue **inactivo**
+> (passthrough) hasta que un operador provisione la llave `TENANT_SECRETS_ENC_KEY`
+> y ejecute el backfill (MIGRATE) por tabla. Falta solo la activación (operador).
 
 ## Qué protege
 
@@ -43,7 +44,7 @@ Este trabajo las cifra **en reposo** con AES-256-GCM.
 | `company_payment_secrets` | `save-payment-config` (cifra) | `create-payment-intent`, `test-stripe`, `stripe-webhook-handler` (descifran) | ✅ **cableado** |
 | `fiscal_pac_secrets` | `fiscal-save-credentials` (cifra + merge) | `fiscal-test-connection`, `timbrar-documento` (descifran) | ✅ **cableado** |
 | `payfac_secrets` | `payfac-save-credentials` (cifra + merge) | `payfac-test-connection`, `create-charge` (descifran) | ✅ **cableado** |
-| `company_email_configs` | `google-oauth-callback`, + refresh de token en 6 fns | `send-email`, `process-email-queue`, `route-reminders`, `notifications-dispatcher`, `notify-package` | ⏳ pendiente (fase final) |
+| `company_email_configs` | `google-oauth-callback` (cifra al alta) + refresh de token en 5 fns (cifran al reescribir) | `send-email`, `process-email-queue`, `route-reminders`, `notifications-dispatcher`, `notify-package` (descifran tras leer) | ✅ **cableado** |
 
 > El blob `credenciales` (jsonb) de fiscal/payfac se cifra con `encryptJson` /
 > `decryptJson` (serializa el objeto, guarda `enc:v1:…` como string jsonb; sin

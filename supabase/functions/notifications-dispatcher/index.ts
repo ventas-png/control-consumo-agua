@@ -26,6 +26,7 @@
 // migracion 20260604100000_notifications_outbox.sql).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 // Helpers puros de render/plantillas/routing extraídos a ./render.ts para poder
 // testearlos en vitest sin I/O (infra:I22). El handler sigue haciendo las queries.
 import {
@@ -133,7 +134,7 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
   if (!data.access_token) return null
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase.from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -272,6 +273,12 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
     .eq('company_id', row.company_id).eq('is_active', true)
     .maybeSingle()
   if (!cfg) return { ok: false, error: 'sin Gmail configurado para la empresa', retriable: false }
+  // P0 #7: descifrar los tokens en reposo (dual-read).
+  {
+    const cs = cfg as { access_token?: string | null; refresh_token?: string | null }
+    cs.access_token = (await decryptSecret(cs.access_token)) ?? ''
+    cs.refresh_token = await decryptSecret(cs.refresh_token)
+  }
 
   // Resolucion de plantilla en cascada (I/O aquí; la decisión en resolveEmailContent):
   //   1) notification_templates (tenant → global) por template_key.

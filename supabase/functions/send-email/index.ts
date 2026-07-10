@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
@@ -59,7 +60,7 @@ async function refreshAccessToken(
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase
     .from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -526,6 +527,9 @@ Deno.serve(async (req: Request) => {
     // retoma con backoff exponencial. Errores permanentes (400, 403 token
     // revoked) responden 500 — no tiene sentido reintentar.
     const typedConfig = config as EmailConfig
+    // P0 #7: descifrar los tokens en reposo (dual-read: texto plano legacy pasa igual).
+    typedConfig.access_token = (await decryptSecret(typedConfig.access_token)) ?? ''
+    typedConfig.refresh_token = await decryptSecret(typedConfig.refresh_token)
     // El payload re-encolado para reintentos usa el scope EFECTIVO ya validado,
     // no el del body original (que pudo venir manipulado).
     const scopedPayload = { ...payload, company_id: effIsSuperadmin ? null : effCompanyId, is_superadmin: effIsSuperadmin }

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 
 // process-email-queue: worker que process el batch de emails pendientes.
@@ -67,7 +68,7 @@ async function refreshAccessToken(
   if (!data.access_token) return null
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase.from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -96,6 +97,9 @@ async function attemptSend(
   if (!cfgData) return { ok: false, error: 'sin Gmail config activa' }
 
   const config = cfgData as EmailConfig
+  // P0 #7: descifrar los tokens en reposo (dual-read: texto plano legacy pasa igual).
+  config.access_token = (await decryptSecret(config.access_token)) ?? ''
+  config.refresh_token = await decryptSecret(config.refresh_token)
   let accessToken = config.access_token
   const isExpired = config.token_expiry != null &&
     new Date(config.token_expiry).getTime() - Date.now() < 5 * 60 * 1000
