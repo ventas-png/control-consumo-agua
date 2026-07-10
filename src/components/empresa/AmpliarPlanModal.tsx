@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { EditModal } from '../shared/EditModal'
 import { notify } from '../shared/Dialog'
-import { supabase } from '../../lib/supabase'
+import { solicitarAmpliacionLimites } from '../../domain/empresa/mutations'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { fetchPlanPricing, fetchMonthlyTotalBreakdown } from '../../domain/facturacion/billing'
 import { proyectarTotalConLimitesCents, type PlanPricingCents } from '../../lib/businessBilling'
@@ -77,14 +77,11 @@ export function AmpliarPlanModal({ companyId, onClose, onSuccess }: Props) {
   async function ampliar() {
     if (sinCambios || invalido) return
     setSaving(true)
-    const { error } = await supabase.rpc('solicitar_ampliacion_limites', {
-      p_max_projects: newProj,
-      p_max_units: newUnits,
-    })
+    const { error } = await solicitarAmpliacionLimites(newProj, newUnits)
     setSaving(false)
     if (error) {
       // La RPC devuelve mensajes en español (rol, suscripción, tope del plan).
-      notify({ variant: 'error', title: 'No se pudo ampliar', text: error.message })
+      notify({ variant: 'error', title: 'No se pudo ampliar', text: error })
       return
     }
     notify({

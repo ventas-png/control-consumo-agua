@@ -29,6 +29,11 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      # Guardarraíl de arquitectura (P0 #11): los componentes no importan el
+      # cliente `supabase` directo. Bloqueante — evita la regresión del boundary.
+      - name: Lint (boundary)
+        run: npm run lint
+
       - name: Test
         run: npm run test
 
