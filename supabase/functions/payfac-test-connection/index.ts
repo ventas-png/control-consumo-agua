@@ -15,6 +15,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   getPaymentProvider,
   resolverConfigPagoEfectiva,
@@ -140,10 +141,9 @@ Deno.serve(async (req: Request) => {
       ? credLookup.is('project_id', null)
       : credLookup.eq('project_id', projectId)
     const { data: secretRow } = await credLookup.maybeSingle()
-    const credenciales = credsDeAmbiente(
-      (secretRow as { credenciales?: unknown } | null)?.credenciales,
-      ambiente,
-    )
+    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const credBlob = await decryptJson((secretRow as { credenciales?: unknown } | null)?.credenciales)
+    const credenciales = credsDeAmbiente(credBlob, ambiente)
 
     // Helper: persiste el ESTATUS (NO el secreto) y arma la respuesta.
     const persistirYResponder = async (ok: boolean, mensaje: string) => {

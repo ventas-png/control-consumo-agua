@@ -116,3 +116,28 @@ export async function decryptSecret(stored: string | null | undefined): Promise<
   if (stored == null) return null
   return decryptWithKey(await envKey(), stored)
 }
+
+// ── Blobs de credenciales en columnas jsonb (fiscal_pac_secrets, payfac_secrets) ──
+// El secreto es un OBJETO jsonb (p.ej. { sandbox:{…}, prod:{…} }). Se cifra
+// serializándolo y guardando el string "enc:v1:…" en la misma columna jsonb (un
+// string es jsonb válido). Passthrough sin llave: se devuelve el OBJETO tal cual
+// para preservar la forma jsonb legacy.
+
+/** Cifra un objeto de credenciales para una columna jsonb. Sin llave → devuelve el objeto. */
+export async function encryptJson(value: unknown): Promise<unknown> {
+  const enc = await encryptSecret(JSON.stringify(value))
+  return isEncrypted(enc) ? enc : value
+}
+
+/**
+ * Descifra un valor leído de una columna jsonb de credenciales. Si es un string
+ * "enc:v1:…" lo descifra y parsea al objeto; si ya es objeto (legacy plano) u
+ * otro valor, lo devuelve tal cual. Lectura dual.
+ */
+export async function decryptJson(stored: unknown): Promise<unknown> {
+  if (typeof stored === 'string' && isEncrypted(stored)) {
+    const pt = await decryptSecret(stored)
+    return pt == null ? null : JSON.parse(pt)
+  }
+  return stored
+}

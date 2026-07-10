@@ -22,6 +22,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   getPaymentProvider,
   resolverConfigPagoEfectiva,
@@ -176,7 +177,9 @@ Deno.serve(async (req: Request) => {
     let credLookup = admin.from('payfac_secrets').select('credenciales').eq('company_id', companyId)
     credLookup = projectId === null ? credLookup.is('project_id', null) : credLookup.eq('project_id', projectId)
     const { data: secretRow } = await credLookup.maybeSingle()
-    const credenciales = credsDeAmbiente((secretRow as { credenciales?: unknown } | null)?.credenciales, ambiente)
+    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const credBlob = await decryptJson((secretRow as { credenciales?: unknown } | null)?.credenciales)
+    const credenciales = credsDeAmbiente(credBlob, ambiente)
 
     // ── 3) Construir el CobroCanonico (datos del cliente para el recibo) ──
     const { data: cliente } = await admin
