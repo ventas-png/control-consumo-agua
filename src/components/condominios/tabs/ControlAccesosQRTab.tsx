@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { notify } from '../../shared/Dialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsert } from '../../../lib/validatedInsert'
@@ -21,16 +22,19 @@ interface QRGenerado {
   unidadId: string
   unidadNombre: string
   validoHasta: string
-  qrUrl: string
 }
 
+// P0 #8 (auditoría 2026-07-10): token CRIPTOGRÁFICO (antes Math.random, adivinable).
+// Alfabeto sin caracteres ambiguos (0/O/1/I/L) para que el guardia lo pueda teclear
+// sin confusión. 12 chars × ~4.95 bits ≈ 59 bits de entropía — no adivinable en la
+// ventana de validez del pase.
+const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 function generarToken(): string {
-  return Math.random().toString(36).substring(2, 10).toUpperCase()
-}
-
-function qrUrl(token: string, nombre: string, unidad: string, hasta: string): string {
-  const data = encodeURIComponent(`VISITA:${token}|${nombre}|${unidad}|${hasta}`)
-  return `https://api.qrserver.com/v1/create-qr-code/?data=${data}&size=180x180&margin=8`
+  const bytes = new Uint8Array(12)
+  crypto.getRandomValues(bytes)
+  let out = ''
+  for (const b of bytes) out += TOKEN_ALPHABET[b % TOKEN_ALPHABET.length]
+  return out
 }
 
 export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate: _canCreate, onRefresh }: Props) {
@@ -65,7 +69,6 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       unidadId: form.unidadId,
       unidadNombre: u?.nombre ?? '',
       validoHasta: form.validoHasta,
-      qrUrl: qrUrl(token, form.nombre.trim(), u?.nombre ?? '', form.validoHasta),
     }
     setQrGenerado(qr)
   }
@@ -200,8 +203,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 12 }}>
                   {qrGenerado.nombre} → {qrGenerado.unidadNombre} · válido hasta {qrGenerado.validoHasta}
                 </div>
-                <img src={qrGenerado.qrUrl} alt="QR" width={180} height={180}
-                  style={{ border: '2px solid var(--at-line)', borderRadius: 8, marginBottom: 12 }} />
+                {/* P0 #8: QR renderizado LOCALMENTE (antes iba a api.qrserver.com con
+                    los datos del visitante — fuga de PII a un tercero). Codifica solo
+                    el token opaco; el guardia lo escanea y valida contra qr_token. */}
+                <div style={{ background: '#fff', padding: 10, border: '2px solid var(--at-line)', borderRadius: 8, marginBottom: 12, lineHeight: 0 }}>
+                  <QRCodeSVG value={qrGenerado.token} size={180} level="M" marginSize={2} />
+                </div>
                 <div style={{ padding: '6px 12px', background: 'var(--at-chip)', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 2, marginBottom: 12, color: 'var(--at-ink)' }}>
                   Token: {qrGenerado.token}
                 </div>
