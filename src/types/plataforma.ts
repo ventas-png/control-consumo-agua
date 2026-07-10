@@ -44,6 +44,8 @@ export interface UserSession {
   expires_at: string;
   servicio_agua?: boolean;
   servicio_condominios?: boolean;
+  // P0 #10: si la empresa exige 2FA, el shell bloquea hasta enrolar TOTP.
+  mfa_required?: boolean;
   // RBAC: effective permission keys for this user (e.g. 'condominios.tab.cuotas')
   permissions?: Set<string>;
   // RBAC: assigned role IDs (system + custom)

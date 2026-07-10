@@ -62,19 +62,21 @@ export async function buildSessionFromSupabase(
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
   let empresaSuspendida = false
+  let mfa_required = false
   try {
     const batch2: Promise<void> = (async () => {
       if (companyId) {
         const { data } = await supabase
           .from('companies')
-          .select('servicio_agua, servicio_condominios, activa')
+          .select('servicio_agua, servicio_condominios, activa, mfa_required')
           .eq('id', companyId)
           .single()
         if (data) {
-          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean }
+          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean; mfa_required?: boolean }
           servicio_agua = flags.servicio_agua
           servicio_condominios = flags.servicio_condominios
           empresaSuspendida = flags.activa === false
+          mfa_required = flags.mfa_required === true
         }
       } else if (clienteId) {
         type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
@@ -121,6 +123,7 @@ export async function buildSessionFromSupabase(
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
     servicio_agua,
     servicio_condominios,
+    mfa_required,
     permissions: buildPermissionsSet(rbacPermsResult),
     assigned_role_ids: buildAssignedRoleIds(userRolesResult),
     assigned_roles: buildAssignedRoles(userRolesResult),

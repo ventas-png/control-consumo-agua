@@ -35,6 +35,7 @@ import {
 } from './components/app/lazySections'
 import { AuthSplash, DualServicePortal, PresenceBar } from './components/app/shell'
 import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/routes'
+import { MfaGate } from './components/auth/MfaGate'
 
 export default function App() {
   // F3.13: ComponentShowcase dev route (/dev/components). Solo accesible
@@ -171,6 +172,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [showSignupCompany, setShowSignupCompany] = useState(false)
+  // P0 #10: enforcement de MFA por empresa. Se resetea al cambiar de usuario;
+  // el MfaGate lo pone en true si ya hay factor verificado o tras enrolar.
+  const [mfaSatisfied, setMfaSatisfied] = useState(false)
+  useEffect(() => { setMfaSatisfied(false) }, [currentUser?.user_id])
   const [unreadComunicacion, setUnreadComunicacion] = useState(0)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   // Legacy: kept for backward compatibility with old reset links already sent
@@ -334,6 +339,13 @@ export default function App() {
         )}
       </Suspense>
     )
+  }
+
+  // P0 #10: si la empresa exige 2FA y el usuario aún no tiene un factor
+  // verificado, bloqueá el shell hasta enrolar. El MfaGate satisface de
+  // inmediato si ya hay factor (clientes no tienen company → mfa_required falsy).
+  if (currentUser.mfa_required && !mfaSatisfied) {
+    return <MfaGate onSatisfied={() => setMfaSatisfied(true)} onLogout={logout} />
   }
 
   // Cliente users get their own portal — no admin data needed
