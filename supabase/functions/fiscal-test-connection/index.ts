@@ -24,6 +24,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   getFiscalProvider,
   resolverConfigFiscalEfectiva,
@@ -124,7 +125,8 @@ async function cargarCredencialesPac(
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .maybeSingle()
-    const cred = (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales
+    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const cred = await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null
     if (cred && Object.keys(cred).length > 0) return cred
   }
   const { data } = await admin
@@ -133,7 +135,7 @@ async function cargarCredencialesPac(
     .eq('company_id', companyId)
     .is('project_id', null)
     .maybeSingle()
-  return (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales ?? null
+  return (await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null) ?? null
 }
 
 Deno.serve(async (req: Request) => {

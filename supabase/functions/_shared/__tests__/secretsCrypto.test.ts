@@ -6,6 +6,8 @@ import {
   decryptWithKey,
   encryptSecret,
   decryptSecret,
+  encryptJson,
+  decryptJson,
 } from '../secretsCrypto.ts'
 
 async function freshKey(): Promise<CryptoKey> {
@@ -106,5 +108,31 @@ describe('encryptSecret / decryptSecret (wrappers de entorno)', () => {
   it('decryptSecret(null) → null', async () => {
     expect(await decryptSecret(null)).toBeNull()
     expect(await decryptSecret(undefined)).toBeNull()
+  })
+})
+
+describe('encryptJson / decryptJson (blobs jsonb de credenciales)', () => {
+  const cred = { sandbox: { x_login: 'a', x_api_key: 'b' }, prod: { x_login: 'c' } }
+
+  it('sin llave: encryptJson devuelve el OBJETO tal cual (preserva forma jsonb legacy)', async () => {
+    const out = await encryptJson(cred)
+    expect(out).toEqual(cred)
+    expect(typeof out).toBe('object')
+  })
+
+  it('decryptJson de un objeto legacy (plano) lo devuelve tal cual', async () => {
+    expect(await decryptJson(cred)).toEqual(cred)
+  })
+
+  it('decryptJson de un string cifrado sin llave → lanza', async () => {
+    await expect(decryptJson('enc:v1:xxxx')).rejects.toThrow(/no hay llave/)
+  })
+
+  it('round-trip con llave (vía núcleo puro): objeto → cifrar → descifrar → objeto', async () => {
+    const key = await importAesKey(crypto.getRandomValues(new Uint8Array(32)))
+    const enc = await encryptWithKey(key, JSON.stringify(cred))
+    expect(isEncrypted(enc)).toBe(true)
+    const back = JSON.parse(await decryptWithKey(key, enc))
+    expect(back).toEqual(cred)
   })
 })

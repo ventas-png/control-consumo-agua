@@ -40,11 +40,17 @@ Este trabajo las cifra **en reposo** con AES-256-GCM.
 
 | Tabla | Writers | Readers | Estado |
 |---|---|---|---|
-| `company_payment_secrets` | `save-payment-config` (cifra) | `create-payment-intent`, `test-stripe`, `stripe-webhook-handler` (descifran) | ✅ **cableado (EXPAND)** |
-| `fiscal_pac_secrets` | `fiscal-save-credentials` | `fiscal-test-connection`, `timbrar-documento`, `_shared/fiscal/felGtProvider`, `_shared/fiscal/cfdiMxProvider` | ⏳ pendiente |
-| `payfac_secrets` | `payfac-save-credentials` | `payfac-test-connection`, `create-charge` | ⏳ pendiente |
-| `company_email_configs` | `complete-oauth-onboarding`, `send-email` (refresh token) | `send-email`, `process-email-queue` | ⏳ pendiente |
+| `company_payment_secrets` | `save-payment-config` (cifra) | `create-payment-intent`, `test-stripe`, `stripe-webhook-handler` (descifran) | ✅ **cableado** |
+| `fiscal_pac_secrets` | `fiscal-save-credentials` (cifra + merge) | `fiscal-test-connection`, `timbrar-documento` (descifran) | ✅ **cableado** |
+| `payfac_secrets` | `payfac-save-credentials` (cifra + merge) | `payfac-test-connection`, `create-charge` (descifran) | ✅ **cableado** |
+| `company_email_configs` | `google-oauth-callback`, + refresh de token en 6 fns | `send-email`, `process-email-queue`, `route-reminders`, `notifications-dispatcher`, `notify-package` | ⏳ pendiente (fase final) |
 
+> El blob `credenciales` (jsonb) de fiscal/payfac se cifra con `encryptJson` /
+> `decryptJson` (serializa el objeto, guarda `enc:v1:…` como string jsonb; sin
+> llave devuelve el objeto igual). Los providers fiscales
+> (`felGtProvider`/`cfdiMxProvider`) reciben el objeto ya descifrado por
+> parámetro → no tocan la tabla.
+>
 > `stripe_webhook_secret` no tiene writer en edge (lo fija el operador). Su reader
 > (`stripe-webhook-handler`) ya descifra; el backfill lo cubre.
 
