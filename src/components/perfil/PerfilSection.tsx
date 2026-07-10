@@ -406,9 +406,21 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setBillingFb(null)
     setBillingActionLoading(true)
     try {
-      const { url, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
+      const { url, swapped, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
       if (error) {
         setBillingFb({ type: 'error', msg: error ?? 'No se pudo crear la sesión de pago.' })
+        return
+      }
+      // P0 #1: la company ya tenía suscripción activa → el plan se cambió
+      // in-place (sin redirigir ni crear una segunda suscripción). Refrescamos
+      // la suscripción para reflejar el nuevo plan.
+      if (swapped) {
+        setShowPlanPicker(false)
+        setBillingFb({ type: 'success', msg: 'Tu plan se actualizó. El ajuste se prorratea en tu próxima factura.' })
+        if (currentUser.company_id) {
+          const fresh = await fetchActiveSubscription<SubscriptionRow>(currentUser.company_id)
+          setSubscription(fresh)
+        }
         return
       }
       if (!url) {
