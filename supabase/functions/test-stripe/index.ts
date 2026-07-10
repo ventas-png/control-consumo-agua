@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { decryptSecret } from '../_shared/secretsCrypto.ts'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
@@ -159,9 +160,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Test Stripe connection by getting account info
+    // Test Stripe connection by getting account info.
+    // P0 #7: descifrar en reposo (dual-read: texto plano legacy pasa igual).
+    const stripeSecretKey = await decryptSecret(secrets.stripe_secret_key)
     const Stripe = stripe.default || stripe
-    const stripeClient = new Stripe(secrets.stripe_secret_key)
+    const stripeClient = new Stripe(stripeSecretKey as string)
 
     try {
       const account = await stripeClient.account.retrieve()

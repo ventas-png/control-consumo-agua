@@ -115,6 +115,7 @@ Configurados en **Supabase → Edge Functions → Secrets**. Detectados por
 | `STRIPE_PLATFORM_SECRET_KEY` | **Secreto** | `create-checkout-session`, `create-billing-portal-session`, `stripe-platform-webhook` | Secret key de la cuenta **plataforma** de Stripe (billing del SaaS). |
 | `STRIPE_PLATFORM_WEBHOOK_SECRET` | **Secreto** | `stripe-platform-webhook` | Verifica la firma HMAC del webhook de Stripe plataforma. |
 | `CRON_SECRET` | **Secreto** | funciones invocadas por `pg_cron` / triggers | Token compartido para autenticar invocaciones de cron sin JWT. |
+| `TENANT_SECRETS_ENC_KEY` | **Secreto crítico** | `_shared/secretsCrypto.ts` (cifrado en reposo de secretos por tenant, P0 #7) | Llave AES-256 (base64, 32 bytes) para cifrar/descifrar las tablas *deny-all* de categoría E. Vive **solo** aquí; jamás en la base. Si se omite, el cifrado queda en passthrough (texto plano). Rotación y provisión: `docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md`. |
 | `ALLOWED_ORIGINS` | Sensible (config) | helper CORS compartido | Allow-list de orígenes adicionales para CORS. |
 | `APP_URL` | Sensible (config) | varias (CORS/redirect) | URL pública usada como origen permitido de respaldo. |
 | `BILLING_SYNC_DRY_RUN` | Flag | sync de billing | Modo simulación; no es secreto. |
@@ -170,6 +171,13 @@ No son variables de entorno: son secretos **de cada tenant**, guardados en tabla
 **RLS habilitado y policy *deny-all*** → solo `service_role` (vía edge function) accede.
 El cliente **nunca** los lee; solo ve metadata/flags vía RPCs `SECURITY DEFINER`
 acotadas. Patrón establecido en `company_payment_secrets` y replicado en el resto.
+
+> **Cifrado en reposo (P0 #7).** Además del RLS, estos valores se cifran con
+> AES-256-GCM (`_shared/secretsCrypto.ts`, llave `TENANT_SECRETS_ENC_KEY` fuera de la
+> base). En curso por fases (expand→migrate→contract): la ruta de **pagos** ya está
+> cableada; fiscal/payfac/email siguen. Provisión de llave, orden de cableado y
+> backfill: `docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md`. El cifrado es passthrough
+> (texto plano) hasta que se provisiona la llave, así que no altera el flujo actual.
 
 | Tabla | Contenido | Escrito por (edge) | Metadata expuesta (RPC) |
 |---|---|---|---|

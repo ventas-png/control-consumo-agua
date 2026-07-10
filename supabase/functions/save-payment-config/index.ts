@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret } from '../_shared/secretsCrypto.ts'
 
 // CORS utilities for Edge Functions
 function getAllowedOrigins(): string[] {
@@ -141,6 +142,11 @@ Deno.serve(async (req) => {
     let companyUpdate: Record<string, unknown>
     let secretsUpdate: Record<string, unknown>
 
+    // P0 #7: cifrar el secreto en reposo antes de guardarlo. Sin
+    // TENANT_SECRETS_ENC_KEY configurada, encryptSecret devuelve el texto plano
+    // (passthrough) → cero cambio de comportamiento hasta provisionar la llave.
+    const encryptedSecret = await encryptSecret(secretKey)
+
     if (provider === 'stripe') {
       companyUpdate = {
         stripe_public_key: publicKey,
@@ -149,7 +155,7 @@ Deno.serve(async (req) => {
       }
       secretsUpdate = {
         company_id: companyId,
-        stripe_secret_key: secretKey,
+        stripe_secret_key: encryptedSecret,
         updated_at: new Date().toISOString(),
       }
     } else {
@@ -160,7 +166,7 @@ Deno.serve(async (req) => {
       }
       secretsUpdate = {
         company_id: companyId,
-        paypal_client_secret: secretKey,
+        paypal_client_secret: encryptedSecret,
         updated_at: new Date().toISOString(),
       }
     }
