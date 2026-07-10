@@ -111,14 +111,28 @@ async function upsertSubscriptionFromStripe(
   // lado Stripe.
   const { data: existing } = await supabase
     .from('subscriptions')
-    .select('id')
+    .select('id, status, past_due_since')
     .eq('stripe_subscription_id', stripeSub.id)
     .maybeSingle()
+
+  const status = mapStripeStatus(stripeSub.status)
+
+  // P0 #2 (dunning): fijar past_due_since al ENTRAR en past_due (primer pago
+  // fallido) y NO reiniciar el reloj en reintentos posteriores; limpiarlo al
+  // salir de past_due (recuperación / cancelación). company_write_enabled usa
+  // esta marca para la ventana de gracia antes de degradar a solo-lectura.
+  const existingRow = existing as { id: string; status?: string; past_due_since?: string | null } | null
+  let pastDueSince: string | null = null
+  if (status === 'past_due') {
+    pastDueSince = existingRow?.status === 'past_due' && existingRow.past_due_since
+      ? existingRow.past_due_since
+      : new Date().toISOString()
+  }
 
   const row = {
     company_id: companyId,
     plan_id: planId,
-    status: mapStripeStatus(stripeSub.status),
+    status,
     billing_cycle: billingCycle,
     current_period_start: periodStart,
     current_period_end: periodEnd,
@@ -127,6 +141,7 @@ async function upsertSubscriptionFromStripe(
     cancel_at_period_end: !!stripeSub.cancel_at_period_end,
     stripe_subscription_id: stripeSub.id,
     stripe_customer_id: typeof stripeSub.customer === 'string' ? stripeSub.customer : stripeSub.customer.id,
+    past_due_since: pastDueSince,
   }
 
   if (existing) {
@@ -224,6 +239,60 @@ async function upsertInvoiceFromStripe(
   }
 }
 
+// P0 #2 (dunning): encola un correo de aviso de pago fallido al owner de la
+// empresa vía la cola existente (enqueue_email → process-email-queue). Se envía
+// desde la cuenta de plataforma (is_superadmin) con el template 'dunning_pago'.
+// Best-effort: si no hay owner o falla el encolado, se loguea y sigue — Stripe
+// además manda su propio correo de pago fallido y reintenta el cobro.
+async function enqueueDunningEmail(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string,
+): Promise<void> {
+  try {
+    const { data: company } = await supabase
+      .from('companies').select('nombre').eq('id', companyId).maybeSingle()
+    // El worker exige un triggered_by no vacío; usamos el user id del owner
+    // (destinatario natural del aviso de facturación).
+    const { data: owner } = await supabase
+      .from('app_users')
+      .select('id, email, full_name')
+      .eq('company_id', companyId)
+      .in('role', ['company_owner', 'admin'])
+      .order('role', { ascending: false }) // 'company_owner' antes que 'admin'
+      .limit(1)
+      .maybeSingle()
+    const o = owner as { id: string; email: string | null; full_name: string | null } | null
+    if (!o?.id || !o?.email) {
+      console.warn('[webhook] dunning: empresa sin owner/email, no se encola correo:', companyId)
+      return
+    }
+    const appUrl = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
+    const vars: Record<string, string> = {
+      empresa_nombre: (company as { nombre?: string } | null)?.nombre ?? 'tu empresa',
+      to_name: o.full_name ?? '',
+      dias_gracia: '14',
+      cta_texto: 'Actualizar método de pago',
+      cta_url: `${appUrl}/perfil`,
+    }
+    await supabase.rpc('enqueue_email', {
+      p_payload: {
+        company_id: null,
+        is_superadmin: true,
+        template_key: 'dunning_pago',
+        to_email: o.email,
+        to_name: o.full_name ?? '',
+        vars,
+      },
+      p_company_id: companyId,
+      p_is_superadmin: true,
+      p_triggered_by: o.id,
+      p_first_error: 'dunning: encolado por webhook invoice.payment_failed',
+    })
+  } catch (e) {
+    console.warn('[webhook] dunning: no se pudo encolar correo:', e instanceof Error ? e.message : String(e))
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
@@ -306,11 +375,14 @@ Deno.serve(async (req: Request) => {
       case 'invoice.finalized': {
         const invoice = event.data.object as Stripe.Invoice
         await upsertInvoiceFromStripe(supabase, invoice)
-        // Si el pago fallo, asegurar subscription queda past_due
+        // Si el pago fallo, asegurar subscription queda past_due (+ past_due_since)
+        // y encolar el correo de dunning al owner de la empresa.
         if (event.type === 'invoice.payment_failed' && invoice.subscription) {
           const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
           const stripeSub = await stripe.subscriptions.retrieve(subId)
           await upsertSubscriptionFromStripe(supabase, stripeSub)
+          const dunningCompanyId = stripeSub.metadata?.company_id
+          if (dunningCompanyId) await enqueueDunningEmail(supabase, dunningCompanyId)
         }
         break
       }

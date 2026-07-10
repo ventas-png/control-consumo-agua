@@ -280,6 +280,24 @@ function renderTemplate(key: string, vars: Record<string, string>): { subject: s
     }
   }
 
+  if (key === 'dunning_pago') {
+    // P0 #2: aviso de pago fallido de la suscripción SaaS (plataforma → tenant).
+    const platform = vars.platform_name ?? 'AdministraTodo'
+    const dias = vars.dias_gracia ?? '14'
+    return {
+      subject: `Pago rechazado — acción requerida | ${vars.empresa_nombre ?? platform}`,
+      html: baseLayout(`
+        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">No pudimos procesar tu pago</h2>
+        <p style="margin:0 0 20px;color:#64748b;font-size:14px;">Estimado equipo de <strong>${vars.empresa_nombre ?? 'su empresa'}</strong>, el cobro de tu suscripción fue rechazado.</p>
+        <div style="background:#fef2f2;border-radius:12px;border-left:4px solid #dc2626;padding:18px 22px;margin-bottom:24px;">
+          <p style="margin:0;font-size:14px;color:#991b1b;line-height:1.7;">Tienes <strong>${dias} días</strong> para actualizar tu método de pago. Pasado ese plazo, la cuenta pasará a <strong>modo solo lectura</strong> hasta regularizar el pago. Reintentaremos el cobro automáticamente mientras tanto.</p>
+        </div>
+        ${vars.cta_url && vars.cta_texto ? `<div style="text-align:center;margin:24px 0;"><a href="${vars.cta_url}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;">${vars.cta_texto}</a></div>` : ''}
+        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">Si ya actualizaste tu método de pago, puedes ignorar este correo.<br/>Atentamente,<br/><strong>${platform}</strong></p>
+      `, platform, logo),
+    }
+  }
+
   if (key === 'notificacion_empresa') {
     const platform = vars.platform_name ?? 'AquaControl'
     return {
