@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -74,7 +75,7 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
   if (!data.access_token) return null
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase.from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -348,6 +349,10 @@ Deno.serve(async (req: Request) => {
         .eq('is_active', true)
         .maybeSingle()
       if (cfg) {
+        // P0 #7: descifrar los tokens en reposo (dual-read).
+        const cs = cfg as { access_token?: string | null; refresh_token?: string | null }
+        cs.access_token = (await decryptSecret(cs.access_token)) ?? ''
+        cs.refresh_token = await decryptSecret(cs.refresh_token)
         const { data: customTpl } = await admin
           .from('email_templates')
           .select('subject, html_body')

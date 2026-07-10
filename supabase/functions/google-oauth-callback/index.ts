@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret } from '../_shared/secretsCrypto.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
@@ -140,8 +141,9 @@ Deno.serve(async (req: Request) => {
     const record = {
       provider: 'google',
       email: userInfo.email,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token ?? null,
+      // P0 #7: cifrar los tokens OAuth en reposo (passthrough sin llave).
+      access_token: await encryptSecret(tokens.access_token),
+      refresh_token: tokens.refresh_token ? await encryptSecret(tokens.refresh_token) : null,
       token_expiry: tokenExpiry,
       is_active: true,
       updated_at: new Date().toISOString(),
