@@ -69,6 +69,14 @@ jobs:
   apply:
     needs: check-secrets
     runs-on: ubuntu-latest
+    # P0 #9 (auditoría 2026-07-10): gate de aprobación antes de escribir a prod.
+    # Este job aplica SQL a la base de PRODUCCIÓN; asociarlo a un Environment
+    # permite exigir aprobación humana (Settings → Environments → `production-db`
+    # → Required reviewers). Mientras el Environment no tenga reglas de protección,
+    # el job corre igual (no bloquea) — así este cambio es seguro de mergear y el
+    # gate se activa cuando el owner configure los reviewers. También permite
+    # restringir los secrets de Supabase a este Environment.
+    environment: production-db
     env:
       API_URL: https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query
       ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
