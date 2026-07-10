@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { decryptSecret } from '../_shared/secretsCrypto.ts'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
@@ -93,10 +94,14 @@ Deno.serve(async (req) => {
       try {
         if (!secret.stripe_webhook_secret) continue
 
+        // P0 #7: descifrar en reposo (dual-read: texto plano legacy pasa igual).
+        const webhookSecret = await decryptSecret(secret.stripe_webhook_secret)
+        if (!webhookSecret) continue
+
         event = Stripe.webhooks.constructEvent(
           body,
           signature,
-          secret.stripe_webhook_secret
+          webhookSecret
         )
         companyId = secret.company_id
         console.log(`Webhook verified for company: ${companyId}`)
