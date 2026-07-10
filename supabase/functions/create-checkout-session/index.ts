@@ -1,5 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+import {
+  computeExpectedQuantities,
+  planSwapItems,
+  type StripeSubItem,
+  type PlanPriceIds,
+} from '../_shared/billingSync.ts'
 
 // ============================================================================
 // create-checkout-session — Platform Stripe (plat:P1 part 2, F2.12)
@@ -185,12 +191,88 @@ Deno.serve(async (req: Request) => {
     // 6. Get or create Stripe customer for this company
     const { data: existingSub } = await supabase
       .from('subscriptions')
-      .select('id, stripe_customer_id, status, trial_end, plan_id')
+      .select('id, stripe_customer_id, stripe_subscription_id, status, trial_end, plan_id')
       .eq('company_id', companyId)
       .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
       .maybeSingle()
 
     const stripe = new Stripe(stripeSecret, { apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion })
+
+    // 6b. CAMBIO DE PLAN in-place (P0 #1). Si la company ya tiene una
+    // subscription ACTIVA en Stripe, NO abrimos otro Checkout (crearía una
+    // SEGUNDA subscription → doble cobro). En su lugar, actualizamos los items
+    // de la subscription existente al nuevo plan con prorrateo. El webhook
+    // customer.subscription.updated sincroniza el plan_id local (más el
+    // fast-path directo de abajo para que la UI lo refleje al instante).
+    const sub = existingSub as {
+      id: string
+      stripe_subscription_id: string | null
+      status: string
+    } | null
+    if (sub?.stripe_subscription_id && ['trialing', 'active', 'past_due'].includes(sub.status)) {
+      const activeSubId = sub.stripe_subscription_id
+
+      let stripeSub: Stripe.Subscription
+      try {
+        stripeSub = await stripe.subscriptions.retrieve(activeSubId, { expand: ['items.data.price'] })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return new Response(
+          JSON.stringify({ error: `No se pudo leer la suscripción actual en Stripe: ${msg}` }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const expected = computeExpectedQuantities({
+        extra_projects_count: usage?.extra_projects_count ?? 0,
+        primary_units_count: usage?.primary_units_count ?? 0,
+        extra_units_count: usage?.extra_units_count ?? 0,
+      })
+      const newPriceIds: PlanPriceIds = {
+        activation: p.stripe_price_id_activation,
+        unit_primary: p.stripe_price_id_unit_primary,
+        extra_project: p.stripe_price_id_extra_project,
+        unit_extra: p.stripe_price_id_unit_extra,
+      }
+      const curItems: StripeSubItem[] = stripeSub.items.data.map(it => ({
+        id: it.id,
+        price: { id: typeof it.price === 'string' ? it.price : it.price.id },
+        quantity: it.quantity ?? 0,
+      }))
+      const swapOps = planSwapItems(curItems, expected, newPriceIds)
+
+      if (swapOps.length > 0) {
+        try {
+          await stripe.subscriptions.update(activeSubId, {
+            items: swapOps as Stripe.SubscriptionUpdateParams.Item[],
+            proration_behavior: 'create_prorations',
+            metadata: {
+              ...stripeSub.metadata,
+              company_id: companyId,
+              plan_code: planCode,
+              plan_id: p.id,
+            },
+          }, {
+            idempotencyKey: `swap-${activeSubId}-${p.id}-${curItems.map(i => `${i.price.id}:${i.quantity}`).sort().join(',')}`,
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          return new Response(
+            JSON.stringify({ error: `No se pudo cambiar el plan en Stripe: ${msg}` }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      // Fast-path: reflejar el plan_id local de inmediato (el webhook también lo
+      // hará; ambos convergen al mismo valor de forma idempotente).
+      await supabase.from('subscriptions').update({ plan_id: p.id }).eq('id', sub.id)
+
+      return new Response(
+        JSON.stringify({ success: true, swapped: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     let customerId = (existingSub as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? null
     if (!customerId) {

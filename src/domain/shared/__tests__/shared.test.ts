@@ -58,23 +58,27 @@ describe('fetchActiveSubscription', () => {
 
 describe('createCheckoutSession', () => {
   const body = { plan_code: 'pro', billing_cycle: 'monthly', return_path: '/perfil' }
-  it('éxito → { url, error: null }', async () => {
+  it('éxito → { url, swapped: false, error: null }', async () => {
     invoke.mockResolvedValueOnce({ data: { url: 'https://checkout' }, error: null })
-    expect(await createCheckoutSession(body)).toEqual({ url: 'https://checkout', error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: 'https://checkout', swapped: false, error: null })
   })
-  it('error del edge → { url: null, error }', async () => {
+  it('cambio de plan in-place → { url: null, swapped: true, error: null }', async () => {
+    invoke.mockResolvedValueOnce({ data: { success: true, swapped: true }, error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: true, error: null })
+  })
+  it('error del edge → { url: null, swapped: false, error }', async () => {
     invoke.mockResolvedValueOnce({ data: null, error: { message: 'stripe down' } })
-    expect(await createCheckoutSession(body)).toEqual({ url: null, error: 'stripe down' })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: false, error: 'stripe down' })
   })
-  it('sin url en la respuesta → { url: null, error: null }', async () => {
+  it('sin url en la respuesta → { url: null, swapped: false, error: null }', async () => {
     invoke.mockResolvedValueOnce({ data: {}, error: null })
-    expect(await createCheckoutSession(body)).toEqual({ url: null, error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: false, error: null })
   })
   it('FunctionsHttpError → expone el mensaje del body del edge', async () => {
     const ctx = new Response(JSON.stringify({ error: 'Stripe no configurado. Contacta a AdministraTodo.' }), { status: 503 })
     invoke.mockResolvedValueOnce({ data: null, error: new FunctionsHttpError(ctx) })
     expect(await createCheckoutSession(body))
-      .toEqual({ url: null, error: 'Stripe no configurado. Contacta a AdministraTodo.' })
+      .toEqual({ url: null, swapped: false, error: 'Stripe no configurado. Contacta a AdministraTodo.' })
   })
 })
 
