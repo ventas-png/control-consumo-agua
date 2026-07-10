@@ -77,3 +77,21 @@ export async function uploadProyectoLogo(
   const { error } = await supabase.from('projects').update({ logo_url: path }).eq('id', proyectoId)
   return { error: error?.message ?? null }
 }
+
+/**
+ * Solicita la ampliación self-service de los límites del tenant (proyectos /
+ * unidades) vía la RPC `solicitar_ampliacion_limites`, que valida rol,
+ * suscripción y tope del plan en la BD (SECURITY DEFINER). La RPC devuelve
+ * mensajes de error en español; los propagamos crudos para que la UI los
+ * muestre tal cual.
+ */
+export async function solicitarAmpliacionLimites(
+  maxProjects: number,
+  maxUnits: number,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('solicitar_ampliacion_limites', {
+    p_max_projects: maxProjects,
+    p_max_units: maxUnits,
+  })
+  return { error: error?.message ?? null }
+}

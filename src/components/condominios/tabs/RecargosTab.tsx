@@ -1,7 +1,6 @@
 import { useState, useCallback, type CSSProperties} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { supabase } from '../../../lib/supabase'
+import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { condominiosKeys } from '../../../domain/condominios/keys'
@@ -256,10 +255,11 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     // Marca las cuotas recargadas con mora_aplicada_at (la misma señal que usa el
     // cron de mora) para que re-ejecutar el masivo — o el cron — no las re-cobre.
     if (cuotasCobradas.length > 0) {
-      const { error: markErr } = await supabase
-        .from('cuotas_condominio')
-        .update({ mora_aplicada_at: new Date().toISOString() })
-        .in('id', cuotasCobradas)
+      const { error: markErr } = await updateCondominioRowsByIds(
+        'cuotas_condominio',
+        cuotasCobradas,
+        { mora_aplicada_at: new Date().toISOString() },
+      )
       if (markErr) console.error('[recargo masivo] no se pudo marcar mora_aplicada_at:', markErr.message)
     }
     setSaving(false)

@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "gen:db-types": "supabase gen types typescript --project-id nnsqmeigtgewatameexo --schema public > src/types/database.types.ts"
+    "gen:db-types": "supabase gen types typescript --project-id nnsqmeigtgewatameexo --schema public > src/types/database.types.ts",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -47,10 +48,13 @@
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "jest-axe": "^10.0.0",
     "jsdom": "^29.1.1",
     "storybook": "^8.6.18",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^8.63.0",
     "vite": "^5.1.0",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.5",
