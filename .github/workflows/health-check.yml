@@ -1,0 +1,48 @@
+name: Health check
+
+# P0 #4 (auditoría 2026-07-10) — probe de uptime del backend.
+#
+# El endpoint supabase/functions/health existe pero NADIE lo llamaba: el SLO
+# health.uptime ≥99.9% no tenía fuente de datos y una caída fuera de horario
+# pasaba desapercibida. Este cron hace GET a /health cada 15 min; si responde
+# ≠200 o `status:degraded`, el job FALLA → ci-alert.yml lo escucha (está en su
+# lista de workflows) y notifica a Slack.
+#
+# NOTA: GitHub Actions cron tiene lag/jitter (no es un uptime monitor de grado
+# producción). Para SLA formal, apuntar UptimeRobot/BetterUptime al mismo
+# endpoint (ver el comentario de la propia edge function). Esto es la red de
+# seguridad barata, en-repo, mientras tanto.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /health
+        env:
+          # Override opcional vía repo variable HEALTH_URL. El project ref no es
+          # secreto (está en supabase/config.toml y en los comentarios del bot).
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://nnsqmeigtgewatameexo.supabase.co/functions/v1/health' }}
+        run: |
+          echo "Probing $HEALTH_URL"
+          body=$(mktemp)
+          code=$(curl -s -m 15 -o "$body" -w "%{http_code}" "$HEALTH_URL" || echo "000")
+          echo "HTTP $code"
+          cat "$body" 2>/dev/null || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Health probe falló: HTTP $code (esperado 200)"
+            exit 1
+          fi
+          if grep -q '"status":"degraded"' "$body"; then
+            echo "::error::Health probe degradado: faltan env críticas en el backend"
+            exit 1
+          fi
+          echo "Health OK ✓"

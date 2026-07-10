@@ -88,17 +88,15 @@ export function trackSLOBreach(key: SLOKey, ctx: BreachContext): void {
     return
   }
 
-  // Sentry: capturamos como exception con tags para alerting.
+  // Sentry: capturamos como exception. Los campos por los que FILTRAN las Alert
+  // Rules (slo_breach / slo_key / slo_type / slo_severity) van como TAGS
+  // indexados; el detalle numérico y el contexto del caller, como `extra`.
   const breachError = new Error(`SLO breach: ${key}`)
-  captureException(breachError, {
-    slo_key: key,
-    slo_type: def.type,
-    slo_severity: ctx.severity,
-    slo_target: ctx.target,
-    slo_measured: ctx.measured,
-    slo_breach: true,
-    ...ctx.extra,
-  })
+  captureException(
+    breachError,
+    { slo_target: ctx.target, slo_measured: ctx.measured, ...ctx.extra },
+    { slo_breach: true, slo_key: key, slo_type: def.type, slo_severity: ctx.severity },
+  )
 
   // PostHog: event para dashboards.
   track('slo.breach', {

@@ -60,8 +60,23 @@ export function initMonitoring(): void {
   enabled = true
 }
 
-export function captureException(error: unknown, context?: Record<string, unknown>): void {
+export function captureException(
+  error: unknown,
+  context?: Record<string, unknown>,
+  // `tags` se INDEXAN en Sentry (a diferencia de `context`, que va como `extra`):
+  // son la única forma de que las Alert Rules filtren por evento (p.ej.
+  // event.tags["slo_breach"] = "true"). Ver docs/ALERTING.md.
+  tags?: Record<string, string | number | boolean>,
+): void {
   if (!enabled) return
+  if (tags) {
+    Sentry.withScope((scope) => {
+      scope.setTags(tags)
+      if (context) scope.setExtras(context)
+      Sentry.captureException(error)
+    })
+    return
+  }
   Sentry.captureException(error, context ? { extra: context } : undefined)
 }
 
