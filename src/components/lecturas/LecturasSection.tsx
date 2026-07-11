@@ -5,7 +5,7 @@ import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto }
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularTotalPagar, validarLectura } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 
 interface Props {
@@ -41,6 +41,8 @@ export function LecturasSection({
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
+  // P1 (quick win): confirmación de reset del medidor para el caso lectura↓ legítima.
+  const [resetContador, setResetContador] = useState(false)
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
   const [fechaLecturaActual, setFechaLecturaActual] = useState(() => new Date().toISOString().split('T')[0])
   const [notas, setNotas] = useState('')
@@ -105,6 +107,9 @@ export function LecturasSection({
     setSelectedContadorId('')
     setLecturaActual('')
   }, [selectedUnidadId])
+
+  // El flag "medidor reseteado" es por-lectura: limpiarlo al cambiar de contexto.
+  useEffect(() => { setResetContador(false) }, [selectedUnidadId, selectedContadorId])
 
   // GPS automático con watchPosition
   useEffect(() => {
@@ -180,9 +185,24 @@ export function LecturasSection({
     : null
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
+  // Promedio histórico de consumo del contador → detección de salto anómalo.
+  const promedioHistorico = (() => {
+    if (!contadorSeleccionado) return undefined
+    const consumos = registros
+      .filter(r => r.contador_id === contadorSeleccionado.id && typeof r.consumo === 'number' && r.consumo > 0)
+      .map(r => r.consumo)
+    return consumos.length ? consumos.reduce((a, b) => a + b, 0) / consumos.length : undefined
+  })()
+  // validarLectura: fuente única de validación (retroceso/reset + anomalía).
+  const validacion = !isNaN(lecturaNum)
+    ? validarLectura(ultimaLectura, lecturaNum, { resetContador, promedioHistorico })
+    : null
+  // Consumo efectivo a guardar: 0 en reset, el delta si es válido, o el crudo
+  // (negativo) para el display de error cuando no es válido.
+  const consumoEfectivo = validacion?.valid ? (validacion.consumo ?? 0) : consumo
   const calculo =
-    consumo !== null && consumo >= 0 && tarifaDelContador
-      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
+    consumoEfectivo !== null && consumoEfectivo >= 0 && tarifaDelContador
+      ? calcularTotalPagar(consumoEfectivo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
 
   function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
@@ -234,10 +254,14 @@ export function LecturasSection({
       })
       return
     }
-    if (consumo === null || isNaN(consumo)) return notify({ variant: 'error', title: 'Error', text: 'Datos de lectura inválidos' })
-    if (consumo < 0) return notify({ variant: 'error', title: 'Consumo Negativo', text: 'La lectura actual debe ser mayor o igual a la anterior.' })
+    // validarLectura es la fuente única: bloquea retroceso sin reset y lecturas
+    // no numéricas; permite reset (consumo→0) y solo avisa ante salto anómalo.
+    if (!validacion || !validacion.valid) {
+      return notify({ variant: 'error', title: 'Lectura inválida', text: validacion?.error ?? 'Datos de lectura inválidos' })
+    }
+    const consumoGuardar = validacion.consumo ?? 0
 
-    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
+    const resultadoCobro = calcularTotalPagar(consumoGuardar, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
 
     if (!projectId) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto del usuario' })
@@ -271,7 +295,7 @@ export function LecturasSection({
       fecha: new Date(fechaLecturaActual + 'T12:00:00').toISOString(),
       lectura_anterior: ultimaLectura,
       lectura_actual: lecturaNum,
-      consumo,
+      consumo: consumoGuardar,
       tarifa_aplicada: tarifaDelContador!.precio_m3,
       tarifa_exceso_aplicada: tarifaDelContador!.precio_m3_exceso ?? 0,
       canon_aplicado: tarifaDelContador!.canon_fijo,
@@ -420,7 +444,7 @@ export function LecturasSection({
   const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px', display: 'block' }
 
-  const consumoInvalido = consumo !== null && consumo < 0
+  const consumoInvalido = validacion !== null && !validacion.valid
 
   const bannerRuta = rutaActiva
     ? {
@@ -572,8 +596,21 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
+                    <input type="text" readOnly value={consumoEfectivo !== null ? (consumoInvalido ? (consumo ?? 0).toFixed(2) + ' (ERROR)' : consumoEfectivo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
                   </div>
+                  {consumo !== null && consumo < 0 && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={resetContador} onChange={e => setResetContador(e.target.checked)} />
+                        El medidor fue reemplazado/reseteado (la lectura bajó). Registrá el motivo en Observaciones.
+                      </label>
+                    </div>
+                  )}
+                  {validacion?.warning && (
+                    <div style={{ gridColumn: '1 / -1', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                      ⚠️ {validacion.warning}
+                    </div>
+                  )}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
                     {calculo ? (
