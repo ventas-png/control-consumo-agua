@@ -42,6 +42,8 @@ const APP_URL = Deno.env.get('APP_URL') ?? ''
 interface ReqBody {
   cliente_id?: string
   registro_id?: string | null
+  /** Cuota de condominio a pagar (portal del residente). Alternativo a registro_id. */
+  cuota_id?: string | null
   company_id?: string
   project_id?: string | null
   monto?: number
@@ -88,8 +90,11 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
 
-    // ── 1) Auth: service_role (interno) o JWT de un usuario del tenant ──
+    // ── 1) Auth: service_role (interno), JWT de un usuario del tenant, o JWT de
+    //    un RESIDENTE (rol cliente). El residente no tiene company_id: se autoriza
+    //    por PROPIEDAD del ítem (su unidad) más abajo. ──
     let callerCompanyId: string | null = null
+    let callerClienteId: string | null = null
     let internal = false
     if (token && token === SERVICE_ROLE_KEY) {
       internal = true
@@ -102,30 +107,97 @@ Deno.serve(async (req: Request) => {
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
       const { data: au } = await admin
         .from('app_users')
-        .select('company_id')
+        .select('company_id, cliente_id')
         .eq('id', user.id)
         .maybeSingle()
-      callerCompanyId = (au as { company_id?: string } | null)?.company_id ?? null
-      if (!callerCompanyId) return json({ error: 'Forbidden' }, 403)
+      const auRow = au as { company_id?: string | null; cliente_id?: string | null } | null
+      callerCompanyId = auRow?.company_id ?? null
+      callerClienteId = auRow?.cliente_id ?? null
+      // Un usuario de tenant sin company_id NI cliente_id no tiene sobre qué operar.
+      if (!callerCompanyId && !callerClienteId) return json({ error: 'Forbidden' }, 403)
     } else {
       return json({ error: 'Unauthorized' }, 401)
     }
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
-    const clienteId = body.cliente_id
-    const registroId = body.registro_id ?? null
-    const projectId = body.project_id ?? null
-    const monto = Number(body.monto)
     const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
+    const cuotaId = body.cuota_id ?? null
 
-    if (!clienteId || !body.company_id || !(monto > 0)) {
-      return json({ error: 'Parámetros inválidos (cliente_id, company_id, monto > 0).' }, 400)
-    }
-    const companyId = body.company_id
+    // Valores del ÍTEM a pagar, resueltos según sea CUOTA (condominio) o REGISTRO (agua).
+    let companyId: string
+    let projectId: string | null
+    let clienteId: string
+    let registroId: string | null = null
+    let monto: number
+    let descripcionItem = ''
 
-    // Autorización por tenant: el llamante debe pertenecer a la empresa del cobro.
-    if (!internal && callerCompanyId !== companyId) {
-      return json({ error: 'No autorizado para cobrar a nombre de otra empresa' }, 403)
+    if (cuotaId) {
+      // ── Pago de una CUOTA de condominio (portal del residente o admin) ──
+      const { data: cuotaRow, error: cuErr } = await admin
+        .from('cuotas_condominio')
+        .select('company_id, project_id, unidad_id, concepto, periodo, monto, total_a_pagar, cuota_estado, deleted_at')
+        .eq('id', cuotaId)
+        .maybeSingle()
+      if (cuErr) return json({ error: cuErr.message }, 500)
+      const cuota = cuotaRow as {
+        company_id: string; project_id: string | null; unidad_id: string | null
+        concepto: string; periodo: string; monto: number; total_a_pagar: number | null
+        cuota_estado: string; deleted_at: string | null
+      } | null
+      if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
+
+      // Cliente dueño de la unidad de la cuota (para ownership + datos del pagador).
+      const { data: uni } = await admin
+        .from('unidades').select('cliente_id').eq('id', cuota.unidad_id ?? '').maybeSingle()
+      const uniClienteId = (uni as { cliente_id?: string | null } | null)?.cliente_id ?? null
+
+      // PROPIEDAD del ítem: el residente debe ser dueño de la unidad; el usuario de
+      // tenant, de la empresa; service_role es interno.
+      if (!internal) {
+        if (callerClienteId) {
+          if (uniClienteId !== callerClienteId) return json({ error: 'No autorizado para pagar esta cuota' }, 403)
+        } else if (callerCompanyId !== cuota.company_id) {
+          return json({ error: 'No autorizado para cobrar cuotas de otra empresa' }, 403)
+        }
+      }
+
+      // Solo cuotas emitidas/vencidas son pagables (no pendientes/pagadas/anuladas).
+      if (cuota.cuota_estado !== 'emitida' && cuota.cuota_estado !== 'vencida') {
+        return json({ error: `La cuota no está disponible para pago (estado: ${cuota.cuota_estado}).` }, 409)
+      }
+      if (!uniClienteId) return json({ error: 'La unidad de la cuota no tiene cliente asociado.' }, 409)
+
+      // Saldo = total_a_pagar (con mora) − abonos ya registrados (pagos no borrados).
+      const totalCuota = Number(cuota.total_a_pagar ?? cuota.monto)
+      const { data: pagosPrevios } = await admin
+        .from('pagos').select('monto').eq('cuota_id', cuotaId).is('deleted_at', null)
+      const abonado = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
+      const saldo = Math.max(0, totalCuota - abonado)
+      if (saldo <= 0) return json({ error: 'La cuota ya está saldada.' }, 409)
+
+      // Monto: abono parcial pedido (acotado al saldo) o el saldo completo.
+      const pedido = Number(body.monto)
+      monto = pedido > 0 ? Math.min(pedido, saldo) : saldo
+      companyId = cuota.company_id
+      projectId = cuota.project_id
+      clienteId = uniClienteId
+      descripcionItem = `${cuota.concepto} — ${cuota.periodo}`
+    } else {
+      // ── Pago de un REGISTRO de agua (flujo existente, auth por tenant) ──
+      if (callerClienteId && !callerCompanyId) {
+        return json({ error: 'El pago de registros de agua no está habilitado desde el portal del residente.' }, 403)
+      }
+      clienteId = body.cliente_id ?? ''
+      registroId = body.registro_id ?? null
+      projectId = body.project_id ?? null
+      monto = Number(body.monto)
+      if (!clienteId || !body.company_id || !(monto > 0)) {
+        return json({ error: 'Parámetros inválidos (cliente_id, company_id, monto > 0).' }, 400)
+      }
+      companyId = body.company_id
+      if (!internal && callerCompanyId !== companyId) {
+        return json({ error: 'No autorizado para cobrar a nombre de otra empresa' }, 403)
+      }
     }
 
     // ── 2) Config de pago efectiva + credenciales del ambiente ──
@@ -193,8 +265,8 @@ Deno.serve(async (req: Request) => {
     const cobro: CobroCanonico = {
       monto,
       moneda: monedaCobro,
-      descripcion: body.descripcion?.trim() || `Pago de servicio — ${cli?.nombre ?? 'Cliente'}`,
-      referenciaInterna: registroId ?? clienteId,
+      descripcion: descripcionItem || body.descripcion?.trim() || `Pago — ${cli?.nombre ?? 'Cliente'}`,
+      referenciaInterna: registroId ?? cuotaId ?? clienteId,
       pagador: {
         nombre: cli?.nombre ?? null,
         email: cli?.email ?? null,
@@ -203,7 +275,11 @@ Deno.serve(async (req: Request) => {
       },
       urlRetorno: body.url_retorno ?? (base ? `${base}/portal?pago=ok` : null),
       urlCancelacion: body.url_cancelacion ?? (base ? `${base}/portal?pago=cancelado` : null),
-      metadata: { company_id: companyId, cliente_id: clienteId, ...(registroId ? { registro_id: registroId } : {}) },
+      metadata: {
+        company_id: companyId, cliente_id: clienteId,
+        ...(registroId ? { registro_id: registroId } : {}),
+        ...(cuotaId ? { cuota_id: cuotaId } : {}),
+      },
     }
 
     // ── 4) Crear el cobro con el payfac efectivo ──
@@ -232,6 +308,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         cliente_id: clienteId,
         registro_id: registroId,
+        cuota_id: cuotaId,
         company_id: companyId,
         monto,
         provider: config.proveedorPago,
