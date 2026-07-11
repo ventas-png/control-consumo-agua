@@ -1,9 +1,14 @@
+import { useState, type CSSProperties } from 'react'
 import type { CuotaCondominio, EstadoCuota } from '../../../types'
+import { notify } from '../../shared/Dialog'
+import { iniciarPagoCuota, confirmarPagoCuota } from '../../../domain/portal/mutations'
 
 interface Props {
   cuotas: CuotaCondominio[]
   moneda: string
   unidadNombre: string
+  /** F1 pago en línea: refrescar la cuenta tras un pago/abono. */
+  onPagado?: () => void
 }
 
 const ESTADO_CONFIG: Record<EstadoCuota, { label: string; bg: string; color: string; border: string }> = {
@@ -12,13 +17,59 @@ const ESTADO_CONFIG: Record<EstadoCuota, { label: string; bg: string; color: str
   moroso:    { label: 'Vencida',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'var(--at-danger-border)' },
 }
 
-export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
+export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, onPagado }: Props) {
   const pendientes  = cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso')
   const pagadas     = cuotas.filter(c => c.estado === 'pagado')
   const totalDeuda  = pendientes.reduce((s, c) => s + c.monto, 0)
   const totalPagado = pagadas.reduce((s, c) => s + c.monto, 0)
   const hoy         = new Date().toISOString().slice(0, 10)
   const vencidas    = pendientes.filter(c => c.fecha_vencimiento && c.fecha_vencimiento < hoy)
+
+  // F1 pago en línea: modal de pago sobre una cuota (permite abono parcial).
+  const [pagando, setPagando]       = useState<CuotaCondominio | null>(null)
+  const [montoInput, setMontoInput] = useState('')
+  const [procesando, setProcesando] = useState(false)
+
+  function abrirPago(c: CuotaCondominio) {
+    setPagando(c)
+    setMontoInput(c.monto != null ? String(c.monto) : '')
+  }
+
+  async function handlePagar() {
+    if (!pagando) return
+    const montoNum = parseFloat(montoInput)
+    if (!(montoNum > 0)) { notify({ variant: 'warning', title: 'Monto inválido', text: 'Ingresá un monto mayor a 0.' }); return }
+    setProcesando(true)
+    try {
+      const res = await iniciarPagoCuota(pagando.id, montoNum)
+      if (res.error) { notify({ variant: 'error', title: 'No se pudo iniciar el pago', text: res.error }); return }
+      // Hosted checkout (payfac real): guardamos la solicitud y redirigimos.
+      if (res.redirectUrl && res.paymentRequestId) {
+        try { sessionStorage.setItem('pago_pr_id', res.paymentRequestId) } catch { /* no-op */ }
+        window.location.href = res.redirectUrl
+        return
+      }
+      // Aprobación inmediata (sandbox): confirmar+conciliar ya.
+      if (res.estado === 'aprobado' && res.paymentRequestId) {
+        const conf = await confirmarPagoCuota(res.paymentRequestId)
+        if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
+        notify({
+          variant: 'success',
+          title: conf.cuotaLiquidada ? 'Cuota pagada' : 'Abono registrado',
+          text: conf.cuotaLiquidada
+            ? 'Tu cuota quedó al día.'
+            : `Abono aplicado. Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
+        })
+        setPagando(null)
+        onPagado?.()
+        return
+      }
+      notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago se está procesando; se reflejará en unos momentos.' })
+      setPagando(null)
+    } finally {
+      setProcesando(false)
+    }
+  }
 
   return (
     <div>
@@ -52,7 +103,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
               const ec = ESTADO_CONFIG[c.estado]
               const esVencida = c.fecha_vencimiento && c.fecha_vencimiento < hoy
               return (
-                <div key={c.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esVencida ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div key={c.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esVencida ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{c.concepto.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} — {c.periodo}</div>
                     {c.fecha_vencimiento && (
@@ -66,6 +117,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
                     <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
                     <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                   </div>
+                  <button onClick={() => abrirPago(c)} style={payBtn}>💳 Pagar</button>
                 </div>
               )
             })}
@@ -98,6 +150,47 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
           <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay cuotas registradas para esta unidad</p>
         </div>
       )}
+
+      {/* Modal de pago en línea (F1) */}
+      {pagando && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={e => e.target === e.currentTarget && !procesando && setPagando(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+        >
+          <div style={{ background: 'var(--at-surface)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 800, color: 'var(--at-ink)' }}>Pagar cuota</h2>
+            <p style={{ margin: '0 0 18px', fontSize: 13.5, color: 'var(--at-ink-2)' }}>
+              {pagando.concepto.replace(/_/g, ' ')} — {pagando.periodo}
+            </p>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: 6 }}>
+              Monto a pagar ({moneda}) <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>— podés abonar un monto menor</span>
+            </label>
+            <input
+              type="number" step="0.01" min="0.01" inputMode="decimal"
+              value={montoInput}
+              onChange={e => setMontoInput(e.target.value)}
+              autoFocus
+              style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--at-line-strong)', fontSize: 18, fontWeight: 700, boxSizing: 'border-box', marginBottom: 18 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setPagando(null)} disabled={procesando} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 700, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={() => void handlePagar()} disabled={procesando} style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: procesando ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))', color: '#fff', fontWeight: 800, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
+                {procesando ? 'Procesando…' : '💳 Pagar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+const payBtn: CSSProperties = {
+  padding: '8px 14px', borderRadius: 10, border: 'none',
+  background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+  color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0,
 }

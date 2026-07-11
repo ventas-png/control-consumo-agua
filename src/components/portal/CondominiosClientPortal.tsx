@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente } from '../../domain/portal/queries'
+import { confirmarPagoCuota } from '../../domain/portal/mutations'
+import { notify } from '../shared/Dialog'
 import { BrandLogo } from '../shared/BrandLogo'
 import { EditModal } from '../shared/EditModal'
 import { NotificationBell } from '../layout/NotificationBell'
@@ -120,6 +122,40 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   }, [clienteId, currentUser.company_id])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
+
+  // F1 pago en línea: retorno del checkout hospedado (?pago=ok|cancelado). En 'ok'
+  // confirma+concilia server-side el pago guardado antes de redirigir. Corre una
+  // sola vez al montar; limpia el query param para no re-disparar en refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pago = params.get('pago')
+    if (!pago) return
+    params.delete('pago')
+    window.history.replaceState({}, '', window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash)
+    if (pago === 'cancelado') {
+      notify({ variant: 'warning', title: 'Pago cancelado', text: 'No se completó el pago. Podés intentarlo de nuevo.' })
+      return
+    }
+    if (pago !== 'ok') return
+    let prId: string | null = null
+    try { prId = sessionStorage.getItem('pago_pr_id'); sessionStorage.removeItem('pago_pr_id') } catch { /* no-op */ }
+    if (!prId) return
+    void (async () => {
+      const conf = await confirmarPagoCuota(prId)
+      if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
+      if (conf.estado === 'aprobado') {
+        notify({
+          variant: 'success',
+          title: conf.cuotaLiquidada ? 'Cuota pagada' : 'Abono registrado',
+          text: conf.cuotaLiquidada ? 'Tu cuota quedó al día.' : `Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
+        })
+        cargarDatos()
+      } else {
+        notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago aún se está procesando; se reflejará en unos momentos.' })
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Pop-up de aviso: muestra los paquetes pendientes una vez por sesión (set de
   // ids vistos en sessionStorage para no repetir en cada refresco).
@@ -373,6 +409,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 cuotas={cuotasU}
                 moneda={moneda}
                 unidadNombre={unidad.nombre}
+                onPagado={cargarDatos}
               />
             )}
             {tab === 'tickets' && (
