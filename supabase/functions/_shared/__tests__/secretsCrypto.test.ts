@@ -8,6 +8,7 @@ import {
   decryptSecret,
   encryptJson,
   decryptJson,
+  hasEncryptionKey,
 } from '../secretsCrypto.ts'
 
 async function freshKey(): Promise<CryptoKey> {
@@ -108,6 +109,10 @@ describe('encryptSecret / decryptSecret (wrappers de entorno)', () => {
   it('decryptSecret(null) → null', async () => {
     expect(await decryptSecret(null)).toBeNull()
     expect(await decryptSecret(undefined)).toBeNull()
+  })
+
+  it('hasEncryptionKey() → false sin llave (vitest sin Deno.env)', async () => {
+    expect(await hasEncryptionKey()).toBe(false)
   })
 })
 
