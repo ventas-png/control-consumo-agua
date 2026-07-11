@@ -96,7 +96,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde.
+      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde,
+      # pero VISIBLE: warning annotation + step summary, para que el "verde" no
+      # oculte que la suite Playwright no se ejecutó (auditoría 2026-07-10:
+      # "E2E/RLS verdes no-op").
       - name: Gate por E2E_BASE_URL
         id: gate
         run: |
@@ -104,7 +107,20 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "E2E_BASE_URL no configurado — E2E omitido (no-op verde). Ver e2e/README.md."
+            echo "::warning title=E2E omitido::E2E_BASE_URL no configurado — la suite Playwright NO se ejecutó (no-op verde). Configurá los secretos E2E_* del repo para activarla. Ver e2e/README.md."
+            {
+              echo "### ⚠️ E2E omitido — la suite Playwright no se ejecutó"
+              echo ""
+              echo "Este job quedó **verde sin correr** por falta del secreto \`E2E_BASE_URL\`."
+              echo "Para activar los E2E, configurá en *Settings → Secrets and variables → Actions*:"
+              echo ""
+              echo "- \`E2E_BASE_URL\` — URL del preview/staging contra el que correr"
+              echo "- \`E2E_LOGIN_EMAIL\` / \`E2E_LOGIN_PASSWORD\` — cuenta de prueba"
+              echo "- \`E2E_INVITE_TOKEN\` — flujo de aceptar invitación"
+              echo "- \`E2E_RESTRICTED_EMAIL\` / \`E2E_RESTRICTED_PASSWORD\` — flujo de rol restringido"
+              echo ""
+              echo "Referencia: \`e2e/README.md\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - uses: actions/setup-node@v4
