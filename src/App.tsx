@@ -4,6 +4,7 @@ import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/prom
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
 import { PastDueBanner } from './components/shared/PastDueBanner'
 import { CompanySuspendedBanner } from './components/shared/CompanySuspendedBanner'
+import { SetupWizard } from './components/onboarding/SetupWizard'
 import { BrandingApplier } from './components/branding/BrandingApplier'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta } from './types'
@@ -394,6 +395,15 @@ export default function App() {
     activeSection.startsWith('condominios') &&
     agua.proyectos.filter(p => p.estado === 'activo').length === 0
 
+  // F3.11 (P1 quick win): onboarding. Un company_owner/admin cuya empresa aún no
+  // tiene proyectos ve el SetupWizard (crea el primero). Se evalúa SOLO tras
+  // cargar los datos → nunca parpadea; empresas ya configuradas jamás lo ven.
+  const necesitaOnboarding =
+    !agua.dataLoading &&
+    (currentUser.role === 'company_owner' || currentUser.role === 'admin') &&
+    !!currentUser.company_id &&
+    agua.proyectos.length === 0
+
   // Contexto que consumen los renders del registro declarativo de rutas (P1 #4).
   const routesCtx: AppRoutesCtx = {
     currentUser,
@@ -416,6 +426,13 @@ export default function App() {
           en la esquina superior derecha para success/warning/info no críticos.
           Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
       <Toaster richColors position="top-right" closeButton />
+
+      {/* F3.11: onboarding — wizard de configuración inicial para empresas sin
+          proyectos. autoOpen al montar; onComplete recarga el dominio agua para
+          que la app muestre el proyecto recién creado y el wizard se desmonte. */}
+      {necesitaOnboarding && (
+        <SetupWizard currentUser={currentUser} autoOpen onComplete={agua.refrescarDatos} />
+      )}
 
       {/* Global CommandPalette (Cmd+K / Ctrl+K) — agrega secciones top-level
           mas los comandos registrados por componentes hijos (ej: tabs de
