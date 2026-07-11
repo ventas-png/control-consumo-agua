@@ -119,12 +119,52 @@ Residente (portal)                Edge (service_role)              Payfac de la 
 4. **F4 — Comisión por transacción** (si aplica): application fee del payfac o
    registro de comisión de plataforma.
 
-## 8. Decisiones abiertas (para vos)
-1. **Comisión por transacción**: ¿la cobramos ya en el MVP (F4) o primero solo
-   habilitamos el pago y la comisión va después?
-2. **Abono parcial en cuotas de condominio**: agua ya permite parcial. ¿Las cuotas
-   se pagan **completas** (incluida mora) o permitimos abonos?
-3. **QPayPro**: confirmar que su checkout es **redirect** (hosted) y que **no** hay
-   webhook async → el `confirm-charge` en el retorno + `reconcile-charges` (cron)
-   son suficientes. (Si hay webhook, lo agregamos como confirmación autoritativa.)
-4. **Arranque**: ¿F1 condominios primero (recomendado) o agua primero?
+## 8. Decisiones tomadas (2026-07-11)
+1. **Comisión por transacción**: primero habilitar el pago; comisión en **F4**.
+2. **Abono parcial en cuotas**: **SÍ** se permiten abonos (no solo cuota completa).
+   → Ver §9: requiere acumular pagos por cuota (hoy la cuota es binaria).
+3. **QPayPro**: investigado — su doc está detrás de login de comercio (no accesible
+   públicamente). Confirmado que es **hosted checkout AIM** (retorno a
+   `x_url_complete`); `consultarEstado`/`reembolsar` del adapter están **stub**
+   (follow-up). Ver §10: implicación de seguridad + enfoque sandbox-first.
+4. **Arranque**: **F1 = condominios primero**.
+
+## 9. Abonos parciales en cuotas — modelo de datos
+
+Hoy `cuotas_condominio` es binaria (`estado` pendiente/pagado); no acumula pagos
+parciales. Para permitir abonos, reusamos la tabla `pagos` (ya existe para agua)
+extendiéndola:
+
+- `ALTER TABLE pagos ADD COLUMN cuota_id uuid REFERENCES cuotas_condominio(id)`
+  (un pago es contra `registro_id` XOR `cuota_id`).
+- **Saldo de la cuota** = `total_a_pagar` − `sum(pagos.monto WHERE cuota_id=… AND estado ok)`.
+- La cuota pasa a `pagado` (transición de la máquina de estados) **solo cuando el
+  saldo llega a 0**; con abono parcial queda `pendiente` con saldo reducido.
+- `PortalMiCuentaTab` muestra saldo por cuota + input de monto (≤ saldo), igual que
+  el modal de agua.
+
+## 10. Confirmación de pago — seguridad (clave)
+
+Los params que QPayPro devuelve a `x_url_complete` **llegan por el navegador del
+cliente** → **no se pueden confiar** para marcar pagado (spoofeables). Marcar un
+pago con tarjeta como "pagado" exige **verificación server-side**. Como el
+`consultarEstado` de QPayPro aún no está cableado (ni confirmado su webhook),
+adoptamos un enfoque **sandbox-first** que no queda bloqueado:
+
+- **F1 se construye y valida end-to-end contra el provider `sandbox`** (cobro
+  simulado, resultado determinista) → todo el vertical (migración, create-charge
+  con `cuota_id`, `confirm-charge`, UI, abonos) es probable HOY sin depender de
+  QPayPro.
+- `confirm-charge` es **provider-agnostic**: marca pagado SOLO con un estado
+  `aprobado` devuelto por el **provider server-side** (no por los params del
+  retorno del navegador).
+- **Wiring de confirmación real de QPayPro = follow-up** (necesita tu panel de
+  comercio): o bien (a) su **webhook/IPN** (endpoint `payfac-webhook` que valida
+  firma/credenciales) como confirmación autoritativa, o bien (b) cablear
+  `consultarEstado` contra el endpoint de status real de QPayPro. Hasta entonces,
+  un tenant en QPayPro puede iniciar el cobro (redirect) pero la conciliación
+  automática de ese pago real queda pendiente de ese follow-up.
+
+> En resumen: **F1 entrega el vertical completo en `sandbox`** (demo/dev + tenants
+> en sandbox), y la confirmación autoritativa de QPayPro producción es un
+> follow-up acotado que depende de info que solo está en tu panel de QPayPro.
