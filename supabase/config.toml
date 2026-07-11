@@ -21,6 +21,12 @@ verify_jwt = false
 [functions.complete-oauth-onboarding]
 verify_jwt = false
 
+# Backfill de cifrado de secretos por tenant (P0 #7, fase MIGRATE): operación de
+# operador que recifra las filas en texto plano. verify_jwt=false: autentica a
+# mano con service_role o x-cron-secret; exige TENANT_SECRETS_ENC_KEY.
+[functions.backfill-tenant-secrets]
+verify_jwt = false
+
 # Recordatorios de rutas: autentica con service key (cron) o JWT de admin.
 [functions.route-reminders]
 verify_jwt = false

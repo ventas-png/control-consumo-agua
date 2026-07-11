@@ -117,6 +117,14 @@ export async function decryptSecret(stored: string | null | undefined): Promise<
   return decryptWithKey(await envKey(), stored)
 }
 
+/**
+ * ¿Está provisionada TENANT_SECRETS_ENC_KEY? Gate para operaciones que NO tienen
+ * sentido en passthrough (p.ej. el backfill: sin llave recifraría a texto plano).
+ */
+export async function hasEncryptionKey(): Promise<boolean> {
+  return (await envKey()) !== null
+}
+
 // ── Blobs de credenciales en columnas jsonb (fiscal_pac_secrets, payfac_secrets) ──
 // El secreto es un OBJETO jsonb (p.ej. { sandbox:{…}, prod:{…} }). Se cifra
 // serializándolo y guardando el string "enc:v1:…" en la misma columna jsonb (un

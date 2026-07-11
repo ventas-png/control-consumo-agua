@@ -73,14 +73,38 @@ lecturas descifran; las filas viejas siguen en plano (lectura dual) hasta el bac
 ## Backfill (MIGRATE)
 
 La llave vive solo en el entorno de las edge functions, así que el backfill **debe**
-correr en una edge function (no en SQL). Dos caminos:
+correr en una edge function (no en SQL). Ya existe:
+**`supabase/functions/backfill-tenant-secrets`** — recorre las 4 bóvedas, cifra las
+filas que aún están en texto plano (`isEncrypted=false`) y las reescribe por `id`.
+**Idempotente** (re-ejecutar solo salta lo ya cifrado) y exige
+`TENANT_SECRETS_ENC_KEY` (si falta → 400, para no "recifrar" a texto plano).
 
-- **Perezoso (recomendado para empezar):** cada vez que el tenant re-guarda una
-  credencial (UI → `*-save-*` / OAuth refresh), queda cifrada. Cobertura gradual.
-- **De una (una tabla a la vez):** función administrativa `service_role` que hace
-  `SELECT` de las filas en texto plano (`NOT LIKE 'enc:v1:%'`), `encryptSecret` y
-  `UPDATE`. Ejecutar **por tabla, solo después** de cablear todos sus readers.
-  Verificar con la función `*-test-connection` correspondiente antes de continuar.
+Pasos:
+
+1. Provisionar la llave (sección anterior) y **redeploy** de funciones.
+2. **Dry-run** (no escribe, solo reporta cuántas filas cifraría):
+   ```bash
+   curl -sS -X POST "$SUPABASE_URL/functions/v1/backfill-tenant-secrets" \
+     -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"dry_run": true}'
+   ```
+3. **Por tabla** (recomendado; empezar por la menos crítica). Verificar con la
+   `*-test-connection` correspondiente tras cada una:
+   ```bash
+   curl -sS -X POST "$SUPABASE_URL/functions/v1/backfill-tenant-secrets" \
+     -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "Content-Type: application/json" \
+     -d '{"tables": ["payfac_secrets"]}'
+   ```
+   Tablas válidas: `company_payment_secrets`, `fiscal_pac_secrets`, `payfac_secrets`,
+   `company_email_configs`. Sin `tables` corre las 4.
+4. La respuesta trae `{ ok, dry_run, results: [{ table, scanned, encrypted, skipped, errors }] }`.
+   `ok:false` (HTTP 207) si alguna fila falló — revisar `last_error` y re-ejecutar
+   (es idempotente).
+
+> Alternativa **perezosa** (sin este job): cada vez que el tenant re-guarda una
+> credencial o se refresca el token OAuth, queda cifrada. Cobertura gradual; el job
+> es para forzar la cobertura completa de una vez.
 
 ## Contract
 
