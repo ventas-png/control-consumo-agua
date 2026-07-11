@@ -99,6 +99,12 @@ verify_jwt = false
 [functions.create-charge]
 verify_jwt = false
 
+# Confirma+concilia server-side un cobro de cuota (F1 pago en línea). verify_jwt=false:
+# autentica a mano (service_role/cron, usuario de tenant, o residente dueño del ítem);
+# marca el pago solo si el provider reporta 'aprobado'. Idempotente por provider_ref.
+[functions.confirm-charge]
+verify_jwt = false
+
 # Cobros pluggable — "probar conexion" al payfac. Resuelve la config de pago
 # efectiva (override locacion<->empresa), carga credenciales del ambiente y pingea
 # via el adapter (sandbox ok; qpaypro valida credenciales). Guarda el estatus en
