@@ -99,9 +99,10 @@ verify_jwt = false
 [functions.create-charge]
 verify_jwt = false
 
-# Confirma+concilia server-side un cobro de cuota (F1 pago en línea). verify_jwt=false:
-# autentica a mano (service_role/cron, usuario de tenant, o residente dueño del ítem);
-# marca el pago solo si el provider reporta 'aprobado'. Idempotente por provider_ref.
+# Confirma+concilia server-side un cobro en línea de cuota (F1) o recibo de agua
+# (F2). verify_jwt=false: autentica a mano (service_role/cron, usuario de tenant, o
+# residente dueño del ítem); marca el pago solo si el provider reporta 'aprobado'.
+# Idempotente por provider_ref.
 [functions.confirm-charge]
 verify_jwt = false
 

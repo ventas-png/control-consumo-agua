@@ -1,5 +1,6 @@
-// Cobros pluggable — lógica PURA de conciliación de pagos de cuota (F1 pago en
-// línea). Vive separada del edge `confirm-charge` para testearla sin Deno/BD.
+// Cobros pluggable — lógica PURA de conciliación de pagos de cuota (F1) y de
+// recibos de agua (F2). Vive separada del edge `confirm-charge` para testearla
+// sin Deno/BD.
 
 /** Redondeo monetario a 2 decimales (evita ruido de coma flotante). */
 export function round2(n: number): number {
@@ -28,4 +29,16 @@ export function planPagoCuota(
   const saldoRestante = Math.max(0, round2(totalCuota - abonosPrevios - montoNuevo))
   const liquida = saldoRestante <= 0
   return { saldoRestante, liquida, tipoAplicacion: liquida ? 'pago_total' : 'abono' }
+}
+
+/**
+ * F2 — ¿La factura de un recibo admite transición a 'pagada' al liquidarlo? Espeja
+ * normalizarEstadoFactura + TRANSICIONES_FACTURA de src/lib/business.ts (que el edge
+ * no puede importar por la frontera Deno/Vite): solo 'emitida' y 'vencida' pagan.
+ * Los legacy se normalizan ('mora'→vencida, 'pagado'→pagada); null/sin factura →
+ * 'pendiente', que NO transiciona (mismo guard `factura && …` que PagoModal).
+ */
+export function facturaTransicionaAPagada(estado: string | null | undefined): boolean {
+  const e = estado === 'mora' ? 'vencida' : estado === 'pagado' ? 'pagada' : (estado ?? 'pendiente')
+  return e === 'emitida' || e === 'vencida'
 }

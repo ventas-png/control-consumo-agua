@@ -122,6 +122,7 @@ Deno.serve(async (req: Request) => {
     const body = (await req.json().catch(() => ({}))) as ReqBody
     const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
     const cuotaId = body.cuota_id ?? null
+    const registroIdBody = body.registro_id ?? null
 
     // Valores del ÍTEM a pagar, resueltos según sea CUOTA (condominio) o REGISTRO (agua).
     let companyId: string
@@ -182,19 +183,66 @@ Deno.serve(async (req: Request) => {
       projectId = cuota.project_id
       clienteId = uniClienteId
       descripcionItem = `${cuota.concepto} — ${cuota.periodo}`
+    } else if (registroIdBody) {
+      // ── Pago de un REGISTRO de agua (portal del residente o admin) ──
+      const { data: regRow, error: regErr } = await admin
+        .from('registros')
+        .select('cliente_id, project_id, monto_calculado, total_a_pagar, monto_pagado, factura_estado, deleted_at')
+        .eq('id', registroIdBody)
+        .maybeSingle()
+      if (regErr) return json({ error: regErr.message }, 500)
+      const reg = regRow as {
+        cliente_id: string | null; project_id: string | null
+        monto_calculado: number | null; total_a_pagar: number | null; monto_pagado: number | null
+        factura_estado: string | null; deleted_at: string | null
+      } | null
+      if (!reg || reg.deleted_at) return json({ error: 'Recibo no encontrado' }, 404)
+      if (reg.factura_estado === 'anulada') return json({ error: 'El recibo está anulado.' }, 409)
+
+      // registros no tiene company_id: se deriva del proyecto.
+      let regCompanyId: string | null = null
+      if (reg.project_id) {
+        const { data: proj } = await admin.from('projects').select('company_id').eq('id', reg.project_id).maybeSingle()
+        regCompanyId = (proj as { company_id?: string | null } | null)?.company_id ?? null
+      }
+      if (!regCompanyId) return json({ error: 'El recibo no tiene empresa asociada.' }, 409)
+
+      // Propiedad: el residente debe ser el cliente del recibo; el usuario de
+      // tenant, de la empresa; service_role es interno.
+      if (!internal) {
+        if (callerClienteId) {
+          if (reg.cliente_id !== callerClienteId) return json({ error: 'No autorizado para pagar este recibo' }, 403)
+        } else if (callerCompanyId !== regCompanyId) {
+          return json({ error: 'No autorizado para cobrar recibos de otra empresa' }, 403)
+        }
+      }
+
+      // Saldo = total_a_pagar (o monto_calculado) − monto_pagado.
+      const totalReg = Number(reg.total_a_pagar ?? reg.monto_calculado ?? 0)
+      const abonado = Number(reg.monto_pagado ?? 0)
+      const saldo = Math.max(0, totalReg - abonado)
+      if (saldo <= 0) return json({ error: 'El recibo ya está saldado.' }, 409)
+      const pedido = Number(body.monto)
+      monto = pedido > 0 ? Math.min(pedido, saldo) : saldo
+
+      companyId = regCompanyId
+      projectId = reg.project_id
+      registroId = registroIdBody
+      clienteId = reg.cliente_id ?? callerClienteId ?? ''
+      if (!clienteId) return json({ error: 'El recibo no tiene cliente asociado.' }, 409)
+      descripcionItem = body.descripcion?.trim() || 'Pago de servicio de agua'
     } else {
-      // ── Pago de un REGISTRO de agua (flujo existente, auth por tenant) ──
+      // ── Cobro genérico (solo tenant/interno; requiere company_id + cliente_id) ──
       if (callerClienteId && !callerCompanyId) {
-        return json({ error: 'El pago de registros de agua no está habilitado desde el portal del residente.' }, 403)
+        return json({ error: 'El residente solo puede pagar cuotas o recibos específicos.' }, 403)
       }
       clienteId = body.cliente_id ?? ''
-      registroId = body.registro_id ?? null
-      projectId = body.project_id ?? null
       monto = Number(body.monto)
       if (!clienteId || !body.company_id || !(monto > 0)) {
         return json({ error: 'Parámetros inválidos (cliente_id, company_id, monto > 0).' }, 400)
       }
       companyId = body.company_id
+      projectId = body.project_id ?? null
       if (!internal && callerCompanyId !== companyId) {
         return json({ error: 'No autorizado para cobrar a nombre de otra empresa' }, 403)
       }

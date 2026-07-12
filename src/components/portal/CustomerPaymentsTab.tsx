@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
-import { fetchPortalPaymentConfig, iniciarCobroPayfac } from '../../domain/portal/queries'
+import { fetchPortalPaymentConfig } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
-import { StripeCheckoutModal } from './StripeCheckoutModal'
+import { PagoEnLineaModal } from './PagoEnLineaModal'
 import { PagoManualModal } from './PagoManualModal'
 
 interface Props {
@@ -11,9 +11,15 @@ interface Props {
   clientes: Cliente[]
   currentUser: UserSession
   moneda: string
+  /** F2: refrescar los recibos del portal tras un pago/abono en línea. */
+  onDataChange?: () => void
 }
 
-export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
+/** Payfacs pluggable que el edge `create-charge` sabe cobrar (checkout hospedado o
+ *  aprobación inmediata en sandbox). Stripe/PayPal usan sus flujos dedicados. */
+const PAYFAC_PLUGGABLE = ['sandbox', 'qpaypro']
+
+export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChange }: Props) {
   const [paymentConfig, setPaymentConfig] = useState<{
     stripe_configured: boolean
     stripe_activo: boolean
@@ -28,10 +34,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     proveedor_pago: 'sandbox',
   })
   const [loading, setLoading] = useState(true)
-  const [stripeModal, setStripeModal] = useState<Registro | null>(null)
+  const [pagoModal, setPagoModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
-  // Cobro payfac en vuelo (id del registro que se está redirigiendo al checkout).
-  const [chargingId, setChargingId] = useState<string | null>(null)
 
   useEffect(() => {
     cargarConfig()
@@ -53,41 +57,9 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     setLoading(false)
   }
 
-  /**
-   * Cobro en línea con el payfac efectivo del tenant (hoy QPayPro). Llama al edge
-   * `create-charge` y, para checkout hospedado, redirige al cliente a pagar en la
-   * página del payfac (no pasan datos de tarjeta por la app). La reconciliación
-   * automática del recibo (marcarlo pagado al volver) es follow-up; por ahora se
-   * concilia como un pago manual.
-   */
-  async function onPagarPayfac(registro: Registro, saldo: number) {
-    if (!currentUser.company_id || saldo <= 0 || chargingId) return
-    setChargingId(registro.id)
-    try {
-      const res = await iniciarCobroPayfac({
-        clienteId: registro.cliente_id,
-        registroId: registro.id,
-        companyId: currentUser.company_id,
-        projectId: registro.project_id ?? null,
-        monto: saldo,
-        ambiente: 'prod',
-      })
-      if (res.redirectUrl) {
-        window.location.href = res.redirectUrl
-        return
-      }
-      if (res.ok && res.estado === 'aprobado') {
-        notify({ variant: 'success', title: 'Pago aprobado', text: 'Tu pago se procesó correctamente.' })
-        void cargarConfig()
-        return
-      }
-      notify({ variant: 'warning', title: 'No se pudo iniciar el pago', text: res.error ?? 'Intenta nuevamente en unos minutos.' })
-    } catch (e) {
-      notify({ variant: 'error', title: 'Error', text: (e as Error).message })
-    } finally {
-      setChargingId(null)
-    }
-  }
+  // ¿El tenant tiene un payfac pluggable (sandbox/qpaypro)? Entonces ofrecemos el
+  // pago en línea con conciliación server-side (create-charge → confirm-charge).
+  const pagoEnLineaActivo = PAYFAC_PLUGGABLE.includes(paymentConfig.proveedor_pago)
 
   // Registros pendientes (no pagados)
   const registrosPendientes = registros.filter(r => r.estado !== 'pagado').sort((a, b) =>
@@ -206,22 +178,23 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
 
                 {/* Botones de pago */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
-                  {paymentConfig.stripe_activo && (
+                  {pagoEnLineaActivo && (
                     <button
-                      onClick={() => setStripeModal(registro)}
+                      onClick={() => setPagoModal(registro)}
+                      disabled={saldo <= 0}
                       style={{
                         padding: '10px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+                        background: saldo <= 0 ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '13px',
-                        cursor: 'pointer',
+                        cursor: saldo <= 0 ? 'not-allowed' : 'pointer',
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      💳 Pagar Stripe
+                      💳 Pagar en línea
                     </button>
                   )}
                   {paymentConfig.paypal_activo && (
@@ -248,25 +221,6 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                       🅿️ Pagar PayPal
                     </button>
                   )}
-                  {paymentConfig.proveedor_pago === 'qpaypro' && (
-                    <button
-                      onClick={() => void onPagarPayfac(registro, saldo)}
-                      disabled={chargingId === registro.id || saldo <= 0}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: chargingId === registro.id ? 'var(--at-ink-3)' : 'linear-gradient(135deg, #0a7d3c, #0a5c2c)',
-                        color: 'white',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                        cursor: chargingId === registro.id ? 'wait' : 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {chargingId === registro.id ? '⏳ Redirigiendo…' : '💳 Pagar con QPayPro'}
-                    </button>
-                  )}
                   <button
                     onClick={() => setManualModal(registro)}
                     style={{
@@ -291,15 +245,14 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
       </div>
 
       {/* Modales */}
-      {stripeModal && (
-        <StripeCheckoutModal
-          registro={stripeModal}
+      {pagoModal && (
+        <PagoEnLineaModal
+          registro={pagoModal}
           moneda={moneda}
-          currentUser={currentUser}
-          onClose={() => setStripeModal(null)}
-          onSuccess={() => {
-            setStripeModal(null)
-            void cargarConfig()
+          onClose={() => setPagoModal(null)}
+          onPagado={() => {
+            setPagoModal(null)
+            onDataChange?.()
           }}
         />
       )}
@@ -312,7 +265,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
           onClose={() => setManualModal(null)}
           onSuccess={() => {
             setManualModal(null)
-            void cargarConfig()
+            onDataChange?.()
           }}
         />
       )}

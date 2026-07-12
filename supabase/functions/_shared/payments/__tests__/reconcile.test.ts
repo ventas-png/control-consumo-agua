@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planPagoCuota, round2 } from '../reconcile.ts'
+import { planPagoCuota, round2, facturaTransicionaAPagada } from '../reconcile.ts'
 
 describe('round2', () => {
   it('redondea a 2 decimales', () => {
@@ -37,5 +37,28 @@ describe('planPagoCuota', () => {
   it('cuota con mora: total_a_pagar mayor al monto base', () => {
     // total_a_pagar = 120 (100 + 20 mora); abono de 50 deja 70.
     expect(planPagoCuota(120, 0, 50)).toEqual({ saldoRestante: 70, liquida: false, tipoAplicacion: 'abono' })
+  })
+})
+
+describe('facturaTransicionaAPagada', () => {
+  it('emitida y vencida pagan', () => {
+    expect(facturaTransicionaAPagada('emitida')).toBe(true)
+    expect(facturaTransicionaAPagada('vencida')).toBe(true)
+  })
+
+  it('legacy: mora → vencida paga', () => {
+    expect(facturaTransicionaAPagada('mora')).toBe(true)
+  })
+
+  it('sin factura / pendiente / null / undefined NO transiciona', () => {
+    expect(facturaTransicionaAPagada(null)).toBe(false)
+    expect(facturaTransicionaAPagada(undefined)).toBe(false)
+    expect(facturaTransicionaAPagada('pendiente')).toBe(false)
+  })
+
+  it('estados terminales no re-transicionan', () => {
+    expect(facturaTransicionaAPagada('pagada')).toBe(false)
+    expect(facturaTransicionaAPagada('pagado')).toBe(false) // legacy → pagada
+    expect(facturaTransicionaAPagada('anulada')).toBe(false)
   })
 })
