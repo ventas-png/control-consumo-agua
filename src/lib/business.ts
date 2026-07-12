@@ -1,4 +1,4 @@
-import type { CostoCalculo, TarifaTramo } from '../types'
+import type { CostoCalculo, TarifaTramo, ConvenioCuota } from '../types'
 
 export function calcularTotalPagar(
   consumo: number,
@@ -435,6 +435,61 @@ export function calcularTotalFactura(
     mora_monto: mora,
     total_a_pagar: redondear2(iva.total + mora),
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Calendario de cuotas de un convenio de pago (P1 · cobranza).
+// ────────────────────────────────────────────────────────────────────────────
+
+export type FrecuenciaConvenio = 'semanal' | 'quincenal' | 'mensual'
+
+/** Días entre cuotas por frecuencia (semanal/quincenal). Mensual se maneja aparte. */
+const DIAS_FRECUENCIA: Record<'semanal' | 'quincenal', number> = { semanal: 7, quincenal: 15 }
+
+/**
+ * Suma `i` periodos a una fecha YYYY-MM-DD según la frecuencia. Puro y determinista.
+ * Mensual usa aritmética de meses con CLAMP de día (31 ene + 1 mes → 28/29 feb, no
+ * se desborda a marzo). UTC para no depender de la zona horaria del navegador.
+ */
+function sumarPeriodo(fechaISO: string, i: number, frecuencia: FrecuenciaConvenio): string {
+  const [y, m, d] = fechaISO.split('-').map(Number)
+  if (frecuencia === 'mensual') {
+    const totalMes = (m - 1) + i
+    const ty = y + Math.floor(totalMes / 12)
+    const tm = ((totalMes % 12) + 12) % 12 // 0..11
+    const ultimoDia = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate()
+    return new Date(Date.UTC(ty, tm, Math.min(d, ultimoDia))).toISOString().slice(0, 10)
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + i * DIAS_FRECUENCIA[frecuencia])
+  return dt.toISOString().slice(0, 10)
+}
+
+/**
+ * Genera el calendario de cuotas de un convenio: divide `montoTotal` en `numCuotas`
+ * cuotas iguales (la ÚLTIMA absorbe el residual de redondeo para casar el total al
+ * centavo) y las agenda desde `fechaPrimera` según la frecuencia. Puro y testeable.
+ * Devuelve `[]` ante entradas inválidas (numCuotas < 1, monto ≤ 0, fecha mal formada).
+ */
+export function generarCalendarioConvenio(
+  montoTotal: number,
+  numCuotas: number,
+  fechaPrimera: string,
+  frecuencia: FrecuenciaConvenio = 'mensual',
+): ConvenioCuota[] {
+  const n = Math.floor(numCuotas)
+  const total = redondear2(montoTotal)
+  if (!Number.isFinite(n) || n < 1 || !(total > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(fechaPrimera)) return []
+  const base = redondear2(total / n)
+  const cuotas: ConvenioCuota[] = []
+  let acumulado = 0
+  for (let i = 0; i < n; i++) {
+    const esUltima = i === n - 1
+    const monto = esUltima ? redondear2(total - acumulado) : base
+    acumulado = redondear2(acumulado + monto)
+    cuotas.push({ numero: i + 1, fecha_vencimiento: sumarPeriodo(fechaPrimera, i, frecuencia), monto })
+  }
+  return cuotas
 }
 
 // ────────────────────────────────────────────────────────────────────────────

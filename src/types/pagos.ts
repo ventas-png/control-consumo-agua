@@ -104,6 +104,16 @@ export interface PaymentRequest {
   updated_at: string;
 }
 
+/** Una cuota del calendario de pagos de un convenio (P1 · cobranza). */
+export interface ConvenioCuota {
+  /** Número de cuota (1-based). */
+  numero: number;
+  /** Fecha de vencimiento (YYYY-MM-DD). */
+  fecha_vencimiento: string;
+  /** Monto de la cuota (la última absorbe el residual de redondeo). */
+  monto: number;
+}
+
 export interface ConvenioPago {
   id: string;
   cliente_id: string;
@@ -114,6 +124,8 @@ export interface ConvenioPago {
   monto_total: number;
   monto_pagado: number;
   cuotas_pactadas?: number | null;
+  /** Calendario de cuotas (fechas + montos). null en convenios legacy sin calendario. */
+  cuotas?: ConvenioCuota[] | null;
   fecha_inicio: string;
   fecha_vencimiento?: string | null;
   estado: EstadoConvenio;

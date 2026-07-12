@@ -4,6 +4,7 @@ import {
   calcularTotalPagarEscalonado,
   calcularCostoTarifa,
   validarTramos,
+  generarCalendarioConvenio,
   validarLectura,
   redondear2,
   calcularIVA,
@@ -613,5 +614,43 @@ describe('aplicarTransicionFactura', () => {
     const stamped = new Date(p.emitida_at as string).getTime()
     expect(stamped).toBeGreaterThanOrEqual(before)
     expect(stamped).toBeLessThanOrEqual(Date.now())
+  })
+})
+
+describe('generarCalendarioConvenio', () => {
+  it('divide en N cuotas iguales; la última absorbe el residual (suma exacta)', () => {
+    const cal = generarCalendarioConvenio(100, 3, '2026-01-15', 'mensual')
+    expect(cal.map(c => c.monto)).toEqual([33.33, 33.33, 33.34])
+    expect(cal.reduce((s, c) => s + c.monto, 0)).toBeCloseTo(100, 6)
+    expect(cal.map(c => c.numero)).toEqual([1, 2, 3])
+  })
+
+  it('agenda mensual con clamp de fin de mes (31 ene → 28 feb → 31 mar)', () => {
+    const cal = generarCalendarioConvenio(300, 3, '2026-01-31', 'mensual')
+    expect(cal.map(c => c.fecha_vencimiento)).toEqual(['2026-01-31', '2026-02-28', '2026-03-31'])
+  })
+
+  it('frecuencia quincenal y semanal suman días', () => {
+    expect(generarCalendarioConvenio(90, 3, '2026-01-01', 'quincenal').map(c => c.fecha_vencimiento))
+      .toEqual(['2026-01-01', '2026-01-16', '2026-01-31'])
+    expect(generarCalendarioConvenio(90, 3, '2026-01-01', 'semanal').map(c => c.fecha_vencimiento))
+      .toEqual(['2026-01-01', '2026-01-08', '2026-01-15'])
+  })
+
+  it('cruza el año en frecuencia mensual', () => {
+    const cal = generarCalendarioConvenio(200, 2, '2026-12-10', 'mensual')
+    expect(cal.map(c => c.fecha_vencimiento)).toEqual(['2026-12-10', '2027-01-10'])
+  })
+
+  it('una sola cuota = el total completo', () => {
+    expect(generarCalendarioConvenio(150.5, 1, '2026-03-01', 'mensual'))
+      .toEqual([{ numero: 1, fecha_vencimiento: '2026-03-01', monto: 150.5 }])
+  })
+
+  it('entradas inválidas → []', () => {
+    expect(generarCalendarioConvenio(100, 0, '2026-01-01')).toEqual([])
+    expect(generarCalendarioConvenio(0, 3, '2026-01-01')).toEqual([])
+    expect(generarCalendarioConvenio(100, 3, 'no-es-fecha')).toEqual([])
+    expect(generarCalendarioConvenio(-50, 3, '2026-01-01')).toEqual([])
   })
 })

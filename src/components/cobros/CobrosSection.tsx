@@ -958,6 +958,22 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                   {conv.fecha_vencimiento && <span>⏰ Vence: <strong>{new Date(conv.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>}
                   {conv.cuotas_pactadas && <span>📋 Cuotas: <strong>{conv.cuotas_pactadas}</strong></span>}
                 </div>
+                {conv.cuotas && conv.cuotas.length > 0 && (
+                  <details style={{ marginTop: '10px' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600 }}>
+                      📅 Ver calendario ({conv.cuotas.length} cuota{conv.cuotas.length !== 1 ? 's' : ''})
+                    </summary>
+                    <div style={{ marginTop: '8px', border: '1px solid var(--at-line)', borderRadius: '8px', overflow: 'hidden', maxWidth: '360px' }}>
+                      {conv.cuotas.map((c, i) => (
+                        <div key={c.numero} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', fontSize: '12.5px', borderTop: i === 0 ? 'none' : '1px solid var(--at-line)' }}>
+                          <span style={{ color: 'var(--at-ink-3)', minWidth: '54px' }}>Cuota {c.numero}</span>
+                          <span style={{ color: 'var(--at-ink-2)' }}>{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: est.bg, color: est.color }}>
