@@ -9,6 +9,8 @@ import {
   fetchRegistrosByProjects,
 } from '../../domain/portal/queries'
 import { updateCliente } from '../../domain/clientes/mutations'
+import { confirmarPago } from '../../domain/portal/mutations'
+import { notify } from '../shared/Dialog'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
@@ -199,6 +201,40 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
+
+  // F2 pago en línea: retorno del checkout hospedado (?pago=ok|cancelado). En 'ok'
+  // confirma+concilia server-side el pago guardado antes de redirigir. Corre una
+  // sola vez al montar; limpia el query param para no re-disparar en refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pago = params.get('pago')
+    if (!pago) return
+    params.delete('pago')
+    window.history.replaceState({}, '', window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash)
+    if (pago === 'cancelado') {
+      notify({ variant: 'warning', title: 'Pago cancelado', text: 'No se completó el pago. Podés intentarlo de nuevo.' })
+      return
+    }
+    if (pago !== 'ok') return
+    let prId: string | null = null
+    try { prId = sessionStorage.getItem('pago_pr_id'); sessionStorage.removeItem('pago_pr_id') } catch { /* no-op */ }
+    if (!prId) return
+    void (async () => {
+      const conf = await confirmarPago(prId)
+      if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
+      if (conf.estado === 'aprobado') {
+        notify({
+          variant: 'success',
+          title: conf.liquidado ? 'Recibo pagado' : 'Abono registrado',
+          text: conf.liquidado ? 'Tu recibo quedó al día.' : `Saldo restante: Q ${(conf.saldoRestante ?? 0).toFixed(2)}`,
+        })
+        cargarDatos()
+      } else {
+        notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago aún se está procesando; se reflejará en unos momentos.' })
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Dashboard analytics (useMemo) ────────────────────────
   const dashboardData = useMemo(() => construirDashboardData({
@@ -483,6 +519,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             clientes={[]}
             currentUser={currentUser}
             moneda={projects[0]?.moneda ?? 'Q'}
+            onDataChange={cargarDatos}
           />
         )}
 

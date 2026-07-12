@@ -1,68 +1,78 @@
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
-import type { Registro, UserSession } from '../../types'
+import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import { iniciarPagoRegistro, confirmarPago } from '../../domain/portal/mutations'
 
 interface Props {
   registro: Registro
   moneda: string
-  currentUser: UserSession
   onClose: () => void
-  onSuccess: () => void
+  /** Pago aplicado (inmediato/sandbox): cerrar + refrescar la lista de recibos. */
+  onPagado: () => void
 }
 
-export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, onSuccess }: Props) {
-  const [monto, setMonto] = useState('')
-  const [loading, setLoading] = useState(false)
-
+/**
+ * F2 pago en línea de un RECIBO de agua con el payfac EFECTIVO del tenant (pluggable:
+ * sandbox/qpaypro/…). No pasa datos de tarjeta por la app. Dos caminos:
+ *   • Aprobación inmediata (sandbox) → confirma+concilia server-side al instante.
+ *   • Checkout hospedado (qpaypro) → guarda el payment_request y redirige; el retorno
+ *     (?pago=ok) lo concilia CustomerPortal. Permite ABONOS parciales.
+ */
+export function PagoEnLineaModal({ registro, moneda, onClose, onPagado }: Props) {
   const total = registro.monto_calculado ?? calcularTotalPagar(registro.consumo, registro.tarifa_aplicada, registro.canon_aplicado ?? 20).total
   const abonado = registro.monto_pagado ?? 0
   const saldo = Math.max(0, total - abonado)
 
-  async function handlePay() {
+  const [monto, setMonto] = useState(saldo > 0 ? saldo.toFixed(2) : '')
+  const [loading, setLoading] = useState(false)
+
+  async function handlePagar() {
     const montoNum = parseFloat(monto) || 0
-    if (montoNum <= 0 || montoNum > saldo) {
-      notify({ variant: 'warning', title: 'Monto inválido' })
+    if (montoNum <= 0) {
+      notify({ variant: 'warning', title: 'Monto inválido', text: 'Ingresá un monto mayor a 0.' })
+      return
+    }
+    // Tolerancia de medio centavo (el input se prellena con saldo.toFixed(2)).
+    if (montoNum > saldo + 0.005) {
+      notify({ variant: 'warning', title: 'Monto excede el saldo', text: `El saldo pendiente es ${moneda} ${saldo.toFixed(2)}` })
       return
     }
 
     setLoading(true)
-
     try {
-      // Llamar Edge Function para crear PaymentIntent
-      const response = await fetch('/api/create-payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cliente_id: registro.cliente_id,
-          registro_id: registro.id,
-          company_id: currentUser.company_id,
-          monto: montoNum,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('No se pudo crear el pago')
+      const res = await iniciarPagoRegistro(registro.id, montoNum)
+      if (res.error) {
+        notify({ variant: 'error', title: 'No se pudo iniciar el pago', text: res.error })
+        return
       }
-
-      const { clientSecret } = await response.json()
-
-      // Aquí iría la integración con Stripe.js (stripe-js library)
-      // Por ahora mostramos un placeholder
-      notify({
-        variant: 'info',
-        title: 'Integración Stripe',
-        text: `Redirigiendo a Stripe para procesar el pago... (Client Secret: ${clientSecret.substring(0, 20)}...)`,
-      })
-
-      onSuccess()
-    } catch (err: any) {
-      console.error(err)
-      notify({
-        variant: 'error',
-        title: 'Error',
-        text: err.message || 'No se pudo procesar el pago',
-      })
+      // Checkout hospedado (payfac real): guardamos la solicitud y redirigimos.
+      if (res.redirectUrl && res.paymentRequestId) {
+        try { sessionStorage.setItem('pago_pr_id', res.paymentRequestId) } catch { /* no-op */ }
+        window.location.href = res.redirectUrl
+        return
+      }
+      // Aprobación inmediata (sandbox): confirmar+conciliar ya.
+      if (res.estado === 'aprobado' && res.paymentRequestId) {
+        const conf = await confirmarPago(res.paymentRequestId)
+        if (conf.error) {
+          notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error })
+          return
+        }
+        notify({
+          variant: 'success',
+          title: conf.liquidado ? 'Recibo pagado' : 'Abono registrado',
+          text: conf.liquidado
+            ? 'Tu recibo quedó al día.'
+            : `Abono aplicado. Saldo restante: ${moneda} ${(conf.saldoRestante ?? 0).toFixed(2)}`,
+        })
+        onPagado()
+        return
+      }
+      notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago se está procesando; se reflejará en unos momentos.' })
+      onClose()
+    } catch (err) {
+      notify({ variant: 'error', title: 'Error', text: (err as Error).message || 'No se pudo procesar el pago' })
     } finally {
       setLoading(false)
     }
@@ -70,6 +80,8 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       style={{
         position: 'fixed',
         inset: 0,
@@ -80,7 +92,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
         zIndex: 1000,
         padding: '16px',
       }}
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onClick={e => e.target === e.currentTarget && !loading && onClose()}
     >
       <div
         style={{
@@ -93,10 +105,11 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>💳 Pagar con Stripe</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>💳 Pagar en línea</h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--at-ink-3)' }}
+            disabled={loading}
+            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: loading ? 'not-allowed' : 'pointer', color: 'var(--at-ink-3)' }}
           >
             ✕
           </button>
@@ -117,15 +130,17 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
 
         <div style={{ marginBottom: '24px' }}>
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
-            Monto a Pagar ({moneda}) *
+            Monto a Pagar ({moneda}) <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>— podés abonar un monto menor</span>
           </label>
           <input
             type="number"
             step="0.01"
             min="0.01"
             max={saldo}
+            inputMode="decimal"
             value={monto}
             onChange={e => setMonto(e.target.value)}
+            autoFocus
             placeholder={saldo.toFixed(2)}
             style={{
               width: '100%',
@@ -135,6 +150,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: 'inherit',
+              boxSizing: 'border-box',
             }}
           />
         </div>
@@ -142,6 +158,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={onClose}
+            disabled={loading}
             style={{
               flex: 1,
               padding: '12px',
@@ -151,13 +168,13 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               color: 'var(--at-ink-3)',
               fontWeight: 700,
               fontSize: '14px',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
             Cancelar
           </button>
           <button
-            onClick={handlePay}
+            onClick={() => void handlePagar()}
             disabled={loading}
             style={{
               flex: 2,
@@ -171,7 +188,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? '⏳ Procesando...' : '💳 Ir a Stripe'}
+            {loading ? '⏳ Procesando...' : '💳 Pagar'}
           </button>
         </div>
       </div>

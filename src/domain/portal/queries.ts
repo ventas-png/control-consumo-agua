@@ -158,52 +158,9 @@ export async function fetchPortalPaymentConfig(companyId: string): Promise<Porta
   return (data as PortalPaymentConfigRow) ?? null
 }
 
-/** Respuesta del edge `create-charge` (cobro con el payfac efectivo del tenant). */
-export interface CrearCobroResult {
-  ok?: boolean
-  estado?: string
-  proveedor?: string | null
-  referencia?: string | null
-  /** Checkout hospedado (QPayPro): URL a la que redirigir al cliente para pagar. */
-  redirectUrl?: string | null
-  clientSecret?: string | null
-  payment_request_id?: string | null
-  error?: string | null
-}
-
-export interface IniciarCobroVars {
-  clienteId: string
-  registroId: string
-  companyId: string
-  projectId?: string | null
-  /** Monto a cobrar (saldo pendiente del registro). > 0. */
-  monto: number
-  /** Ambiente del payfac. Default 'prod' (cobro real desde el portal). */
-  ambiente?: 'prod' | 'sandbox'
-}
-
-/**
- * Inicia un cobro con el payfac EFECTIVO del tenant vía el edge `create-charge`.
- * Devuelve el resultado normalizado; para checkout hospedado (QPayPro) trae
- * `redirectUrl` a donde mandar al cliente. NO maneja datos de tarjeta.
- */
-export async function iniciarCobroPayfac(vars: IniciarCobroVars): Promise<CrearCobroResult> {
-  const { data, error } = await supabase.functions.invoke<CrearCobroResult>('create-charge', {
-    body: {
-      cliente_id: vars.clienteId,
-      registro_id: vars.registroId,
-      company_id: vars.companyId,
-      project_id: vars.projectId ?? null,
-      monto: vars.monto,
-      ambiente: vars.ambiente ?? 'prod',
-    },
-  })
-  if (error) throw new Error(error.message)
-  if (data && data.ok === false && !data.redirectUrl) {
-    throw new Error(data.error ?? 'No se pudo iniciar el cobro.')
-  }
-  return data ?? {}
-}
+// El inicio de cobro en línea del portal vive en domain/portal/mutations.ts
+// (iniciarPagoRegistro / iniciarPagoCuota) con conciliación server-side vía
+// confirm-charge. `iniciarCobroPayfac` quedó obsoleto y se removió (F2).
 
 /** Unidades activas de un cliente (batch 1 del portal de condominios). */
 export async function fetchPortalUnidadesByCliente(clienteId: string): Promise<unknown[] | null> {

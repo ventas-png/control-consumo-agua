@@ -1,20 +1,24 @@
-// Cobros pluggable — Edge `confirm-charge`: CONFIRMA (server-side) un cobro de
-// cuota de condominio y lo CONCILIA (marca el pago). Complemento de create-charge.
+// Cobros pluggable — Edge `confirm-charge`: CONFIRMA (server-side) un cobro en
+// línea y lo CONCILIA (marca el pago). Complemento de create-charge.
 //
 // Por qué server-side: los params que el payfac devuelve al navegador tras el
 // checkout NO son confiables (spoofeables). La única confirmación válida es
 // preguntarle al provider (consultarEstado) desde el servidor. Aquí, si el
 // provider reporta 'aprobado', insertamos el `pagos` y —si el saldo llega a 0—
-// transicionamos la cuota a 'pagada'. Habilita ABONOS parciales.
+// liquidamos el ítem. Habilita ABONOS parciales.
 //
 // Idempotente: reintentos (retorno del portal + cron de reconciliación) no
-// duplican el pago (guard por provider_ref) ni re-transicionan la cuota.
+// duplican el pago (guard por provider_ref) ni re-liquidan el ítem.
 //
 // Auth: service_role (cron), usuario de tenant, o RESIDENTE (rol cliente)
 // dueño del ítem. verify_jwt=false en config.toml.
 //
-// F1: solo cuotas de condominio (payment_requests.cuota_id). El pago de
-// registros de agua se concilia en F2.
+// Ítems soportados:
+//   • F1 — CUOTA de condominio (payment_requests.cuota_id): el acumulador es la
+//     suma de `pagos`; al liquidar transiciona cuotas_condominio a 'pagada'.
+//   • F2 — REGISTRO de agua (payment_requests.registro_id): el acumulador vive en
+//     `registros.monto_pagado`; al liquidar marca estado='pagado' y —si hay
+//     factura emitida/vencida— factura_estado='pagada'.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
@@ -27,7 +31,7 @@ import {
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
 } from '../_shared/payments/index.ts'
-import { planPagoCuota } from '../_shared/payments/reconcile.ts'
+import { planPagoCuota, round2, facturaTransicionaAPagada } from '../_shared/payments/reconcile.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -98,9 +102,11 @@ Deno.serve(async (req: Request) => {
     } | null
     if (!pr) return json({ error: 'Solicitud de cobro no encontrada' }, 404)
 
-    // F1: solo cuotas.
-    if (!pr.cuota_id) {
-      return json({ error: 'confirm-charge solo concilia cuotas de condominio en esta fase.' }, 400)
+    // El cobro es de una cuota (F1) o de un registro (F2), nunca ambos.
+    const esCuota = !!pr.cuota_id
+    const esRegistro = !!pr.registro_id
+    if (!esCuota && !esRegistro) {
+      return json({ error: 'confirm-charge concilia cuotas de condominio o recibos de agua.' }, 400)
     }
     if (!pr.cliente_id) {
       return json({ error: 'La solicitud de cobro no tiene cliente asociado.' }, 409)
@@ -124,25 +130,56 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'La solicitud no tiene referencia del proveedor para confirmar.' }, 409)
     }
 
-    // ── 3) Resolver payfac + credenciales (por la empresa/proyecto de la cuota) ──
-    const { data: cuotaRow, error: cuErr } = await admin
-      .from('cuotas_condominio')
-      .select('company_id, project_id, monto, total_a_pagar, cuota_estado, deleted_at')
-      .eq('id', pr.cuota_id)
-      .maybeSingle()
-    if (cuErr) return json({ error: cuErr.message }, 500)
-    const cuota = cuotaRow as {
-      company_id: string; project_id: string | null; monto: number; total_a_pagar: number | null
-      cuota_estado: string; deleted_at: string | null
-    } | null
-    if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
+    // ── 2b) Cargar el ítem (cuota o registro): project_id (override del payfac),
+    //    montos (plan de conciliación) y —en registro— el estado de la factura. ──
+    let itemProjectId: string | null = null
+    let planTotal = 0 // total a pagar del ítem (con mora/IVA si aplica)
+    let abonosPrevios = 0 // ya pagado
+    let regFacturaEstado: string | null = null
 
+    if (esCuota) {
+      const { data: cuotaRow, error: cuErr } = await admin
+        .from('cuotas_condominio')
+        .select('project_id, monto, total_a_pagar, deleted_at')
+        .eq('id', pr.cuota_id)
+        .maybeSingle()
+      if (cuErr) return json({ error: cuErr.message }, 500)
+      const cuota = cuotaRow as {
+        project_id: string | null; monto: number; total_a_pagar: number | null; deleted_at: string | null
+      } | null
+      if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
+      itemProjectId = cuota.project_id
+      planTotal = Number(cuota.total_a_pagar ?? cuota.monto)
+      // Acumulador de cuota = suma de pagos no borrados (no hay columna monto_pagado).
+      const { data: pagosPrevios } = await admin
+        .from('pagos').select('monto').eq('cuota_id', pr.cuota_id).is('deleted_at', null)
+      abonosPrevios = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
+    } else {
+      const { data: regRow, error: regErr } = await admin
+        .from('registros')
+        .select('project_id, monto_calculado, total_a_pagar, monto_pagado, factura_estado, deleted_at')
+        .eq('id', pr.registro_id)
+        .maybeSingle()
+      if (regErr) return json({ error: regErr.message }, 500)
+      const reg = regRow as {
+        project_id: string | null; monto_calculado: number | null; total_a_pagar: number | null
+        monto_pagado: number | null; factura_estado: string | null; deleted_at: string | null
+      } | null
+      if (!reg || reg.deleted_at) return json({ error: 'Recibo no encontrado' }, 404)
+      itemProjectId = reg.project_id
+      planTotal = Number(reg.total_a_pagar ?? reg.monto_calculado ?? 0)
+      // Acumulador de registro = columna monto_pagado (la fila lleva el total pagado).
+      abonosPrevios = Number(reg.monto_pagado ?? 0)
+      regFacturaEstado = reg.factura_estado
+    }
+
+    // ── 3) Resolver payfac + credenciales (por la empresa/proyecto del ítem) ──
     const { data: company } = await admin
       .from('companies').select('proveedor_pago, default_currency').eq('id', pr.company_id).maybeSingle()
     let projectProveedor: string | null = null
-    if (cuota.project_id) {
+    if (itemProjectId) {
       const { data: proj } = await admin
-        .from('projects').select('proveedor_pago').eq('id', cuota.project_id).maybeSingle()
+        .from('projects').select('proveedor_pago').eq('id', itemProjectId).maybeSingle()
       projectProveedor = (proj as { proveedor_pago?: string | null } | null)?.proveedor_pago ?? null
     }
     const empresaConfig: ConfigPagoEmpresa = {
@@ -151,11 +188,11 @@ Deno.serve(async (req: Request) => {
     }
     const config = resolverConfigPagoEfectiva(
       empresaConfig,
-      cuota.project_id ? ({ proveedorPago: projectProveedor } as ConfigPagoLocacion) : null,
+      itemProjectId ? ({ proveedorPago: projectProveedor } as ConfigPagoLocacion) : null,
     )
 
     let credLookup = admin.from('payfac_secrets').select('credenciales').eq('company_id', pr.company_id)
-    credLookup = cuota.project_id === null ? credLookup.is('project_id', null) : credLookup.eq('project_id', cuota.project_id)
+    credLookup = itemProjectId === null ? credLookup.is('project_id', null) : credLookup.eq('project_id', itemProjectId)
     const { data: secretRow } = await credLookup.maybeSingle()
     const credBlob = await decryptJson((secretRow as { credenciales?: unknown } | null)?.credenciales)
     const credenciales = credsDeAmbiente(credBlob, ambiente)
@@ -181,50 +218,67 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 5) Aprobado → conciliar (idempotente por provider_ref) ──
-    // ¿Ya existe un pago para esta referencia? (retorno + cron no duplican).
-    const { data: pagoExistente } = await admin
-      .from('pagos').select('id').eq('cuota_id', pr.cuota_id).eq('referencia', pr.provider_ref).is('deleted_at', null).maybeSingle()
+    // ¿Ya existe un pago para esta referencia + ítem? (retorno + cron no duplican).
+    let idemQuery = admin.from('pagos').select('id').eq('referencia', pr.provider_ref).is('deleted_at', null)
+    idemQuery = esCuota ? idemQuery.eq('cuota_id', pr.cuota_id) : idemQuery.eq('registro_id', pr.registro_id)
+    const { data: pagoExistente } = await idemQuery.maybeSingle()
     if (pagoExistente) {
       await admin.from('payment_requests').update({ estado: 'succeeded' }).eq('id', pr.id)
       return json({ ok: true, estado: 'aprobado', already: true })
     }
 
-    const totalCuota = Number(cuota.total_a_pagar ?? cuota.monto)
-    const { data: pagosPrevios } = await admin
-      .from('pagos').select('monto').eq('cuota_id', pr.cuota_id).is('deleted_at', null)
-    const abonosPrevios = ((pagosPrevios as { monto: number }[] | null) ?? []).reduce((s, p) => s + Number(p.monto), 0)
-    const plan = planPagoCuota(totalCuota, abonosPrevios, Number(pr.monto))
+    const plan = planPagoCuota(planTotal, abonosPrevios, Number(pr.monto))
 
     const { data: nuevoPago, error: pagoErr } = await admin
       .from('pagos')
       .insert({
         cliente_id: pr.cliente_id,
-        cuota_id: pr.cuota_id,
-        project_id: cuota.project_id,
+        project_id: itemProjectId,
         monto: pr.monto,
         metodo: 'tarjeta_credito',
         estado: 'aplicado',
         verification_status: 'aplicado',
         tipo_aplicacion: plan.tipoAplicacion,
         referencia: pr.provider_ref,
+        ...(esCuota ? { cuota_id: pr.cuota_id } : { registro_id: pr.registro_id }),
       })
       .select('id')
       .maybeSingle()
     if (pagoErr) return json({ ok: false, estado: 'error', error: `No se pudo registrar el pago: ${pagoErr.message}` }, 500)
     const pagoId = (nuevoPago as { id?: string } | null)?.id ?? null
 
-    // Liquidada → transicionar la cuota a 'pagada' (misma forma que el pago manual).
-    if (plan.liquida) {
-      const ahora = new Date().toISOString()
-      await admin.from('cuotas_condominio').update({
-        cuota_estado: 'pagada',
-        pagada_at: ahora,
-        estado: 'pagado',
-        fecha_pago: ahora.slice(0, 10),
-        metodo_pago: `en_linea:${provider.nombre}`,
-        referencia_pago: pr.provider_ref,
-        pago_id: pagoId,
-      }).eq('id', pr.cuota_id)
+    if (esCuota) {
+      // Liquidada → transicionar la cuota a 'pagada' (misma forma que el pago manual).
+      if (plan.liquida) {
+        const ahora = new Date().toISOString()
+        await admin.from('cuotas_condominio').update({
+          cuota_estado: 'pagada',
+          pagada_at: ahora,
+          estado: 'pagado',
+          fecha_pago: ahora.slice(0, 10),
+          metodo_pago: `en_linea:${provider.nombre}`,
+          referencia_pago: pr.provider_ref,
+          pago_id: pagoId,
+        }).eq('id', pr.cuota_id)
+      }
+    } else {
+      // Registro: el acumulador vive en la fila → siempre actualiza monto_pagado.
+      // Al liquidar marca estado='pagado' + fecha_pago y —si hay factura emitida/
+      // vencida— transiciona factura_estado='pagada' (mismo guard que PagoModal).
+      const nuevoAbonado = round2(abonosPrevios + Number(pr.monto))
+      const patch: Record<string, unknown> = {
+        monto_pagado: nuevoAbonado,
+        estado: plan.liquida ? 'pagado' : 'pendiente',
+      }
+      if (plan.liquida) {
+        const ahora = new Date().toISOString()
+        patch.fecha_pago = ahora.slice(0, 10)
+        if (facturaTransicionaAPagada(regFacturaEstado)) {
+          patch.factura_estado = 'pagada'
+          patch.pagada_at = ahora
+        }
+      }
+      await admin.from('registros').update(patch).eq('id', pr.registro_id)
     }
 
     await admin.from('payment_requests').update({ estado: 'succeeded' }).eq('id', pr.id)
@@ -233,7 +287,8 @@ Deno.serve(async (req: Request) => {
       ok: true,
       estado: 'aprobado',
       conciliado: true,
-      cuota_liquidada: plan.liquida,
+      liquidado: plan.liquida,
+      cuota_liquidada: plan.liquida, // alias legacy (F1) — el frontend nuevo lee `liquidado`.
       saldo_restante: plan.saldoRestante,
       pago_id: pagoId,
     })
