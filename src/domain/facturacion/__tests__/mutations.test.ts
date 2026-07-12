@@ -10,6 +10,7 @@ vi.mock('../../../lib/supabase', () => ({
 import {
   calcularFechaVencimiento,
   buildEmitirFacturaPatch,
+  particionarEmitibles,
   TransicionInvalidaError,
 } from '../mutations'
 
@@ -129,5 +130,33 @@ describe('TransicionInvalidaError', () => {
     expect(err.name).toBe('TransicionInvalidaError')
     expect(err.accion).toBe('emitir')
     expect(err.estadoActual).toBe('pagada')
+  })
+})
+
+describe('particionarEmitibles', () => {
+  it('separa pendientes (emitibles) de terminales/emitidas (omitidas)', () => {
+    const { emitibles, omitidas } = particionarEmitibles([
+      { id: 'a', factura_estado: 'pendiente' },
+      { id: 'b', factura_estado: null },        // sin factura → pendiente → emitible
+      { id: 'c', factura_estado: 'emitida' },   // ya emitida → omitida
+      { id: 'd', factura_estado: 'pagada' },    // terminal → omitida
+      { id: 'e', factura_estado: 'anulada' },   // terminal → omitida
+      { id: 'f', factura_estado: 'vencida' },   // vencida no re-emite → omitida
+    ])
+    expect(emitibles.map(x => x.id)).toEqual(['a', 'b'])
+    expect(omitidas.map(x => x.id)).toEqual(['c', 'd', 'e', 'f'])
+  })
+
+  it('normaliza estados legacy (pendiente emitible; mora=vencida no)', () => {
+    const { emitibles, omitidas } = particionarEmitibles([
+      { id: 'a', factura_estado: 'mora' },   // legacy → vencida → omitida
+      { id: 'b', factura_estado: 'pagado' }, // legacy → pagada → omitida
+    ])
+    expect(emitibles).toHaveLength(0)
+    expect(omitidas.map(x => x.id)).toEqual(['a', 'b'])
+  })
+
+  it('set vacío → ambas listas vacías', () => {
+    expect(particionarEmitibles([])).toEqual({ emitibles: [], omitidas: [] })
   })
 })

@@ -50,6 +50,25 @@ export interface EmitirFacturaPatch {
 }
 
 /**
+ * Particiona un set de facturas en EMITIBLES (transición válida a 'emitida') y las
+ * que se OMITEN (ya emitidas/pagadas/anuladas/vencidas). Puro: espeja la máquina de
+ * estados de business.ts. Habilita la emisión masiva "por ciclo" sin duplicar la
+ * regla de transición. Cada item aporta su `factura_estado` ya resuelto (el de la
+ * Factura, o el legacy del registro si aún no se emitió).
+ */
+export function particionarEmitibles<T extends { factura_estado?: string | null }>(
+  facturas: T[],
+): { emitibles: T[]; omitidas: T[] } {
+  const emitibles: T[] = []
+  const omitidas: T[] = []
+  for (const f of facturas) {
+    if (puedeTransicionarFactura(f.factura_estado ?? null, 'emitir').ok) emitibles.push(f)
+    else omitidas.push(f)
+  }
+  return { emitibles, omitidas }
+}
+
+/**
  * Suma `dias` días a una fecha base ISO y devuelve la fecha (YYYY-MM-DD).
  * Defensa: una base no parseable cae a "ahora". Días no finitos → 0.
  */
