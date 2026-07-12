@@ -21,6 +21,22 @@ import { aguaKeys } from './keys'
 const REGISTROS_LIST_COLS =
   'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
 
+/**
+ * ¿Existe ya una lectura con esta CLAVE NATURAL (contador + lectura + fecha)? Es la
+ * base de la IDEMPOTENCIA de la captura offline: antes de sincronizar una lectura
+ * encolada se verifica que no esté ya en la BD, para no duplicar en reintentos
+ * (retorno del portal + resincronización). `head:true` no baja filas, solo cuenta.
+ */
+export async function registroExiste(contadorId: string, lecturaActual: number, fecha: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('registros')
+    .select('id', { count: 'exact', head: true })
+    .eq('contador_id', contadorId)
+    .eq('lectura_actual', lecturaActual)
+    .eq('fecha', fecha)
+  return (count ?? 0) > 0
+}
+
 // `projects` (proyectos del tenant). RLS los scopea por empresa; orden por nombre
 // igual que useData. Es la ÚLTIMA colección que vivía en useData → cierra
 // `agua:A4`. El hook devuelve el set CRUDO que RLS permite; el filtrado fino por
