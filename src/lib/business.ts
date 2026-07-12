@@ -1,4 +1,4 @@
-import type { CostoCalculo } from '../types'
+import type { CostoCalculo, TarifaTramo } from '../types'
 
 export function calcularTotalPagar(
   consumo: number,
@@ -39,6 +39,104 @@ export function calcularTotalPagar(
     tipo_cobro: 'Consumo Normal',
     desglose: { tramo: 2, consumo_m3: consumo, precio_m3: t },
   }
+}
+
+/**
+ * Cobro por tarifa ESCALONADA (increasing-block tariff). Debajo del mínimo cobra
+ * solo el canon fijo (mismo piso que el modelo plano); por encima suma bloque a
+ * bloque sobre el consumo completo desde 0. Cada m³ dentro de `(desde_m3, hasta_m3]`
+ * se cobra a `precio_m3`; el último bloque tiene `hasta_m3 = null` (∞). Bloques con
+ * 0 m³ cubiertos se omiten del desglose. La contigüidad la garantiza la UI (ver
+ * `validarTramos`), pero el cálculo es robusto ante huecos/solapes (cobra el
+ * volumen recortado de cada bloque, sin doble conteo dentro de un mismo bloque).
+ */
+export function calcularTotalPagarEscalonado(
+  consumo: number,
+  tramos: TarifaTramo[],
+  canon = 0,
+  consumoMinimo = 0,
+): CostoCalculo {
+  const canonVal = parseFloat(String(canon || 0))
+  // Tramo 1: consumo ≤ mínimo → solo canon fijo (piso mínimo, igual al modelo plano).
+  if (consumo >= 0 && consumo <= consumoMinimo) {
+    return { total: canonVal, tipo_cobro: 'Canon Fijo', desglose: { tramo: 1, canon_fijo: canonVal } }
+  }
+  const ordenados = [...tramos].sort((a, b) => (Number(a.desde_m3) || 0) - (Number(b.desde_m3) || 0))
+  let total = 0
+  const detalle: NonNullable<CostoCalculo['desglose']['tramos']> = []
+  for (const tr of ordenados) {
+    const desde = Number(tr.desde_m3) || 0
+    const hasta = tr.hasta_m3 == null ? Infinity : Number(tr.hasta_m3)
+    const precio = parseFloat(String(tr.precio_m3 || 0))
+    const m3 = Math.max(0, Math.min(consumo, hasta) - desde)
+    if (m3 <= 0) continue
+    const monto = m3 * precio
+    total += monto
+    detalle.push({ desde_m3: desde, hasta_m3: tr.hasta_m3 ?? null, precio_m3: precio, m3, monto })
+  }
+  return { total, tipo_cobro: 'Consumo Escalonado', desglose: { tramo: 'escalonado', tramos: detalle } }
+}
+
+/** Entrada mínima de tarifa para resolver el cobro (la satisface `Tarifa`). */
+export interface EntradaCostoTarifa {
+  precio_m3: number
+  precio_m3_exceso?: number | null
+  canon_fijo: number
+  consumo_minimo?: number | null
+  tramos?: TarifaTramo[] | null
+}
+
+/**
+ * Punto ÚNICO de decisión del cobro de una lectura: si la tarifa tiene bloques
+ * (`tramos`), usa el modelo ESCALONADO; si no, el plano de 3 tramos
+ * (`calcularTotalPagar`). Lo consume la captura de lecturas.
+ */
+export function calcularCostoTarifa(
+  consumo: number,
+  tarifa: EntradaCostoTarifa,
+  derechoServicioM3: number | null = null,
+): CostoCalculo {
+  if (Array.isArray(tarifa.tramos) && tarifa.tramos.length > 0) {
+    return calcularTotalPagarEscalonado(consumo, tarifa.tramos, tarifa.canon_fijo, tarifa.consumo_minimo ?? 0)
+  }
+  return calcularTotalPagar(
+    consumo,
+    tarifa.precio_m3,
+    tarifa.canon_fijo,
+    tarifa.consumo_minimo ?? 0,
+    tarifa.precio_m3_exceso ?? 0,
+    derechoServicioM3,
+  )
+}
+
+/**
+ * Valida un set de bloques escalonados para guardar la tarifa: ≥1 bloque,
+ * contiguos desde 0 (sin huecos ni solapes), cada `hasta_m3 > desde_m3`, precios
+ * ≥ 0, y solo el ÚLTIMO bloque sin tope (`hasta_m3 = null`). Devuelve el mensaje de
+ * error o `null` si es válido.
+ */
+export function validarTramos(tramos: TarifaTramo[]): string | null {
+  if (!Array.isArray(tramos) || tramos.length === 0) return 'Agregá al menos un bloque.'
+  const ord = [...tramos].sort((a, b) => (Number(a.desde_m3) || 0) - (Number(b.desde_m3) || 0))
+  let esperadoDesde = 0
+  for (let i = 0; i < ord.length; i++) {
+    const t = ord[i]
+    const esUltimo = i === ord.length - 1
+    const desde = Number(t.desde_m3)
+    const precio = Number(t.precio_m3)
+    if (!Number.isFinite(desde) || desde < 0) return 'Los límites deben ser números ≥ 0.'
+    if (Math.abs(desde - esperadoDesde) > 1e-9) return 'Los bloques deben ser contiguos desde 0 (sin huecos ni solapes).'
+    if (!Number.isFinite(precio) || precio < 0) return 'Los precios por m³ deben ser ≥ 0.'
+    if (esUltimo) {
+      if (t.hasta_m3 != null && Number(t.hasta_m3) <= desde) return 'El límite superior del último bloque debe ser mayor a su inicio (o vacío = ∞).'
+    } else {
+      if (t.hasta_m3 == null) return 'Solo el último bloque puede quedar sin tope.'
+      const hasta = Number(t.hasta_m3)
+      if (!Number.isFinite(hasta) || hasta <= desde) return 'Cada bloque debe terminar por encima de su inicio.'
+      esperadoDesde = hasta
+    }
+  }
+  return null
 }
 
 // ────────────────────────────────────────────────────────────────────────────
