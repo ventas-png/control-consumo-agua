@@ -1,11 +1,18 @@
-import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useEffect, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
+import { registroExiste } from '../../domain/agua/queries'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
+import {
+  localStorageOutbox,
+  leerPendientes,
+  encolarLectura,
+  sincronizarPendientes,
+} from '../../lib/lecturasOutbox'
 import { APP_CONFIG } from '../../lib/config'
 
 interface Props {
@@ -58,6 +65,11 @@ export function LecturasSection({
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
   const [contadoresLeidos, setContadoresLeidos] = useState<Set<string>>(new Set())
+  // Captura offline (P1): cola local de lecturas guardadas sin conexión, para
+  // sincronizarlas después de forma idempotente (sin duplicar).
+  const outbox = useMemo(() => localStorageOutbox(), [])
+  const [pendientes, setPendientes] = useState(() => leerPendientes(outbox))
+  const [sincronizando, setSincronizando] = useState(false)
 
   // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
@@ -239,6 +251,33 @@ export function LecturasSection({
     setFotoFile(null)
   }
 
+  // Sincroniza la cola offline (manual, controlado por el operador). Idempotente:
+  // una lectura que ya está en la BD (por clave natural) se descarta sin duplicar.
+  // Las insertadas se agregan a la lista; las que fallan quedan para reintentar.
+  async function sincronizar() {
+    if (sincronizando || pendientes.length === 0) return
+    setSincronizando(true)
+    try {
+      const res = await sincronizarPendientes(outbox, {
+        existe: (r) => registroExiste(r.contador_id as string, r.lectura_actual as number, r.fecha as string),
+        insertar: async (r) => {
+          const { data, error } = await createRegistro(r)
+          if (!error && data) onRegistroAdded(data)
+          return error
+        },
+      })
+      setPendientes(leerPendientes(outbox))
+      notify({
+        variant: res.fallidas ? 'warning' : 'success',
+        title: `Sincronización: ${res.ok} subida(s)`,
+        text: `${res.yaExistian} ya estaban en el sistema · ${res.fallidas} pendiente(s).`,
+        duration: 2600,
+      })
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
   async function handleGuardar() {
     if (!unidadSeleccionada) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione una unidad primero' })
     if (!contadorSeleccionado) return notify({ variant: 'warning', title: 'Atención', text: 'Seleccione un contador' })
@@ -271,21 +310,10 @@ export function LecturasSection({
     // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
     // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
     const clienteIdRegistro = unidadSeleccionada.cliente_id ?? null
-    setSaving(true)
-    let fotoPath: string | null = null
-    if (fotoFile && clienteIdRegistro) {
-      const path = `${clienteIdRegistro}/${Date.now()}`
-      const { error: uploadError } = await uploadRegistroFoto(path, fotoFile, fotoFile.type)
-      if (uploadError) {
-        notify({ variant: 'warning', title: 'Foto no guardada', text: 'No se pudo subir la foto; la lectura se guardará sin ella.' })
-      } else {
-        fotoPath = path
-      }
-    } else if (fotoFile && !clienteIdRegistro) {
-      notify({ variant: 'warning', title: 'Foto no guardada', text: 'La unidad no tiene cliente asociado; la lectura se guardará sin foto.' })
-    }
 
-    const registro = {
+    // Builder del payload de la lectura. La foto se resuelve aparte (online = path
+    // subido; offline = null: se conserva el dato crítico y la foto se recaptura).
+    const construirRegistro = (fotoPath: string | null) => ({
       // El cliente se toma de la unidad (siempre cargada), no de la lista `clientes`
       // en memoria: un operador puede no tenerla por RLS y se perdía el cliente_id.
       cliente_id: clienteIdRegistro,
@@ -307,7 +335,36 @@ export function LecturasSection({
       notas,
       gps,
       foto: fotoPath,
+    })
+
+    // Captura OFFLINE: sin conexión encolamos la lectura (sin foto) en la cola local
+    // y salimos; se sincroniza luego de forma idempotente. Evita perder la lectura.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      const reg = construirRegistro(null)
+      const etiqueta = `${reg.cliente_nombre ?? 'Cliente'} · ${contadorSeleccionado.numero_serie}`
+      setPendientes(encolarLectura(outbox, reg, etiqueta, Date.now()))
+      notify({ variant: 'info', title: '📴 Guardada sin conexión', text: 'La lectura quedó en la cola local; sincronizala cuando recuperes señal.' })
+      limpiarFormulario()
+      return
     }
+
+    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
+    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
+    setSaving(true)
+    let fotoPath: string | null = null
+    if (fotoFile && clienteIdRegistro) {
+      const path = `${clienteIdRegistro}/${Date.now()}`
+      const { error: uploadError } = await uploadRegistroFoto(path, fotoFile, fotoFile.type)
+      if (uploadError) {
+        notify({ variant: 'warning', title: 'Foto no guardada', text: 'No se pudo subir la foto; la lectura se guardará sin ella.' })
+      } else {
+        fotoPath = path
+      }
+    } else if (fotoFile && !clienteIdRegistro) {
+      notify({ variant: 'warning', title: 'Foto no guardada', text: 'La unidad no tiene cliente asociado; la lectura se guardará sin foto.' })
+    }
+
+    const registro = construirRegistro(fotoPath)
 
     const { data, error } = await createRegistro(registro)
     setSaving(false)
@@ -464,6 +521,22 @@ export function LecturasSection({
 
   return (
     <div>
+      {/* Captura offline (P1): lecturas guardadas sin conexión, pendientes de subir. */}
+      {pendientes.length > 0 && (
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <span style={{ color: 'var(--at-warning-strong)', fontWeight: 600, fontSize: '14px' }}>
+            📴 {pendientes.length} lectura{pendientes.length !== 1 ? 's' : ''} sin sincronizar (guardada{pendientes.length !== 1 ? 's' : ''} sin conexión)
+          </span>
+          <button
+            onClick={() => void sincronizar()}
+            disabled={sincronizando}
+            style={{ padding: '8px 16px', background: sincronizando ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: sincronizando ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {sincronizando ? '⏳ Sincronizando…' : '🔄 Sincronizar ahora'}
+          </button>
+        </div>
+      )}
+
       {/* Ruta Control */}
       <div style={{ background: bannerRuta.bg, padding: '15px', borderRadius: '12px', marginBottom: '20px', border: `1px solid ${bannerRuta.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <span style={{ color: bannerRuta.color, fontWeight: 600 }}>
