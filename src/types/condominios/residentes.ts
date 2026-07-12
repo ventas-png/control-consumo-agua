@@ -2,6 +2,27 @@
 // Particionado de types/condominios.ts (auditoría P1); el barrel
 // ./index.ts re-exporta todo, así que la superficie pública no cambia.
 
+import type { TipoResidente } from './operaciones'
+
+/**
+ * Membresía de un residente en una unidad (portal propietario/inquilino · fase 1).
+ * Una unidad puede tener VARIOS residentes con rol distinto (propietario,
+ * arrendatario, familiar…). La tabla `unidad_residentes` es la fundación para
+ * diferenciar accesos y cargos por rol en las fases siguientes. `tipo` casa con el
+ * CHECK de la migración.
+ */
+export interface UnidadResidente {
+  id: string
+  unidad_id: string
+  cliente_id: string
+  company_id: string
+  project_id: string
+  tipo: TipoResidente
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
 // ━━ Autorizaciones de renta y mudanza por unidad ━━
 // ── Autorización de Renta por Unidad ──────────────────────────────────────
 
