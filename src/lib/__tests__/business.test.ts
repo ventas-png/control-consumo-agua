@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   calcularTotalPagar,
+  calcularTotalPagarEscalonado,
+  calcularCostoTarifa,
+  validarTramos,
   validarLectura,
   redondear2,
   calcularIVA,
@@ -90,6 +93,151 @@ describe('calcularTotalPagar', () => {
       const result = calcularTotalPagar(20, 0, 0, 0)
       expect(result.total).toBe(0)
     })
+  })
+})
+
+describe('calcularTotalPagarEscalonado', () => {
+  it('consumo ≤ mínimo → solo canon fijo (piso)', () => {
+    const r = calcularTotalPagarEscalonado(3, [{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }], 40, 5)
+    expect(r.total).toBe(40)
+    expect(r.tipo_cobro).toBe('Canon Fijo')
+    expect(r.desglose.tramo).toBe(1)
+  })
+
+  it('bloque único (sin tope) cobra todo el consumo a un precio', () => {
+    const r = calcularTotalPagarEscalonado(15, [{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }], 0, 0)
+    expect(r.total).toBe(75) // 15 * 5
+    expect(r.tipo_cobro).toBe('Consumo Escalonado')
+    expect(r.desglose.tramo).toBe('escalonado')
+    expect(r.desglose.tramos).toHaveLength(1)
+  })
+
+  it('dos bloques: parte en el primero y parte en el segundo', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(90) // 10*5 + 5*8
+    expect(r.desglose.tramos).toEqual([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5, m3: 10, monto: 50 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8, m3: 5, monto: 40 },
+    ])
+  })
+
+  it('tres bloques: consumo cae en el bloque intermedio (último bloque no aplica)', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 4 },
+      { desde_m3: 10, hasta_m3: 20, precio_m3: 6 },
+      { desde_m3: 20, hasta_m3: null, precio_m3: 10 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(70) // 10*4 + 5*6
+    expect(r.desglose.tramos).toHaveLength(2) // el tercer bloque cubre 0 m³ → omitido
+  })
+
+  it('consumo exactamente en un límite de bloque', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 4 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 6 },
+    ]
+    const r = calcularTotalPagarEscalonado(10, tramos, 0, 0)
+    expect(r.total).toBe(40) // 10*4; el segundo bloque cubre 0 m³
+    expect(r.desglose.tramos).toHaveLength(1)
+  })
+
+  it('bloques desordenados se ordenan por desde_m3', () => {
+    const tramos = [
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(90)
+  })
+
+  it('precisión de coma flotante', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 1.1 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 2.2 },
+    ]
+    const r = calcularTotalPagarEscalonado(10.1, tramos, 0, 0)
+    // 10*1.1 + 0.1*2.2 = 11 + 0.22 = 11.22
+    expect(r.total).toBeCloseTo(11.22, 6)
+  })
+})
+
+describe('calcularCostoTarifa (dispatcher plano vs escalonado)', () => {
+  it('sin tramos → modelo plano (idéntico a calcularTotalPagar)', () => {
+    const tarifa = { precio_m3: 5, precio_m3_exceso: 8, canon_fijo: 50, consumo_minimo: 10, tramos: null }
+    const dispatcher = calcularCostoTarifa(50, tarifa, 30)
+    const plano = calcularTotalPagar(50, 5, 50, 10, 8, 30)
+    expect(dispatcher).toEqual(plano)
+    expect(dispatcher.tipo_cobro).toBe('Consumo con Exceso')
+  })
+
+  it('tramos vacíos → modelo plano', () => {
+    const tarifa = { precio_m3: 5, precio_m3_exceso: 0, canon_fijo: 0, consumo_minimo: 0, tramos: [] }
+    expect(calcularCostoTarifa(20, tarifa).tipo_cobro).toBe('Consumo Normal')
+  })
+
+  it('con tramos → modelo escalonado', () => {
+    const tarifa = {
+      precio_m3: 5, precio_m3_exceso: 8, canon_fijo: 0, consumo_minimo: 0,
+      tramos: [
+        { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+        { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+      ],
+    }
+    const r = calcularCostoTarifa(15, tarifa, 30)
+    expect(r.tipo_cobro).toBe('Consumo Escalonado')
+    expect(r.total).toBe(90)
+  })
+})
+
+describe('validarTramos', () => {
+  it('bloques contiguos desde 0 con último sin tope → válido', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: 20, precio_m3: 8 },
+      { desde_m3: 20, hasta_m3: null, precio_m3: 12 },
+    ])).toBeNull()
+  })
+
+  it('un solo bloque sin tope → válido', () => {
+    expect(validarTramos([{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }])).toBeNull()
+  })
+
+  it('vacío → error', () => {
+    expect(validarTramos([])).toMatch(/al menos un bloque/i)
+  })
+
+  it('no empieza en 0 → error de contigüidad', () => {
+    expect(validarTramos([{ desde_m3: 5, hasta_m3: null, precio_m3: 5 }])).toMatch(/contiguos/i)
+  })
+
+  it('hueco entre bloques → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 12, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/contiguos/i)
+  })
+
+  it('solape entre bloques → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 8, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/contiguos/i)
+  })
+
+  it('bloque intermedio sin tope → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: null, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/último bloque/i)
+  })
+
+  it('precio negativo → error', () => {
+    expect(validarTramos([{ desde_m3: 0, hasta_m3: null, precio_m3: -1 }])).toMatch(/≥ 0/)
   })
 })
 

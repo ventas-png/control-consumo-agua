@@ -2,7 +2,7 @@ import { useState, type ChangeEvent, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import type { Cliente, Contador, Tarifa } from '../../types'
-import { calcularTotalPagar, validarLectura } from '../../lib/business'
+import { calcularTotalPagar, calcularTotalPagarEscalonado, validarLectura } from '../../lib/business'
 
 interface Props {
   clientes: Cliente[]
@@ -40,8 +40,12 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
   const consumo = validacion?.valid ? (validacion.consumo ?? 0) : 0
   const tariffPrice = selectedTariff?.precio_m3 ?? 0
   const canolFixed = parseFloat(canon) || 0
+  // Tarifa escalonada → cobro por bloques (usa el canon manual como piso); si no,
+  // el modelo plano de siempre (comportamiento idéntico para tarifas planas).
   const calculation = consumo > 0
-    ? calcularTotalPagar(consumo, tariffPrice, canolFixed)
+    ? (selectedTariff?.tramos?.length
+        ? calcularTotalPagarEscalonado(consumo, selectedTariff.tramos, canolFixed, selectedTariff.consumo_minimo ?? 0)
+        : calcularTotalPagar(consumo, tariffPrice, canolFixed))
     : { total: 0, tipo_cobro: 'Sin datos' as const, desglose: {} }
 
   const handleSelectImage = (e: ChangeEvent<HTMLInputElement>) => {

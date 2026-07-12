@@ -1,10 +1,11 @@
 import { useState, type CSSProperties} from 'react'
 import { confirm, notify } from '../shared/Dialog'
-import type { Tarifa, Proyecto } from '../../types'
+import type { Tarifa, Proyecto, TarifaTramo } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createTarifa, updateTarifa, setTarifaActiva, deleteTarifa } from '../../domain/tarifas/mutations'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
+import { validarTramos } from '../../lib/business'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 import { FacturacionConfigSection } from './FacturacionConfigSection'
@@ -57,6 +58,11 @@ export function TarifasSection({
   const currentUser = useSession()
   const perms = usePermissionsContext()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  // Tarifa escalonada (P1): bloques por m³. `bloques` guarda los inputs como
+  // strings; el `desde` se deriva (0, o el `hasta` del bloque previo) y el ÚLTIMO
+  // bloque llega a ∞ (hasta = null). Si `escalonada` está off → tramos = null.
+  const [escalonada, setEscalonada] = useState(false)
+  const [bloques, setBloques] = useState<{ hasta: string; precio: string }[]>([{ hasta: '', precio: '0.0000' }])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -68,8 +74,24 @@ export function TarifasSection({
   const canEdit = perms.canEdit('tarifas') && currentUser.role !== 'viewer'
   const canDelete = perms.canDelete('tarifas') && currentUser.role !== 'viewer'
 
+  const EMPTY_BLOQUES = [{ hasta: '', precio: '0.0000' }]
+
+  /** Construye los tramos canónicos desde los inputs: `desde` derivado, último ∞. */
+  function construirTramos(): TarifaTramo[] {
+    let desde = 0
+    return bloques.map((b, i) => {
+      const esUltimo = i === bloques.length - 1
+      const hasta = esUltimo ? null : (parseFloat(b.hasta) || 0)
+      const tramo: TarifaTramo = { desde_m3: desde, hasta_m3: hasta, precio_m3: parseFloat(b.precio) || 0 }
+      if (hasta != null) desde = hasta
+      return tramo
+    })
+  }
+
   function startCreate() {
     setForm(EMPTY_FORM)
+    setEscalonada(false)
+    setBloques(EMPTY_BLOQUES)
     setEditingId(null)
     setIsModalOpen(true)
   }
@@ -87,6 +109,11 @@ export function TarifasSection({
       fecha_revision: t.fecha_revision ?? '',
       project_id: t.project_id ?? '',
     })
+    const tr = t.tramos ?? []
+    setEscalonada(tr.length > 0)
+    setBloques(tr.length > 0
+      ? tr.map(b => ({ hasta: b.hasta_m3 == null ? '' : String(b.hasta_m3), precio: String(b.precio_m3) }))
+      : EMPTY_BLOQUES)
     setEditingId(t.id)
     setIsModalOpen(true)
   }
@@ -95,6 +122,8 @@ export function TarifasSection({
     setIsModalOpen(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
+    setEscalonada(false)
+    setBloques(EMPTY_BLOQUES)
   }
 
   async function handleGuardar() {
@@ -111,6 +140,16 @@ export function TarifasSection({
     if (!validateNumber(canon_fijo, 0, 99999)) errors.push('Canon fijo debe ser un valor entre 0 y 99999')
     if (!validateNumber(consumo_minimo, 0, 99999)) errors.push('Consumo mínimo debe ser un valor entre 0 y 99999')
 
+    // Tarifa escalonada: valida los bloques (contiguos desde 0, último ∞). Si está
+    // apagada, tramos = null → se guarda/limpia y el cobro usa el modelo plano.
+    let tramosPayload: TarifaTramo[] | null = null
+    if (escalonada) {
+      const tramos = construirTramos()
+      const errTramos = validarTramos(tramos)
+      if (errTramos) errors.push(errTramos)
+      else tramosPayload = tramos
+    }
+
     if (errors.length > 0) {
       notify({ variant: 'error', title: 'Error de validación', text: errors.join('<br>') })
       return
@@ -126,6 +165,7 @@ export function TarifasSection({
         precio_m3_exceso,
         canon_fijo,
         consumo_minimo,
+        tramos: tramosPayload,
         descripcion: form.descripcion || null,
         activa: true,
         fecha_revision: form.fecha_revision || null,
@@ -160,6 +200,7 @@ export function TarifasSection({
         precio_m3_exceso,
         canon_fijo,
         consumo_minimo,
+        tramos: tramosPayload,
         descripcion: form.descripcion || null,
         activa: form.activa,
         fecha_revision: form.fecha_revision || null,
@@ -401,6 +442,75 @@ export function TarifasSection({
               <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px', display: 'block' }}>
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
+            </div>
+            <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, color: 'var(--at-ink)', fontSize: '13px' }}>
+                <input type="checkbox" checked={escalonada} onChange={e => setEscalonada(e.target.checked)} />
+                Tarifa escalonada por bloques
+              </label>
+              {escalonada && (
+                <div style={{ marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'block', marginBottom: '10px' }}>
+                    Reemplaza el precio por m³ y el exceso. Cada bloque cobra el consumo dentro de su rango; el último llega a ∞. El canon fijo y el consumo mínimo siguen aplicando como piso.
+                  </span>
+                  {bloques.map((b, i) => {
+                    const desde = i === 0 ? 0 : (parseFloat(bloques[i - 1].hasta) || 0)
+                    const esUltimo = i === bloques.length - 1
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--at-ink-2)', minWidth: '58px' }}>De {desde} m³</span>
+                        {esUltimo ? (
+                          <span style={{ fontSize: '13px', color: 'var(--at-ink-2)', minWidth: '92px' }}>a ∞</span>
+                        ) : (
+                          <input
+                            style={{ ...inputStyle, width: '92px' }}
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={b.hasta}
+                            placeholder="hasta"
+                            onChange={e => setBloques(bs => bs.map((x, j) => (j === i ? { ...x, hasta: e.target.value } : x)))}
+                          />
+                        )}
+                        <input
+                          style={{ ...inputStyle, width: '110px' }}
+                          type="number"
+                          min="0"
+                          step="0.0001"
+                          value={b.precio}
+                          placeholder="precio"
+                          onChange={e => setBloques(bs => bs.map((x, j) => (j === i ? { ...x, precio: e.target.value } : x)))}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{moneda}/m³</span>
+                        {bloques.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setBloques(bs => bs.filter((_, j) => j !== i))}
+                            style={{ background: 'none', border: 'none', color: 'var(--at-danger)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
+                            aria-label="Quitar bloque"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setBloques(bs => {
+                      const ultimoIdx = bs.length - 1
+                      const desdeUltimo = ultimoIdx === 0 ? 0 : (parseFloat(bs[ultimoIdx - 1].hasta) || 0)
+                      // El bloque que era ∞ toma un tope por defecto (desde + 10) para que
+                      // el nuevo bloque quede después; el usuario puede ajustarlo.
+                      const conTope = bs.map((x, j) => (j === ultimoIdx && !x.hasta ? { ...x, hasta: String(desdeUltimo + 10) } : x))
+                      return [...conTope, { hasta: '', precio: bs[ultimoIdx]?.precio ?? '0.0000' }]
+                    })}
+                    style={{ marginTop: '4px', fontSize: '13px', color: 'var(--at-primary)', background: 'none', border: '1px dashed var(--at-primary)', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer' }}
+                  >
+                    + Agregar bloque
+                  </button>
+                </div>
+              )}
             </div>
             <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
               <label style={{ ...labelStyle, color: 'var(--at-ink)' }}>Fecha de Revisión</label>

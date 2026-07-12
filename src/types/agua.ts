@@ -175,6 +175,20 @@ export interface RutaOcurrencia {
 }
 
 // ── Tarifa de agua ──────────────────────────────────────────────────────────
+/**
+ * Bloque de una tarifa ESCALONADA (increasing-block tariff). El consumo se cobra
+ * por bloques: cada m³ dentro de `(desde_m3, hasta_m3]` se cobra a `precio_m3`.
+ * Los bloques deben ser contiguos desde 0 y el último tener `hasta_m3 = null` (∞).
+ */
+export interface TarifaTramo {
+  /** Límite inferior del bloque en m³. */
+  desde_m3: number;
+  /** Límite superior en m³; `null` = sin tope (último bloque). */
+  hasta_m3: number | null;
+  /** Precio por m³ dentro del bloque. */
+  precio_m3: number;
+}
+
 export interface Tarifa {
   id: string;
   project_id: string;
@@ -186,6 +200,12 @@ export interface Tarifa {
   precio_m3_exceso: number;
   canon_fijo: number;
   consumo_minimo: number;
+  /**
+   * Tarifa escalonada opcional. Si tiene ≥1 bloque, ANULA el modelo plano
+   * (precio_m3 / precio_m3_exceso / derecho de servicio) y el cobro se calcula por
+   * bloques. `consumo_minimo` + `canon_fijo` siguen aplicando como piso mínimo.
+   */
+  tramos?: TarifaTramo[] | null;
   activa: boolean;
   fecha_revision?: string | null;
   created_at?: string;

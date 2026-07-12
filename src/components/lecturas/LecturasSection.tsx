@@ -5,7 +5,7 @@ import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto }
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
-import { calcularTotalPagar, validarLectura } from '../../lib/business'
+import { calcularCostoTarifa, validarLectura } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 
 interface Props {
@@ -202,7 +202,7 @@ export function LecturasSection({
   const consumoEfectivo = validacion?.valid ? (validacion.consumo ?? 0) : consumo
   const calculo =
     consumoEfectivo !== null && consumoEfectivo >= 0 && tarifaDelContador
-      ? calcularTotalPagar(consumoEfectivo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
+      ? calcularCostoTarifa(consumoEfectivo, tarifaDelContador, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
 
   function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
@@ -261,7 +261,7 @@ export function LecturasSection({
     }
     const consumoGuardar = validacion.consumo ?? 0
 
-    const resultadoCobro = calcularTotalPagar(consumoGuardar, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
+    const resultadoCobro = calcularCostoTarifa(consumoGuardar, tarifaDelContador!, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
 
     if (!projectId) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto del usuario' })

@@ -127,9 +127,9 @@ export interface ConvenioPago {
 
 export interface CostoCalculo {
   total: number;
-  tipo_cobro: 'Canon Fijo' | 'Consumo Normal' | 'Consumo con Exceso';
+  tipo_cobro: 'Canon Fijo' | 'Consumo Normal' | 'Consumo con Exceso' | 'Consumo Escalonado';
   desglose: {
-    tramo: 1 | 2 | 3;
+    tramo: 1 | 2 | 3 | 'escalonado';
     canon_fijo?: number;
     consumo_m3?: number;
     precio_m3?: number;
@@ -138,6 +138,8 @@ export interface CostoCalculo {
     precio_exceso?: number;
     monto_base?: number;
     monto_exceso?: number;
+    /** Detalle por bloque cuando la tarifa es escalonada. */
+    tramos?: Array<{ desde_m3: number; hasta_m3: number | null; precio_m3: number; m3: number; monto: number }>;
   };
 }
 
