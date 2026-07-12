@@ -23,6 +23,7 @@ import {
   useEmitirFacturaMutation,
   useAnularFacturaMutation,
   useIvaTasaDefaultQuery,
+  particionarEmitibles,
 } from '../../domain/facturacion/mutations'
 import { useDocumentosFiscalesQuery } from '../../domain/fiscal/queries'
 import { useTimbrarDocumentoMutation, puedeDispararTimbrado } from '../../domain/fiscal/mutations'
@@ -108,6 +109,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const emitirMut = useEmitirFacturaMutation(companyId)
   const anularMut = useAnularFacturaMutation(companyId)
   const [accionFacturaId, setAccionFacturaId] = useState<string | null>(null)
+  const [emitiendoLote, setEmitiendoLote] = useState(false)
 
   // serv:S11 · estatus de timbrado. Documentos fiscales del tenant indexados por
   // registro_id; como la query ordena por created_at desc, el PRIMERO que veamos
@@ -268,7 +270,72 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
     setConvenioModal(bulk.selectedItems)
   }
 
+  // Facturación masiva "por ciclo": emite en lote las facturas seleccionadas que
+  // están pendientes de emisión (fija vencimiento + snapshot de IVA por fila,
+  // reusando la mutación de emisión ya testeada). El operador acota el ciclo con
+  // los filtros (búsqueda/estado) + selección; las no-emitibles se omiten.
+  async function emitirLoteSeleccion() {
+    if (!bulk.hasSelection || emitiendoLote) return
+    const conEstado = bulk.selectedItems.map(r => ({
+      r,
+      factura_estado: facturaById.get(r.id)?.factura_estado ?? r.estado,
+    }))
+    const { emitibles, omitidas } = particionarEmitibles(conEstado)
+    if (emitibles.length === 0) {
+      notify({ variant: 'warning', title: 'Nada para emitir', text: 'Ninguna de las facturas seleccionadas está pendiente de emisión.' })
+      return
+    }
+    const { isConfirmed } = await confirm({
+      title: `¿Emitir ${emitibles.length} factura(s)?`,
+      text: `Se fijará el vencimiento y el IVA de ${emitibles.length} factura(s).${omitidas.length ? ` ${omitidas.length} seleccionada(s) se omiten (ya emitidas o en estado terminal).` : ''}`,
+      icon: 'question',
+      confirmText: 'Sí, emitir',
+    })
+    if (!isConfirmed) return
+
+    setEmitiendoLote(true)
+    let ok = 0
+    const fallidas: string[] = []
+    // Secuencial: reusa la mutación por fila (validación server-side + snapshot)
+    // sin saturar la BD; la última invalidación refresca la tabla.
+    for (const { r, factura_estado } of emitibles) {
+      const factura = facturaById.get(r.id)
+      try {
+        await emitirMut.mutateAsync({
+          factura: {
+            id: r.id,
+            factura_estado,
+            monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
+            mora_monto: factura?.mora_monto,
+          },
+          ivaTasa: factura?.iva_tasa ?? ivaTasaDefault,
+          diasVencimiento: diasVencimientoPara(r.project_id),
+        })
+        ok++
+      } catch {
+        fallidas.push(r.cliente_nombre ?? r.id)
+      }
+    }
+    setEmitiendoLote(false)
+    bulk.clear()
+    notify({
+      variant: fallidas.length ? 'warning' : 'success',
+      title: `📤 ${ok} factura(s) emitida(s)`,
+      text: fallidas.length
+        ? `${fallidas.length} no se pudieron emitir: ${fallidas.slice(0, 3).join(', ')}${fallidas.length > 3 ? '…' : ''}`
+        : 'Ciclo de facturación emitido correctamente.',
+      duration: 2600,
+    })
+  }
+
   const bulkActions: BulkAction[] = useMemo(() => [
+    {
+      id: 'emitir-facturas',
+      label: emitiendoLote ? 'Emitiendo…' : 'Emitir facturas',
+      icon: '📤',
+      variant: 'primary',
+      onClick: emitirLoteSeleccion,
+    },
     {
       id: 'marcar-mora',
       label: 'Marcar mora',
@@ -284,7 +351,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
       onClick: abrirConvenioGrupal,
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [bulk.selectedItems])
+  ], [bulk.selectedItems, emitiendoLote])
 
   async function handleVerificarPago(pagoId: string, aprobar: boolean) {
     setVerificando(pagoId)
