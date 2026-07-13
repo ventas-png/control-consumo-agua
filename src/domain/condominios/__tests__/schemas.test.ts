@@ -64,6 +64,22 @@ describe('cuotaInputSchema', () => {
     expect(cuotaInputSchema.safeParse({ ...base, fecha_vencimiento: '2026-06-30' }).success).toBe(true)
     expect(cuotaInputSchema.safeParse({ ...base, fecha_vencimiento: '30/06/2026' }).success).toBe(false)
   })
+
+  it('rol_responsable es opcional (omitido o null = sin diferenciar)', () => {
+    expect(cuotaInputSchema.safeParse(base).success).toBe(true)
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: null }).success).toBe(true)
+  })
+
+  it('rol_responsable acepta el dominio de unidad_residentes.tipo', () => {
+    for (const rol of ['propietario', 'arrendatario', 'familiar', 'otro'] as const) {
+      expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: rol }).success).toBe(true)
+    }
+  })
+
+  it('rechaza rol_responsable fuera del enum', () => {
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: 'inquilino' }).success).toBe(false)
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: '' }).success).toBe(false)
+  })
 })
 
 describe('visitanteInputSchema', () => {

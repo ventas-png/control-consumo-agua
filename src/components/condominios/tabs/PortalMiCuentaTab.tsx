@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react'
 import type { CuotaCondominio, EstadoCuota } from '../../../types'
 import { notify } from '../../shared/Dialog'
 import { iniciarPagoCuota, confirmarPagoCuota } from '../../../domain/portal/mutations'
+import { ResponsableCuotaBadge } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -106,6 +107,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, onPagado }: Pr
                 <div key={c.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esVencida ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{c.concepto.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} — {c.periodo}</div>
+                    {c.rol_responsable && <div style={{ marginTop: '4px' }}><ResponsableCuotaBadge rol={c.rol_responsable} /></div>}
                     {c.fecha_vencimiento && (
                       <div style={{ fontSize: '12.5px', color: esVencida ? 'var(--at-danger)' : 'var(--at-ink-3)', marginTop: '2px' }}>
                         {esVencida ? '⚠ Vencida el ' : 'Vence el '}{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}

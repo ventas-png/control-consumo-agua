@@ -4,6 +4,7 @@
 
 import type { RubroConfig } from './core'
 import type { CanalNotificacion } from './residentes'
+import type { TipoResidente } from './operaciones'
 
 // ━━ Fase 9: gastos, presupuesto legacy, alertas ━━
 // ── Phase 9: Contabilidad, Presupuesto, Alertas ───────────────────────────────
@@ -272,6 +273,11 @@ export interface PlantillaCuota {
   created_at: string
   rubros?: RubroConfig[] | null
   monto_total_estimado?: number | null
+  /**
+   * Rol responsable por defecto que la generación en lote estampa en cada cuota
+   * (mismo dominio que `unidad_residentes.tipo`). NULL = sin diferenciar.
+   */
+  rol_responsable?: TipoResidente | null
 }
 
 export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'

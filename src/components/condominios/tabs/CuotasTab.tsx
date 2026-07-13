@@ -9,7 +9,7 @@ import { countRecibosByProyecto } from '../../../domain/condominios/tabQueries'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
-import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
+import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle, TipoResidente } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
 // T4 · cond:C4 — capa de datos del agregado Cuota (estado/mora) + máquina de
 // estados. La tabla recibe `CuotaCondominio[]` (legacy, sin campos de
@@ -23,7 +23,7 @@ import {
   useAnularCuotaMutation,
 } from '../../../domain/condominios/mutations'
 import { puedeTransicionarCuota } from '../../../lib/businessCondominios'
-import { CuotaEstadoBadge } from './CuotasUi'
+import { CuotaEstadoBadge, ResponsableCuotaBadge, ROLES_RESPONSABLE_CUOTA, rolResponsableLabel } from './CuotasUi'
 
 interface CSVRow {
   rawUnidad: string
@@ -67,6 +67,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   const [importando, setImportando] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCuota | 'todos'>('todos')
+  // Filtro por rol responsable: 'todos' | 'sin' (no diferenciadas) | un rol.
+  const [filtroResponsable, setFiltroResponsable] = useState<TipoResidente | 'todos' | 'sin'>('todos')
   const [expandidasRubros, setExpandidasRubros] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     unidad_id: '',
@@ -74,6 +76,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     monto: '',
     periodo: new Date().toISOString().slice(0, 7),
     fecha_vencimiento: '',
+    rol_responsable: '',
     notas: '',
   })
 
@@ -194,9 +197,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }
   }
 
-  const cuotasFiltradas = filtroEstado === 'todos'
-    ? cuotas
-    : cuotas.filter(c => c.estado === filtroEstado)
+  const cuotasFiltradas = cuotas.filter(c => {
+    if (filtroEstado !== 'todos' && c.estado !== filtroEstado) return false
+    if (filtroResponsable === 'sin') return !c.rol_responsable
+    if (filtroResponsable !== 'todos' && c.rol_responsable !== filtroResponsable) return false
+    return true
+  })
 
   const cuotasPagables = cuotasFiltradas.filter(c => c.estado !== 'pagado')
 
@@ -304,7 +310,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   function resetForm() {
-    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: new Date().toISOString().slice(0, 7), fecha_vencimiento: '', notas: '' })
+    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: new Date().toISOString().slice(0, 7), fecha_vencimiento: '', rol_responsable: '', notas: '' })
     setShowForm(false)
   }
 
@@ -341,6 +347,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       monto: Number(form.monto),
       periodo: form.periodo,
       fecha_vencimiento: form.fecha_vencimiento || null,
+      rol_responsable: form.rol_responsable || null,
       notas: form.notas || null,
       estado: 'pendiente',
     })
@@ -473,8 +480,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <button
             onClick={() => exportarExcel(`cuotas-${new Date().toISOString().slice(0,10)}`, [{
               name: 'Cuotas',
-              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
-              rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
+              headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
+              rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
             }])}
             style={{ padding: '10px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
@@ -530,6 +537,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               <select value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 {CONCEPTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Responsable</label>
+              <select value={form.rol_responsable} onChange={e => setForm(f => ({ ...f, rol_responsable: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+                <option value="">Sin diferenciar</option>
+                {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
@@ -625,6 +640,19 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         </div>
       )}
 
+      {/* Filtro por responsable — visible solo cuando hay cuotas diferenciadas */}
+      {cuotas.some(c => c.rol_responsable) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <span style={{ color: 'var(--at-ink-3)', fontWeight: 600 }}>Responsable:</span>
+          <select value={filtroResponsable} onChange={e => { setFiltroResponsable(e.target.value as TipoResidente | 'todos' | 'sin'); bulk.clear() }}
+            style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13, background: 'var(--at-surface)' }}>
+            <option value="todos">Todos</option>
+            <option value="sin">Sin diferenciar</option>
+            {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Lista */}
       {/* F3.9.2: migrado a <DataTable> shared con expandedContent */}
       <DataTable<CuotaCondominio>
@@ -693,6 +721,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             key: 'concepto', header: 'Concepto', sortable: true,
             accessor: c => c.concepto,
             render: c => <span style={{ color: 'var(--at-ink-2)' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</span>,
+          },
+          {
+            key: 'responsable', header: 'Responsable', sortable: true,
+            accessor: c => c.rol_responsable ?? '',
+            render: c => c.rol_responsable
+              ? <ResponsableCuotaBadge rol={c.rol_responsable} />
+              : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+            hideOnMobile: true,
           },
           {
             key: 'periodo', header: 'Período', sortable: true,
@@ -837,8 +873,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             icon: '📊',
             onClick: () => exportarExcel(`cuotas-seleccion-${new Date().toISOString().slice(0, 10)}`, [{
               name: 'Cuotas',
-              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado'],
-              rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
+              headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado'],
+              rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
             }]),
           },
         ]}
