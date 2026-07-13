@@ -6,8 +6,11 @@
 // quedan en la UI; aquí sólo el I/O. Convive con las mutations payfac (hooks
 // react-query) de mutations.ts: estas son funciones planas, imperativas, porque
 // StripePayPalConfig maneja su propio estado de carga/guardado.
-import { supabase } from '../../lib/supabase'
+// `db` = la misma instancia tipada (tablas/columnas chequeadas); `supabase` queda
+// para functions.invoke (edges), que no pasa por el esquema generado.
+import { db, supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import type { TablesUpdate } from '../../types/database.types'
 
 /** Columnas de `companies` que consume la pantalla de config Stripe/PayPal. */
 export interface CompanyPaymentConfigRow {
@@ -23,12 +26,13 @@ export interface CompanyPaymentConfigRow {
 export async function fetchCompanyPaymentConfig(
   companyId: string,
 ): Promise<{ data: CompanyPaymentConfigRow | null; error: string | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('companies')
     .select('stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_configured,paypal_activo')
     .eq('id', companyId)
     .single()
-  return { data: (data as CompanyPaymentConfigRow) ?? null, error: error?.message ?? null }
+  // La fila tipada coincide columna a columna con CompanyPaymentConfigRow (sin cast).
+  return { data: data ?? null, error: error?.message ?? null }
 }
 
 /** Activa/desactiva un proveedor (patch ya armado por la UI: {stripe_activo} | {paypal_activo}). */
@@ -36,7 +40,8 @@ export async function setCompanyProviderActivo(
   companyId: string,
   patch: Record<string, unknown>,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('companies').update(patch).eq('id', companyId)
+  // Firma pública laxa (la UI arma el patch); la frontera lo castea al Update generado.
+  const { error } = await db.from('companies').update(patch as TablesUpdate<'companies'>).eq('id', companyId)
   return { error: error?.message ?? null }
 }
 
@@ -80,6 +85,9 @@ export async function testStripeConnection(companyId: string): Promise<{ error: 
 export async function fetchProjectProveedorPagoOverride(
   projectId: string,
 ): Promise<{ proveedorPago: string | null; ambientePago: string | null } | null> {
+  // Sin migrar a `db` a propósito: `ambiente_pago` (#592) entró a prod DESPUÉS de
+  // la última regeneración de database.types.ts, así que el cliente tipado aún no
+  // conoce la columna. Migrar al regenerar tipos.
   const rows = await runQuery<Array<{ proveedor_pago: string | null; ambiente_pago: string | null }>>((signal) =>
     supabase.from('projects').select('proveedor_pago,ambiente_pago').eq('id', projectId).limit(1).abortSignal(signal),
   )

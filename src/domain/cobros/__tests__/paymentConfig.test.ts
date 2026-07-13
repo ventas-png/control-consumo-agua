@@ -15,9 +15,11 @@ const h = vi.hoisted(() => {
   return { state, builder, invoke }
 })
 
-vi.mock('../../../lib/supabase', () => ({
-  supabase: { from: () => h.builder, functions: { invoke: h.invoke } },
-}))
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: () => h.builder, functions: { invoke: h.invoke } }
+  // Como en el módulo real, `db` es la MISMA instancia vista con el esquema tipado.
+  return { supabase: client, db: client }
+})
 
 import {
   fetchCompanyPaymentConfig,
