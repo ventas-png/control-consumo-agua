@@ -20,6 +20,7 @@ export function UnidadCard({
   onEdit,
   onToggleActivo,
   onEliminar,
+  onResidentes,
 }: {
   unidad: Unidad
   tipo: { icon: string; label: string }
@@ -33,6 +34,8 @@ export function UnidadCard({
   onEdit: () => void
   onToggleActivo: () => void
   onEliminar: () => void
+  /** Portal propietario/inquilino (fase 3): abrir la gestión de residentes. */
+  onResidentes?: () => void
 }) {
   const tag = getEditedTagInfo(u.updated_at, u.updated_by_name)
   return (
@@ -177,6 +180,18 @@ export function UnidadCard({
             >
               {u.activo ? 'Desactivar' : 'Activar'}
             </button>
+            {onResidentes && (
+              <button
+                onClick={onResidentes}
+                title="Residentes (propietario / inquilino)"
+                style={{
+                  padding: '7px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)',
+                  border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                }}
+              >
+                👥
+              </button>
+            )}
             {canDelete && (
               <button
                 onClick={onEliminar}

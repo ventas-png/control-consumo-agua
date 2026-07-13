@@ -13,6 +13,7 @@ import { EMPTY_FORM, type FormState, type UnidadesCtx } from './ctx'
 import { TIPOS_UNIDAD, TIPO_COLORES, inputStyle } from './ui'
 import { UnidadFormModal } from './UnidadFormModal'
 import { UnidadCard, pageBtnStyle } from './UnidadCard'
+import { UnidadResidentesModal } from './UnidadResidentesModal'
 
 const ImportUnidadesModal = lazy(() => import('./ImportUnidadesModal').then(m => ({ default: m.ImportUnidadesModal })))
 
@@ -50,6 +51,8 @@ export function UnidadesSection({
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
   const [filterProyecto, setFilterProyecto] = useState<string>('')
   const [showImportModal, setShowImportModal] = useState(false)
+  // Portal propietario/inquilino (fase 3): unidad cuyos residentes se gestionan.
+  const [residentesModal, setResidentesModal] = useState<Unidad | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const PAGE_SIZE = 24  // cards grandes, 24 ≈ 4 filas × 6 columnas en pantalla XL
 
@@ -498,6 +501,7 @@ export function UnidadesSection({
                 onEdit={() => startEdit(u)}
                 onToggleActivo={() => handleToggleActivo(u)}
                 onEliminar={() => handleEliminar(u)}
+                onResidentes={() => setResidentesModal(u)}
               />
             ))}
           </div>
@@ -530,6 +534,14 @@ export function UnidadesSection({
         {search || filterTipo ? 'encontradas' : 'registradas'} ·{' '}
         {unidades.filter(u => u.activo).length} activa{unidades.filter(u => u.activo).length !== 1 ? 's' : ''}
       </div>
+
+      {residentesModal && (
+        <UnidadResidentesModal
+          unidad={residentesModal}
+          clientes={clientes}
+          onClose={() => setResidentesModal(null)}
+        />
+      )}
 
       {showImportModal && (
         <Suspense fallback={null}>
