@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planPagoCuota, round2, facturaTransicionaAPagada } from '../reconcile.ts'
+import { planPagoCuota, round2, facturaTransicionaAPagada, residentePuedePagarCuota } from '../reconcile.ts'
 
 describe('round2', () => {
   it('redondea a 2 decimales', () => {
@@ -60,5 +60,30 @@ describe('facturaTransicionaAPagada', () => {
     expect(facturaTransicionaAPagada('pagada')).toBe(false)
     expect(facturaTransicionaAPagada('pagado')).toBe(false) // legacy → pagada
     expect(facturaTransicionaAPagada('anulada')).toBe(false)
+  })
+})
+
+describe('residentePuedePagarCuota', () => {
+  it('no-residente (rol null/undefined) nunca puede pagar', () => {
+    expect(residentePuedePagarCuota(null, null)).toBe(false)
+    expect(residentePuedePagarCuota('propietario', null)).toBe(false)
+    expect(residentePuedePagarCuota('arrendatario', undefined)).toBe(false)
+  })
+
+  it('cuota sin diferenciar (null/vacío) → cualquier residente puede', () => {
+    expect(residentePuedePagarCuota(null, 'propietario')).toBe(true)
+    expect(residentePuedePagarCuota(null, 'arrendatario')).toBe(true)
+    expect(residentePuedePagarCuota('', 'familiar')).toBe(true)
+  })
+
+  it('cuota diferenciada → solo el residente de ese rol', () => {
+    expect(residentePuedePagarCuota('propietario', 'propietario')).toBe(true)
+    expect(residentePuedePagarCuota('arrendatario', 'arrendatario')).toBe(true)
+  })
+
+  it('cuota diferenciada → el otro rol NO puede (regla "ocultar del otro")', () => {
+    // Dueño no paga la del inquilino y viceversa.
+    expect(residentePuedePagarCuota('arrendatario', 'propietario')).toBe(false)
+    expect(residentePuedePagarCuota('propietario', 'arrendatario')).toBe(false)
   })
 })

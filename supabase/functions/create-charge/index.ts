@@ -33,6 +33,7 @@ import {
   type ConfigPagoLocacion,
   type EstadoCobroProveedor,
 } from '../_shared/payments/index.ts'
+import { residentePuedePagarCuota } from '../_shared/payments/reconcile.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -136,27 +137,51 @@ Deno.serve(async (req: Request) => {
       // ── Pago de una CUOTA de condominio (portal del residente o admin) ──
       const { data: cuotaRow, error: cuErr } = await admin
         .from('cuotas_condominio')
-        .select('company_id, project_id, unidad_id, concepto, periodo, monto, total_a_pagar, cuota_estado, deleted_at')
+        .select('company_id, project_id, unidad_id, rol_responsable, concepto, periodo, monto, total_a_pagar, cuota_estado, deleted_at')
         .eq('id', cuotaId)
         .maybeSingle()
       if (cuErr) return json({ error: cuErr.message }, 500)
       const cuota = cuotaRow as {
         company_id: string; project_id: string | null; unidad_id: string | null
+        rol_responsable: string | null
         concepto: string; periodo: string; monto: number; total_a_pagar: number | null
         cuota_estado: string; deleted_at: string | null
       } | null
       if (!cuota || cuota.deleted_at) return json({ error: 'Cuota no encontrada' }, 404)
 
-      // Cliente dueño de la unidad de la cuota (para ownership + datos del pagador).
+      // Cliente dueño de la unidad de la cuota (unidades.cliente_id).
       const { data: uni } = await admin
         .from('unidades').select('cliente_id').eq('id', cuota.unidad_id ?? '').maybeSingle()
       const uniClienteId = (uni as { cliente_id?: string | null } | null)?.cliente_id ?? null
 
-      // PROPIEDAD del ítem: el residente debe ser dueño de la unidad; el usuario de
-      // tenant, de la empresa; service_role es interno.
+      // Rol del residente llamante en ESA unidad (espeja la RLS del SELECT de
+      // cuotas_condominio): dueño (unidades.cliente_id) → 'propietario'; si no, su
+      // membresía activa en unidad_residentes (tipo). null = no es residente.
+      let callerRolEnUnidad: string | null = null
+      if (callerClienteId) {
+        if (uniClienteId === callerClienteId) {
+          callerRolEnUnidad = 'propietario'
+        } else if (cuota.unidad_id) {
+          const { data: ur } = await admin
+            .from('unidad_residentes')
+            .select('tipo')
+            .eq('unidad_id', cuota.unidad_id)
+            .eq('cliente_id', callerClienteId)
+            .eq('activo', true)
+            .maybeSingle()
+          callerRolEnUnidad = (ur as { tipo?: string } | null)?.tipo ?? null
+        }
+      }
+
+      // AUTORIZACIÓN. Residente: debe ser residente activo de la unidad Y la cuota
+      // no estar diferenciada (rol_responsable NULL) o ser de su rol — MISMA regla
+      // que la RLS del portal ("ocultar del otro"), aplicada aquí server-side porque
+      // la función carga con service_role (sin RLS). Usuario de tenant: su empresa.
       if (!internal) {
         if (callerClienteId) {
-          if (uniClienteId !== callerClienteId) return json({ error: 'No autorizado para pagar esta cuota' }, 403)
+          if (!residentePuedePagarCuota(cuota.rol_responsable, callerRolEnUnidad)) {
+            return json({ error: 'No autorizado para pagar esta cuota' }, 403)
+          }
         } else if (callerCompanyId !== cuota.company_id) {
           return json({ error: 'No autorizado para cobrar cuotas de otra empresa' }, 403)
         }
@@ -166,7 +191,6 @@ Deno.serve(async (req: Request) => {
       if (cuota.cuota_estado !== 'emitida' && cuota.cuota_estado !== 'vencida') {
         return json({ error: `La cuota no está disponible para pago (estado: ${cuota.cuota_estado}).` }, 409)
       }
-      if (!uniClienteId) return json({ error: 'La unidad de la cuota no tiene cliente asociado.' }, 409)
 
       // Saldo = total_a_pagar (con mora) − abonos ya registrados (pagos no borrados).
       const totalCuota = Number(cuota.total_a_pagar ?? cuota.monto)
@@ -181,7 +205,11 @@ Deno.serve(async (req: Request) => {
       monto = pedido > 0 ? Math.min(pedido, saldo) : saldo
       companyId = cuota.company_id
       projectId = cuota.project_id
-      clienteId = uniClienteId
+      // Pagador: el residente que paga (callerClienteId, p. ej. el inquilino) o, si
+      // es staff/interno, el dueño de la unidad. Se necesita alguno para el recibo
+      // y el payment_request (confirm-charge lo usa como dueño de la solicitud).
+      clienteId = callerClienteId ?? uniClienteId ?? ''
+      if (!clienteId) return json({ error: 'No hay cliente asociado para el pago de la cuota.' }, 409)
       descripcionItem = `${cuota.concepto} — ${cuota.periodo}`
     } else if (registroIdBody) {
       // ── Pago de un REGISTRO de agua (portal del residente o admin) ──
