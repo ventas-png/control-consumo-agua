@@ -27,6 +27,7 @@ import {
   credencialesEfectivasDeAmbiente,
   getPaymentProvider,
   resolverConfigPagoEfectiva,
+  normalizarAmbientePago,
   normalizarMonedaISO,
   type AmbientePago,
   type CobroCanonico,
@@ -49,6 +50,8 @@ interface ReqBody {
   company_id?: string
   project_id?: string | null
   monto?: number
+  /** Override del ambiente SOLO para llamadas internas (service_role); los demás
+   *  cobran con el ambiente configurado por el tenant (ambiente_pago). */
   ambiente?: string
   descripcion?: string
   url_retorno?: string
@@ -115,7 +118,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
-    const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
     const cuotaId = body.cuota_id ?? null
     const registroIdBody = body.registro_id ?? null
 
@@ -273,17 +275,17 @@ Deno.serve(async (req: Request) => {
     // ── 2) Config de pago efectiva + credenciales del ambiente ──
     const { data: company, error: compErr } = await admin
       .from('companies')
-      .select('id, proveedor_pago, default_currency')
+      .select('id, proveedor_pago, default_currency, ambiente_pago')
       .eq('id', companyId)
       .maybeSingle()
     if (compErr) return json({ error: compErr.message }, 500)
     if (!company) return json({ error: 'Empresa no encontrada' }, 404)
 
-    let projectRow: { proveedor_pago?: string | null; moneda?: string | null } | null = null
+    let projectRow: { proveedor_pago?: string | null; moneda?: string | null; ambiente_pago?: string | null } | null = null
     if (projectId) {
       const { data: proj } = await admin
         .from('projects')
-        .select('proveedor_pago, moneda')
+        .select('proveedor_pago, moneda, ambiente_pago')
         .eq('id', projectId)
         .maybeSingle()
       projectRow = (proj as typeof projectRow) ?? null
@@ -292,11 +294,24 @@ Deno.serve(async (req: Request) => {
     const empresaConfig: ConfigPagoEmpresa = {
       proveedorPago: (company as { proveedor_pago?: string | null }).proveedor_pago ?? null,
       monedaDefault: (company as { default_currency?: string | null }).default_currency ?? null,
+      ambientePago: (company as { ambiente_pago?: string | null }).ambiente_pago ?? null,
     }
     const config = resolverConfigPagoEfectiva(
       empresaConfig,
-      projectRow ? ({ proveedorPago: projectRow.proveedor_pago ?? null } as ConfigPagoLocacion) : null,
+      projectRow
+        ? ({
+            proveedorPago: projectRow.proveedor_pago ?? null,
+            ambientePago: projectRow.ambiente_pago ?? null,
+          } as ConfigPagoLocacion)
+        : null,
     )
+
+    // Ambiente EFECTIVO del cobro: decisión del TENANT (ambiente_pago de la
+    // locación/empresa), resuelta server-side. El body SOLO lo sobreescribe en
+    // llamadas internas (service_role): un pagador no puede forzar sandbox (que
+    // "aprobaría" un cobro simulado) ni prod.
+    const ambiente: AmbientePago =
+      internal && body.ambiente ? normalizarAmbientePago(body.ambiente) : config.ambiente
 
     // Moneda del COBRO: la del RECIBO (projects.moneda, p. ej. 'Q' = GTQ), NO el
     // default genérico de la empresa (companies.default_currency, que puede estar
@@ -392,6 +407,9 @@ Deno.serve(async (req: Request) => {
         company_id: companyId,
         monto,
         provider: config.proveedorPago,
+        // Sello del ambiente del cobro: confirm-charge confirma contra ESTE
+        // ambiente aunque el tenant cambie su config antes del retorno.
+        ambiente,
         estado: estadoPaymentRequest(resultado.estado),
         provider_ref: resultado.referencia ?? null,
         referencia: cobro.referenciaInterna,

@@ -8,7 +8,7 @@ import { SandboxPaymentProvider } from '../sandboxProvider.ts'
 import { QPayProProvider } from '../qpayproProvider.ts'
 import { getPaymentProvider } from '../getPaymentProvider.ts'
 import { PayfacNoConfiguradoError } from '../provider.ts'
-import { resolverConfigPagoEfectiva, normalizarMonedaISO } from '../resolverConfigPago.ts'
+import { resolverConfigPagoEfectiva, normalizarMonedaISO, normalizarAmbientePago } from '../resolverConfigPago.ts'
 import { credsDeAmbiente, credencialesEfectivasDeAmbiente } from '../credenciales.ts'
 import type { CobroCanonico } from '../types.ts'
 
@@ -176,10 +176,27 @@ describe('resolverConfigPagoEfectiva (espejo Deno)', () => {
     expect(c.desdeLocacion).toBe(true)
   })
 
-  it('defaults seguros: sandbox + GTQ', () => {
+  it('defaults seguros: sandbox + GTQ (+ ambiente sandbox)', () => {
     const c = resolverConfigPagoEfectiva(null, null)
     expect(c.proveedorPago).toBe('sandbox')
     expect(c.moneda).toBe('GTQ')
+    expect(c.ambiente).toBe('sandbox')
+  })
+
+  it('ambiente: hereda el de la empresa; el override de locación gana', () => {
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, null).ambiente).toBe('prod')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, { ambientePago: 'sandbox' }).ambiente).toBe('sandbox')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'sandbox' }, { ambientePago: 'prod' }).ambiente).toBe('prod')
+  })
+})
+
+describe('normalizarAmbientePago (espejo Deno)', () => {
+  it("solo 'prod' exacto cobra real; el resto cae a sandbox", () => {
+    expect(normalizarAmbientePago('prod')).toBe('prod')
+    expect(normalizarAmbientePago(' PROD ')).toBe('prod')
+    expect(normalizarAmbientePago('produccion')).toBe('sandbox')
+    expect(normalizarAmbientePago(null)).toBe('sandbox')
+    expect(normalizarAmbientePago(undefined)).toBe('sandbox')
   })
 })
 

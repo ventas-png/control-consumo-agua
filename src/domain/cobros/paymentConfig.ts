@@ -72,17 +72,17 @@ export async function testStripeConnection(companyId: string): Promise<{ error: 
 }
 
 /**
- * Override CRUDO del payfac de una locación (`projects.proveedor_pago`): permite
- * distinguir "hereda" (NULL) de "propio" (con valor). `null` si no existe la
- * fila. Mantiene el `abortSignal` (vía runQuery) para cancelar al cambiar de
- * ámbito.
+ * Override CRUDO del payfac de una locación (`projects.proveedor_pago` +
+ * `projects.ambiente_pago`): permite distinguir "hereda" (NULL) de "propio"
+ * (con valor). `null` si no existe la fila. Mantiene el `abortSignal` (vía
+ * runQuery) para cancelar al cambiar de ámbito.
  */
 export async function fetchProjectProveedorPagoOverride(
   projectId: string,
-): Promise<{ proveedorPago: string | null } | null> {
-  const rows = await runQuery<Array<{ proveedor_pago: string | null }>>((signal) =>
-    supabase.from('projects').select('proveedor_pago').eq('id', projectId).limit(1).abortSignal(signal),
+): Promise<{ proveedorPago: string | null; ambientePago: string | null } | null> {
+  const rows = await runQuery<Array<{ proveedor_pago: string | null; ambiente_pago: string | null }>>((signal) =>
+    supabase.from('projects').select('proveedor_pago,ambiente_pago').eq('id', projectId).limit(1).abortSignal(signal),
   )
   const p = rows?.[0]
-  return p ? { proveedorPago: p.proveedor_pago ?? null } : null
+  return p ? { proveedorPago: p.proveedor_pago ?? null, ambientePago: p.ambiente_pago ?? null } : null
 }

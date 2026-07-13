@@ -89,14 +89,14 @@ describe('testStripeConnection', () => {
 })
 
 describe('fetchProjectProveedorPagoOverride', () => {
-  it('con fila → { proveedorPago }', async () => {
-    h.state.result = { data: [{ proveedor_pago: 'qpaypro' }], error: null }
-    expect(await fetchProjectProveedorPagoOverride('p1')).toEqual({ proveedorPago: 'qpaypro' })
+  it('con fila → { proveedorPago, ambientePago }', async () => {
+    h.state.result = { data: [{ proveedor_pago: 'qpaypro', ambiente_pago: 'prod' }], error: null }
+    expect(await fetchProjectProveedorPagoOverride('p1')).toEqual({ proveedorPago: 'qpaypro', ambientePago: 'prod' })
   })
 
-  it('fila con proveedor_pago null → hereda (null)', async () => {
-    h.state.result = { data: [{ proveedor_pago: null }], error: null }
-    expect(await fetchProjectProveedorPagoOverride('p1')).toEqual({ proveedorPago: null })
+  it('fila con proveedor_pago/ambiente_pago null → hereda (null)', async () => {
+    h.state.result = { data: [{ proveedor_pago: null, ambiente_pago: null }], error: null }
+    expect(await fetchProjectProveedorPagoOverride('p1')).toEqual({ proveedorPago: null, ambientePago: null })
   })
 
   it('sin filas → null', async () => {

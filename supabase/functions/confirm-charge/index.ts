@@ -27,6 +27,7 @@ import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   credencialesEfectivasDeAmbiente,
   getPaymentProvider,
+  normalizarAmbientePago,
   resolverConfigPagoEfectiva,
   type AmbientePago,
   type ConfigPagoEmpresa,
@@ -40,7 +41,6 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 interface ReqBody {
   payment_request_id?: string
-  ambiente?: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -80,21 +80,26 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
     const prId = body.payment_request_id
-    const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
     if (!prId) return json({ error: 'payment_request_id requerido' }, 400)
 
     // ── 2) Cargar la solicitud de cobro ──
     const { data: prRow, error: prErr } = await admin
       .from('payment_requests')
-      .select('id, cliente_id, cuota_id, registro_id, company_id, monto, provider, estado, provider_ref')
+      .select('id, cliente_id, cuota_id, registro_id, company_id, monto, provider, ambiente, estado, provider_ref')
       .eq('id', prId)
       .maybeSingle()
     if (prErr) return json({ error: prErr.message }, 500)
     const pr = prRow as {
       id: string; cliente_id: string | null; cuota_id: string | null; registro_id: string | null
-      company_id: string; monto: number; provider: string; estado: string; provider_ref: string | null
+      company_id: string; monto: number; provider: string; ambiente: string | null; estado: string
+      provider_ref: string | null
     } | null
     if (!pr) return json({ error: 'Solicitud de cobro no encontrada' }, 404)
+
+    // Ambiente SELLADO al crear el cobro (create-charge): se confirma contra el
+    // MISMO ambiente aunque el tenant haya cambiado su config entre el checkout
+    // y el retorno. No es un input del caller (era spoofeable / caía a sandbox).
+    const ambiente: AmbientePago = normalizarAmbientePago(pr.ambiente)
 
     // El cobro es de una cuota (F1) o de un registro (F2), nunca ambos.
     const esCuota = !!pr.cuota_id

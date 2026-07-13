@@ -66,6 +66,8 @@ export type AmbientePago = 'sandbox' | 'prod';
 export interface ConfigPagoEfectiva {
   proveedorPago: string;
   moneda: string;
+  /** Ambiente de cobro efectivo ('sandbox' default; 'prod' = cobros REALES). */
+  ambiente: AmbientePago;
   desdeLocacion: boolean;
 }
 
