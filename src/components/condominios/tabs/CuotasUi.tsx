@@ -9,6 +9,7 @@ import {
   normalizarEstadoCuota,
   type EstadoCuotaCanonico,
 } from '../../../lib/businessCondominios'
+import type { TipoResidente } from '../../../types'
 
 interface EstadoStyle {
   label: string
@@ -37,6 +38,51 @@ export function CuotaEstadoBadge({ estado, style }: { estado?: string | null; st
         padding: '3px 10px',
         borderRadius: '20px',
         fontSize: '11.5px',
+        fontWeight: 700,
+        background: s.bg,
+        color: s.color,
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
+    >
+      {s.icon} {s.label}
+    </span>
+  )
+}
+
+// ── Responsable de la cuota (propietario/inquilino) ──────────────────────────
+// Etiqueta el rol responsable del cargo — mismo dominio que unidad_residentes.tipo.
+// 'arrendatario' se muestra como "Inquilino" (consistente con UnidadResidentesModal).
+interface RolResponsableStyle { label: string; icon: string; bg: string; color: string }
+const ROL_RESPONSABLE_STYLE: Record<TipoResidente, RolResponsableStyle> = {
+  propietario: { label: 'Propietario', icon: '🏠', bg: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)' },
+  arrendatario: { label: 'Inquilino', icon: '🔑', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  familiar: { label: 'Familiar', icon: '👪', bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
+  otro: { label: 'Otro', icon: '•', bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
+}
+
+/** Opciones para los selects de rol responsable (mismo orden en toda la app). */
+export const ROLES_RESPONSABLE_CUOTA: { value: TipoResidente; label: string }[] =
+  (['propietario', 'arrendatario', 'familiar', 'otro'] as const).map(v => ({ value: v, label: ROL_RESPONSABLE_STYLE[v].label }))
+
+/** Etiqueta legible del rol responsable ('' si no está diferenciado). */
+export function rolResponsableLabel(rol?: string | null): string {
+  return rol && rol in ROL_RESPONSABLE_STYLE ? ROL_RESPONSABLE_STYLE[rol as TipoResidente].label : ''
+}
+
+/**
+ * Chip del rol responsable del cargo. Devuelve null si la cuota no está
+ * diferenciada (rol NULL) — quien lo consume muestra un guion en su lugar.
+ */
+export function ResponsableCuotaBadge({ rol, style }: { rol?: string | null; style?: CSSProperties }) {
+  if (!rol || !(rol in ROL_RESPONSABLE_STYLE)) return null
+  const s = ROL_RESPONSABLE_STYLE[rol as TipoResidente]
+  return (
+    <span
+      style={{
+        padding: '2px 9px',
+        borderRadius: '20px',
+        fontSize: '11px',
         fontWeight: 700,
         background: s.bg,
         color: s.color,

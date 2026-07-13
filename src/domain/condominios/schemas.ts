@@ -37,6 +37,10 @@ const optionalIsoTimestamp = z.union([isoTimestamp, z.null()]).optional()
 // ── CuotaCondominio ─────────────────────────────────────────────────────────
 const conceptoCuota = z.enum(['mantenimiento', 'extraordinaria', 'CAM', 'amenidad', 'otro'])
 const estadoCuota = z.enum(['pendiente', 'pagado', 'moroso'])
+// Rol responsable del cargo: mismo dominio que unidad_residentes.tipo. NULL =
+// sin diferenciar (responsabilidad de la unidad).
+const rolResponsable = z.enum(['propietario', 'arrendatario', 'familiar', 'otro'])
+const optionalRolResponsable = z.union([rolResponsable, z.null()]).optional()
 
 export const cuotaInputSchema = z
   .object({
@@ -48,6 +52,7 @@ export const cuotaInputSchema = z
     periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Periodo debe ser YYYY-MM'),
     fecha_vencimiento: optionalYmd,
     estado: estadoCuota,
+    rol_responsable: optionalRolResponsable,
     notas: optionalString,
   })
   // passthrough: preserva campos system-side (id, created_at, etc.) que no

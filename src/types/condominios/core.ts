@@ -2,6 +2,8 @@
 // Particionado de types/condominios.ts (auditoría P1); el barrel
 // ./index.ts re-exporta todo, así que la superficie pública no cambia.
 
+import type { TipoResidente } from './operaciones'
+
 // ━━ base del módulo (rubros, cuotas, visitantes, amenidades, reservas) ━━
 export type MetodoCalculo = 'fijo' | 'por_m2' | 'alicuota'
 
@@ -34,6 +36,12 @@ export interface CuotaCondominio {
   periodo: string           // 'YYYY-MM'
   fecha_vencimiento?: string | null
   estado: EstadoCuota
+  /**
+   * Rol del residente responsable del cargo (mismo dominio que
+   * `unidad_residentes.tipo`). NULL/undefined = sin diferenciar
+   * (responsabilidad de la unidad). Informativo: no altera la RLS del portal.
+   */
+  rol_responsable?: TipoResidente | null
   pago_id?: string | null
   notas?: string | null
   created_by?: string | null

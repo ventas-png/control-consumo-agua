@@ -49,7 +49,7 @@ export interface CuotaConEstado extends CuotaCondominio {
 // proyección y evitar traer columnas pesadas/irrelevantes.
 const CUOTA_AGREGADO_COLS =
   'id,company_id,project_id,unidad_id,concepto,monto,periodo,fecha_vencimiento,' +
-  'estado,cuota_estado,pago_id,notas,created_at,fecha_pago,metodo_pago,referencia_pago,' +
+  'estado,cuota_estado,rol_responsable,pago_id,notas,created_at,fecha_pago,metodo_pago,referencia_pago,' +
   'rubros_detalle,regla_mora_id,mora_monto,mora_aplicada_at,total_a_pagar,' +
   'emitida_at,pagada_at,vencida_at,anulada_at'
 
