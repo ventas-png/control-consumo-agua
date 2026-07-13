@@ -208,12 +208,10 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
     const rows = [...seleccionadas].map(uid => {
       const calc = calculosMapa.get(uid)
-      const u = calc?.unidad
       return {
         company_id: companyId,
         project_id: proyectoId,
         unidad_id: uid,
-        unidad_nombre: u?.nombre ?? '',
         concepto: conceptoFinal,
         monto: calc?.total ?? 0,
         periodo,
