@@ -105,7 +105,10 @@ export async function fetchPortalFotoIds(
   contadorIds: string[],
   projectIds: string[],
 ): Promise<string[]> {
-  const queries = [
+  // Tipo explícito y ancho: cada builder encadena filtros distintos y dejar
+  // que TS lo infiera del primer elemento dispara "type instantiation is
+  // excessively deep" con los genéricos de supabase-js ≥2.110.
+  const queries: PromiseLike<{ data: unknown }>[] = [
     supabase.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null),
   ]
   if (contadorIds.length > 0) {

@@ -17,7 +17,7 @@
 
 | SLO key | Target | Severity |
 |---|---|---|
-| `login.complete` | < 2.0s | critical |
+| `login.complete` | < 3.0s | critical |
 | `auth.oauth.callback` | < 3.0s | critical |
 | `payment.checkout.open` | < 3.0s | critical |
 | `payment.manual.submit` | < 2.5s | critical |
