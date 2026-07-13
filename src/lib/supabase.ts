@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../types/database.types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -37,6 +38,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: { 'x-application-name': 'aquacontrol' },
   },
 })
+
+// ── Cliente TIPADO paralelo (P2 tipos · adopción incremental) ────────────────
+// La MISMA instancia, vista con el esquema generado (src/types/database.types.ts).
+// Tipar `createClient<Database>` de una produce ~148 errores TS en 49 archivos
+// (medido), así que la migración es módulo por módulo: el código nuevo/migrado
+// importa `db` (tablas, columnas, RPCs y embeds chequeados en compile-time) y el
+// resto sigue con `supabase` sin tipar. El flip global queda para cuando la
+// adopción llegue a ~100%.
+export const db = supabase as unknown as SupabaseClient<Database>
 
 // Mitigación de cold starts (Sentry PINK-RIBBON-2/-8/-4): con la instancia
 // inactiva, el primer signInWithPassword puede tardar 15-20s y morir en el
