@@ -111,6 +111,33 @@ export async function marcarCuotasMorosas(ids: string[]): Promise<{ error: RowEr
   return { error }
 }
 
+/** Resultado del cierre de ciclo de cuotas (RPC `condominios_cerrar_ciclo`). */
+export interface ResultadoCierreCiclo {
+  emitidas: number
+  avisos: number
+  dias_vencimiento: number
+}
+
+/**
+ * Cierra el ciclo de cuotas de un proyecto/período: el RPC emite EN UN SOLO
+ * statement todas las cuotas emitibles del período (paridad con
+ * buildEmitirCuotaPatch: vencimiento por regla de mora + snapshot de total) y
+ * avisa in-app al residente responsable vía el outbox. La autorización vive
+ * server-side (super admin o empresa del proyecto + permiso de cuotas).
+ */
+export async function cerrarCicloCuotas(
+  projectId: string,
+  periodo: string,
+  notificar = true,
+): Promise<{ data: ResultadoCierreCiclo | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('condominios_cerrar_ciclo', {
+    p_project_id: projectId,
+    p_periodo: periodo,
+    p_notificar: notificar,
+  })
+  return { data: (data as ResultadoCierreCiclo | null) ?? null, error }
+}
+
 /**
  * Firma la recepción de un paquete por parte del residente (RPC `SECURITY DEFINER`
  * que acota la escritura a la unidad del usuario). `firmaPath` es el objeto ya subido

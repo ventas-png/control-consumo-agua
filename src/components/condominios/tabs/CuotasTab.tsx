@@ -4,7 +4,9 @@ import { openPromptDialog } from '../../shared/PromptDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
-import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas } from '../../../domain/condominios/tabMutations'
+import { useQueryClient } from '@tanstack/react-query'
+import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas, cerrarCicloCuotas } from '../../../domain/condominios/tabMutations'
+import { condominiosKeys } from '../../../domain/condominios/keys'
 import { countRecibosByProyecto } from '../../../domain/condominios/tabQueries'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
@@ -112,6 +114,47 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   const pagarMut = usePagarCuotaMutation()
   const anularMut = useAnularCuotaMutation()
   const [accionCuotaId, setAccionCuotaId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  // Cierre de ciclo (P1 · facturación masiva): emite TODAS las cuotas pendientes
+  // de un período en un solo RPC staff-gated y avisa al residente responsable en
+  // su portal (outbox). El conteo local es orientativo; el server es la verdad.
+  async function cerrarCiclo() {
+    const emitibles = cuotas.filter(c => puedeTransicionarCuota(estadoCanonicoDe(c), 'emitir').ok)
+    const periodosEmitibles = emitibles.map(c => c.periodo).sort()
+    const periodoDefault = periodosEmitibles[periodosEmitibles.length - 1]
+      ?? new Date().toISOString().slice(0, 7)
+    const datos = await openPromptDialog({
+      title: '📤 Emitir período (cerrar ciclo)',
+      description: 'Emite todas las cuotas pendientes del período y avisa a los residentes responsables en su portal.',
+      fields: [{ name: 'periodo', label: 'Período (YYYY-MM)', type: 'month', initialValue: periodoDefault, required: true, autoFocus: true }],
+      submitText: 'Continuar',
+    })
+    const periodo = datos?.periodo
+    if (!periodo) return
+    const candidatas = emitibles.filter(c => c.periodo === periodo)
+    if (candidatas.length === 0) {
+      notify({ variant: 'info', title: 'Sin cuotas por emitir', text: `No hay cuotas pendientes de emisión en ${periodo}.` })
+      return
+    }
+    const { isConfirmed } = await confirm({
+      title: `¿Emitir ${candidatas.length} cuota${candidatas.length > 1 ? 's' : ''} de ${periodo}?`,
+      text: `Se emitirán con vencimiento a ${diasVencimiento} días y se avisará a los residentes responsables en su portal.`,
+      icon: 'question',
+      confirmText: '📤 Emitir período',
+    })
+    if (!isConfirmed) return
+    const { data, error } = await cerrarCicloCuotas(proyectoId, periodo)
+    if (error) { notify({ variant: 'error', title: 'No se pudo cerrar el ciclo', text: error.message }); return }
+    notify({
+      variant: 'success',
+      title: `${data?.emitidas ?? 0} cuota${(data?.emitidas ?? 0) !== 1 ? 's' : ''} emitida${(data?.emitidas ?? 0) !== 1 ? 's' : ''}`,
+      text: `${data?.avisos ?? 0} aviso(s) al portal del residente.`,
+      duration: 2500,
+    })
+    void queryClient.invalidateQueries({ queryKey: condominiosKeys.all })
+    onRefresh()
+  }
 
   async function handleEmitir(cuota: CuotaCondominio) {
     setAccionCuotaId(cuota.id)
@@ -500,6 +543,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             style={{ padding: '10px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
+          {canEdit && (
+            <button onClick={() => void cerrarCiclo()}
+              title="Emitir todas las cuotas pendientes de un período y avisar a los residentes (cerrar ciclo)"
+              style={{ padding: '10px 16px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              📤 Emitir período
+            </button>
+          )}
           {canEdit && (
             <button onClick={aplicarMoraMasiva}
               title="Marcar como morosas todas las cuotas pendientes con vencimiento pasado"
