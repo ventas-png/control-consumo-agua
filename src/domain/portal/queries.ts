@@ -5,7 +5,11 @@
 // específicas del portal, acotadas por RLS al propio cliente). Lecturas
 // imperativas (no-hook). Devuelven `data` cruda (nullable) para que la UI castee
 // como ya lo hace.
-import { supabase } from '../../lib/supabase'
+//
+// P2 tipos: migrado al cliente TIPADO `db` — tablas, columnas, filtros y embeds
+// se chequean en compile-time contra el esquema generado. Los shapes públicos
+// (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
+import { db } from '../../lib/supabase'
 
 // ── CustomerPortal (agua) ──────────────────────────────────────────────────
 
@@ -23,21 +27,21 @@ export interface PortalBootstrap {
  */
 export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBootstrap> {
   const [ccRes, uRes, rRes, clRes] = await Promise.all([
-    supabase
+    db
       .from('company_clientes')
       .select('company_id, activo, companies(id, nombre)')
       .eq('cliente_id', clienteId),
-    supabase
+    db
       .from('unidades')
       .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
       .eq('cliente_id', clienteId)
       .eq('activo', true),
-    supabase
+    db
       .from('registros')
       .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas')
       .eq('cliente_id', clienteId)
       .order('fecha', { ascending: false }),
-    supabase
+    db
       .from('clientes')
       .select('email, telefono, whatsapp, telefono_alterno')
       .eq('id', clienteId)
@@ -48,7 +52,7 @@ export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBoo
 
 /** Contadores activos de un conjunto de unidades (para el portal de agua). */
 export async function fetchPortalContadores(unidadIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('contadores')
     .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
     .in('unidad_id', unidadIds)
@@ -58,7 +62,7 @@ export async function fetchPortalContadores(unidadIds: string[]): Promise<unknow
 
 /** Proyectos activos de un conjunto de empresas (para el portal de agua). */
 export async function fetchPortalProjectsByCompanies(companyIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('projects')
     .select('id, nombre, company_id, moneda')
     .in('company_id', companyIds)
@@ -75,7 +79,7 @@ const REGISTROS_SELECT =
 
 /** Fallback de lecturas por contador (cuando cliente_id es incorrecto/null). */
 export async function fetchRegistrosByContadores(contadorIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('contador_id', contadorIds)
@@ -85,7 +89,7 @@ export async function fetchRegistrosByContadores(contadorIds: string[]): Promise
 
 /** Fallback de lecturas por proyecto (cuando contador_id también es null; RLS acota). */
 export async function fetchRegistrosByProjects(projectIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('project_id', projectIds)
@@ -107,15 +111,17 @@ export async function fetchPortalFotoIds(
 ): Promise<string[]> {
   // Tipo explícito y ancho: cada builder encadena filtros distintos y dejar
   // que TS lo infiera del primer elemento dispara "type instantiation is
-  // excessively deep" con los genéricos de supabase-js ≥2.110.
+  // excessively deep" con los genéricos de supabase-js ≥2.110 (más aún con el
+  // cliente tipado). Cada builder `db.from(...)` se chequea igual contra el
+  // esquema ANTES del widening — solo se ensancha el tipo del array.
   const queries: PromiseLike<{ data: unknown }>[] = [
-    supabase.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null),
+    db.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null),
   ]
   if (contadorIds.length > 0) {
-    queries.push(supabase.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null))
+    queries.push(db.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null))
   }
   if (projectIds.length > 0) {
-    queries.push(supabase.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null))
+    queries.push(db.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null))
   }
   const results = await Promise.all(queries)
   const ids = new Set<string>()
@@ -131,12 +137,13 @@ export async function fetchPortalFotoIds(
  * (miniaturas visibles y el lightbox), nunca para el listado completo.
  */
 export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('registros')
     .select('foto')
     .eq('id', registroId)
     .maybeSingle()
-  return (data as { foto: string | null } | null)?.foto ?? null
+  // El select tipado ya devuelve { foto: string | null } — sin cast.
+  return data?.foto ?? null
 }
 
 // ── CustomerPaymentsTab ────────────────────────────────────────────────────
@@ -153,12 +160,13 @@ export interface PortalPaymentConfigRow {
 
 /** Lee los flags de pago de la empresa (Stripe/PayPal + payfac) para el portal del cliente. */
 export async function fetchPortalPaymentConfig(companyId: string): Promise<PortalPaymentConfigRow | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('companies')
     .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago')
     .eq('id', companyId)
     .single()
-  return (data as PortalPaymentConfigRow) ?? null
+  // La fila tipada es asignable a la interfaz (proveedor_pago NOT NULL ⊂ string|null) — sin cast.
+  return data ?? null
 }
 
 // El inicio de cobro en línea del portal vive en domain/portal/mutations.ts
@@ -167,7 +175,7 @@ export async function fetchPortalPaymentConfig(companyId: string): Promise<Porta
 
 /** Unidades activas de un cliente (batch 1 del portal de condominios). */
 export async function fetchPortalUnidadesByCliente(clienteId: string): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('unidades')
     .select('*')
     .eq('cliente_id', clienteId)
@@ -211,28 +219,28 @@ export async function fetchCondominiosPortalData(
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
     anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
   ] = await Promise.all([
-    supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
-    supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
-    supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
+    db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
+    db.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
+    db.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
       .is('deleted_at', null)
       .gte('fecha_vencimiento', haceDosAnos)
       .order('fecha_vencimiento', { ascending: false })
       .limit(500),
-    supabase.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
-    supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
-    supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
+    db.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
+    db.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
+    db.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
       .is('deleted_at', null)
       .gte('created_at', noventaDias)
       .order('created_at', { ascending: false })
       .limit(200),
-    supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
-    supabase.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
-    supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
+    db.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
+    db.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
+    db.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
       .gte('created_at', sesentaDias)
       .order('created_at', { ascending: false })
       .limit(100),
-    supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
-    supabase.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
+    db.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
   ])
 
   return {

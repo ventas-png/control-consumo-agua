@@ -12,7 +12,7 @@ const h = vi.hoisted(() => {
   b.then = (resolve: (v: unknown) => void) => resolve(state.results.shift())
   return { state, b }
 })
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b } }))
+vi.mock('../../../lib/supabase', () => ({ db: { from: () => h.b } }))
 
 import {
   fetchPortalBootstrap,
