@@ -42,3 +42,24 @@ export function facturaTransicionaAPagada(estado: string | null | undefined): bo
   const e = estado === 'mora' ? 'vencida' : estado === 'pagado' ? 'pagada' : (estado ?? 'pendiente')
   return e === 'emitida' || e === 'vencida'
 }
+
+/**
+ * F1 (cuotas diferenciadas) — ¿un residente con rol `callerRol` en la unidad puede
+ * pagar una cuota etiquetada `rolResponsable`? Espeja EXACTAMENTE la RLS del SELECT
+ * de cuotas_condominio (regla "ocultar del otro"), aplicada server-side en
+ * create-charge porque el edge carga con service_role (sin RLS):
+ *   • callerRol null (no es residente activo de la unidad) → NO puede.
+ *   • cuota sin diferenciar (rolResponsable null/'' = responsabilidad de la unidad)
+ *     → cualquier residente puede.
+ *   • cuota diferenciada → solo el residente cuyo rol coincide (propietario paga las
+ *     'propietario', inquilino/'arrendatario' las suyas, etc.).
+ * El dueño de la unidad se modela como rol 'propietario' (unidades.cliente_id).
+ */
+export function residentePuedePagarCuota(
+  rolResponsable: string | null | undefined,
+  callerRol: string | null | undefined,
+): boolean {
+  if (!callerRol) return false
+  if (rolResponsable == null || rolResponsable === '') return true
+  return rolResponsable === callerRol
+}
