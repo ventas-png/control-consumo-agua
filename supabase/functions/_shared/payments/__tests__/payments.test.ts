@@ -9,6 +9,7 @@ import { QPayProProvider } from '../qpayproProvider.ts'
 import { getPaymentProvider } from '../getPaymentProvider.ts'
 import { PayfacNoConfiguradoError } from '../provider.ts'
 import { resolverConfigPagoEfectiva, normalizarMonedaISO } from '../resolverConfigPago.ts'
+import { credsDeAmbiente, credencialesEfectivasDeAmbiente } from '../credenciales.ts'
 import type { CobroCanonico } from '../types.ts'
 
 function cobroEjemplo(over: Partial<CobroCanonico> = {}): CobroCanonico {
@@ -179,6 +180,50 @@ describe('resolverConfigPagoEfectiva (espejo Deno)', () => {
     const c = resolverConfigPagoEfectiva(null, null)
     expect(c.proveedorPago).toBe('sandbox')
     expect(c.moneda).toBe('GTQ')
+  })
+})
+
+describe('credencialesEfectivasDeAmbiente (herencia locación→empresa)', () => {
+  const blobEmpresa = { sandbox: { x_login: 'emp-sbx' }, prod: { x_login: 'emp-prod' } }
+
+  it('sin fila de locación → hereda las credenciales de la empresa', () => {
+    expect(credencialesEfectivasDeAmbiente(null, blobEmpresa, 'sandbox')).toEqual({ x_login: 'emp-sbx' })
+    expect(credencialesEfectivasDeAmbiente(undefined, blobEmpresa, 'prod')).toEqual({ x_login: 'emp-prod' })
+  })
+
+  it('la locación con credenciales del ambiente GANA sobre la empresa', () => {
+    const blobLoc = { sandbox: { x_login: 'loc-sbx' } }
+    expect(credencialesEfectivasDeAmbiente(blobLoc, blobEmpresa, 'sandbox')).toEqual({ x_login: 'loc-sbx' })
+  })
+
+  it('herencia POR AMBIENTE: locación solo con prod hereda el sandbox de la empresa', () => {
+    const blobLoc = { prod: { x_login: 'loc-prod' } }
+    expect(credencialesEfectivasDeAmbiente(blobLoc, blobEmpresa, 'sandbox')).toEqual({ x_login: 'emp-sbx' })
+    expect(credencialesEfectivasDeAmbiente(blobLoc, blobEmpresa, 'prod')).toEqual({ x_login: 'loc-prod' })
+  })
+
+  it('fila de locación solo-estatus (sin credenciales) no bloquea la herencia', () => {
+    expect(credencialesEfectivasDeAmbiente({}, blobEmpresa, 'sandbox')).toEqual({ x_login: 'emp-sbx' })
+  })
+
+  it('sin credenciales en ningún nivel → null', () => {
+    expect(credencialesEfectivasDeAmbiente(null, null, 'sandbox')).toBeNull()
+    expect(credencialesEfectivasDeAmbiente({}, {}, 'prod')).toBeNull()
+  })
+})
+
+describe('credsDeAmbiente', () => {
+  it('lee el ambiente pedido del blob { sandbox, prod }', () => {
+    const blob = { sandbox: { x_login: 'a' }, prod: { x_login: 'b' } }
+    expect(credsDeAmbiente(blob, 'sandbox')).toEqual({ x_login: 'a' })
+    expect(credsDeAmbiente(blob, 'prod')).toEqual({ x_login: 'b' })
+  })
+
+  it('tolera blobs no-objeto o ambientes malformados → null', () => {
+    expect(credsDeAmbiente(null, 'sandbox')).toBeNull()
+    expect(credsDeAmbiente('enc:v1:xxx', 'sandbox')).toBeNull()
+    expect(credsDeAmbiente({ sandbox: ['no-objeto'] }, 'sandbox')).toBeNull()
+    expect(credsDeAmbiente({ prod: {} }, 'sandbox')).toBeNull()
   })
 })
 

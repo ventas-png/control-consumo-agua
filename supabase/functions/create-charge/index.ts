@@ -24,6 +24,7 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
+  credencialesEfectivasDeAmbiente,
   getPaymentProvider,
   resolverConfigPagoEfectiva,
   normalizarMonedaISO,
@@ -66,13 +67,6 @@ function estadoPaymentRequest(estado: EstadoCobroProveedor): string {
       // 'pendiente' | 'requiere_accion' → esperando confirmación/retorno.
       return 'pending'
   }
-}
-
-/** Credenciales del ambiente desde el jsonb opaco de la bóveda. */
-function credsDeAmbiente(credenciales: unknown, ambiente: AmbientePago): Record<string, unknown> | null {
-  if (typeof credenciales !== 'object' || credenciales === null) return null
-  const v = (credenciales as Record<string, unknown>)[ambiente]
-  return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
 
 Deno.serve(async (req: Request) => {
@@ -322,12 +316,22 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    let credLookup = admin.from('payfac_secrets').select('credenciales').eq('company_id', companyId)
-    credLookup = projectId === null ? credLookup.is('project_id', null) : credLookup.eq('project_id', projectId)
-    const { data: secretRow } = await credLookup.maybeSingle()
-    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
-    const credBlob = await decryptJson((secretRow as { credenciales?: unknown } | null)?.credenciales)
-    const credenciales = credsDeAmbiente(credBlob, ambiente)
+    // Credenciales EFECTIVAS con herencia locación→empresa (mismo criterio que
+    // resolverConfigPagoEfectiva): un ítem con proyecto usa la fila del proyecto
+    // si trae credenciales del ambiente; si no, hereda la fila de la empresa
+    // (project_id NULL, donde la UI las conecta a nivel empresa).
+    let credLookup = admin.from('payfac_secrets').select('project_id, credenciales').eq('company_id', companyId)
+    credLookup = projectId === null
+      ? credLookup.is('project_id', null)
+      : credLookup.or(`project_id.eq.${projectId},project_id.is.null`)
+    const { data: secretRows } = await credLookup
+    const filas = ((secretRows as { project_id: string | null; credenciales?: unknown }[] | null) ?? [])
+    // P0 #7: descifrar los blobs jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const credenciales = credencialesEfectivasDeAmbiente(
+      await decryptJson(filas.find((f) => f.project_id !== null)?.credenciales),
+      await decryptJson(filas.find((f) => f.project_id === null)?.credenciales),
+      ambiente,
+    )
 
     // ── 3) Construir el CobroCanonico (datos del cliente para el recibo) ──
     const { data: cliente } = await admin

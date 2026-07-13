@@ -13595,6 +13595,8 @@ export type Database = {
           consumo: number | null
           contador_id: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           dias_servicio: number | null
           emitida_at: string | null
           estado: string | null
@@ -13634,6 +13636,8 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null
@@ -13673,6 +13677,8 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null

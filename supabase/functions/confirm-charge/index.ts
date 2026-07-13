@@ -25,6 +25,7 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
+  credencialesEfectivasDeAmbiente,
   getPaymentProvider,
   resolverConfigPagoEfectiva,
   type AmbientePago,
@@ -40,13 +41,6 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 interface ReqBody {
   payment_request_id?: string
   ambiente?: string
-}
-
-/** Credenciales del ambiente desde el jsonb opaco de la bóveda. */
-function credsDeAmbiente(credenciales: unknown, ambiente: AmbientePago): Record<string, unknown> | null {
-  if (typeof credenciales !== 'object' || credenciales === null) return null
-  const v = (credenciales as Record<string, unknown>)[ambiente]
-  return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
 
 Deno.serve(async (req: Request) => {
@@ -191,11 +185,20 @@ Deno.serve(async (req: Request) => {
       itemProjectId ? ({ proveedorPago: projectProveedor } as ConfigPagoLocacion) : null,
     )
 
-    let credLookup = admin.from('payfac_secrets').select('credenciales').eq('company_id', pr.company_id)
-    credLookup = itemProjectId === null ? credLookup.is('project_id', null) : credLookup.eq('project_id', itemProjectId)
-    const { data: secretRow } = await credLookup.maybeSingle()
-    const credBlob = await decryptJson((secretRow as { credenciales?: unknown } | null)?.credenciales)
-    const credenciales = credsDeAmbiente(credBlob, ambiente)
+    // Credenciales EFECTIVAS con herencia locación→empresa (espeja create-charge):
+    // la fila del proyecto aporta si trae credenciales del ambiente; si no,
+    // hereda la fila de la empresa (project_id NULL).
+    let credLookup = admin.from('payfac_secrets').select('project_id, credenciales').eq('company_id', pr.company_id)
+    credLookup = itemProjectId === null
+      ? credLookup.is('project_id', null)
+      : credLookup.or(`project_id.eq.${itemProjectId},project_id.is.null`)
+    const { data: secretRows } = await credLookup
+    const filas = ((secretRows as { project_id: string | null; credenciales?: unknown }[] | null) ?? [])
+    const credenciales = credencialesEfectivasDeAmbiente(
+      await decryptJson(filas.find((f) => f.project_id !== null)?.credenciales),
+      await decryptJson(filas.find((f) => f.project_id === null)?.credenciales),
+      ambiente,
+    )
 
     const provider = getPaymentProvider({
       companyId: pr.company_id, proveedor: config.proveedorPago, ambiente,
