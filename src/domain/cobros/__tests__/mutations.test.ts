@@ -4,12 +4,14 @@ import { describe, it, expect, vi } from 'vitest'
 // Stub del cliente Supabase: mutations.ts lo importa para invocar los edges, pero
 // esta suite solo ejercita el patch builder PURO (sin red). Evita el throw de env
 // vars al cargar el módulo. Mismo patrón que fiscal/mutations.test.ts.
-vi.mock('../../../lib/supabase', () => ({
-  supabase: {
+vi.mock('../../../lib/supabase', () => {
+  const stub = {
     from: () => { throw new Error('default client should not be used in pure-logic tests') },
     functions: { invoke: () => { throw new Error('invoke should not be used in pure-logic tests') } },
-  },
-}))
+  }
+  // Como en el módulo real, `db` es la MISMA instancia vista con el esquema tipado.
+  return { supabase: stub, db: stub }
+})
 
 import { buildConfigPagoPatch } from '../mutations'
 

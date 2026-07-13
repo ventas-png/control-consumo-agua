@@ -6,8 +6,8 @@ import { describe, it, expect, vi } from 'vitest'
 const order = vi.fn()
 const insert = vi.fn()
 const updateEq = vi.fn()
-vi.mock('../../../lib/supabase', () => ({
-  supabase: {
+vi.mock('../../../lib/supabase', () => {
+  const client = {
     from: () => ({
       // fetchPagosYConvenios: pagos usa .select().is().order(); convenios .select().order()
       select: () => ({
@@ -17,8 +17,10 @@ vi.mock('../../../lib/supabase', () => ({
       insert,
       update: () => ({ eq: updateEq }),
     }),
-  },
-}))
+  }
+  // Como en el módulo real, `db` es la MISMA instancia vista con el esquema tipado.
+  return { supabase: client, db: client }
+})
 
 import { fetchPagosYConvenios } from '../queries'
 import { createPago, verifyPago, rejectPago, createConvenio, setConvenioEstado } from '../mutations'
@@ -30,7 +32,8 @@ describe('fetchPagosYConvenios', () => {
       .mockResolvedValueOnce({ data: [{ id: 'c1' }] }) // convenios (2do)
     expect(await fetchPagosYConvenios()).toEqual({
       pagos: [{ id: 'p1' }],
-      convenios: [{ id: 'c1' }],
+      // La frontera tipada normaliza registro_ids null → [] (el dominio lo exige no-null).
+      convenios: [{ id: 'c1', registro_ids: [] }],
     })
   })
 
