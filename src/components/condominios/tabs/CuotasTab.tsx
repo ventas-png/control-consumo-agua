@@ -32,9 +32,11 @@ interface CSVRow {
   rawPeriodo: string
   rawVencimiento: string
   rawNotas: string
+  rawResponsable: string
   unidadId: string | null
   concepto: ConceptoCuota | null
   monto: number | null
+  rolResponsable: TipoResidente | null
   status: 'ok' | 'warn' | 'error'
   errores: string[]
 }
@@ -224,7 +226,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     // skip header row
     return lineas.slice(1).map(linea => {
       const cols = linea.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-      const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = ''] = cols
+      const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = '', rawResponsable = ''] = cols
       const errores: string[] = []
 
       const unidadMatch = unidades.find(u => u.nombre.toLowerCase() === rawUnidad.toLowerCase())
@@ -242,15 +244,26 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       if (!rawPeriodo.match(/^\d{4}-\d{2}$/)) errores.push('Período debe ser AAAA-MM')
 
+      // Responsable (columna opcional al final): vacío → sin diferenciar; acepta el
+      // valor ('arrendatario') o la etiqueta ('Inquilino'), sin distinguir mayúsculas.
+      let rolResponsable: TipoResidente | null = null
+      if (rawResponsable.trim()) {
+        const t = rawResponsable.trim().toLowerCase()
+        const match = ROLES_RESPONSABLE_CUOTA.find(r => r.value === t || r.label.toLowerCase() === t)
+        if (match) rolResponsable = match.value
+        else errores.push(`Responsable "${rawResponsable}" inválido (propietario, inquilino, familiar, otro o vacío)`)
+      }
+
       const status: CSVRow['status'] = errores.length === 0 ? 'ok'
         : errores.some(e => e.includes('no encontrada')) ? 'warn'
         : 'error'
 
       return {
-        rawUnidad, rawConcepto, rawMonto, rawPeriodo, rawVencimiento, rawNotas,
+        rawUnidad, rawConcepto, rawMonto, rawPeriodo, rawVencimiento, rawNotas, rawResponsable,
         unidadId: unidadMatch?.id ?? null,
         concepto: errores.length === 0 || !errores.some(e => e.includes('Concepto')) ? concepto : null,
         monto: isNaN(monto) ? null : monto,
+        rolResponsable,
         status,
         errores,
       }
@@ -297,6 +310,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       monto: r.monto!,
       periodo: r.rawPeriodo,
       fecha_vencimiento: r.rawVencimiento || null,
+      rol_responsable: r.rolResponsable,
       notas: r.rawNotas || null,
       estado: 'pendiente' as EstadoCuota,
     }))
@@ -604,7 +618,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
               <thead>
                 <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-                  {['', 'Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
+                  {['', 'Unidad', 'Concepto', 'Responsable', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -617,6 +631,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     </td>
                     <td style={{ padding: '7px 12px', color: r.unidadId ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawUnidad || '—'}</td>
                     <td style={{ padding: '7px 12px', color: r.concepto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawConcepto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.rawResponsable && !r.rolResponsable ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{r.rolResponsable ? rolResponsableLabel(r.rolResponsable) : '—'}</td>
                     <td style={{ padding: '7px 12px', color: r.monto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawMonto || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawPeriodo || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawVencimiento || '—'}</td>
@@ -635,7 +650,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             </div>
           )}
           <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--at-primary-tint)', borderRadius: '8px', fontSize: '11.5px', color: 'var(--at-primary-hover)' }}>
-            Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,</code>
+            Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas,responsable</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,,inquilino</code>. La columna <code>responsable</code> es opcional (propietario / inquilino / familiar / otro; vacío = sin diferenciar).
           </div>
         </div>
       )}
