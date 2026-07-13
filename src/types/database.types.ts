@@ -2566,6 +2566,7 @@ export type Database = {
           address_line1: string | null
           address_postal_code: string | null
           address_state: string | null
+          ambiente_pago: string
           center_lat: number | null
           center_lng: number | null
           country: string | null
@@ -2608,6 +2609,7 @@ export type Database = {
           address_line1?: string | null
           address_postal_code?: string | null
           address_state?: string | null
+          ambiente_pago?: string
           center_lat?: number | null
           center_lng?: number | null
           country?: string | null
@@ -2650,6 +2652,7 @@ export type Database = {
           address_line1?: string | null
           address_postal_code?: string | null
           address_state?: string | null
+          ambiente_pago?: string
           center_lat?: number | null
           center_lng?: number | null
           country?: string | null
@@ -11120,6 +11123,7 @@ export type Database = {
       }
       payment_requests: {
         Row: {
+          ambiente: string
           cliente_id: string
           company_id: string
           created_at: string | null
@@ -11138,6 +11142,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ambiente?: string
           cliente_id: string
           company_id: string
           created_at?: string | null
@@ -11156,6 +11161,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ambiente?: string
           cliente_id?: string
           company_id?: string
           created_at?: string | null
@@ -12618,6 +12624,7 @@ export type Database = {
       projects: {
         Row: {
           activo: boolean
+          ambiente_pago: string | null
           company_id: string
           created_at: string | null
           descripcion: string | null
@@ -12651,6 +12658,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          ambiente_pago?: string | null
           company_id: string
           created_at?: string | null
           descripcion?: string | null
@@ -12684,6 +12692,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          ambiente_pago?: string | null
           company_id?: string
           created_at?: string | null
           descripcion?: string | null
@@ -13723,6 +13732,8 @@ export type Database = {
           consumo: number | null
           contador_id: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           dias_servicio: number | null
           emitida_at: string | null
           estado: string | null
@@ -13762,6 +13773,8 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null
@@ -13801,6 +13814,8 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null

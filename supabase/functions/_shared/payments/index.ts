@@ -9,6 +9,7 @@
 export * from './types.ts'
 export * from './provider.ts'
 export * from './resolverConfigPago.ts'
+export * from './credenciales.ts'
 export { SandboxPaymentProvider } from './sandboxProvider.ts'
 export { QPayProProvider } from './qpayproProvider.ts'
 export { makeStubPaymentProvider, makeStripeStubProvider } from './stubProvider.ts'

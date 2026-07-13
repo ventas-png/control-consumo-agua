@@ -45,10 +45,12 @@ interface CompanyPagoRow {
   id: string
   proveedor_pago?: string | null
   default_currency?: string | null
+  ambiente_pago?: string | null
 }
 interface ProjectPagoRow {
   id: string
   proveedor_pago?: string | null
+  ambiente_pago?: string | null
 }
 
 /**
@@ -63,7 +65,7 @@ export function useConfigPagoEfectivaQuery(companyId?: string, projectId?: strin
       const company = (await runQuery<CompanyPagoRow[]>((signal) =>
         supabase
           .from('companies')
-          .select('id,proveedor_pago,default_currency')
+          .select('id,proveedor_pago,default_currency,ambiente_pago')
           .eq('id', companyId!)
           .limit(1)
           .abortSignal(signal),
@@ -75,7 +77,7 @@ export function useConfigPagoEfectivaQuery(companyId?: string, projectId?: strin
         project = (await runQuery<ProjectPagoRow[]>((signal) =>
           supabase
             .from('projects')
-            .select('id,proveedor_pago')
+            .select('id,proveedor_pago,ambiente_pago')
             .eq('id', projectId)
             .limit(1)
             .abortSignal(signal),
@@ -83,8 +85,14 @@ export function useConfigPagoEfectivaQuery(companyId?: string, projectId?: strin
       }
 
       return resolverConfigPagoEfectiva(
-        { proveedorPago: company.proveedor_pago ?? null, monedaDefault: company.default_currency ?? null },
-        project ? { proveedorPago: project.proveedor_pago ?? null } : null,
+        {
+          proveedorPago: company.proveedor_pago ?? null,
+          monedaDefault: company.default_currency ?? null,
+          ambientePago: company.ambiente_pago ?? null,
+        },
+        project
+          ? { proveedorPago: project.proveedor_pago ?? null, ambientePago: project.ambiente_pago ?? null }
+          : null,
       )
     },
     enabled: !!companyId,

@@ -5,7 +5,7 @@
 // supabase/functions/_shared/payments/resolverConfigPago.ts. Mismo criterio que
 // resolverConfigFiscalEfectiva (businessFiscal.ts) pero para el procesador de pagos.
 
-import type { ConfigPagoEfectiva } from '../types/pagos'
+import type { AmbientePago, ConfigPagoEfectiva } from '../types/pagos'
 
 /** Moneda por defecto si la empresa no fijó companies.default_currency. */
 export const MONEDA_PAGO_DEFAULT = 'GTQ'
@@ -13,17 +13,29 @@ export const MONEDA_PAGO_DEFAULT = 'GTQ'
 /** Payfac por defecto (cobro simulado) si nadie eligió uno. */
 export const PROVEEDOR_PAGO_DEFAULT = 'sandbox'
 
+/** Ambiente por defecto (pruebas): 'prod' solo cuando el tenant lo eligió explícito. */
+export const AMBIENTE_PAGO_DEFAULT: AmbientePago = 'sandbox'
+
+/** Normaliza un ambiente guardado/recibido: SOLO 'prod' exacto cobra real. */
+export function normalizarAmbientePago(v: string | null | undefined): AmbientePago {
+  return (v ?? '').trim().toLowerCase() === 'prod' ? 'prod' : AMBIENTE_PAGO_DEFAULT
+}
+
 /** Campos de pago a nivel EMPRESA (companies). */
 export interface ConfigPagoEmpresa {
   /** companies.proveedor_pago (default 'sandbox'). */
   proveedorPago?: string | null
   /** companies.default_currency. */
   monedaDefault?: string | null
+  /** companies.ambiente_pago (default 'sandbox'; 'prod' = cobros REALES). */
+  ambientePago?: string | null
 }
 
 /** Override de pago a nivel LOCACIÓN (projects). NULL = hereda de la empresa. */
 export interface ConfigPagoLocacion {
   proveedorPago?: string | null
+  /** projects.ambiente_pago (NULL = hereda de la empresa). */
+  ambientePago?: string | null
 }
 
 /** Trim que colapsa '' y whitespace a null (un override vacío = "hereda"). */
@@ -39,6 +51,8 @@ function nz(v: string | null | undefined): string | null {
  *
  *   - proveedorPago: locación ?? empresa ?? 'sandbox' (default seguro).
  *   - moneda:        empresa.monedaDefault ?? 'GTQ'.
+ *   - ambiente:      locación ?? empresa ?? 'sandbox' (default seguro: solo un
+ *                    'prod' explícito del tenant cobra dinero real).
  *
  * `desdeLocacion` = true si el proveedor provino del override de la locación.
  */
@@ -58,9 +72,12 @@ export function resolverConfigPagoEfectiva(
 
   const moneda = (nz(emp.monedaDefault) ?? MONEDA_PAGO_DEFAULT).toUpperCase()
 
+  const ambiente = normalizarAmbientePago(nz(loc.ambientePago) ?? nz(emp.ambientePago))
+
   return {
     proveedorPago,
     moneda,
+    ambiente,
     desdeLocacion: proveedorLoc != null,
   }
 }

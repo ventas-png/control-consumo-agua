@@ -6,6 +6,7 @@
 // NULL/'' en la locación = "hereda de la empresa". PURO + determinista.
 
 import type {
+  AmbientePago,
   ConfigPagoEfectiva,
   ConfigPagoEmpresa,
   ConfigPagoLocacion,
@@ -16,6 +17,14 @@ export const MONEDA_PAGO_DEFAULT = 'GTQ'
 
 /** Payfac por defecto (cobro simulado) si nadie eligió uno. */
 export const PROVEEDOR_PAGO_DEFAULT = 'sandbox'
+
+/** Ambiente por defecto (pruebas): 'prod' solo cuando el tenant lo eligió explícito. */
+export const AMBIENTE_PAGO_DEFAULT: AmbientePago = 'sandbox'
+
+/** Normaliza un ambiente guardado/recibido: SOLO 'prod' exacto cobra real. */
+export function normalizarAmbientePago(v: string | null | undefined): AmbientePago {
+  return (v ?? '').trim().toLowerCase() === 'prod' ? 'prod' : AMBIENTE_PAGO_DEFAULT
+}
 
 /** Trim que colapsa '' y whitespace a null (un override vacío = "hereda"). */
 function nz(v: string | null | undefined): string | null {
@@ -32,6 +41,8 @@ function nz(v: string | null | undefined): string | null {
  *   - proveedorPago: locacion ?? empresa ?? 'sandbox' (default seguro).
  *   - moneda:        empresa.monedaDefault ?? 'GTQ' (la moneda es del tenant; no
  *                    se sobreescribe por locación hoy).
+ *   - ambiente:      locacion ?? empresa ?? 'sandbox' (default seguro: solo un
+ *                    'prod' explícito del tenant cobra dinero real).
  *
  * `desdeLocacion` = true si el proveedor provino del override de la locación.
  */
@@ -48,9 +59,12 @@ export function resolverConfigPagoEfectiva(
 
   const moneda = (nz(emp.monedaDefault) ?? MONEDA_PAGO_DEFAULT).toUpperCase()
 
+  const ambiente = normalizarAmbientePago(nz(loc.ambientePago) ?? nz(emp.ambientePago))
+
   return {
     proveedorPago,
     moneda,
+    ambiente,
     desdeLocacion: proveedorLoc != null,
   }
 }

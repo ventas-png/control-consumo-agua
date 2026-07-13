@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest'
 import {
   resolverConfigPagoEfectiva,
   normalizarMonedaISO,
+  normalizarAmbientePago,
+  AMBIENTE_PAGO_DEFAULT,
   MONEDA_PAGO_DEFAULT,
   PROVEEDOR_PAGO_DEFAULT,
 } from '../businessPagos'
@@ -49,6 +51,31 @@ describe('resolverConfigPagoEfectiva', () => {
     const c = resolverConfigPagoEfectiva({ proveedorPago: 'QPayPro', monedaDefault: 'gtq' })
     expect(c.proveedorPago).toBe('qpaypro')
     expect(c.moneda).toBe('GTQ')
+  })
+
+  it('ambiente: default seguro sandbox cuando nadie lo eligió', () => {
+    expect(resolverConfigPagoEfectiva(null, null).ambiente).toBe(AMBIENTE_PAGO_DEFAULT)
+    expect(resolverConfigPagoEfectiva({ proveedorPago: 'qpaypro' }).ambiente).toBe('sandbox')
+  })
+
+  it('ambiente: hereda el de la empresa; el override de locación gana', () => {
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }).ambiente).toBe('prod')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, { ambientePago: null }).ambiente).toBe('prod')
+    // Piloto inverso: empresa en prod, una locación se queda en pruebas.
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, { ambientePago: 'sandbox' }).ambiente).toBe('sandbox')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'sandbox' }, { ambientePago: 'prod' }).ambiente).toBe('prod')
+  })
+})
+
+describe('normalizarAmbientePago', () => {
+  it("solo 'prod' exacto (case/trim-insensible) cobra real; el resto cae a sandbox", () => {
+    expect(normalizarAmbientePago('prod')).toBe('prod')
+    expect(normalizarAmbientePago(' PROD ')).toBe('prod')
+    expect(normalizarAmbientePago('sandbox')).toBe('sandbox')
+    expect(normalizarAmbientePago('produccion')).toBe('sandbox')
+    expect(normalizarAmbientePago('')).toBe('sandbox')
+    expect(normalizarAmbientePago(null)).toBe('sandbox')
+    expect(normalizarAmbientePago(undefined)).toBe('sandbox')
   })
 })
 

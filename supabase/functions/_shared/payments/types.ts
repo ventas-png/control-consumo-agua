@@ -106,11 +106,15 @@ export interface ConfigPagoEmpresa {
   proveedorPago?: string | null
   /** Moneda por defecto del tenant (companies.default_currency). */
   monedaDefault?: string | null
+  /** companies.ambiente_pago (default 'sandbox'; 'prod' = cobros REALES). */
+  ambientePago?: string | null
 }
 
 export interface ConfigPagoLocacion {
   /** projects.proveedor_pago (NULL = hereda de la empresa). */
   proveedorPago?: string | null
+  /** projects.ambiente_pago (NULL = hereda de la empresa). */
+  ambientePago?: string | null
 }
 
 export interface ConfigPagoEfectiva {
@@ -118,6 +122,8 @@ export interface ConfigPagoEfectiva {
   proveedorPago: string
   /** Moneda efectiva (default 'GTQ' si la empresa no la fijó). */
   moneda: string
+  /** Ambiente de cobro efectivo (default seguro 'sandbox'). */
+  ambiente: AmbientePago
   /** true si el proveedor provino del override de la locación. */
   desdeLocacion: boolean
 }
