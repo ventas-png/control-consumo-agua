@@ -11,7 +11,11 @@ const h = vi.hoisted(() => {
   b.then = (resolve: (v: unknown) => void) => resolve(state.results.shift())
   return { state, b }
 })
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.b } }))
+// `db` es la misma instancia que `supabase` (retipada); el mock espeja eso.
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: () => h.b }
+  return { supabase: client, db: client }
+})
 
 import { fetchCondominioStatsForProject, fetchCondominioStatsRows } from '../queries'
 import { createContactosEmergencia, createInventarioItems, createTareasCondominio } from '../mutations'

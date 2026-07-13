@@ -12,7 +12,10 @@
 // estos helpers devuelven el ERROR CON SHAPE `{ message }` (el de supabase) para que
 // los ~140 tabs que ya hacen `error.message` / `if (error)` migren con un simple
 // swap de la llamada, sin tocar su manejo de errores.
-import { supabase } from '../../lib/supabase'
+//
+// P2 tipos: las funciones con tabla/RPC LITERAL usan el cliente tipado `db`;
+// los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
+import { supabase, db } from '../../lib/supabase'
 
 /** Error con el shape mínimo que consume la UI (mensaje legible). */
 export type RowError = { message: string } | null
@@ -107,7 +110,7 @@ export async function updateCondominioRowsByIds(
  * error (`{ message }`) que el resto de helpers de tab.
  */
 export async function marcarCuotasMorosas(ids: string[]): Promise<{ error: RowError }> {
-  const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', ids)
+  const { error } = await db.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', ids)
   return { error }
 }
 
@@ -130,11 +133,12 @@ export async function cerrarCicloCuotas(
   periodo: string,
   notificar = true,
 ): Promise<{ data: ResultadoCierreCiclo | null; error: RowError }> {
-  const { data, error } = await supabase.rpc('condominios_cerrar_ciclo', {
+  const { data, error } = await db.rpc('condominios_cerrar_ciclo', {
     p_project_id: projectId,
     p_periodo: periodo,
     p_notificar: notificar,
   })
+  // El RPC declara `Returns: Json`; el shape concreto lo fija el SQL del cierre.
   return { data: (data as ResultadoCierreCiclo | null) ?? null, error }
 }
 
@@ -148,7 +152,7 @@ export async function firmarRecepcionPaquete(
   firmaPath: string,
   nombre: string,
 ): Promise<{ error: RowError }> {
-  const { error } = await supabase.rpc('paquete_firmar_recepcion', {
+  const { error } = await db.rpc('paquete_firmar_recepcion', {
     p_paquete_id: paqueteId, p_firma_path: firmaPath, p_nombre: nombre,
   })
   return { error }
@@ -173,15 +177,17 @@ export interface AutorizarSalidaParams {
 export async function autorizarSalidaPaquete(
   p: AutorizarSalidaParams,
 ): Promise<{ data: Record<string, unknown> | null; error: RowError }> {
-  const { data, error } = await supabase.rpc('paquete_autorizar_salida', {
+  // Los args opcionales del RPC se generan como `?: string` (no aceptan null);
+  // omitirlos (`?? undefined`) equivale a su DEFAULT NULL en SQL.
+  const { data, error } = await db.rpc('paquete_autorizar_salida', {
     p_unidad_id: p.unidadId,
     p_tipo: p.tipo,
     p_descripcion: p.descripcion,
     p_autorizado_nombre: p.autorizadoNombre,
-    p_autorizado_documento: p.autorizadoDocumento,
-    p_autorizado_telefono: p.autorizadoTelefono,
-    p_fotos: p.fotos,
-    p_notas: p.notas,
+    p_autorizado_documento: p.autorizadoDocumento ?? undefined,
+    p_autorizado_telefono: p.autorizadoTelefono ?? undefined,
+    p_fotos: p.fotos ?? undefined,
+    p_notas: p.notas ?? undefined,
   })
   return { data: (data as Record<string, unknown>) ?? null, error }
 }

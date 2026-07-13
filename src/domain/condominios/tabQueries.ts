@@ -4,7 +4,11 @@
 // propios, counts, rangos de fecha). Aquí baja sólo el acceso a datos; la
 // agregación/derivación (KPIs, reducciones) se queda en la UI. Genéricos en la
 // fila (`<T>`) para no acoplar el dominio a los tipos de la UI; degradan a `[]`.
-import { supabase } from '../../lib/supabase'
+//
+// P2 tipos: migrado al cliente tipado `db` (tablas/columnas/embeds chequeados
+// contra el esquema generado). `supabase` (sin tipar) queda SOLO para las dos
+// tablas que no existen en el esquema generado (ver comentarios in situ).
+import { supabase, db } from '../../lib/supabase'
 
 // ── DirectorioTab ──
 
@@ -12,7 +16,7 @@ import { supabase } from '../../lib/supabase'
 export async function fetchDirectorioResidentes(
   projectId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await supabase
+  const { data } = await db
     .from('unidades')
     .select('nombre, clientes(nombre, telefono, email, identificacion)')
     .eq('project_id', projectId)
@@ -40,10 +44,10 @@ export async function fetchProyectoResumen(
   hoy: string,
 ): Promise<ProyectoResumenRaw> {
   const [cuotasRes, ticketsRes, unidadesRes, visitantesRes] = await Promise.all([
-    supabase.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
-    supabase.from('tickets_mantenimiento').select('estado').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
-    supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId),
-    supabase.from('visitantes').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId).gte('hora_entrada', hoy),
+    db.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
+    db.from('tickets_mantenimiento').select('estado').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
+    db.from('unidades').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId),
+    db.from('visitantes').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId).gte('hora_entrada', hoy),
   ])
   return {
     cuotas: (cuotasRes.data as ProyectoResumenRaw['cuotas'] | null) ?? [],
@@ -57,7 +61,7 @@ export async function fetchProyectoResumen(
 
 /** Mensajes del portal de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchMensajesPortal<T>(unidadId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('mensajes_portal')
     .select('*')
     .eq('unidad_id', unidadId)
@@ -70,7 +74,7 @@ export async function activarPortalUnidad(
   unidadId: string,
   token: string,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
+  const { error } = await db
     .from('unidades')
     .update({ token_portal: token, portal_activo: true })
     .eq('id', unidadId)
@@ -81,7 +85,7 @@ export async function activarPortalUnidad(
 
 /** Fondo de reserva aprobado (modelo legacy), 50 más recientes. Degrada a `[]`. */
 export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('fondo_reserva')
     .select('*')
     .eq('project_id', projectId)
@@ -92,6 +96,8 @@ export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T
 }
 
 /** Movimientos del fondo de reserva (modelo moderno), 50 más recientes. */
+// SIN MIGRAR a `db`: `fondo_reserva_movimientos` NO existe en el esquema
+// generado (hay `fondo_reserva` y `fondo_reserva_condominio`) — hallazgo P2.
 export async function fetchFondoReservaMovimientos<T>(projectId: string): Promise<T[]> {
   const { data } = await supabase
     .from('fondo_reserva_movimientos')
@@ -103,6 +109,8 @@ export async function fetchFondoReservaMovimientos<T>(projectId: string): Promis
 }
 
 /** Presupuestos del condominio para un año. */
+// SIN MIGRAR a `db`: `presupuestos_condominio` NO existe en el esquema generado
+// (hay `presupuesto_condominio`, singular, y `presupuestos`) — hallazgo P2.
 export async function fetchPresupuestosAnio<T>(projectId: string, anio: number): Promise<T[]> {
   const { data } = await supabase
     .from('presupuestos_condominio')
@@ -117,7 +125,7 @@ export async function fetchPresupuestosAnio<T>(projectId: string, anio: number):
 
 /** Ejecuciones de un plan de mantenimiento (más recientes primero). Degrada a `[]`. */
 export async function fetchEjecucionesMantenimiento<T>(planId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('ejecuciones_mantenimiento')
     .select('*')
     .eq('plan_id', planId)
@@ -131,7 +139,7 @@ export async function fetchEjecucionesMantenimiento<T>(planId: string): Promise<
 export async function fetchPuntosAsambleaConVotos(
   asambleaId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await supabase
+  const { data } = await db
     .from('puntos_asamblea')
     .select('*, votos_asamblea(*, unidades(nombre))')
     .eq('asamblea_id', asambleaId)
@@ -141,7 +149,7 @@ export async function fetchPuntosAsambleaConVotos(
 
 /** Asambleas digitales de un proyecto (20 más recientes). Degrada a `[]`. */
 export async function fetchAsambleasDigital<T>(projectId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('asambleas_digital')
     .select('*')
     .eq('project_id', projectId)
@@ -152,7 +160,7 @@ export async function fetchAsambleasDigital<T>(projectId: string): Promise<T[]> 
 
 /** Puntos de varias asambleas por id (`.in`), ordenados. Degrada a `[]`. */
 export async function fetchPuntosByAsambleaIds<T>(ids: string[]): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('puntos_asamblea')
     .select('*')
     .in('asamblea_id', ids)
@@ -162,7 +170,7 @@ export async function fetchPuntosByAsambleaIds<T>(ids: string[]): Promise<T[]> {
 
 /** Votos previos de una unidad (punto_id + voto) para precargar el portal. */
 export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('votos_asamblea')
     .select('punto_id, voto')
     .eq('unidad_id', unidadId)
@@ -173,7 +181,7 @@ export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
 export async function fetchVotosVotacion(
   votacionId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await supabase
+  const { data } = await db
     .from('votos')
     .select('*, unidades(nombre)')
     .eq('votacion_id', votacionId)
@@ -185,7 +193,7 @@ export async function fetchVotosVotacion(
 /** Huéspedes de un conjunto de reservas STR (`.in`). Degrada a `[]`. */
 export async function fetchHuespedesByReservas<T>(reservaIds: string[]): Promise<T[]> {
   if (reservaIds.length === 0) return []
-  const { data } = await supabase
+  const { data } = await db
     .from('huespedes_str')
     .select('*')
     .in('reserva_str_id', reservaIds)
@@ -197,7 +205,7 @@ export async function fetchVisitantesActivosByReservas(
   reservaIds: string[],
 ): Promise<Array<{ reserva_str_id?: string | null }>> {
   if (reservaIds.length === 0) return []
-  const { data } = await supabase
+  const { data } = await db
     .from('visitantes')
     .select('reserva_str_id')
     .in('reserva_str_id', reservaIds)
@@ -207,7 +215,7 @@ export async function fetchVisitantesActivosByReservas(
 
 /** Contratos de arrendamiento de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchContratosByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('contratos_arrendamiento')
     .select('*')
     .eq('unidad_id', unidadId)
@@ -217,7 +225,7 @@ export async function fetchContratosByUnidad<T>(unidadId: string): Promise<T[]> 
 
 /** Reservas STR de una unidad (por fecha de entrada desc). Degrada a `[]`. */
 export async function fetchReservasStrByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('reservas_str')
     .select('*')
     .eq('unidad_id', unidadId)
@@ -236,7 +244,7 @@ export async function fetchVisitantesPorDpi<T>(
   companyId: string,
   dpi: string,
 ): Promise<{ data: T[]; error: { message: string } | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('visitantes')
     .select('*, unidades(nombre)')
     .eq('company_id', companyId)
@@ -250,7 +258,7 @@ export async function fetchVisitantesPorDpi<T>(
 
 /** Cuotas de un plan de pago, ordenadas por número. Degrada a `[]`. */
 export async function fetchCuotasPlanPago<T>(planId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('cuotas_plan_pago')
     .select('*')
     .eq('plan_id', planId)
@@ -260,7 +268,7 @@ export async function fetchCuotasPlanPago<T>(planId: string): Promise<T[]> {
 
 /** Cantidad de recibos digitales emitidos en un proyecto (para numerar el siguiente). */
 export async function countRecibosByProyecto(projectId: string): Promise<number> {
-  const { count } = await supabase
+  const { count } = await db
     .from('recibos_digitales')
     .select('*', { count: 'exact', head: true })
     .eq('project_id', projectId)
@@ -269,7 +277,7 @@ export async function countRecibosByProyecto(projectId: string): Promise<number>
 
 /** Bitácora de generación de cuotas de un proyecto (50 más recientes). Degrada a `[]`. */
 export async function fetchGeneracionCuotasLogs<T>(projectId: string, companyId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('generacion_cuotas_log')
     .select('*')
     .eq('project_id', projectId)
@@ -281,7 +289,7 @@ export async function fetchGeneracionCuotasLogs<T>(projectId: string, companyId:
 
 /** Notas actuales de una cuota de condominio (para anexar en conciliación). */
 export async function fetchCuotaCondominioNotas(id: string): Promise<string | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('cuotas_condominio')
     .select('notas')
     .eq('id', id)
@@ -293,7 +301,7 @@ export async function fetchCuotaCondominioNotas(id: string): Promise<string | nu
 
 /** Solicitudes de mudanza de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchSolicitudesMudanzaByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('solicitud_mudanza_unidad')
     .select('*')
     .eq('unidad_id', unidadId)
@@ -303,7 +311,7 @@ export async function fetchSolicitudesMudanzaByUnidad<T>(unidadId: string): Prom
 
 /** Términos de mudanza del proyecto (vista del residente, sólo por project_id). */
 export async function fetchTerminosMudanzaPorProyecto(projectId: string): Promise<string | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('config_condominio')
     .select('terminos_mudanza')
     .eq('project_id', projectId)
@@ -316,7 +324,7 @@ export async function fetchConfigCondominioTerminos(
   projectId: string,
   companyId: string,
 ): Promise<{ id: string; terminos_mudanza: string | null } | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('config_condominio')
     .select('id, terminos_mudanza')
     .eq('project_id', projectId)
@@ -330,7 +338,7 @@ export async function fetchGastosAnioMontos(
   projectId: string,
   year: number,
 ): Promise<Array<{ monto: number }>> {
-  const { data } = await supabase
+  const { data } = await db
     .from('gastos_condominio')
     .select('monto')
     .eq('project_id', projectId)
