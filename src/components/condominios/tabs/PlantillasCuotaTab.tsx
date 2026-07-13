@@ -6,6 +6,7 @@ import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { PlantillaCuota, PeriodicidadPlantilla, RubroConfig, Unidad } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
+import { ROLES_RESPONSABLE_CUOTA } from './CuotasUi'
 
 interface Props {
   plantillas: PlantillaCuota[]
@@ -47,11 +48,11 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   const [form, setForm] = useState({
     nombre: '', concepto: 'mantenimiento', monto: '',
     dia_vencimiento: '5', periodicidad: 'mensual' as PeriodicidadPlantilla,
-    aplica_a: 'todas', notas: '',
+    aplica_a: 'todas', rol_responsable: '', notas: '',
   })
 
   function resetForm() {
-    setForm({ nombre: '', concepto: 'mantenimiento', monto: '', dia_vencimiento: '5', periodicidad: 'mensual', aplica_a: 'todas', notas: '' })
+    setForm({ nombre: '', concepto: 'mantenimiento', monto: '', dia_vencimiento: '5', periodicidad: 'mensual', aplica_a: 'todas', rol_responsable: '', notas: '' })
     setRubros([{ nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 }])
     setUsarRubros(false)
     setMostrarForm(false); setEditingId(null)
@@ -61,7 +62,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     setForm({
       nombre: p.nombre, concepto: p.concepto, monto: String(p.monto),
       dia_vencimiento: String(p.dia_vencimiento), periodicidad: p.periodicidad,
-      aplica_a: p.aplica_a, notas: p.notas ?? '',
+      aplica_a: p.aplica_a, rol_responsable: p.rol_responsable ?? '', notas: p.notas ?? '',
     })
     if (p.rubros && p.rubros.length > 0) {
       setRubros(p.rubros)
@@ -92,6 +93,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       monto: montoTotal,
       dia_vencimiento: parseInt(form.dia_vencimiento),
       periodicidad: form.periodicidad, aplica_a: form.aplica_a,
+      rol_responsable: form.rol_responsable || null,
       notas: form.notas.trim() || null,
       rubros: usarRubros ? rubros : null,
       monto_total_estimado: usarRubros ? montoTotal : null,
@@ -167,6 +169,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
         periodo,
         fecha_vencimiento: fechaVenc,
         estado: 'pendiente',
+        rol_responsable: p.rol_responsable ?? null,
         rubros_detalle: usaRubros ? p.rubros!.map(r => ({
           ...r,
           monto_calculado: Math.round(calcularMontoPorUnidad(u, [r], totalM2) * 100) / 100,
@@ -232,6 +235,13 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                 <option value="todas">Todas las unidades</option>
                 <option value="residencial">Solo residencial</option>
                 <option value="comercial">Solo comercial</option>
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Responsable</label>
+              <select style={inp} value={form.rol_responsable} onChange={e => setForm(p => ({ ...p, rol_responsable: e.target.value }))}>
+                <option value="">Sin diferenciar</option>
+                {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
