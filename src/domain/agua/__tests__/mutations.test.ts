@@ -6,16 +6,18 @@ const updateEq = vi.fn()
 const updateIn = vi.fn()
 const deleteEq = vi.fn()
 const storageUpload = vi.fn()
-vi.mock('../../../lib/supabase', () => ({
-  supabase: {
+vi.mock('../../../lib/supabase', () => {
+  // `db` es la MISMA instancia que `supabase` (cast tipado) — el mock replica eso.
+  const client = {
     from: () => ({
       insert: () => ({ select: insertSelect }),
       update: () => ({ eq: updateEq, in: updateIn }),
       delete: () => ({ eq: deleteEq }),
     }),
     storage: { from: () => ({ upload: storageUpload }) },
-  },
-}))
+  }
+  return { supabase: client, db: client }
+})
 
 import { createRegistro, updateRegistro, deleteRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
 

@@ -11,7 +11,8 @@
 // `registros` (migración 20260604160000). Por eso los writes apuntan a `registros`
 // y las invalidaciones tocan las keys de `useFacturasQuery`/`useFacturasPorProyectoQuery`.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/supabase'
+import type { TablesUpdate } from '../../types/database.types'
 import { runQuery } from '../queryFetch'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { facturacionKeys } from './keys'
@@ -161,7 +162,7 @@ export function useEmitirFacturaMutation(companyId?: string) {
       if (!check.ok) throw new TransicionInvalidaError(factura.factura_estado, 'emitir', check.error)
       const patch = buildEmitirFacturaPatch(factura, ivaTasa, diasVencimiento)
       await runQuery((signal) =>
-        supabase.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
+        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
       )
       return patch
     },
@@ -191,7 +192,7 @@ export function useAnularFacturaMutation(companyId?: string) {
       // Parche = estado + anulada_at (business.ts es la fuente del timestamp).
       const patch = aplicarTransicionFactura(factura.factura_estado, 'anular')
       await runQuery((signal) =>
-        supabase.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
+        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
       )
       return patch
     },
@@ -241,14 +242,15 @@ export function useRegistrarPagoFacturaMutation(companyId?: string) {
 
       // El estado solo transiciona si el pago liquida el total; un abono parcial
       // deja la factura en su estado actual (emitida/vencida) con más abonado.
-      const patch: Record<string, unknown> = { monto_pagado: nuevoAbonado }
+      // El parche se tipa contra el esquema generado (P2 tipos).
+      const patch: TablesUpdate<'registros'> = { monto_pagado: nuevoAbonado }
       if (liquidada) {
         const transicion = aplicarTransicionFactura(factura.factura_estado, 'pagar')
         patch.factura_estado = transicion.factura_estado
         patch.pagada_at = transicion.pagada_at
       }
       await runQuery((signal) =>
-        supabase.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
+        db.from('registros').update(patch).eq('id', factura.id).abortSignal(signal),
       )
       return {
         liquidada,
@@ -279,7 +281,7 @@ export function useIvaTasaDefaultQuery(companyId?: string) {
     queryKey: facturacionKeys.ivaTasaDefault(companyId),
     queryFn: async () => {
       const rows = await runQuery<{ iva_tasa_default: number | null }[]>((signal) =>
-        supabase
+        db
           .from('companies')
           .select('iva_tasa_default')
           .eq('id', companyId!)
@@ -301,7 +303,7 @@ export function useActualizarIvaTasaDefaultMutation(companyId?: string) {
       if (t < 0) t = 0
       if (t > 1) t = 1
       await runQuery((signal) =>
-        supabase
+        db
           .from('companies')
           .update({ iva_tasa_default: t })
           .eq('id', companyId!)
@@ -343,15 +345,25 @@ export interface ReglaMoraInput {
 export function useReglasMoraConfigQuery(companyId?: string) {
   return useQuery({
     queryKey: facturacionKeys.reglasMoraConfig(companyId),
-    queryFn: async () =>
-      (await runQuery<ReglaMoraConfig[]>((signal) => {
-        let q = supabase
-          .from('reglas_mora_config')
-          .select('*')
-          .order('nombre', { ascending: true })
-        if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
-      })) ?? [],
+    queryFn: async () => {
+      const rows =
+        (await runQuery((signal) => {
+          let q = db
+            .from('reglas_mora_config')
+            .select('*')
+            .order('nombre', { ascending: true })
+          if (companyId) q = q.eq('company_id', companyId)
+          return q.abortSignal(signal)
+        })) ?? []
+      // `tipo`/`aplicar_sobre` generadas como string; el dominio las acota (CHECKs en BD).
+      return rows.map(
+        (r): ReglaMoraConfig => ({
+          ...r,
+          tipo: r.tipo as ReglaMoraConfig['tipo'],
+          aplicar_sobre: r.aplicar_sobre as ReglaMoraConfig['aplicar_sobre'],
+        }),
+      )
+    },
     enabled: !!companyId,
   })
 }
@@ -369,11 +381,19 @@ function useInvalidarReglasMora(companyId?: string) {
 export function useCrearReglaMoraMutation(companyId?: string) {
   const invalidar = useInvalidarReglasMora(companyId)
   return useMutation({
-    mutationFn: async (input: ReglaMoraInput) => {
-      const rows = await runQuery<ReglaMoraInput[]>((signal) =>
-        supabase.from('reglas_mora_config').insert(input).select().abortSignal(signal),
+    // El retorno se pinta ReglaMoraInput | null (contrato previo del hook).
+    mutationFn: async (input: ReglaMoraInput): Promise<ReglaMoraInput | null> => {
+      const rows = await runQuery((signal) =>
+        db.from('reglas_mora_config').insert(input).select().abortSignal(signal),
       )
-      return rows?.[0] ?? null
+      const row = rows?.[0]
+      if (!row) return null
+      // `tipo`/`aplicar_sobre` generadas como string; el dominio las acota (CHECKs en BD).
+      return {
+        ...row,
+        tipo: row.tipo as ReglaMoraInput['tipo'],
+        aplicar_sobre: row.aplicar_sobre as ReglaMoraInput['aplicar_sobre'],
+      }
     },
     onSuccess: invalidar,
   })
@@ -384,7 +404,7 @@ export function useActualizarReglaMoraMutation(companyId?: string) {
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<ReglaMoraInput> }) => {
       await runQuery((signal) =>
-        supabase.from('reglas_mora_config').update(patch).eq('id', id).abortSignal(signal),
+        db.from('reglas_mora_config').update(patch).eq('id', id).abortSignal(signal),
       )
       return { id, patch }
     },
@@ -398,7 +418,7 @@ export function useToggleReglaMoraMutation(companyId?: string) {
   return useMutation({
     mutationFn: async ({ id, activa }: { id: string; activa: boolean }) => {
       await runQuery((signal) =>
-        supabase.from('reglas_mora_config').update({ activa }).eq('id', id).abortSignal(signal),
+        db.from('reglas_mora_config').update({ activa }).eq('id', id).abortSignal(signal),
       )
       return { id, activa }
     },
@@ -411,7 +431,7 @@ export function useEliminarReglaMoraMutation(companyId?: string) {
   return useMutation({
     mutationFn: async (id: string) => {
       await runQuery((signal) =>
-        supabase.from('reglas_mora_config').delete().eq('id', id).abortSignal(signal),
+        db.from('reglas_mora_config').delete().eq('id', id).abortSignal(signal),
       )
       return id
     },

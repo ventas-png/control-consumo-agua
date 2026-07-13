@@ -1,8 +1,11 @@
 // domain/agua/mutations.ts — Escrituras del dominio agua. T7/PR3: el acceso
 // directo a `registros` (y la foto del registro en Storage) sale de los
 // componentes hacia la capa domain.
-import { supabase } from '../../lib/supabase'
+// P2 tipos: los writes a `registros` van por el cliente TIPADO `db`; `supabase`
+// queda solo para Storage (los buckets no están en el esquema generado).
+import { db, supabase } from '../../lib/supabase'
 import type { Registro } from '../../types'
+import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 
 /**
  * Sube la foto de un registro al bucket `registro-fotos` (path bare; el display
@@ -27,8 +30,11 @@ export async function uploadRegistroFoto(
 export async function createRegistro(
   registro: Record<string, unknown>,
 ): Promise<{ data: Registro | null; error: string | null }> {
-  const { data, error } = await supabase.from('registros').insert(registro).select()
-  return { data: (data?.[0] as Registro) ?? null, error: error?.message ?? null }
+  // El payload lo arma la UI como objeto libre; el contrato real es el del esquema.
+  const { data, error } = await db.from('registros').insert(registro as TablesInsert<'registros'>).select()
+  // Row generado (columnas NULLABLES, estado string, gps Json) vs interfaz manual
+  // Registro no-null/unión (bug latente, reportado) — cast en la frontera.
+  return { data: (data?.[0] ?? null) as unknown as Registro | null, error: error?.message ?? null }
 }
 
 /**
@@ -41,7 +47,8 @@ export async function updateRegistro(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('registros').update(payload).eq('id', id)
+  // El parche lo arma la UI como objeto libre; el contrato real es el del esquema.
+  const { error } = await db.from('registros').update(payload as TablesUpdate<'registros'>).eq('id', id)
   return { error: error?.message ?? null }
 }
 
@@ -53,7 +60,7 @@ export async function updateRegistro(
 export async function deleteRegistro(
   id: string,
 ): Promise<{ error: string | null; count: number | null }> {
-  const { error, count } = await supabase.from('registros').delete({ count: 'exact' }).eq('id', id)
+  const { error, count } = await db.from('registros').delete({ count: 'exact' }).eq('id', id)
   return { error: error?.message ?? null, count: count ?? null }
 }
 
@@ -62,6 +69,6 @@ export async function deleteRegistro(
  * Usado al marcar mora en lote y al crear un convenio.
  */
 export async function marcarRegistrosMora(ids: string[]): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('registros').update({ estado: 'mora' }).in('id', ids)
+  const { error } = await db.from('registros').update({ estado: 'mora' }).in('id', ids)
   return { error: error?.message ?? null }
 }
