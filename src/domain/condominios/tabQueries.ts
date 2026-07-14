@@ -8,7 +8,7 @@
 // P2 tipos: migrado al cliente tipado `db` (tablas/columnas/embeds chequeados
 // contra el esquema generado). `supabase` (sin tipar) queda SOLO para las dos
 // tablas que no existen en el esquema generado (ver comentarios in situ).
-import { supabase, db } from '../../lib/supabase'
+import { db } from '../../lib/supabase'
 
 // ── DirectorioTab ──
 
@@ -83,29 +83,31 @@ export async function activarPortalUnidad(
 
 // ── PortalTransparenciaTab ──
 
-/** Fondo de reserva aprobado (modelo legacy), 50 más recientes. Degrada a `[]`. */
-// SIN MIGRAR a `db`: BUG LATENTE — `fondo_reserva` NO tiene columna `estado`
-// (tiene id/company_id/project_id/created_at/notas/tipo/fecha/monto/referencia/
-// concepto), así que el `.eq('estado','aprobado')` devuelve 400 en runtime HOY.
-// El cliente tipado (postgrest-js ≥2.110) lo rechaza en compile-time; queda en
-// `supabase` sin tipar para no cambiar conducta en este arco. Fix funcional aparte.
+/** Fondo de reserva aprobado, 50 más recientes. Degrada a `[]`. */
+// FIX (query rota en runtime, cazada por el arco de tipado): apuntaba a
+// `fondo_reserva`, que NO tiene columna `estado` → PostgREST 400 y el tab
+// degradaba a [] siempre. La tabla con estado/justificacion/aprobado_por (el
+// shape de `FondoReserva`) es `fondo_reserva_condominio`; lleva soft-delete,
+// así que se filtra deleted_at como hace sectionData.
 export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T[]> {
-  const { data } = await supabase
-    .from('fondo_reserva')
+  const { data } = await db
+    .from('fondo_reserva_condominio')
     .select('*')
     .eq('project_id', projectId)
     .eq('estado', 'aprobado')
+    .is('deleted_at', null)
     .order('fecha', { ascending: false })
     .limit(50)
   return (data as T[] | null) ?? []
 }
 
-/** Movimientos del fondo de reserva (modelo moderno), 50 más recientes. */
-// SIN MIGRAR a `db`: `fondo_reserva_movimientos` NO existe en el esquema
-// generado (hay `fondo_reserva` y `fondo_reserva_condominio`) — hallazgo P2.
+/** Movimientos del fondo de reserva (ledger), 50 más recientes. */
+// FIX (query rota en runtime): apuntaba a `fondo_reserva_movimientos`, tabla
+// inexistente. El ledger de movimientos (tipo/concepto/monto/fecha/referencia —
+// el shape de `FondoReservaMovimiento`) es la tabla `fondo_reserva`.
 export async function fetchFondoReservaMovimientos<T>(projectId: string): Promise<T[]> {
-  const { data } = await supabase
-    .from('fondo_reserva_movimientos')
+  const { data } = await db
+    .from('fondo_reserva')
     .select('*')
     .eq('project_id', projectId)
     .order('fecha', { ascending: false })
@@ -114,11 +116,12 @@ export async function fetchFondoReservaMovimientos<T>(projectId: string): Promis
 }
 
 /** Presupuestos del condominio para un año. */
-// SIN MIGRAR a `db`: `presupuestos_condominio` NO existe en el esquema generado
-// (hay `presupuesto_condominio`, singular, y `presupuestos`) — hallazgo P2.
+// FIX (query rota en runtime): apuntaba a `presupuestos_condominio`, tabla
+// inexistente — la real es `presupuesto_condominio` (singular; su Row calza
+// 1:1 con el tipo PresupuestoCondominio del dominio).
 export async function fetchPresupuestosAnio<T>(projectId: string, anio: number): Promise<T[]> {
-  const { data } = await supabase
-    .from('presupuestos_condominio')
+  const { data } = await db
+    .from('presupuesto_condominio')
     .select('*')
     .eq('project_id', projectId)
     .eq('anio', anio)
