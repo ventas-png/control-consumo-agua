@@ -100,15 +100,20 @@ describe('PortalResidenteTab helpers', () => {
 })
 
 describe('PortalTransparenciaTab reads', () => {
-  it('fetchFondoReservaAprobado degrada a []', async () => {
-    expect(await fetchFondoReservaAprobado('p1')).toEqual([])
+  // Regresión del fix de queries rotas: las tres funciones apuntaban a tablas/
+  // columnas inexistentes (fondo_reserva sin `estado`, fondo_reserva_movimientos
+  // y presupuestos_condominio no existen). Los mocks quedan keyed por las tablas
+  // REALES para fijar el contrato.
+  it('fetchFondoReservaAprobado lee de fondo_reserva_condominio', async () => {
+    h.state.byTable.fondo_reserva_condominio = { data: [{ concepto: 'reserva', estado: 'aprobado', monto: 900 }], error: null }
+    expect(await fetchFondoReservaAprobado('p1')).toEqual([{ concepto: 'reserva', estado: 'aprobado', monto: 900 }])
   })
-  it('fetchFondoReservaMovimientos devuelve filas', async () => {
-    h.state.byTable.fondo_reserva_movimientos = { data: [{ tipo: 'aportacion', monto: 50 }], error: null }
+  it('fetchFondoReservaMovimientos lee de fondo_reserva (ledger)', async () => {
+    h.state.byTable.fondo_reserva = { data: [{ tipo: 'aportacion', monto: 50 }], error: null }
     expect(await fetchFondoReservaMovimientos('p1')).toEqual([{ tipo: 'aportacion', monto: 50 }])
   })
-  it('fetchPresupuestosAnio devuelve filas', async () => {
-    h.state.byTable.presupuestos_condominio = { data: [{ categoria: 'agua', monto_presupuestado: 1000 }], error: null }
+  it('fetchPresupuestosAnio lee de presupuesto_condominio', async () => {
+    h.state.byTable.presupuesto_condominio = { data: [{ categoria: 'agua', monto_presupuestado: 1000 }], error: null }
     expect(await fetchPresupuestosAnio('p1', 2026)).toEqual([{ categoria: 'agua', monto_presupuestado: 1000 }])
   })
   it('fetchGastosAnioMontos degrada a []', async () => {

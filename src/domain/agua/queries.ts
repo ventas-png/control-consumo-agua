@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad, Empresa, Proyecto } from '../../types'
 // `db` = cliente TIPADO (P2 tipos). `supabase` (sin tipar) queda SOLO para los
 // call sites cuyas columnas no existen en el esquema generado (ver comentarios).
-import { db, supabase } from '../../lib/supabase'
+import { db } from '../../lib/supabase'
 import { isProjectExempt } from '../../lib/proyectosAccess'
 import { runQuery } from '../queryFetch'
 import { aguaKeys } from './keys'
@@ -373,8 +373,11 @@ export interface ConsumoMensual {
 /**
  * Consumo mensual (m³) de un proyecto en los últimos ~6 meses, agregado por mes.
  * Lectura DEPENDIENTE en dos pasos (espeja el fetch original de SostenibilidadTab):
- * primero los contadores del proyecto, luego sus registros. Usa las columnas
- * `consumo_m3`/`fecha_lectura` tal cual venían en el componente.
+ * primero los contadores del proyecto, luego sus registros.
+ *
+ * FIX (query rota en runtime, cazada por el arco de tipado): el fetch original
+ * seleccionaba `consumo_m3`/`fecha_lectura`, columnas que NO existen en
+ * `registros` (son `consumo`/`fecha`) → PostgREST 400 y la serie quedaba vacía.
  */
 export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId: string) {
   return useQuery({
@@ -391,23 +394,22 @@ export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId:
         )) ?? []
       if (contadores.length === 0) return []
 
-      // SIN MIGRAR a `db`: `consumo_m3` y `fecha_lectura` NO existen en el esquema
-      // generado de `registros` (bug latente reportado — PostgREST devolvería 400).
       const rows =
-        (await runQuery<{ consumo_m3: number | null; fecha_lectura: string }[]>((signal) =>
-          supabase
+        (await runQuery((signal) =>
+          db
             .from('registros')
-            .select('consumo_m3, fecha_lectura')
+            .select('consumo, fecha')
             .in('contador_id', contadores.map((c) => c.id))
-            .gte('fecha_lectura', desdeStr)
-            .order('fecha_lectura')
+            .gte('fecha', desdeStr)
+            .order('fecha')
             .abortSignal(signal),
         )) ?? []
 
       const byMes: Record<string, number> = {}
       for (const r of rows) {
-        const mes = r.fecha_lectura.slice(0, 7)
-        byMes[mes] = (byMes[mes] ?? 0) + (r.consumo_m3 ?? 0)
+        const mes = r.fecha.slice(0, 7)
+        // `consumo` es NULLABLE en el esquema; 0 es neutro para la suma mensual.
+        byMes[mes] = (byMes[mes] ?? 0) + (r.consumo ?? 0)
       }
       return Object.entries(byMes)
         .map(([mes, m3]) => ({ mes, m3 }))
@@ -449,19 +451,26 @@ export function useMedidoresAguaPorProyectoQuery(companyId: string, proyectoId: 
   return useQuery({
     queryKey: aguaKeys.medidoresAguaPorProyecto(companyId, proyectoId),
     queryFn: async (): Promise<MedidoresAguaData> => {
-      // SIN MIGRAR a `db`: `numero_medidor` NO existe en el esquema generado de
-      // `contadores` (ahí es `numero_serie`; bug latente reportado — PostgREST
-      // devolvería 400). Se mantiene el cliente sin tipar + cast, como antes.
-      const contadores =
-        ((await runQuery((signal) =>
-          supabase
+      // FIX (query rota en runtime, cazada por el arco de tipado): la columna real
+      // es `numero_serie` (`numero_medidor` no existe en contadores → PostgREST 400
+      // y el resumen quedaba vacío). Se mapea al shape público
+      // `MedidorContador.numero_medidor` para no tocar la UI del tab.
+      const contadoresRows =
+        (await runQuery((signal) =>
+          db
             .from('contadores')
-            .select('id, numero_medidor, unidad_id, unidades(nombre)')
+            .select('id, numero_serie, unidad_id, unidades(nombre)')
             .eq('project_id', proyectoId)
             .eq('company_id', companyId)
-            .order('numero_medidor')
+            .order('numero_serie')
             .abortSignal(signal),
-        )) ?? []) as unknown as MedidorContador[]
+        )) ?? []
+      const contadores: MedidorContador[] = contadoresRows.map((c) => ({
+        id: c.id,
+        numero_medidor: c.numero_serie,
+        unidad_id: c.unidad_id,
+        unidades: c.unidades,
+      }))
       if (contadores.length === 0) return { contadores: [], registros: [] }
 
       const registros =
