@@ -84,8 +84,13 @@ export async function activarPortalUnidad(
 // ── PortalTransparenciaTab ──
 
 /** Fondo de reserva aprobado (modelo legacy), 50 más recientes. Degrada a `[]`. */
+// SIN MIGRAR a `db`: BUG LATENTE — `fondo_reserva` NO tiene columna `estado`
+// (tiene id/company_id/project_id/created_at/notas/tipo/fecha/monto/referencia/
+// concepto), así que el `.eq('estado','aprobado')` devuelve 400 en runtime HOY.
+// El cliente tipado (postgrest-js ≥2.110) lo rechaza en compile-time; queda en
+// `supabase` sin tipar para no cambiar conducta en este arco. Fix funcional aparte.
 export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T[]> {
-  const { data } = await db
+  const { data } = await supabase
     .from('fondo_reserva')
     .select('*')
     .eq('project_id', projectId)
