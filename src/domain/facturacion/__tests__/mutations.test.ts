@@ -2,10 +2,12 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Stub del cliente Supabase: mutations.ts lo importa para los writes, pero esta
 // suite solo ejercita los helpers PUROS (sin red). Evita el throw de env vars al
-// cargar el módulo. Mismo patrón que validatedInsert.test.ts.
-vi.mock('../../../lib/supabase', () => ({
-  supabase: { from: () => { throw new Error('default client should not be used in pure-logic tests') } },
-}))
+// cargar el módulo. Mismo patrón que validatedInsert.test.ts. `db` es la MISMA
+// instancia que `supabase` (cast tipado) — el mock replica eso.
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: () => { throw new Error('default client should not be used in pure-logic tests') } }
+  return { supabase: client, db: client }
+})
 
 import {
   calcularFechaVencimiento,

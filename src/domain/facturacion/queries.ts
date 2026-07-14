@@ -8,7 +8,7 @@
 // La Factura no es una tabla nueva: son columnas de estado/IVA/mora sobre
 // `registros` (migración 20260604160000). Estos hooks proyectan esos campos.
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { facturacionKeys } from './keys'
 
@@ -80,7 +80,7 @@ export function useFacturasQuery(companyId?: string) {
     queryKey: facturacionKeys.facturas(companyId),
     queryFn: async () =>
       (await runQuery<FacturaRow[]>((signal) =>
-        supabase
+        db
           .from('registros')
           .select(FACTURA_COLS)
           .order('fecha', { ascending: false })
@@ -101,7 +101,7 @@ export function useFacturasPorProyectoQuery(companyId?: string, projectId?: stri
     queryKey: facturacionKeys.facturasPorProyecto(companyId, projectId),
     queryFn: async () =>
       (await runQuery<FacturaRow[]>((signal) =>
-        supabase
+        db
           .from('registros')
           .select(FACTURA_COLS)
           .eq('project_id', projectId!)
@@ -121,16 +121,26 @@ export function useFacturasPorProyectoQuery(companyId?: string, projectId?: stri
 export function useReglasMoraQuery(companyId?: string) {
   return useQuery({
     queryKey: facturacionKeys.reglasMora(companyId),
-    queryFn: async () =>
-      (await runQuery<ReglaMoraConfig[]>((signal) => {
-        let q = supabase
-          .from('reglas_mora_config')
-          .select('*')
-          .eq('activa', true)
-          .order('nombre', { ascending: true })
-        if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
-      })) ?? [],
+    queryFn: async () => {
+      const rows =
+        (await runQuery((signal) => {
+          let q = db
+            .from('reglas_mora_config')
+            .select('*')
+            .eq('activa', true)
+            .order('nombre', { ascending: true })
+          if (companyId) q = q.eq('company_id', companyId)
+          return q.abortSignal(signal)
+        })) ?? []
+      // `tipo`/`aplicar_sobre` generadas como string; el dominio las acota (CHECKs en BD).
+      return rows.map(
+        (r): ReglaMoraConfig => ({
+          ...r,
+          tipo: r.tipo as ReglaMoraConfig['tipo'],
+          aplicar_sobre: r.aplicar_sobre as ReglaMoraConfig['aplicar_sobre'],
+        }),
+      )
+    },
     enabled: !!companyId,
   })
 }

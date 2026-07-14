@@ -4,28 +4,32 @@
 // queries.ts: esto es el billing de la plataforma (Stripe). Funciones planas
 // (imperativas) porque PerfilSection las consume con su propio estado de carga;
 // degradan a null/[] (la UI ya muestra su loading/empty). Genéricas en el row
-// para no duplicar los tipos locales de la UI.
-import { supabase } from '../../lib/supabase'
+// para no duplicar los tipos locales de la UI. P2 tipos: cliente TIPADO `db` —
+// tablas/columnas/embeds/RPC chequeados contra el esquema; el row sigue siendo
+// genérico del caller, así que el cast a T pasa por unknown en la frontera.
+import { db } from '../../lib/supabase'
 
 /** Suscripción activa (trialing/active/past_due/incomplete) + plan embebido. */
 export async function fetchActiveSubscription<T>(companyId: string): Promise<T | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('subscriptions')
     .select('status, billing_cycle, current_period_end, trial_end, cancel_at_period_end, plan:billing_plans!inner(code, name, description, price_monthly_cents, currency, features)')
     .eq('company_id', companyId)
     .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
     .maybeSingle()
-  return (data as T | null) ?? null
+  // Select validado contra el esquema; T lo aporta la UI (tipo local) — frontera.
+  return (data as unknown as T | null) ?? null
 }
 
 /** Catálogo de planes activos (orden de presentación). Degrada a `[]`. */
 export async function fetchActiveBillingPlans<T>(): Promise<T[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('billing_plans')
     .select('code, name, price_monthly_cents, price_yearly_cents, description, features')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
-  return (data as T[] | null) ?? []
+  // Select validado contra el esquema; T lo aporta la UI (tipo local) — frontera.
+  return (data as unknown as T[] | null) ?? []
 }
 
 /**
@@ -33,8 +37,9 @@ export async function fetchActiveBillingPlans<T>(): Promise<T[]> {
  * de proyectos/unidades. Devuelve la primera fila o null.
  */
 export async function fetchMonthlyTotalBreakdown<T>(companyId: string): Promise<T | null> {
-  const { data } = await supabase.rpc('calculate_monthly_total_cents', { p_company_id: companyId })
-  return ((data as T[] | null)?.[0]) ?? null
+  const { data } = await db.rpc('calculate_monthly_total_cents', { p_company_id: companyId })
+  // RPC y args validados contra el esquema; T lo aporta la UI — frontera.
+  return ((data as unknown as T[] | null)?.[0]) ?? null
 }
 
 /**
@@ -43,11 +48,12 @@ export async function fetchMonthlyTotalBreakdown<T>(companyId: string): Promise<
  * suscripción viva. La RLS billing_plans_select es pública para authenticated.
  */
 export async function fetchPlanPricing<T>(companyId: string): Promise<T | null> {
-  const { data } = await supabase
+  const { data } = await db
     .from('subscriptions')
     .select('plan:billing_plans!inner(base_activation_cents, extra_project_cents, unit_primary_cents, unit_extra_cents, max_projects, max_units)')
     .eq('company_id', companyId)
     .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
     .maybeSingle()
-  return ((data as { plan: T } | null)?.plan) ?? null
+  // Select/embed validados contra el esquema; T lo aporta la UI — frontera.
+  return ((data as unknown as { plan: T } | null)?.plan) ?? null
 }
