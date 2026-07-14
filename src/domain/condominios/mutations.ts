@@ -17,9 +17,10 @@
 // ver cabecera de la migración) y el "pago" es all-or-nothing vía estado (no hay
 // abono parcial como en agua).
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { condominiosKeys } from './keys'
+import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 import {
   aplicarTransicionCuota,
   puedeTransicionarCuota,
@@ -137,7 +138,7 @@ export function useEmitirCuotaMutation() {
       if (!check.ok) throw new TransicionCuotaInvalidaError(cuota.cuota_estado, 'emitir', check.error)
       const patch = buildEmitirCuotaPatch(cuota, diasVencimiento)
       await runQuery((signal) =>
-        supabase.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
+        db.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
       )
       return patch
     },
@@ -168,7 +169,7 @@ export function usePagarCuotaMutation() {
       // + datos del pago. Mantenemos también la columna legacy `estado='pagado'`
       // sincronizada para que la UI actual (que aún lee `estado`) refleje el pago.
       const transicion = aplicarTransicionCuota(cuota.cuota_estado, 'pagar')
-      const patch: Record<string, unknown> = {
+      const patch: TablesUpdate<'cuotas_condominio'> = {
         cuota_estado: transicion.cuota_estado,
         pagada_at: transicion.pagada_at,
         estado: 'pagado',
@@ -177,7 +178,7 @@ export function usePagarCuotaMutation() {
       if (metodoPago) patch.metodo_pago = metodoPago
       if (referenciaPago) patch.referencia_pago = referenciaPago
       await runQuery((signal) =>
-        supabase.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
+        db.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
       )
       return patch
     },
@@ -201,7 +202,7 @@ export function useAnularCuotaMutation() {
       // Parche = estado + anulada_at (businessCondominios.ts es la fuente del timestamp).
       const patch = aplicarTransicionCuota(cuota.cuota_estado, 'anular')
       await runQuery((signal) =>
-        supabase.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
+        db.from('cuotas_condominio').update(patch).eq('id', cuota.id).abortSignal(signal),
       )
       return patch
     },
@@ -215,7 +216,8 @@ export function useAnularCuotaMutation() {
 export async function createContactosEmergencia(
   rows: Record<string, unknown>[],
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('contactos_emergencia').insert(rows)
+  // Cast en la frontera: el payload lo arma la UI sin tipar (import CSV).
+  const { error } = await db.from('contactos_emergencia').insert(rows as TablesInsert<'contactos_emergencia'>[])
   return { error: error?.message ?? null }
 }
 
@@ -225,7 +227,8 @@ export async function createContactosEmergencia(
 export async function createInventarioItems(
   rows: Record<string, unknown>[],
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('inventario_condominio').insert(rows)
+  // Cast en la frontera: el payload lo arma la UI sin tipar (import CSV).
+  const { error } = await db.from('inventario_condominio').insert(rows as TablesInsert<'inventario_condominio'>[])
   return { error: error?.message ?? null }
 }
 
@@ -235,7 +238,8 @@ export async function createInventarioItems(
 export async function createTareasCondominio(
   rows: Record<string, unknown>[],
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('tareas_condominio').insert(rows)
+  // Cast en la frontera: el payload lo arma la UI sin tipar (import CSV).
+  const { error } = await db.from('tareas_condominio').insert(rows as TablesInsert<'tareas_condominio'>[])
   return { error: error?.message ?? null }
 }
 
@@ -245,6 +249,7 @@ export async function createTareasCondominio(
 export async function createSuministrosCondominio(
   rows: Record<string, unknown>[],
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('suministros_condominio').insert(rows)
+  // Cast en la frontera: el payload lo arma la UI sin tipar (import CSV).
+  const { error } = await db.from('suministros_condominio').insert(rows as TablesInsert<'suministros_condominio'>[])
   return { error: error?.message ?? null }
 }

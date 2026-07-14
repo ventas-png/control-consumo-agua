@@ -17,7 +17,11 @@ const h = vi.hoisted(() => {
   return { state, from: (t: string) => makeBuilder(t) }
 })
 
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: h.from } }))
+// `db` es la misma instancia que `supabase` (retipada); el mock espeja eso.
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: h.from }
+  return { supabase: client, db: client }
+})
 
 import {
   fetchDirectorioResidentes,
