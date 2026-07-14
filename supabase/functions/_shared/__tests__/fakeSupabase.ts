@@ -17,6 +17,11 @@ export interface FakeWriteCall {
   payload: unknown
 }
 
+export interface FakeRpcCall {
+  fn: string
+  args: unknown
+}
+
 export interface FakeSupabaseState {
   /** Resolución de LECTURAS por tabla: `{ data, error }` con el shape esperado. */
   byTable: Record<string, unknown>
@@ -31,12 +36,20 @@ export interface FakeSupabaseState {
   writes: Record<string, unknown>
   /** Registro de escrituras para asserts. */
   calls: FakeWriteCall[]
+  /** Registro de llamadas RPC para asserts. */
+  rpcCalls: FakeRpcCall[]
+  /** Resolución de RPCs por nombre: `{ data, error }`. */
+  rpcs: Record<string, unknown>
   /** Resultado de caller.auth.getUser(). */
   auth: unknown
 }
 
 export function emptyState(): FakeSupabaseState {
-  return { byTable: {}, readQueues: {}, writes: {}, calls: [], auth: { data: { user: null }, error: null } }
+  return {
+    byTable: {}, readQueues: {}, writes: {}, calls: [],
+    rpcCalls: [], rpcs: {},
+    auth: { data: { user: null }, error: null },
+  }
 }
 
 const FALLBACK = { data: null, error: null }
@@ -78,6 +91,12 @@ export function makeCreateClient(state: FakeSupabaseState) {
     if (opts?.global) {
       return { auth: { getUser: async () => state.auth } }
     }
-    return { from: (table: string) => makeBuilder(state, table) }
+    return {
+      from: (table: string) => makeBuilder(state, table),
+      rpc: (fn: string, args?: unknown) => {
+        state.rpcCalls.push({ fn, args })
+        return Promise.resolve(state.rpcs[fn] ?? FALLBACK)
+      },
+    }
   }
 }
