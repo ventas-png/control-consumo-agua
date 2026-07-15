@@ -309,6 +309,20 @@ $fn$;
 COMMENT ON FUNCTION public.enqueue_recordatorios_cuotas IS
   'Encola recordatorios in-app (outbox) a los residentes responsables de las cuotas impagas (próximas o vencidas). Role-aware + idempotente (cuota_recordatorios_log). El aviso in_app no setea ruta_id (un cuota_id no es una ruta). Devuelve cuántos encoló.';
 
+-- ── (3) Reparación de datos: avisos ya encolados con el payload defectuoso ────
+-- El cron de recordatorios ya corrió con la versión buggy: hay filas in_app en el
+-- outbox cuyo payload trae `ruta_id` (verificado en prod: 4 'cuota_recordatorio'
+-- en status queued). Al despacharse violarían la FK y esos avisos se perderían.
+-- Se limpia el `ruta_id` SOLO de los tipos de cuotas (otros productores, p. ej.
+-- rutas de ronda, usan ruta_id legítimamente) y solo de filas aún no enviadas.
+-- Idempotente: re-ejecutar no cambia nada (payload ? 'ruta_id' ya es falso).
+UPDATE public.notifications_outbox
+SET payload = payload - 'ruta_id'
+WHERE channel = 'in_app'
+  AND payload->>'tipo' IN ('cuota_emitida', 'cuota_recordatorio')
+  AND payload ? 'ruta_id'
+  AND status <> 'sent';
+
 -- Grants: CREATE OR REPLACE preserva los grants existentes; se re-afirman por
 -- claridad y para no depender del estado previo.
 REVOKE ALL ON FUNCTION public.enqueue_recordatorios_cuotas() FROM PUBLIC;
