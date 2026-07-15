@@ -128,6 +128,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         registros={agua.registros}
         clientes={agua.clientes}
         moneda={agua.moneda}
+        proyectos={agua.proyectos}
         onEstadoUpdated={agua.updateRegistroEstado}
         onRegistroUpdated={(id, partial) => {
           if (partial.monto_pagado !== undefined) {

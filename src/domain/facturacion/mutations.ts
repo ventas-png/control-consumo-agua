@@ -11,7 +11,7 @@
 // `registros` (migración 20260604160000). Por eso los writes apuntan a `registros`
 // y las invalidaciones tocan las keys de `useFacturasQuery`/`useFacturasPorProyectoQuery`.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { db } from '../../lib/supabase'
+import { db, supabase } from '../../lib/supabase'
 import type { TablesUpdate } from '../../types/database.types'
 import { runQuery } from '../queryFetch'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
@@ -172,6 +172,49 @@ export function useEmitirFacturaMutation(companyId?: string) {
       invalidar()
     },
   })
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 1b. CERRAR CICLO — emisión masiva por proyecto/período (RPC set-based).
+//     Espejo de condominios_cerrar_ciclo: emite EN UN SOLO statement todos los
+//     registros emitibles del mes (misma paridad que buildEmitirFacturaPatch:
+//     factura_estado=emitida + vencimiento por regla de mora + snapshot de
+//     IVA/total) y avisa al cliente vía el outbox (in_app + email). La emisión
+//     por selección (CobrosSection.emitirLoteSeleccion) sigue existiendo para el
+//     lote manual; esto cubre "cerrar el mes" de golpe con aviso al residente.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Resultado del cierre de ciclo de agua (RPC `agua_cerrar_ciclo`). */
+export interface ResultadoCierreCicloAgua {
+  emitidas: number
+  avisos: number
+  emails: number
+  dias_vencimiento: number
+  iva_tasa: number
+}
+
+/**
+ * Cierra el ciclo de facturación de agua de un proyecto/período. La autorización
+ * vive server-side (super admin o empresa del proyecto + permiso
+ * agua.cobros.change_status); el RPC calcula el snapshot de IVA/total y encola el
+ * aviso al cliente (in_app siempre; email si el tenant tiene Gmail).
+ *
+ * NOTA(tipos): usa el cliente UNTYPED `supabase` a propósito. `agua_cerrar_ciclo`
+ * entra a prod por el gate P0 #9 DESPUÉS de este merge, así que todavía no está en
+ * los tipos generados (mismo patrón que paymentConfig.ts con `ambiente_pago`).
+ * Migrar a `db.rpc('agua_cerrar_ciclo', …)` cuando se regeneren los tipos.
+ */
+export async function cerrarCicloAgua(
+  projectId: string,
+  periodo: string,
+  notificar = true,
+): Promise<{ data: ResultadoCierreCicloAgua | null; error: { message: string } | null }> {
+  const { data, error } = await supabase.rpc('agua_cerrar_ciclo', {
+    p_project_id: projectId,
+    p_periodo: periodo,
+    p_notificar: notificar,
+  })
+  return { data: (data as ResultadoCierreCicloAgua | null) ?? null, error }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
