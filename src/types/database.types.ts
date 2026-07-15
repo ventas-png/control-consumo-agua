@@ -18017,6 +18017,10 @@ export type Database = {
       }
     }
     Functions: {
+      agua_cerrar_ciclo: {
+        Args: { p_notificar?: boolean; p_periodo: string; p_project_id: string }
+        Returns: Json
+      }
       aplicar_mora_cuotas_vencidas: { Args: never; Returns: undefined }
       aplicar_mora_facturas_vencidas: { Args: never; Returns: undefined }
       banco_ajuste_conciliacion: {
