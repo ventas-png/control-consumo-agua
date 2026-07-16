@@ -95,6 +95,8 @@ beforeEach(() => {
   h.state.writes = fresh.writes
   h.state.calls = fresh.calls
   h.state.auth = fresh.auth
+  h.state.rpcs = fresh.rpcs
+  h.state.rpcCalls = fresh.rpcCalls
   h.consulta = { ok: true, estado: 'aprobado', referencia: 'ref-1' }
 })
 
@@ -111,6 +113,23 @@ describe('confirm-charge · auth y ownership', () => {
   it('403 si el residente no es el dueño de la solicitud', async () => {
     fixture(h.state, { caller: { cliente_id: 'otro' } })
     expect((await post({ payment_request_id: 'pr-1' }, 'user-jwt')).status).toBe(403)
+  })
+})
+
+describe('confirm-charge · rate limit (auditoría S6)', () => {
+  it('429 cuando rate_limit_hit devuelve false para el usuario', async () => {
+    fixture(h.state)
+    h.state.rpcs.rate_limit_hit = { data: false, error: null }
+    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    expect(res.status).toBe(429)
+  })
+
+  it('service_role (cron de reconciliación) está exento del límite', async () => {
+    fixture(h.state)
+    h.state.rpcs.rate_limit_hit = { data: false, error: null }
+    const res = await post({ payment_request_id: 'pr-1' }, 'srk-secret')
+    expect(res.status).toBe(200)
+    expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(false)
   })
 })
 

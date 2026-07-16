@@ -29,6 +29,7 @@
 // migracion 20260604100000_notifications_outbox.sql).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 // Helpers puros de render/plantillas/routing extraídos a ./render.ts para poder
 // testearlos en vitest sin I/O (infra:I22). El handler sigue haciendo las queries.
@@ -504,8 +505,8 @@ Deno.serve(async (req: Request) => {
   const cronSecret = req.headers.get('x-cron-secret') ?? ''
   const bearer = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
   const authorized =
-    (CRON_SECRET !== '' && cronSecret === CRON_SECRET) ||
-    (SERVICE_ROLE_KEY !== '' && bearer === SERVICE_ROLE_KEY)
+    (CRON_SECRET !== '' && (await timingSafeEqualSecret(cronSecret, CRON_SECRET))) ||
+    (SERVICE_ROLE_KEY !== '' && (await timingSafeEqualSecret(bearer, SERVICE_ROLE_KEY)))
   if (!authorized) return json({ error: 'Unauthorized' }, 401)
 
   try {
