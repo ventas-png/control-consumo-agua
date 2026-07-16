@@ -25,7 +25,7 @@ vi.mock('../../../lib/supabase', () => {
 
 import {
   fetchDirectorioResidentes,
-  fetchProyectoResumen,
+  fetchProyectosResumen,
   fetchMensajesPortal,
   activarPortalUnidad,
   fetchFondoReservaAprobado,
@@ -64,23 +64,33 @@ describe('fetchDirectorioResidentes', () => {
   })
 })
 
-describe('fetchProyectoResumen', () => {
-  it('combina las 4 queries (filas + counts)', async () => {
-    h.state.byTable.cuotas_condominio = { data: [{ estado: 'pagado', monto: 100, fecha_vencimiento: null }], error: null }
-    h.state.byTable.tickets_mantenimiento = { data: [{ estado: 'abierto' }], error: null }
-    h.state.byTable.unidades = { data: null, count: 12, error: null }
-    h.state.byTable.visitantes = { data: null, count: 3, error: null }
-    const r = await fetchProyectoResumen('p1', 'co1', '2026-06-06')
-    expect(r).toEqual({
-      cuotas: [{ estado: 'pagado', monto: 100, fecha_vencimiento: null }],
-      tickets: [{ estado: 'abierto' }],
-      unidadesCount: 12,
-      visitantesCount: 3,
+describe('fetchProyectosResumen', () => {
+  it('agrupa por proyecto las 4 queries batched (filas etiquetadas + counts por conteo)', async () => {
+    h.state.byTable.cuotas_condominio = { data: [
+      { project_id: 'p1', estado: 'pagado', monto: 100, fecha_vencimiento: null },
+      { project_id: 'p2', estado: 'pendiente', monto: 50, fecha_vencimiento: '2026-01-01' },
+    ], error: null }
+    h.state.byTable.tickets_mantenimiento = { data: [{ project_id: 'p1', estado: 'abierto' }], error: null }
+    h.state.byTable.unidades = { data: [{ project_id: 'p1' }, { project_id: 'p1' }, { project_id: 'p2' }], error: null }
+    h.state.byTable.visitantes = { data: [{ project_id: 'p2' }], error: null }
+    const r = await fetchProyectosResumen(['p1', 'p2'], 'co1', '2026-06-06')
+    expect(r.p1).toEqual({
+      cuotas: [{ project_id: 'p1', estado: 'pagado', monto: 100, fecha_vencimiento: null }],
+      tickets: [{ project_id: 'p1', estado: 'abierto' }],
+      unidadesCount: 2,
+      visitantesCount: 0,
     })
+    expect(r.p2.cuotas).toHaveLength(1)
+    expect(r.p2.unidadesCount).toBe(1)
+    expect(r.p2.visitantesCount).toBe(1)
   })
-  it('degrada filas a [] y counts a 0', async () => {
-    const r = await fetchProyectoResumen('p1', 'co1', '2026-06-06')
-    expect(r).toEqual({ cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 })
+  it('filas de proyectos fuera de la lista se ignoran; sin data degrada a base vacía', async () => {
+    h.state.byTable.cuotas_condominio = { data: [{ project_id: 'ajeno', estado: 'pagado', monto: 1, fecha_vencimiento: null }], error: null }
+    const r = await fetchProyectosResumen(['p1'], 'co1', '2026-06-06')
+    expect(r).toEqual({ p1: { cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 } })
+  })
+  it('sin proyectos → {} sin disparar queries', async () => {
+    expect(await fetchProyectosResumen([], 'co1', '2026-06-06')).toEqual({})
   })
 })
 
