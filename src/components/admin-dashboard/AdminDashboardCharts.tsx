@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, memo } from 'react'
 import { Chart } from '../../lib/chartjs'
+import { parseFecha } from '../../lib/format'
 import type { Registro, Cliente } from '../../types'
 
 interface Props {
@@ -22,9 +23,11 @@ function AdminDashboardChartsImpl({ registros }: Props) {
   const chartsData = useMemo(() => {
     const monthKeys: string[] = []
     const labels: string[] = []
+    const hoy = new Date()
     for (let i = 5; i >= 0; i--) {
-      const d = new Date()
-      d.setMonth(d.getMonth() - i)
+      // Anclado al día 1: `setMonth` sobre un día 29-31 se desliza al mes
+      // siguiente (p. ej. 31 de julio − 1 mes → 1 de julio, no junio).
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       monthKeys.push(key)
       labels.push(`${MESES_NOMBRES[d.getMonth()]} ${d.getFullYear()}`)
@@ -40,7 +43,9 @@ function AdminDashboardChartsImpl({ registros }: Props) {
       if (r.estado === 'pagado') pagado++
       else if (r.estado === 'pendiente') pendiente++
       else if (r.estado === 'mora') mora++
-      const d = new Date(r.fecha)
+      // parseFecha ancla las fechas date-only a T12:00 local: sin él, en
+      // GMT-6 una lectura del día 1 caía al mes anterior (auditoría D2).
+      const d = parseFecha(r.fecha)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       const b = buckets[key]
       if (b) {
