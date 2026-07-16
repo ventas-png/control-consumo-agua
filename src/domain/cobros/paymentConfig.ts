@@ -85,11 +85,8 @@ export async function testStripeConnection(companyId: string): Promise<{ error: 
 export async function fetchProjectProveedorPagoOverride(
   projectId: string,
 ): Promise<{ proveedorPago: string | null; ambientePago: string | null } | null> {
-  // Sin migrar a `db` a propósito: `ambiente_pago` (#592) entró a prod DESPUÉS de
-  // la última regeneración de database.types.ts, así que el cliente tipado aún no
-  // conoce la columna. Migrar al regenerar tipos.
   const rows = await runQuery<Array<{ proveedor_pago: string | null; ambiente_pago: string | null }>>((signal) =>
-    supabase.from('projects').select('proveedor_pago,ambiente_pago').eq('id', projectId).limit(1).abortSignal(signal),
+    db.from('projects').select('proveedor_pago,ambiente_pago').eq('id', projectId).limit(1).abortSignal(signal),
   )
   const p = rows?.[0]
   return p ? { proveedorPago: p.proveedor_pago ?? null, ambientePago: p.ambiente_pago ?? null } : null
