@@ -18,6 +18,7 @@ import {
 } from '../../domain/clientes/mutations'
 import { validatedInsert } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
+import { mensajeErrorGuardarCliente } from '../../domain/clientes/errores'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { useRegimenFiscalQuery } from '../../domain/fiscal/mutations'
 import { validarReceptorFiscal } from './receptorFiscal'
@@ -320,7 +321,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
         cancelForm()
         notify({ variant: 'success', title: 'Cliente actualizado', duration: 1800 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo actualizar el cliente.' })
+        notify({ variant: 'error', title: 'Error', text: mensajeErrorGuardarCliente(error, 'actualizar') })
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: currentUser.role }, userId)
@@ -346,7 +347,10 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
         cancelForm()
         notify({ variant: 'success', title: 'Cliente guardado', duration: 2000 })
       } else {
-        notify({ variant: 'error', title: 'Error', text: 'No se pudo guardar el cliente. Verifique conexión.' })
+        // 23505 (codigo/cui_dui duplicado a nivel plataforma) llega hasta aquí
+        // porque el lookup de onboarding solo reporta coincidencias exactas
+        // 3-de-3; el mensaje debe decir la causa real, no "verifique conexión".
+        notify({ variant: 'error', title: 'Error', text: mensajeErrorGuardarCliente(error) })
       }
     }
 
