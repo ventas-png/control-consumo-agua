@@ -159,15 +159,59 @@ Deno.serve(async (req) => {
       user_metadata: { full_name },
     })
 
-    if (createError || !newAuthUser?.user) {
-      console.error('Auth create error:', createError)
-      const message = createError?.message?.includes('already registered')
-        ? 'El correo electrónico ya está registrado.'
-        : 'No se pudo crear la cuenta. Intente nuevamente.'
-      return err(message)
-    }
+    let newUserId: string
+    // Si el perfil no se puede crear (Step 5), solo se borra el auth user
+    // cuando lo creamos nosotros en este request — nunca uno adoptado.
+    let createdFreshAuthUser = false
 
-    const newUserId = newAuthUser.user.id
+    if (createError || !newAuthUser?.user) {
+      const isDuplicate = createError?.message?.toLowerCase().includes('already') ?? false
+
+      // Login huérfano: existe en Auth pero SIN perfil app_users (p.ej. un
+      // perfil eliminado sin borrar el login, o un alta anterior que quedó a
+      // medias). Sin esto, ese correo queda bloqueado para siempre: registro →
+      // "ya está registrado", login → sin perfil. La identidad ya se verificó
+      // 3-de-3 contra `clientes` (Step 1) y el cliente no tiene otra cuenta
+      // (Step 3), así que adoptar el login (nueva contraseña + perfil) es
+      // equivalente a crearlo. generateLink NO envía correo: solo resuelve el
+      // auth user por email.
+      let adoptedId: string | null = null
+      if (isDuplicate) {
+        const { data: linkData } = await adminClient.auth.admin.generateLink({
+          type: 'recovery',
+          email: email.toLowerCase().trim(),
+        })
+        const existingId = linkData?.user?.id
+        if (existingId) {
+          const { data: existingProfile } = await adminClient
+            .from('app_users')
+            .select('id')
+            .eq('id', existingId)
+            .maybeSingle()
+          if (!existingProfile) {
+            const { error: adoptError } = await adminClient.auth.admin.updateUserById(existingId, {
+              password,
+              email_confirm: true,
+              user_metadata: { full_name },
+            })
+            if (adoptError) console.error('Orphan auth user adopt error:', adoptError)
+            else adoptedId = existingId
+          }
+        }
+      }
+
+      if (!adoptedId) {
+        console.error('Auth create error:', createError)
+        const message = isDuplicate
+          ? 'El correo electrónico ya está registrado.'
+          : 'No se pudo crear la cuenta. Intente nuevamente.'
+        return err(message)
+      }
+      newUserId = adoptedId
+    } else {
+      newUserId = newAuthUser.user.id
+      createdFreshAuthUser = true
+    }
 
     // Step 5: Insert profile in app_users
     const { error: profileError } = await adminClient
@@ -182,7 +226,7 @@ Deno.serve(async (req) => {
 
     if (profileError) {
       console.error('Profile insert error:', profileError)
-      await adminClient.auth.admin.deleteUser(newUserId)
+      if (createdFreshAuthUser) await adminClient.auth.admin.deleteUser(newUserId)
       return err('No se pudo completar el registro. Intente nuevamente.')
     }
 

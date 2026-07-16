@@ -20,7 +20,7 @@ import { useCredentialsLogin } from './auth/useCredentialsLogin'
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
 
-  const { loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding } =
+  const { loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError } =
     useOAuthSession(setCurrentUser)
   useSessionMaintenance(currentUser, setCurrentUser)
   const { login, loginWithGoogle, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } =
@@ -78,5 +78,5 @@ export function useAuth() {
     return null
   }, [currentUser])
 
-  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
+  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
 }

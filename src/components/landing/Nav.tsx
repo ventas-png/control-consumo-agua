@@ -65,13 +65,24 @@ interface LoginModalProps {
   mfaChallenge: { email: string } | null
   onVerifyMfa: (code: string) => Promise<string | null>
   onCancelMfa: () => Promise<void>
+  // Error a mostrar al abrir (p.ej. el callback de Google OAuth falló y el
+  // usuario volvió del redirect sin sesión). Cualquier acción posterior del
+  // usuario lo reemplaza por el resultado de esa acción.
+  initialError?: string
 }
 
-export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa }: LoginModalProps) {
+export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialError }: LoginModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError ?? '')
+
+  // El modal vive montado con open=false; si el error OAuth llega después del
+  // primer render (la sesión falló al construirse tras el SIGNED_IN), el
+  // useState inicial ya corrió y hay que sincronizarlo.
+  useEffect(() => {
+    if (initialError) setError(initialError)
+  }, [initialError])
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [mfaCode, setMfaCode] = useState('')

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database.types'
+import { extractOAuthCallbackError, type OAuthCallbackError } from '../domain/auth/oauthCallbackError'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -26,6 +27,31 @@ if (!supabaseUrl || !supabaseAnonKey) {
     }
   } catch { /* not a Gmail callback — let Supabase handle it */ }
 })()
+
+// Captura el error del callback OAuth ANTES de crear el cliente. Cuando GoTrue
+// no puede completar el login (ej. "Unable to exchange external code" porque el
+// client secret de Google en Supabase es inválido), redirige de vuelta con
+// #error=...&error_description=... y NINGÚN evento de supabase-js lo reporta.
+// Guardamos el error para que useOAuthSession lo muestre y limpiamos la URL
+// (así un reload no lo re-procesa). Sin esto el usuario rebota a la landing
+// sin ningún mensaje.
+let oauthCallbackError: OAuthCallbackError | null = null
+;(function captureOAuthCallbackError() {
+  try {
+    const { error, cleanedHash, cleanedSearch } = extractOAuthCallbackError(
+      window.location.hash,
+      window.location.search,
+    )
+    if (!error) return
+    oauthCallbackError = error
+    window.history.replaceState({}, '', window.location.pathname + cleanedSearch + cleanedHash)
+  } catch { /* nunca bloquear el arranque de la app por esto */ }
+})()
+
+/** Error del callback OAuth capturado en esta carga de página (o null). */
+export function getOAuthCallbackError(): OAuthCallbackError | null {
+  return oauthCallbackError
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

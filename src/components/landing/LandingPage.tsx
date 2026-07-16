@@ -17,6 +17,10 @@ interface LandingPageProps {
   mfaChallenge: { email: string } | null
   onVerifyMfa: (code: string) => Promise<string | null>
   onCancelMfa: () => Promise<void>
+  // Error del flujo OAuth detectado al volver del redirect (callback fallido o
+  // sesión que no se pudo construir). Abre el modal de login mostrándolo — sin
+  // esto el usuario rebota de Google a la landing sin ninguna explicación.
+  initialAuthError?: string | null
 }
 
 function initialLang(): Lang {
@@ -24,7 +28,7 @@ function initialLang(): Lang {
   return urlLang === 'en' ? 'en' : 'es'
 }
 
-export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa }: LandingPageProps) {
+export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialAuthError }: LandingPageProps) {
   const [loginOpen, setLoginOpen] = useState(false)
   const [lang, setLang] = useState<Lang>(initialLang)
 
@@ -34,6 +38,12 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   useEffect(() => {
     if (mfaChallenge) setLoginOpen(true)
   }, [mfaChallenge])
+
+  // Un error de OAuth al volver del redirect debe verse: abrir el modal de
+  // login, que lo renderiza como error inicial.
+  useEffect(() => {
+    if (initialAuthError) setLoginOpen(true)
+  }, [initialAuthError])
 
   // Keep <html lang> and the shareable ?lang= URL in sync with the active locale.
   useEffect(() => {
@@ -86,6 +96,7 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         mfaChallenge={mfaChallenge}
         onVerifyMfa={onVerifyMfa}
         onCancelMfa={onCancelMfa}
+        initialError={initialAuthError ?? undefined}
       />
     </div>
   )

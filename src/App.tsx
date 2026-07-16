@@ -82,7 +82,7 @@ export default function App() {
     }
   }
 
-  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
+  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const { canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete } = usePermissions(currentUser)
 
   // agua:A1 — navegación basada en URL (react-router-dom v6). El sidebar/topbar
@@ -335,6 +335,7 @@ export default function App() {
           mfaChallenge={mfaChallenge ? { email: mfaChallenge.email } : null}
           onVerifyMfa={verifyMfaChallenge}
           onCancelMfa={cancelMfaChallenge}
+          initialAuthError={oauthError}
         />
         {showPasswordReset && (
           <PasswordResetModal onClose={() => setShowPasswordReset(false)} />
