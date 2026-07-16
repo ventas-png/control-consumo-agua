@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
 import {
+  fetchCondominiosPanelData,
   fetchCondominiosSectionData,
   fetchCondominiosRondasData,
   fetchVisitasControlRecent,
@@ -337,12 +338,58 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   // `proyectosActivos` y el id activo (con su default/persistencia) los provee
   // ActiveCondominioContext; ya no se derivan ni se inicializan aquí.
 
-  const cargarDatos = useCallback(async () => {
+  const restoCargadoRef = useRef(false)
+  const runSeqRef = useRef(0)
+
+  // P2 perf — carga por FASES: abrir Condominios dispara solo las 9 colecciones
+  // del tab Panel (fetchCondominiosPanelData); el resto (~132 queries en 5
+  // batches) se difiere al primer tab distinto de Panel. `restoCargadoRef` marca
+  // si el batch grande ya corrió (se resetea al cambiar de proyecto/empresa);
+  // `runSeqRef` descarta cargas viejas que resuelven tarde (cambio de proyecto o
+  // panel→todo en vuelo) para que no pisen datos ni apaguen el spinner ajeno.
+  const cargarDatos = useCallback(async (fase?: 'panel' | 'todo') => {
     if (!selectedProyectoId || !currentUser.company_id) return
+    // Sin fase explícita (onRefresh de los tabs, que puede llegar con un event
+    // como argumento): recargar lo ya cargado — 'todo' si el batch grande ya
+    // corrió, 'panel' si seguimos en la fase inicial.
+    const efectiva: 'panel' | 'todo' =
+      fase === 'panel' || fase === 'todo' ? fase : (restoCargadoRef.current ? 'todo' : 'panel')
+    const run = ++runSeqRef.current
     setLoading(true)
 
     const pid = selectedProyectoId
     const cid = currentUser.company_id
+
+    const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
+      data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
+
+    if (efectiva === 'panel') {
+      const [
+        cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes,
+        paquetesRes, polizasRes, inspeccionesRes, gastosRes,
+      ] = await fetchCondominiosPanelData(pid, cid)
+      if (runSeqRef.current !== run) return // una carga más nueva ya corre
+      // Mismos mapeos que el batch grande (mantener sincronizados).
+      setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
+      setVisitantes(mapUnidad<Visitante>(visitantesRes.data ?? []))
+      setAmenidades((amenidadesRes.data ?? []) as Amenidad[])
+      setReservas((reservasRes.data ?? []).map((r: Record<string, unknown>) => ({
+        ...r,
+        amenidad_nombre: (r.amenidades as { nombre: string } | null)?.nombre,
+        unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
+      } as ReservaAmenidad)))
+      setTickets(mapUnidad<TicketMantenimiento>(ticketsRes.data ?? []))
+      setPaquetes(mapUnidad<PaqueteRecibido>(paquetesRes.data ?? []))
+      setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
+      setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
+      setGastos((gastosRes.data ?? []) as GastoCondominio[])
+      setLoading(false)
+      return
+    }
+
+    // Optimista y SÍNCRONO (antes del primer await): dedupe del disparo por
+    // cambio de tab mientras este batch está en vuelo.
+    restoCargadoRef.current = true
 
     const [
       cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes, anunciosRes,
@@ -388,6 +435,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       solicitudesRentaRes,
       solicitudesMudanzaRes,
     ] = await fetchCondominiosSectionData(pid, cid)
+    if (runSeqRef.current !== run) return // una carga más nueva ya corre
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
     const [areasRes, rutasRes, puntosControlRes, bloqueosAmenRes] = await fetchCondominiosRondasData(pid, cid)
@@ -453,8 +501,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       setTareasBloque([]); setRevisionesTarea([])
     }
 
-    const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
-      data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
+    if (runSeqRef.current !== run) return
 
     setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
     setVisitantes(mapUnidad<Visitante>(visitantesRes.data ?? []))
@@ -609,10 +656,26 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setFondoReservaMovs((fondoReservaMovsRes.data ?? []) as FondoReservaMovimiento[])
     setConfigCondominio((configCondominioRes.data ?? null) as ConfigCondominio | null)
 
-    setLoading(false)
+    if (runSeqRef.current === run) setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
 
-  useEffect(() => { cargarDatos() }, [cargarDatos])
+  // Espejo de activeTab en un ref para que el efecto de carga inicial (que solo
+  // depende de cargarDatos) decida la fase sin re-dispararse en cada cambio de tab.
+  const activeTabRef = useRef(activeTab)
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+
+  // Carga inicial / cambio de proyecto-empresa: resetea la fase y carga según el
+  // tab actual (deep-link a un tab ≠ Panel necesita el batch completo).
+  useEffect(() => {
+    restoCargadoRef.current = false
+    void cargarDatos(activeTabRef.current === 'panel' ? 'panel' : 'todo')
+  }, [cargarDatos])
+
+  // Primer tab distinto de Panel → carga diferida del batch grande. El set
+  // optimista de restoCargadoRef dentro de cargarDatos deduplica disparos.
+  useEffect(() => {
+    if (activeTab !== 'panel' && !restoCargadoRef.current) void cargarDatos('todo')
+  }, [activeTab, cargarDatos])
 
   // Feature-usage analytics: which of the condominios tabs are actually used.
   useEffect(() => {

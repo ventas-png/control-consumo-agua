@@ -13,6 +13,28 @@
 import { supabase, db } from '../../lib/supabase'
 
 /**
+ * Fase PANEL del loader (P2 perf): SOLO las 9 colecciones que consume el tab por
+ * defecto (PanelGeneralTab: cuotas, visitantes, amenidades, reservas, tickets,
+ * paquetes, pólizas, inspecciones, gastos). Abrir Condominios pasa de ~141
+ * queries a 9; el resto se carga al activar el primer tab distinto de Panel
+ * (fetchCondominiosSectionData, sin cambios). Cada select ESPEJA 1:1 su entrada
+ * del batch grande (mismos filtros/orden/límites) — mantener sincronizados.
+ */
+export async function fetchCondominiosPanelData(pid: string, cid: string) {
+  return Promise.all([
+    db.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
+    db.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
+    db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+    db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
+    db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+    db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
+    db.from('inspecciones_normativas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+    db.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+  ])
+}
+
+/**
  * Batch grande: ~143 colecciones del condominio para (project, company). El orden
  * del arreglo DEBE coincidir con el destructuring del componente.
  */

@@ -34,27 +34,33 @@ export interface ProyectoResumenRaw {
 }
 
 /**
- * Data cruda del resumen comparativo de un proyecto: cuotas + tickets (filas
- * para que la UI agregue) y counts de unidades/visitantes-hoy. `hoy` (yyyy-mm-dd)
- * lo pasa la UI para el filtro de visitantes.
+ * Data cruda del resumen comparativo para VARIOS proyectos en 4 QUERIES totales
+ * (P2 perf: antes era 4 × N — un fetch por proyecto). Las filas vienen
+ * etiquetadas con project_id y se agrupan aquí; los counts (unidades /
+ * visitantes-hoy) se derivan contando filas por proyecto. `hoy` (yyyy-mm-dd) lo
+ * pasa la UI para el filtro de visitantes.
  */
-export async function fetchProyectoResumen(
-  projectId: string,
+export async function fetchProyectosResumen(
+  projectIds: string[],
   companyId: string,
   hoy: string,
-): Promise<ProyectoResumenRaw> {
-  const [cuotasRes, ticketsRes, unidadesRes, visitantesRes] = await Promise.all([
-    db.from('cuotas_condominio').select('estado, monto, fecha_vencimiento').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
-    db.from('tickets_mantenimiento').select('estado').eq('project_id', projectId).eq('company_id', companyId).is('deleted_at', null),
-    db.from('unidades').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId),
-    db.from('visitantes').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('company_id', companyId).gte('hora_entrada', hoy),
-  ])
-  return {
-    cuotas: (cuotasRes.data as ProyectoResumenRaw['cuotas'] | null) ?? [],
-    tickets: (ticketsRes.data as ProyectoResumenRaw['tickets'] | null) ?? [],
-    unidadesCount: unidadesRes.count ?? 0,
-    visitantesCount: visitantesRes.count ?? 0,
+): Promise<Record<string, ProyectoResumenRaw>> {
+  const porProyecto: Record<string, ProyectoResumenRaw> = {}
+  for (const id of projectIds) {
+    porProyecto[id] = { cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 }
   }
+  if (projectIds.length === 0) return porProyecto
+  const [cuotasRes, ticketsRes, unidadesRes, visitantesRes] = await Promise.all([
+    db.from('cuotas_condominio').select('project_id, estado, monto, fecha_vencimiento').in('project_id', projectIds).eq('company_id', companyId).is('deleted_at', null),
+    db.from('tickets_mantenimiento').select('project_id, estado').in('project_id', projectIds).eq('company_id', companyId).is('deleted_at', null),
+    db.from('unidades').select('project_id').in('project_id', projectIds).eq('company_id', companyId),
+    db.from('visitantes').select('project_id').in('project_id', projectIds).eq('company_id', companyId).gte('hora_entrada', hoy),
+  ])
+  for (const c of cuotasRes.data ?? []) porProyecto[c.project_id]?.cuotas.push(c)
+  for (const t of ticketsRes.data ?? []) porProyecto[t.project_id]?.tickets.push(t)
+  for (const u of unidadesRes.data ?? []) { const r = porProyecto[u.project_id]; if (r) r.unidadesCount++ }
+  for (const v of visitantesRes.data ?? []) { const r = porProyecto[v.project_id]; if (r) r.visitantesCount++ }
+  return porProyecto
 }
 
 // ── PortalResidenteTab ──
