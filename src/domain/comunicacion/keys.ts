@@ -10,4 +10,7 @@ export const comunicacionKeys = {
   /** Usuarios del equipo (staff) de una empresa, para asignación. */
   teamUsers: (companyId?: string) =>
     [...comunicacionKeys.all, 'team-users', companyId ?? null] as const,
+  /** Estatus (metadata, sin token) de la config de WhatsApp del tenant. */
+  whatsappEstatus: (companyId?: string) =>
+    [...comunicacionKeys.all, 'whatsapp-estatus', companyId ?? null] as const,
 }
