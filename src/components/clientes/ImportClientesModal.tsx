@@ -3,6 +3,7 @@ import { notify } from '../shared/Dialog'
 import type { Cliente } from '../../types'
 import { fetchClientesForDedup } from '../../domain/clientes/queries'
 import { addCompanyClientesLinks, upsertCompanyClientesLinks } from '../../domain/clientes/mutations'
+import { mensajeErrorGuardarCliente } from '../../domain/clientes/errores'
 import { validatedInsertMany } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
@@ -328,7 +329,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         }
         insertados.push(...lote.map(c => ({ ...c } as unknown as Cliente)))
       } else {
-        notify({ variant: 'error', title: 'Error en inserción', text: error?.message ?? 'Error al guardar lote de clientes.' })
+        notify({ variant: 'error', title: 'Error en inserción', text: mensajeErrorGuardarCliente(error) })
         setStep('preview')
         return
       }
