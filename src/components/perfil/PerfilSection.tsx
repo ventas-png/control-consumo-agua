@@ -14,6 +14,7 @@ import {
   unenrollMfaFactor,
 } from '../../domain/auth/mfaActions'
 import { createCheckoutSession, createBillingPortalSession } from '../../domain/shared/mutations'
+import { trackFunnel, FUNNEL } from '../../lib/analytics'
 import {
   fetchActiveSubscription,
   fetchActiveBillingPlans,
@@ -405,6 +406,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   async function handleChangePlan(planCode: string, cycle: 'monthly' | 'yearly') {
     setBillingFb(null)
     setBillingActionLoading(true)
+    trackFunnel(FUNNEL.checkoutIniciado, { origen: 'perfil', plan_destino: planCode, ciclo: cycle })
     try {
       const { url, swapped, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
       if (error) {
@@ -415,6 +417,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       // in-place (sin redirigir ni crear una segunda suscripción). Refrescamos
       // la suscripción para reflejar el nuevo plan.
       if (swapped) {
+        trackFunnel(FUNNEL.planActualizado, { origen: 'perfil', plan_destino: planCode })
         setShowPlanPicker(false)
         setBillingFb({ type: 'success', msg: 'Tu plan se actualizó. El ajuste se prorratea en tu próxima factura.' })
         if (currentUser.company_id) {
