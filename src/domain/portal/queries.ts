@@ -156,13 +156,16 @@ export interface PortalPaymentConfigRow {
   paypal_activo: boolean | null
   /** Payfac efectivo de la empresa (cobros pluggable): 'sandbox'|'qpaypro'|… */
   proveedor_pago: string | null
+  /** Flag EXPLÍCITO de demo (auditoría C1): sin él, 'sandbox' (el default de
+   *  toda empresa) no ofrece pago en línea — aprobaría cobros simulados. */
+  pago_sandbox_demo: boolean | null
 }
 
 /** Lee los flags de pago de la empresa (Stripe/PayPal + payfac) para el portal del cliente. */
 export async function fetchPortalPaymentConfig(companyId: string): Promise<PortalPaymentConfigRow | null> {
   const { data } = await db
     .from('companies')
-    .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago')
+    .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago,pago_sandbox_demo')
     .eq('id', companyId)
     .single()
   // La fila tipada es asignable a la interfaz (proveedor_pago NOT NULL ⊂ string|null) — sin cast.

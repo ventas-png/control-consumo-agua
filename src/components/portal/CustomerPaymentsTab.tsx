@@ -26,12 +26,14 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
     paypal_configured: boolean
     paypal_activo: boolean
     proveedor_pago: string
+    pago_sandbox_demo: boolean
   }>({
     stripe_configured: false,
     stripe_activo: false,
     paypal_configured: false,
     paypal_activo: false,
     proveedor_pago: 'sandbox',
+    pago_sandbox_demo: false,
   })
   const [loading, setLoading] = useState(true)
   const [pagoModal, setPagoModal] = useState<Registro | null>(null)
@@ -52,6 +54,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
         paypal_configured: data.paypal_configured || false,
         paypal_activo: data.paypal_activo !== false,
         proveedor_pago: data.proveedor_pago || 'sandbox',
+        pago_sandbox_demo: data.pago_sandbox_demo === true,
       })
     }
     setLoading(false)
@@ -59,7 +62,12 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
 
   // ¿El tenant tiene un payfac pluggable (sandbox/qpaypro)? Entonces ofrecemos el
   // pago en línea con conciliación server-side (create-charge → confirm-charge).
-  const pagoEnLineaActivo = PAYFAC_PLUGGABLE.includes(paymentConfig.proveedor_pago)
+  // 'sandbox' es el DEFAULT de toda empresa y aprueba cobros SIMULADOS: solo
+  // cuenta como payfac válido con el flag explícito de demo (auditoría C1);
+  // create-charge aplica el mismo gate server-side.
+  const pagoEnLineaActivo =
+    PAYFAC_PLUGGABLE.includes(paymentConfig.proveedor_pago) &&
+    (paymentConfig.proveedor_pago !== 'sandbox' || paymentConfig.pago_sandbox_demo)
 
   // Registros pendientes (no pagados)
   const registrosPendientes = registros.filter(r => r.estado !== 'pagado').sort((a, b) =>

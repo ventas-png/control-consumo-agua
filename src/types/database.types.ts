@@ -2582,6 +2582,7 @@ export type Database = {
           nit: string | null
           nombre: string
           nombre_fiscal: string | null
+          pago_sandbox_demo: boolean
           paypal_activo: boolean | null
           paypal_client_id: string | null
           paypal_configured: boolean | null
@@ -2625,6 +2626,7 @@ export type Database = {
           nit?: string | null
           nombre: string
           nombre_fiscal?: string | null
+          pago_sandbox_demo?: boolean
           paypal_activo?: boolean | null
           paypal_client_id?: string | null
           paypal_configured?: boolean | null
@@ -2668,6 +2670,7 @@ export type Database = {
           nit?: string | null
           nombre?: string
           nombre_fiscal?: string | null
+          pago_sandbox_demo?: boolean
           paypal_activo?: boolean | null
           paypal_client_id?: string | null
           paypal_configured?: boolean | null

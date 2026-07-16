@@ -62,6 +62,7 @@ function fixtureCuota(state: FakeSupabaseState, overrides: {
   caller?: { company_id?: string | null; cliente_id?: string | null }
   residente?: { tipo: string } | null
   pagosPrevios?: Array<{ monto: number }>
+  empresa?: Record<string, unknown>
 } = {}) {
   state.auth = { data: { user: { id: 'user-1' } }, error: null }
   state.byTable.app_users = { data: { company_id: null, cliente_id: 'inq1', ...overrides.caller }, error: null }
@@ -77,7 +78,9 @@ function fixtureCuota(state: FakeSupabaseState, overrides: {
   state.byTable.unidades = { data: { cliente_id: 'duenio' }, error: null }
   state.byTable.unidad_residentes = { data: overrides.residente ?? null, error: null }
   state.byTable.pagos = { data: overrides.pagosPrevios ?? [], error: null }
-  state.byTable.companies = { data: { id: 'co1', proveedor_pago: 'sandbox', default_currency: 'GTQ', ambiente_pago: 'sandbox' }, error: null }
+  // pago_sandbox_demo: true — el fixture representa un tenant DEMO: el gate
+  // anti-sandbox (auditoría C1) rechaza cobros sandbox sin este flag.
+  state.byTable.companies = { data: { id: 'co1', proveedor_pago: 'sandbox', default_currency: 'GTQ', ambiente_pago: 'sandbox', pago_sandbox_demo: true, ...overrides.empresa }, error: null }
   state.byTable.projects = { data: { proveedor_pago: null, moneda: 'Q', ambiente_pago: null }, error: null }
   state.byTable.payfac_secrets = { data: [], error: null }
   state.byTable.clientes = { data: { nombre: 'Inquilino Uno', email: 'i@x.com', telefono: null, nit: null }, error: null }
@@ -196,5 +199,35 @@ describe('create-charge · sello de ambiente (#592)', () => {
     const res = await post({ cuota_id: 'c1', ambiente: 'prod' }, 'srk-secret')
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.ambiente).toBe('prod')
+  })
+})
+
+describe('create-charge · gate anti-sandbox (auditoría C1)', () => {
+  it('403 si el payfac efectivo es sandbox (el default de toda empresa) sin flag de demo', async () => {
+    // Escenario del hallazgo: tenant productivo que nunca configuró payfac —
+    // antes el residente podía "pagar" (aprobación simulada) y liquidar deuda real.
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: false } })
+    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/proveedor de pagos/)
+    expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
+  })
+
+  it('403 también cuando el flag viene null (columna aún sin backfill)', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: null } })
+    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    expect(res.status).toBe(403)
+  })
+
+  it('200 con el flag explícito de demo (tenant de demostración)', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: true } })
+    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    expect(res.status).toBe(200)
+  })
+
+  it('service_role (interna) NO pasa por el gate: puede cobrar sandbox sin flag', async () => {
+    fixtureCuota(h.state, { empresa: { pago_sandbox_demo: false } })
+    const res = await post({ cuota_id: 'c1' }, 'srk-secret')
+    expect(res.status).toBe(200)
   })
 })
