@@ -298,8 +298,8 @@ export const APP_ROUTES: AppRouteDef[] = [
       />
     ),
   },
-  { path: '/energia', sectionName: 'servicios_energia', render: renderEnergia },
-  { path: '/energia/:tab', sectionName: 'servicios_energia', render: renderEnergia },
+  { path: '/energia', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
+  { path: '/energia/:tab', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
   // cond:A1 sub-rutas: `/condominios/panel` es el selector de proyecto
   // (CondominiosDashboard). Cualquier otro segmento se interpreta como un tab
   // del registry; tabs desconocidos caen a 'panel'. `/condominios` (sin
