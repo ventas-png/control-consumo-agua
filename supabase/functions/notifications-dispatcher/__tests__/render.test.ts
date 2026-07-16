@@ -2,7 +2,7 @@
 // tratando el módulo como TS normal. Cubre lo de mayor valor del orquestador:
 //   - resolución de plantilla de email EN CASCADA (notif tenant→global → email_tpl
 //     → payload) y reglas post-cascada (subject por defecto, wrap en layout).
-//   - routing de canal (in_app/email soportados; whatsapp/push/desconocido → error).
+//   - routing de canal (in_app/email/whatsapp soportados; push/desconocido → error).
 //   - sustitución de variables {{...}}, expiración de token Gmail, clasificación
 //     retriable de status HTTP y clamp del batch.
 
@@ -16,6 +16,7 @@ import {
   formatFromHeader,
   isGmailStatusRetriable,
   isTokenExpired,
+  isWhatsAppStatusRetriable,
   looksLikeFullHtml,
   resolveEmailContent,
   routeChannel,
@@ -176,14 +177,14 @@ describe('dispatcher/resolveEmailContent (cascada)', () => {
 })
 
 describe('dispatcher/routeChannel', () => {
-  it('in_app y email son soportados', () => {
+  it('in_app, email y whatsapp son soportados', () => {
     expect(routeChannel('in_app')).toEqual({ supported: true })
     expect(routeChannel('email')).toEqual({ supported: true })
+    expect(routeChannel('whatsapp')).toEqual({ supported: true })
   })
 
-  it('whatsapp y push: no soportados (follow-up) con mensaje', () => {
-    expect(routeChannel('whatsapp')).toMatchObject({ supported: false })
-    expect(routeChannel('whatsapp').error).toMatch(/whatsapp no implementado/)
+  it('push: no soportado (follow-up) con mensaje', () => {
+    expect(routeChannel('push')).toMatchObject({ supported: false })
     expect(routeChannel('push').error).toMatch(/push no implementado/)
   })
 
@@ -232,6 +233,21 @@ describe('dispatcher/isGmailStatusRetriable', () => {
     expect(isGmailStatusRetriable(401)).toBe(false)
     expect(isGmailStatusRetriable(403)).toBe(false)
     expect(isGmailStatusRetriable(404)).toBe(false)
+  })
+})
+
+describe('dispatcher/isWhatsAppStatusRetriable', () => {
+  it('429 (rate limit) y 5xx son retriables', () => {
+    expect(isWhatsAppStatusRetriable(429)).toBe(true)
+    expect(isWhatsAppStatusRetriable(500)).toBe(true)
+    expect(isWhatsAppStatusRetriable(503)).toBe(true)
+  })
+
+  it('4xx (salvo 429) son terminales: token inválido, número/plantilla mala', () => {
+    expect(isWhatsAppStatusRetriable(400)).toBe(false)
+    expect(isWhatsAppStatusRetriable(401)).toBe(false)
+    expect(isWhatsAppStatusRetriable(403)).toBe(false)
+    expect(isWhatsAppStatusRetriable(404)).toBe(false)
   })
 })
 
