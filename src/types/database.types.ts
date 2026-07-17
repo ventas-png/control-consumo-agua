@@ -18901,6 +18901,24 @@ export type Database = {
           updated_at: string
         }[]
       }
+      whatsapp_estatus: {
+        Args: { p_company_id: string }
+        Returns: {
+          company_id: string
+          created_at: string
+          estado_conexion: string
+          estado_mensaje: string
+          estado_probado_en: string
+          id: string
+          is_active: boolean
+          phone_number_id: string
+          provider: string
+          template_default: string
+          template_lang: string
+          tiene_token: boolean
+          updated_at: string
+        }[]
+      }
       pop_email_batch: {
         Args: { p_batch_size?: number }
         Returns: {

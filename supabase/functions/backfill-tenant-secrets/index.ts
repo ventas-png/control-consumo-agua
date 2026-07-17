@@ -38,6 +38,10 @@ interface TableResult {
 const TEXT_TABLES: Record<string, string[]> = {
   company_payment_secrets: ['stripe_secret_key', 'stripe_webhook_secret', 'paypal_client_secret'],
   company_email_configs: ['access_token', 'refresh_token'],
+  // Bóveda WhatsApp por tenant (#611): el access_token de Meta se sembraba en
+  // texto plano (interin por SQL editor) y quedaba fuera del backfill de cifrado
+  // (auditoría 2026-07-16, S4). Incluirlo aquí lo cifra en la próxima corrida.
+  company_whatsapp_configs: ['access_token'],
 }
 const JSONB_TABLES = ['fiscal_pac_secrets', 'payfac_secrets']
 const ALL_TABLES = [...Object.keys(TEXT_TABLES), ...JSONB_TABLES]
