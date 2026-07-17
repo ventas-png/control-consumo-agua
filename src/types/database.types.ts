@@ -18042,6 +18042,17 @@ export type Database = {
         Args: { p_notificar?: boolean; p_periodo: string; p_project_id: string }
         Returns: Json
       }
+      agua_consumo_comunidad: {
+        Args: { p_project_id: string; p_meses?: number }
+        Returns: {
+          mes: string
+          n_residentes: number
+          mediana_m3: number
+          p25_m3: number
+          p75_m3: number
+          promedio_m3: number
+        }[]
+      }
       aplicar_mora_cuotas_vencidas: { Args: never; Returns: undefined }
       aplicar_mora_facturas_vencidas: { Args: never; Returns: undefined }
       banco_ajuste_conciliacion: {

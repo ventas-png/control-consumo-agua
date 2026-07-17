@@ -3,6 +3,7 @@
 // tendencia (regresión lineal) y desgloses por tipo de agua y unidad. Antes
 // vivía en un useMemo de ~185 líneas dentro del componente, sin tests.
 import { parseFecha } from './format'
+import { proyectarProximoRecibo, type ProyeccionRecibo } from './portalProyeccion'
 
 export interface UnidadInfo {
   id: string
@@ -42,6 +43,36 @@ export interface LecturaInfo {
   cliente_id?: string | null
   project_id?: string | null
   foto?: string | null
+  // Snapshot de la tarifa aplicada en la lectura (para proyectar el próximo
+  // recibo sin bajar la config de tarifas). Opcionales: no todas las lecturas
+  // los traen y las proyecciones degradan a 0 si faltan.
+  tarifa_aplicada?: number | null
+  tarifa_exceso_aplicada?: number | null
+  canon_aplicado?: number | null
+}
+
+/** Fila de la referencia anónima de la comunidad (RPC agua_consumo_comunidad). */
+export interface ComunidadMensual {
+  /** Primer día del mes (YYYY-MM-DD). */
+  mes: string
+  n_residentes: number
+  mediana_m3: number
+  p25_m3: number
+  p75_m3: number
+  promedio_m3: number
+}
+
+/** Comparación del consumo del residente vs la mediana de su comunidad. */
+export interface ComparativoComunidad {
+  /** Mes comparado (el más reciente con dato del residente y de la comunidad). */
+  mesLabel: string
+  tuConsumo: number
+  mediana: number
+  n_residentes: number
+  /** % del residente respecto a la mediana (100 = igual a la mediana). */
+  pctDeMediana: number
+  /** Posición cualitativa respecto a la banda p25–p75 de la comunidad. */
+  posicion: 'bajo' | 'tipico' | 'alto'
 }
 
 export const TIPO_AGUA_LABELS: Record<string, string> = {
@@ -72,6 +103,8 @@ export interface PortalDashboardInputs {
   chartCustomEnd: string
   chartRangeMode: 'preset' | 'custom'
   chartMetric: 'm3' | 'moneda'
+  /** Referencia anónima de la comunidad (mediana mensual por residente). */
+  comunidad?: ComunidadMensual[]
   /** Inyectable en tests; default: ahora. */
   ahora?: Date
 }
@@ -82,6 +115,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
     selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd,
     chartRangeMode, chartMetric,
   } = inputs
+    const comunidad = inputs.comunidad ?? []
     const fotoRegistroIds = inputs.fotoRegistroIds ?? new Set<string>()
     const now = inputs.ahora ?? new Date()
     const curY = now.getFullYear()
@@ -206,6 +240,47 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       parseFloat(Math.max(0, slope * x + intercept).toFixed(2))
     )
 
+    // ── Referencia de la comunidad (O5/V6) ──────────────────────────────────
+    // Mediana mensual de la comunidad alineada a los meses del gráfico. Solo
+    // tiene sentido en m³ (el RPC no expone importes de otros residentes); la
+    // UI la muestra únicamente cuando chartMetric === 'm3'.
+    const comunidadPorYM = new Map<string, ComunidadMensual>()
+    for (const c of comunidad) {
+      const d = parseFecha(c.mes)
+      comunidadPorYM.set(`${d.getFullYear()}-${d.getMonth()}`, c)
+    }
+    const medianaComunidadData: (number | null)[] = chartMonths.map(({ y, m }) => {
+      const c = comunidadPorYM.get(`${y}-${m}`)
+      return c ? c.mediana_m3 : null
+    })
+
+    // Comparación puntual: mes más reciente en el que HAY dato de la comunidad y
+    // el residente tuvo consumo (independiente de la ventana visible del gráfico).
+    let comparativoComunidad: ComparativoComunidad | null = null
+    const comunidadDesc = [...comunidad].sort((a, b) => (a.mes < b.mes ? 1 : a.mes > b.mes ? -1 : 0))
+    for (const c of comunidadDesc) {
+      const d = parseFecha(c.mes)
+      const tu = filteredLecturas
+        .filter(l => sameYM(l.fecha, d.getFullYear(), d.getMonth()))
+        .reduce((s, l) => s + (l.consumo || 0), 0)
+      if (tu > 0) {
+        comparativoComunidad = {
+          mesLabel: `${MESES_LABELS[d.getMonth()]} ${d.getFullYear()}`,
+          tuConsumo: parseFloat(tu.toFixed(2)),
+          mediana: c.mediana_m3,
+          n_residentes: c.n_residentes,
+          pctDeMediana: c.mediana_m3 > 0 ? Math.round((tu / c.mediana_m3) * 100) : 100,
+          posicion: tu < c.p25_m3 ? 'bajo' : tu > c.p75_m3 ? 'alto' : 'tipico',
+        }
+        break
+      }
+    }
+
+    // ── Proyección del próximo recibo (O5) ──────────────────────────────────
+    // Estimación a partir del promedio reciente por medidor valorado con su
+    // última tarifa conocida (snapshot en la lectura). Ver lib/portalProyeccion.
+    const proyeccion: ProyeccionRecibo = proyectarProximoRecibo(filteredLecturas)
+
     // Comparaciones (always based on fixed 24m baseline)
     const consumoPrevMes = all24Consumo[22] ?? 0
     const consumoSameLastYear = all24Consumo[11] ?? 0
@@ -266,6 +341,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
       chartLabels, chartDatasets, chartCurrentMonthIdx, trendData,
+      medianaComunidadData, comparativoComunidad, proyeccion,
       availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
     }

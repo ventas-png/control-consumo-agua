@@ -148,4 +148,80 @@ describe('construirDashboardData', () => {
     }))
     expect(d.consumoMesActual).toBe(10)
   })
+
+  describe('comparación con la comunidad (O5/V6)', () => {
+    it('sin datos de comunidad: serie de mediana toda en null y sin comparativo', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [lectura({ fecha: '2026-06-10', consumo: 10 })],
+      }))
+      expect(d.medianaComunidadData.every(v => v === null)).toBe(true)
+      expect(d.comparativoComunidad).toBeNull()
+    })
+
+    it('alinea la mediana al mes correcto de la ventana del gráfico', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [lectura({ fecha: '2026-06-10', consumo: 10 })],
+        comunidad: [{ mes: '2026-06-01', n_residentes: 8, mediana_m3: 20, p25_m3: 10, p75_m3: 30, promedio_m3: 22 }],
+      }))
+      // Ventana de 12 meses termina en Jun 2026 (último índice).
+      expect(d.medianaComunidadData).toHaveLength(12)
+      expect(d.medianaComunidadData[11]).toBe(20)
+      expect(d.medianaComunidadData.filter(v => v !== null)).toHaveLength(1)
+    })
+
+    it('comparativo: posición típica cuando el consumo cae dentro de p25–p75', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [lectura({ fecha: '2026-06-10', consumo: 15 })],
+        comunidad: [{ mes: '2026-06-01', n_residentes: 8, mediana_m3: 20, p25_m3: 10, p75_m3: 30, promedio_m3: 22 }],
+      }))
+      expect(d.comparativoComunidad).toMatchObject({
+        mesLabel: 'Jun 2026', tuConsumo: 15, mediana: 20, n_residentes: 8,
+        pctDeMediana: 75, posicion: 'tipico',
+      })
+    })
+
+    it('comparativo: posición alta cuando el consumo supera p75', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [lectura({ fecha: '2026-06-10', consumo: 40 })],
+        comunidad: [{ mes: '2026-06-01', n_residentes: 8, mediana_m3: 20, p25_m3: 10, p75_m3: 30, promedio_m3: 22 }],
+      }))
+      expect(d.comparativoComunidad?.posicion).toBe('alto')
+      expect(d.comparativoComunidad?.pctDeMediana).toBe(200)
+    })
+
+    it('comparativo usa el mes más reciente con dato del residente y de la comunidad', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [
+          lectura({ id: 'a', fecha: '2026-05-10', consumo: 12 }),
+          lectura({ id: 'b', fecha: '2026-06-10', consumo: 18 }),
+        ],
+        comunidad: [
+          { mes: '2026-05-01', n_residentes: 6, mediana_m3: 10, p25_m3: 5, p75_m3: 15, promedio_m3: 11 },
+          { mes: '2026-06-01', n_residentes: 7, mediana_m3: 20, p25_m3: 12, p75_m3: 28, promedio_m3: 21 },
+        ],
+      }))
+      expect(d.comparativoComunidad?.mesLabel).toBe('Jun 2026')
+      expect(d.comparativoComunidad?.tuConsumo).toBe(18)
+    })
+  })
+
+  describe('proyección del próximo recibo (O5)', () => {
+    it('propaga la proyección desde el historial filtrado', () => {
+      const d = construirDashboardData(inputs({
+        contadores: [contador({})], unidades: [unidad({})],
+        lecturas: [
+          lectura({ id: 'a', fecha: '2026-05-10', consumo: 10, tarifa_aplicada: 5, canon_aplicado: 0 }),
+          lectura({ id: 'b', fecha: '2026-06-10', consumo: 20, tarifa_aplicada: 5, canon_aplicado: 0 }),
+        ],
+      }))
+      expect(d.proyeccion.base).toBe('promedio')
+      expect(d.proyeccion.consumoProyectado).toBe(15) // (10 + 20) / 2
+      expect(d.proyeccion.montoProyectado).toBe(75)   // 15 * 5
+    })
+  })
 })
