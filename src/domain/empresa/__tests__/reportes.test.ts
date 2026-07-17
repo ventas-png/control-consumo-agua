@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => {
   const state: { result: unknown; calls: Array<[string, ...unknown[]]> } = { result: { data: null, error: null }, calls: [] }
   const builder: Record<string, unknown> = {}
-  for (const m of ['select', 'insert', 'delete', 'update', 'eq', 'is', 'order', 'limit']) {
+  for (const m of ['select', 'insert', 'delete', 'update', 'eq', 'is', 'order', 'limit', 'range']) {
     builder[m] = (...args: unknown[]) => { state.calls.push([m, ...args]); return builder }
   }
   builder.then = (resolve: (v: unknown) => void) => resolve(state.result)
@@ -95,17 +95,20 @@ describe('runReportQuery', () => {
   it('filtra company_id + deleted_at null + filtros guardados (ignora vacíos)', async () => {
     h.state.result = { data: [{ id: 1 }, { id: 2 }], error: null }
     const r = await runReportQuery('pagos', 'co1', { estado: 'pendiente', mes: '', nada: null })
-    expect(r).toEqual({ data: [{ id: 1 }, { id: 2 }], error: null })
+    // D1: paginación estable server-side (order id + range) sin truncar.
+    expect(r).toEqual({ data: [{ id: 1 }, { id: 2 }], error: null, truncated: false })
     expect(h.state.calls).toContainEqual(['eq', 'company_id', 'co1'])
     expect(h.state.calls).toContainEqual(['is', 'deleted_at', null])
     expect(h.state.calls).toContainEqual(['eq', 'estado', 'pendiente'])
+    expect(h.state.calls).toContainEqual(['order', 'id', { ascending: true }])
+    expect(h.state.calls).toContainEqual(['range', 0, 999])
     // los vacíos no generan eq
     expect(h.state.calls).not.toContainEqual(['eq', 'mes', ''])
     expect(h.state.calls).not.toContainEqual(['eq', 'nada', null])
   })
 
-  it('error → mensaje legible', async () => {
+  it('error → mensaje legible (sin filas)', async () => {
     h.state.result = { data: null, error: { message: 'rls' } }
-    expect(await runReportQuery('pagos', 'co1', {})).toEqual({ data: null, error: 'rls' })
+    expect(await runReportQuery('pagos', 'co1', {})).toEqual({ data: null, error: 'rls', truncated: false })
   })
 })

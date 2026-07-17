@@ -5,6 +5,7 @@
 // corrida (incluye la resolución del actor vía auth.getUser). La exportación
 // (exportData) y el envío por email se quedan en la UI/lib.
 import { supabase } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 
 /** Columnas de report_templates que consume la pantalla (evita select('*')). */
 const TEMPLATE_COLS =
@@ -62,18 +63,26 @@ export async function fetchReportRuns<T>(
  * Ejecuta el SELECT dinámico de un reporte: tabla fuente + scope de empresa,
  * excluye soft-deleted (`deleted_at IS NULL`) y aplica los filtros guardados
  * (ignora null/''/undefined). Devuelve las filas crudas para exportar.
+ *
+ * D1: trae el resultado COMPLETO paginando server-side con `.range()` en vez de
+ * un solo SELECT — que quedaba a merced del tope silencioso de PostgREST (~1000
+ * filas), exportando/enviando reportes incompletos sin aviso. El orden por `id`
+ * (todas las tablas fuente del whitelist lo tienen) da una paginación estable.
  */
 export async function runReportQuery(
   sourceTable: string,
   companyId: string,
   filters: Record<string, unknown>,
-): Promise<{ data: Array<Record<string, unknown>> | null; error: string | null }> {
-  let q = supabase.from(sourceTable).select('*').eq('company_id', companyId).is('deleted_at', null)
-  for (const [k, v] of Object.entries(filters)) {
-    if (v !== null && v !== '' && v !== undefined) q = q.eq(k, v)
-  }
-  const { data, error } = await q
-  return { data: (data as Array<Record<string, unknown>>) ?? null, error: error?.message ?? null }
+): Promise<{ data: Array<Record<string, unknown>> | null; error: string | null; truncated?: boolean }> {
+  const { data, error, truncated } = await fetchAllRows<Record<string, unknown>>((from, to) => {
+    let q = supabase.from(sourceTable).select('*').eq('company_id', companyId).is('deleted_at', null)
+    for (const [k, v] of Object.entries(filters)) {
+      if (v !== null && v !== '' && v !== undefined) q = q.eq(k, v)
+    }
+    return q.order('id', { ascending: true }).range(from, to)
+  })
+  if (error) return { data: null, error, truncated }
+  return { data, error: null, truncated }
 }
 
 export interface LogReportRunInput {
