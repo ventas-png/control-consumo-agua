@@ -14,4 +14,7 @@ export const payfacKeys = {
   // Estatus (NO sensible) de credenciales del payfac de un tenant.
   estatus: (companyId?: string) =>
     [...payfacKeys.all, 'estatus', companyId ?? null] as const,
+  // Aging + score de morosidad por unidad (RPC cartera_morosidad).
+  morosidad: (companyId?: string, projectId?: string | null) =>
+    [...payfacKeys.all, 'cartera-morosidad', companyId ?? null, projectId ?? null] as const,
 } as const

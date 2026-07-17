@@ -18531,6 +18531,21 @@ export type Database = {
         Returns: undefined
       }
       current_user_role: { Args: never; Returns: string }
+      cartera_morosidad: {
+        Args: { p_project_id?: string }
+        Returns: {
+          unidad_id: string
+          bucket_0_30: number
+          bucket_31_60: number
+          bucket_61_90: number
+          bucket_90_plus: number
+          total_vencido: number
+          cuotas_vencidas: number
+          dias_atraso_max: number
+          periodos_morosos: number
+          score: number
+        }[]
+      }
       cxp_antiguedad_saldos: {
         Args: { p_company_id: string; p_project_id: string }
         Returns: {
