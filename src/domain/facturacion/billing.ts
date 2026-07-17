@@ -25,7 +25,10 @@ export async function fetchActiveSubscription<T>(companyId: string): Promise<T |
 export async function fetchActiveBillingPlans<T>(): Promise<T[]> {
   const { data } = await db
     .from('billing_plans')
-    .select('code, name, price_monthly_cents, price_yearly_cents, description, features')
+    // F1 (C5): + componentes del precio POR USO (base/extra_project/unit_*) y
+    // topes — el picker proyecta el total con el uso actual del tenant en vez
+    // de mostrar solo la base plana (que subestimaba la factura real).
+    .select('code, name, price_monthly_cents, price_yearly_cents, description, features, base_activation_cents, extra_project_cents, unit_primary_cents, unit_extra_cents, max_projects, max_units')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
   // Select validado contra el esquema; T lo aporta la UI (tipo local) — frontera.
