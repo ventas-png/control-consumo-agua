@@ -5,6 +5,7 @@ import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto }
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import { registroExiste } from '../../domain/agua/queries'
+import { hoyLocalISO } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
 import {
@@ -51,7 +52,9 @@ export function LecturasSection({
   // P1 (quick win): confirmación de reset del medidor para el caso lectura↓ legítima.
   const [resetContador, setResetContador] = useState(false)
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
-  const [fechaLecturaActual, setFechaLecturaActual] = useState(() => new Date().toISOString().split('T')[0])
+  // E4/D5: fecha LOCAL (el patrón toISOString() daba la fecha UTC — de noche en
+  // GMT-6 pre-llenaba "mañana" y la lectura caía al ciclo siguiente).
+  const [fechaLecturaActual, setFechaLecturaActual] = useState(() => hoyLocalISO())
   const [notas, setNotas] = useState('')
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
@@ -244,7 +247,7 @@ export function LecturasSection({
     setSelectedContadorId('')
     setLecturaActual('')
     setEstado('pendiente')
-    setFechaLecturaActual(new Date().toISOString().split('T')[0])
+    setFechaLecturaActual(hoyLocalISO())
     setFechaAnteriorManual('')
     setNotas('')
     setFoto(null)

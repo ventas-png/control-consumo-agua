@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
+import { hoyLocalISO } from '../../lib/format'
 import type { Cliente, Contador, Tarifa } from '../../types'
 import { calcularTotalPagar, calcularTotalPagarEscalonado, validarLectura } from '../../lib/business'
 
@@ -102,7 +103,10 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       const { error } = await createRegistro({
         cliente_id: selectedClienteId,
         cliente_nombre: selectedCliente?.nombre,
-        fecha: new Date().toISOString().split('T')[0],
+        // E4/D5: fecha LOCAL a mediodía (patrón de LecturasSection). Antes iba la
+        // fecha UTC date-only directa al timestamptz → medianoche UTC = 18:00 del
+        // día ANTERIOR en GT, y de noche caía al ciclo siguiente.
+        fecha: new Date(hoyLocalISO() + 'T12:00:00').toISOString(),
         lectura_anterior: parseFloat(lecturaAnterior),
         lectura_actual: parseFloat(lecturaActual),
         consumo,

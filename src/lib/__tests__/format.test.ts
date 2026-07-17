@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   parseFecha,
+  dateLocalISO,
+  hoyLocalISO,
   formatDate,
   formatDateShort,
   formatDateTime,
@@ -33,6 +35,29 @@ describe('parseFecha', () => {
   it('pasa Date sin tocar', () => {
     const date = new Date(2026, 4, 16)
     expect(parseFecha(date)).toBe(date)
+  })
+})
+
+describe('dateLocalISO / hoyLocalISO (E4/D5)', () => {
+  it('usa los componentes LOCALES de la fecha (no la fecha UTC)', () => {
+    // 23:30 local: toISOString() daría la fecha UTC (posible "mañana");
+    // dateLocalISO debe conservar el día local.
+    const d = new Date(2026, 6, 31, 23, 30, 0) // 31 jul local, 23:30
+    expect(dateLocalISO(d)).toBe('2026-07-31')
+  })
+
+  it('con padding de mes y día', () => {
+    expect(dateLocalISO(new Date(2026, 0, 5, 8, 0, 0))).toBe('2026-01-05')
+  })
+
+  it('hoyLocalISO coincide con dateLocalISO(new Date())', () => {
+    expect(hoyLocalISO()).toBe(dateLocalISO(new Date()))
+  })
+
+  it('round-trip con parseFecha: conserva el mismo día local', () => {
+    const iso = dateLocalISO(new Date(2026, 11, 31, 22, 0, 0))
+    expect(parseFecha(iso).getDate()).toBe(31)
+    expect(parseFecha(iso).getMonth()).toBe(11)
   })
 })
 

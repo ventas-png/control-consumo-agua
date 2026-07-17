@@ -2602,6 +2602,7 @@ export type Database = {
           tax_id: string | null
           tax_id_type: string | null
           telefono: string | null
+          timezone: string
           zoom_default: number | null
         }
         Insert: {
@@ -2646,6 +2647,7 @@ export type Database = {
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
+          timezone?: string
           zoom_default?: number | null
         }
         Update: {
@@ -2690,6 +2692,7 @@ export type Database = {
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
+          timezone?: string
           zoom_default?: number | null
         }
         Relationships: []
