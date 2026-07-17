@@ -61,7 +61,8 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
   const { data: usuarios = [], isLoading: usuariosLoading } = useEmpresaUsuariosQuery(emp.id)
   const { data: billing } = useEmpresaBillingQuery(emp.id)
   const { data: moneda } = useEmpresaMonedaQuery(emp.id)
-  // F7: comisión transaccional de la plataforma (config + acumulado mensual).
+  // F7: take-rate de plataforma (config + acumulado mensual). No confundir con
+  // el recargo de tarjeta al cliente final (recargo_tarjeta_config, del tenant).
   const { data: comisionRows = [] } = useEmpresaComisionQuery(emp.id)
   const { data: comisionResumen = [] } = useEmpresaComisionResumenQuery(emp.id)
   // F8: modelo de cobro del timbrado fiscal (config + contador mensual).
@@ -109,14 +110,16 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     }
   }
 
-  // F7: configurar la comisión transaccional de un canal. Dos pasos (igual que
+  // F7: configurar el take-rate de plataforma de un canal. Dos pasos (igual que
   // el cierre automático): elegir canal → editar valores prefijados con la fila
   // vigente. pct se captura en % y se guarda como fracción.
   async function configurarComision() {
     const paso1 = await openPromptDialog({
-      title: '💸 Comisión transaccional',
+      title: '💸 Take-rate de plataforma',
       description:
-        'Comisión de la plataforma sobre cada pago en línea del tenant (solo pagos de ambiente prod). '
+        'Comisión de la plataforma sobre cada pago en línea del tenant, facturable al tenant '
+        + '(solo pagos de ambiente prod). NO es el recargo por pago con tarjeta — ese lo '
+        + 'configura el tenant y lo paga su cliente final. '
         + 'Se sella al crear cada cobro: cambiarla no afecta pagos ya creados. '
         + 'La fila «Todos los canales» aplica a cualquier proveedor sin fila propia.',
       fields: [
@@ -132,7 +135,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     if (!canal) return
     const actual = comisionRows.find(c => c.canal === canal)
     const datos = await openPromptDialog({
-      title: `💸 Comisión — ${canalComisionLabel(canal)}`,
+      title: `💸 Take-rate — ${canalComisionLabel(canal)}`,
       description: actual
         ? `Config vigente: ${(actual.pct * 100).toFixed(2)}% + ${actual.fijo.toFixed(2)} fijo${actual.activo ? '' : ' (inactiva)'}.`
         : 'Este canal aún no tiene comisión configurada.',
@@ -171,7 +174,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       notify({ variant: 'error', title: 'No se pudo guardar la comisión', text: error })
       return
     }
-    notify({ variant: 'success', title: '💸 Comisión guardada', duration: 1400 })
+    notify({ variant: 'success', title: '💸 Take-rate guardado', duration: 1400 })
     void qc.invalidateQueries({ queryKey: superadminKeys.empresaComision(emp.id) })
     void qc.invalidateQueries({ queryKey: superadminKeys.empresaComisionResumen(emp.id) })
   }
@@ -412,14 +415,19 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
           )}
         </Section>
 
-        {/* ── Comisión transaccional (F7) ── */}
+        {/* ── Take-rate de plataforma (F7) ── */}
         <Section
-          title="Comisión transaccional"
+          title="Take-rate de plataforma (opcional)"
           action={<button onClick={() => void configurarComision()} style={secondaryBtnStyle}>Configurar</button>}
         >
+          <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+            Comisión de la plataforma sobre los pagos en línea del tenant, facturable al
+            tenant (ledger). NO es el recargo por pago con tarjeta: ese lo configura el
+            tenant en Mi Empresa y lo paga su cliente final.
+          </p>
           {comisionRows.length === 0 ? (
             <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
-              Sin comisión configurada — los pagos en línea de esta empresa no generan
+              Sin take-rate configurado — los pagos en línea de esta empresa no generan
               comisión de plataforma.
             </div>
           ) : (

@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
 import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
+import { calcularRecargo, totalConRecargo, type RecargoConfigRow } from '../_shared/payments/recargo.ts'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
@@ -173,16 +174,29 @@ Deno.serve(async (req) => {
       .eq('id', cliente_id)
       .single()
 
+    // Recargo por pago con tarjeta (config del TENANT): se SUMA al total que
+    // cobra Stripe; el abono al recibo sigue siendo `monto`
+    // (payment_requests.monto). Aplica en todos los ambientes — es el total
+    // del checkout, no facturación de plataforma.
+    const { data: recRows } = await adminClient
+      .from('recargo_tarjeta_config')
+      .select('canal, activo, pct, fijo')
+      .eq('company_id', company_id)
+    const recargoCalc = calcularRecargo(monto, 'stripe', (recRows as RecargoConfigRow[] | null) ?? [])
+    const totalCobro = totalConRecargo(monto, recargoCalc.recargo)
+
     // Create PaymentIntent with dynamic currency
     const paymentIntent = await stripeClient.paymentIntents.create({
-      amount: Math.round(monto * 100), // Convert to cents
+      amount: Math.round(totalCobro * 100), // Convert to cents (monto + recargo)
       currency: currency,
       metadata: {
         cliente_id,
         registro_id,
         company_id,
       },
-      description: `Pago de agua - ${cliente?.nombre ?? 'Cliente'}`,
+      description: recargoCalc.recargo != null
+        ? `Pago de agua - ${cliente?.nombre ?? 'Cliente'} · incluye recargo por pago con tarjeta ${recargoCalc.recargo.toFixed(2)} ${currency.toUpperCase()}`
+        : `Pago de agua - ${cliente?.nombre ?? 'Cliente'}`,
     })
 
     // Comisión de plataforma (F7): config por empresa+canal, sellada al crear
@@ -210,6 +224,8 @@ Deno.serve(async (req) => {
         stripe_payment_intent: paymentIntent.id,
         comision: comisionCalc.comision,
         comision_detalle: comisionCalc.detalle,
+        recargo: recargoCalc.recargo,
+        recargo_detalle: recargoCalc.detalle,
       })
 
     if (paymentRequestError) {
@@ -219,6 +235,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      // Desglose del checkout: abono al recibo = monto; Stripe cobra el total.
+      recargo: recargoCalc.recargo,
+      total_cobrado: totalCobro,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

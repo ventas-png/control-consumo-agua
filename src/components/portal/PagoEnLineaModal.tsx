@@ -2,11 +2,17 @@ import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../lib/businessPagos'
 import { iniciarPagoRegistro, confirmarPago } from '../../domain/portal/mutations'
 
 interface Props {
   registro: Registro
   moneda: string
+  /** Config de recargo por pago con tarjeta del tenant (desglose pre-pago).
+   *  El cobro real lo calcula y sella el edge server-side. */
+  recargoRows?: RecargoTarjetaRow[]
+  /** Canal efectivo del cobro (proveedor_pago) para elegir la fila de recargo. */
+  canalPago?: string
   onClose: () => void
   /** Pago aplicado (inmediato/sandbox): cerrar + refrescar la lista de recibos. */
   onPagado: () => void
@@ -19,13 +25,18 @@ interface Props {
  *   • Checkout hospedado (qpaypro) → guarda el payment_request y redirige; el retorno
  *     (?pago=ok) lo concilia CustomerPortal. Permite ABONOS parciales.
  */
-export function PagoEnLineaModal({ registro, moneda, onClose, onPagado }: Props) {
+export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onClose, onPagado }: Props) {
   const total = registro.monto_calculado ?? calcularTotalPagar(registro.consumo, registro.tarifa_aplicada, registro.canon_aplicado ?? 20).total
   const abonado = registro.monto_pagado ?? 0
   const saldo = Math.max(0, total - abonado)
 
   const [monto, setMonto] = useState(saldo > 0 ? saldo.toFixed(2) : '')
   const [loading, setLoading] = useState(false)
+
+  // Desglose pre-pago: el recargo se recalcula en vivo con el monto capturado
+  // (el valor autoritativo lo sella el edge; este espejo solo informa).
+  const montoNum = parseFloat(monto) || 0
+  const recargo = calcularRecargoTarjeta(montoNum, canalPago ?? 'default', recargoRows)
 
   async function handlePagar() {
     const montoNum = parseFloat(monto) || 0
@@ -153,6 +164,20 @@ export function PagoEnLineaModal({ registro, moneda, onClose, onPagado }: Props)
               boxSizing: 'border-box',
             }}
           />
+          {recargo != null && (
+            <div style={{
+              marginTop: '10px', padding: '10px 12px', borderRadius: '8px',
+              background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
+              fontSize: '12.5px', color: 'var(--at-ink-2)',
+            }}>
+              Recargo por pago con tarjeta: <strong>{moneda} {recargo.toFixed(2)}</strong>
+              <span style={{ color: 'var(--at-ink-3)' }}> · </span>
+              Total a pagar: <strong>{moneda} {(montoNum + recargo).toFixed(2)}</strong>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                El abono a tu recibo es {moneda} {montoNum.toFixed(2)}; el recargo cubre el fee del procesador de tarjeta.
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>

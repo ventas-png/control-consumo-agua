@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente } from '../../domain/portal/queries'
+import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
+import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
 import { BrandLogo } from '../shared/BrandLogo'
@@ -60,6 +61,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [selectedUnidadId, setSelectedUnidadId]   = useState('')
   const [resolvedCompanyId, setResolvedCompanyId] = useState(currentUser.company_id ?? '')
   const [moneda, setMoneda]                       = useState('Q')
+  // Recargo por pago con tarjeta + canal efectivo (desglose pre-pago del modal
+  // de cuotas; el cobro real lo sella el edge server-side).
+  const [recargoRows, setRecargoRows]             = useState<RecargoTarjetaRow[]>([])
+  const [canalPago, setCanalPago]                 = useState('sandbox')
   const [cuotas, setCuotas]                       = useState<CuotaCondominio[]>([])
   const [amenidades, setAmenidades]               = useState<Amenidad[]>([])
   const [reservas, setReservas]                   = useState<ReservaAmenidad[]>([])
@@ -122,6 +127,22 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   }, [clienteId, currentUser.company_id])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
+
+  // Recargo por pago con tarjeta + canal efectivo del tenant, para el desglose
+  // pre-pago del modal de cuotas (el cobro real lo sella create-charge).
+  useEffect(() => {
+    if (!resolvedCompanyId) return
+    let cancelado = false
+    void Promise.all([
+      fetchPortalPaymentConfig(resolvedCompanyId),
+      fetchPortalRecargoTarjeta(resolvedCompanyId),
+    ]).then(([cfg, rows]) => {
+      if (cancelado) return
+      setCanalPago(cfg?.proveedor_pago || 'sandbox')
+      setRecargoRows(rows)
+    })
+    return () => { cancelado = true }
+  }, [resolvedCompanyId])
 
   // F1 pago en línea: retorno del checkout hospedado (?pago=ok|cancelado). En 'ok'
   // confirma+concilia server-side el pago guardado antes de redirigir. Corre una
@@ -409,6 +430,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 cuotas={cuotasU}
                 moneda={moneda}
                 unidadNombre={unidad.nombre}
+                recargoRows={recargoRows}
+                canalPago={canalPago}
                 onPagado={cargarDatos}
               />
             )}

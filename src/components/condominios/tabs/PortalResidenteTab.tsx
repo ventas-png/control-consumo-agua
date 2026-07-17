@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchMensajesPortal, activarPortalUnidad } from '../../../domain/condominios/tabQueries'
+import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../../domain/portal/queries'
+import type { RecargoTarjetaRow } from '../../../lib/businessPagos'
 import type {
   Unidad, CuotaCondominio, TicketMantenimiento,
   Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, AnuncioComunidad, MensajePortal,
@@ -45,6 +47,10 @@ export function PortalResidenteTab({
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [subTab, setSubTab]                     = useState<PortalTab>('cuenta')
   const [mensajes, setMensajes]                 = useState<MensajePortal[]>([])
+  // Recargo por pago con tarjeta + canal efectivo (desglose pre-pago del modal
+  // de cuotas de PortalMiCuentaTab; el cobro real lo sella el edge).
+  const [recargoRows, setRecargoRows]           = useState<RecargoTarjetaRow[]>([])
+  const [canalPago, setCanalPago]               = useState('sandbox')
 
   const unidad = unidades.find(u => u.id === selectedUnidadId) ?? null
 
@@ -52,6 +58,20 @@ export function PortalResidenteTab({
     if (!selectedUnidadId) { setMensajes([]); return }
     void fetchMensajesPortal<MensajePortal>(selectedUnidadId).then(setMensajes)
   }, [selectedUnidadId])
+
+  useEffect(() => {
+    if (!companyId) return
+    let cancelado = false
+    void Promise.all([
+      fetchPortalPaymentConfig(companyId),
+      fetchPortalRecargoTarjeta(companyId),
+    ]).then(([cfg, rows]) => {
+      if (cancelado) return
+      setCanalPago(cfg?.proveedor_pago || 'sandbox')
+      setRecargoRows(rows)
+    })
+    return () => { cancelado = true }
+  }, [companyId])
 
   async function generarToken() {
     if (!unidad) return
@@ -135,6 +155,8 @@ export function PortalResidenteTab({
                 cuotas={cuotasU}
                 moneda={moneda}
                 unidadNombre={unidad.nombre}
+                recargoRows={recargoRows}
+                canalPago={canalPago}
               />
             )}
             {subTab === 'tickets' && (

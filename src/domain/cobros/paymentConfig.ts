@@ -91,3 +91,52 @@ export async function fetchProjectProveedorPagoOverride(
   const p = rows?.[0]
   return p ? { proveedorPago: p.proveedor_pago ?? null, ambientePago: p.ambiente_pago ?? null } : null
 }
+
+// ── Recargo por pago con tarjeta al cliente final (recargo_tarjeta_config) ──
+// El TENANT (company_owner, RLS) fija por canal el fee que su payfac le cobra y
+// que quiere trasladar al cliente final: el edge create-charge lo suma al total
+// del checkout y lo sella en payment_requests.recargo. `supabase` laxo porque
+// la tabla aún no está en el esquema generado (migración 20260717190000).
+
+/** Fila editable de recargo por canal ('default' aplica a todo canal sin fila). */
+export interface RecargoTarjetaConfigFila {
+  canal: string
+  activo: boolean
+  /** Fracción (0.05 = 5%). */
+  pct: number
+  /** Monto fijo por pago, en la moneda de cobro del tenant. */
+  fijo: number
+}
+
+/** Lee las filas de recargo de la empresa (todas; la UI las indexa por canal). */
+export async function fetchRecargoTarjetaConfig(
+  companyId: string,
+): Promise<{ data: RecargoTarjetaConfigFila[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('recargo_tarjeta_config')
+    .select('canal, activo, pct, fijo')
+    .eq('company_id', companyId)
+    .order('canal', { ascending: true })
+  return { data: (data as RecargoTarjetaConfigFila[] | null) ?? [], error: error?.message ?? null }
+}
+
+/** Upsert de la fila de un canal (única por company+canal). */
+export async function upsertRecargoTarjeta(
+  companyId: string,
+  fila: RecargoTarjetaConfigFila,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('recargo_tarjeta_config')
+    .upsert(
+      {
+        company_id: companyId,
+        canal: fila.canal,
+        activo: fila.activo,
+        pct: fila.pct,
+        fijo: fila.fijo,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id,canal' },
+    )
+  return { error: error?.message ?? null }
+}

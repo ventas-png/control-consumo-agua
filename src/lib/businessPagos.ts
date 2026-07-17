@@ -82,6 +82,46 @@ export function resolverConfigPagoEfectiva(
   }
 }
 
+// ── Recargo por pago con tarjeta al cliente final ───────────────────────────
+// ESPEJO Vite de supabase/functions/_shared/payments/recargo.ts (el edge
+// create-charge sella y cobra el recargo server-side; este espejo solo pinta
+// el desglose ANTES de pagar en el portal). Config en recargo_tarjeta_config:
+// fila activa del canal > fila activa 'default' > sin recargo.
+
+/** Fila de recargo_tarjeta_config visible al portal (RLS de cliente). */
+export interface RecargoTarjetaRow {
+  canal: string
+  activo: boolean
+  /** Fracción (0.05 = 5%). */
+  pct: number
+  /** Monto fijo por pago, en la moneda del cobro. */
+  fijo: number
+}
+
+function redondear2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
+/**
+ * Recargo de tarjeta para un cobro de `monto` por el canal `proveedor`, o null
+ * si no aplica. Misma aritmética que el edge (acotado a [0, monto]).
+ */
+export function calcularRecargoTarjeta(
+  monto: number,
+  proveedor: string,
+  rows: RecargoTarjetaRow[] | null | undefined,
+): number | null {
+  if (!Number.isFinite(monto) || monto <= 0) return null
+  const activas = (rows ?? []).filter(r => r.activo === true)
+  const cfg = activas.find(r => r.canal === proveedor) ?? activas.find(r => r.canal === 'default')
+  if (!cfg) return null
+  const pct = Number.isFinite(cfg.pct) && cfg.pct > 0 ? cfg.pct : 0
+  const fijo = Number.isFinite(cfg.fijo) && cfg.fijo > 0 ? cfg.fijo : 0
+  if (pct === 0 && fijo === 0) return null
+  const bruta = redondear2(monto * pct + fijo)
+  return Math.min(Math.max(bruta, 0), redondear2(monto))
+}
+
 /**
  * Normaliza una moneda guardada al código ISO 4217 que esperan los payfacs
  * (ej. QPayPro `x_currency_code`). Acepta tanto SÍMBOLOS de display (como 'Q',

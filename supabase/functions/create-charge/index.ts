@@ -40,6 +40,7 @@ import {
 } from '../_shared/payments/index.ts'
 import { residentePuedePagarCuota } from '../_shared/payments/reconcile.ts'
 import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
+import { calcularRecargo, totalConRecargo, type RecargoConfigRow } from '../_shared/payments/recargo.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -387,6 +388,18 @@ Deno.serve(async (req: Request) => {
       ambiente,
     )
 
+    // ── 2c) Recargo por pago con tarjeta (config del TENANT, tabla
+    // recargo_tarjeta_config): se SUMA al total que cobra el payfac; el abono
+    // al recibo/cuota sigue siendo `monto` (payment_requests.monto, que es lo
+    // que concilia confirm-charge). Aplica en TODOS los ambientes — es el
+    // total del checkout del cliente final, no facturación de plataforma. ──
+    const { data: recRows } = await admin
+      .from('recargo_tarjeta_config')
+      .select('canal, activo, pct, fijo')
+      .eq('company_id', companyId)
+    const recargoCalc = calcularRecargo(monto, config.proveedorPago, (recRows as RecargoConfigRow[] | null) ?? [])
+    const totalCobro = totalConRecargo(monto, recargoCalc.recargo)
+
     // ── 3) Construir el CobroCanonico (datos del cliente para el recibo) ──
     const { data: cliente } = await admin
       .from('clientes')
@@ -395,11 +408,15 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
     const cli = (cliente as { nombre?: string; email?: string; telefono?: string; nit?: string } | null) ?? null
 
+    const descripcionBase = descripcionItem || body.descripcion?.trim() || `Pago — ${cli?.nombre ?? 'Cliente'}`
     const base = APP_URL || origin || ''
     const cobro: CobroCanonico = {
-      monto,
+      // El proveedor cobra el TOTAL (monto + recargo de tarjeta).
+      monto: totalCobro,
       moneda: monedaCobro,
-      descripcion: descripcionItem || body.descripcion?.trim() || `Pago — ${cli?.nombre ?? 'Cliente'}`,
+      descripcion: recargoCalc.recargo != null
+        ? `${descripcionBase} · incluye recargo por pago con tarjeta ${recargoCalc.recargo.toFixed(2)} ${monedaCobro.toUpperCase()}`
+        : descripcionBase,
       referenciaInterna: registroId ?? cuotaId ?? clienteId,
       pagador: {
         nombre: cli?.nombre ?? null,
@@ -465,6 +482,8 @@ Deno.serve(async (req: Request) => {
         referencia: cobro.referenciaInterna,
         comision: comisionCalc.comision,
         comision_detalle: comisionCalc.detalle,
+        recargo: recargoCalc.recargo,
+        recargo_detalle: recargoCalc.detalle,
       })
       .select('id')
       .maybeSingle()
@@ -482,6 +501,10 @@ Deno.serve(async (req: Request) => {
       redirectUrl: resultado.redirectUrl ?? null,
       clientSecret: resultado.clientSecret ?? null,
       payment_request_id: (pr as { id?: string } | null)?.id ?? null,
+      // Desglose del checkout: abono al recibo/cuota = monto; el proveedor
+      // cobró total_cobrado (monto + recargo de tarjeta, si aplica).
+      recargo: recargoCalc.recargo,
+      total_cobrado: totalCobro,
       error: resultado.error ?? null,
     })
   } catch (e) {
