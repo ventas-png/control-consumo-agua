@@ -30,4 +30,8 @@ export const superadminKeys = {
     [...superadminKeys.all, 'empresa-billing', companyId] as const,
   empresaMoneda: (companyId: string) =>
     [...superadminKeys.all, 'empresa-moneda', companyId] as const,
+  empresaComision: (companyId: string) =>
+    [...superadminKeys.all, 'empresa-comision', companyId] as const,
+  empresaComisionResumen: (companyId: string) =>
+    [...superadminKeys.all, 'empresa-comision-resumen', companyId] as const,
 } as const

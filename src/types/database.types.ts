@@ -2633,6 +2633,64 @@ export type Database = {
           },
         ]
       }
+      comision_config: {
+        Row: {
+          activo: boolean
+          canal: string
+          company_id: string
+          created_at: string
+          fijo: number
+          id: string
+          notas: string | null
+          pct: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          canal?: string
+          company_id: string
+          created_at?: string
+          fijo?: number
+          id?: string
+          notas?: string | null
+          pct?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          canal?: string
+          company_id?: string
+          created_at?: string
+          fijo?: number
+          id?: string
+          notas?: string | null
+          pct?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           activa: boolean
@@ -11205,6 +11263,8 @@ export type Database = {
         Row: {
           ambiente: string
           cliente_id: string
+          comision: number | null
+          comision_detalle: Json | null
           company_id: string
           created_at: string | null
           cuota_id: string | null
@@ -11224,6 +11284,8 @@ export type Database = {
         Insert: {
           ambiente?: string
           cliente_id: string
+          comision?: number | null
+          comision_detalle?: Json | null
           company_id: string
           created_at?: string | null
           cuota_id?: string | null
@@ -11243,6 +11305,8 @@ export type Database = {
         Update: {
           ambiente?: string
           cliente_id?: string
+          comision?: number | null
+          comision_detalle?: Json | null
           company_id?: string
           created_at?: string | null
           cuota_id?: string | null
@@ -19172,6 +19236,15 @@ export type Database = {
           enforced: boolean
           provider_id: string
           sso_available: boolean
+        }[]
+      }
+      superadmin_comisiones_resumen: {
+        Args: { p_company_id: string }
+        Returns: {
+          comision_total: number
+          mes: string
+          monto_total: number
+          pagos: number
         }[]
       }
       update_email_attempt: {

@@ -16,6 +16,33 @@ export async function updateEmpresaCampo(
   return { error: error?.message ?? null }
 }
 
+/**
+ * Crea o actualiza la comisión transaccional de una empresa para un canal (F7).
+ * Upsert por la llave natural (company_id, canal); la RLS restringe la
+ * escritura a super_admin. pct es fracción (0.025 = 2.5%); fijo va en la
+ * moneda de cobro del tenant. Los cobros ya sellados no cambian.
+ */
+export async function guardarComisionConfig(
+  companyId: string,
+  canal: string,
+  cfg: { activo: boolean; pct: number; fijo: number },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('comision_config')
+    .upsert(
+      {
+        company_id: companyId,
+        canal,
+        activo: cfg.activo,
+        pct: cfg.pct,
+        fijo: cfg.fijo,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id,canal' },
+    )
+  return { error: error?.message ?? null }
+}
+
 /** Crea una empresa (payload ya armado por la UI). Devuelve la fila creada. */
 export async function createEmpresa(
   payload: Record<string, unknown>,

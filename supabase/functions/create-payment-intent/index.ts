@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
+import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
@@ -184,6 +185,18 @@ Deno.serve(async (req) => {
       description: `Pago de agua - ${cliente?.nombre ?? 'Cliente'}`,
     })
 
+    // Comisión de plataforma (F7): config por empresa+canal, sellada al crear
+    // el cobro. Con llave de TEST de Stripe (sk_test_) no se factura — mismo
+    // criterio que el gate de ambiente prod en create-charge.
+    let comisionCalc: ReturnType<typeof calcularComision> = { comision: null, detalle: null }
+    if (!(stripeSecretKey as string).startsWith('sk_test_')) {
+      const { data: comRows } = await adminClient
+        .from('comision_config')
+        .select('canal, activo, pct, fijo')
+        .eq('company_id', company_id)
+      comisionCalc = calcularComision(monto, 'stripe', (comRows as ComisionConfigRow[] | null) ?? [])
+    }
+
     // Create payment_request record for tracking
     const { error: paymentRequestError } = await adminClient
       .from('payment_requests')
@@ -195,6 +208,8 @@ Deno.serve(async (req) => {
         provider: 'stripe',
         estado: 'pending',
         stripe_payment_intent: paymentIntent.id,
+        comision: comisionCalc.comision,
+        comision_detalle: comisionCalc.detalle,
       })
 
     if (paymentRequestError) {

@@ -235,6 +235,56 @@ export interface EmpresaBillingBreakdown {
   primary_project_id: string | null
 }
 
+/** Fila de comisión transaccional configurada (comision_config) — F7. */
+export interface ComisionConfigFila {
+  canal: string
+  activo: boolean
+  /** Fracción (0.025 = 2.5%). */
+  pct: number
+  /** Monto fijo por pago, en la moneda de cobro del tenant. */
+  fijo: number
+}
+
+/**
+ * Config de comisión de plataforma de una empresa (todas sus filas por canal).
+ * La RLS permite leerla al superadmin y al propio tenant.
+ */
+export function useEmpresaComisionQuery(companyId: string | null, enabled = true) {
+  return useQuery<ComisionConfigFila[]>({
+    queryKey: superadminKeys.empresaComision(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .from('comision_config')
+          .select('canal, activo, pct, fijo')
+          .eq('company_id', companyId as string)
+          .order('canal', { ascending: true })
+          .abortSignal(signal))) ?? []) as unknown as ComisionConfigFila[],
+    enabled: enabled && !!companyId,
+  })
+}
+
+/** Un mes del resumen de comisiones selladas (RPC superadmin_comisiones_resumen). */
+export interface ComisionMesResumen {
+  mes: string
+  pagos: number
+  monto_total: number
+  comision_total: number
+}
+
+/** Comisiones de plataforma acumuladas por mes (pagos succeeded, últimos 6 meses). */
+export function useEmpresaComisionResumenQuery(companyId: string | null, enabled = true) {
+  return useQuery<ComisionMesResumen[]>({
+    queryKey: superadminKeys.empresaComisionResumen(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .rpc('superadmin_comisiones_resumen', { p_company_id: companyId as string })
+          .abortSignal(signal))) ?? []) as unknown as ComisionMesResumen[],
+    enabled: enabled && !!companyId,
+  })
+}
+
 /**
  * Desglose de facturación de una empresa para el drawer del superadmin. La RPC
  * es SECURITY DEFINER con p_company_id, así que el super_admin puede pedirla
