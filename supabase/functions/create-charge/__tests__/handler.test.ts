@@ -102,13 +102,13 @@ beforeEach(() => {
 
 describe('create-charge · auth básica', () => {
   it('401 sin Authorization', async () => {
-    const res = await post({ cuota_id: 'c1' })
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' })
     expect(res.status).toBe(401)
   })
 
   it('403 usuario sin company_id ni cliente_id', async () => {
     fixtureCuota(h.state, { caller: { company_id: null, cliente_id: null } })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(403)
   })
 })
@@ -116,7 +116,7 @@ describe('create-charge · auth básica', () => {
 describe('create-charge · cuota — autorización por rol (cuotas diferenciadas)', () => {
   it('403 si el caller no es residente de la unidad', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'ajeno' }, residente: null })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/No autorizado/)
   })
@@ -127,7 +127,7 @@ describe('create-charge · cuota — autorización por rol (cuotas diferenciadas
       caller: { cliente_id: 'inq1' },
       residente: { tipo: 'arrendatario' },
     })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(403)
   })
 
@@ -137,30 +137,30 @@ describe('create-charge · cuota — autorización por rol (cuotas diferenciadas
       caller: { cliente_id: 'inq1' },
       residente: { tipo: 'arrendatario' },
     })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
     expect(body.payment_request_id).toBe('pr-1')
     const pr = insertDe(h.state.calls, 'payment_requests')!
     expect(pr.cliente_id).toBe('inq1') // pagador REAL, no el dueño de la unidad
-    expect(pr.cuota_id).toBe('c1')
+    expect(pr.cuota_id).toBe('cccccccc-cccc-4ccc-8ccc-ccccccccccc1')
     expect(pr.monto).toBe(100)
   })
 
   it('200 dueño legacy (unidades.cliente_id) sin fila en unidad_residentes', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, residente: null })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.cliente_id).toBe('duenio')
   })
 
   it('staff de OTRA empresa → 403; de la empresa dueña → 200 con el dueño como pagador', async () => {
     fixtureCuota(h.state, { caller: { company_id: 'otra', cliente_id: null } })
-    expect((await post({ cuota_id: 'c1' }, 'user-jwt')).status).toBe(403)
+    expect((await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')).status).toBe(403)
 
     fixtureCuota(h.state, { caller: { company_id: 'co1', cliente_id: null } })
-    const ok = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const ok = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(ok.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.cliente_id).toBe('duenio')
   })
@@ -169,19 +169,19 @@ describe('create-charge · cuota — autorización por rol (cuotas diferenciadas
 describe('create-charge · cuota — guards de estado y saldo', () => {
   it('409 cuota no emitida/vencida', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, cuota: { cuota_estado: 'pendiente' } })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(409)
   })
 
   it('409 cuota ya saldada por abonos previos', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, pagosPrevios: [{ monto: 60 }, { monto: 40 }] })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(409)
   })
 
   it('abono parcial: monto pedido se acota al saldo', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, pagosPrevios: [{ monto: 70 }] })
-    const res = await post({ cuota_id: 'c1', monto: 999 }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1', monto: 999 }, 'user-jwt')
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.monto).toBe(30)
   })
@@ -191,7 +191,7 @@ describe('create-charge · rate limit (auditoría S6)', () => {
   it('429 cuando rate_limit_hit devuelve false para el usuario', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
     h.state.rpcs.rate_limit_hit = { data: false, error: null }
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBeTruthy()
     expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(true)
@@ -200,7 +200,7 @@ describe('create-charge · rate limit (auditoría S6)', () => {
   it('service_role (interna, ej. cron) está exento del límite', async () => {
     fixtureCuota(h.state, {})
     h.state.rpcs.rate_limit_hit = { data: false, error: null }
-    const res = await post({ cuota_id: 'c1' }, 'srk-secret')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'srk-secret')
     expect(res.status).toBe(200)
     expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(false)
   })
@@ -208,7 +208,7 @@ describe('create-charge · rate limit (auditoría S6)', () => {
   it('fail-open: si el contador falla (data null), la solicitud pasa', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
     h.state.rpcs.rate_limit_hit = { data: null, error: { message: 'db down' } }
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(200)
   })
 })
@@ -216,7 +216,7 @@ describe('create-charge · rate limit (auditoría S6)', () => {
 describe('create-charge · sello de ambiente (#592)', () => {
   it('un pagador NO puede forzar el ambiente por body: manda el del tenant', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
-    const res = await post({ cuota_id: 'c1', ambiente: 'prod' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1', ambiente: 'prod' }, 'user-jwt')
     expect(res.status).toBe(200)
     // config.ambiente del tenant (mock) = 'sandbox'; el override solo aplica a service_role.
     expect(insertDe(h.state.calls, 'payment_requests')!.ambiente).toBe('sandbox')
@@ -224,7 +224,7 @@ describe('create-charge · sello de ambiente (#592)', () => {
 
   it('service_role SÍ puede sobreescribir el ambiente (llamada interna)', async () => {
     fixtureCuota(h.state, {})
-    const res = await post({ cuota_id: 'c1', ambiente: 'prod' }, 'srk-secret')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1', ambiente: 'prod' }, 'srk-secret')
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.ambiente).toBe('prod')
   })
@@ -235,7 +235,7 @@ describe('create-charge · gate anti-sandbox (auditoría C1)', () => {
     // Escenario del hallazgo: tenant productivo que nunca configuró payfac —
     // antes el residente podía "pagar" (aprobación simulada) y liquidar deuda real.
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: false } })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/proveedor de pagos/)
     expect(insertDe(h.state.calls, 'payment_requests')).toBeUndefined()
@@ -243,19 +243,19 @@ describe('create-charge · gate anti-sandbox (auditoría C1)', () => {
 
   it('403 también cuando el flag viene null (columna aún sin backfill)', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: null } })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(403)
   })
 
   it('200 con el flag explícito de demo (tenant de demostración)', async () => {
     fixtureCuota(h.state, { caller: { cliente_id: 'duenio' }, empresa: { pago_sandbox_demo: true } })
-    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'user-jwt')
     expect(res.status).toBe(200)
   })
 
   it('service_role (interna) NO pasa por el gate: puede cobrar sandbox sin flag', async () => {
     fixtureCuota(h.state, { empresa: { pago_sandbox_demo: false } })
-    const res = await post({ cuota_id: 'c1' }, 'srk-secret')
+    const res = await post({ cuota_id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1' }, 'srk-secret')
     expect(res.status).toBe(200)
   })
 })

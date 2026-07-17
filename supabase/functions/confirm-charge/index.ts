@@ -24,6 +24,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { validarConfirmChargeBody } from './validate.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
@@ -94,9 +95,10 @@ Deno.serve(async (req: Request) => {
       if (rl) return rl
     }
 
-    const body = (await req.json().catch(() => ({}))) as ReqBody
-    const prId = body.payment_request_id
-    if (!prId) return json({ error: 'payment_request_id requerido' }, 400)
+    // B6 (S9): validación estricta — payment_request_id obligatorio y UUID.
+    const validacion = validarConfirmChargeBody(await req.json().catch(() => ({})))
+    if (!validacion.ok) return json({ error: `body inválido: ${validacion.error}` }, 400)
+    const prId = validacion.body.payment_request_id
 
     // ── 2) Cargar la solicitud de cobro ──
     const { data: prRow, error: prErr } = await admin
