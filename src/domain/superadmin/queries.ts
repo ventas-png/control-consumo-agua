@@ -175,6 +175,57 @@ export function useMrrTrendQuery(days = 90, enabled = true) {
   })
 }
 
+/** Config del modelo de cobro del timbrado fiscal (timbrado_config) — F8. */
+export interface TimbradoConfigEmpresa {
+  activo: boolean
+  /** Precio por DTE en USD cents (unidad de billing_plans). */
+  precio_dte_cents: number
+  /** DTEs incluidos sin costo por mes calendario. */
+  timbres_incluidos: number
+}
+
+/**
+ * Modelo de cobro del timbrado de una empresa (fila única), o null si no se ha
+ * configurado. La RLS permite leerlo al superadmin y al propio tenant.
+ */
+export function useEmpresaTimbradoQuery(companyId: string | null, enabled = true) {
+  return useQuery<TimbradoConfigEmpresa | null>({
+    queryKey: superadminKeys.empresaTimbrado(companyId ?? ''),
+    queryFn: async () => {
+      const rows = ((await runQuery((signal) =>
+        supabase
+          .from('timbrado_config')
+          .select('activo, precio_dte_cents, timbres_incluidos')
+          .eq('company_id', companyId as string)
+          .limit(1)
+          .abortSignal(signal))) ?? []) as unknown as TimbradoConfigEmpresa[]
+      return rows[0] ?? null
+    },
+    enabled: enabled && !!companyId,
+  })
+}
+
+/** Un mes del contador de timbres (RPC superadmin_timbres_resumen). */
+export interface TimbresMesResumen {
+  mes: string
+  timbres: number
+  con_costo: number
+  costo_total_cents: number
+}
+
+/** Timbres certificados y costo sellado por mes (últimos 6 con actividad). */
+export function useEmpresaTimbresResumenQuery(companyId: string | null, enabled = true) {
+  return useQuery<TimbresMesResumen[]>({
+    queryKey: superadminKeys.empresaTimbresResumen(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .rpc('superadmin_timbres_resumen', { p_company_id: companyId as string })
+          .abortSignal(signal))) ?? []) as unknown as TimbresMesResumen[],
+    enabled: enabled && !!companyId,
+  })
+}
+
 /** Un usuario de la empresa (drawer de detalle del superadmin). */
 export interface EmpresaUsuarioRow {
   id: string

@@ -52,6 +52,30 @@ export async function createEmpresa(
 }
 
 /**
+ * Crea o actualiza el modelo de cobro del timbrado fiscal de una empresa (F8).
+ * Upsert por company_id (fila única); la RLS restringe la escritura a
+ * super_admin. Los DTEs ya sellados no cambian de costo.
+ */
+export async function guardarTimbradoConfig(
+  companyId: string,
+  cfg: { activo: boolean; precio_dte_cents: number; timbres_incluidos: number },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('timbrado_config')
+    .upsert(
+      {
+        company_id: companyId,
+        activo: cfg.activo,
+        precio_dte_cents: cfg.precio_dte_cents,
+        timbres_incluidos: cfg.timbres_incluidos,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id' },
+    )
+  return { error: error?.message ?? null }
+}
+
+/**
  * Suspende una empresa: activa=false + motivo. El trigger
  * stamp_company_suspension (20260612180000) sella suspended_at; los triggers
  * de escritura y el login pasan a rechazar a sus usuarios.

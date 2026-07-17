@@ -16,9 +16,11 @@ import {
   useEmpresaMonedaQuery,
   useEmpresaComisionQuery,
   useEmpresaComisionResumenQuery,
+  useEmpresaTimbradoQuery,
+  useEmpresaTimbresResumenQuery,
   type EmpresaSuperadminRow,
 } from '../../domain/superadmin/queries'
-import { guardarComisionConfig } from '../../domain/superadmin/mutations'
+import { guardarComisionConfig, guardarTimbradoConfig } from '../../domain/superadmin/mutations'
 import { superadminKeys } from '../../domain/superadmin/keys'
 import { useQueryClient } from '@tanstack/react-query'
 import { MONEDAS_ISO, monedaLabel } from '../../lib/monedas'
@@ -62,6 +64,9 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
   // F7: comisión transaccional de la plataforma (config + acumulado mensual).
   const { data: comisionRows = [] } = useEmpresaComisionQuery(emp.id)
   const { data: comisionResumen = [] } = useEmpresaComisionResumenQuery(emp.id)
+  // F8: modelo de cobro del timbrado fiscal (config + contador mensual).
+  const { data: timbrado } = useEmpresaTimbradoQuery(emp.id)
+  const { data: timbresResumen = [] } = useEmpresaTimbresResumenQuery(emp.id)
   const qc = useQueryClient()
 
   const patch = (changes: Partial<EmpresaSuperadminRow>) => setEmp(prev => ({ ...prev, ...changes }))
@@ -169,6 +174,57 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     notify({ variant: 'success', title: '💸 Comisión guardada', duration: 1400 })
     void qc.invalidateQueries({ queryKey: superadminKeys.empresaComision(emp.id) })
     void qc.invalidateQueries({ queryKey: superadminKeys.empresaComisionResumen(emp.id) })
+  }
+
+  // F8: configurar el modelo de cobro del timbrado (precio por DTE + cuota
+  // incluida). El costo se sella POR DTE al certificar: cambiar la config no
+  // toca timbres ya sellados.
+  async function configurarTimbrado() {
+    const datos = await openPromptDialog({
+      title: '🧾 Cobro del timbrado (DTE)',
+      description:
+        (timbrado
+          ? `Vigente: $${(timbrado.precio_dte_cents / 100).toFixed(2)} por DTE, ${timbrado.timbres_incluidos} incluido${timbrado.timbres_incluidos !== 1 ? 's' : ''}/mes${timbrado.activo ? '' : ' (inactivo)'}. `
+          : 'Esta empresa aún no tiene modelo de cobro de timbrado. ')
+        + 'El costo se sella por DTE al certificar; los primeros N del mes calendario salen sin costo.',
+      fields: [
+        {
+          name: 'precio', label: 'Precio por DTE (USD)', type: 'number', autoFocus: true,
+          initialValue: timbrado ? String(timbrado.precio_dte_cents / 100) : '0',
+          helpText: 'Ej. 0.50 = 50¢ por DTE timbrado. 0 = sin costo.',
+        },
+        {
+          name: 'incluidos', label: 'DTEs incluidos por mes', type: 'number',
+          initialValue: String(timbrado?.timbres_incluidos ?? 0),
+          helpText: '0 = todos los DTEs se cobran al precio configurado.',
+        },
+        {
+          name: 'activo', label: 'Modelo de cobro activo', control: 'checkbox',
+          initialValue: timbrado == null || timbrado.activo ? 'true' : '',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (d) => {
+        const precio = Number(d.precio)
+        const incluidos = Number(d.incluidos)
+        if (!Number.isFinite(precio) || precio < 0) return 'El precio no puede ser negativo.'
+        if (!Number.isInteger(incluidos) || incluidos < 0) return 'Los DTEs incluidos deben ser un entero ≥ 0.'
+        return null
+      },
+    })
+    if (!datos) return
+    const { error } = await guardarTimbradoConfig(emp.id, {
+      activo: datos.activo === 'true',
+      precio_dte_cents: Math.round(Number(datos.precio) * 100),
+      timbres_incluidos: Number(datos.incluidos),
+    })
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo guardar el modelo de cobro', text: error })
+      return
+    }
+    notify({ variant: 'success', title: '🧾 Modelo de cobro guardado', duration: 1400 })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaTimbrado(emp.id) })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaTimbresResumen(emp.id) })
   }
 
   async function guardarLimites() {
@@ -434,6 +490,41 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
               onLabelColor="var(--at-accent)"
             />
           </div>
+        </Section>
+
+        {/* ── Timbrado fiscal (F8) ── */}
+        <Section
+          title="Timbrado fiscal (DTE)"
+          action={<button onClick={() => void configurarTimbrado()} style={secondaryBtnStyle}>Configurar</button>}
+        >
+          {timbrado ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--at-font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                ${(timbrado.precio_dte_cents / 100).toFixed(2)} / DTE
+              </span>
+              <span style={{ color: 'var(--at-ink-3)' }}>
+                · {timbrado.timbres_incluidos} incluido{timbrado.timbres_incluidos !== 1 ? 's' : ''}/mes
+              </span>
+              {!timbrado.activo && <StatusBadge tone="warning">Inactivo</StatusBadge>}
+            </div>
+          ) : (
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
+              Sin modelo de cobro — los DTEs de esta empresa no generan costo de timbrado.
+            </div>
+          )}
+          {timbresResumen.length > 0 && (
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginTop: '12px' }}>
+              <tbody>
+                {timbresResumen.map(m => (
+                  <BreakdownRow
+                    key={m.mes}
+                    label={`${m.mes} · ${m.timbres} timbre${m.timbres !== 1 ? 's' : ''} (${m.con_costo} con costo)`}
+                    value={formatUsdCents(m.costo_total_cents)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
         </Section>
 
         {/* ── Usuarios ── */}
