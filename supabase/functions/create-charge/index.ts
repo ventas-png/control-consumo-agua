@@ -39,6 +39,7 @@ import {
   type EstadoCobroProveedor,
 } from '../_shared/payments/index.ts'
 import { residentePuedePagarCuota } from '../_shared/payments/reconcile.ts'
+import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -435,6 +436,17 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // ── 4b) Comisión de plataforma (F7): config por empresa+canal, sellada en
+    // el payment_request. SOLO ambiente prod — sandbox/demo jamás factura.
+    let comisionCalc: ReturnType<typeof calcularComision> = { comision: null, detalle: null }
+    if (ambiente === 'prod') {
+      const { data: comRows } = await admin
+        .from('comision_config')
+        .select('canal, activo, pct, fijo')
+        .eq('company_id', companyId)
+      comisionCalc = calcularComision(monto, config.proveedorPago, (comRows as ComisionConfigRow[] | null) ?? [])
+    }
+
     // ── 5) Registrar el payment_request (auditoría + idempotencia por provider_ref) ──
     const { data: pr, error: prErr } = await admin
       .from('payment_requests')
@@ -451,6 +463,8 @@ Deno.serve(async (req: Request) => {
         estado: estadoPaymentRequest(resultado.estado),
         provider_ref: resultado.referencia ?? null,
         referencia: cobro.referenciaInterna,
+        comision: comisionCalc.comision,
+        comision_detalle: comisionCalc.detalle,
       })
       .select('id')
       .maybeSingle()

@@ -14,8 +14,13 @@ import {
   useEmpresaUsuariosQuery,
   useEmpresaBillingQuery,
   useEmpresaMonedaQuery,
+  useEmpresaComisionQuery,
+  useEmpresaComisionResumenQuery,
   type EmpresaSuperadminRow,
 } from '../../domain/superadmin/queries'
+import { guardarComisionConfig } from '../../domain/superadmin/mutations'
+import { superadminKeys } from '../../domain/superadmin/keys'
+import { useQueryClient } from '@tanstack/react-query'
 import { MONEDAS_ISO, monedaLabel } from '../../lib/monedas'
 import { ToggleSwitch } from './ToggleSwitch'
 import { subscriptionBadge } from './EmpresasTable'
@@ -54,6 +59,10 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
   const { data: usuarios = [], isLoading: usuariosLoading } = useEmpresaUsuariosQuery(emp.id)
   const { data: billing } = useEmpresaBillingQuery(emp.id)
   const { data: moneda } = useEmpresaMonedaQuery(emp.id)
+  // F7: comisión transaccional de la plataforma (config + acumulado mensual).
+  const { data: comisionRows = [] } = useEmpresaComisionQuery(emp.id)
+  const { data: comisionResumen = [] } = useEmpresaComisionResumenQuery(emp.id)
+  const qc = useQueryClient()
 
   const patch = (changes: Partial<EmpresaSuperadminRow>) => setEmp(prev => ({ ...prev, ...changes }))
 
@@ -93,6 +102,73 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       patch({ nombre: values.nombre, nit: values.nit, email: values.email, telefono: values.telefono })
       onChanged()
     }
+  }
+
+  // F7: configurar la comisión transaccional de un canal. Dos pasos (igual que
+  // el cierre automático): elegir canal → editar valores prefijados con la fila
+  // vigente. pct se captura en % y se guarda como fracción.
+  async function configurarComision() {
+    const paso1 = await openPromptDialog({
+      title: '💸 Comisión transaccional',
+      description:
+        'Comisión de la plataforma sobre cada pago en línea del tenant (solo pagos de ambiente prod). '
+        + 'Se sella al crear cada cobro: cambiarla no afecta pagos ya creados. '
+        + 'La fila «Todos los canales» aplica a cualquier proveedor sin fila propia.',
+      fields: [
+        {
+          name: 'canal', label: 'Canal', control: 'select', autoFocus: true,
+          initialValue: 'default',
+          options: CANALES_COMISION.map(c => ({ value: c.value, label: c.label })),
+        },
+      ],
+      submitText: 'Continuar',
+    })
+    const canal = paso1?.canal
+    if (!canal) return
+    const actual = comisionRows.find(c => c.canal === canal)
+    const datos = await openPromptDialog({
+      title: `💸 Comisión — ${canalComisionLabel(canal)}`,
+      description: actual
+        ? `Config vigente: ${(actual.pct * 100).toFixed(2)}% + ${actual.fijo.toFixed(2)} fijo${actual.activo ? '' : ' (inactiva)'}.`
+        : 'Este canal aún no tiene comisión configurada.',
+      fields: [
+        {
+          name: 'pct', label: 'Porcentaje del monto (%)', type: 'number',
+          initialValue: actual ? String(actual.pct * 100) : '0',
+          helpText: 'Ej. 2.5 = 2.5% de cada pago. Máximo 20.',
+        },
+        {
+          name: 'fijo', label: 'Monto fijo por pago', type: 'number',
+          initialValue: actual ? String(actual.fijo) : '0',
+          helpText: 'En la moneda de cobro del tenant. 0 = sin componente fijo.',
+        },
+        {
+          name: 'activo', label: 'Comisión activa', control: 'checkbox',
+          initialValue: actual == null || actual.activo ? 'true' : '',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (d) => {
+        const pct = Number(d.pct)
+        const fijo = Number(d.fijo)
+        if (!Number.isFinite(pct) || pct < 0 || pct > 20) return 'El porcentaje debe estar entre 0 y 20.'
+        if (!Number.isFinite(fijo) || fijo < 0) return 'El monto fijo no puede ser negativo.'
+        return null
+      },
+    })
+    if (!datos) return
+    const { error } = await guardarComisionConfig(emp.id, canal, {
+      activo: datos.activo === 'true',
+      pct: Number(datos.pct) / 100,
+      fijo: Number(datos.fijo),
+    })
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo guardar la comisión', text: error })
+      return
+    }
+    notify({ variant: 'success', title: '💸 Comisión guardada', duration: 1400 })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaComision(emp.id) })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaComisionResumen(emp.id) })
   }
 
   async function guardarLimites() {
@@ -280,6 +356,44 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
           )}
         </Section>
 
+        {/* ── Comisión transaccional (F7) ── */}
+        <Section
+          title="Comisión transaccional"
+          action={<button onClick={() => void configurarComision()} style={secondaryBtnStyle}>Configurar</button>}
+        >
+          {comisionRows.length === 0 ? (
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
+              Sin comisión configurada — los pagos en línea de esta empresa no generan
+              comisión de plataforma.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {comisionRows.map(c => (
+                <div key={c.canal} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                  <span style={{ fontWeight: 600, minWidth: '110px' }}>{canalComisionLabel(c.canal)}</span>
+                  <span style={{ fontFamily: 'var(--at-font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatPctComision(c.pct)}{c.fijo > 0 ? ` + ${c.fijo.toFixed(2)} fijo` : ''}
+                  </span>
+                  {!c.activo && <StatusBadge tone="warning">Inactiva</StatusBadge>}
+                </div>
+              ))}
+            </div>
+          )}
+          {comisionResumen.length > 0 && (
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginTop: '12px' }}>
+              <tbody>
+                {comisionResumen.map(m => (
+                  <BreakdownRow
+                    key={m.mes}
+                    label={`${m.mes} · ${m.pagos} pago${m.pagos !== 1 ? 's' : ''} cobrado${m.pagos !== 1 ? 's' : ''}`}
+                    value={m.comision_total.toFixed(2)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
+
         {/* ── Límites del tenant ── */}
         <Section title="Límites">
           <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
@@ -398,6 +512,23 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 }
 
 // ── Piezas locales ──────────────────────────────────────────────────────────
+
+// F7: canales de comisión (deben casar con el CHECK de comision_config).
+const CANALES_COMISION = [
+  { value: 'default', label: 'Todos los canales (default)' },
+  { value: 'qpaypro', label: 'QPayPro' },
+  { value: 'stripe', label: 'Stripe' },
+  { value: 'paypal', label: 'PayPal' },
+] as const
+
+function canalComisionLabel(canal: string): string {
+  return CANALES_COMISION.find(c => c.value === canal)?.label ?? canal
+}
+
+function formatPctComision(pct: number): string {
+  // 0.025 → "2.5%" (sin ceros colgantes).
+  return `${parseFloat((pct * 100).toFixed(2))}%`
+}
 
 function Section({ title, action, danger = false, children }: {
   title: string
