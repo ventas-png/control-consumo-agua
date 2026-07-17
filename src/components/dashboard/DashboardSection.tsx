@@ -3,6 +3,7 @@ import type { Registro } from '../../types'
 import { resumenDashboardAgua } from '../../lib/dashboardAgua'
 import { Chart } from '../../lib/chartjs'
 import { resolveChartColor, chartFill } from '../../lib/chartColors'
+import { AlertasConsumoCard } from './AlertasConsumoCard'
 
 // El CSS de .dash-skeleton (shimmer) vive ahora en src/styles/runtime.css (I24).
 
@@ -10,9 +11,11 @@ interface Props {
   registros: Registro[]
   moneda?: string
   isLoading?: boolean
+  /** Tenant, para las alertas de anomalías de consumo (D3). */
+  companyId?: string
 }
 
-export function DashboardSection({ registros, moneda = 'Q', isLoading = false }: Props) {
+export function DashboardSection({ registros, moneda = 'Q', isLoading = false, companyId }: Props) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
 
@@ -74,6 +77,9 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
           </div>
         ))}
       </div>
+
+      {/* D3 — alertas de anomalías de consumo (se auto-oculta si no hay). */}
+      <AlertasConsumoCard companyId={companyId} />
 
       <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
         <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Tendencias de Consumo</div>

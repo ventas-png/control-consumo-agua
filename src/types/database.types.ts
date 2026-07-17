@@ -18020,6 +18020,24 @@ export type Database = {
       }
     }
     Functions: {
+      agua_anomalias_consumo: {
+        Args: { p_project_id?: string }
+        Returns: {
+          contador_id: string
+          cliente_id: string
+          cliente_nombre: string
+          project_id: string
+          ultima_fecha: string
+          ultimo_consumo: number
+          promedio: number
+          desviacion: number
+          z_score: number
+          ceros_consecutivos: number
+          n_lecturas: number
+          tipo_anomalia: string
+          severidad: string
+        }[]
+      }
       agua_cerrar_ciclo: {
         Args: { p_notificar?: boolean; p_periodo: string; p_project_id: string }
         Returns: Json
