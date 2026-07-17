@@ -227,7 +227,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     let errorMsg: string | null = null
     let rowsCount = 0
     try {
-      const { data, error: err } = await runReportQuery(t.source_table, companyId, t.filters)
+      const { data, error: err, truncated } = await runReportQuery(t.source_table, companyId, t.filters)
       if (err) throw new Error(err)
       const rows = data ?? []
       rowsCount = rows.length
@@ -242,7 +242,11 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
         title: t.name,
         subtitle: t.description ?? undefined,
       })
-      notify({ variant: 'success', title: 'Reporte exportado', text: `${rowsCount} filas`, duration: 1800 })
+      if (truncated) {
+        notify({ variant: 'warning', title: 'Reporte muy grande', text: `Se exportaron las primeras ${rowsCount.toLocaleString()} filas (tope de seguridad).` })
+      } else {
+        notify({ variant: 'success', title: 'Reporte exportado', text: `${rowsCount} filas`, duration: 1800 })
+      }
     } catch (e: unknown) {
       status = 'failed'
       errorMsg = e instanceof Error ? e.message : String(e)
@@ -307,10 +311,13 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
     let errorMsg: string | null = null
     let rowsCount = 0
     try {
-      const { data, error: err } = await runReportQuery(t.source_table, companyId, t.filters)
+      const { data, error: err, truncated } = await runReportQuery(t.source_table, companyId, t.filters)
       if (err) throw new Error(err)
       const rows = data ?? []
       rowsCount = rows.length
+      if (truncated) {
+        notify({ variant: 'warning', title: 'Reporte muy grande', text: `Se enviarán las primeras ${rowsCount.toLocaleString()} filas (tope de seguridad).` })
+      }
 
       const exportColumns: ExportColumn<Record<string, unknown>>[] = t.columns.map(c => ({
         header: c.header, accessor: c.accessor,

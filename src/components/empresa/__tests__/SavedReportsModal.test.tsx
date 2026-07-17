@@ -15,7 +15,7 @@ vi.mock('../../../lib/supabase', () => {
     const result = { data: table === 'report_templates' ? mockState.templates : mockState.rows, error: null }
     const obj: Record<string, unknown> = {}
     const pass = () => obj
-    for (const m of ['select', 'eq', 'is', 'in', 'order', 'gte', 'lte', 'not', 'neq']) obj[m] = pass
+    for (const m of ['select', 'eq', 'is', 'in', 'order', 'gte', 'lte', 'not', 'neq', 'range']) obj[m] = pass
     obj.then = (resolve: (v: typeof result) => unknown) => resolve(result)
     obj.maybeSingle = () => Promise.resolve(result)
     obj.single = () => Promise.resolve(result)
