@@ -27,15 +27,27 @@ export async function uploadRegistroFoto(
 /**
  * Inserta un registro de lectura (payload ya armado por la UI). Devuelve la fila
  * creada (o `null`) + `error` con el mensaje legible.
+ *
+ * E1: `duplicado: true` cuando la BD rechazó el insert por la llave natural
+ * UNIQUE (contador + lectura + fecha, error 23505) — la lectura YA existe. El
+ * sync offline la descarta como "ya existía" y la captura manual muestra el
+ * mensaje amigable en vez del error crudo de Postgres.
  */
 export async function createRegistro(
   registro: Record<string, unknown>,
-): Promise<{ data: Registro | null; error: string | null }> {
+): Promise<{ data: Registro | null; error: string | null; duplicado: boolean }> {
   // El payload lo arma la UI como objeto libre; el contrato real es el del esquema.
   const { data, error } = await db.from('registros').insert(registro as TablesInsert<'registros'>).select()
+  if (error?.code === '23505') {
+    return {
+      data: null,
+      error: 'Esta lectura ya está registrada (mismo contador, lectura y fecha).',
+      duplicado: true,
+    }
+  }
   // Row generado (columnas NULLABLES, estado string, gps Json) vs interfaz manual
   // Registro no-null/unión (bug latente, reportado) — cast en la frontera.
-  return { data: (data?.[0] ?? null) as unknown as Registro | null, error: error?.message ?? null }
+  return { data: (data?.[0] ?? null) as unknown as Registro | null, error: error?.message ?? null, duplicado: false }
 }
 
 /**

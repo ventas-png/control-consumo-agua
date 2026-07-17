@@ -1,6 +1,6 @@
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -180,6 +180,11 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     // cond:C2 — batch insert con pre-validación Zod por fila.
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, rows)
     setGenerando(null)
+    // E1: llave natural — la plantilla ya se aplicó a este período.
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas ya generadas', text: `Alguna unidad ya tiene cuota de este concepto en ${periodo}. No se duplicó nada — actualizá la vista.` })
+      onRefresh(); return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${rows.length} cuotas generadas`, text: `Período ${periodo}`, duration: 2000 })
     onRefresh()

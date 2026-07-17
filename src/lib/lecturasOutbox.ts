@@ -80,8 +80,14 @@ export function quitarPendiente(storage: OutboxStorage, clave: string): LecturaP
 export interface FlushDeps {
   /** ¿La lectura ya existe en la BD? (idempotencia; evita duplicar en reintentos). */
   existe: (registro: Record<string, unknown>) => Promise<boolean>
-  /** Inserta la lectura. Devuelve el mensaje de error, o null en éxito. */
-  insertar: (registro: Record<string, unknown>) => Promise<string | null>
+  /**
+   * Inserta la lectura. Devuelve el mensaje de error, o null en éxito.
+   * E1: 'duplicado' cuando la BD la rechazó por la llave natural UNIQUE (23505)
+   * — otro dispositivo la insertó entre existe() y este insert (TOCTOU). Se
+   * cuenta como yaExistía y se DESCARTA de la cola (antes quedaba atascada
+   * reintentando para siempre).
+   */
+  insertar: (registro: Record<string, unknown>) => Promise<string | null | 'duplicado'>
 }
 
 export interface FlushResultado {
@@ -111,7 +117,11 @@ export async function sincronizarPendientes(storage: OutboxStorage, deps: FlushD
         continue
       }
       const err = await deps.insertar(item.registro)
-      if (err) {
+      if (err === 'duplicado') {
+        // La llave natural (E1) la rechazó: otro dispositivo ganó la carrera.
+        // Ya está en la BD → descartar de la cola, no reintentar.
+        yaExistian++
+      } else if (err) {
         fallidas++
         restantes.push(item)
       } else {

@@ -261,7 +261,10 @@ export function LecturasSection({
       const res = await sincronizarPendientes(outbox, {
         existe: (r) => registroExiste(r.contador_id as string, r.lectura_actual as number, r.fecha as string),
         insertar: async (r) => {
-          const { data, error } = await createRegistro(r)
+          const { data, error, duplicado } = await createRegistro(r)
+          // E1: la llave natural la rechazó (otro dispositivo ganó la carrera
+          // TOCTOU) → se descarta de la cola como "ya existía", no se reintenta.
+          if (duplicado) return 'duplicado'
           if (!error && data) onRegistroAdded(data)
           return error
         },
