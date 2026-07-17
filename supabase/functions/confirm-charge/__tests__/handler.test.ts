@@ -142,7 +142,9 @@ describe('confirm-charge · conciliación de cuota', () => {
     expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, liquidado: true, saldo_restante: 0 })
 
     const pago = callsDe(h.state.calls, 'pagos', 'insert')[0].payload as Record<string, unknown>
-    expect(pago).toMatchObject({ cliente_id: 'inq1', cuota_id: 'c1', monto: 100, tipo_aplicacion: 'pago_total', referencia: 'ref-1' })
+    // metodo 'sandbox': el provider mockeado es el simulado — el sello C1
+    // garantiza que un pago demo nunca se confunde con tarjeta real.
+    expect(pago).toMatchObject({ cliente_id: 'inq1', cuota_id: 'c1', monto: 100, tipo_aplicacion: 'pago_total', referencia: 'ref-1', metodo: 'sandbox' })
 
     const cuotaUpd = callsDe(h.state.calls, 'cuotas_condominio', 'update')[0].payload as Record<string, unknown>
     expect(cuotaUpd).toMatchObject({ cuota_estado: 'pagada', estado: 'pagado', pago_id: 'pago-1' })

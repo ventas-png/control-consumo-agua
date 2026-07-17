@@ -275,7 +275,7 @@ Deno.serve(async (req: Request) => {
     // ── 2) Config de pago efectiva + credenciales del ambiente ──
     const { data: company, error: compErr } = await admin
       .from('companies')
-      .select('id, proveedor_pago, default_currency, ambiente_pago')
+      .select('id, proveedor_pago, default_currency, ambiente_pago, pago_sandbox_demo')
       .eq('id', companyId)
       .maybeSingle()
     if (compErr) return json({ error: compErr.message }, 500)
@@ -322,6 +322,18 @@ Deno.serve(async (req: Request) => {
         (company as { default_currency?: string | null }).default_currency ??
         config.moneda,
     )
+
+    // ── Gate anti-sandbox (auditoría C1): 'sandbox' es el DEFAULT de toda
+    // empresa (NOT NULL DEFAULT), aprueba siempre y liquidaría deuda REAL sin
+    // dinero real. Solo se permite si el tenant activó el flag explícito de
+    // demo (pago_sandbox_demo) o en llamadas internas (service_role). ──
+    const sandboxDemo = (company as { pago_sandbox_demo?: boolean | null }).pago_sandbox_demo === true
+    if (config.proveedorPago === 'sandbox' && !internal && !sandboxDemo) {
+      return json(
+        { error: 'El pago en línea no está disponible: la empresa aún no ha configurado un proveedor de pagos.' },
+        403,
+      )
+    }
 
     // Stripe usa su flujo dedicado: no pasa por el adapter genérico.
     if (config.proveedorPago === 'stripe') {

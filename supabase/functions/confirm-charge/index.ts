@@ -243,7 +243,10 @@ Deno.serve(async (req: Request) => {
         cliente_id: pr.cliente_id,
         project_id: itemProjectId,
         monto: pr.monto,
-        metodo: 'tarjeta_credito',
+        // Sello anti-confusión (auditoría C1): un pago aprobado por el
+        // proveedor SIMULADO se marca 'sandbox' — identificable y filtrable
+        // en conciliación/EEFF, nunca indistinguible de dinero real.
+        metodo: provider.nombre === 'sandbox' ? 'sandbox' : 'tarjeta_credito',
         estado: 'aplicado',
         verification_status: 'aplicado',
         tipo_aplicacion: plan.tipoAplicacion,
