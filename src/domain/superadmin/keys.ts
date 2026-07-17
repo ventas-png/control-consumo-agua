@@ -24,6 +24,8 @@ export const superadminKeys = {
     ] as const,
   trends: (months: number) => [...superadminKeys.all, 'trends', months] as const,
   mrrTrend: (days: number) => [...superadminKeys.all, 'mrr-trend', days] as const,
+  trialCohortes: (months: number) =>
+    [...superadminKeys.all, 'trial-cohortes', months] as const,
   empresaUsuarios: (companyId: string) =>
     [...superadminKeys.all, 'empresa-usuarios', companyId] as const,
   empresaBilling: (companyId: string) =>

@@ -119,16 +119,17 @@ export function SuperAdminSection() {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      {/* Header */}
+      {/* Header — sobre var(--at-nav-bg) (oscuro FIJO en ambos temas; var(--at-ink)
+          se invertía en dark y dejaba los overlays blancos casi invisibles). */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
+        background: 'linear-gradient(135deg, var(--at-nav-bg), color-mix(in srgb, var(--at-nav-bg) 85%, var(--at-primary-2)))',
         borderRadius: '16px', padding: '24px 28px', marginBottom: '20px',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}>
-        <h1 style={{ color: 'var(--at-chip)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
+        <h1 style={{ color: 'var(--at-nav-ink)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
           Panel Superadministrador
         </h1>
-        <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', margin: '4px 0 16px' }}>
+        <p style={{ color: 'color-mix(in srgb, var(--at-nav-ink) 62%, transparent)', fontSize: '14px', margin: '4px 0 16px' }}>
           Operación de la plataforma: métricas, empresas y configuración.
         </p>
         <div role="tablist" aria-label="Secciones del panel" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -143,11 +144,11 @@ export function SuperAdminSection() {
                 style={{
                   padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
                   cursor: 'pointer',
-                  border: active ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                  border: active ? 'none' : '1px solid rgba(255,255,255,0.14)',
                   background: active
                     ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))'
-                    : 'rgba(255,255,255,0.06)',
-                  color: active ? 'white' : 'var(--at-chip)',
+                    : 'rgba(255,255,255,0.08)',
+                  color: active ? 'white' : 'var(--at-nav-ink)',
                 }}
               >
                 {t.label}
@@ -157,7 +158,12 @@ export function SuperAdminSection() {
         </div>
       </div>
 
-      {tab === 'dashboard' && <SuperAdminDashboardTab />}
+      {tab === 'dashboard' && (
+        <SuperAdminDashboardTab
+          onVerEmpresas={() => setTab('empresas')}
+          onShowHealth={() => setShowHealth(true)}
+        />
+      )}
 
       {tab === 'empresas' && (
         <EmpresasTable
