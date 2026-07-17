@@ -33,6 +33,26 @@ export function parseFecha(value: string | Date | null | undefined): Date {
   return new Date(value.includes('T') ? value : value + 'T12:00:00')
 }
 
+/**
+ * Fecha LOCAL como 'YYYY-MM-DD' (E4/D5). El patrón previo
+ * `new Date().toISOString().split('T')[0]` devuelve la fecha UTC: en GMT-6,
+ * después de las 18:00 locales ya es "mañana" — una captura nocturna quedaba
+ * pre-llenada con la fecha del día siguiente y la lectura caía al ciclo de
+ * facturación equivocado. Usar SIEMPRE este helper para defaults de inputs
+ * de fecha y payloads date-only.
+ */
+export function dateLocalISO(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Hoy LOCAL como 'YYYY-MM-DD' (ver dateLocalISO). */
+export function hoyLocalISO(): string {
+  return dateLocalISO(new Date())
+}
+
 /** Fecha sin hora — '15 de mayo de 2026' o similar según locale. */
 export function formatDate(
   value: string | Date | null | undefined,
