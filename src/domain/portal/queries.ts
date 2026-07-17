@@ -41,6 +41,7 @@ export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBoo
       .from('registros')
       .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas')
       .eq('cliente_id', clienteId)
+      .is('deleted_at', null) // E2: lecturas soft-deleted fuera del portal
       .order('fecha', { ascending: false }),
     db
       .from('clientes')
@@ -84,6 +85,7 @@ export async function fetchRegistrosByContadores(contadorIds: string[]): Promise
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('contador_id', contadorIds)
+    .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
   return data
 }
@@ -94,6 +96,7 @@ export async function fetchRegistrosByProjects(projectIds: string[]): Promise<un
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('project_id', projectIds)
+    .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
   return data
 }
@@ -116,13 +119,13 @@ export async function fetchPortalFotoIds(
   // cliente tipado). Cada builder `db.from(...)` se chequea igual contra el
   // esquema ANTES del widening — solo se ensancha el tipo del array.
   const queries: PromiseLike<{ data: unknown }>[] = [
-    db.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null),
+    db.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null).is('deleted_at', null),
   ]
   if (contadorIds.length > 0) {
-    queries.push(db.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null))
+    queries.push(db.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null).is('deleted_at', null))
   }
   if (projectIds.length > 0) {
-    queries.push(db.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null))
+    queries.push(db.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null).is('deleted_at', null))
   }
   const results = await Promise.all(queries)
   const ids = new Set<string>()
@@ -142,6 +145,7 @@ export async function fetchRegistroFoto(registroId: string): Promise<string | nu
     .from('registros')
     .select('foto')
     .eq('id', registroId)
+    .is('deleted_at', null) // E2
     .maybeSingle()
   // El select tipado ya devuelve { foto: string | null } — sin cast.
   return data?.foto ?? null

@@ -85,6 +85,7 @@ export function useFacturasQuery(companyId?: string) {
         db
           .from('registros')
           .select(FACTURA_COLS)
+          .is('deleted_at', null) // E2: lecturas soft-deleted fuera de facturación
           .order('fecha', { ascending: false })
           .order('id', { ascending: true })
           .range(from, to)
@@ -108,6 +109,7 @@ export function useFacturasPorProyectoQuery(companyId?: string, projectId?: stri
           .from('registros')
           .select(FACTURA_COLS)
           .eq('project_id', projectId!)
+          .is('deleted_at', null) // E2
           .order('fecha', { ascending: false })
           .order('id', { ascending: true })
           .range(from, to)

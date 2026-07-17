@@ -36,6 +36,9 @@ export async function registroExiste(contadorId: string, lecturaActual: number, 
     .eq('contador_id', contadorId)
     .eq('lectura_actual', lecturaActual)
     .eq('fecha', fecha)
+    // E2: una lectura soft-deleted NO bloquea re-capturarla (espeja el índice
+    // único parcial WHERE deleted_at IS NULL de E1).
+    .is('deleted_at', null)
   return (count ?? 0) > 0
 }
 
@@ -156,6 +159,7 @@ export function useRegistrosQuery(companyId?: string) {
         db
           .from('registros')
           .select(REGISTROS_LIST_COLS)
+          .is('deleted_at', null) // E2: lecturas soft-deleted fuera de todo consumo
           .order('fecha', { ascending: false })
           .order('id', { ascending: true })
           .range(from, to)
@@ -359,6 +363,7 @@ export function useConsumoPorProyectoQuery(proyectoId: string, mes: string) {
             .eq('project_id', proyectoId)
             .gte('fecha', `${mes}-01`)
             .lte('fecha', `${mes}-31`)
+            .is('deleted_at', null) // E2
             .abortSignal(signal),
         )) ?? []
       // `consumo` es NULLABLE en el esquema; 0 es neutro para la suma del consumidor.
@@ -405,6 +410,7 @@ export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId:
             .select('consumo, fecha')
             .in('contador_id', contadores.map((c) => c.id))
             .gte('fecha', desdeStr)
+            .is('deleted_at', null) // E2
             .order('fecha')
             .abortSignal(signal),
         )) ?? []
@@ -483,6 +489,7 @@ export function useMedidoresAguaPorProyectoQuery(companyId: string, proyectoId: 
             .from('registros')
             .select('contador_id, lectura_actual, consumo, fecha')
             .in('contador_id', contadores.map((c) => c.id))
+            .is('deleted_at', null) // E2
             .order('fecha', { ascending: false })
             .abortSignal(signal)
             // `contador_id` es nullable en el esquema, pero el .in() sobre ids no
