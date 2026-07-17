@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { configurarCierreAutomatico } from '../../shared/cierreAutomaticoDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
@@ -64,7 +65,7 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [csvRows, setCsvRows] = useState<CSVRow[] | null>(null)
@@ -558,6 +559,19 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               title="Emitir todas las cuotas pendientes de un período y avisar a los residentes (cerrar ciclo)"
               style={{ padding: '10px 16px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               📤 Emitir período
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => void configurarCierreAutomatico({
+                companyId,
+                projectId: proyectoId,
+                projectNombre: proyectos.find(p => p.id === proyectoId)?.nombre,
+                modulo: 'condominios',
+              })}
+              title="Programar el cierre de ciclo mensual automático (emite el período anterior a partir del día elegido)"
+              style={{ padding: '10px 16px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              🗓️ Automático
             </button>
           )}
           {canEdit && (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
+import { configurarCierreAutomatico } from '../shared/cierreAutomaticoDialog'
 import { fetchPagosYConvenios } from '../../domain/cobros/queries'
 import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/mutations'
 import { updateRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
@@ -387,6 +388,37 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
     void qc.invalidateQueries({ queryKey: facturacionKeys.all })
   }
 
+  // F3: programación del cierre automático (cron server-side). Si hay más de un
+  // proyecto, se elige primero cuál configurar; el diálogo compartido hace el resto.
+  async function configurarCierreAutomaticoAgua() {
+    if (!companyId) return
+    const opciones = (proyectos ?? []).map(p => ({ value: p.id, label: p.nombre }))
+    if (opciones.length === 0) {
+      notify({ variant: 'info', title: 'Sin proyectos', text: 'No hay proyectos para programar el cierre de agua.' })
+      return
+    }
+    let seleccion = opciones[0]
+    if (opciones.length > 1) {
+      const datos = await openPromptDialog({
+        title: '🗓️ Cierre de ciclo automático',
+        description: 'Elige el proyecto cuya programación quieres ver o editar.',
+        fields: [
+          { name: 'project_id', label: 'Proyecto', control: 'select', required: true, autoFocus: true, options: opciones },
+        ],
+        submitText: 'Continuar',
+      })
+      const elegido = opciones.find(o => o.value === datos?.project_id)
+      if (!elegido) return
+      seleccion = elegido
+    }
+    await configurarCierreAutomatico({
+      companyId,
+      projectId: seleccion.value,
+      projectNombre: seleccion.label,
+      modulo: 'agua',
+    })
+  }
+
   const bulkActions: BulkAction[] = useMemo(() => [
     {
       id: 'emitir-facturas',
@@ -585,6 +617,20 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                 }}
               >
                 {cerrandoCiclo ? 'Emitiendo…' : '📤 Emitir período'}
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => void configurarCierreAutomaticoAgua()}
+                title="Programar el cierre de ciclo mensual automático (emite el período anterior a partir del día elegido)"
+                style={{
+                  padding: '10px 16px', borderRadius: '8px',
+                  border: '1.5px solid var(--at-line)', background: 'var(--at-surface)',
+                  color: 'var(--at-ink)', fontSize: '14px', fontWeight: 700,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                🗓️ Automático
               </button>
             )}
           </div>
