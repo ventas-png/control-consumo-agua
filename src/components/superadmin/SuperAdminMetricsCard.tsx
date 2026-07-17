@@ -27,6 +27,11 @@ interface SubscriptionRow {
 
 interface Metrics {
   mrrCents: number
+  // F2 (C6): partición del MRR active por cobrabilidad — cobrable (con Stripe)
+  // vs potencial (pilotos grandfathered sin cobro, target de conversión).
+  mrrCobrableCents: number
+  mrrPotencialCents: number
+  grandfatheredCount: number
   activeCount: number
   trialingCount: number
   cancelledLast30Days: number
@@ -56,6 +61,9 @@ export function SuperAdminMetricsCard() {
 
   const m: Metrics = {
     mrrCents: kpis?.mrr_cents ?? 0,
+    mrrCobrableCents: kpis?.mrr_cobrable_cents ?? 0,
+    mrrPotencialCents: kpis?.mrr_potencial_cents ?? 0,
+    grandfatheredCount: kpis?.empresas_grandfathered ?? 0,
     activeCount: kpis?.suscripciones_activas ?? 0,
     trialingCount: kpis?.suscripciones_trialing ?? 0,
     cancelledLast30Days: kpis?.canceladas_30d ?? 0,
@@ -70,7 +78,17 @@ export function SuperAdminMetricsCard() {
       <div style={titleStyle}>Métricas globales SaaS</div>
 
       <div style={kpiGridStyle}>
-        <Kpi label="MRR" value={formatUsd(m.mrrCents)} subtitle="recurring revenue / mes" highlight />
+        {/* F2 (C6): el titular es lo que SE COBRA; el potencial (pilotos
+            grandfathered sin Stripe) va aparte — antes se sumaban y el MRR
+            reportado sobreestimaba el ingreso real. */}
+        <Kpi
+          label="MRR cobrable"
+          value={formatUsd(m.mrrCobrableCents)}
+          subtitle={m.mrrPotencialCents > 0
+            ? `+${formatUsd(m.mrrPotencialCents)} potencial (${m.grandfatheredCount} piloto${m.grandfatheredCount !== 1 ? 's' : ''} sin cobro)`
+            : 'recurring revenue / mes'}
+          highlight
+        />
         <Kpi label="Empresas activas" value={m.activeCount.toString()} />
         <Kpi label="En trial" value={m.trialingCount.toString()} />
         <Kpi label="Churn 30d" value={`${formatPct(churnRate(m))}`} subtitle={`${m.cancelledLast30Days} canceladas`} />
@@ -168,6 +186,11 @@ export function computeMetrics(rows: SubscriptionRow[]): Metrics {
 
   return {
     mrrCents,
+    // computeMetrics es el helper LEGACY (suma flat desde filas crudas, solo
+    // tests): no distingue cobrabilidad — la partición real viene de la MV.
+    mrrCobrableCents: mrrCents,
+    mrrPotencialCents: 0,
+    grandfatheredCount: 0,
     activeCount,
     trialingCount,
     cancelledLast30Days,

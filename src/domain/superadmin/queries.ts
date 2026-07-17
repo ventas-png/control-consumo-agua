@@ -31,6 +31,11 @@ export interface PlataformaKpis {
   total_proyectos: number
   total_unidades: number
   mrr_cents: number
+  /** F2 (C6): partición del MRR active por cobrabilidad (con/sin Stripe). */
+  mrr_cobrable_cents: number
+  mrr_potencial_cents: number
+  /** Pilotos con suscripción active SIN stripe_subscription_id (operan gratis). */
+  empresas_grandfathered: number
   suscripciones_activas: number
   suscripciones_trialing: number
   canceladas_30d: number

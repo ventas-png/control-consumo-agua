@@ -18762,8 +18762,11 @@ export type Database = {
         Returns: {
           canceladas_30d: number
           empresas_activas: number
+          empresas_grandfathered: number
           empresas_inactivas: number
           mrr_cents: number
+          mrr_cobrable_cents: number
+          mrr_potencial_cents: number
           plan_distribution: Json
           refreshed_at: string
           suscripciones_activas: number
