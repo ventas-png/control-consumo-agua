@@ -7,7 +7,8 @@ import {
 } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { generarCodigoRetiro, codigoRetiroQrUrl } from '../../../lib/paquetes'
+import { generarCodigoRetiro, qrPayloadRetiro } from '../../../lib/paquetes'
+import { QRCodeSVG } from 'qrcode.react'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
@@ -301,8 +302,11 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
             <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>{verCodigo.descripcion} · {verCodigo.unidad_nombre ?? ''}</div>
             <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '14px' }}>Para: <strong>{verCodigo.autorizado_nombre}</strong></div>
             <div style={{ fontSize: '34px', fontWeight: 800, letterSpacing: '0.18em', color: 'var(--at-primary)', marginBottom: '14px' }}>{verCodigo.codigo_retiro}</div>
+            {/* B5: QR local (antes api.qrserver.com — la CSP lo bloqueaba y filtraba el código a un tercero) */}
             {verCodigo.codigo_retiro && (
-              <img src={codigoRetiroQrUrl(verCodigo.codigo_retiro)} alt="QR del código" style={{ width: '180px', height: '180px', border: '1px solid var(--at-line)', borderRadius: '10px' }} />
+              <div aria-label="QR del código" style={{ display: 'inline-block', padding: '8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
+                <QRCodeSVG value={qrPayloadRetiro(verCodigo.codigo_retiro)} size={164} level="M" marginSize={2} />
+              </div>
             )}
             <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '14px' }}>
               Comparta este código con quien recogerá el paquete. Lo necesitará en portería.

@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { notify } from '../../shared/Dialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsert } from '../../../lib/validatedInsert'
+import { generarToken } from '../../../lib/tokens'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { Visitante, Unidad } from '../../../types'
 
@@ -25,17 +26,8 @@ interface QRGenerado {
 }
 
 // P0 #8 (auditoría 2026-07-10): token CRIPTOGRÁFICO (antes Math.random, adivinable).
-// Alfabeto sin caracteres ambiguos (0/O/1/I/L) para que el guardia lo pueda teclear
-// sin confusión. 12 chars × ~4.95 bits ≈ 59 bits de entropía — no adivinable en la
-// ventana de validez del pase.
-const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-function generarToken(): string {
-  const bytes = new Uint8Array(12)
-  crypto.getRandomValues(bytes)
-  let out = ''
-  for (const b of bytes) out += TOKEN_ALPHABET[b % TOKEN_ALPHABET.length]
-  return out
-}
+// B5: el generador se extrajo a lib/tokens para compartirlo con paquetería
+// (12 chars × ~4.95 bits ≈ 59 bits — no adivinable en la ventana del pase).
 
 export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate: _canCreate, onRefresh }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
