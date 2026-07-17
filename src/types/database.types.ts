@@ -2151,6 +2151,80 @@ export type Database = {
           },
         ]
       }
+      cierre_ciclo_config: {
+        Row: {
+          activo: boolean
+          company_id: string
+          created_at: string
+          dia_cierre: number
+          id: string
+          modulo: string
+          notificar: boolean
+          project_id: string
+          ultimo_periodo_cerrado: string | null
+          ultimo_resultado: Json | null
+          ultimo_run_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          company_id: string
+          created_at?: string
+          dia_cierre?: number
+          id?: string
+          modulo: string
+          notificar?: boolean
+          project_id: string
+          ultimo_periodo_cerrado?: string | null
+          ultimo_resultado?: Json | null
+          ultimo_run_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          company_id?: string
+          created_at?: string
+          dia_cierre?: number
+          id?: string
+          modulo?: string
+          notificar?: boolean
+          project_id?: string
+          ultimo_periodo_cerrado?: string | null
+          ultimo_resultado?: Json | null
+          ultimo_run_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cierres_anuales: {
         Row: {
           anio: number
