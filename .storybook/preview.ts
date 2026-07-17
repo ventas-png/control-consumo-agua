@@ -1,4 +1,5 @@
-import type { Preview } from '@storybook/react'
+// SB 9+: los tipos se importan del paquete del framework, no del renderer.
+import type { Preview } from '@storybook/react-vite'
 import '../src/index.css'
 import '../src/components/shared/shared.css'
 

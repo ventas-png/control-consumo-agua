@@ -164,13 +164,18 @@ export default defineConfig({
     sourcemap: uploadSourcemaps ? 'hidden' : false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-charts': ['chart.js'],
-          'vendor-maps': ['leaflet'],
-          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
-          'vendor-xlsx': ['exceljs'],
-          'vendor-observability': ['@sentry/react', 'posthog-js'],
+        // vite 8 (rolldown) solo acepta manualChunks como FUNCIÓN — la forma
+        // objeto de rollup lanza "manualChunks is not a function". Mismo
+        // particionado de vendors que antes, expresado por id de módulo.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react-dom|react|scheduler)\//.test(id)) return 'vendor-react'
+          if (id.includes('node_modules/chart.js/')) return 'vendor-charts'
+          if (id.includes('node_modules/leaflet/')) return 'vendor-maps'
+          if (/node_modules\/(jspdf-autotable|jspdf)\//.test(id)) return 'vendor-pdf'
+          if (id.includes('node_modules/exceljs/')) return 'vendor-xlsx'
+          if (/node_modules\/(@sentry\/react|posthog-js)\//.test(id)) return 'vendor-observability'
+          return undefined
         },
       },
     },

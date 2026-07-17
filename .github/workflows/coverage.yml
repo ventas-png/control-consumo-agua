@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -126,7 +126,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -186,7 +186,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

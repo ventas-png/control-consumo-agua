@@ -53,7 +53,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
 
       # Sin dependencias: el script usa solo APIs nativas de Node 20 (fetch, fs).
       - name: Run security guard (solo lectura de catálogo)
