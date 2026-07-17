@@ -21,6 +21,7 @@
 // "Send by email" del frontend para esos formatos cuando lo necesite.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
 interface RequestBody {
@@ -64,7 +65,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'env_misconfigured' }, 500, cors)
   }
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
-  if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+  const bearerTok = (authHeader ?? '').replace('Bearer ', '').trim()
+  if (!(await timingSafeEqualSecret(bearerTok, serviceKey))) {
     return jsonResponse({ error: 'unauthorized' }, 401, cors)
   }
 

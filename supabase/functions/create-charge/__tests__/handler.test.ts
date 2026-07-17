@@ -96,6 +96,8 @@ beforeEach(() => {
   h.state.writes = fresh.writes
   h.state.calls = fresh.calls
   h.state.auth = fresh.auth
+  h.state.rpcs = fresh.rpcs
+  h.state.rpcCalls = fresh.rpcCalls
 })
 
 describe('create-charge · auth básica', () => {
@@ -182,6 +184,32 @@ describe('create-charge · cuota — guards de estado y saldo', () => {
     const res = await post({ cuota_id: 'c1', monto: 999 }, 'user-jwt')
     expect(res.status).toBe(200)
     expect(insertDe(h.state.calls, 'payment_requests')!.monto).toBe(30)
+  })
+})
+
+describe('create-charge · rate limit (auditoría S6)', () => {
+  it('429 cuando rate_limit_hit devuelve false para el usuario', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
+    h.state.rpcs.rate_limit_hit = { data: false, error: null }
+    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBeTruthy()
+    expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(true)
+  })
+
+  it('service_role (interna, ej. cron) está exento del límite', async () => {
+    fixtureCuota(h.state, {})
+    h.state.rpcs.rate_limit_hit = { data: false, error: null }
+    const res = await post({ cuota_id: 'c1' }, 'srk-secret')
+    expect(res.status).toBe(200)
+    expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(false)
+  })
+
+  it('fail-open: si el contador falla (data null), la solicitud pasa', async () => {
+    fixtureCuota(h.state, { caller: { cliente_id: 'duenio' } })
+    h.state.rpcs.rate_limit_hit = { data: null, error: { message: 'db down' } }
+    const res = await post({ cuota_id: 'c1' }, 'user-jwt')
+    expect(res.status).toBe(200)
   })
 })
 

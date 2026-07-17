@@ -23,6 +23,7 @@
 // fiscal-test-connection.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { encryptJson, decryptJson } from '../_shared/secretsCrypto.ts'
 
@@ -72,7 +73,7 @@ Deno.serve(async (req: Request) => {
     let callerIsSuperAdmin = false
     let internal = false
 
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)

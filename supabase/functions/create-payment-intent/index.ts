@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
 
 // CORS utilities
@@ -79,6 +80,20 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Rate limit por usuario (auditoría S6): el camino de dinero no tenía tope.
+    // rate_limit_hit es service-role-only → client admin dedicado; fail-open.
+    const rlAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
+    const rl = await enforceRateLimit(rlAdmin, {
+      subject: caller.id,
+      action: 'create_payment_intent',
+      max: 30,
+      message: 'Demasiados intentos de pago en poco tiempo. Espera unos minutos e intenta de nuevo.',
+    }, corsHeaders)
+    if (rl) return rl
 
     const body = await req.json() as {
       cliente_id: string

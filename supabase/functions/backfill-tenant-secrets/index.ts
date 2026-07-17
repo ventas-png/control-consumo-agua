@@ -16,6 +16,7 @@
 // Ver docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md (sección "Backfill (MIGRATE)").
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { encryptSecret, encryptJson, isEncrypted, hasEncryptionKey } from '../_shared/secretsCrypto.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -98,8 +99,8 @@ Deno.serve(async (req: Request) => {
   // Auth: solo operador/interno — service_role (Bearer) o x-cron-secret.
   const cronHdr = req.headers.get('x-cron-secret')
   const bearer = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
-  const authorized = (CRON_SECRET !== '' && cronHdr === CRON_SECRET) ||
-    (SERVICE_ROLE_KEY !== '' && bearer === SERVICE_ROLE_KEY)
+  const authorized = (CRON_SECRET !== '' && (await timingSafeEqualSecret(cronHdr ?? '', CRON_SECRET))) ||
+    (SERVICE_ROLE_KEY !== '' && (await timingSafeEqualSecret(bearer, SERVICE_ROLE_KEY)))
   if (!authorized) return json({ error: 'Unauthorized' }, 401)
 
   // Gate: sin llave, el cifrado es passthrough → el backfill sería un no-op

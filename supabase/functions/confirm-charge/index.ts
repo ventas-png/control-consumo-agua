@@ -21,6 +21,8 @@
 //     factura emitida/vencida— factura_estado='pagada'.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
@@ -59,8 +61,9 @@ Deno.serve(async (req: Request) => {
     // ── 1) Auth: service_role, usuario de tenant, o residente (rol cliente) ──
     let callerCompanyId: string | null = null
     let callerClienteId: string | null = null
+    let callerUserId: string | null = null
     let internal = false
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -68,6 +71,7 @@ Deno.serve(async (req: Request) => {
       })
       const { data: { user }, error } = await callerClient.auth.getUser()
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
+      callerUserId = user.id
       const { data: au } = await admin
         .from('app_users').select('company_id, cliente_id').eq('id', user.id).maybeSingle()
       const auRow = au as { company_id?: string | null; cliente_id?: string | null } | null
@@ -76,6 +80,18 @@ Deno.serve(async (req: Request) => {
       if (!callerCompanyId && !callerClienteId) return json({ error: 'Forbidden' }, 403)
     } else {
       return json({ error: 'Unauthorized' }, 401)
+    }
+
+    // Rate limit por usuario (auditoría S6). El retorno del portal + polling
+    // legítimo cabe de sobra en 60/h; interno (cron) exento; fail-open.
+    if (!internal && callerUserId) {
+      const rl = await enforceRateLimit(admin, {
+        subject: callerUserId,
+        action: 'confirm_charge',
+        max: 60,
+        message: 'Demasiadas confirmaciones de pago en poco tiempo. Espera unos minutos e intenta de nuevo.',
+      }, corsHeaders)
+      if (rl) return rl
     }
 
     const body = (await req.json().catch(() => ({}))) as ReqBody

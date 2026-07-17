@@ -20,6 +20,8 @@
 // nuestro servidor (QPayPro usa checkout hospedado).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
@@ -93,8 +95,9 @@ Deno.serve(async (req: Request) => {
     //    por PROPIEDAD del ítem (su unidad) más abajo. ──
     let callerCompanyId: string | null = null
     let callerClienteId: string | null = null
+    let callerUserId: string | null = null
     let internal = false
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       // Validamos el JWT con un client anon que lleva el token del llamante.
@@ -103,6 +106,7 @@ Deno.serve(async (req: Request) => {
       })
       const { data: { user }, error } = await callerClient.auth.getUser()
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
+      callerUserId = user.id
       const { data: au } = await admin
         .from('app_users')
         .select('company_id, cliente_id')
@@ -115,6 +119,18 @@ Deno.serve(async (req: Request) => {
       if (!callerCompanyId && !callerClienteId) return json({ error: 'Forbidden' }, 403)
     } else {
       return json({ error: 'Unauthorized' }, 401)
+    }
+
+    // Rate limit por usuario (auditoría S6: el camino de dinero no tenía tope).
+    // Interno (service_role/cron) exento; fail-open si el contador falla.
+    if (!internal && callerUserId) {
+      const rl = await enforceRateLimit(admin, {
+        subject: callerUserId,
+        action: 'create_charge',
+        max: 30,
+        message: 'Demasiados intentos de pago en poco tiempo. Espera unos minutos e intenta de nuevo.',
+      }, corsHeaders)
+      if (rl) return rl
     }
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
