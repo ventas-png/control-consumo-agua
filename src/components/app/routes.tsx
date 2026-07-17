@@ -140,8 +140,8 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/dashboard', sectionName: 'dashboard', module: 'dashboard',
-    render: ({ agua }) => (
-      <DashboardSection registros={agua.registros} moneda={agua.moneda} isLoading={agua.dataLoading} />
+    render: ({ agua, currentUser }) => (
+      <DashboardSection registros={agua.registros} moneda={agua.moneda} isLoading={agua.dataLoading} companyId={currentUser.company_id ?? undefined} />
     ),
   },
   {
