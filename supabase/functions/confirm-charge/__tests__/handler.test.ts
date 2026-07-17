@@ -64,7 +64,7 @@ function fixture(state: FakeSupabaseState, overrides: {
   state.byTable.app_users = { data: { company_id: null, cliente_id: 'inq1', ...overrides.caller }, error: null }
   state.byTable.payment_requests = {
     data: {
-      id: 'pr-1', cliente_id: 'inq1', cuota_id: 'c1', registro_id: null, company_id: 'co1',
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', cliente_id: 'inq1', cuota_id: 'c1', registro_id: null, company_id: 'co1',
       monto: 100, provider: 'sandbox', ambiente: 'sandbox', estado: 'pending', provider_ref: 'ref-1',
       ...overrides.pr,
     },
@@ -102,7 +102,7 @@ beforeEach(() => {
 
 describe('confirm-charge · auth y ownership', () => {
   it('401 sin Authorization', async () => {
-    expect((await post({ payment_request_id: 'pr-1' })).status).toBe(401)
+    expect((await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' })).status).toBe(401)
   })
 
   it('400 sin payment_request_id', async () => {
@@ -112,7 +112,7 @@ describe('confirm-charge · auth y ownership', () => {
 
   it('403 si el residente no es el dueño de la solicitud', async () => {
     fixture(h.state, { caller: { cliente_id: 'otro' } })
-    expect((await post({ payment_request_id: 'pr-1' }, 'user-jwt')).status).toBe(403)
+    expect((await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')).status).toBe(403)
   })
 })
 
@@ -120,14 +120,14 @@ describe('confirm-charge · rate limit (auditoría S6)', () => {
   it('429 cuando rate_limit_hit devuelve false para el usuario', async () => {
     fixture(h.state)
     h.state.rpcs.rate_limit_hit = { data: false, error: null }
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(429)
   })
 
   it('service_role (cron de reconciliación) está exento del límite', async () => {
     fixture(h.state)
     h.state.rpcs.rate_limit_hit = { data: false, error: null }
-    const res = await post({ payment_request_id: 'pr-1' }, 'srk-secret')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'srk-secret')
     expect(res.status).toBe(200)
     expect(h.state.rpcCalls.some((c) => c.fn === 'rate_limit_hit')).toBe(false)
   })
@@ -136,7 +136,7 @@ describe('confirm-charge · rate limit (auditoría S6)', () => {
 describe('confirm-charge · idempotencia', () => {
   it('solicitud ya succeeded → already, sin tocar nada', async () => {
     fixture(h.state, { pr: { estado: 'succeeded' } })
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true, already: true })
     expect(h.state.calls.length).toBe(0)
@@ -144,7 +144,7 @@ describe('confirm-charge · idempotencia', () => {
 
   it('pago ya registrado con el mismo provider_ref → already, sin insert duplicado', async () => {
     fixture(h.state, { pagoExistente: { id: 'pago-previo' } })
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(await res.json()).toMatchObject({ ok: true, already: true })
     expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
     // Solo sella la solicitud como succeeded.
@@ -155,7 +155,7 @@ describe('confirm-charge · idempotencia', () => {
 describe('confirm-charge · conciliación de cuota', () => {
   it('aprobado + pago total → inserta pago, liquida la cuota y sella la solicitud', async () => {
     fixture(h.state)
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toMatchObject({ ok: true, estado: 'aprobado', conciliado: true, liquidado: true, saldo_restante: 0 })
@@ -173,7 +173,7 @@ describe('confirm-charge · conciliación de cuota', () => {
 
   it('aprobado + abono parcial → NO liquida la cuota (sin update de cuota)', async () => {
     fixture(h.state, { pr: { monto: 40 } })
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     const body = await res.json()
     expect(body).toMatchObject({ conciliado: true, liquidado: false, saldo_restante: 60 })
     expect((callsDe(h.state.calls, 'pagos', 'insert')[0].payload as Record<string, unknown>).tipo_aplicacion).toBe('abono')
@@ -183,7 +183,7 @@ describe('confirm-charge · conciliación de cuota', () => {
   it('provider NO aprobado → refleja estado sin conciliar', async () => {
     fixture(h.state)
     h.consulta = { ok: true, estado: 'pendiente' }
-    const res = await post({ payment_request_id: 'pr-1' }, 'user-jwt')
+    const res = await post({ payment_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, 'user-jwt')
     expect(await res.json()).toMatchObject({ ok: true, estado: 'pendiente', conciliado: false })
     expect(callsDe(h.state.calls, 'pagos', 'insert').length).toBe(0)
     expect(callsDe(h.state.calls, 'payment_requests', 'update')[0].payload).toMatchObject({ estado: 'pending' })

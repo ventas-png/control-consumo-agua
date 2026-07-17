@@ -23,6 +23,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { validarCreateChargeBody } from './validate.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
@@ -133,7 +134,16 @@ Deno.serve(async (req: Request) => {
       if (rl) return rl
     }
 
-    const body = (await req.json().catch(() => ({}))) as ReqBody
+    // B6 (S9): validación estricta del body ANTES de tocar la BD — shape,
+    // UUIDs, monto acotado, ambiente permitido, URLs http(s). 400 accionable.
+    const validacion = validarCreateChargeBody(await req.json().catch(() => ({})))
+    if (!validacion.ok) {
+      return new Response(JSON.stringify({ error: `body inválido: ${validacion.error}` }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const body: ReqBody = validacion.body
     const cuotaId = body.cuota_id ?? null
     const registroIdBody = body.registro_id ?? null
 

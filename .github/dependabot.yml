@@ -1,0 +1,28 @@
+# B6 (auditoría 2026-07-16, S11): actualizaciones de dependencias automatizadas.
+# Agrupadas para no inundar de PRs: minor+patch juntos, majors aparte (revisión
+# manual). Las alertas de seguridad de Dependabot se activan en Settings →
+# Code security (ver SECURITY.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Guatemala
+    open-pull-requests-limit: 5
+    groups:
+      minor-y-patch:
+        update-types: ["minor", "patch"]
+    labels: ["dependencies"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Guatemala
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
