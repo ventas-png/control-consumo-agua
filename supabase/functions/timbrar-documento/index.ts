@@ -29,6 +29,7 @@ import {
   type AmbientePac,
   type CredencialesPacPorAmbiente,
 } from '../_shared/fiscal/index.ts'
+import { calcularCostoTimbre, type TimbradoConfigRow } from '../_shared/fiscal/costoTimbre.ts'
 import {
   armarDteDesdeFilas,
   type ClienteRow,
@@ -263,6 +264,31 @@ Deno.serve(async (req: Request) => {
 
     const ahora = new Date().toISOString()
     if (resultado.ok) {
+      // F8: costo del timbre según el modelo de cobro del tenant
+      // (timbrado_config), sellado en el documento. Los primeros
+      // `timbres_incluidos` del mes calendario salen a 0; el resto al precio
+      // vigente. Sin config/inactiva → NULL (no se cobra el timbrado).
+      let costoCents: number | null = null
+      {
+        const { data: tcRow } = await admin
+          .from('timbrado_config')
+          .select('activo, precio_dte_cents, timbres_incluidos')
+          .eq('company_id', companyId)
+          .maybeSingle()
+        if (tcRow) {
+          const inicioMes = new Date()
+          inicioMes.setUTCDate(1)
+          inicioMes.setUTCHours(0, 0, 0, 0)
+          const { count } = await admin
+            .from('documentos_fiscales')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+            .eq('estado', 'timbrado')
+            .gte('fecha_certificacion', inicioMes.toISOString())
+          costoCents = calcularCostoTimbre(tcRow as TimbradoConfigRow, count ?? 0)
+        }
+      }
+
       const parche = aplicarTransicionFiscal('por_timbrar', 'timbrar', ahora)
       const { error: updErr } = await admin
         .from('documentos_fiscales')
@@ -274,6 +300,7 @@ Deno.serve(async (req: Request) => {
           numero_autorizacion: resultado.numeroAutorizacion ?? null,
           fecha_certificacion: resultado.fechaCertificacion ?? parche.fecha_certificacion ?? ahora,
           response_payload: resultado.raw ?? null,
+          costo_cents: costoCents,
         })
         .eq('id', docId)
       if (updErr) return json({ error: updErr.message, documento_id: docId }, 500)

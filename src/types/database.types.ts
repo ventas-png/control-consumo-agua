@@ -5756,6 +5756,7 @@ export type Database = {
       documentos_fiscales: {
         Row: {
           company_id: string
+          costo_cents: number | null
           created_at: string
           error: string | null
           estado: string
@@ -5775,6 +5776,7 @@ export type Database = {
         }
         Insert: {
           company_id: string
+          costo_cents?: number | null
           created_at?: string
           error?: string | null
           estado?: string
@@ -5794,6 +5796,7 @@ export type Database = {
         }
         Update: {
           company_id?: string
+          costo_cents?: number | null
           created_at?: string
           error?: string | null
           estado?: string
@@ -16870,6 +16873,61 @@ export type Database = {
           },
         ]
       }
+      timbrado_config: {
+        Row: {
+          activo: boolean
+          company_id: string
+          created_at: string
+          id: string
+          notas: string | null
+          precio_dte_cents: number
+          timbres_incluidos: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          precio_dte_cents?: number
+          timbres_incluidos?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          precio_dte_cents?: number
+          timbres_incluidos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       unidad_residentes: {
         Row: {
           activo: boolean
@@ -19245,6 +19303,15 @@ export type Database = {
           mes: string
           monto_total: number
           pagos: number
+        }[]
+      }
+      superadmin_timbres_resumen: {
+        Args: { p_company_id: string }
+        Returns: {
+          con_costo: number
+          costo_total_cents: number
+          mes: string
+          timbres: number
         }[]
       }
       update_email_attempt: {
