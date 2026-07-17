@@ -4,6 +4,7 @@
 // P2 tipos: los writes a `registros` van por el cliente TIPADO `db`; `supabase`
 // queda solo para Storage (los buckets no están en el esquema generado).
 import { db, supabase } from '../../lib/supabase'
+import { softDelete } from '../../lib/softDelete'
 import type { Registro } from '../../types'
 import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 
@@ -53,14 +54,16 @@ export async function updateRegistro(
 }
 
 /**
- * Elimina un registro por id. Devuelve también `count` (con `count: 'exact'`)
- * para que la UI distinga "borrado" de "sin permisos" (RLS devuelve count 0 sin
- * error cuando la fila no es visible/eliminable para el usuario).
+ * Elimina un registro por id — SOFT DELETE (E2, auditoría 2026-07-16 D3): marca
+ * deleted_at/deleted_by en vez de DELETE físico. La lectura desaparece de todos
+ * los consumidores (filtran .is('deleted_at', null)) pero queda para auditoría
+ * y para la purga programada. Devuelve `count` para que la UI distinga
+ * "borrado" (1) de "sin permisos / ya borrado" (0 — RLS niega en silencio).
  */
 export async function deleteRegistro(
   id: string,
 ): Promise<{ error: string | null; count: number | null }> {
-  const { error, count } = await db.from('registros').delete({ count: 'exact' }).eq('id', id)
+  const { error, count } = await softDelete('registros', { id })
   return { error: error?.message ?? null, count: count ?? null }
 }
 
