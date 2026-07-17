@@ -16,7 +16,7 @@ export const SECTIONS: SectionDef[] = [
     'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
     'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
     'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
-    'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado',
+    'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado', 'benchmarking',
   ]},
   { id: 'finanzas', label: 'Finanzas', tabs: [
     'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
