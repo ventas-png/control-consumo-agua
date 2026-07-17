@@ -14,6 +14,7 @@ import { SECTIONS, sectionForTab } from './sections'
 import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
+import { AccessDenied } from '../shared/AccessDenied'
 import { MediaScopeProvider } from '../shared/MediaScopeContext'
 import { ActiveCondominioProvider, useActiveCondominio } from './ActiveCondominioContext'
 import { CondominioContextBar } from './CondominioContextBar'
@@ -851,7 +852,12 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}
         <MediaScopeProvider projectId={selectedProyectoId}>
         <Suspense fallback={<TabFallback />}>
-        {TAB_BY_ID[activeTab]?.render(tabCtx)}
+        {/* Gate de vista también en el render: la nav y el command palette ya
+            filtran por permiso, pero un deep-link (/condominios/:tab) llega
+            directo aquí sin pasar por ellos. */}
+        {TAB_BY_ID[activeTab] && !canViewCondominiosTabByPermission(currentUser, activeTab)
+          ? <AccessDenied />
+          : TAB_BY_ID[activeTab]?.render(tabCtx)}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
