@@ -1,15 +1,19 @@
 // Helpers para paquetería de salida (retiro por tercero).
+import { generarToken } from './tokens'
 
-// Código de retiro de un solo uso, corto y legible (6 caracteres en mayúsculas).
-// Usado cuando recepción registra una salida directamente; el camino del residente
-// genera el código en el servidor (RPC paquete_autorizar_salida).
+// Código de retiro de un solo uso, corto y legible. B5 (auditoría 2026-07-16,
+// S3): CRIPTOGRÁFICO (antes Math.random — predecible) y con el alfabeto sin
+// ambiguos de lib/tokens; 8 chars ≈ 40 bits. Usado cuando recepción registra
+// una salida directamente; el camino del residente genera el código en el
+// servidor (RPC paquete_autorizar_salida, también endurecido en B5).
 export function generarCodigoRetiro(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
+  return generarToken(8)
 }
 
-// QR del código para que el tercero lo muestre en portería. Reutiliza el mismo
-// servicio que ya usa Control de Accesos QR (sin dependencias nuevas).
-export function codigoRetiroQrUrl(codigo: string): string {
-  const data = encodeURIComponent(`PAQUETE:${codigo}`)
-  return `https://api.qrserver.com/v1/create-qr-code/?data=${data}&size=200x200&margin=8`
+// El QR del código se renderiza LOCAL con <QRCodeSVG value={qrPayloadRetiro(c)}>
+// (qrcode.react, igual que Control de Accesos QR). El servicio externo
+// api.qrserver.com se eliminó en B5: la CSP lo bloqueaba (QR roto en prod) y
+// además filtraba el código de retiro a un tercero.
+export function qrPayloadRetiro(codigo: string): string {
+  return `PAQUETE:${codigo}`
 }
