@@ -9,7 +9,7 @@
 // el filtro .eq('company_id', …) como defense-in-depth donde aplica.
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { fiscalKeys } from './keys'
 import { resolverConfigFiscalEfectiva } from '../../lib/businessFiscal'
 import type {
@@ -29,22 +29,25 @@ const DOC_COLS =
 
 /**
  * Documentos fiscales del tenant (scope company). RLS + filtro defensivo por
- * company_id. Orden por created_at desc. Limit 5000 para no exceder el
- * statement_timeout en históricos grandes.
+ * company_id. Orden por created_at desc. Fase 6: fetch COMPLETO por chunks —
+ * el limit 5000 podía dejar fuera el último comprobante de registros viejos y
+ * el índice docFiscalByRegistro (badge de timbrado) mentía en silencio.
+ * order('id') secundario = orden total estable para range().
  */
 export function useDocumentosFiscalesQuery(companyId?: string) {
   return useQuery({
     queryKey: fiscalKeys.documentos(companyId),
     queryFn: async () =>
-      (await runQuery<DocumentoFiscal[]>((signal) => {
+      await runQueryAll<DocumentoFiscal>((from, to, signal) => {
         let q = supabase
           .from('documentos_fiscales')
           .select(DOC_COLS)
           .order('created_at', { ascending: false })
-          .limit(5000)
+          .order('id', { ascending: true })
+          .range(from, to)
         if (companyId) q = q.eq('company_id', companyId)
         return q.abortSignal(signal)
-      })) ?? [],
+      }),
     enabled: !!companyId,
   })
 }

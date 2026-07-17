@@ -9,7 +9,7 @@
 // `registros` (migración 20260604160000). Estos hooks proyectan esos campos.
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { facturacionKeys } from './keys'
 
 // Columnas de facturación a proyectar desde `registros`. NUNCA traer `foto`
@@ -71,22 +71,25 @@ export interface ReglaMoraConfig {
 
 /**
  * Facturas (registros con campos de facturación) del tenant. RLS scopea por
- * company vía projects + company_clientes (igual que useRegistrosQuery); limit
- * 5000 para no exceder el statement_timeout en históricos grandes. Orden por
- * fecha desc.
+ * company vía projects + company_clientes (igual que useRegistrosQuery).
+ * Fase 6: fetch COMPLETO por chunks — el limit 5000 truncaba en silencio el
+ * índice facturaById y el conteo de cierre de ciclo en históricos grandes;
+ * cada chunk corre con su propio timeout así que el statement_timeout que
+ * motivó el cap ya no es riesgo. order('id') secundario = orden total estable.
  */
 export function useFacturasQuery(companyId?: string) {
   return useQuery({
     queryKey: facturacionKeys.facturas(companyId),
     queryFn: async () =>
-      (await runQuery<FacturaRow[]>((signal) =>
+      await runQueryAll<FacturaRow>((from, to, signal) =>
         db
           .from('registros')
           .select(FACTURA_COLS)
           .order('fecha', { ascending: false })
-          .limit(5000)
+          .order('id', { ascending: true })
+          .range(from, to)
           .abortSignal(signal),
-      )) ?? [],
+      ),
     enabled: !!companyId,
   })
 }
@@ -94,21 +97,22 @@ export function useFacturasQuery(companyId?: string) {
 /**
  * Facturas de un proyecto concreto (scope company + proyecto). RLS scopea por
  * company; aquí filtramos por project_id. Útil para el tablero de cobranza de un
- * condominio/servicio puntual.
+ * condominio/servicio puntual. Fase 6: fetch completo por chunks (ver arriba).
  */
 export function useFacturasPorProyectoQuery(companyId?: string, projectId?: string) {
   return useQuery({
     queryKey: facturacionKeys.facturasPorProyecto(companyId, projectId),
     queryFn: async () =>
-      (await runQuery<FacturaRow[]>((signal) =>
+      await runQueryAll<FacturaRow>((from, to, signal) =>
         db
           .from('registros')
           .select(FACTURA_COLS)
           .eq('project_id', projectId!)
           .order('fecha', { ascending: false })
-          .limit(5000)
+          .order('id', { ascending: true })
+          .range(from, to)
           .abortSignal(signal),
-      )) ?? [],
+      ),
     enabled: !!companyId && !!projectId,
   })
 }
