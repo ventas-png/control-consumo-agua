@@ -11,6 +11,31 @@
 // columna Json (opciones/items/novedades/comentarios) a interfaces manuales y
 // tipar aquí rompería CondominiosSection.tsx (fuera del alcance de este PR).
 import { supabase, db } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
+
+// Fase 6 — cuotas SIN truncar: el .limit(5000) anterior era una "salvaguarda
+// interina" que en condominios grandes truncaba en silencio los totales de
+// CuotasTab, el snapshot de HistorialSaldos y la mora masiva (este arreglo los
+// alimenta a todos vía ctx.cuotas). Se trae el set COMPLETO paginando por
+// chunks con orden total (created_at desc + id) — cada ventana es chica, así
+// que el statement_timeout que motivó el cap ya no es riesgo. Devuelve el
+// shape { data, error } que el Promise.all posicional del componente espera.
+async function fetchAllCuotas(pid: string, cid: string) {
+  const { data, error, truncated } = await fetchAllRows((from, to) =>
+    db.from('cuotas_condominio')
+      .select('*, unidades(nombre)')
+      .eq('project_id', pid)
+      .eq('company_id', cid)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
+  if (truncated) {
+    console.warn(`[condominios] cuotas cortadas en el techo de seguridad (${data.length}) — totales incompletos`)
+  }
+  return { data: error ? null : data, error: error ? { message: error } : null }
+}
 
 /**
  * Fase PANEL del loader (P2 perf): SOLO las 9 colecciones que consume el tab por
@@ -22,7 +47,7 @@ import { supabase, db } from '../../lib/supabase'
  */
 export async function fetchCondominiosPanelData(pid: string, cid: string) {
   return Promise.all([
-    db.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
+    fetchAllCuotas(pid, cid), // Fase 6: completo por chunks (antes .limit(5000) truncaba totales)
     db.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
@@ -40,11 +65,12 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
  */
 export async function fetchCondominiosSectionData(pid: string, cid: string) {
   return Promise.all([
-    // limit(5000): salvaguarda interina contra truncado de totales/saldos en
-    // condominios grandes (las cuotas crecen por-unidad por-mes y este arreglo
-    // alimenta totales de CuotasTab, snapshot de HistorialSaldos y mora masiva).
-    // TODO(Fase 6): mover los totales a agregados server-side / fetch por-tab.
-    db.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
+    // Fase 6 HECHA: cuotas completas por chunks (fetchAllCuotas). El arreglo
+    // alimenta totales de CuotasTab, snapshot de HistorialSaldos y mora masiva
+    // — con el .limit(5000) anterior esos números salían truncados en silencio.
+    // (Mover los totales a agregados server-side sigue siendo la optimización
+    // futura de perf; la CORRECTITUD ya no depende de ella.)
+    fetchAllCuotas(pid, cid),
     db.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),

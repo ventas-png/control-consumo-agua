@@ -14,7 +14,7 @@ import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergi
 // call sites cuyas columnas no existen en el esquema generado (ver comentarios).
 import { db } from '../../lib/supabase'
 import { isProjectExempt } from '../../lib/proyectosAccess'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { aguaKeys } from './keys'
 
 // Columnas de listado de registros. NUNCA incluir `foto`: es base64 (hasta
@@ -142,24 +142,28 @@ export function useClientesQuery(companyId?: string) {
   })
 }
 
-// `registros`: RLS scopea por company vía projects + company_clientes. Limit 5000
-// para no exceder el statement_timeout en empresas con mucho histórico (el
-// dashboard filtra por rango de fechas, no necesita más).
+// `registros`: RLS scopea por company vía projects + company_clientes.
+// Fase 6: fetch COMPLETO por chunks (runQueryAll) — el .limit(5000) anterior
+// truncaba en silencio los totales del Historial, dashboards y exports en
+// tenants con mucho histórico. Cada chunk corre con su propio timeout, así que
+// el statement_timeout que motivó el cap ya no es riesgo. El .order('id')
+// secundario da el orden TOTAL que range() necesita para no saltar/duplicar.
 export function useRegistrosQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.registros(companyId),
     queryFn: async () =>
-      (await runQuery<Registro[]>((signal) =>
+      await runQueryAll<Registro>((from, to, signal) =>
         db
           .from('registros')
           .select(REGISTROS_LIST_COLS)
           .order('fecha', { ascending: false })
-          .limit(5000)
+          .order('id', { ascending: true })
+          .range(from, to)
           .abortSignal(signal)
           // Esquema: casi todas las columnas NULLABLES (y estado string, gps Json) vs
           // interfaz Registro no-null/unión (bug latente, reportado) — override frontera.
           .overrideTypes<Registro[], { merge: false }>(),
-      )) ?? [],
+      ),
     enabled: !!companyId,
   })
 }
