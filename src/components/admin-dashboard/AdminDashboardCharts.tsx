@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, memo } from 'react'
 import { Chart } from '../../lib/chartjs'
 import { parseFecha } from '../../lib/format'
+import { resolveChartColor, resolveChartColors, chartFill } from '../../lib/chartColors'
 import type { Registro, Cliente } from '../../types'
 
 interface Props {
@@ -76,8 +77,9 @@ function AdminDashboardChartsImpl({ registros }: Props) {
           {
             label: 'Consumo (m³)',
             data: chartsData.dataConsumo,
-            borderColor: 'var(--at-primary)',
-            backgroundColor: 'rgba(27, 59, 54, 0.1)',
+            // V1: el canvas no entiende var(--at-*); resolver token + alfa.
+            borderColor: resolveChartColor('var(--at-primary)'),
+            backgroundColor: chartFill('var(--at-primary)', 0.1),
             borderWidth: 3,
             fill: true,
             tension: 0.4,
@@ -86,8 +88,8 @@ function AdminDashboardChartsImpl({ registros }: Props) {
           {
             label: 'Recaudo (Q)',
             data: chartsData.dataRecaudo,
-            borderColor: 'var(--at-success)',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderColor: resolveChartColor('var(--at-success)'),
+            backgroundColor: chartFill('var(--at-success)', 0.1),
             borderWidth: 3,
             fill: true,
             tension: 0.4,
@@ -135,8 +137,10 @@ function AdminDashboardChartsImpl({ registros }: Props) {
         labels: ['Pagado', 'Pendiente', 'En Mora'],
         datasets: [{
           data: chartsData.estados,
-          backgroundColor: ['var(--at-success)', 'var(--at-warning)', 'var(--at-danger)'],
-          borderColor: ['var(--at-success-strong)', 'var(--at-warning)', 'var(--at-danger)'],
+          // V1: los segmentos del doughnut deben mostrar los colores de estado
+          // reales (verde/ámbar/rojo), no el gris por defecto de Chart.js.
+          backgroundColor: resolveChartColors(['var(--at-success)', 'var(--at-warning)', 'var(--at-danger)']),
+          borderColor: resolveChartColors(['var(--at-success-strong)', 'var(--at-warning)', 'var(--at-danger)']),
           borderWidth: 2,
         }],
       },

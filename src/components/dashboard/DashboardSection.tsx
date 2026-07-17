@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Registro } from '../../types'
 import { resumenDashboardAgua } from '../../lib/dashboardAgua'
 import { Chart } from '../../lib/chartjs'
+import { resolveChartColor, chartFill } from '../../lib/chartColors'
 
 // El CSS de .dash-skeleton (shimmer) vive ahora en src/styles/runtime.css (I24).
 
@@ -31,8 +32,10 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
         datasets: [{
           label: 'Consumo (m³)',
           data: resumen.serie.consumo,
-          borderColor: 'var(--at-primary)',
-          backgroundColor: 'rgba(27, 59, 54, 0.1)',
+          // V1: resolver el token a su valor computado (el canvas no entiende
+          // var(--at-*)); el relleno deriva del mismo color con alfa.
+          borderColor: resolveChartColor('var(--at-primary)'),
+          backgroundColor: chartFill('var(--at-primary)', 0.1),
           borderWidth: 3,
           fill: true,
           tension: 0.4,

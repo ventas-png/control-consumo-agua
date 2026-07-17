@@ -14,6 +14,7 @@ import { notify } from '../shared/Dialog'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
+import { resolveChartColor } from '../../lib/chartColors'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { construirDashboardData, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
 import type { PortalCtx } from './customer/ctx'
@@ -265,7 +266,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               label,
               data,
               backgroundColor: chartLabels.map((_, i) =>
-                i === chartCurrentMonthIdx ? colorSet.full : colorSet.soft
+                // V1: colorSet.full es un token var(--at-*); el canvas no lo
+                // resuelve, así que las barras del mes actual salían en negro.
+                i === chartCurrentMonthIdx ? resolveChartColor(colorSet.full) : colorSet.soft
               ),
               borderRadius: 6,
               borderSkipped: false,
@@ -274,7 +277,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               type: 'line' as const,
               label: 'Tendencia',
               data: trendData,
-              borderColor: 'var(--at-warning)',
+              borderColor: resolveChartColor('var(--at-warning)'),
               borderWidth: 2,
               borderDash: [6, 4],
               pointRadius: 0,
