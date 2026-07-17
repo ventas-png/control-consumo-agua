@@ -1,12 +1,14 @@
 // Hooks de LECTURA del dominio Superadmin (plataforma).
 //
 // Consumen VISTAS MATERIALIZADAS vía RPC SECURITY DEFINER (migraciones
-// 20260605200000 + 20260612180100) en vez de agregar listas completas en el
-// cliente:
-//   · get_superadmin_plataforma_kpis() — KPIs globales del SaaS (1 fila).
-//   · get_superadmin_empresas()        — listado paginado/buscable/filtrable.
-//   · get_superadmin_trends()          — altas/bajas por mes (gráficas).
-//   · get_superadmin_mrr_trend()       — serie diaria de MRR (snapshot cron).
+// 20260605200000 + 20260612180100 + 20260717180000) en vez de agregar listas
+// completas en el cliente:
+//   · get_superadmin_plataforma_kpis()  — KPIs globales del SaaS (1 fila).
+//   · get_superadmin_empresas()         — listado paginado/buscable/filtrable.
+//   · get_superadmin_trends()           — altas/bajas por mes (gráficas).
+//   · get_superadmin_mrr_trend()        — serie diaria de MRR + desglose
+//     cobrable/potencial (snapshot cron).
+//   · get_superadmin_trial_cohortes()   — cohortes de trial por mes de alta.
 // Todas las RPC están acotadas a super_admin en la BD. Convención de
 // src/domain/README.md (queryFn con runQuery). El `.rpc(...)` se tipa laxo sin
 // los tipos generados de Supabase, así que se castea — igual que sesiones/agua.
@@ -153,6 +155,7 @@ export function useSuperadminTrendsQuery(months = 12, enabled = true) {
         supabase.rpc('get_superadmin_trends', { p_months: months }).abortSignal(signal))) ??
         []) as unknown as SuperadminTrendPoint[],
     enabled,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -160,10 +163,16 @@ export function useSuperadminTrendsQuery(months = 12, enabled = true) {
 export interface MrrTrendPoint {
   day: string
   mrr_cents: number
+  /** Desglose cobrable/potencial (20260717180000). null = día sin desglose
+   *  registrado (filas previas a la migración) — jamás tratarlo como 0. */
+  mrr_cobrable_cents: number | null
+  mrr_potencial_cents: number | null
   empresas_activas: number
+  suscripciones_vigentes: number
+  suscripciones_trialing: number | null
 }
 
-/** Serie diaria de MRR/empresas activas (gráfica del dashboard). */
+/** Serie diaria de MRR (total + desglose) y conteos (gráficas del dashboard). */
 export function useMrrTrendQuery(days = 90, enabled = true) {
   return useQuery<MrrTrendPoint[]>({
     queryKey: superadminKeys.mrrTrend(days),
@@ -172,6 +181,37 @@ export function useMrrTrendQuery(days = 90, enabled = true) {
         supabase.rpc('get_superadmin_mrr_trend', { p_days: days }).abortSignal(signal))) ??
         []) as unknown as MrrTrendPoint[],
     enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Una cohorte mensual de trials clasificada por su estado ACTUAL. Los seis
+ *  buckets particionan la cohorte completa (suman = trials). */
+export interface TrialCohortePoint {
+  mes: string
+  trials: number
+  activas_cobrables: number
+  activas_sin_cobro: number
+  en_trial: number
+  trial_vencido: number
+  pago_vencido: number
+  canceladas: number
+}
+
+/**
+ * Cohortes de trial por mes de alta (RPC get_superadmin_trial_cohortes,
+ * acotada a super_admin). Reporta el estado actual de cada camada — no es
+ * conversión a ventana de 30 días.
+ */
+export function useTrialCohortesQuery(months = 12, enabled = true) {
+  return useQuery<TrialCohortePoint[]>({
+    queryKey: superadminKeys.trialCohortes(months),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase.rpc('get_superadmin_trial_cohortes', { p_months: months }).abortSignal(signal))) ??
+        []) as unknown as TrialCohortePoint[],
+    enabled,
+    placeholderData: keepPreviousData,
   })
 }
 
