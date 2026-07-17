@@ -105,6 +105,18 @@ describe('sincronizarPendientes', () => {
     expect(restantes.map((x) => x.clave)).toEqual(['c2|50|2026-07-12'])
   })
 
+  it('E1: insert rechazado por llave natural (duplicado) → cuenta yaExistía y sale de la cola', async () => {
+    // La carrera TOCTOU: existe() dijo false, pero otro dispositivo insertó
+    // antes que nosotros — la BD rechaza con 23505 y el caller devuelve
+    // 'duplicado'. La lectura YA está en el sistema: descartar, no reintentar.
+    const s = memStorage()
+    encolarLectura(s, reg('c1', 120), 'a', 1000)
+    const insertar = vi.fn().mockResolvedValue('duplicado' as const)
+    const res = await sincronizarPendientes(s, { existe: async () => false, insertar })
+    expect(res).toEqual({ ok: 0, yaExistian: 1, fallidas: 0 })
+    expect(leerPendientes(s)).toHaveLength(0) // no queda atascada reintentando
+  })
+
   it('una excepción en insertar cuenta como fallida y conserva la pendiente', async () => {
     const s = memStorage()
     encolarLectura(s, reg('c1', 120), 'a', 1000)

@@ -25,12 +25,23 @@ import { createRegistro, updateRegistro, deleteRegistro, marcarRegistrosMora, up
 describe('createRegistro', () => {
   it('éxito → devuelve la primera fila', async () => {
     insertSelect.mockResolvedValueOnce({ data: [{ id: 'reg1' }], error: null })
-    expect(await createRegistro({})).toEqual({ data: { id: 'reg1' }, error: null })
+    expect(await createRegistro({})).toEqual({ data: { id: 'reg1' }, error: null, duplicado: false })
   })
 
   it('error → { data: null, error: mensaje }', async () => {
     insertSelect.mockResolvedValueOnce({ data: null, error: { message: 'bad insert' } })
-    expect(await createRegistro({})).toEqual({ data: null, error: 'bad insert' })
+    expect(await createRegistro({})).toEqual({ data: null, error: 'bad insert', duplicado: false })
+  })
+
+  it('E1: 23505 (llave natural) → duplicado true con mensaje amigable', async () => {
+    insertSelect.mockResolvedValueOnce({
+      data: null,
+      error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_registros_llave_natural"' },
+    })
+    const r = await createRegistro({})
+    expect(r.duplicado).toBe(true)
+    expect(r.data).toBeNull()
+    expect(r.error).toContain('ya está registrada')
   })
 })
 

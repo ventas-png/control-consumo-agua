@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchGeneracionCuotasLogs } from '../../../domain/condominios/tabQueries'
-import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog, RubroConfig, RubroDetalle } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
@@ -224,6 +224,12 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
     // cond:C2 — batch insert con pre-validación Zod por fila.
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, rows)
+    // E1: la llave natural (unidad+período+concepto) rechazó el lote — otra
+    // generación concurrente ya creó estas cuotas. Nada se duplicó (batch atómico).
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas ya generadas', text: `Alguna unidad ya tiene cuota de ${conceptoFinal} en ${periodo} (generación simultánea). No se duplicó nada — actualizá la vista.` })
+      setGenerando(false); onRefresh(); return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setGenerando(false); return }
 
     // Log de auditoría con rubros

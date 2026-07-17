@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas, cerrarCicloCuotas } from '../../../domain/condominios/tabMutations'
 import { condominiosKeys } from '../../../domain/condominios/keys'
 import { countRecibosByProyecto } from '../../../domain/condominios/tabQueries'
-import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsert, validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle, TipoResidente } from '../../../types'
@@ -360,6 +360,11 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     // cond:C2 — batch insert (CSV import) con pre-validación Zod por fila.
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, inserts)
     setImportando(false)
+    // E1: llave natural — el CSV trae cuotas que ya existen (unidad+período+concepto).
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas duplicadas en el CSV', text: 'Alguna fila ya existe (misma unidad, período y concepto). No se importó nada — depurá el archivo y reintentá.' })
+      return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${validas.length} cuotas importadas`, duration: 1800 })
     setCsvRows(null)
@@ -409,6 +414,11 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       estado: 'pendiente',
     })
     setSaving(false)
+    // E1: llave natural — la unidad ya tiene una cuota de este período/concepto.
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuota ya existe', text: `La unidad ya tiene una cuota de "${form.concepto}" para ${form.periodo}. No se duplicó.` })
+      return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Cuota registrada', duration: 1500 })
     resetForm()
