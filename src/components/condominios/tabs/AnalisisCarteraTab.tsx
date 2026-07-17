@@ -1,17 +1,26 @@
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
+import { useCarteraMorosidadQuery, bandaRiesgo, type BandaRiesgo } from '../../../domain/cobros/morosidad'
 
 interface Props {
   cuotas: CuotaCondominio[]
   unidades: Unidad[]
   moneda: string
+  companyId?: string
+  projectId?: string | null
+}
+
+const BANDA_META: Record<BandaRiesgo, { label: string; color: string; bg: string }> = {
+  alto:  { label: 'Riesgo alto',  color: 'var(--at-danger)',  bg: 'var(--at-danger-tint)' },
+  medio: { label: 'Riesgo medio', color: 'var(--at-warning-strong, var(--at-warning))', bg: 'var(--at-warning-tint)' },
+  bajo:  { label: 'Riesgo bajo',  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
 }
 
 function diasVencido(fechaVenc: string): number {
   return Math.floor((Date.now() - new Date(fechaVenc).getTime()) / 86400000)
 }
 
-export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) {
+export default function AnalisisCarteraTab({ cuotas, unidades, moneda, companyId, projectId }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
 
   const vencidas = cuotas.filter(c =>
@@ -127,6 +136,75 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
           )}
         </div>
       </div>
+
+      {/* D2 — Priorización de cobranza por RIESGO (server-side, con score) */}
+      <PriorizacionRiesgo companyId={companyId} projectId={projectId} unidades={unidades} moneda={moneda} />
+    </div>
+  )
+}
+
+// ── Panel de priorización por score de morosidad (RPC cartera_morosidad) ──────
+function PriorizacionRiesgo({ companyId, projectId, unidades, moneda }: {
+  companyId?: string
+  projectId?: string | null
+  unidades: Unidad[]
+  moneda: string
+}) {
+  const { data: filas = [], isLoading } = useCarteraMorosidadQuery(companyId, projectId)
+  const nombreUnidad = useMemo(() => {
+    const m = new Map(unidades.map(u => [u.id, u.nombre]))
+    return (id: string) => m.get(id) ?? 'Sin unidad'
+  }, [unidades])
+
+  if (!companyId) return null
+
+  return (
+    <div style={{ marginTop: 16, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>Priorización de cobranza por riesgo</div>
+        <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>score 0–100 · deuda +90d, atraso y reincidencia</div>
+      </div>
+      {isLoading ? (
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '24px 0', fontSize: 13 }}>Calculando riesgo…</div>
+      ) : filas.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '24px 0', fontSize: 13 }}>Sin unidades en riesgo — cartera al día.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ textAlign: 'right', color: 'var(--at-ink-3)', fontSize: 11, borderBottom: '1px solid var(--at-line)' }}>
+                <th style={{ padding: 6, textAlign: 'left' }}>Unidad</th>
+                <th style={{ padding: 6 }}>Riesgo</th>
+                <th style={{ padding: 6 }}>Vencido</th>
+                <th style={{ padding: 6 }}>+90d</th>
+                <th style={{ padding: 6 }}>Atraso máx.</th>
+                <th style={{ padding: 6 }}>Reincidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.slice(0, 20).map(f => {
+                const banda = BANDA_META[bandaRiesgo(f.score)]
+                return (
+                  <tr key={f.unidad_id} style={{ borderBottom: '1px solid var(--at-line)' }}>
+                    <td style={{ padding: 6, fontWeight: 600, color: 'var(--at-ink)' }}>{nombreUnidad(f.unidad_id)}</td>
+                    <td style={{ padding: 6, textAlign: 'right' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 800, color: banda.color, background: banda.bg }}>
+                        {f.score} · {banda.label.replace('Riesgo ', '')}
+                      </span>
+                    </td>
+                    <td style={{ padding: 6, textAlign: 'right', fontWeight: 600 }}>{moneda} {f.total_vencido.toLocaleString('es', { minimumFractionDigits: 2 })}</td>
+                    <td style={{ padding: 6, textAlign: 'right', color: f.bucket_90_plus > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
+                      {moneda} {f.bucket_90_plus.toLocaleString('es', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: 6, textAlign: 'right' }}>{f.dias_atraso_max}d</td>
+                    <td style={{ padding: 6, textAlign: 'right' }}>{f.periodos_morosos} períodos</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

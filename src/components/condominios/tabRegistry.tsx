@@ -736,7 +736,7 @@ export const TAB_REGISTRY: TabDef[] = [
       feature="analisis_cartera"
       fallback={<UpgradeCTA feature="Análisis de Cartera" description="Analytics avanzados de mora por antigüedad, predicción de cobro y segmentación de unidades morosas." requiredPlan="Solo Agua o Bundle" />}
     >
-      <AnalisisCarteraTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} />
+      <AnalisisCarteraTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} companyId={ctx.cid} projectId={ctx.proyectoId} />
     </FeatureGate>
   },
   { id: 'integracion_agua', label: 'Integración agua', icon: '💧', render: (ctx) =>
