@@ -10,6 +10,7 @@
 // se chequean en compile-time contra el esquema generado. Los shapes públicos
 // (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
 import { db } from '../../lib/supabase'
+import type { ComunidadMensual } from '../../lib/portalDashboard'
 
 // ── CustomerPortal (agua) ──────────────────────────────────────────────────
 
@@ -144,6 +145,25 @@ export async function fetchRegistroFoto(registroId: string): Promise<string | nu
     .maybeSingle()
   // El select tipado ya devuelve { foto: string | null } — sin cast.
   return data?.foto ?? null
+}
+
+/**
+ * Referencia anónima de consumo de la comunidad del residente (O5/V6): mediana,
+ * cuartiles y promedio del consumo mensual por residente del proyecto. La RPC es
+ * SECURITY DEFINER con autorización por pertenencia y piso de k-anonimato (>=5
+ * residentes) — jamás devuelve consumos individuales de otros. Devuelve [] si el
+ * residente no pertenece al proyecto o la comunidad es demasiado chica.
+ */
+export async function fetchConsumoComunidad(
+  projectId: string,
+  meses = 12,
+): Promise<ComunidadMensual[]> {
+  const { data, error } = await db.rpc('agua_consumo_comunidad', {
+    p_project_id: projectId,
+    p_meses: meses,
+  })
+  if (error || !data) return []
+  return data as ComunidadMensual[]
 }
 
 // ── CustomerPaymentsTab ────────────────────────────────────────────────────

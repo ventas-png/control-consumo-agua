@@ -7,6 +7,7 @@ import {
   fetchRegistroFoto,
   fetchRegistrosByContadores,
   fetchRegistrosByProjects,
+  fetchConsumoComunidad,
 } from '../../domain/portal/queries'
 import { updateCliente } from '../../domain/clientes/mutations'
 import { confirmarPago } from '../../domain/portal/mutations'
@@ -16,7 +17,7 @@ import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
 import { resolveChartColor } from '../../lib/chartColors'
 import { useSignedUrl } from '../../lib/storageUrls'
-import { construirDashboardData, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
+import { construirDashboardData, type ComunidadMensual, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
 import type { PortalCtx } from './customer/ctx'
 import type { CompanyInfo, ProjectInfo, ClienteContacto } from './customer/ctx'
 import { DashboardTab } from './customer/DashboardTab'
@@ -119,6 +120,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [chartMetric, setChartMetric] = useState<'m3' | 'moneda'>('m3')
   const [selectedUnidadId, setSelectedUnidadId] = useState<string | null>(null)
   const [selectedTipoAgua, setSelectedTipoAgua] = useState<string | null>(null)
+  const [comunidad, setComunidad] = useState<ComunidadMensual[]>([])
 
   const clienteId = currentUser.cliente_id
 
@@ -237,12 +239,33 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Referencia anónima de la comunidad para el proyecto activo (O5/V6). Con un
+  // solo proyecto propio se usa ese; con varios, solo cuando el residente elige
+  // uno en el filtro (evita mezclar comunidades). 24 meses cubre la ventana máx.
+  const comunidadProjectId = useMemo(() => {
+    if (selectedProjectId) return selectedProjectId
+    const propios = projects.filter(p =>
+      unidades.some(u => u.project_id === p.id) || contadores.some(c => c.project_id === p.id)
+    )
+    return propios.length === 1 ? propios[0].id : null
+  }, [selectedProjectId, projects, unidades, contadores])
+
+  useEffect(() => {
+    if (!comunidadProjectId) { setComunidad([]); return }
+    let cancelled = false
+    fetchConsumoComunidad(comunidadProjectId, 24)
+      .then(rows => { if (!cancelled) setComunidad(rows) })
+      .catch(() => { if (!cancelled) setComunidad([]) })
+    return () => { cancelled = true }
+  }, [comunidadProjectId])
+
   // ── Dashboard analytics (useMemo) ────────────────────────
   const dashboardData = useMemo(() => construirDashboardData({
     lecturas, contadores, unidades, fotoRegistroIds,
     selectedProjectId, selectedUnidadId, selectedTipoAgua,
     chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric,
-  }), [lecturas, contadores, unidades, fotoRegistroIds, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric])
+    comunidad,
+  }), [lecturas, contadores, unidades, fotoRegistroIds, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric, comunidad])
 
   // ── Chart.js bar chart (per-counter, configurable range & metric) ──
   useEffect(() => {
@@ -250,12 +273,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const timeout = setTimeout(() => {
       if (!chartRef.current) return
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
-      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData } = dashboardData
+      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData, medianaComunidadData } = dashboardData
       const moneda = selectedProjectId
         ? (projects.find(p => p.id === selectedProjectId)?.moneda ?? projects[0]?.moneda ?? 'Q')
         : (projects[0]?.moneda ?? 'Q')
       const metricLabel = chartMetric === 'm3' ? 'm³' : moneda
       const hasTrend = trendData.some(v => v > 0)
+      // Mediana de la comunidad: solo en m³ (el RPC no expone importes ajenos) y
+      // solo si hay algún mes con dato dentro de la ventana visible.
+      const hasComunidad = chartMetric === 'm3' && medianaComunidadData.some(v => v != null)
       chartInstance.current = new Chart(chartRef.current, {
         type: 'bar',
         data: {
@@ -286,6 +312,20 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               backgroundColor: 'transparent',
               order: -1,
             }] : []),
+            ...(hasComunidad ? [{
+              type: 'line' as const,
+              label: 'Mediana de la comunidad',
+              data: medianaComunidadData,
+              borderColor: resolveChartColor('var(--at-accent-2)'),
+              borderWidth: 2,
+              borderDash: [3, 3],
+              pointRadius: 0,
+              fill: false,
+              tension: 0.3,
+              backgroundColor: 'transparent',
+              spanGaps: true,
+              order: -2,
+            }] : []),
           ],
         },
         options: {
@@ -294,7 +334,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           animation: { duration: 400 },
           plugins: {
             legend: {
-              display: chartDatasets.length > 1 || hasTrend,
+              display: chartDatasets.length > 1 || hasTrend || hasComunidad,
               labels: {
                 font: { size: 11 }, color: 'var(--at-ink-2)', boxWidth: 12, padding: 14,
                 filter: item => item.text !== 'Tendencia' || hasTrend,
