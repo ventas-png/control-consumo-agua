@@ -7,6 +7,8 @@ import {
   fetchReportRuns,
   runReportQuery,
   logReportRun,
+  REPORT_SOURCES,
+  type ReportSourceTable,
 } from '../../domain/empresa/reportes'
 import { confirm, notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
@@ -32,12 +34,9 @@ import { nextRunFor, formatNextRun } from '../../lib/scheduleHelpers'
 
 interface Props { onClose: () => void; companyId: string }
 
-type SourceTable =
-  | 'cuotas_condominio'
-  | 'pagos'
-  | 'tickets_mantenimiento'
-  | 'gastos_condominio'
-  | 'fondo_reserva_condominio'
+// C4: la metadata de tablas fuente (labels, columnas sugeridas, scoping) vive
+// en domain/empresa/reportes.ts — única fuente de verdad del frontend.
+type SourceTable = ReportSourceTable
 
 type ScheduleKind = 'manual' | 'monthly_day1' | 'weekly_monday'
 type Format = 'xlsx' | 'csv' | 'pdf'
@@ -69,50 +68,9 @@ interface ReportTemplate {
   last_run_at: string | null
 }
 
-const SOURCE_LABELS: Record<SourceTable, string> = {
-  cuotas_condominio:        'Cuotas de condominio',
-  pagos:                    'Pagos',
-  tickets_mantenimiento:    'Tickets de mantenimiento',
-  gastos_condominio:        'Gastos',
-  fondo_reserva_condominio: 'Fondo de reserva',
-}
-
-// Columnas sugeridas por tabla (template inicial al elegir source)
-const DEFAULT_COLUMNS: Record<SourceTable, Array<{ header: string; accessor: string }>> = {
-  cuotas_condominio: [
-    { header: 'Periodo', accessor: 'periodo' },
-    { header: 'Concepto', accessor: 'concepto' },
-    { header: 'Monto', accessor: 'monto' },
-    { header: 'Estado', accessor: 'estado' },
-    { header: 'Vencimiento', accessor: 'fecha_vencimiento' },
-  ],
-  pagos: [
-    { header: 'Fecha', accessor: 'fecha_pago' },
-    { header: 'Monto', accessor: 'monto' },
-    { header: 'Estado', accessor: 'estado' },
-    { header: 'Método', accessor: 'metodo_pago' },
-    { header: 'Referencia', accessor: 'referencia_pago' },
-  ],
-  tickets_mantenimiento: [
-    { header: 'Título', accessor: 'titulo' },
-    { header: 'Estado', accessor: 'estado' },
-    { header: 'Prioridad', accessor: 'prioridad' },
-    { header: 'Creado', accessor: 'created_at' },
-  ],
-  gastos_condominio: [
-    { header: 'Fecha', accessor: 'fecha' },
-    { header: 'Categoría', accessor: 'categoria' },
-    { header: 'Concepto', accessor: 'concepto' },
-    { header: 'Monto', accessor: 'monto' },
-    { header: 'Estado', accessor: 'estado' },
-  ],
-  fondo_reserva_condominio: [
-    { header: 'Fecha', accessor: 'fecha' },
-    { header: 'Concepto', accessor: 'concepto' },
-    { header: 'Tipo', accessor: 'tipo' },
-    { header: 'Monto', accessor: 'monto' },
-  ],
-}
+const SOURCE_LABELS = Object.fromEntries(
+  Object.entries(REPORT_SOURCES).map(([k, v]) => [k, v.label]),
+) as Record<SourceTable, string>
 
 const SCHEDULE_LABELS: Record<ScheduleKind, string> = {
   manual:        'Solo manual',
@@ -177,7 +135,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
       name: result.name.trim(),
       description: result.description?.trim() || null,
       source_table: source,
-      columns: DEFAULT_COLUMNS[source],
+      columns: REPORT_SOURCES[source].defaultColumns,
       filters: {},
       schedule_kind: 'manual',
       recipients: [],

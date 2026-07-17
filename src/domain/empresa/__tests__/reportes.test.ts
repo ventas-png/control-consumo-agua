@@ -4,18 +4,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
-  const state: { result: unknown; calls: Array<[string, ...unknown[]]> } = { result: { data: null, error: null }, calls: [] }
+  // `results` es una cola FIFO para flujos con varias consultas encadenadas
+  // (p.ej. runReportQuery scope 'project': prefetch de projects + página(s));
+  // si está vacía, se usa `result` para todo (comportamiento previo).
+  const state: { result: unknown; results: unknown[]; calls: Array<[string, ...unknown[]]> } =
+    { result: { data: null, error: null }, results: [], calls: [] }
   const builder: Record<string, unknown> = {}
-  for (const m of ['select', 'insert', 'delete', 'update', 'eq', 'is', 'order', 'limit', 'range']) {
+  for (const m of ['select', 'insert', 'delete', 'update', 'eq', 'in', 'is', 'order', 'limit', 'range']) {
     builder[m] = (...args: unknown[]) => { state.calls.push([m, ...args]); return builder }
   }
-  builder.then = (resolve: (v: unknown) => void) => resolve(state.result)
+  builder.then = (resolve: (v: unknown) => void) =>
+    resolve(state.results.length > 0 ? state.results.shift() : state.result)
   const getUser = vi.fn()
   return { state, builder, getUser }
 })
 
 vi.mock('../../../lib/supabase', () => ({
-  supabase: { from: () => h.builder, auth: { getUser: h.getUser } },
+  supabase: {
+    from: (table: string) => { h.state.calls.push(['from', table]); return h.builder },
+    auth: { getUser: h.getUser },
+  },
 }))
 
 import {
@@ -30,6 +38,7 @@ import {
 
 beforeEach(() => {
   h.state.result = { data: null, error: null }
+  h.state.results = []
   h.state.calls = []
   h.getUser.mockReset()
   h.getUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
@@ -92,9 +101,9 @@ describe('runs', () => {
 })
 
 describe('runReportQuery', () => {
-  it('filtra company_id + deleted_at null + filtros guardados (ignora vacíos)', async () => {
+  it('scope company: filtra company_id + deleted_at null + filtros guardados (ignora vacíos)', async () => {
     h.state.result = { data: [{ id: 1 }, { id: 2 }], error: null }
-    const r = await runReportQuery('pagos', 'co1', { estado: 'pendiente', mes: '', nada: null })
+    const r = await runReportQuery('cuotas_condominio', 'co1', { estado: 'pendiente', mes: '', nada: null })
     // D1: paginación estable server-side (order id + range) sin truncar.
     expect(r).toEqual({ data: [{ id: 1 }, { id: 2 }], error: null, truncated: false })
     expect(h.state.calls).toContainEqual(['eq', 'company_id', 'co1'])
@@ -107,8 +116,58 @@ describe('runReportQuery', () => {
     expect(h.state.calls).not.toContainEqual(['eq', 'nada', null])
   })
 
+  it('scope project (pagos sin company_id): resuelve proyectos del tenant y filtra por in(project_id)', async () => {
+    h.state.results = [
+      { data: [{ id: 'p1' }, { id: 'p2' }], error: null },     // prefetch projects
+      { data: [{ id: 'pay1' }], error: null },                  // página única de pagos
+    ]
+    const r = await runReportQuery('pagos', 'co1', {})
+    expect(r).toEqual({ data: [{ id: 'pay1' }], error: null, truncated: false })
+    expect(h.state.calls).toContainEqual(['from', 'projects'])
+    expect(h.state.calls).toContainEqual(['in', 'project_id', ['p1', 'p2']])
+    // pagos SÍ tiene deleted_at (F2.7)
+    expect(h.state.calls).toContainEqual(['is', 'deleted_at', null])
+  })
+
+  it('scope project sin proyectos: devuelve vacío sin consultar la tabla', async () => {
+    h.state.results = [{ data: [], error: null }]
+    const r = await runReportQuery('registros', 'co1', {})
+    expect(r).toEqual({ data: [], error: null, truncated: false })
+    expect(h.state.calls.filter(c => c[0] === 'from')).toEqual([['from', 'projects']])
+  })
+
+  it('registros: proyección explícita sin foto/gps', async () => {
+    h.state.results = [
+      { data: [{ id: 'p1' }], error: null },
+      { data: [{ id: 'r1' }], error: null },
+    ]
+    await runReportQuery('registros', 'co1', {})
+    const selects = h.state.calls.filter(c => c[0] === 'select')
+    const selectCall = selects[selects.length - 1]
+    expect(String(selectCall?.[1])).toContain('consumo')
+    expect(String(selectCall?.[1])).not.toContain('foto')
+    expect(String(selectCall?.[1])).not.toContain('gps')
+  })
+
+  it('tablas sin deleted_at (conta_asientos, gastos_condominio): no filtran soft delete', async () => {
+    h.state.result = { data: [], error: null }
+    await runReportQuery('conta_asientos', 'co1', {})
+    expect(h.state.calls).not.toContainEqual(['is', 'deleted_at', null])
+    h.state.calls = []
+    await runReportQuery('gastos_condominio', 'co1', {})
+    expect(h.state.calls).not.toContainEqual(['is', 'deleted_at', null])
+    expect(h.state.calls).toContainEqual(['eq', 'company_id', 'co1'])
+  })
+
+  it('tabla fuera de la whitelist → error sin consultar', async () => {
+    const r = await runReportQuery('companies', 'co1', {})
+    expect(r.data).toBeNull()
+    expect(r.error).toContain('no soportada')
+    expect(h.state.calls).toEqual([])
+  })
+
   it('error → mensaje legible (sin filas)', async () => {
     h.state.result = { data: null, error: { message: 'rls' } }
-    expect(await runReportQuery('pagos', 'co1', {})).toEqual({ data: null, error: 'rls', truncated: false })
+    expect(await runReportQuery('cuotas_condominio', 'co1', {})).toEqual({ data: null, error: 'rls', truncated: false })
   })
 })
