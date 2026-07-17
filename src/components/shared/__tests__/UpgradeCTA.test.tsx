@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 
-const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }))
+const { mockInvoke, mockRefresh } = vi.hoisted(() => ({ mockInvoke: vi.fn(), mockRefresh: vi.fn() }))
 
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
@@ -14,7 +14,7 @@ vi.mock('../Dialog', () => ({
 }))
 
 vi.mock('../../../lib/featureFlags', () => ({
-  useFeatureFlags: () => ({ planName: 'Solo Agua', flags: new Set(), has: () => false, loading: false, planCode: 'agua_only', refresh: async () => {} }),
+  useFeatureFlags: () => ({ planName: 'Solo Agua', flags: new Set(), has: () => false, loading: false, planCode: 'agua_only', refresh: mockRefresh }),
 }))
 
 import { UpgradeCTA } from '../UpgradeCTA'
@@ -23,6 +23,8 @@ import { notify } from '../Dialog'
 beforeEach(() => {
   cleanup()
   mockInvoke.mockReset()
+  mockRefresh.mockReset()
+  vi.mocked(notify).mockReset()
 })
 
 describe('UpgradeCTA — render', () => {
@@ -99,5 +101,34 @@ describe('UpgradeCTA — stripe checkout flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Actualizar plan/i }))
 
     await waitFor(() => expect(notify).toHaveBeenCalled())
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' }))
+  })
+})
+
+describe('UpgradeCTA — cambio de plan in-place (swapped)', () => {
+  it('swapped:true muestra ÉXITO (no error) y refresca los feature flags', async () => {
+    // P0 #1: company con suscripción activa → el edge hace el swap con
+    // prorrateo y responde { swapped: true } sin URL. Antes este camino
+    // mostraba "No se obtuvo URL de checkout" tras cobrar el upgrade.
+    mockInvoke.mockResolvedValue({ data: { swapped: true }, error: null })
+    render(<UpgradeCTA feature="Cartera" />)
+    fireEvent.click(screen.getByRole('button', { name: /Actualizar plan/i }))
+
+    await waitFor(() => expect(notify).toHaveBeenCalled())
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'success',
+      title: expect.stringContaining('plan se actualizó'),
+    }))
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' }))
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1))
+  })
+
+  it('el botón vuelve a estado normal tras el swap (no redirige)', async () => {
+    mockInvoke.mockResolvedValue({ data: { swapped: true }, error: null })
+    render(<UpgradeCTA feature="X" />)
+    const btn = screen.getByRole('button', { name: /Actualizar plan/i })
+    fireEvent.click(btn)
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Actualizar plan/i })).toBeDefined())
   })
 })

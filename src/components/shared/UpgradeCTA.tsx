@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react'
 import { Button } from './Button'
 import { useFeatureFlags } from '../../lib/featureFlags'
 import { createCheckoutSession } from '../../domain/shared/mutations'
+import { trackFunnel, FUNNEL } from '../../lib/analytics'
 import { notify } from './Dialog'
 
 interface Props {
@@ -33,7 +34,7 @@ export function UpgradeCTA({
   billingCycle = 'monthly',
   onUpgrade,
 }: Props) {
-  const { planName } = useFeatureFlags()
+  const { planName, refresh } = useFeatureFlags()
   const [loading, setLoading] = useState(false)
 
   async function handleClick() {
@@ -43,16 +44,34 @@ export function UpgradeCTA({
     }
 
     setLoading(true)
+    trackFunnel(FUNNEL.checkoutIniciado, { origen: 'upgrade_cta', feature, plan_destino: targetPlanCode, ciclo: billingCycle })
     try {
       // plat:P36d — invoca edge function que crea Stripe Checkout session
       // y devuelve la URL. Redirigimos al usuario alli para completar el pago.
-      const { url, error } = await createCheckoutSession({
+      const { url, swapped, error } = await createCheckoutSession({
         plan_code: targetPlanCode,
         billing_cycle: billingCycle,
         return_path: window.location.pathname + window.location.hash,
       })
 
       if (error) throw new Error(error)
+
+      // P0 #1: la company ya tenía suscripción activa → el edge cambió el plan
+      // in-place (con prorrateo, sin URL). Antes este camino caía al throw de
+      // "No se obtuvo URL": el usuario veía un error mientras Stripe SÍ había
+      // aplicado el upgrade. Éxito + refresh de flags desbloquea la feature.
+      if (swapped) {
+        trackFunnel(FUNNEL.planActualizado, { origen: 'upgrade_cta', plan_destino: targetPlanCode })
+        notify({
+          variant: 'success',
+          title: 'Tu plan se actualizó',
+          text: 'El cambio ya está activo; el ajuste se prorratea en tu próxima factura.',
+        })
+        await refresh()
+        setLoading(false)
+        return
+      }
+
       if (!url) throw new Error('No se obtuvo URL de checkout')
 
       window.location.href = url
