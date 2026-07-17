@@ -99,6 +99,7 @@ export type CondominioTab =
   | 'centro_notificaciones' | 'cumpleanos' | 'rutas_ronda'
   | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
   | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
+  | 'benchmarking'
 
 // ── Contexto pasado a cada `render(ctx)` ─────────────────────────────────────
 // Centraliza todo el estado y derivados que CondominiosSection tenía dispersos
@@ -290,6 +291,7 @@ const TareasPersonalTab = lazy(() => import('./tabs/TareasPersonalTab').then(m =
 const RevisionTareasTab = lazy(() => import('./tabs/RevisionTareasTab').then(m => ({ default: m.RevisionTareasTab })))
 const DesempenoPersonalTab = lazy(() => import('./tabs/DesempenoPersonalTab').then(m => ({ default: m.DesempenoPersonalTab })))
 const ReporteConsolidadoTab = lazy(() => import('./tabs/ReporteConsolidadoTab').then(m => ({ default: m.ReporteConsolidadoTab })))
+const BenchmarkingTab = lazy(() => import('./tabs/BenchmarkingTab').then(m => ({ default: m.BenchmarkingTab })))
 const ArrendamientosTab = lazy(() => import('./tabs/ArrendamientosTab').then(m => ({ default: m.ArrendamientosTab })))
 const AsambleasTab = lazy(() => import('./tabs/AsambleasTab').then(m => ({ default: m.AsambleasTab })))
 const ProveedoresTab = lazy(() => import('./tabs/ProveedoresTab').then(m => ({ default: m.ProveedoresTab })))
@@ -491,6 +493,8 @@ export const TAB_REGISTRY: TabDef[] = [
     <DesempenoPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} revisiones={ctx.revisionesTarea} rondas={ctx.rondas} visitasControl={ctx.visitasControl} personal={ctx.personal} /> },
   { id: 'reporte_consolidado', label: 'Rpt. Consolidado', icon: '📋', render: (ctx) =>
     <ReporteConsolidadoTab cuotas={ctx.cuotas} gastos={ctx.gastos} tickets={ctx.tickets} presupuestos={ctx.presupuestos} visitantes={ctx.visitantes} novedades={ctx.novedades} rondas={ctx.rondas} anuncios={ctx.anuncios} reservas={ctx.reservas} bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} unidades={ctx.unidadesProyecto} paquetes={ctx.paquetes} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
+  { id: 'benchmarking', label: 'Benchmarking', icon: '🏆', render: (ctx) =>
+    <BenchmarkingTab companyId={ctx.cid} proyectos={ctx.proyectosActivos} moneda={ctx.moneda} /> },
   { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄', render: (ctx) =>
     <ArrendamientosTab contratos={ctx.contratos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('arrendamientos')} canEdit={ctx.canEdit('arrendamientos')} onRefresh={ctx.onRefresh} /> },
   { id: 'asambleas', label: 'Asambleas', icon: '🗳️', render: (ctx) =>
