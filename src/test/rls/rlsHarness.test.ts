@@ -52,10 +52,20 @@ const SECRET_TABLES = [
   'fiscal_pac_secrets',
   'company_payment_secrets',
   'payfac_secrets',
+  // Bóveda WhatsApp por tenant (#611): deny-all "Deny access to all", el
+  // access_token de Meta nunca se proyecta al cliente (la metadata no sensible
+  // sale por el RPC whatsapp_estatus). Auditoría 2026-07-16, S5.
+  'company_whatsapp_configs',
   // No es un secreto, pero es deny-all por diseño: el folio correlativo de
   // pólizas solo lo asignan las funciones SECURITY DEFINER al publicar.
   'conta_folios',
 ] as const
+
+// Tablas con RLS habilitada pero SIN policy de SELECT: solo service_role
+// (BYPASSRLS) las lee. Para authenticated Y anon el SELECT devuelve 0 filas.
+// payment_requests guarda el camino de dinero del pago en línea; sus filas
+// nunca deben proyectarse a un cliente (auditoría 2026-07-16, S5).
+const NO_SELECT_TABLES = ['payment_requests'] as const
 
 // anon no debe leer NINGUNA fila de estas tablas de negocio (no hay policy anon;
 // las user-scoped exigen auth.uid() que para anon es NULL → 0 filas).
@@ -69,6 +79,13 @@ const ANON_DENY_TABLES = [
   'pagos',
   'notification_preferences',
   'user_preferences',
+  // Tablas de julio 2026 (auditoría 2026-07-16, S5): portal residente, log de
+  // recordatorios de cobranza, config de email OAuth por tenant, y el camino
+  // de dinero del pago en línea. Ninguna tiene policy para anon → 0 filas.
+  'unidad_residentes',
+  'cuota_recordatorios_log',
+  'company_email_configs',
+  'payment_requests',
   // ERP financiero (fases 1–5): catálogo, pólizas, CxP, presupuesto, bancos.
   'conta_cuentas',
   'conta_asientos',
@@ -100,6 +117,10 @@ const TENANT_SCOPED_TABLES = [
   'presupuestos',
   'cuentas_bancarias',
   'banco_movimientos',
+  // Tablas de julio 2026 con company_id directo (auditoría 2026-07-16, S5):
+  // el portal de residentes y la config de email OAuth por tenant.
+  'unidad_residentes',
+  'company_email_configs',
 ] as const
 
 // Tablas con scope POR USUARIO (no por empresa): RLS = user_id = auth.uid().
@@ -146,6 +167,17 @@ const ERP_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown>
 
 const ERP_RPCS_AUTH_SIN_EFECTOS = ERP_RPCS_ANON.filter((r) => r.name !== 'conta_cierre_anual')
 
+// RPCs de estatus de las bóvedas (metadata NO sensible): REVOKE FROM PUBLIC, anon
+// (whatsapp_estatus explícito; payfac/fiscal por el mismo patrón). anon SIEMPRE
+// rechazado. Regresa-guarda el fail-open trivaluado que el equipo cazó en #611
+// (guards IF NOT con helpers NULL exponían metadata de cualquier tenant).
+// Auditoría 2026-07-16, S5.
+const ESTATUS_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+  { name: 'whatsapp_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
+  { name: 'payfac_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
+  { name: 'fiscal_pac_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -191,6 +223,20 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('tablas de secretos = deny-all (nunca al cliente)', () => {
     for (const table of SECRET_TABLES) {
+      it(`${table}: authenticated (empresa A) no ve filas`, async () => {
+        const { data } = await userA.from(table).select('*')
+        expect(data ?? []).toHaveLength(0)
+      })
+
+      it(`${table}: anon no ve filas`, async () => {
+        const { data } = await anon.from(table).select('*')
+        expect(data ?? []).toHaveLength(0)
+      })
+    }
+  })
+
+  describe('tablas sin policy de SELECT = deny-all para el cliente', () => {
+    for (const table of NO_SELECT_TABLES) {
       it(`${table}: authenticated (empresa A) no ve filas`, async () => {
         const { data } = await userA.from(table).select('*')
         expect(data ?? []).toHaveLength(0)
@@ -407,6 +453,27 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         const { data, error } = await userA.rpc(name, args)
         expect(error, `${name} con id inexistente debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+  })
+
+  describe('guard anon: RPCs de estatus de bóvedas (#611) RECHAZADOS', () => {
+    for (const { name, args } of ESTATUS_RPCS_ANON) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args)
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+    }
+
+    // authenticated de la empresa A pidiendo la metadata de un tenant AJENO
+    // (FOREIGN_COMPANY_ID): el guard fail-closed debe negar — nunca metadata
+    // cross-tenant, aun con claims válidos. Esto cubre el bug trivaluado de #611.
+    for (const { name } of ESTATUS_RPCS_ANON) {
+      it(`authenticated (A) NO obtiene metadata de un tenant ajeno vía ${name}`, async () => {
+        const { data, error } = await userA.rpc(name, { p_company_id: FOREIGN_COMPANY_ID })
+        const negado = error !== null || (data ?? []).length === 0
+        expect(negado, `${name} no debe exponer metadata de otro tenant`).toBe(true)
       })
     }
   })
