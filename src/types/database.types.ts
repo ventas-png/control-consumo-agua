@@ -18634,6 +18634,25 @@ export type Database = {
           version: string
         }[]
       }
+      get_kpis_tenant_mensual: {
+        Args: { p_desde: string; p_hasta: string; p_project_id?: string }
+        Returns: {
+          project_id: string
+          mes: string
+          cuotas_count: number
+          cuotas_morosas: number
+          unidades_con_deuda: number
+          cuotas_emitido: number
+          cuotas_cobrado: number
+          agua_recibos: number
+          agua_consumo_m3: number
+          agua_emitido: number
+          agua_cobrado: number
+          gastos_total: number
+          total_emitido: number
+          total_cobrado: number
+        }[]
+      }
       get_my_cliente_id: { Args: never; Returns: string }
       get_my_company_id: { Args: never; Returns: string }
       get_my_sessions: {
