@@ -2,12 +2,18 @@ import { useState, type CSSProperties } from 'react'
 import type { CuotaCondominio, EstadoCuota } from '../../../types'
 import { notify } from '../../shared/Dialog'
 import { iniciarPagoCuota, confirmarPagoCuota } from '../../../domain/portal/mutations'
+import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../../lib/businessPagos'
 import { ResponsableCuotaBadge } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
   moneda: string
   unidadNombre: string
+  /** Config de recargo por pago con tarjeta del tenant (desglose pre-pago;
+   *  el cobro real lo calcula y sella el edge server-side). */
+  recargoRows?: RecargoTarjetaRow[]
+  /** Canal efectivo del cobro (proveedor_pago a nivel empresa). */
+  canalPago?: string
   /** F1 pago en línea: refrescar la cuenta tras un pago/abono. */
   onPagado?: () => void
 }
@@ -18,7 +24,7 @@ const ESTADO_CONFIG: Record<EstadoCuota, { label: string; bg: string; color: str
   moroso:    { label: 'Vencida',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'var(--at-danger-border)' },
 }
 
-export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, onPagado }: Props) {
+export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, canalPago, onPagado }: Props) {
   const pendientes  = cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso')
   const pagadas     = cuotas.filter(c => c.estado === 'pagado')
   const totalDeuda  = pendientes.reduce((s, c) => s + c.monto, 0)
@@ -176,6 +182,22 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, onPagado }: Pr
               autoFocus
               style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--at-line-strong)', fontSize: 18, fontWeight: 700, boxSizing: 'border-box', marginBottom: 18 }}
             />
+            {(() => {
+              // Desglose pre-pago (espejo del cálculo que sella el edge).
+              const montoNum = parseFloat(montoInput) || 0
+              const recargo = calcularRecargoTarjeta(montoNum, canalPago ?? 'default', recargoRows)
+              if (recargo == null) return null
+              return (
+                <div style={{ margin: '-8px 0 18px', padding: '10px 12px', borderRadius: 8, background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', fontSize: 12.5, color: 'var(--at-ink-2)' }}>
+                  Recargo por pago con tarjeta: <strong>{moneda} {recargo.toFixed(2)}</strong>
+                  <span style={{ color: 'var(--at-ink-3)' }}> · </span>
+                  Total a pagar: <strong>{moneda} {(montoNum + recargo).toFixed(2)}</strong>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                    El abono a tu cuota es {moneda} {montoNum.toFixed(2)}; el recargo cubre el fee del procesador de tarjeta.
+                  </div>
+                </div>
+              )
+            })()}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setPagando(null)} disabled={procesando} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid var(--at-line)', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 700, fontSize: 14, cursor: procesando ? 'not-allowed' : 'pointer' }}>
                 Cancelar

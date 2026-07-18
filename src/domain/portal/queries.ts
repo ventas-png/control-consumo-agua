@@ -9,8 +9,11 @@
 // P2 tipos: migrado al cliente TIPADO `db` — tablas, columnas, filtros y embeds
 // se chequean en compile-time contra el esquema generado. Los shapes públicos
 // (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
-import { db } from '../../lib/supabase'
+// `supabase` (laxo) solo para tablas aún fuera del esquema generado
+// (recargo_tarjeta_config, migración 20260717190000).
+import { db, supabase } from '../../lib/supabase'
 import type { ComunidadMensual } from '../../lib/portalDashboard'
+import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 
 // ── CustomerPortal (agua) ──────────────────────────────────────────────────
 
@@ -194,6 +197,19 @@ export async function fetchPortalPaymentConfig(companyId: string): Promise<Porta
     .single()
   // La fila tipada es asignable a la interfaz (proveedor_pago NOT NULL ⊂ string|null) — sin cast.
   return data ?? null
+}
+
+/**
+ * Recargo por pago con tarjeta del tenant (recargo_tarjeta_config; RLS permite
+ * leerlo al cliente del portal). El portal lo usa para pintar el DESGLOSE antes
+ * de pagar; el cobro real lo sella y suma el edge create-charge server-side.
+ */
+export async function fetchPortalRecargoTarjeta(companyId: string): Promise<RecargoTarjetaRow[]> {
+  const { data } = await supabase
+    .from('recargo_tarjeta_config')
+    .select('canal, activo, pct, fijo')
+    .eq('company_id', companyId)
+  return (data as RecargoTarjetaRow[] | null) ?? []
 }
 
 // El inicio de cobro en línea del portal vive en domain/portal/mutations.ts

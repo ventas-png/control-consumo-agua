@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
-import { fetchPortalPaymentConfig } from '../../domain/portal/queries'
+import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { PagoEnLineaModal } from './PagoEnLineaModal'
 import { PagoManualModal } from './PagoManualModal'
 
@@ -35,6 +36,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
     proveedor_pago: 'sandbox',
     pago_sandbox_demo: false,
   })
+  const [recargoRows, setRecargoRows] = useState<RecargoTarjetaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [pagoModal, setPagoModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
@@ -46,7 +48,11 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
   async function cargarConfig() {
     // Sin company_id no hay config que leer: salimos del loading igual (no colgar).
     if (!currentUser.company_id) { setLoading(false); return }
-    const data = await fetchPortalPaymentConfig(currentUser.company_id)
+    const [data, recargos] = await Promise.all([
+      fetchPortalPaymentConfig(currentUser.company_id),
+      fetchPortalRecargoTarjeta(currentUser.company_id),
+    ])
+    setRecargoRows(recargos)
     if (data) {
       setPaymentConfig({
         stripe_configured: data.stripe_configured || false,
@@ -257,6 +263,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
         <PagoEnLineaModal
           registro={pagoModal}
           moneda={moneda}
+          recargoRows={recargoRows}
+          canalPago={paymentConfig.proveedor_pago}
           onClose={() => setPagoModal(null)}
           onPagado={() => {
             setPagoModal(null)
