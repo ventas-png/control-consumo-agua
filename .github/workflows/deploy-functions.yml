@@ -111,6 +111,9 @@ jobs:
       - name: Deploy route-reminders (no JWT — invocada por pg_cron con service_role)
         run: bash .github/scripts/deploy-fn.sh route-reminders --no-verify-jwt
 
+      - name: Deploy purgar-fotos-registros (no JWT — invocada por pg_cron con service_role)
+        run: bash .github/scripts/deploy-fn.sh purgar-fotos-registros --no-verify-jwt
+
       - name: Deploy health (no JWT — endpoint público para monitoreo externo)
         run: bash .github/scripts/deploy-fn.sh health --no-verify-jwt
 
