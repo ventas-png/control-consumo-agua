@@ -4,7 +4,7 @@ import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '..
 import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
-import { DataTable, type DataTableColumn, Icon } from '../shared'
+import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 import {
   registroCoincide,
@@ -63,6 +63,9 @@ export function HistorialSection({
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
   const [filtroFechaFin, setFiltroFechaFin] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
+  // Lectura cuya foto se está viendo en el lightbox (la foto se baja bajo demanda
+  // por id; nunca viaja en el listado — ver domain/agua/queries.ts).
+  const [photoModal, setPhotoModal] = useState<{ registroId: string; label: string } | null>(null)
   const [savingEstado, setSavingEstado] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
@@ -280,6 +283,12 @@ export function HistorialSection({
             >✏️ Editar</button>
           )}
           <button
+            onClick={() => setPhotoModal({ registroId: r.id, label: fotoLabel(r) })}
+            aria-label="Ver imagen de la lectura"
+            title="Ver imagen de la lectura"
+            style={btnFotoStyle}
+          >🖼️ Imagen</button>
+          <button
             onClick={() => enviarWhatsApp(r)}
             aria-label="Enviar por WhatsApp"
             style={btnWaStyle}
@@ -449,6 +458,7 @@ export function HistorialSection({
                     {canEdit && (
                       <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
+                    <button onClick={() => setPhotoModal({ registroId: r.id, label: fotoLabel(r) })} aria-label="Ver imagen de la lectura" title="Ver imagen de la lectura" style={{ padding: '6px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🖼️</button>
                     <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
                     {canDelete && onRegistroDeleted && (
                       <button onClick={() => eliminarRegistro(r)} aria-label="Eliminar lectura" style={{ padding: '6px 10px', background: 'var(--at-danger)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🗑️</button>
@@ -556,8 +566,22 @@ export function HistorialSection({
           </div>
         </div>
       )}
+
+      {/* Lightbox de la foto de la lectura — baja la imagen bajo demanda por id */}
+      {photoModal && (
+        <PhotoLightbox
+          registroId={photoModal.registroId}
+          label={photoModal.label}
+          onClose={() => setPhotoModal(null)}
+        />
+      )}
     </div>
   )
+}
+
+// Etiqueta del visor de foto: cliente + fecha de la lectura.
+function fotoLabel(r: Registro): string {
+  return `${r.cliente_nombre ?? 'Lectura'} · ${formatDate(r.fecha)}`
 }
 
 // ── Sub-componentes locales ───────────────────────────────────────────────
@@ -737,6 +761,12 @@ const filterFieldStyle: CSSProperties = {
 const btnEditStyle: CSSProperties = {
   padding: '8px 12px', minHeight: 36,
   background: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)',
+  color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: 600,
+}
+
+const btnFotoStyle: CSSProperties = {
+  padding: '8px 12px', minHeight: 36, background: 'var(--at-primary)',
   color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
   fontSize: 12, fontWeight: 600,
 }

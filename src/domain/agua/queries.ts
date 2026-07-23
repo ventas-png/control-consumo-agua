@@ -42,6 +42,24 @@ export async function registroExiste(contadorId: string, lecturaActual: number, 
   return (count ?? 0) > 0
 }
 
+/**
+ * Baja el `foto` de UN registro bajo demanda (data-URI base64 o, en lecturas
+ * nuevas, un path de Storage). Solo se llama para las fotos que se van a mostrar
+ * (miniaturas visibles y el lightbox), nunca para el listado completo — por eso
+ * `foto` se excluye de REGISTROS_LIST_COLS (base64 pesado). RLS acota la fila al
+ * tenant/cliente autorizado.
+ */
+export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
+  const { data } = await db
+    .from('registros')
+    .select('foto')
+    .eq('id', registroId)
+    .is('deleted_at', null) // E2
+    .maybeSingle()
+  // El select tipado ya devuelve { foto: string | null } — sin cast.
+  return data?.foto ?? null
+}
+
 // `projects` (proyectos del tenant). RLS los scopea por empresa; orden por nombre
 // igual que useData. Es la ÚLTIMA colección que vivía en useData → cierra
 // `agua:A4`. El hook devuelve el set CRUDO que RLS permite; el filtrado fino por

@@ -4,7 +4,6 @@ import {
   fetchPortalContadores,
   fetchPortalProjectsByCompanies,
   fetchPortalFotoIds,
-  fetchRegistroFoto,
   fetchRegistrosByContadores,
   fetchRegistrosByProjects,
   fetchConsumoComunidad,
@@ -16,7 +15,7 @@ import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/val
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
 import { resolveChartColor } from '../../lib/chartColors'
-import { useSignedUrl } from '../../lib/storageUrls'
+import { PhotoLightbox } from '../shared/PhotoLightbox'
 import { construirDashboardData, type ComunidadMensual, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
 import type { PortalCtx } from './customer/ctx'
 import type { CompanyInfo, ProjectInfo, ClienteContacto } from './customer/ctx'
@@ -32,63 +31,6 @@ interface Props {
   onLogout: () => void
 }
 
-
-
-
-
-// Lightbox que baja la foto del registro bajo demanda (por id) y la firma con
-// useSignedUrl. Se extrae como sub-componente para que los hooks puedan llamarse
-// condicionalmente (solo cuando hay un photoModal abierto). La foto no viaja en
-// el listado de lecturas: es base64 de hasta ~15 MB (ver domain/portal/queries).
-function PhotoLightbox({ modal, onClose }: { modal: { registroId: string; label: string }; onClose: () => void }) {
-  const [fotoValue, setFotoValue] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setFotoValue(null)
-    setFailed(false)
-    fetchRegistroFoto(modal.registroId)
-      .then(v => { if (!cancelled) { setFotoValue(v); if (!v) setFailed(true) } })
-      .catch(() => { if (!cancelled) setFailed(true) })
-    return () => { cancelled = true }
-  }, [modal.registroId])
-
-  // Versión mediana (ancho 1400, q80): nítida para ver en pantalla pero mucho más
-  // liviana que el original (~1.5 MB) — la carga del visor es casi inmediata.
-  const signedUrl = useSignedUrl(fotoValue, 'registro-fotos', 3600, { width: 1400, quality: 80 })
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 9999, cursor: 'pointer', flexDirection: 'column', gap: '14px', padding: '24px',
-      }}
-    >
-      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', textAlign: 'center', maxWidth: '80vw' }}>
-        {modal.label}
-      </div>
-      {!failed && signedUrl && (
-        <img
-          src={signedUrl}
-          alt={modal.label}
-          onError={() => setFailed(true)}
-          style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', objectFit: 'contain' }}
-        />
-      )}
-      {!failed && !signedUrl && (
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Cargando foto…</div>
-      )}
-      {failed && (
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', textAlign: 'center', maxWidth: '80vw' }}>
-          No se pudo cargar la foto.
-        </div>
-      )}
-      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
-    </div>
-  )
-}
 
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
@@ -585,7 +527,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       {/* ── Lightbox de fotos ── */}
       {photoModal && (
-        <PhotoLightbox modal={photoModal} onClose={() => setPhotoModal(null)} />
+        <PhotoLightbox registroId={photoModal.registroId} label={photoModal.label} onClose={() => setPhotoModal(null)} />
       )}
     </div>
   )
