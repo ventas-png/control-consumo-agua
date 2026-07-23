@@ -138,21 +138,10 @@ export async function fetchPortalFotoIds(
   return [...ids]
 }
 
-/**
- * Baja el `foto` de UN registro bajo demanda (data-URI base64 o, en lecturas
- * nuevas, un path de Storage). Solo se llama para las fotos que se van a mostrar
- * (miniaturas visibles y el lightbox), nunca para el listado completo.
- */
-export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
-  const { data } = await db
-    .from('registros')
-    .select('foto')
-    .eq('id', registroId)
-    .is('deleted_at', null) // E2
-    .maybeSingle()
-  // El select tipado ya devuelve { foto: string | null } — sin cast.
-  return data?.foto ?? null
-}
+// `fetchRegistroFoto` es una query del dominio agua (proyección de `registros`).
+// Vive en domain/agua/queries.ts; se re-exporta aquí para no romper los
+// consumidores del portal (RegistroFotoThumb) que la importan desde este barrel.
+export { fetchRegistroFoto } from '../agua/queries'
 
 /**
  * Referencia anónima de consumo de la comunidad del residente (O5/V6): mediana,
