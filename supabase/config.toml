@@ -31,6 +31,12 @@ verify_jwt = false
 [functions.route-reminders]
 verify_jwt = false
 
+# Purga de fotos de lectura >90 días del bucket registro-fotos: invocada por
+# pg_cron (run_purga_fotos_storage → service_role) o por super_admin con JWT.
+# verify_jwt=false: valida el token a mano (service_role o super_admin).
+[functions.purgar-fotos-registros]
+verify_jwt = false
+
 # Aviso de paquete al residente: autentica con service key o JWT de la empresa.
 [functions.notify-package]
 verify_jwt = false
