@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { createCondominioRow, createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -74,6 +74,20 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(blankForm())
   const [vistaFutura, setVistaFutura] = useState(true)
+
+  // ids estables para asociar cada <label htmlFor> con su control. Sin la
+  // asociación, un lector de pantalla anuncia "cuadro combinado, en blanco" y dos
+  // campos de hora idénticos, y tocar el texto del label no enfoca el campo.
+  // useId da un prefijo único aunque el tab se monte más de una vez.
+  const uid = useId()
+  const ids = useMemo(() => ({
+    amenidad:   `${uid}-amenidad`,
+    fecha:      `${uid}-fecha`,
+    invitados:  `${uid}-invitados`,
+    horaInicio: `${uid}-hora-inicio`,
+    horaFin:    `${uid}-hora-fin`,
+    notas:      `${uid}-notas`,
+  }), [uid])
 
   const hoy = new Date().toISOString().slice(0, 10)
   const misReservas = reservas.filter(r => r.unidad_id === unidadId)
@@ -315,10 +329,10 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           {/* minmax(min(100%,300px)): 2 columnas en escritorio, 1 en móvil, sin media queries. */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
+              <label htmlFor={ids.amenidad} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
               {/* autoFocus: mete el foco DENTRO del diálogo al abrirlo, que es lo que
                   activa el focus trap de EditModal (su handler vive en el div del modal). */}
-              <select autoFocus value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
+              <select autoFocus id={ids.amenidad} value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }}>
                 <option value="">Seleccionar...</option>
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
@@ -386,29 +400,29 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               </div>
             )}
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha *</label>
-              <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+              <label htmlFor={ids.fecha} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha *</label>
+              <input type="date" id={ids.fecha} value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>No. invitados</label>
-              <input type="number" min={0} value={form.num_invitados} onChange={e => setForm(f => ({ ...f, num_invitados: parseInt(e.target.value) || 0 }))}
+              <label htmlFor={ids.invitados} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>No. invitados</label>
+              <input type="number" id={ids.invitados} min={0} value={form.num_invitados} onChange={e => setForm(f => ({ ...f, num_invitados: parseInt(e.target.value) || 0 }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
-              <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
+              <label htmlFor={ids.horaInicio} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
+              <input type="time" id={ids.horaInicio} value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
-              <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
+              <label htmlFor={ids.horaFin} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
+              <input type="time" id={ids.horaFin} value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
+              <label htmlFor={ids.notas} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
               {/* type="text" explícito: sin él, el selector de index.css no lo alcanza y se queda sin el min-height táctil de 44px. */}
-              <input type="text" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
+              <input type="text" id={ids.notas} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
           </div>
