@@ -2,6 +2,13 @@ import { useEffect, useRef, useCallback, type ReactNode, type KeyboardEvent as R
 
 export type EditModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
 
+// ── Scroll lock del body, compartido por TODAS las instancias ────────────────
+// Contador a nivel de módulo (no por instancia) para soportar modales anidados:
+// si un modal abre otro, al cerrar el de adentro el body debe seguir bloqueado.
+// El valor original se guarda solo en la transición 0→1 para restaurarlo intacto.
+let scrollLockCount = 0
+let overflowOriginal = ''
+
 const SIZE_WIDTHS: Record<EditModalSize, string> = {
   sm: '480px',
   md: '760px', // legacy default (mantener para retro-compat)
@@ -57,6 +64,42 @@ export function EditModal({
   closeOnEscape = true,
 }: EditModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  /** Elemento que tenía el foco antes de abrir, para devolvérselo al cerrar. */
+  const disparadorRef = useRef<HTMLElement | null>(null)
+
+  // Foco de entrada y de salida (WCAG 2.4.3):
+  //  - Al abrir, si el consumidor no movió ya el foco adentro (p. ej. con
+  //    `autoFocus` en un campo), se enfoca el propio diálogo. Sin esto el foco se
+  //    queda en el botón que abrió el modal —detrás del backdrop— y el focus trap
+  //    de abajo nunca llega a correr, porque es un onKeyDown de este nodo.
+  //  - Al cerrar, se devuelve el foco al disparador, para que el usuario de
+  //    teclado/lector no reinicie la navegación desde el inicio de la página.
+  useEffect(() => {
+    disparadorRef.current = document.activeElement as HTMLElement | null
+    const nodo = dialogRef.current
+    if (nodo && !nodo.contains(document.activeElement)) nodo.focus()
+    return () => {
+      const previo = disparadorRef.current
+      // Solo si sigue en el DOM y es enfocable (pudo desmontarse con el modal).
+      if (previo && document.body.contains(previo) && typeof previo.focus === 'function') {
+        previo.focus()
+      }
+    }
+  }, [])
+
+  // Bloqueo de scroll del fondo mientras el overlay está abierto: sin esto la
+  // rueda/el gesto sobre el backdrop desplaza la página detrás del modal.
+  useEffect(() => {
+    if (scrollLockCount === 0) {
+      overflowOriginal = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
+    scrollLockCount++
+    return () => {
+      scrollLockCount = Math.max(0, scrollLockCount - 1)
+      if (scrollLockCount === 0) document.body.style.overflow = overflowOriginal
+    }
+  }, [])
 
   useEffect(() => {
     if (!closeOnEscape) return
@@ -91,6 +134,9 @@ export function EditModal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      /* -1: enfocable por código (para el foco de entrada) pero fuera del orden
+         de tabulación, así el focus trap de abajo tampoco lo lista. */
+      tabIndex={-1}
       onKeyDown={handleFocusTrap}
       style={{
         position: 'fixed',
@@ -101,6 +147,7 @@ export function EditModal({
         justifyContent: 'center',
         zIndex: 1000,
         padding: 'var(--at-space-3)',
+        outline: 'none',
       }}
       onClick={e => {
         if (!closeOnBackdropClick) return
