@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 import { createCondominioRow, createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
 import { useSignedUrls } from '../../../lib/storageUrls'
@@ -84,6 +85,22 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
   // Firma todas las fotos en UNA petición (createSignedUrls batch) en vez de
   // N peticiones desde cada card hijo.
   const signedFotoUrls = useSignedUrls(amenidadesActivas.map(a => a.foto_url), 'condominios-media')
+
+  /** Cierra el modal CONSERVANDO lo escrito (× y Escape). No borra el formulario:
+   *  un cierre accidental no debe costarle al residente todo lo que capturó.
+   *  Bloqueado mientras se guarda para no ocultar una reserva en vuelo. */
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+  }
+
+  /** Descarta el formulario (botón Cancelar y camino de éxito). NUNCA se bloquea:
+   *  es la salida de emergencia si una petición se queda colgada — el modal es un
+   *  overlay que tapa todo el portal y el cliente de Supabase no tiene timeout. */
+  function descartarForm() {
+    setShowForm(false)
+    setForm(blankForm())
+  }
 
   async function hacerReserva() {
     if (!form.amenidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione una amenidad.' }); return }
@@ -178,7 +195,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
         : '¡Reserva confirmada!'
     notify({ variant: 'success', title: titulo, duration: 2600 })
-    setForm(blankForm()); setShowForm(false); onRefresh()
+    descartarForm(); onRefresh()
   }
 
   async function cancelarReserva(id: string) {
@@ -267,15 +284,42 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
         )}
       </div>
 
-      {/* Formulario */}
+      {/* Formulario en modal (EditModal: focus trap + Escape + backdrop, igual que
+          el resto de tabs del portal). Antes era un bloque inline al final de la
+          página: al tocar una amenidad había que hacer scroll para llenarlo. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
-          <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Solicitar reserva</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <EditModal
+          title="Solicitar reserva"
+          subtitle={amenidadSel
+            ? `${amenidadSel.nombre}${amenidadSel.horario_inicio && amenidadSel.horario_fin ? ` · ${amenidadSel.horario_inicio}–${amenidadSel.horario_fin}` : ''}`
+            : 'Elige la amenidad y tu horario'}
+          size="md"
+          onClose={cerrarForm}
+          /* Sin cierre por backdrop: en móvil el panel deja una franja tocable a
+             los lados y un roce accidental cerraría el formulario a medio llenar. */
+          closeOnBackdropClick={false}
+          footer={
+            <>
+              {/* Cancelar NUNCA va disabled: es la escotilla de salida si el guardado se cuelga. */}
+              <button onClick={descartarForm}
+                style={{ padding: '10px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', fontSize: '13.5px', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={hacerReserva} disabled={saving}
+                style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13.5px', whiteSpace: 'nowrap', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Reservando…' : '📅 Confirmar reserva'}
+              </button>
+            </>
+          }
+        >
+          {/* minmax(min(100%,300px)): 2 columnas en escritorio, 1 en móvil, sin media queries. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
-              <select value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              {/* autoFocus: mete el foco DENTRO del diálogo al abrirlo, que es lo que
+                  activa el focus trap de EditModal (su handler vive en el div del modal). */}
+              <select autoFocus value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }}>
                 <option value="">Seleccionar...</option>
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
               </select>
@@ -330,7 +374,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             {amenidadSel?.reglamento && (
               <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-ink)', marginBottom: 6 }}>📜 Reglamento</div>
-                <div style={{ fontSize: 12, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, lineHeight: 1.5 }}>
+                {/* Scroller anidado dentro del body del modal: overscrollBehavior contain
+                    evita que al llegar al final el gesto arrastre el formulario detrás. */}
+                <div style={{ fontSize: 12, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', maxHeight: 'min(280px, 40vh)', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '6px 8px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, lineHeight: 1.5 }}>
                   {amenidadSel.reglamento}
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
@@ -342,36 +388,31 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>No. invitados</label>
               <input type="number" min={0} value={form.num_invitados} onChange={e => setForm(f => ({ ...f, num_invitados: parseInt(e.target.value) || 0 }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
               <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
               <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
-              <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+              {/* type="text" explícito: sin él, el selector de index.css no lo alcanza y se queda sin el min-height táctil de 44px. */}
+              <input type="text" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '16px', background: 'var(--at-surface-2)' }} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button onClick={hacerReserva} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Reservando...' : '📅 Confirmar reserva'}
-            </button>
-            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Mis reservas */}
