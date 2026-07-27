@@ -3,6 +3,7 @@ import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInse
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { toast } from '../../../lib/toast'
 import { ImageUploader } from '../../shared/ImageUploader'
+import { diaValidez } from '../../../lib/visitantesFiltros'
 import type { Visitante } from '../../../types'
 
 interface Props {
@@ -388,7 +389,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
             .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
             .map(v => {
               const esHoy = v.hora_entrada.slice(0, 10) === hoy
-              const vigente = !v.valido_hasta || v.valido_hasta >= hoy
+              const vigente = !v.valido_hasta || diaValidez(v.valido_hasta) >= hoy
               const acomps = visitantes.filter(c => c.visitante_principal_id === v.id)
               return (
                 <div key={v.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${esHoy ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '13px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -409,7 +410,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                     </div>
                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                       {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      {v.valido_hasta && ` · Válida hasta ${new Date(v.valido_hasta + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })}`}
+                      {v.valido_hasta && ` · Válida hasta ${new Date(diaValidez(v.valido_hasta) + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })}`}
                     </div>
                   </div>
                   {esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)', flexShrink: 0 }}>Hoy</span>}

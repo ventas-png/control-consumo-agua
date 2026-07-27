@@ -4,6 +4,7 @@ import { notify } from '../../shared/Dialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsert } from '../../../lib/validatedInsert'
 import { generarToken } from '../../../lib/tokens'
+import { diaValidez } from '../../../lib/visitantesFiltros'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { Visitante, Unidad } from '../../../types'
 
@@ -39,12 +40,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   const [registrando, setRegistrando] = useState(false)
 
   const preAutorizados = useMemo(() =>
-    visitantes.filter(v => v.qr_token && !v.hora_salida && v.valido_hasta && v.valido_hasta >= hoy),
+    visitantes.filter(v => v.qr_token && !v.hora_salida && v.valido_hasta && diaValidez(v.valido_hasta) >= hoy),
     [visitantes, hoy]
   )
 
   const vencidos = useMemo(() =>
-    visitantes.filter(v => v.qr_token && !v.hora_entrada && v.valido_hasta && v.valido_hasta < hoy),
+    visitantes.filter(v => v.qr_token && !v.hora_entrada && v.valido_hasta && diaValidez(v.valido_hasta) < hoy),
     [visitantes, hoy]
   )
 
@@ -94,8 +95,8 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
     if (!v) {
       setResultadoValidacion({ ok: false, msg: 'Token no encontrado en el sistema.' }); return
     }
-    if (v.valido_hasta && v.valido_hasta < hoy) {
-      setResultadoValidacion({ ok: false, visitante: v, msg: `Token vencido el ${v.valido_hasta}.` }); return
+    if (v.valido_hasta && diaValidez(v.valido_hasta) < hoy) {
+      setResultadoValidacion({ ok: false, visitante: v, msg: `Token vencido el ${diaValidez(v.valido_hasta)}.` }); return
     }
     if (v.hora_entrada && !v.hora_salida) {
       setResultadoValidacion({ ok: true, visitante: v, msg: `Ya está dentro desde ${v.hora_entrada?.slice(11, 16)}.` }); return
@@ -249,7 +250,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                     <div><strong>{resultadoValidacion.visitante.nombre}</strong></div>
                     <div>Unidad: {resultadoValidacion.visitante.unidad_nombre}</div>
                     {resultadoValidacion.visitante.motivo && <div>Motivo: {resultadoValidacion.visitante.motivo}</div>}
-                    <div>Válido hasta: {resultadoValidacion.visitante.valido_hasta}</div>
+                    <div>Válido hasta: {resultadoValidacion.visitante.valido_hasta && diaValidez(resultadoValidacion.visitante.valido_hasta)}</div>
                   </div>
                 )}
                 {resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
@@ -288,7 +289,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                       {v.unidad_nombre} · Token: <code style={{ background: 'var(--at-chip)', padding: '1px 5px', borderRadius: 4 }}>{v.qr_token}</code>
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>
-                      Válido hasta {v.valido_hasta}
+                      Válido hasta {v.valido_hasta && diaValidez(v.valido_hasta)}
                       {v.hora_entrada && ` · Entró ${v.hora_entrada.slice(11, 16)}`}
                     </div>
                   </div>

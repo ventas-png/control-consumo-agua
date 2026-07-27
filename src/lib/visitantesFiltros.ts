@@ -6,6 +6,22 @@ import type { ReservaSTR, SolicitudMudanzaUnidad, Visitante } from '../types'
 
 export type FiltroFechaVisitas = 'hoy' | 'semana' | 'mes' | 'todos'
 
+/**
+ * Día de vigencia ('YYYY-MM-DD') de un `valido_hasta`, venga como fecha pelada
+ * o como timestamp.
+ *
+ * `visitantes.valido_hasta` es `timestamptz` en DB pero la UI lo llena con
+ * <input type="date">, así que PostgREST puede devolverlo como '2026-07-28' o
+ * como '2026-07-28T00:00:00+00:00' según el tipo efectivo de la columna. Sin
+ * normalizar, `new Date(valor + 'T12:00:00')` produce Invalid Date en el
+ * segundo caso y las comparaciones contra 'YYYY-MM-DD' quedan a merced del
+ * orden lexicográfico. Recortar a los primeros 10 chars es correcto para ambas
+ * formas.
+ */
+export function diaValidez(validoHasta: string): string {
+  return validoHasta.slice(0, 10)
+}
+
 export interface RangosFecha {
   hoy: string
   inicioSemana: string
