@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   agruparVisitantes,
+  diaValidez,
   filtrarVisitantes,
   kpisVisitantes,
   rangosDeFecha,
@@ -16,6 +17,34 @@ function visitante(partial: Partial<Visitante>): Visitante {
     ...partial,
   } as Visitante
 }
+
+describe('diaValidez', () => {
+  // `visitantes.valido_hasta` es timestamptz en DB pero la UI lo llena con
+  // <input type="date">, así que el valor leído de vuelta puede traer o no
+  // componente horario. Ambas formas deben colapsar al mismo día.
+  it('deja intacta una fecha pelada', () => {
+    expect(diaValidez('2026-07-28')).toBe('2026-07-28')
+  })
+
+  it('recorta el componente horario de un timestamptz', () => {
+    expect(diaValidez('2026-07-28T00:00:00+00:00')).toBe('2026-07-28')
+    expect(diaValidez('2026-07-28T23:59:59.999Z')).toBe('2026-07-28')
+    expect(diaValidez('2026-07-28 00:00:00+00')).toBe('2026-07-28')
+  })
+
+  it('el resultado sirve para comparar contra un YYYY-MM-DD', () => {
+    const hoy = '2026-07-24'
+    expect(diaValidez('2026-07-28T00:00:00+00:00') >= hoy).toBe(true)
+    expect(diaValidez('2026-07-20T00:00:00+00:00') < hoy).toBe(true)
+    // El propio día de vencimiento sigue vigente.
+    expect(diaValidez('2026-07-24T00:00:00+00:00') >= hoy).toBe(true)
+  })
+
+  it('el resultado es concatenable a T12:00:00 sin producir Invalid Date', () => {
+    const d = new Date(diaValidez('2026-07-28T00:00:00+00:00') + 'T12:00:00')
+    expect(Number.isNaN(d.getTime())).toBe(false)
+  })
+})
 
 describe('rangosDeFecha', () => {
   it('calcula hoy, lunes de la semana y día 1 del mes', () => {
