@@ -742,6 +742,58 @@ código que v7 requiere. Los otros PRs abiertos (#663 eslint 10, #662 sonner 2,
 #670 grupo minor/patch, #659 checkout 7) siguen su flujo — salvo que PR-29 choque
 con #663, en cuyo caso se ordenan.
 
+#### ✅ Implementado — el major era obligatorio y la migración de código, nula
+
+**1. No había salida por v6.** El informe decía «absorber el 7» como una opción de
+oportunidad; al mirar los rangos resulta que era la ÚNICA vía. El open redirect
+(GHSA-wrjc-x8rr-h8h6) afecta a `>=6.0.0 <7.18.0`: **ninguna 6.x lo arregla**. Y
+aparecieron dos avisos más que el informe no listaba, ambos vigentes sobre la
+6.30.4 instalada:
+
+| Aviso | Rango vulnerable |
+|---|---|
+| GHSA-wrjc-x8rr-h8h6 · open redirect vía backslash en `<Link>`/`useNavigate` | `>=6.0.0 <7.18.0` |
+| GHSA-jjmj-jmhj-qwj2 · open redirect que deriva en XSS | `>=6.30.2 <=6.30.4` |
+| GHSA-337j-9hxr-rhxg · inyección de constructor en `deserializeErrors()` (SSR) | `>=6.4.0 <7.18.0` |
+
+**2. La «migración de código que v7 requiere» resultó ser cero.** La app usa sólo
+la API declarativa, en **5 archivos**: `useNavigate` ×3, `useParams` ×2,
+`useLocation`, `Routes`, `Route`, `Navigate`, `BrowserRouter`, `MemoryRouter`.
+Cero data router (`createBrowserRouter`/`RouterProvider`), cero `loader`/`action`,
+cero `json()`/`defer()` (lo que v7 elimina), cero `Form`/`useFetcher`. Los flags
+que v7 activa por defecto no muerden: todos los `path` son absolutos y la única
+ruta comodín (`*`) navega a un destino absoluto, así que `v7_relativeSplatPath` no
+aplica. Diff real: `package.json` + `package-lock.json`.
+
+**3. `npm audit` NO queda limpio, y bajar de versión sería peor.** En 7.18.2
+aparece GHSA-qwww-vcr4-c8h2 (*RSC Mode CSRF Bypass*, `>=7.12.0 <8.3.0`) y `npm
+audit` propone «arreglarlo» bajando a **7.11.0** — que reintroduce los tres avisos
+de arriba. El aviso es de **modo RSC**, y esta app no lo tiene: es una SPA de Vite
+con `<BrowserRouter>`; verificado que no hay `react-router/rsc`,
+`matchRSCServerRequest`, `createCallServer`, `@react-router/dev` ni `plugin-rsc`.
+Se queda en 7.18.2 a sabiendas, no por descuido.
+
+**4. La verificación que hacía falta no era la suite, era el router.** Con el
+upgrade puesto, los 2720 tests pasaron… sin significar nada: sólo un archivo
+tocaba el router (`AppPublicRoutes.test.tsx`, escrito para pasar con o sin shell) y
+`lib/routes.ts` —la tabla por la que navega toda la app— **no tenía ningún test**.
+Se añade `src/lib/__tests__/routes.test.tsx` (8 casos) que monta rutas de verdad,
+navega con `useNavigate` y comprueba URL y sección resultantes.
+
+Los tests se validaron en tres direcciones, no sólo en verde:
+
+- **Mutación** — colisionar dos secciones en la misma URL: 4 fallos nombrando la
+  sección. Invertir el desempate de prefijo (que gane el más corto):
+  `expected 'condominios' to be 'condominios_cuotas'`. Cambiar el destino del
+  comodín: `expected '/cobros' to be '/clientes'`.
+- **Paridad de versiones** — los mismos 8 casos corren **idénticos contra 6.30.4 y
+  contra 7.18.2**. Ésa es la evidencia de que el major preserva el contrato de
+  navegación de la app, y no «los tests pasan».
+- Un mutante que parecía regresión (`path.length > bestLen` → `>= 0`) resultó
+  **equivalente**: el orden de claves de `SECTION_TO_PATH` hace que la última
+  coincidencia siga siendo la más larga. Se anota para no confundirlo con un
+  hueco del test.
+
 ---
 
 # Orden de ejecución
