@@ -593,13 +593,56 @@ predicado RLS y filtros. **Es el PR más grande del plan; va el último y solo.*
 | **PR-28** ⏸ | **NO es un barrido — replanteado.** Son **59 sitios, no 26.** Y la conversión a `runQuery` que proponía el informe **no es segura**: los 59 están en funciones exportadas planas (ninguno dentro de un `queryFn`), y sus llamadores son `void fetchX().then(...)` — promesas flotantes **sin `.catch()`**. Hacerlas lanzar produciría rechazos no capturados en vez de UI de error, es decir *peor* que hoy. Además `appUserProfileExists` se espera en el flujo de login OAuth (`useOAuthSession.ts:28`), y hay tests que fijan el contrato actual (`expect(await fetchDirectorioResidentes('p1')).toEqual([])` ante error). El arreglo correcto es, por sitio: llevar el llamador a React Query (o darle manejo de error) y **después** cambiar el contrato. Es un refactor por call site, no un find-and-replace |
 | **PR-29** | ESLint: ampliar alcance y encender reglas | Hoy las reglas aplican **solo a `src/components/**`** (`eslint.config.js:27`): `src/domain`, `src/lib` y `src/hooks` están **sin lint**. Solo hay 2 reglas activas. `react-hooks/exhaustive-deps` está en **`'off'`** (`:42`) con **26 supresiones vivas** que nunca se revalidan porque `reportUnusedDisableDirectives` también está `'off'` (`:31`). `typescript-eslint` es dependencia pero **ninguna** de sus reglas está activa. Poner `exhaustive-deps: 'warn'`, activar `no-floating-promises`, ampliar `files` |
 | **PR-30** | Incluir `supabase/functions/**` en el type-check | `tsconfig.json` tiene `include: ["src"]`, así que **toda la ruta de dinero del servidor** (`create-charge`, `confirm-charge`, `timbrar-documento`) nunca se typechequea. El único `deno check` es `continue-on-error: true` y solo cubre «helpers puros» (`edge-tests.yml:56,65,75`) |
-| **PR-31** | Extender el umbral de cobertura a `src/domain/**` de dinero | El gate cubre **12 archivos de `src/lib/`** (`coverage.yml:38-75`). Ningún archivo de `src/domain/**` tiene umbral — es toda la capa de queries/mutations. Empezar por `eeff` (1 test / 4 archivos) y `contabilidad` (3 / 5) |
+| **PR-31** ✅ | Extender el umbral de cobertura a `src/domain/**` de dinero | El gate cubría **12 archivos de `src/lib/`** (`coverage.yml:38-75`) y ningún archivo de `src/domain/**`. **Corrección de alcance al implementar:** el informe decía «es toda la capa de queries/mutations», y *por eso mismo* la capa de queries/mutations queda FUERA del gate — ver abajo |
 
 **Corrección a una hipótesis previa:** no hay dominios de dinero sin tests — todos
 tienen (facturacion 3, cobros 4, contabilidad 3, fiscal 3, presupuesto 3, bancos 2,
 cxp 2, tarifas 1, eeff 1). Los dominios con cero tests son no-monetarios
 (`branding`, `legal`, `preferencias`, `sesiones`). Ratio global: 179 archivos de
 test / 707 fuente.
+
+### PR-31 · Corrección de alcance (medido, no estimado)
+
+El plan decía «extender el umbral a `src/domain/**`» y sugería empezar por `eeff`
+y `contabilidad`. Al medir la cobertura real, el alcance correcto resultó **más
+amplio en archivos puros y explícitamente excluyente con la capa de I/O**:
+
+**Qué entra (9 archivos, cálculo y validación puros):** `eeff/calculos.ts`,
+`contabilidad/arbol.ts`, `contabilidad/schemas.ts`, `presupuesto/proyeccion.ts`,
+`presupuesto/schemas.ts`, `bancos/schemas.ts`, `cxp/schemas.ts`,
+`condominios/schemas.ts`, `agua/schemas.ts`. Los dos últimos no estaban en el
+plan y son de los más grandes (195 y 159 líneas) — se encontraron barriendo
+`src/domain/**` por archivos que **no importan `lib/supabase`**, que es el
+criterio operativo de «puro».
+
+**Qué NO entra, y por qué no es un descuido:** `queries.ts`, `mutations.ts`,
+`facturacion/billing.ts`, `cobros/paymentConfig.ts`, `cobros/morosidad.ts`. Son
+cadenas del query builder de Supabase; cubrirlas mide cuánto mock se escribió
+(«se llamó `.eq()` con esta columna»), no si el dinero se calcula bien. Medido:
+incluirlas baja el techo alcanzable a **68% en `cobros`** y arrastra el conjunto
+a ~92%, con lo que el umbral tendría que fijarse tan bajo que dejaría de reportar
+nada. El contrato de error de esa capa ya lo fija
+`src/domain/__tests__/queryFetch.test.ts`; que los call sites lo usen es PR-28.
+
+**Estado medido y umbral.** Los 9 archivos estaban al 95,49 / 85,47 / 98,66 /
+96,57 (stmts/ramas/funcs/líneas). Los tres huecos reales eran todos lógica pura y
+se cerraron con tests, no bajando el listón:
+
+| Hueco | Qué era | Por qué importaba |
+|---|---|---|
+| `contabilidad/schemas.ts:26-31` | `normalizarMoneda` **sin ningún test** | Es un **espejo TS↔SQL** de `conta_normalizar_moneda` (`20260611000100:21-32`) — la misma forma del bug de PR-23. Verifiqué las 5 ramas del `CASE` contra el SQL (incluidos `NULL`, `''` y el `upper(trim(...))` que se aplica *antes* de mapear): el espejo **es fiel hoy**, y ahora hay test que lo fija |
+| `bancos/schemas.ts:31` | rama **numérica** de `parseMontoExtracto` sin cubrir en su lado falso | Las celdas de XLSX llegan como `number`, no `string`. Sin esto, `0`/`NaN`/`Infinity` de una celda vacía o rota entraban al import como movimiento válido |
+| `eeff/calculos.ts:146` | el `?? 0` de `resumirConsolidado` | Una fila **con tasa** pero con componente `null` propagaría `NaN` a *todo* el consolidado: el reporte financiero renderiza «NaN» en vez de fallar |
+
+Resultado: **100 / 100 / 100 / 100** (275 stmts, 151 ramas, 79 funcs, 227 líneas),
+122 tests. Umbral fijado en **95/95/95/90** — misma holgura de 5 puntos que usa el
+gate de `src/lib/` respecto de su real (~95% contra 90/85), para que falle ante
+una regresión y no ante un refactor de una línea.
+
+**El gate se verificó en ambos sentidos**, no solo en verde: con el código actual
+sale `EXIT=0`; inyectando una función de dinero sin tests en un archivo cubierto,
+sale `EXIT=1` con `statements 92,9% < 95%` y `branches 88,3% < 90%`. Un gate que
+no se probó fallando es un gate que no se sabe si funciona.
 
 **Ya está bien — no re-proponer:** 9 `as any` en 185k LOC y cero `@ts-ignore`;
 React Query invalida en los 17 archivos con `useMutation` y **no hay fuga de caché

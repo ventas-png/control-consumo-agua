@@ -33,6 +33,24 @@ describe('parseMontoExtracto', () => {
     expect(parseMontoExtracto('abc')).toBeNull()
     expect(parseMontoExtracto(null)).toBeNull()
   })
+
+  // La rama NUMÉRICA (celdas de XLSX, que llegan como number y no como string)
+  // solo estaba ejercitada por el camino feliz. Sin esto, un extracto con una
+  // celda vacía o rota entraba al import como si fuera un movimiento válido.
+  it('rechaza números no interpretables sin pasar por el parser de strings', () => {
+    expect(parseMontoExtracto(0)).toBeNull()
+    expect(parseMontoExtracto(-0)).toBeNull()
+    expect(parseMontoExtracto(NaN)).toBeNull()
+    expect(parseMontoExtracto(Infinity)).toBeNull()
+    expect(parseMontoExtracto(-Infinity)).toBeNull()
+  })
+
+  it('redondea a 2 decimales los números crudos de XLSX', () => {
+    // XLSX arrastra error binario al leer celdas de moneda; sin el redondeo el
+    // movimiento entra con 6+ decimales y nunca concilia contra el asiento.
+    expect(parseMontoExtracto(1234.5649)).toBe(1234.56)
+    expect(parseMontoExtracto(-75.256)).toBe(-75.26)
+  })
 })
 
 describe('parseFechaExtracto', () => {
@@ -70,6 +88,17 @@ describe('validarFilaExtracto', () => {
     const r = validarFilaExtracto({ fecha: 'x', monto: '0' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.errors).toHaveLength(2)
+  })
+
+  it('columnas descripcion/referencia AUSENTES → null, no la cadena "undefined"', () => {
+    // `String(row.descripcion ?? '')` sin el `??` produciría literalmente
+    // "undefined" como descripción del movimiento en el extracto importado.
+    const r = validarFilaExtracto({ fecha: '2026-06-10', monto: 100 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.data.descripcion).toBeNull()
+      expect(r.data.referencia).toBeNull()
+    }
   })
 })
 
