@@ -491,8 +491,13 @@ function sumarPeriodo(fechaISO: string, i: number, frecuencia: FrecuenciaConveni
   }
   const dt = new Date(Date.UTC(y, m - 1, d))
   dt.setUTCDate(dt.getUTCDate() + i * DIAS_FRECUENCIA[frecuencia])
-  // UTC deliberado, igual que arriba.
-  // eslint-disable-next-line no-restricted-syntax
+  // UTC deliberado, igual que arriba. Aquí NO hace falta la supresión de
+  // `no-restricted-syntax`: el selector de la regla exige que el receptor sea un
+  // `new Date(...)` INLINE (`new Date(…).toISOString()`), y esto va por variable.
+  // Es decir, la regla tiene un punto ciego con la forma
+  // `const d = new Date(); d.toISOString()` — se deja anotado en vez de ampliar
+  // el selector, porque cualquier `x.toISOString()` legítimamente UTC pasaría a
+  // dar falsos positivos.
   return dt.toISOString().slice(0, 10)
 }
 
