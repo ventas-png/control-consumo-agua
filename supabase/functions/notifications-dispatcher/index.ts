@@ -31,6 +31,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
+import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 // Helpers puros de render/plantillas/routing extraídos a ./render.ts para poder
 // testearlos en vitest sin I/O (infra:I22). El handler sigue haciendo las queries.
 import {
@@ -148,11 +149,17 @@ function buildRawMessage(
   fromEmail: string, fromName: string | null, replyTo: string | null,
   to: string, subject: string, htmlBody: string,
 ): string {
+  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
+  // única cabecera de este mensaje que no va codificada en base64, así que es la
+  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
+  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
+  const safeTo = assertEmailAddress('To', to)
+  const safeReplyTo = replyTo ? assertEmailAddress('Reply-To', replyTo) : null
   const boundary = `----=_Part_${Date.now()}`
   const lines = [
     `From: ${formatFromHeader(fromEmail, fromName)}`,
-    `To: ${to}`,
-    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
+    `To: ${safeTo}`,
+    ...(safeReplyTo ? [`Reply-To: ${safeReplyTo}`] : []),
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -81,10 +82,15 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
 }
 
 function buildRawMessage(from: string, to: string, subject: string, htmlBody: string): string {
+  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
+  // única cabecera de este mensaje que no va codificada en base64, así que es la
+  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
+  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
+  const safeTo = assertEmailAddress('To', to)
   const boundary = `----=_Part_${Date.now()}`
   const lines = [
     `From: ${from}`,
-    `To: ${to}`,
+    `To: ${safeTo}`,
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
