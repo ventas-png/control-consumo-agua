@@ -23,6 +23,17 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Guardarraíl de aislamiento multi-tenant (auditoría 2026-07-28, PR-9).
+      # Análisis ESTÁTICO del repo, complementario a security-guard.yml (que mira
+      # el catálogo de PROD, de noche, DESPUÉS del merge). Éste mira el repo, en
+      # el PR, ANTES del merge — que es donde se cuela el drift: RLS habilitada a
+      # mano en el dashboard deja prod verde para siempre mientras el repo se
+      # queda sin la migración, y cualquier deploy fresco nace con el hueco.
+      # Sin dependencias ni red: solo APIs nativas de Node, así que va antes de
+      # `npm ci` para dar feedback en segundos.
+      - name: Migrations guard (RLS + scope de RPCs)
+        run: node scripts/migrations-guard.mjs
+
       - name: Install dependencies
         run: npm ci
 
