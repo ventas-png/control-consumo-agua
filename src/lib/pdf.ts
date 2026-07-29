@@ -1,3 +1,4 @@
+import { dateLocalISO } from './format'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Registro, Empresa, RegistroCalidad } from '../types'
@@ -150,7 +151,7 @@ export function generarPDFAnalisis(registro: RegistroCalidad, empresa: Empresa):
     },
   })
 
-  const nombreArchivo = `calidad_${fuente ? fuente.identificador.replace(/[^a-z0-9]/gi, '_') : 'analisis'}_${new Date(registro.fecha).toISOString().slice(0, 10)}.pdf`
+  const nombreArchivo = `calidad_${fuente ? fuente.identificador.replace(/[^a-z0-9]/gi, '_') : 'analisis'}_${dateLocalISO(new Date(registro.fecha))}.pdf`
   doc.save(nombreArchivo)
 }
 

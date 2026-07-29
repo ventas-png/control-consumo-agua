@@ -481,10 +481,18 @@ function sumarPeriodo(fechaISO: string, i: number, frecuencia: FrecuenciaConveni
     const ty = y + Math.floor(totalMes / 12)
     const tm = ((totalMes % 12) + 12) % 12 // 0..11
     const ultimoDia = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate()
+    // UTC DELIBERADO: la fecha se construye con Date.UTC() y se reexpresa con
+    // toISOString(), así que el round-trip es exacto y la función queda
+    // independiente de la zona del navegador (ver el docstring). Usar
+    // dateLocalISO aquí introduciría justo el desplazamiento que esta función
+    // existe para evitar.
+    // eslint-disable-next-line no-restricted-syntax
     return new Date(Date.UTC(ty, tm, Math.min(d, ultimoDia))).toISOString().slice(0, 10)
   }
   const dt = new Date(Date.UTC(y, m - 1, d))
   dt.setUTCDate(dt.getUTCDate() + i * DIAS_FRECUENCIA[frecuencia])
+  // UTC deliberado, igual que arriba.
+  // eslint-disable-next-line no-restricted-syntax
   return dt.toISOString().slice(0, 10)
 }
 
