@@ -6,6 +6,10 @@
 // resolverConfigFiscalEfectiva (businessFiscal.ts) pero para el procesador de pagos.
 
 import type { AmbientePago, ConfigPagoEfectiva } from '../types/pagos'
+// PR-22 (auditoría 2026-07-28): el redondeo monetario vive en un solo sitio.
+// Había 8 copias del truco `(n + Number.EPSILON) * 100`, que fallaba el 4,58%
+// de los puntos medios y divergía de `numeric(12,2)` en todo negativo.
+import { redondear2 } from './business'
 
 /** Moneda por defecto si la empresa no fijó companies.default_currency. */
 export const MONEDA_PAGO_DEFAULT = 'GTQ'
@@ -96,10 +100,6 @@ export interface RecargoTarjetaRow {
   pct: number
   /** Monto fijo por pago, en la moneda del cobro. */
   fijo: number
-}
-
-function redondear2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
 /**

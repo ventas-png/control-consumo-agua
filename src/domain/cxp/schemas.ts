@@ -1,6 +1,7 @@
 // CxP — validación Zod de formularios. La validación autoritativa (estados,
 // inmutabilidad, saldos) vive en los triggers de BD; esto da feedback en UI.
 import { z } from 'zod'
+import { redondear2 } from '../../lib/business'
 
 export const proveedorFormSchema = z.object({
   nombre: z.string().trim().min(2, 'El nombre es obligatorio (mín. 2 caracteres)').max(150),
@@ -49,5 +50,8 @@ export type OrdenPagoFormInput = z.infer<typeof ordenPagoFormSchema>
 
 /** Saldo pendiente de una factura (lo máximo que puede pagar una orden). */
 export function saldoFactura(f: { monto_total: number; monto_pagado: number }): number {
-  return Math.round((f.monto_total - f.monto_pagado + Number.EPSILON) * 100) / 100
+  // PR-22: era la OCTAVA copia del redondeo defectuoso —embebida en la expresión,
+  // por eso no salía al buscar `function redondear2`. Es la que decide cuánto
+  // puede pagar una orden contra una factura de proveedor.
+  return redondear2(f.monto_total - f.monto_pagado)
 }

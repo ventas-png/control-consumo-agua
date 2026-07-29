@@ -3,11 +3,15 @@
 // (conta_publicar_asiento valida debe=haber, cuentas de detalle y periodo);
 // esto da feedback inmediato en la UI con las mismas reglas.
 import { z } from 'zod'
+import { redondear2 } from '../../lib/business'
 
-/** Redondeo monetario a 2 decimales (mismo round half-up que la BD). */
-export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100
-}
+/**
+ * Redondeo monetario a 2 decimales, half-away-from-zero como `numeric(12,2)`.
+ * Se reexporta con el nombre `round2` que ya importan los consumidores (p. ej.
+ * AperturaSaldosModal) sin duplicar la aritmética: la implementación única vive
+ * en `lib/business` (PR-22).
+ */
+export const round2 = redondear2
 
 /** Conversión a moneda base: debe/haber = round(monto_origen × tipo_cambio, 2). */
 export function convertirMontoBase(montoOrigen: number, tipoCambio: number): number {

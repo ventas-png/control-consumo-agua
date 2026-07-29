@@ -329,6 +329,70 @@ describe('redondear2', () => {
     expect(redondear2(NaN)).toBe(0)
     expect(redondear2(Infinity)).toBe(0)
   })
+
+  // ── Regresión del defecto de la auditoría 2026-07-28 (Bloque D · PR-22) ────
+  // La implementación anterior sumaba `Number.EPSILON` antes de redondear. El
+  // test de arriba pasaba —1.005, 1.004 y 2.675 caen del lado bueno— pero el
+  // 4,58% de los puntos medios NO. Estos vectores son de los que fallaban.
+  it('acierta los puntos medios que el truco del epsilon perdía', () => {
+    expect(redondear2(2.135)).toBe(2.14)
+    expect(redondear2(4.015)).toBe(4.02)
+    expect(redondear2(8.165)).toBe(8.17)
+    expect(redondear2(10.075)).toBe(10.08)
+  })
+
+  // `Number.EPSILON` es el ulp EN 1.0: por encima de ~1000 sumarlo no cambia
+  // nada (`(1000.005 + Number.EPSILON) === 1000.005`), así que el redondeo
+  // quedaba a merced del error binario. Importa: son importes de factura reales.
+  it('sigue siendo correcto en magnitudes donde el epsilon era inoperante', () => {
+    expect(redondear2(1000.005)).toBe(1000.01)
+    expect(redondear2(12345.675)).toBe(12345.68)
+    expect(redondear2(999999.005)).toBe(999999.01)
+  })
+
+  // `Math.round` es half-UP, no half-away-from-zero: TODO punto medio negativo
+  // divergía de la columna `numeric(12,2)`. Afecta a notas de crédito, ajustes
+  // y reversos.
+  it('redondea los negativos alejándose del cero, como numeric', () => {
+    expect(redondear2(-1.005)).toBe(-1.01)
+    expect(redondear2(-2.135)).toBe(-2.14)
+    expect(redondear2(-10.045)).toBe(-10.05)
+    expect(redondear2(-0.005)).toBe(-0.01)
+  })
+
+  it('nunca devuelve -0 (distinto de 0 al serializar y al mostrarlo)', () => {
+    expect(Object.is(redondear2(-0.001), 0)).toBe(true)
+    expect(Object.is(redondear2(-0), 0)).toBe(true)
+  })
+
+  it('absorbe el error de coma flotante clásico', () => {
+    expect(redondear2(0.1 + 0.2)).toBe(0.3)
+    expect(redondear2(1.1 * 3)).toBe(3.3)
+  })
+
+  // Prueba de propiedad contra una referencia DECIMAL exacta (BigInt sobre
+  // centavos), que es lo que hace `numeric` en Postgres. Es la red que hubiera
+  // cazado el defecto original: barre magnitudes en vez de fiarse de 3 casos.
+  it('coincide con numeric(12,2) en 20.000 puntos medios de ambos signos', () => {
+    const referenciaDecimal = (x: number): number => {
+      const s = x.toFixed(10)
+      const negativo = s.startsWith('-')
+      const [entera, decimal] = s.replace('-', '').split('.')
+      const centavos = BigInt(entera) * 100n + BigInt(decimal.slice(0, 2))
+      const conRedondeo = centavos + (Number(decimal[2]) >= 5 ? 1n : 0n)
+      const valor = Number(conRedondeo) / 100
+      return negativo ? (valor === 0 ? 0 : -valor) : valor
+    }
+
+    const fallos: string[] = []
+    for (let i = 5; i <= 100005; i += 10) {
+      for (const n of [i / 1000, -i / 1000]) {
+        const esperado = referenciaDecimal(n)
+        if (redondear2(n) !== esperado) fallos.push(`${n}: ${redondear2(n)} ≠ ${esperado}`)
+      }
+    }
+    expect(fallos.slice(0, 5)).toEqual([])
+  })
 })
 
 describe('calcularIVA', () => {

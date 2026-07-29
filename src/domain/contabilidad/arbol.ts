@@ -1,5 +1,9 @@
 // Contabilidad — armado del árbol del catálogo de cuentas (puro, testeable).
 import type { CuentaContable, BalanzaFila } from '../../types/contabilidad'
+// PR-22 (auditoría 2026-07-28): el redondeo monetario vive en un solo sitio.
+// Había 8 copias del truco `(n + Number.EPSILON) * 100`, que fallaba el 4,58%
+// de los puntos medios y divergía de `numeric(12,2)` en todo negativo.
+import { redondear2 as r2 } from '../../lib/business'
 
 export interface CuentaNode extends CuentaContable {
   hijos: CuentaNode[]
@@ -66,7 +70,6 @@ export function balanzaConRollups(
 ): BalanzaNodo[] {
   const porCuenta = new Map(filas.map((f) => [f.cuenta_id, f]))
   const arbol = buildArbolCuentas(cuentas)
-  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 
   // Pasada 1: totales por nodo (propios + descendientes); null = rama sin movimiento.
   const totales = new Map<string, Omit<BalanzaNodo, 'cuenta'> | null>()

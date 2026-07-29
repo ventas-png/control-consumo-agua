@@ -256,9 +256,32 @@ export function validarLectura(
 // drift de centavos entre el cálculo en TS y la columna persistida.
 export function redondear2(n: number): number {
   if (!Number.isFinite(n)) return 0
-  // Epsilon para neutralizar el error de coma flotante (0.1+0.2) antes de
-  // redondear: 1.005 debe dar 1.01, no 1.00.
-  return Math.round((n + Number.EPSILON) * 100) / 100
+
+  // El truco de `Math.round((n + Number.EPSILON) * 100) / 100` NO cumple lo que
+  // promete el comentario de arriba, por dos motivos distintos (auditoría
+  // 2026-07-28, Bloque D · PR-22):
+  //
+  //  1. `Number.EPSILON` es el ulp EN 1.0 (~2.22e-16), un empujón ABSOLUTO
+  //     contra un error que ESCALA con la magnitud. Medido por fuerza bruta
+  //     sobre los 200.001 puntos medios de 0,005 a 200,005: 9.158 (el 4,58%)
+  //     redondeaban hacia abajo — 2.135→2.13, 4.015→4.01, 10.075→10.07. Y por
+  //     encima de ~1000 el epsilon es literalmente inoperante:
+  //     `(1000.005 + Number.EPSILON) === 1000.005` es `true`.
+  //
+  //  2. `Math.round` es "half UP", no "half away from zero": para negativos
+  //     rompe la equivalencia con `numeric` de Postgres que el comentario
+  //     promete. `Math.round(-1.005 * 100) / 100` da -1.00; Postgres da -1.01.
+  //     Afecta a notas de crédito, ajustes y reversos. Además producía `-0`.
+  //
+  // La corrección: escalar y recuperar la intención DECIMAL con `toFixed` antes
+  // de redondear —`2.135 * 100` es `213.49999999999997` en binario, y
+  // `Math.round` de eso da 213— y aplicar el signo por fuera para que el
+  // redondeo sea siempre alejándose del cero, como hace `numeric`.
+  const signo = n < 0 ? -1 : 1
+  const escalado = Number((Math.abs(n) * 100).toFixed(6))
+  const resultado = (signo * Math.round(escalado)) / 100
+  // `-0` es un valor distinto de `0` al serializar a JSON y al mostrarlo.
+  return resultado === 0 ? 0 : resultado
 }
 
 // ────────────────────────────────────────────────────────────────────────────
