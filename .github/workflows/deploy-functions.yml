@@ -9,6 +9,14 @@ on:
       - 'supabase/config.toml'
       - '.github/workflows/deploy-functions.yml'
 
+# Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
+# `permissions` se heredan los del repositorio, que por defecto pueden ser de
+# escritura: un step comprometido (o una dependencia que ejecute código en
+# postinstall) podría entonces empujar commits o publicar releases. Ninguno de
+# estos workflows escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   check-secrets:
     runs-on: ubuntu-latest
@@ -180,3 +188,49 @@ jobs:
 
       - name: Deploy create-broadcast (no JWT — valida JWT admin/owner a mano)
         run: bash .github/scripts/deploy-fn.sh create-broadcast --no-verify-jwt
+
+      # ── Funciones que faltaban en este workflow (auditoría 2026-07-28, PR-20) ──
+      # Las 10 de abajo tienen index.ts y se invocan en producción, pero no estaban
+      # aquí: su despliegue —y por tanto su postura `verify_jwt`— dependía de que
+      # alguien corriera `supabase functions deploy` a mano. Eso es exactamente el
+      # tipo de deriva que abre huecos sin que nadie lo note, porque el flag se
+      # decide fuera del repo.
+      #
+      # Las 7 primeras declaran `verify_jwt = false` en config.toml y validan el
+      # token por su cuenta; las 3 últimas ni siquiera están en config.toml y se
+      # autentican con un secreto de cron o con el service-role key.
+
+      # Alta por invitación: el invitado AÚN NO tiene sesión (llega desde el correo
+      # con un token), así que no puede haber JWT. La función valida el token de
+      # invitación contra la tabla.
+      - name: Deploy accept-invitation (no JWT — el invitado aún no tiene sesión; valida el token de invitación)
+        run: bash .github/scripts/deploy-fn.sh accept-invitation --no-verify-jwt
+
+      - name: Deploy invite-user (no JWT — valida el JWT a mano; whitelist INVITABLE_ROLES)
+        run: bash .github/scripts/deploy-fn.sh invite-user --no-verify-jwt
+
+      - name: Deploy delete-company (no JWT — valida el JWT a mano; super_admin + confirmación por nombre exacto)
+        run: bash .github/scripts/deploy-fn.sh delete-company --no-verify-jwt
+
+      - name: Deploy confirm-charge (no JWT — valida token a mano; confirmación server-side del cobro)
+        run: bash .github/scripts/deploy-fn.sh confirm-charge --no-verify-jwt
+
+      - name: Deploy whatsapp-save-credentials (no JWT — valida token a mano, service_role o admin/owner)
+        run: bash .github/scripts/deploy-fn.sh whatsapp-save-credentials --no-verify-jwt
+
+      - name: Deploy whatsapp-test-connection (no JWT — valida token a mano, service_role o admin/owner)
+        run: bash .github/scripts/deploy-fn.sh whatsapp-test-connection --no-verify-jwt
+
+      - name: Deploy backfill-tenant-secrets (no JWT — cifrado en reposo; auth por CRON_SECRET/service_role en tiempo constante)
+        run: bash .github/scripts/deploy-fn.sh backfill-tenant-secrets --no-verify-jwt
+
+      # Workers de cron: los invoca pg_cron/pg_net con un secreto propio, nunca el
+      # navegador. verify_jwt debe ser false porque no llega ningún JWT de usuario.
+      - name: Deploy process-email-queue (no JWT — worker de pg_cron; auth por CRON_SECRET en tiempo constante)
+        run: bash .github/scripts/deploy-fn.sh process-email-queue --no-verify-jwt
+
+      - name: Deploy process-scheduled-reports (no JWT — worker de pg_cron; auth por service-role key en tiempo constante)
+        run: bash .github/scripts/deploy-fn.sh process-scheduled-reports --no-verify-jwt
+
+      - name: Deploy sync-stripe-quantities (no JWT — worker de pg_cron; auth por CRON_SECRET en tiempo constante)
+        run: bash .github/scripts/deploy-fn.sh sync-stripe-quantities --no-verify-jwt

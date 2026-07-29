@@ -17,6 +17,14 @@ concurrency:
   group: coverage-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
+# `permissions` se heredan los del repositorio, que por defecto pueden ser de
+# escritura: un step comprometido (o una dependencia que ejecute código en
+# postinstall) podría entonces empujar commits o publicar releases. Ninguno de
+# estos workflows escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   coverage-gate:
     name: Coverage gate (lógica de negocio crítica)
