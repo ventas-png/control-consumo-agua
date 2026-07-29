@@ -179,7 +179,13 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     // Fase 28
     db.from('recordatorios_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
     db.from('plantillas_cuota').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('bitacora_acciones').select('*').eq('company_id', cid).order('created_at', { ascending: false }).limit(500),
+    // PR-26 (auditoría 2026-07-28): faltaba el filtro por proyecto. La tabla SÍ
+    // tiene `project_id` —confirmado en los tipos generados— y todas sus hermanas
+    // de este mismo batch lo filtran; solo ésta se quedó sin él. En un tenant con
+    // varios condominios, la bitácora de cada proyecto mostraba las acciones de
+    // todos: no es fuga cross-tenant (el company_id acota), pero sí mezcla
+    // proyectos dentro de la empresa.
+    db.from('bitacora_acciones').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(500),
     // Fase 29
     db.from('recargos_mora').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_aplicacion', { ascending: false }).limit(500),
     db.from('convenios_cuota_cond').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
