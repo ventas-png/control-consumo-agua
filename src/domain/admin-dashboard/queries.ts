@@ -2,6 +2,7 @@
 // Stats de `conversations` (servicio agua) para el panel: el acceso a datos baja
 // aquí; los umbrales de tiempo y la agregación por proyecto (lógica de negocio)
 // se quedan en la UI. Lecturas imperativas (no-hook).
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 /** Conteos de conversaciones para el badge del dashboard. */
@@ -68,10 +69,11 @@ export interface ConvStatsRow {
  * stats por proyecto en JS (la agregación se queda en la UI).
  */
 export async function fetchConvRowsAllProjects(companyId: string): Promise<ConvStatsRow[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('conversations')
     .select('project_id, status, assigned_to, created_at, closed_at')
     .eq('company_id', companyId)
     .eq('service_type', 'agua')
+  reportDegradedQuery('admin-dashboard.fetchConvRowsAllProjects', error)
   return (data as ConvStatsRow[]) ?? []
 }

@@ -63,3 +63,68 @@ describe('runQueryAll', () => {
     }
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// reportDegradedQuery — auditoría 2026-07-28 · PR-28
+//
+// El informe proponía convertir a `runQuery` los 59 sitios que descartaban el
+// `error` de Supabase. No es seguro: ninguno se consume como `queryFn` de React
+// Query, así que hacerlos LANZAR produciría rechazos no capturados en vez de UI
+// de error. Este helper separa **degradar** (que se conserva) de **callar** (que
+// era el bug): el valor por defecto sigue saliendo y el error va a Sentry.
+//
+// Lo que estos tests fijan es exactamente esa doble propiedad: que REPORTA y que
+// NO LANZA. Si alguien "mejora" el helper haciéndolo lanzar, 59 call sites
+// empiezan a producir unhandled rejections y estos tests lo dicen antes.
+// ════════════════════════════════════════════════════════════════════════════
+vi.mock('../../lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
+describe('reportDegradedQuery', () => {
+  it('sin error no reporta nada y devuelve false', async () => {
+    const { reportDegradedQuery } = await import('../queryFetch')
+    const { logger } = await import('../../lib/logger')
+    vi.mocked(logger.error).mockClear()
+
+    expect(reportDegradedQuery('mod.fn', null)).toBe(false)
+    expect(reportDegradedQuery('mod.fn', undefined)).toBe(false)
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('con error reporta a logger.error con el scope y devuelve true', async () => {
+    const { reportDegradedQuery } = await import('../queryFetch')
+    const { logger } = await import('../../lib/logger')
+    vi.mocked(logger.error).mockClear()
+
+    const err = {
+      message: 'permission denied for table cuotas_condominio',
+      code: '42501', details: 'd', hint: 'h',
+    }
+    expect(reportDegradedQuery('condominios.fetchCuotas', err)).toBe(true)
+
+    expect(logger.error).toHaveBeenCalledTimes(1)
+    const [msg, ctx, passed] = vi.mocked(logger.error).mock.calls[0]
+    // El scope debe ir en el mensaje Y en el contexto: en Sentry el primero es
+    // lo que se lee y el segundo lo que se filtra.
+    expect(msg).toContain('condominios.fetchCuotas')
+    expect(ctx).toMatchObject({ scope: 'condominios.fetchCuotas', code: '42501' })
+    // El error original se pasa como tercer argumento — es lo que hace que
+    // logger.error lo mande a Sentry como excepción y no como mero breadcrumb.
+    expect(passed).toBe(err)
+  })
+
+  it('NO lanza: los 59 call sites conservan su contrato de degradación', async () => {
+    const { reportDegradedQuery } = await import('../queryFetch')
+    // Esta es LA invariante del PR. Un throw aquí = 59 promesas flotantes
+    // rechazadas sin `.catch()` en producción.
+    expect(() => reportDegradedQuery('x.y', { message: 'boom' })).not.toThrow()
+  })
+
+  it('acepta también el error de supabase.auth (sin code/details/hint)', async () => {
+    // 2 de los 59 sitios son de `supabase.auth.*`, cuyo error es un AuthError y
+    // no un PostgrestError. Se tipó estructuralmente para no dejarlos fuera.
+    const { reportDegradedQuery } = await import('../queryFetch')
+    expect(reportDegradedQuery('auth.getSession', { message: 'invalid JWT' })).toBe(true)
+  })
+})

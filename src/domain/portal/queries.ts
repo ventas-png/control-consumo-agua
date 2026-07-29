@@ -11,6 +11,7 @@
 // (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
 // `supabase` (laxo) solo para tablas aún fuera del esquema generado
 // (recargo_tarjeta_config, migración 20260717190000).
+import { reportDegradedQuery } from '../queryFetch'
 import { hoyLocalISO, dateLocalISO } from '../../lib/format'
 import { db, supabase } from '../../lib/supabase'
 import type { ComunidadMensual } from '../../lib/portalDashboard'
@@ -58,21 +59,23 @@ export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBoo
 
 /** Contadores activos de un conjunto de unidades (para el portal de agua). */
 export async function fetchPortalContadores(unidadIds: string[]): Promise<unknown[] | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('contadores')
     .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
     .in('unidad_id', unidadIds)
     .eq('activo', true)
+  reportDegradedQuery('portal.fetchPortalContadores', error)
   return data
 }
 
 /** Proyectos activos de un conjunto de empresas (para el portal de agua). */
 export async function fetchPortalProjectsByCompanies(companyIds: string[]): Promise<unknown[] | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('projects')
     .select('id, nombre, company_id, moneda')
     .in('company_id', companyIds)
     .eq('estado', 'activo')
+  reportDegradedQuery('portal.fetchPortalProjectsByCompanies', error)
   return data
 }
 
@@ -85,23 +88,25 @@ const REGISTROS_SELECT =
 
 /** Fallback de lecturas por contador (cuando cliente_id es incorrecto/null). */
 export async function fetchRegistrosByContadores(contadorIds: string[]): Promise<unknown[] | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('contador_id', contadorIds)
     .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
+  reportDegradedQuery('portal.fetchRegistrosByContadores', error)
   return data
 }
 
 /** Fallback de lecturas por proyecto (cuando contador_id también es null; RLS acota). */
 export async function fetchRegistrosByProjects(projectIds: string[]): Promise<unknown[] | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('project_id', projectIds)
     .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
+  reportDegradedQuery('portal.fetchRegistrosByProjects', error)
   return data
 }
 
@@ -180,11 +185,12 @@ export interface PortalPaymentConfigRow {
 
 /** Lee los flags de pago de la empresa (Stripe/PayPal + payfac) para el portal del cliente. */
 export async function fetchPortalPaymentConfig(companyId: string): Promise<PortalPaymentConfigRow | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('companies')
     .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago,pago_sandbox_demo')
     .eq('id', companyId)
     .single()
+  reportDegradedQuery('portal.fetchPortalPaymentConfig', error)
   // La fila tipada es asignable a la interfaz (proveedor_pago NOT NULL ⊂ string|null) — sin cast.
   return data ?? null
 }
@@ -195,10 +201,11 @@ export async function fetchPortalPaymentConfig(companyId: string): Promise<Porta
  * de pagar; el cobro real lo sella y suma el edge create-charge server-side.
  */
 export async function fetchPortalRecargoTarjeta(companyId: string): Promise<RecargoTarjetaRow[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('recargo_tarjeta_config')
     .select('canal, activo, pct, fijo')
     .eq('company_id', companyId)
+  reportDegradedQuery('portal.fetchPortalRecargoTarjeta', error)
   return (data as RecargoTarjetaRow[] | null) ?? []
 }
 
@@ -208,11 +215,12 @@ export async function fetchPortalRecargoTarjeta(companyId: string): Promise<Reca
 
 /** Unidades activas de un cliente (batch 1 del portal de condominios). */
 export async function fetchPortalUnidadesByCliente(clienteId: string): Promise<unknown[] | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('unidades')
     .select('*')
     .eq('cliente_id', clienteId)
     .eq('activo', true)
+  reportDegradedQuery('portal.fetchPortalUnidadesByCliente', error)
   return data
 }
 

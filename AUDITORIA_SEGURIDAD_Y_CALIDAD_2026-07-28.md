@@ -662,7 +662,7 @@ resuelto `migrations-guard.mjs`, y se resolvió igual: despojando comentarios.)
 
 | PR | Cambio | Detalle |
 |---|---|---|
-| **PR-28** ⏸ | **NO es un barrido — replanteado.** Son **59 sitios, no 26.** Y la conversión a `runQuery` que proponía el informe **no es segura**: los 59 están en funciones exportadas planas (ninguno dentro de un `queryFn`), y sus llamadores son `void fetchX().then(...)` — promesas flotantes **sin `.catch()`**. Hacerlas lanzar produciría rechazos no capturados en vez de UI de error, es decir *peor* que hoy. Además `appUserProfileExists` se espera en el flujo de login OAuth (`useOAuthSession.ts:28`), y hay tests que fijan el contrato actual (`expect(await fetchDirectorioResidentes('p1')).toEqual([])` ante error). El arreglo correcto es, por sitio: llevar el llamador a React Query (o darle manejo de error) y **después** cambiar el contrato. Es un refactor por call site, no un find-and-replace |
+| **PR-28** ✅ | **Replanteado y resuelto en dos mitades.** Son **59 sitios, no 26**, y la conversión a `runQuery` que proponía el informe **no era segura**: ninguno de los 59 se consume como `queryFn` de React Query (verificado sitio a sitio) — son funciones planas que los llamadores usan con `await` directo o como promesas flotantes `void fetchX().then(...)` **sin `.catch()`**. Hacerlas lanzar produciría rechazos no capturados en vez de UI de error: *peor* que hoy. Además `appUserProfileExists` se espera en el login OAuth (`useOAuthSession.ts:28`) y hay tests que fijan el contrato actual. **Lo que sí se hizo:** separar *degradar* de *callar* — ver abajo |
 | **PR-29** | ESLint: ampliar alcance y encender reglas | Hoy las reglas aplican **solo a `src/components/**`** (`eslint.config.js:27`): `src/domain`, `src/lib` y `src/hooks` están **sin lint**. Solo hay 2 reglas activas. `react-hooks/exhaustive-deps` está en **`'off'`** (`:42`) con **26 supresiones vivas** que nunca se revalidan porque `reportUnusedDisableDirectives` también está `'off'` (`:31`). `typescript-eslint` es dependencia pero **ninguna** de sus reglas está activa. Poner `exhaustive-deps: 'warn'`, activar `no-floating-promises`, ampliar `files` |
 | **PR-30** | Incluir `supabase/functions/**` en el type-check | `tsconfig.json` tiene `include: ["src"]`, así que **toda la ruta de dinero del servidor** (`create-charge`, `confirm-charge`, `timbrar-documento`) nunca se typechequea. El único `deno check` es `continue-on-error: true` y solo cubre «helpers puros» (`edge-tests.yml:56,65,75`) |
 | **PR-31** ✅ | Extender el umbral de cobertura a `src/domain/**` de dinero | El gate cubría **12 archivos de `src/lib/`** (`coverage.yml:38-75`) y ningún archivo de `src/domain/**`. **Corrección de alcance al implementar:** el informe decía «es toda la capa de queries/mutations», y *por eso mismo* la capa de queries/mutations queda FUERA del gate — ver abajo |
@@ -672,6 +672,55 @@ tienen (facturacion 3, cobros 4, contabilidad 3, fiscal 3, presupuesto 3, bancos
 cxp 2, tarifas 1, eeff 1). Los dominios con cero tests son no-monetarios
 (`branding`, `legal`, `preferencias`, `sesiones`). Ratio global: 179 archivos de
 test / 707 fuente.
+
+### PR-28 · Degradación visible: qué se hizo y qué queda
+
+El informe pedía «enrutar por `runQuery` los 26 sitios que descartan el error».
+Al implementarlo, **el número era 59 y la conversión propuesta habría sido una
+regresión**. El patrón mezclaba dos cosas distintas, y sólo una era el bug:
+
+- **Degradar** a `[]`/`{}`/`null` para que la UI no reviente → **se conserva**.
+- **Callar** el error → **eso era el bug**, y es lo que se quita.
+
+`reportDegradedQuery(scope, error)` (en `domain/queryFetch.ts`) reporta a Sentry
+con el nombre del sitio y **no lanza**, así que los 59 llamadores conservan su
+contrato. No arregla la UX —eso exige mover cada llamador a React Query, trabajo
+por call site— pero convierte un fallo mudo en uno diagnosticable, y los datos de
+Sentry dirán **cuáles** fallan de verdad, que es lo que hace falta para priorizar
+ese refactor en vez de adivinar.
+
+**Reparto real de los 59:** 22 en `condominios/tabQueries.ts`, 7 en
+`portal/queries.ts`, 5 en `clientes/queries.ts`, 4 en `facturacion/billing.ts`,
+4 en `comunicacion/emailConfig.ts`, y 17 repartidos en 13 archivos más.
+
+**Dos detalles que el barrido destapó:**
+
+1. **Dos sitios no son PostgREST sino `supabase.auth.*`** (`getAccessToken`,
+   `fetchCurrentAuthProvider`): su error es un `AuthError`, no un
+   `PostgrestError`. Con la firma estrecha habrían quedado fuera del barrido en
+   silencio — justo la clase de omisión que este PR viene a eliminar. Por eso el
+   helper tipa la forma mínima común (`DegradableError`) en vez de importar
+   ambos. `getAccessToken` importa: devolvía `''` sin decir nada, y ese token
+   vacío se usa para invocar edge functions.
+2. **El barrido automático se equivocó dos veces y `tsc` lo cazó ambas.** La
+   primera regla asumía que la sentencia acaba cuando se cierran los paréntesis,
+   pero el estilo del repo es `await supabase\n  .from(...)`, que empieza con
+   balance CERO: el reporte se insertó *dentro* de la cadena. La segunda seguía
+   el encadenamiento con `.` pero `billing.ts` intercala comentarios **dentro**
+   de la cadena. Regla final: continuar mientras haya paréntesis abiertos o la
+   siguiente línea significativa —saltando comentarios y blancos— encadene con
+   `.`.
+
+**Verificación.** Los tests que ya fijaban el contrato de degradación
+(`fetchDirectorioResidentes` devuelve `[]` ante error) **siguen pasando sin
+tocarlos**: ésa es la prueba de que ningún llamador cambió. Se añaden 4 casos
+sobre el helper que fijan la doble propiedad —que **reporta** y que **no
+lanza**— porque si alguien lo «mejora» haciéndolo lanzar, 59 call sites empiezan
+a producir rechazos no capturados.
+
+**Lo que NO hace este PR, dicho explícitamente:** el usuario sigue viendo una
+tabla vacía cuando la consulta falla. Mover los llamadores a React Query para
+que vean un estado de error real sigue pendiente, y es trabajo por call site.
 
 ### PR-31 · Corrección de alcance (medido, no estimado)
 

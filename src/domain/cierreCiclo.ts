@@ -7,6 +7,7 @@
 // diálogos de CobrosSection/CuotasTab manejan su propio flujo) — mismo patrón
 // que domain/facturacion/billing.ts. La RLS limita lectura al tenant y
 // escritura a quien puede cerrar el ciclo manualmente (permiso del módulo).
+import { reportDegradedQuery } from './queryFetch'
 import { db } from '../lib/supabase'
 
 export type ModuloCierre = 'agua' | 'condominios'
@@ -27,12 +28,13 @@ export async function fetchCierreCicloConfig(
   projectId: string,
   modulo: ModuloCierre,
 ): Promise<CierreCicloConfig | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('cierre_ciclo_config')
     .select('activo, dia_cierre, notificar, ultimo_periodo_cerrado, ultimo_resultado, ultimo_run_at')
     .eq('project_id', projectId)
     .eq('modulo', modulo)
     .maybeSingle()
+  reportDegradedQuery('cierreCiclo.fetchCierreCicloConfig', error)
   // ultimo_resultado es Json en el esquema; el shape concreto lo fija el cron.
   return (data as CierreCicloConfig | null) ?? null
 }
