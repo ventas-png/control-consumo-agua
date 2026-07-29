@@ -121,6 +121,22 @@ jobs:
             done
           else
             # push a main: solo los .sql añadidos/modificados en este push.
+            #
+            # `--no-renames` NO es opcional. Git detecta un archivo renombrado
+            # como una sola entrada `R`, y `--diff-filter=AM` excluye la R: el
+            # archivo desaparece de la lista y el job reporta "Nothing to apply"
+            # en VERDE, sin aplicar ni registrar nada. Con --no-renames el
+            # renombre se descompone en D + A, y la A sí entra por el filtro.
+            #
+            # Pasó en el merge de #681: los dos renombres de migración
+            # (…100000 → …100001, …110000 → …110001) se saltaron en silencio.
+            # No rompió nada porque su DDL ya estaba aplicado, pero el registro
+            # quedó incompleto y el fallo fue INVISIBLE — el peor modo posible
+            # para un workflow que toca producción.
+            #
+            # Y el caso se va a repetir: la regla (d) de migrations-guard.mjs
+            # manda RENOMBRAR el archivo cuando hay timestamp duplicado. Sin
+            # esto, seguir esa instrucción mete la migración en este agujero.
             range=""
             if [ -n "${PUSH_BEFORE:-}" ] \
                && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
@@ -128,9 +144,9 @@ jobs:
               range="$PUSH_BEFORE $PUSH_AFTER"
             fi
             if [ -n "$range" ]; then
-              changed=$(git diff --name-only --diff-filter=AM $range -- "$MIG_DIR" | grep '\.sql$' || true)
+              changed=$(git diff --name-only --no-renames --diff-filter=AM $range -- "$MIG_DIR" | grep '\.sql$' || true)
             else
-              changed=$(git show --name-only --diff-filter=AM --pretty=format: "$PUSH_AFTER" -- "$MIG_DIR" | grep '\.sql$' || true)
+              changed=$(git show --name-only --no-renames --diff-filter=AM --pretty=format: "$PUSH_AFTER" -- "$MIG_DIR" | grep '\.sql$' || true)
             fi
             files="$changed"
           fi
@@ -186,4 +202,14 @@ jobs:
 
       - name: Nothing to apply
         if: steps.list.outputs.files == ''
-        run: echo "No hay migraciones nuevas que aplicar en este evento."
+        run: |
+          # En `push` este workflow SOLO se dispara si cambió supabase/migrations/**
+          # (ver `paths`). Que la selección quede vacía significa entonces que un
+          # cambio de migración se coló sin aplicarse — exactamente el fallo mudo
+          # de #681. Un verde silencioso ahí no es "no había nada que hacer".
+          if [ "$EVENT_NAME" = "push" ]; then
+            echo "::warning::El push tocó supabase/migrations/** pero no se seleccionó ningún .sql."
+            echo "::warning::Revisá si fue un borrado puro; si no, la migración NO se aplicó."
+          else
+            echo "No hay migraciones nuevas que aplicar en este evento."
+          fi

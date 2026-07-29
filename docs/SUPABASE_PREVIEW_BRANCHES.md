@@ -117,3 +117,26 @@ ensombrecidos eran justamente los que arreglaban el pago en línea del residente
 Se renombraron a `…100001` / `…110001`, y `scripts/migrations-guard.mjs` ahora
 falla en CI ante cualquier timestamp duplicado o nombre no parseable. Esa regla
 **no es allowlisteable**: el nombre del archivo es la identidad de la migración.
+
+### El renombre destapó un fallo mudo en `apply-migrations-prod.yml`
+
+Al mergear #681, el workflow reportó **verde sin aplicar ni registrar nada**.
+Causa: seleccionaba archivos con `git diff --diff-filter=AM`, y Git detecta un
+renombre como una sola entrada `R` — que ese filtro **excluye**. Los dos
+archivos renombrados desaparecieron de la lista y el job cayó en la rama
+"Nothing to apply", en verde.
+
+No rompió nada (el DDL de ambos ya estaba aplicado en prod: `registros.deleted_at`,
+`registros.deleted_by`, `idx_registros_active`, `companies.ambiente_pago`,
+`projects.ambiente_pago`, `payment_requests.ambiente` — todos verificados), pero
+el registro quedó incompleto **y el fallo fue invisible**, el peor modo posible
+para un workflow que escribe en producción.
+
+Peor todavía: la regla (d) recién agregada **manda renombrar** el archivo cuando
+hay timestamp duplicado. Sin arreglar esto, seguir esa instrucción metía la
+migración justo en este agujero.
+
+Arreglado con `--no-renames` en ambas ramas de selección (descompone el renombre
+en `D` + `A`, y la `A` sí entra por el filtro), más un `::warning::` cuando un
+`push` toca `supabase/migrations/**` y aun así no selecciona ningún `.sql` — un
+verde silencioso ahí no significa "no había nada que hacer".
