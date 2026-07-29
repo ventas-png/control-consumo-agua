@@ -507,10 +507,19 @@ Diverge del cron en **dos ejes**:
    (`20260604160000:106`); `hoy` es medianoche UTC. El SQL usa
    `EXTRACT(EPOCH FROM (v_now - ...))` con `v_now = now()`, dos instantes completos
    (`20260604170000_aplicar_mora_cron.sql:179`).
-2. **Columna de fallback.** El TS usa
-   `COALESCE(emitida_at, created_at, fecha_vencimiento)`; el SQL usa
-   `COALESCE(emitida_at, reg.fecha)`. El comentario del TS afirma que son «misma
-   derivación» — no lo son.
+2. ~~**Columna de fallback.**~~ **Corregido al implementar: comparé contra el
+   cron equivocado.** Hay DOS crons de mora —`20260604170000_aplicar_mora_cron`
+   para `registros` (agua, fallback `reg.fecha`) y
+   `20260604181000_aplicar_mora_cuotas_cron` para `cuotas_condominio`
+   (condominios, fallback `created_at`)—. `RecargosTab` es condominios, así que
+   el cron aplicable usa `COALESCE(emitida_at, created_at)`, que **sí coincide**
+   con el TS.
+
+   Lo que sí queda: el TS añade un TERCER fallback a `fecha_vencimiento` que el
+   SQL no tiene. Si faltan los dos primeros, el cron obtiene NULL y no cobra
+   mora, mientras que el TS inventaba una base y la mostraba. Es el caso
+   contrario al que describí —el TS muestra de más, no de menos— y de borde,
+   porque `created_at` tiene default.
 
 La vista previa y el cargo efectivo cruzan el umbral
 `dias_vencimiento + periodo_gracia` en momentos distintos. **Un residente que

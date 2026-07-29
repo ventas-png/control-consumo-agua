@@ -1,7 +1,7 @@
 // Bancos — Hooks de LECTURA.
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { bancosKeys } from './keys'
 import type {
   BancoMovimiento,
@@ -30,17 +30,20 @@ export function useMovimientosBancoQuery(cuentaBancariaId?: string, estado?: str
   return useQuery({
     queryKey: bancosKeys.movimientos(cuentaBancariaId, estado),
     enabled: !!cuentaBancariaId,
-    queryFn: async () => {
-      let q = supabase
-        .from('banco_movimientos')
-        .select('*')
-        .eq('cuenta_bancaria_id', cuentaBancariaId!)
-        .order('fecha', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(500)
-      if (estado) q = q.eq('estado', estado)
-      return (await runQuery<BancoMovimiento[]>((signal) => q.abortSignal(signal))) ?? []
-    },
+    // PR-25: el `.limit(500)` cortaba el extracto bancario, que es la base de la
+    // conciliación: faltar movimientos ahí produce descuadres que parecen reales.
+    queryFn: async () =>
+      await runQueryAll<BancoMovimiento>((from, to, signal) => {
+        let q = supabase
+          .from('banco_movimientos')
+          .select('*')
+          .eq('cuenta_bancaria_id', cuentaBancariaId!)
+          .order('fecha', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+        if (estado) q = q.eq('estado', estado)
+        return q.range(from, to).abortSignal(signal)
+      }),
   })
 }
 

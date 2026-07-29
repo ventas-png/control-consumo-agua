@@ -48,18 +48,43 @@ function reglaMoraDe(regla: ReglaMoraConfig): ReglaMora {
 }
 
 /**
- * Días transcurridos desde la fecha base de la cuota hasta `hoy`. La base es la
- * de la máquina de estados (emitida_at) o, en su defecto, created_at — misma
- * derivación que el cron de mora (cond:C6, COALESCE(emitida_at, created_at)).
- * Pura: `hoy` se inyecta para tests deterministas.
+ * Días transcurridos desde la fecha base de la cuota hasta `ahora`. La base es
+ * la de la máquina de estados (`emitida_at`) o, en su defecto, `created_at`.
+ *
+ * Tiene que dar EXACTAMENTE lo mismo que el cron que cobra el recargo
+ * (`20260604181000_aplicar_mora_cuotas_cron.sql:137-139`):
+ *
+ *     floor(EXTRACT(EPOCH FROM (now() - COALESCE(cu.emitida_at, cu.created_at))) / 86400.0)
+ *
+ * porque esta función alimenta la vista previa de mora que ve el administrador.
+ * Si difieren, la previsualización y el cargo efectivo cruzan el umbral
+ * `dias_vencimiento + periodo_gracia` en momentos distintos, y un residente que
+ * dispute el recargo tiene razón.
+ *
+ * Dos correcciones de la auditoría 2026-07-28 (Bloque D · PR-23):
+ *
+ *  1. `ahora` era `new Date().toISOString().slice(0, 10)`, es decir MEDIANOCHE
+ *     UTC del día en curso, mientras que `emitida_at` es un `timestamptz` con
+ *     hora real y el cron compara contra `now()` (instante completo). Restar un
+ *     instante a una medianoche descuenta sistemáticamente la fracción de día ya
+ *     transcurrida: una cuota emitida a las 02:00Z leída a las 20:00Z daba 29
+ *     días donde el cron ya contaba 30. Ahora se compara instante contra
+ *     instante.
+ *
+ *  2. Se elimina el tercer fallback a `fecha_vencimiento`, que el SQL no tiene.
+ *     Si faltaran `emitida_at` y `created_at`, el cron obtiene NULL y no aplica
+ *     mora, mientras que el TS inventaba una base y SÍ la mostraba.
+ *
+ * Pura: `ahora` se inyecta para tests deterministas.
  */
 export function diasTranscurridosCuota(
-  cuota: { emitida_at?: string | null; created_at?: string | null; fecha_vencimiento?: string | null },
-  hoy: string = new Date().toISOString().slice(0, 10),
+  cuota: { emitida_at?: string | null; created_at?: string | null },
+  ahora: Date | string = new Date(),
 ): number {
-  const base = cuota.emitida_at ?? cuota.created_at ?? cuota.fecha_vencimiento
+  const base = cuota.emitida_at ?? cuota.created_at
   if (!base) return 0
-  const ms = new Date(hoy).getTime() - new Date(base).getTime()
+  const ahoraMs = (ahora instanceof Date ? ahora : new Date(ahora)).getTime()
+  const ms = ahoraMs - new Date(base).getTime()
   if (!Number.isFinite(ms)) return 0
   return Math.max(0, Math.floor(ms / 86_400_000))
 }
@@ -220,7 +245,11 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     }
 
     setSaving(true)
-    const today = new Date().toISOString().slice(0, 10)
+    // PR-23: instante completo, para que la vista previa cuente los mismos días
+    // que el cron (que compara contra now()). `todayISO` se sigue usando para las
+    // columnas DATE de las filas de recargo.
+    const ahora = new Date()
+    const todayISO = ahora.toISOString().slice(0, 10)
     // cond:C4 — el recargo por unidad es la SUMA del recargo de cada cuota
     // vencida, calculado con calcularMoraCuota (respeta vencimiento/gracia de la
     // regla). Para monto_fijo, la regla aplica el fijo por cuota.
@@ -232,14 +261,14 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       const cuotasU = cuotasVenc.filter(c => c.unidad_id === uid)
       let suma = 0
       for (const c of cuotasU) {
-        const dias = diasTranscurridosCuota(c, today)
+        const dias = diasTranscurridosCuota(c, ahora)
         const m = calcularMoraCuota(reglaEfectiva, dias, c.monto).monto
         if (m > 0) { suma += m; cuotasCobradas.push(c.id) }
       }
       return {
         company_id: companyId, project_id: proyectoId,
         unidad_id: uid, tipo: tipoRecargo, valor: pct,
-        monto_calculado: parseFloat(suma.toFixed(2)), fecha_aplicacion: today, motivo,
+        monto_calculado: parseFloat(suma.toFixed(2)), fecha_aplicacion: todayISO, motivo,
       }
     }).filter(r => r.monto_calculado > 0) // omite unidades cuya mora resultó 0 (en gracia)
 

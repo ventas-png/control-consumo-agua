@@ -3,7 +3,7 @@
 // el cliente nunca descarga líneas masivas.
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { normalizarMoneda } from './schemas'
 import type {
@@ -63,20 +63,29 @@ export function useAsientosQuery(companyId?: string, filtro: AsientosFiltro = {}
   return useQuery({
     queryKey: contabilidadKeys.asientos(companyId, filtro.projectId, filtro.periodo, filtro.estado),
     enabled: !!companyId,
-    queryFn: async () => {
-      let q = supabase
-        .from('conta_asientos')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('fecha', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(500)
-      // Ledger estricto: null/undefined = contabilidad de la EMPRESA.
-      q = filtro.projectId ? q.eq('project_id', filtro.projectId) : q.is('project_id', null)
-      if (filtro.periodo) q = q.eq('periodo', filtro.periodo)
-      if (filtro.estado) q = q.eq('estado', filtro.estado)
-      return (await runQuery<AsientoContable[]>((signal) => q.abortSignal(signal))) ?? []
-    },
+    // PR-25 (auditoría 2026-07-28): el `.limit(500)` anterior truncaba EN SILENCIO
+    // el libro. Un tenant con más de 500 asientos veía un ledger incompleto sin
+    // ningún aviso — y sobre ese listado se calculan totales. `runQueryAll` trae
+    // todo por chunks y avisa si topa el techo de seguridad.
+    //
+    // El `.order('id')` secundario NO es decorativo: `range()` necesita un orden
+    // TOTAL o los chunks se solapan/saltan filas cuando hay empates en `fecha`
+    // y `created_at`, que es justo lo que pasa con asientos cargados en lote.
+    queryFn: async () =>
+      await runQueryAll<AsientoContable>((from, to, signal) => {
+        let q = supabase
+          .from('conta_asientos')
+          .select('*')
+          .eq('company_id', companyId!)
+          .order('fecha', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+        // Ledger estricto: null/undefined = contabilidad de la EMPRESA.
+        q = filtro.projectId ? q.eq('project_id', filtro.projectId) : q.is('project_id', null)
+        if (filtro.periodo) q = q.eq('periodo', filtro.periodo)
+        if (filtro.estado) q = q.eq('estado', filtro.estado)
+        return q.range(from, to).abortSignal(signal)
+      }),
   })
 }
 
