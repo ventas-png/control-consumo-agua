@@ -673,6 +673,48 @@ cxp 2, tarifas 1, eeff 1). Los dominios con cero tests son no-monetarios
 (`branding`, `legal`, `preferencias`, `sesiones`). Ratio global: 179 archivos de
 test / 707 fuente.
 
+### Cierre del Bloque G · los 21 avisos que quedan, y por qué no se «arreglan»
+
+Tras subir react-router (PR-32) y aplicar `npm audit fix` sin `--force` quedan
+**21 avisos (20 high, 1 moderate)**. Ninguno se puede cerrar, y el motivo es el
+mismo en los tres casos: **lo que `npm audit` propone como «fix» es un
+DOWNGRADE**. Verificado contra el registro, no por inspección:
+
+| Paquete | Instalado | Última publicada | «Fix» que propone npm | Avisos |
+|---|---|---|---|---|
+| `exceljs` | 4.4.0 | **4.4.0** | `3.4.0` ⬇️ | 6 |
+| `vite-plugin-pwa` | 1.3.0 | **1.3.0** | `1.2.0` ⬇️ | 5 |
+| `react-router-dom` | 7.18.2 | 7.18.2 | `7.11.0` ⬇️ | 2 |
+| `eslint` | 9.39.5 | 10.8.0 | `10.8.0` ⬆️ | 6 |
+
+En los tres primeros ya estamos en la última versión publicada: **no hay arreglo
+upstream**, y aceptar la sugerencia de npm perdería funcionalidad (y en el caso
+de react-router reintroduciría el open redirect).
+
+**Sólo `eslint` tiene un fix real, y es #663** — ya verificado compatible con el
+config de PR-29 (ESLint 10.8.0: 0 errores, mismo recuento de avisos). Mergearlo
+cierra 6 de los 21.
+
+#### Los 6 de `exceljs` además NO son alcanzables
+
+Merece comprobarse en vez de asumirlo, porque decide si hay que buscar
+alternativa a la librería o no:
+
+- Los avisos vienen de `archiver` (→ `archiver-utils` → `glob` → `minimatch` →
+  `brace-expansion`, más `uuid`). `exceljs@4.4.0` pide `archiver ^5.0.0`.
+- `archiver` se referencia **en un solo módulo**:
+  `lib/stream/xlsx/workbook-writer.js` — el writer **streaming**.
+- La app usa la ruta NO streaming: `new ExcelJS.Workbook()` +
+  `wb.xlsx.writeBuffer()` (`src/lib/xlsx.ts:50,111,124`). **Nadie importa
+  `WorkbookWriter`.**
+- Y hay **cero llamadas `.glob(`** en todo `exceljs`, así que la cadena
+  `glob → minimatch → brace-expansion` no puede dispararse ni por el streaming.
+
+Conclusión: se documentan y se dejan. **Lo que NO hay que hacer es bajar
+`exceljs`, `vite-plugin-pwa` o `react-router` para poner `npm audit` en verde** —
+eso cambia vulnerabilidades no explotables por pérdida de funcionalidad, y en
+react-router por una vulnerabilidad que sí lo es.
+
 ### Seguimiento de PR-29 · las directivas que quedaron a la vista
 
 PR-29 puso `reportUnusedDisableDirectives` a reportar por primera vez, y con eso
