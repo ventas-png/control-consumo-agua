@@ -55,6 +55,13 @@ const RE_CREATE_TABLE =
   /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
 const RE_DROP_TABLE =
   /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
+// El nombre de la policy puede ir entre comillas Y LLEVAR ESPACIOS
+// ("No direct access to user_sessions"), y el ON suele caer en la línea
+// siguiente. Un patrón que asuma nombre sin espacios se salta esas policies y
+// declara "sin policy" tablas que sí la tienen — falso positivo peligroso,
+// porque empuja a añadir una policy permisiva donde ya hay una deny-all.
+const RE_CREATE_POLICY =
+  /CREATE\s+POLICY\s+(?:"[^"]+"|[\w]+)\s+ON\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
 const RE_ENABLE_RLS =
   /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi
 
@@ -104,6 +111,7 @@ async function main() {
     new Set((list ?? []).map((e) => (typeof e === 'string' ? e : e[key] ?? e.fn ?? e.name)))
   const allowNoRls = norm(allowlist.tables_without_rls, 'table')
   const allowNoScope = norm(allowlist.functions_without_company_scope, 'fn')
+  const allowNoPolicy = norm(allowlist.tables_without_policy, 'table')
 
   // Estado acumulado aplicando las migraciones en orden.
   const liveTables = new Set() // creadas y no dropeadas
@@ -111,6 +119,7 @@ async function main() {
   const createdIn = new Map() // tabla → primera migración que la crea
   const functions = new Map() // nombre → última definición (last writer gana)
   const grantedToAuthenticated = new Set()
+  const tablesWithPolicy = new Set()
 
   for (const file of files) {
     const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf8')
@@ -125,6 +134,21 @@ async function main() {
       rlsEnabled.delete(t)
     }
     for (const t of collect(RE_ENABLE_RLS, sql)) rlsEnabled.add(t)
+
+    // Policies, en sus DOS formas. Contar solo las estáticas daría un falso
+    // positivo enorme: TODO el ERP financiero (conta_*, cxp_*, presupuesto_*,
+    // bancos) crea sus policies dentro de bloques `DO $$ ... FOREACH t IN ARRAY
+    // ARRAY['tabla_a','tabla_b'] ... EXECUTE format('CREATE POLICY ...') $$`.
+    // Un escaneo ingenuo declara "sin policy" 11 tablas que sí las tienen.
+    for (const t of collect(RE_CREATE_POLICY, sql)) tablesWithPolicy.add(t)
+    for (const doBlock of sql.match(/DO\s*\$\$[\s\S]*?END\s*\$\$/gi) ?? []) {
+      if (!/CREATE\s+POLICY/i.test(doBlock)) continue
+      for (const arr of doBlock.match(/ARRAY\s*\[([^\]]*)\]/gi) ?? []) {
+        for (const lit of arr.match(/'([\w]+)'/g) ?? []) {
+          tablesWithPolicy.add(lit.replace(/'/g, '').toLowerCase())
+        }
+      }
+    }
 
     for (const fn of extractFunctions(sql)) {
       functions.set(fn.name, { ...fn, file })
@@ -141,6 +165,15 @@ async function main() {
   // ── Regla (a): toda tabla viva de public debe tener RLS ───────────────────
   const missingRls = [...liveTables]
     .filter((t) => !rlsEnabled.has(t) && !allowNoRls.has(t))
+    .sort()
+
+  // ── Regla (c): RLS habilitada pero SIN ninguna policy ────────────────────
+  // Es fail-closed (nadie lee), así que no es un agujero — pero sí un estado
+  // ambiguo: no se distingue "deny-all a propósito" de "se olvidó la policy",
+  // y el repo deja de reproducir prod, donde el guard nocturno exige ≥1 policy.
+  // Exigir una deny-all EXPLÍCITA vuelve la intención auditable.
+  const rlsNoPolicy = [...liveTables]
+    .filter((t) => rlsEnabled.has(t) && !tablesWithPolicy.has(t) && !allowNoPolicy.has(t))
     .sort()
 
   // ── Regla (b): RPC SECURITY DEFINER con p_company_id/p_project_id,
@@ -180,6 +213,10 @@ async function main() {
   for (const t of missingRls) {
     report.push(`    ✗ ${t}  [creada en ${createdIn.get(t)} — sin RLS en ninguna migración]`)
   }
+  report.push(`(c) tablas con RLS pero SIN ninguna policy: ${rlsNoPolicy.length}`)
+  for (const t of rlsNoPolicy) {
+    report.push(`    ✗ ${t}  [RLS habilitada y ninguna policy — declara una deny-all explícita]`)
+  }
   report.push(
     `(b) RPCs SECURITY DEFINER con p_company_id/p_project_id ejecutables por authenticated y SIN guard de scope: ${missingScope.length}`,
   )
@@ -190,14 +227,14 @@ async function main() {
   console.log(report.join('\n'))
   console.log('')
 
-  const total = missingRls.length + missingScope.length
+  const total = missingRls.length + rlsNoPolicy.length + missingScope.length
   if (total > 0) {
     console.error(`❌ migrations-guard: ${total} hallazgo(s) en el repo.`)
     console.error('   Añade la migración que falta, o —si la excepción es intencional y revisada—')
     console.error('   documéntala en scripts/migrations-guard.allowlist.json con su `reason`.')
     process.exit(1)
   }
-  console.log('✅ migrations-guard: sin huecos de RLS ni RPCs sin guard de scope.')
+  console.log('✅ migrations-guard: RLS + policies declaradas y RPCs con scope.')
   process.exit(0)
 }
 
