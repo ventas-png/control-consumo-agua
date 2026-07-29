@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { assertEmailAddress } from '../_shared/emailHeaders.ts'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -86,11 +89,17 @@ function buildRawMessage(
   subject: string,
   htmlBody: string,
 ): string {
+  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
+  // única cabecera de este mensaje que no va codificada en base64, así que es la
+  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
+  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
+  const safeTo = assertEmailAddress('To', to)
+  const safeReplyTo = replyTo ? assertEmailAddress('Reply-To', replyTo) : null
   const boundary = `----=_Part_${Date.now()}`
   const lines = [
     `From: ${formatFromHeader(fromEmail, fromName)}`,
-    `To: ${to}`,
-    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
+    `To: ${safeTo}`,
+    ...(safeReplyTo ? [`Reply-To: ${safeReplyTo}`] : []),
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -374,9 +383,30 @@ Deno.serve(async (req: Request) => {
     //       x-internal-retry con CRON_SECRET valido + x-triggered-by con el
     //       userId original. Skip auth.getUser (que rechazaria el
     //       service_role token).
+    // Auditoría 2026-07-28 (Bloque B · PR-11). Dos cambios sobre lo que había:
+    //
+    //   1. La comparación era `===` sobre el header. Un `===` de strings sale
+    //      en cuanto encuentra el primer byte distinto, así que su duración
+    //      filtra cuántos bytes iniciales acertaste: se puede recuperar el
+    //      secreto byte a byte. El repo ya documenta este ataque en
+    //      `_shared/auth.ts:147-152` y expone el comparador correcto — que
+    //      otras funciones ya usan, pero ésta no.
+    //
+    //   2. Ahora se exigen LOS DOS secretos, no uno. Esta ruta se salta TODA la
+    //      autorización (ver el bloque `if (!internalRetry)` más abajo), así que
+    //      quien la abra manda correo como cualquier tenant o como el superadmin.
+    //      Antes bastaba `CRON_SECRET`, que además está COMPARTIDO por 5
+    //      funciones — filtrarlo en cualquiera de ellas abría el relay aquí.
+    //      Añadir el service-role key no amplía la superficie: quien lo tenga ya
+    //      tiene acceso total a la base. `process-email-queue:123` ya lo manda.
     const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
-    const internalRetry = cronSecret.length > 0
-      && req.headers.get('x-internal-retry') === cronSecret
+    const internalHeader = req.headers.get('x-internal-retry') ?? ''
+    const bearerToken = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
+    const internalRetry =
+      cronSecret.length > 0 &&
+      SUPABASE_SERVICE_ROLE_KEY.length > 0 &&
+      (await timingSafeEqualSecret(internalHeader, cronSecret)) &&
+      (await timingSafeEqualSecret(bearerToken, SUPABASE_SERVICE_ROLE_KEY))
     let userId: string
 
     if (internalRetry) {
@@ -454,6 +484,26 @@ Deno.serve(async (req: Request) => {
         effCompanyId = callerCompany
       }
       // Un super_admin con is_superadmin=false puede enviar a nombre del company_id pedido.
+
+      // ── Rate limit (auditoría 2026-07-28, Bloque C · PR-16) ───────────────
+      // Esta función no tenía NINGÚN límite, siendo la única del repo que envía
+      // correo arbitrario desde la identidad Gmail VERIFICADA del tenant. Todas
+      // las demás escrituras sensibles sí lo tienen (create-user 30/h,
+      // invite-user 30/h, create-charge 30/h, timbrar-documento 120/h).
+      //
+      // Sin él, un `operator` podía mandar phishing ilimitado con el dominio del
+      // cliente pasando SPF/DKIM — y de paso quemar la reputación de envío de la
+      // empresa, que es un daño que no se revierte borrando filas.
+      //
+      // Doble dimensión para que ni un usuario rotando IPs ni una IP rotando
+      // usuarios evada el tope. fail-OPEN (default): el caller ya pasó el
+      // control de rol de arriba, así que ante un fallo del contador es peor
+      // bloquear correo transaccional legítimo (recibos, avisos de corte).
+      const rlSend = await enforceRateLimits(supabase, [
+        { subject: userId, action: 'send_email', max: 120 },
+        { subject: `ip:${getClientIp(req)}`, action: 'send_email:ip', max: 240 },
+      ], corsHeaders)
+      if (rlSend) return rlSend
     }
 
     // Fetch Gmail config — Supabase query builder is immutable so we apply the
@@ -594,8 +644,13 @@ Deno.serve(async (req: Request) => {
       throw sendErr
     }
   } catch (err) {
+    // PR-17: el detalle se registra pero NO se devuelve. Antes se mandaba
+    // `String(err)` al cliente, que expone texto de Postgres / de la API de
+    // Google. Sin este log el detalle se perdería del todo, que es peor para
+    // diagnosticar que la fuga que se está cerrando.
+    console.error('[send-email]', err instanceof Error ? err.message : String(err))
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

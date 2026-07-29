@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 import { validatePayload, type SignupPayload } from './validate.ts'
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 // ============================================================================
 // signup-company — onboarding self-service publico (plat:P5, F2.10)
@@ -18,50 +19,6 @@ import { validatePayload, type SignupPayload } from './validate.ts'
 //   - Si app_users.insert falla → eliminamos company + auth user.
 //   - Welcome email es fire-and-forget — si falla, el signup ya esta hecho.
 // ============================================================================
-
-function getAllowedOrigins(): string[] {
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* malformed APP_URL */ }
-  }
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowed = getAllowedOrigins()
-  if (!origin || !allowed.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed' }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin')
@@ -276,8 +233,11 @@ Deno.serve(async (req: Request) => {
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // PR-17: este endpoint es PÚBLICO (onboarding self-service, --no-verify-jwt),
+    // así que devolver el texto de la excepción se lo entrega a cualquiera.
+    console.error('[signup-company]', msg)
     return new Response(
-      JSON.stringify({ error: `Error inesperado: ${msg}` }),
+      JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

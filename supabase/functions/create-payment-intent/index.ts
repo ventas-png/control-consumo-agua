@@ -3,41 +3,9 @@ import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
 import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
 import { calcularRecargo, totalConRecargo, type RecargoConfigRow } from '../_shared/payments/recargo.ts'
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 // CORS utilities
-function getAllowedOrigins(): string[] {
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
-  }
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = getAllowedOrigins()
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowedOrigins = getAllowedOrigins()
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed', origin }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
 
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
@@ -115,7 +83,7 @@ Deno.serve(async (req) => {
     // Validate that caller belongs to the requested company (CRITICAL SECURITY CHECK)
     const { data: callerProfile } = await callerClient
       .from('app_users')
-      .select('company_id')
+      .select('company_id, role')
       .eq('id', caller.id)
       .single()
 
@@ -130,6 +98,72 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // ── PR-13 (auditoría 2026-07-28): pertenencia de registro_id / cliente_id ──
+    // El bloque de arriba valida `company_id` contra el perfil del caller, pero
+    // `registro_id` y `cliente_id` venían del body SIN comprobar de quién son, y
+    // se escribían tal cual en `payment_requests` (más abajo). El webhook luego
+    // crea un `pagos` con esos ids validando solo `payment_requests.company_id`,
+    // así que un usuario de la empresa A podía apuntar el cobro al recibo de la
+    // empresa B: corrupción de datos financieros cross-tenant.
+    //
+    // Se espeja el patrón que `create-charge/index.ts:238-284` ya aplica bien:
+    // `registros` no tiene company_id, así que se deriva vía `projects`.
+    const { data: regRow, error: regErr } = await adminClient
+      .from('registros')
+      .select('cliente_id, project_id, deleted_at')
+      .eq('id', registro_id)
+      .maybeSingle()
+    if (regErr) {
+      console.error('[create-payment-intent] error leyendo registro:', regErr.message)
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const registro = regRow as {
+      cliente_id: string | null
+      project_id: string | null
+      deleted_at: string | null
+    } | null
+    if (!registro || registro.deleted_at) {
+      return new Response(JSON.stringify({ error: 'Recibo no encontrado' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    let registroCompanyId: string | null = null
+    if (registro.project_id) {
+      const { data: proj } = await adminClient
+        .from('projects')
+        .select('company_id')
+        .eq('id', registro.project_id)
+        .maybeSingle()
+      registroCompanyId = (proj as { company_id?: string | null } | null)?.company_id ?? null
+    }
+
+    if (registroCompanyId !== company_id) {
+      return new Response(JSON.stringify({ error: 'El recibo no pertenece a esta empresa' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // El cliente del cobro tiene que ser el del recibo: si no, el pago se
+    // acreditaría a un tercero.
+    if (registro.cliente_id !== cliente_id) {
+      return new Response(JSON.stringify({ error: 'El cliente no corresponde al recibo' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Gate de rol: no había ninguno — cualquier fila de `app_users` de la empresa
+    // servía, incluido un rol de solo lectura. Se alinea con los roles que ya
+    // pueden cobrar en el resto del producto.
+    const callerRole = (callerProfile as { role?: string } | null)?.role ?? ''
+    if (!['super_admin', 'superadmin', 'company_owner', 'admin', 'operator', 'operador'].includes(callerRole)) {
+      return new Response(JSON.stringify({ error: 'No autorizado para iniciar cobros' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     const { data: company, error: companyError } = await adminClient
       .from('companies')
@@ -243,8 +277,9 @@ Deno.serve(async (req) => {
     })
 
   } catch (err: any) {
+    // PR-17: detalle al log, mensaje genérico al cliente.
     console.error('Error creating payment intent:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Failed to create payment intent' }), {
+    return new Response(JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

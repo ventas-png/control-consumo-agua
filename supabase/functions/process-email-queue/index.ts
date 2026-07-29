@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 
 // process-email-queue: worker que process el batch de emails pendientes.
 // Disparado por pg_cron cada 5 minutos. Toma hasta 50 rows pendientes,
@@ -153,8 +154,13 @@ Deno.serve(async (req: Request) => {
   }
 
   // Auth: solo el cron (con CRON_SECRET) puede invocar.
-  const auth = req.headers.get('x-cron-secret')
-  if (!CRON_SECRET || auth !== CRON_SECRET) {
+  // Comparación en tiempo constante (auditoría 2026-07-28, Bloque B · PR-11):
+  // un `!==` de strings sale en el primer byte distinto, así que su duración
+  // filtra cuántos bytes iniciales acertaste. Importa especialmente aquí porque
+  // este worker reenvía el MISMO CRON_SECRET a send-email como `x-internal-retry`
+  // (línea ~126), que es la ruta que se salta toda la autorización.
+  const auth = req.headers.get('x-cron-secret') ?? ''
+  if (!CRON_SECRET || !(await timingSafeEqualSecret(auth, CRON_SECRET))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { 'Content-Type': 'application/json' },
     })

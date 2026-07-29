@@ -1,56 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireUser } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
-
-function getAllowedOrigins(): string[] {
-  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-
-  // Always allow the configured public app URL so production CORS works even
-  // when ALLOWED_ORIGINS is unset (APP_URL is already set for Google OAuth).
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
-  }
-
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowed = getAllowedOrigins()
-  if (!origin || !allowed.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed' }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')

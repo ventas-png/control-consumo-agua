@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserOrNull } from '../_shared/auth.ts'
+import { enforceRateLimit, getClientIp } from '../_shared/rateLimit.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 // Event types allowed without a valid JWT (fired before login completes)
 const PRE_AUTH_EVENTS = new Set([
@@ -17,43 +19,6 @@ function getClientIP(req: Request): string {
   const fly = req.headers.get('fly-client-ip')
   if (fly) return fly
   return 'unknown'
-}
-
-function getAllowedOrigins(): string[] {
-  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
-  }
-
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
 }
 
 Deno.serve(async (req) => {
@@ -98,6 +63,34 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
+
+    // ── Rate limit (auditoría 2026-07-28, Bloque C · PR-16) ──────────────────
+    // Esta función se despliega con --no-verify-jwt (deploy-functions.yml:94) y
+    // acepta PRE_AUTH_EVENTS sin sesión, con `details` JSON controlado por quien
+    // llama. No tenía NINGÚN límite: cualquiera podía inundar `security_logs`
+    // para enterrar un incidente real bajo ruido (anti-forense), inflar el
+    // almacenamiento, o inyectar contenido que se renderiza en el panel de
+    // seguridad del superadmin.
+    //
+    // fail-CLOSED a propósito: aquí el rate limit es el ÚNICO control, así que
+    // si el contador cae, fail-open dejaría el endpoint completamente abierto —
+    // y tumbar el contador es justo lo primero que intentaría un atacante.
+    // Perder algunos eventos pre-login es preferible a perder la integridad del
+    // log de auditoría.
+    //
+    // El tope es generoso: un login fallido legítimo genera 1 evento, y una
+    // ráfaga de reintentos honesta cabe de sobra en 60/hora por IP.
+    const rl = await enforceRateLimit(
+      adminClient,
+      {
+        subject: `ip:${getClientIp(req)}`,
+        action: 'log_security_event',
+        max: 60,
+        failClosed: true,
+      },
+      corsHeaders,
+    )
+    if (rl) return rl
 
     const { error } = await adminClient.from('security_logs').insert({
       // Always use JWT-verified user_id — never trust body to prevent spoofing

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { requireUser } from '../_shared/auth.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 // ============================================================================
 // delete-company — purga definitiva de una empresa (solo super_admin).
@@ -21,39 +22,6 @@ import { requireUser } from '../_shared/auth.ts'
 //   7. DELETE companies — las FK ON DELETE CASCADE limpian las tablas
 //      dependientes (projects, unidades, pagos, condominios, billing…).
 //   8. Limpieza best-effort del logo en storage (no aborta si falla).
-
-function getAllowedOrigins(): string[] {
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
-  }
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
-}
 
 function jsonResponse(body: unknown, status: number, corsHeaders: ReturnType<typeof getCorsHeaders>) {
   return new Response(JSON.stringify(body), {

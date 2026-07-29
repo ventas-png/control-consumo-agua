@@ -134,8 +134,11 @@ export function useRegistrosCalidadQuery(companyId?: string) {
   })
 }
 
-// `empresa` — objeto único del tenant (RLS lo scopea). Devuelve {} si no hay fila,
-// igual que el INITIAL_DATA previo de useData.
+// `empresa` — tabla legacy SIN columna de tenant, así que RLS NO la scopea por
+// empresa (no hay por dónde): la policy `empresa_select_authenticated` solo cierra
+// el acceso de `anon` y la deja en solo-lectura. Todos los tenants ven las mismas
+// filas. La identidad real del tenant vive en `companies`, no aquí.
+// Devuelve {} si no hay fila, igual que el INITIAL_DATA previo de useData.
 export function useEmpresaQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.empresa(companyId),

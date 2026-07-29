@@ -1,0 +1,46 @@
+{
+  "_README": "Excepciones REVISADAS para scripts/migrations-guard.mjs (análisis ESTÁTICO del repo; para el guard del catálogo de PROD ver scripts/security-guard.allowlist.json). Mantener las listas LO MÁS VACÍAS POSIBLE: cada entrada es un hueco tolerado a propósito y debe llevar su `reason`. Estado 2026-07-28: ninguna tabla sin RLS; 9 helpers internos exentos de la regla (b), todos por la misma causa estructural descrita abajo.",
+
+  "tables_without_rls": [],
+
+  "_NOTA_REGLA_B": "Los 9 helpers de abajo NO pueden llevar `assert_company_scope()`: no son RPCs de reporte que el frontend invoque con un company_id ajeno, sino helpers que se evalúan DENTRO de policies RLS o dentro del cuerpo de otras funciones. Un RAISE ahí no protege nada — rompe la evaluación de la policy o del trigger que los llama. `20260603120000_security_harden_function_grants.sql` ya documenta este razonamiento para company_has_feature y user_has_permission. FOLLOW-UP pendiente (no resuelto aquí): para los que NO se evalúan dentro de policies, el remedio correcto no es un guard sino REVOKE EXECUTE ... FROM authenticated, ya que sus llamadores reales son cuerpos SECURITY DEFINER que corren como owner. Requiere verificar caso por caso que ninguna policy ni función SECURITY INVOKER los invoque; se deja para un PR propio con acceso a un entorno donde probarlo.",
+
+  "functions_without_company_scope": [
+    {
+      "fn": "company_has_feature",
+      "reason": "Helper evaluado DENTRO de las policies RLS de ~150 tablas (5 usos directos en CREATE POLICY). Las policies corren con el rol invocante, así que `authenticated` NECESITA EXECUTE: revocarlo rompería la evaluación de RLS en todo el producto. Exención ya documentada en 20260603120000."
+    },
+    {
+      "fn": "company_write_enabled",
+      "reason": "Helper de solo-lectura del estado de dunning, invocado desde el cuerpo de otras 4 funciones. Devuelve un booleano sobre la empresa que se le pasa; no expone datos del tenant."
+    },
+    {
+      "fn": "company_is_active",
+      "reason": "Helper del ciclo de vida de la empresa (20260612180000), invocado desde el cuerpo de otras 2 funciones. Devuelve un booleano; no expone datos del tenant."
+    },
+    {
+      "fn": "conta_moneda_base",
+      "reason": "Helper del ledger invocado desde 11 cuerpos de función. Devuelve el código de moneda base de la empresa — dato de configuración, no financiero."
+    },
+    {
+      "fn": "conta_tasa_vigente",
+      "reason": "Helper del ledger invocado desde 5 cuerpos de función. Devuelve un tipo de cambio; el dato no es específico del tenant."
+    },
+    {
+      "fn": "conta_tasa_entre",
+      "reason": "Igual que conta_tasa_vigente (3 cuerpos). Tipo de cambio entre dos monedas."
+    },
+    {
+      "fn": "conta_periodo_cerrado",
+      "reason": "Helper del candado contable invocado desde 10 cuerpos de función (triggers de asientos). Devuelve booleano de si el período está cerrado."
+    },
+    {
+      "fn": "conta_anio_cerrado",
+      "reason": "Igual que conta_periodo_cerrado, para el candado de ejercicio anual (20260710010000)."
+    },
+    {
+      "fn": "conta_cuenta_para",
+      "reason": "Resolutor evento→cuenta contable, invocado desde 9 cuerpos de función (incluido presupuesto_estado_partida, que sí deriva la empresa del caller antes de llamarlo). Devuelve un uuid de cuenta del catálogo."
+    }
+  ]
+}

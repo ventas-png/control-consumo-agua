@@ -46,6 +46,20 @@ export interface RateLimitOptions {
   windowSeconds?: number
   /** Mensaje 429 opcional (es-MX). */
   message?: string
+  /**
+   * Qué hacer si el RPC del contador FALLA (error de red/DB, respuesta nula).
+   * No confundir con «el sujeto excedió el tope», que siempre bloquea.
+   *
+   *   · `false` (default) → fail-OPEN: se permite la solicitud. Correcto para
+   *     endpoints autenticados, donde ya hubo un control de acceso antes y
+   *     tumbar a usuarios legítimos por un fallo del contador es peor.
+   *
+   *   · `true` → fail-CLOSED: se responde 503. Para endpoints ANÓNIMOS, donde
+   *     el rate limit ES el único control: si el contador cae, fail-open deja
+   *     el endpoint completamente abierto a un atacante, y eso es exactamente
+   *     lo que un atacante provocaría primero (auditoría 2026-07-28, PR-21).
+   */
+  failClosed?: boolean
 }
 
 /**
@@ -56,9 +70,11 @@ export interface RateLimitOptions {
  * contador vuelva a admitir al sujeto (todas las filas de la ventana caen al desplazarse).
  * Da una pista honesta al cliente/UI y a los proxies, sin filtrar el conteo exacto.
  *
- * Fail-open: solo bloquea cuando el RPC devuelve `false` explícito. Si hay un error de
- * infraestructura (data null/undefined), permite la solicitud — mismo criterio que el
- * patrón inline previo, para no tumbar a usuarios legítimos si el contador falla.
+ * Ante un FALLO DEL CONTADOR (error del RPC o respuesta nula) el comportamiento lo decide
+ * `failClosed`: por defecto permite la solicitud (fail-open, para no tumbar a usuarios
+ * legítimos en endpoints ya autenticados), y con `failClosed: true` responde 503. En
+ * cualquier caso el fallo AHORA SE REGISTRA — antes se tragaba en silencio, así que una
+ * caída del RPC desactivaba todos los límites del repo sin dejar rastro.
  *
  * @example
  *   const rl = await enforceRateLimit(admin, { subject: `ip:${getClientIp(req)}`,
@@ -71,12 +87,33 @@ export async function enforceRateLimit(
   corsHeaders: HeadersInit,
 ): Promise<Response | null> {
   const windowSeconds = opts.windowSeconds ?? 3600
-  const { data } = await client.rpc('rate_limit_hit', {
+  const { data, error } = await client.rpc('rate_limit_hit', {
     p_subject: opts.subject,
     p_action: opts.action,
     p_max_count: opts.max,
     p_window: `${windowSeconds} seconds`,
   })
+
+  // El contador falló (no es que el sujeto se pasara del tope). Antes esto se
+  // tragaba en silencio: `error` ni siquiera se desestructuraba, así que una
+  // caída del RPC desactivaba TODOS los límites del repo sin dejar rastro.
+  if (error || data == null) {
+    console.error(
+      `[rateLimit] contador no disponible (action=${opts.action}, failClosed=${opts.failClosed === true}):`,
+      error ?? 'respuesta nula',
+    )
+    if (opts.failClosed) {
+      return new Response(
+        JSON.stringify({ error: 'Servicio temporalmente no disponible. Intenta de nuevo en unos minutos.' }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+        },
+      )
+    }
+    return null
+  }
+
   if (data === false) {
     return new Response(
       JSON.stringify({ error: opts.message ?? 'Demasiadas solicitudes. Espera unos minutos e intenta de nuevo.' }),
