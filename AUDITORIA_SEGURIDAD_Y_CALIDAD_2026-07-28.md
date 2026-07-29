@@ -584,6 +584,78 @@ de pago de un proyecto dentro de la vista de otro
 No se puede arreglar en la query: requiere migración con `project_id`, backfill,
 predicado RLS y filtros. **Es el PR más grande del plan; va el último y solo.**
 
+#### ✅ Implementado — con tres correcciones al enunciado de arriba
+
+**1. «No se puede arreglar en la query» era falso, pero la columna sigue siendo
+lo correcto.** Las cinco son tablas HIJAS y su padre ya tiene `project_id NOT
+NULL`, así que sí existía una vía por query (filtrar por el embed del padre):
+
+| Hija | Padre | FK |
+|---|---|---|
+| `movimientos_caja` | `caja_chica` | `caja_id` |
+| `cuotas_plan_pago` | `planes_pago_condominio` | `plan_id` |
+| `reservas_amenidades` | `amenidades` | `amenidad_id` |
+| `movimientos_suministro` | `suministros_condominio` | `suministro_id` |
+| `registro_asistentes_evento` | `eventos_comunidad` | `evento_id` |
+
+Se descartó igualmente, y el motivo lo demuestra el propio archivo: la vía del
+embed es la que **ya estaba mal usada** en `sectionData.ts:234` (ver punto 3).
+Además el parentesco hace que el backfill sea **exacto**, no una conjetura.
+
+**2. «Predicado RLS» — no aplica.** El proyecto **no es frontera de RLS en
+ningún punto de este esquema**: las policies de las ~140 tablas de condominio
+acotan por `company_id`, y el scoping por proyecto es de aplicación. Añadir un
+predicado de proyecto solo a estas cinco habría sido inconsistente y habría roto
+la lectura del portal de residentes (`domain/portal/queries.ts:262` lee
+`reservas_amenidades` por `unidad_id`, sin proyecto). Con eso, la severidad real
+del hallazgo es **mezcla de proyectos dentro de la empresa, no fuga
+cross-tenant** — igual que se dijo de PR-26.
+
+**3. Eran seis sitios, no cinco: `puntos_control_ruta` (`sectionData.ts:234`).**
+La línea *parecía* acotada — `.eq('areas_condominio.project_id', pid)` — pero le
+faltaba el `!inner`. En PostgREST, filtrar por una columna embebida **no filtra
+las filas de arriba** salvo que el embed sea inner: sin él solo se anula el
+embed de las que no casan y se devuelven igual todos los puntos de control. La
+tabla no tiene `project_id` **ni `company_id`** propios (se acota vía la RLS de
+`rutas_ronda`, que es por empresa), así que ese embed era el único filtro de
+proyecto que había — y no filtraba nada. Encontrado al implementar este PR.
+
+**Diseño: trigger, no cambios en los call sites.** Los ~6 sitios que escriben
+estas tablas usan helpers genéricos (`createCondominioRow(tabla, payload)`) y
+ninguno arma `project_id`; no hay escritores en SQL ni en edge functions
+(verificado). Un `BEFORE INSERT OR UPDATE OF <fk>, project_id, company_id`
+deriva la columna del padre e **ignora lo que mande el cliente**, así que una
+fila inconsistente no se puede construir ni por olvido ni a propósito. Es la
+lección de PR-4 —un guard que hay que recordar copiar se pierde— aplicada a
+datos.
+
+**`SECURITY DEFINER`, y no INVOKER, por una razón concreta.** La versión INVOKER
+es tentadora porque la RLS del padre bloquearía sola el caso cross-tenant, pero
+acopla el *write* de la hija a la *visibilidad* del padre — y dos de los cinco
+padres condicionan su SELECT a un permiso de pestaña
+(`user_has_permission('condominios.tab.amenidades')` y `…tab.plan_pago`). Un
+usuario sin ese permiso vería su INSERT rechazado por un motivo sin relación con
+lo que escribe. Con DEFINER la invariante se comprueba **explícitamente**
+(`padre.company_id <> NEW.company_id`), que además no depende de cómo estén
+escritas las policies del padre hoy.
+
+**Endurecimiento secundario (acotado).** Hoy `movimientos_caja` acepta un INSERT
+con `company_id` propio y `caja_id` de otro tenant: el `WITH CHECK` solo mira
+`company_id` y las FK no pasan por RLS. No divulga nada —la fila queda con el
+`company_id` del atacante y la víctima no la ve— pero ensucia la integridad
+referencial entre tenants. El trigger lo rechaza. No es la motivación del PR.
+
+**Verificación.** El test que faltaba no es de la migración sino **del loader**:
+`sectionDataScope.test.ts` recorre las ~140 consultas de las cuatro funciones que
+reciben `(pid, cid)` y exige que todas acoten por proyecto, con lista de
+excepciones justificadas. Ninguna revisión humana iba a encontrar la línea que
+no encaja entre 140 casi idénticas — que es exactamente por qué el bug sobrevivió
+a varias auditorías. Se comprobó **fallando**: revirtiendo el filtro de
+`movimientos_caja` y quitando el `!inner`, el test los señala por nombre. (Nota
+de proceso: al escribirlo se acusó a sí mismo, porque los comentarios de este
+repo citan el patrón defectuoso que explican — el mismo tropiezo que ya había
+resuelto `migrations-guard.mjs`, y se resolvió igual: despojando comentarios.)
+
 ---
 
 # Bloque F · Errores silenciosos y calidad
