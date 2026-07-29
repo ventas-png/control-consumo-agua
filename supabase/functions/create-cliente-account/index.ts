@@ -1,46 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
-
-function getAllowedOrigins(): string[] {
-  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
-  }
-
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
-}
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 // Generic identity error — same message for "not found" and "already verified" to prevent enumeration
 const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.'
-
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -63,6 +26,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Validación de origen (auditoría 2026-07-28, Bloque C · PR-19). Esta función
+  // se despliega con --no-verify-jwt (onboarding pre-login) y era la ÚNICA de su
+  // familia sin este gate: signup-company, create-user y delete-user sí lo
+  // tienen. No sustituye a la autenticación —un cliente que no sea navegador
+  // puede mandar cualquier Origin— pero corta el abuso desde una página de
+  // terceros y alinea la función con el resto.
+  const originError = validateOrigin(origin, corsHeaders)
+  if (originError) return originError
 
   try {
     const body = await req.json() as {
@@ -195,7 +167,29 @@ Deno.serve(async (req) => {
               user_metadata: { full_name },
             })
             if (adoptError) console.error('Orphan auth user adopt error:', adoptError)
-            else adoptedId = existingId
+            else {
+              adoptedId = existingId
+              // PR-19: esta rama SOBRESCRIBE la contraseña de un auth user que
+              // ya existía. Está acotada a huérfanos (sin fila en `app_users`,
+              // ver el `if (!existingProfile)` de arriba), así que no toca
+              // cuentas en uso — pero sigue siendo un cambio de credencial
+              // autorizado únicamente por DPI + fecha de nacimiento + correo,
+              // tres datos de baja entropía que suelen ir impresos en la
+              // factura. Como mínimo debe dejar rastro: antes ocurría en
+              // silencio absoluto, sin forma de detectarlo a posteriori.
+              await adminClient.from('security_logs').insert({
+                user_id: existingId,
+                event_type: 'orphan_auth_user_adopted',
+                details: {
+                  email: email.toLowerCase().trim(),
+                  cliente_id: clienteId,
+                  motivo: 'onboarding reclamó un auth user sin perfil',
+                },
+                ip_address: getClientIp(req),
+                user_agent: req.headers.get('user-agent') ?? '',
+                timestamp: new Date().toISOString(),
+              })
+            }
           }
         }
       }

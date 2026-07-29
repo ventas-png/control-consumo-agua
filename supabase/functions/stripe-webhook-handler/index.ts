@@ -2,40 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
 
 // CORS utilities
-function getAllowedOrigins(): string[] {
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
-  }
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = getAllowedOrigins()
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowedOrigins = getAllowedOrigins()
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed', origin }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
-
 
 // PR-12 (auditoría 2026-07-28). Antes: `await import('...stripe@13.10.0?target=deno')`
 // + `Stripe.webhooks.constructEvent(...)` — la variante SÍNCRONA.
@@ -55,6 +21,7 @@ function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof ge
 // Se alinea con `stripe-platform-webhook`, que ya lo hace bien: mismo SDK 17.4.0
 // e import estático.
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 // La verificación de firma es puro HMAC local: no llama a la API de Stripe, así
 // que la clave del constructor es irrelevante. Se instancia una sola vez para
