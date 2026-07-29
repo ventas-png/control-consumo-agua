@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret } from '../_shared/secretsCrypto.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -108,6 +109,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── Rate limit (auditoría 2026-07-28, Bloque C · PR-16) ─────────────────
+    // `google-oauth-initiate` sí topa el inicio del flujo (20/usuario, 40/IP),
+    // pero el callback —que es el lado que hace el intercambio de código contra
+    // Google y ESCRIBE los tokens del tenant— no tenía ninguno. Se alinea con su
+    // par: sin esto, el gasto de cuota contra Google y las escrituras a
+    // company_email_configs quedaban sin tope aunque el inicio estuviera topado.
+    //
+    // Va DESPUÉS del gate de autorización de arriba a propósito: así el contador
+    // registra intentos ya autenticados y autorizados, y no lo puede quemar un
+    // tercero para dejar sin servicio al admin legítimo.
+    const rlCallback = await enforceRateLimits(supabase, [
+      { subject: user.id, action: 'google_oauth_callback', max: 20 },
+      { subject: `ip:${getClientIp(req)}`, action: 'google_oauth_callback:ip', max: 40 },
+    ], corsHeaders)
+    if (rlCallback) return rlCallback
+
     // Exchange authorization code for tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -169,8 +186,13 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    // PR-17: el detalle se registra pero NO se devuelve. Antes se mandaba
+    // `String(err)` al cliente, que expone texto de Postgres / de la API de
+    // Google. Sin este log el detalle se perdería del todo, que es peor para
+    // diagnosticar que la fuga que se está cerrando.
+    console.error('[google-oauth-callback]', err instanceof Error ? err.message : String(err))
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

@@ -4,6 +4,7 @@ import { isRetriable } from '../_shared/emailRetryable.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { assertEmailAddress } from '../_shared/emailHeaders.ts'
+import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -483,6 +484,26 @@ Deno.serve(async (req: Request) => {
         effCompanyId = callerCompany
       }
       // Un super_admin con is_superadmin=false puede enviar a nombre del company_id pedido.
+
+      // ── Rate limit (auditoría 2026-07-28, Bloque C · PR-16) ───────────────
+      // Esta función no tenía NINGÚN límite, siendo la única del repo que envía
+      // correo arbitrario desde la identidad Gmail VERIFICADA del tenant. Todas
+      // las demás escrituras sensibles sí lo tienen (create-user 30/h,
+      // invite-user 30/h, create-charge 30/h, timbrar-documento 120/h).
+      //
+      // Sin él, un `operator` podía mandar phishing ilimitado con el dominio del
+      // cliente pasando SPF/DKIM — y de paso quemar la reputación de envío de la
+      // empresa, que es un daño que no se revierte borrando filas.
+      //
+      // Doble dimensión para que ni un usuario rotando IPs ni una IP rotando
+      // usuarios evada el tope. fail-OPEN (default): el caller ya pasó el
+      // control de rol de arriba, así que ante un fallo del contador es peor
+      // bloquear correo transaccional legítimo (recibos, avisos de corte).
+      const rlSend = await enforceRateLimits(supabase, [
+        { subject: userId, action: 'send_email', max: 120 },
+        { subject: `ip:${getClientIp(req)}`, action: 'send_email:ip', max: 240 },
+      ], corsHeaders)
+      if (rlSend) return rlSend
     }
 
     // Fetch Gmail config — Supabase query builder is immutable so we apply the
@@ -623,8 +644,13 @@ Deno.serve(async (req: Request) => {
       throw sendErr
     }
   } catch (err) {
+    // PR-17: el detalle se registra pero NO se devuelve. Antes se mandaba
+    // `String(err)` al cliente, que expone texto de Postgres / de la API de
+    // Google. Sin este log el detalle se perdería del todo, que es peor para
+    // diagnosticar que la fuga que se está cerrando.
+    console.error('[send-email]', err instanceof Error ? err.message : String(err))
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
