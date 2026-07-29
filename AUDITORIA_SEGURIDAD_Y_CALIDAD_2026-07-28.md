@@ -197,36 +197,55 @@ Fix inmediato: re-añadir el guard. **Fix de proceso, que es lo que importa:**
 extraer un helper `assert_company_scope(p_company_id)` que el cuerpo deba invocar,
 para que una reescritura no pueda perderlo por omisión.
 
-### PR-5 · `assert_company_scope()` en los RPCs de reportes contables 🟠
+### ~~PR-5 · `assert_company_scope()` en los RPCs de reportes contables~~ ❌ RETIRADO — falso positivo
 
+**Se retira: la premisa era falsa.** El hallazgo decía que
 `conta_balance_general`, `conta_estado_resultados`, `conta_balanza_comprobacion`,
-`conta_flujo_efectivo`, `conta_libro_mayor`, `conta_consolidado`,
-`cxp_antiguedad_saldos`, `cxp_proyeccion_pagos`, `banco_estado_conciliacion`,
-`presupuesto_partida_estado` reciben `(p_company_id, p_project_id, …)`, están
-concedidas a `authenticated` y **no comprueban el scope del caller**.
+`conta_flujo_efectivo`, `cxp_antiguedad_saldos`, `cxp_proyeccion_pagos` y
+compañía eran seguras «por accidente», porque son `SECURITY INVOKER` sobre tablas
+sin policy legible.
 
-Hoy son seguras **por accidente**: son `SECURITY INVOKER` y las tablas subyacentes
-no tienen policy legible (ver PR-6). En cuanto alguien añada una policy permisiva
-a `conta_asiento_lineas` —que es justo lo que PR-6 debe hacer— **todas se
-convierten en divulgación cross-tenant de estados financieros**.
+Las tablas **sí tienen policies**, y correctamente acotadas por tenant (ver PR-6
+abajo). Con RLS haciendo su trabajo, un `SECURITY INVOKER` que reciba el
+`p_company_id` de otra empresa devuelve **vacío**, no sus datos: RLS filtra las
+filas por el tenant del caller antes de que la función las vea.
 
-Por eso este PR va **antes** que PR-6. `banco_conciliar_movimiento`,
-`conta_publicar_asiento`, `conta_anular_asiento` y `agua_cerrar_ciclo` ya lo
-hacen bien: copiar esa forma.
+O sea que `SECURITY INVOKER` + RLS acotada no es un accidente afortunado — **es
+el diseño**, y es correcto. Añadirles un `assert_company_scope()` habría exigido
+reescribir siete cuerpos de SQL financiero (`LANGUAGE sql`, no admiten
+`PERFORM`), con el riesgo de transcripción que eso implica, a cambio de cero
+seguridad adicional.
 
-### PR-6 · Policies faltantes en contabilidad / CxP / presupuesto / bancos 🟡
+Dos matices que sí se comprobaron y sostienen la retirada:
+`presupuesto_partida_estado` —la única del grupo que es `SECURITY DEFINER`— está
+**revocada de `authenticated`** (`20260611060000:72`), así que no es invocable
+desde el cliente. Y `presupuesto_estado_partida` (nombre transpuesto, sí
+concedida) **deriva la empresa del caller** con `get_my_company_id()` e ignora
+cualquier id que le pasen.
 
-Con `ENABLE ROW LEVEL SECURITY` y **cero policies** en todo el corpus:
-`conta_cuentas`, `conta_asientos`, `conta_asiento_lineas`, `conta_tipos_cambio`,
-`conta_mapeo_cuentas` (`20260611000000:195-199`), `facturas_proveedor`,
-`ordenes_pago` (`20260611010000:132-133`), `presupuestos`,
-`presupuesto_partidas` (`20260611020000:60-61`), `cuentas_bancarias`,
-`banco_movimientos` (`20260611030000:74-75`), `security_logs`
-(`20260610000808:173`).
+### PR-6 · Policies faltantes — alcance real: **1 tabla, no 12** 🟡
 
-Es **fail-closed, así que no es vulnerabilidad en sí** — pero significa que el
-repo no reproduce prod. Añadir las policies acotadas por tenant, o una deny-all
-`AS RESTRICTIVE` explícita con comentario, para que la intención sea auditable.
+El informe listaba 12 tablas «con RLS habilitada y CERO policies» y proponía
+dotarlas a todas. Al implementarlo, **11 de las 12 ya las tienen**, acotadas por
+tenant con `USING (company_id = get_my_company_id() OR is_super_admin())`.
+
+No aparecían porque **se crean dentro de bloques `DO $$`**:
+
+```sql
+FOREACH t IN ARRAY ARRAY['conta_cuentas','conta_asientos','conta_asiento_lineas', ...]
+LOOP
+  EXECUTE format($p$ CREATE POLICY "%s_select" ON public.%I ... $p$, t, t);
+```
+
+Un escaneo de texto que no modele esa forma declara «sin policy» a todo el ERP
+financiero. Es el **mismo modo de fallo que retiró PR-2**: analizar el texto de
+las migraciones sin modelar cómo se ejecutan.
+
+Queda **una** tabla realmente sin policy: `security_logs`. Y ahí la postura
+actual (RLS sin policy) es funcionalmente correcta — se escribe solo por
+service_role desde `log-security-event` y no se lee desde `src/`. Lo que falta no
+es acceso sino declararlo: sin policy no se distingue «deny-all a propósito» de
+«se olvidó». Se le da SELECT solo a `super_admin` y se deja constancia.
 
 ### PR-7 · Acotar el SELECT de los buckets de logos 🟡
 
@@ -241,10 +260,29 @@ CREATE POLICY "logos_authenticated_select" ON storage.objects
 Más `20260516000006:14,35`, también solo por `bucket_id`. Las migraciones
 `20260603150000`/`20260603170000` sí acotaron INSERT/UPDATE/DELETE por
 `(storage.foldername(name))[1] = get_my_company_id()::text`, pero dejaron el
-SELECT abierto a propósito. Como las policies permisivas se combinan con OR,
-**cualquier usuario autenticado lista y descarga los logos de todos los tenants y
-proyectos**, y de paso mapea el espacio de UUIDs. Esto anula buena parte del
-trabajo de volver privados esos buckets.
+SELECT abierto. Como las policies permisivas se combinan con OR, **cualquier
+usuario autenticado lista y descarga los logos de todos los tenants y
+proyectos**, y de paso mapea el espacio de UUIDs.
+
+> **⏸ NO IMPLEMENTADO — requiere una decisión de producto, no técnica.**
+>
+> Al ir a arreglarlo apareció que **la apertura es deliberada y está
+> documentada**: `20260603170000_storage_scope_project_logos.sql:17-18` dice
+> *"READ se deja amplio a propósito (un logo no es sensible; se muestra vía
+> SecureImage). Las policies de SELECT se mantienen."*
+>
+> El informe lo trató como un descuido; no lo es. Y la justificación tiene
+> fondo: un logo corporativo no es dato sensible, y acotar el SELECT por
+> `foldername[1]` rompería cualquier vista que muestre logos de varias empresas
+> —el panel de superadmin, o el logo de empresa en el login, que es **pre-auth**
+> y por tanto no tiene `get_my_company_id()`.
+>
+> Lo que sí queda en pie del hallazgo es lo secundario: el listado permite
+> enumerar el espacio de UUIDs de empresas y proyectos. Si eso preocupa, la
+> salida no es cerrar el SELECT sino servir los logos por URL firmada.
+>
+> **No lo cambio unilateralmente**: revertir una decisión escrita y razonada, sin
+> poder probar que el logo del login sigue apareciendo, es más riesgo que valor.
 
 ### PR-8 · Fijar en SQL la configuración de `condominios-media` y `mudanza-docs` 🟡
 
