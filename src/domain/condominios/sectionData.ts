@@ -50,7 +50,7 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
     fetchAllCuotas(pid, cid), // Fase 6: completo por chunks (antes .limit(5000) truncaba totales)
     db.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
+    db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
     db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
     db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
@@ -73,7 +73,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     fetchAllCuotas(pid, cid),
     db.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
+    db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
@@ -128,12 +128,16 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
     db.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('placa'),
     db.from('eventos_comunidad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
-    db.from('registro_asistentes_evento').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
+    // PR-27: las 5 tablas hijas marcadas abajo no TENÍAN `project_id` — por eso
+    // filtraban solo por empresa mientras las otras ~135 de este batch filtraban
+    // por ambas. La migración 20260729000600 añade la columna (derivada del
+    // padre por trigger, no del cliente) y aquí se cierra el filtro.
+    db.from('registro_asistentes_evento').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('caja_chica').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_apertura', { ascending: false }),
-    db.from('movimientos_caja').select('*').eq('company_id', cid).order('fecha', { ascending: false }),
+    db.from('movimientos_caja').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     db.from('obras_mejoras').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('planes_pago_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
-    db.from('cuotas_plan_pago').select('*').eq('company_id', cid).order('numero'),
+    db.from('cuotas_plan_pago').select('*').eq('project_id', pid).eq('company_id', cid).order('numero'),
     db.from('accesos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('titular'),
     db.from('garantias_equipo').select('*').eq('project_id', pid).eq('company_id', cid).order('equipo'),
     db.from('entrega_unidades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
@@ -156,7 +160,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('equipos_comunes').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
     db.from('presencia_personal').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('nombre'),
     db.from('suministros_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
-    db.from('movimientos_suministro').select('*').eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+    db.from('movimientos_suministro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     // Sin tipar: la UI castea `comentarios` (Json) a ComentarioTarea[].
     supabase.from('tareas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite').order('created_at', { ascending: false }),
     db.from('gestion_cobranza').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(500),
@@ -231,7 +235,14 @@ export async function fetchCondominiosRondasData(pid: string, cid: string) {
   return Promise.all([
     db.from('areas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
     db.from('rutas_ronda').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('puntos_control_ruta').select('*, areas_condominio(nombre, icono)').eq('areas_condominio.project_id', pid).order('orden'),
+    // PR-27 (auditoría 2026-07-28): faltaba el `!inner`. En PostgREST, filtrar
+    // por una columna EMBEBIDA no filtra las filas de arriba salvo que el embed
+    // sea inner — sin él, `.eq('areas_condominio.project_id', pid)` solo anula
+    // el embed de las que no casan y devuelve igual TODOS los puntos de control.
+    // La tabla no tiene project_id NI company_id propios (se acota vía la RLS de
+    // `rutas_ronda`, que es por empresa, no por proyecto), así que el embed era
+    // el único filtro de proyecto que había — y no filtraba nada.
+    db.from('puntos_control_ruta').select('*, areas_condominio!inner(nombre, icono)').eq('areas_condominio.project_id', pid).order('orden'),
     db.from('amenidades_bloqueos').select('*, amenidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
   ])
 }

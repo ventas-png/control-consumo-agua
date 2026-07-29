@@ -5623,6 +5623,7 @@ export type Database = {
           numero: number
           pagado: boolean
           plan_id: string
+          project_id: string
         }
         Insert: {
           company_id: string
@@ -5635,6 +5636,7 @@ export type Database = {
           numero: number
           pagado?: boolean
           plan_id: string
+          project_id: string
         }
         Update: {
           company_id?: string
@@ -5647,6 +5649,7 @@ export type Database = {
           numero?: number
           pagado?: boolean
           plan_id?: string
+          project_id?: string
         }
         Relationships: [
           {
@@ -5675,6 +5678,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "planes_pago_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuotas_plan_pago_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -9813,6 +9823,7 @@ export type Database = {
           fecha: string
           id: string
           monto: number
+          project_id: string
           registrado_por: string | null
           tipo: string
         }
@@ -9825,6 +9836,7 @@ export type Database = {
           fecha?: string
           id?: string
           monto: number
+          project_id: string
           registrado_por?: string | null
           tipo: string
         }
@@ -9837,6 +9849,7 @@ export type Database = {
           fecha?: string
           id?: string
           monto?: number
+          project_id?: string
           registrado_por?: string | null
           tipo?: string
         }
@@ -9869,6 +9882,13 @@ export type Database = {
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
           },
+          {
+            foreignKeyName: "movimientos_caja_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       movimientos_suministro: {
@@ -9881,6 +9901,7 @@ export type Database = {
           id: string
           motivo: string | null
           notas: string | null
+          project_id: string
           realizado_por: string | null
           suministro_id: string
           tipo: string
@@ -9894,6 +9915,7 @@ export type Database = {
           id?: string
           motivo?: string | null
           notas?: string | null
+          project_id: string
           realizado_por?: string | null
           suministro_id: string
           tipo?: string
@@ -9907,6 +9929,7 @@ export type Database = {
           id?: string
           motivo?: string | null
           notas?: string | null
+          project_id?: string
           realizado_por?: string | null
           suministro_id?: string
           tipo?: string
@@ -9938,6 +9961,13 @@ export type Database = {
             columns: ["suministro_id"]
             isOneToOne: false
             referencedRelation: "suministros_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_suministro_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -13722,6 +13752,7 @@ export type Database = {
           id: string
           nombre: string
           num_personas: number
+          project_id: string
           unidad_id: string
         }
         Insert: {
@@ -13733,6 +13764,7 @@ export type Database = {
           id?: string
           nombre: string
           num_personas?: number
+          project_id: string
           unidad_id: string
         }
         Update: {
@@ -13744,6 +13776,7 @@ export type Database = {
           id?: string
           nombre?: string
           num_personas?: number
+          project_id?: string
           unidad_id?: string
         }
         Relationships: [
@@ -13780,6 +13813,13 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_asistentes_evento_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -14570,6 +14610,7 @@ export type Database = {
           notas: string | null
           num_invitados: number
           observaciones_uso: string | null
+          project_id: string
           rechazada_motivo: string | null
           recordatorio_enviado: boolean
           recordatorio_enviado_at: string | null
@@ -14609,6 +14650,7 @@ export type Database = {
           notas?: string | null
           num_invitados?: number
           observaciones_uso?: string | null
+          project_id: string
           rechazada_motivo?: string | null
           recordatorio_enviado?: boolean
           recordatorio_enviado_at?: string | null
@@ -14648,6 +14690,7 @@ export type Database = {
           notas?: string | null
           num_invitados?: number
           observaciones_uso?: string | null
+          project_id?: string
           rechazada_motivo?: string | null
           recordatorio_enviado?: boolean
           recordatorio_enviado_at?: string | null
@@ -14710,6 +14753,13 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservas_amenidades_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
