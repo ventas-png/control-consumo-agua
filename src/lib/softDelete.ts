@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 // Tablas con columnas deleted_at + deleted_by agregadas en la migracion
 // 20260528000001_soft_delete_critical_tables.sql (lote 1) y
-// 20260713100000_soft_delete_registros.sql (lote 2). Si extends soft delete a
+// 20260713100001_soft_delete_registros.sql (lote 2). Si extends soft delete a
 // otra tabla, sumala aqui y a los SELECT consumidores agregales .is('deleted_at', null).
 export type SoftDeletableTable =
   | 'pagos'

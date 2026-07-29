@@ -176,6 +176,39 @@ async function main() {
     .filter((t) => rlsEnabled.has(t) && !tablesWithPolicy.has(t) && !allowNoPolicy.has(t))
     .sort()
 
+  // ── Regla (d): el NOMBRE del archivo es la identidad de la migración ─────
+  // El historial remoto (`supabase_migrations.schema_migrations`) se indexa por
+  // `version` = los 14 dígitos del nombre, y apply-migrations-prod.yml registra
+  // con `ON CONFLICT (version) DO NOTHING`. Consecuencia de dos archivos con el
+  // mismo timestamp: el segundo se aplica (el push a main lo aplica por nombre
+  // de archivo) pero NUNCA queda registrado — y entonces el modo reconciliar,
+  // que decide por versión, se lo salta creyéndolo ya aplicado.
+  //
+  // Pasó de verdad: 20260713100000 (soft_delete_registros vs
+  // solicitudes_enforce_rbac_gate) y 20260713110000 (ambiente_pago_tenant vs
+  // cerrar_ciclo_cuotas). Los cuatro estaban aplicados en prod por suerte, no
+  // por diseño: los dos ensombrecidos eran justamente los que arreglaban el
+  // pago en línea. Se detectó auditando por qué el branching de Supabase
+  // reportaba MIGRATIONS_FAILED (2026-07-29).
+  //
+  // Un timestamp de más (…100001) cuesta nada; un archivo invisible para el
+  // reconciliador cuesta un incidente de producción.
+  const byVersion = new Map()
+  const malformedNames = []
+  for (const file of files) {
+    const m = /^(\d{14})_/.exec(file)
+    if (!m) {
+      malformedNames.push(file)
+      continue
+    }
+    const version = m[1]
+    if (!byVersion.has(version)) byVersion.set(version, [])
+    byVersion.get(version).push(file)
+  }
+  const duplicateVersions = [...byVersion.entries()]
+    .filter(([, group]) => group.length > 1)
+    .sort(([a], [b]) => a.localeCompare(b))
+
   // ── Regla (b): RPC SECURITY DEFINER con p_company_id/p_project_id,
   //    ejecutable por `authenticated`, debe llamar a assert_company_scope() ──
   const missingScope = []
@@ -223,15 +256,31 @@ async function main() {
   for (const f of missingScope) {
     report.push(`    ✗ ${f.name}  [última definición en ${f.file} — falta assert_company_scope()]`)
   }
+  report.push(
+    `(d) versiones de migración duplicadas o nombres no parseables: ${duplicateVersions.length + malformedNames.length}`,
+  )
+  for (const [version, group] of duplicateVersions) {
+    report.push(`    ✗ ${version}  [${group.join(' · ')} — renombra uno a ${version.slice(0, 13)}1]`)
+  }
+  for (const f of malformedNames) {
+    report.push(`    ✗ ${f}  [el nombre debe ser <timestamp de 14 dígitos>_nombre.sql]`)
+  }
 
   console.log(report.join('\n'))
   console.log('')
 
-  const total = missingRls.length + rlsNoPolicy.length + missingScope.length
+  const total =
+    missingRls.length +
+    rlsNoPolicy.length +
+    missingScope.length +
+    duplicateVersions.length +
+    malformedNames.length
   if (total > 0) {
     console.error(`❌ migrations-guard: ${total} hallazgo(s) en el repo.`)
-    console.error('   Añade la migración que falta, o —si la excepción es intencional y revisada—')
-    console.error('   documéntala en scripts/migrations-guard.allowlist.json con su `reason`.')
+    console.error('   (a)/(b)/(c): añade la migración que falta, o —si la excepción es intencional')
+    console.error('   y revisada— documéntala en scripts/migrations-guard.allowlist.json con su')
+    console.error('   `reason`. (d) NO es allowlisteable: renombra el archivo (el nombre es la')
+    console.error('   identidad de la migración en el historial remoto).')
     process.exit(1)
   }
   console.log('✅ migrations-guard: RLS + policies declaradas y RPCs con scope.')
