@@ -691,9 +691,22 @@ En los tres primeros ya estamos en la última versión publicada: **no hay arreg
 upstream**, y aceptar la sugerencia de npm perdería funcionalidad (y en el caso
 de react-router reintroduciría el open redirect).
 
-**Sólo `eslint` tiene un fix real, y es #663** — ya verificado compatible con el
-config de PR-29 (ESLint 10.8.0: 0 errores, mismo recuento de avisos). Mergearlo
-cierra 6 de los 21.
+**Sólo `eslint` tiene un fix real, y es #663** — verificado compatible con el
+config de PR-29 (ESLint 10.8.0: 0 errores, mismo recuento de avisos) y
+**mergeado**.
+
+**Cerró 3 avisos, no 6 como estimé antes de mergearlo** (21 → 18):
+`@eslint/config-array`, `@eslint/eslintrc` y `eslint`. El error de conteo es
+instructivo y conviene no repetirlo: yo sumé los avisos cuyo `fixAvailable`
+apuntaba a `eslint@10.8.0`, pero ese campo nombra **un** paquete que lo
+arreglaría, no la única ruta. `brace-expansion` y `minimatch` tienen **varios
+padres** — las copias que colgaban de eslint subieron a versión sana, pero
+`exceljs → archiver → glob` y `vite-plugin-pwa → workbox-build` siguen trayendo
+copias vulnerables, así que el aviso permanece.
+
+Regla práctica: `fixAvailable` se lee **por paquete, no por ruta**. Para saber
+cuántos avisos cierra de verdad un bump hay que mirar `npm ls <paquete>` y ver
+si el nodo vulnerable tiene más de un padre.
 
 #### Los 6 de `exceljs` además NO son alcanzables
 
