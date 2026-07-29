@@ -100,6 +100,12 @@ const ANON_DENY_TABLES = [
   'presupuesto_partidas',
   'cuentas_bancarias',
   'banco_movimientos',
+  // Auditoría 2026-07-28 (Bloque A · PR-1): `fuentes_agua` tenía 8 policies pero
+  // NINGUNA migración le encendía RLS, así que eran código muerto y `anon` podía
+  // leerla y escribirla entera. `empresa` no tenía ni RLS ni policy. Ambas se
+  // cierran en 20260729000000; estas aserciones son el regresa-guarda.
+  'fuentes_agua',
+  'empresa',
 ] as const
 
 // Tablas calientes que exponen company_id directo → aislamiento por tenant
@@ -121,6 +127,10 @@ const TENANT_SCOPED_TABLES = [
   // el portal de residentes y la config de email OAuth por tenant.
   'unidad_residentes',
   'company_email_configs',
+  // Auditoría 2026-07-28 (Bloque A · PR-1): sus policies ya acotaban por
+  // `company_id = get_my_company_id()`, pero sin RLS encendida no se evaluaban.
+  // (`empresa` NO va aquí: no tiene columna de tenant — ver 20260729000000.)
+  'fuentes_agua',
 ] as const
 
 // Tablas con scope POR USUARIO (no por empresa): RLS = user_id = auth.uid().
