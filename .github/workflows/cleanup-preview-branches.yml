@@ -1,0 +1,236 @@
+name: Cleanup Supabase preview branches
+
+# Borra las ramas PREVIEW de Supabase que ya no le sirven a nadie.
+#
+# Por qué: Supabase cobra CADA rama preview por hora ($0.01344/h ≈ $9.68/mes en
+# el plan Pro de esta org) y NO las expira nunca. Los previews se crean solos con
+# cada PR que toque `supabase/`, pero solo se borran solos cuando el PR se
+# mergea/cierra — y este repo abre muchos PRs en draft que quedan colgados. El
+# 2026-07-29 había 2 previews de PRs draft abandonados 20 y 27 días atrás
+# quemando ~$19/mes en silencio; nadie se entera porque el costo no falla ningún
+# check, solo aparece en la factura.
+#
+# Criterio de borrado (conservador — ante CUALQUIER duda, NO borra):
+#   1. PR cerrado o mergeado          → borra (el preview ya no tiene consumidor).
+#   2. PR abierto sin commits en N días (default 7) → borra por abandono.
+#   3. Cualquier otro caso (PR ilegible, sin `pr_number`, rama por defecto o
+#      `persistent`, label `keep-preview`) → NO toca nada.
+#
+# Borrar un preview NO cierra el PR ni toca el código: si alguien vuelve a hacer
+# push a esa rama, la integración de Supabase recrea el preview desde cero. Por
+# eso el criterio 2 es seguro incluso con un PR que se retome meses después.
+#
+# La rama por defecto (`main` = el proyecto de PRODUCCIÓN) se filtra por
+# `is_default` ANTES de cualquier otra evaluación, y además el borrado tiene un
+# tope duro por corrida (MAX_DELETIONS): si algún día la API devolviera basura,
+# el daño queda acotado y visible en vez de barrer el proyecto entero.
+#
+# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID (los mismos de
+# apply-migration.yml / apply-migrations-prod.yml). Sin ellos hace no-op con
+# aviso: este workflow ahorra dinero, no debe romper el tablero de CI si aún no
+# está configurado.
+
+on:
+  schedule:
+    # 06:00 UTC diario (00:00 GT). Una pasada al día basta: el ahorro se mide en
+    # días de preview, no en horas, y así no se gasta cuota de Actions.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo reportar qué se borraría, sin borrar (true/false)'
+        required: false
+        default: 'true'
+      stale_days:
+        description: 'Días sin commits para considerar abandonado un PR abierto'
+        required: false
+        default: '7'
+
+concurrency:
+  # Dos pasadas simultáneas podrían intentar borrar la misma rama (una falla con
+  # 404 y el job se marca rojo sin que haya nada roto). Encolar.
+  group: cleanup-preview-branches
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      # En `schedule` los inputs vienen vacíos → borra de verdad. En dispatch
+      # manual el default es 'true' (dry-run) para poder inspeccionar sin riesgo.
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      STALE_DAYS: ${{ github.event.inputs.stale_days || '7' }}
+      # Tope duro de borrados por corrida. Con 1 pasada diaria, un backlog real
+      # se drena en pocos días; un número más alto solo sirve para amplificar un
+      # error de la API.
+      MAX_DELETIONS: '10'
+    steps:
+      - name: Cleanup stale preview branches
+        run: |
+          set -uo pipefail
+
+          if [ -z "${ACCESS_TOKEN:-}" ] || [ -z "${PROJECT_ID:-}" ]; then
+            echo "::notice::Faltan SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_ID — se omite la limpieza."
+            echo "Agrégalos en: Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+
+          SB_API="https://api.supabase.com/v1"
+          GH_API="https://api.github.com"
+          now_epoch=$(date -u +%s)
+          deleted=0
+          failed=0
+
+          {
+            echo "### Limpieza de previews de Supabase"
+            echo ""
+            echo "Modo: **$([ "$DRY_RUN" = "true" ] && echo 'DRY RUN (no borra)' || echo 'REAL')** · umbral de abandono: **${STALE_DAYS}d**"
+            echo ""
+            echo "| Rama preview | PR | Veredicto |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          branches=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "$SB_API/projects/$PROJECT_ID/branches")
+
+          if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$branches"; then
+            echo "::error::La API de Supabase no devolvió una lista de ramas:"
+            echo "$branches" | head -c 500
+            exit 1
+          fi
+
+          total=$(jq 'length' <<<"$branches")
+          echo "Ramas devueltas por Supabase: $total"
+
+          while IFS= read -r b; do
+            [ -n "$b" ] || continue
+            id=$(jq -r '.id' <<<"$b")
+            name=$(jq -r '.name' <<<"$b")
+            is_default=$(jq -r '.is_default // false' <<<"$b")
+            persistent=$(jq -r '.persistent // false' <<<"$b")
+            pr=$(jq -r '.pr_number // empty' <<<"$b")
+
+            # --- Guardas duras: nunca tocar producción ni ramas persistentes ---
+            if [ "$is_default" = "true" ]; then
+              echo "· $name — rama por defecto (producción), intocable."
+              continue
+            fi
+            if [ "$persistent" = "true" ]; then
+              echo "· $name — marcada persistent, se respeta."
+              echo "| \`$name\` | — | ⏭️ persistent |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [ -z "$pr" ]; then
+              echo "::warning::$name no tiene pr_number — no se puede evaluar, se deja."
+              echo "| \`$name\` | — | ⏭️ sin PR asociado |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # --- Estado del PR en GitHub ---
+            pr_json=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GH_API/repos/$REPO/pulls/$pr")
+            state=$(jq -r '.state // empty' <<<"$pr_json")
+            head_sha=$(jq -r '.head.sha // empty' <<<"$pr_json")
+            labels=$(jq -r '[.labels[]?.name] | join(",")' <<<"$pr_json")
+
+            if [ -z "$state" ]; then
+              echo "::warning::No se pudo leer el PR #$pr — se deja $name por precaución."
+              echo "| \`$name\` | #$pr | ⏭️ PR ilegible |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # Escotilla de escape manual para un preview que se quiere conservar.
+            if [[ ",$labels," == *",keep-preview,"* ]]; then
+              echo "· $name — PR #$pr tiene label keep-preview, se respeta."
+              echo "| \`$name\` | #$pr | ⏭️ keep-preview |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            reason=""
+            if [ "$state" != "open" ]; then
+              reason="PR $state"
+            else
+              # PR abierto: se mide el ABANDONO por fecha del último commit, no por
+              # `updated_at` del PR (que se mueve con cada comentario del bot y
+              # mantendría vivo un preview de un PR que nadie toca hace semanas).
+              if [ -z "$head_sha" ]; then
+                echo "::warning::PR #$pr sin head.sha — se deja $name."
+                echo "| \`$name\` | #$pr | ⏭️ sin head sha |" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+              commit_json=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "$GH_API/repos/$REPO/commits/$head_sha")
+              cdate=$(jq -r '.commit.committer.date // empty' <<<"$commit_json")
+              if [ -z "$cdate" ]; then
+                echo "::warning::No se pudo fechar $head_sha — se deja $name."
+                echo "| \`$name\` | #$pr | ⏭️ commit sin fecha |" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+              cepoch=$(date -u -d "$cdate" +%s 2>/dev/null || echo "")
+              if [ -z "$cepoch" ]; then
+                echo "::warning::Fecha ilegible '$cdate' — se deja $name."
+                echo "| \`$name\` | #$pr | ⏭️ fecha ilegible |" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+              age_days=$(( (now_epoch - cepoch) / 86400 ))
+              if [ "$age_days" -lt "$STALE_DAYS" ]; then
+                echo "· $name — PR #$pr activo (último commit hace ${age_days}d), se deja."
+                echo "| \`$name\` | #$pr | ✅ activo (${age_days}d) |" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+              reason="abandonado (${age_days}d sin commits)"
+            fi
+
+            # --- Borrado ---
+            if [ "$deleted" -ge "$MAX_DELETIONS" ]; then
+              echo "::warning::Tope de $MAX_DELETIONS borrados alcanzado — $name queda para la próxima corrida."
+              echo "| \`$name\` | #$pr | ⏭️ tope alcanzado |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "[dry-run] borraría $name ($reason)"
+              echo "| \`$name\` | #$pr | 🔍 se borraría — $reason |" >> "$GITHUB_STEP_SUMMARY"
+              deleted=$((deleted + 1))
+              continue
+            fi
+
+            echo "Borrando $name ($reason)..."
+            code=$(curl -s -o /tmp/del.json -w "%{http_code}" -X DELETE \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              "$SB_API/branches/$id")
+            if [ "$code" = "200" ] || [ "$code" = "204" ]; then
+              echo "  ✓ borrada"
+              echo "| \`$name\` | #$pr | 🗑️ borrada — $reason |" >> "$GITHUB_STEP_SUMMARY"
+              deleted=$((deleted + 1))
+            else
+              echo "::error::Falló el borrado de $name (HTTP $code): $(head -c 300 /tmp/del.json)"
+              echo "| \`$name\` | #$pr | ❌ falló (HTTP $code) |" >> "$GITHUB_STEP_SUMMARY"
+              failed=$((failed + 1))
+            fi
+          done < <(jq -c '.[]' <<<"$branches")
+
+          {
+            echo ""
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "**$deleted** rama(s) se borrarían · ahorro estimado: **\$$(awk "BEGIN{printf \"%.2f\", $deleted * 9.68}")/mes**"
+            else
+              echo "**$deleted** rama(s) borradas · ahorro estimado: **\$$(awk "BEGIN{printf \"%.2f\", $deleted * 9.68}")/mes**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::$failed borrado(s) fallaron."
+            exit 1
+          fi
+          echo "Limpieza terminada: $deleted rama(s), $failed fallo(s)."
