@@ -75,32 +75,6 @@ export default [
     },
   },
 
-  // ── Excepción acotada y TEMPORAL: src/App.tsx ──────────────────────────────
-  //
-  // Al ampliar el alcance, `rules-of-hooks` reporta 31 violaciones en App.tsx.
-  // NO son ruido: `App()` tiene tres `return` tempranos (rutas `/dev/components`,
-  // `/aceptar-invitacion` y la suite legal, resueltas contra `window.location`
-  // ANTES del router) y todos los hooks vienen DESPUÉS. En esas rutas el
-  // componente se renderiza con 0 hooks; en el resto, con ~31.
-  //
-  // Hoy no explota porque esas tres rutas son terminales: se entra por carga
-  // completa y no se navega desde ellas dentro de la app. Pero si algo llamara a
-  // `navigate()` estando en una de ellas, App volvería a renderizar con 31 hooks
-  // donde antes hubo 0, y React lanza "Rendered more hooks than during the
-  // previous render". Es exactamente la clase de bug que la regla existe para
-  // cazar; el propio código tiene un comentario en :100 afirmando que los hooks
-  // se llaman incondicionalmente, cosa que los early returns de arriba desmienten.
-  //
-  // El arreglo es mecánico —mover los tres early returns a un wrapper y dejar los
-  // hooks en un componente interno que siempre los ejecuta— pero reestructura el
-  // componente RAÍZ, que no tiene tests propios. Se deja fuera de PR-29 para no
-  // mezclar un cambio de estructura con el endurecimiento del lint, y queda
-  // documentado aquí en vez de escondido tras un disable a nivel de archivo.
-  {
-    files: ['src/App.tsx'],
-    rules: { 'react-hooks/rules-of-hooks': 'off' },
-  },
-
   // ── Bloque 2: solo componentes ─────────────────────────────────────────────
   // El boundary de arquitectura (P0 #11): los componentes no hablan con Supabase
   // directo. NO puede aplicarse a todo src/ — `src/domain/` importa el cliente a

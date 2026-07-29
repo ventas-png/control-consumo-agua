@@ -40,41 +40,66 @@ import { AuthSplash, DualServicePortal, PresenceBar } from './components/app/she
 import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/routes'
 import { MfaGate } from './components/auth/MfaGate'
 
+// F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
+// módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
+// nuevo cada vez, y React desmonta y remonta el árbol entero al cambiar el tipo.
+const LazyShowcase = lazy(() =>
+  import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })),
+)
+
+/** Rutas públicas que se resuelven ANTES del router y del gate de auth. */
+const LEGAL_ROUTES: Record<string, 'privacy' | 'tos' | 'dpa'> = {
+  '/politica-privacidad': 'privacy',
+  '/terminos-servicio': 'tos',
+  '/acuerdo-dpa-cookies': 'dpa',
+}
+
+/**
+ * Raíz de la app. SOLO resuelve las tres rutas públicas sessionless y, si no
+ * aplica ninguna, delega en `<AppShell/>`.
+ *
+ * POR QUÉ ESTÁ PARTIDO EN DOS (auditoría 2026-07-28, PR-33)
+ * Antes esto era un único componente: los tres `return` de abajo vivían al
+ * principio de `App()` y los ~31 hooks venían DESPUÉS. Eso viola las Rules of
+ * Hooks — en esas rutas el componente renderizaba con 0 hooks y en el resto con
+ * 31. No explotaba porque las tres rutas son terminales (se entra por carga
+ * completa y no se navega desde ellas dentro de la app), pero bastaba con que
+ * algo llamara a `navigate()` estando en una para que React viera 31 hooks donde
+ * antes hubo 0 y lanzara "Rendered more hooks than during the previous render".
+ *
+ * Partirlo lo hace estructuralmente imposible: aquí no hay ningún hook, y
+ * `AppShell` —que los tiene todos— o se monta entero o no se monta. El
+ * comentario que había en el bloque de atajos afirmando que los hooks se llamaban
+ * incondicionalmente ahora es cierto.
+ */
 export default function App() {
-  // F3.13: ComponentShowcase dev route (/dev/components). Solo accesible
-  // si el usuario navega manualmente — no aparece en el sidebar.
-  if (typeof window !== 'undefined' && window.location.pathname === '/dev/components') {
-    const LazyShowcase = lazy(() => import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })))
-    return (
-      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
-        <LazyShowcase />
-      </Suspense>
-    )
-  }
-
-  // T3/plat:P3 — landing pública de aceptación de invitación. Es sessionless
-  // (el invitado todavía no tiene cuenta), por eso se resuelve aquí arriba con
-  // el mismo patrón que /dev/components, ANTES del gate de auth/loading.
-  if (typeof window !== 'undefined' && window.location.pathname === '/aceptar-invitacion') {
-    return (
-      <Suspense fallback={<AuthSplash />}>
-        <AcceptInvitationPage />
-      </Suspense>
-    )
-  }
-
-  // Suite legal pública (RGPD/CCPA + verificación de APIs de Google). Son páginas
-  // 100% públicas e indexables: se resuelven sessionless aquí arriba, ANTES del gate
-  // de auth, con el mismo patrón que /aceptar-invitacion. El doc se mapea por ruta.
   if (typeof window !== 'undefined') {
-    const legalRoutes: Record<string, 'privacy' | 'tos' | 'dpa'> = {
-      '/politica-privacidad': 'privacy',
-      '/terminos-servicio': 'tos',
-      '/acuerdo-dpa-cookies': 'dpa',
+    const { pathname, search } = window.location
+
+    // Solo accesible si el usuario navega manualmente — no está en el sidebar.
+    if (pathname === '/dev/components') {
+      return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+          <LazyShowcase />
+        </Suspense>
+      )
     }
-    const legalDoc = legalRoutes[window.location.pathname]
+
+    // T3/plat:P3 — landing de aceptación de invitación. Es sessionless: el
+    // invitado todavía no tiene cuenta, así que se resuelve antes del gate de auth.
+    if (pathname === '/aceptar-invitacion') {
+      return (
+        <Suspense fallback={<AuthSplash />}>
+          <AcceptInvitationPage />
+        </Suspense>
+      )
+    }
+
+    // Suite legal pública (RGPD/CCPA + verificación de APIs de Google): páginas
+    // 100% públicas e indexables, también sessionless.
+    const legalDoc = LEGAL_ROUTES[pathname]
     if (legalDoc) {
-      const legalLang = new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'es'
+      const legalLang = new URLSearchParams(search).get('lang') === 'en' ? 'en' : 'es'
       return (
         <Suspense fallback={<AuthSplash />}>
           <LegalPage doc={legalDoc} lang={legalLang} />
@@ -83,6 +108,14 @@ export default function App() {
     }
   }
 
+  return <AppShell />
+}
+
+/**
+ * La aplicación autenticada. Todos los hooks viven aquí y se ejecutan siempre:
+ * este componente solo se monta cuando ninguna ruta pública aplicó.
+ */
+function AppShell() {
   const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const { canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete } = usePermissions(currentUser)
 
