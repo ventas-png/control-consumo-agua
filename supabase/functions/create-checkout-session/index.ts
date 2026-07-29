@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
+import { getCorsHeaders } from '../_shared/cors.ts'
 import {
   computeExpectedQuantities,
   planSwapItems,
@@ -23,33 +24,6 @@ import {
 //
 // Devuelve la URL de Stripe Checkout. Frontend hace window.location.href.
 // ============================================================================
-
-function getAllowedOrigins(): string[] {
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
-  else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-  }
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) { try { origins.add(new URL(appUrl).origin) } catch { /* ignore */ } }
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins()
-  return {
-    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : allowed[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  }
-}
 
 interface Payload {
   plan_code?: string
@@ -367,8 +341,9 @@ Deno.serve(async (req: Request) => {
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // PR-17: detalle al log, mensaje genérico al cliente.
     console.error('[create-checkout-session]', msg)
-    return new Response(JSON.stringify({ error: `Error: ${msg}` }), {
+    return new Response(JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

@@ -3,41 +3,9 @@ import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { decryptSecret } from '../_shared/secretsCrypto.ts'
 import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
 import { calcularRecargo, totalConRecargo, type RecargoConfigRow } from '../_shared/payments/recargo.ts'
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 // CORS utilities
-function getAllowedOrigins(): string[] {
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
-  }
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = getAllowedOrigins()
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowedOrigins = getAllowedOrigins()
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed', origin }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
 
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
@@ -309,8 +277,9 @@ Deno.serve(async (req) => {
     })
 
   } catch (err: any) {
+    // PR-17: detalle al log, mensaje genérico al cliente.
     console.error('Error creating payment intent:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Failed to create payment intent' }), {
+    return new Response(JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

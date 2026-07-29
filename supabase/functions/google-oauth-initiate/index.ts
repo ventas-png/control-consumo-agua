@@ -110,8 +110,13 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    // PR-17: el detalle se registra pero NO se devuelve. Antes se mandaba
+    // `String(err)` al cliente, que expone texto de Postgres / de la API de
+    // Google. Sin este log el detalle se perdería del todo, que es peor para
+    // diagnosticar que la fuga que se está cerrando.
+    console.error('[google-oauth-initiate]', err instanceof Error ? err.message : String(err))
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: 'Error interno del servidor. Si persiste, contactá a soporte.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
