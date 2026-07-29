@@ -1,5 +1,6 @@
 // domain/contadores/queries.ts — Lecturas de apoyo para el módulo contadores
 // (import). T7/PR3: sacar el acceso directo a Supabase de los componentes.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 /** Unidad mínima para resolver nombre→id al importar contadores. */
@@ -12,10 +13,11 @@ export interface UnidadLite {
 
 /** Unidades de una empresa (para el matcher de import por nombre). */
 export async function fetchUnidadesByCompany(companyId: string): Promise<UnidadLite[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('unidades')
     .select('id, nombre, project_id, company_id')
     .eq('company_id', companyId)
+  reportDegradedQuery('contadores.fetchUnidadesByCompany', error)
   return (data ?? []) as UnidadLite[]
 }
 

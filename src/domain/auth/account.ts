@@ -4,6 +4,7 @@
 // aquí sólo baja el acceso a Supabase (auth + functions). Devuelve `{ error }`
 // mapeado a `string` (la convención del dominio) para que la UI no toque tipos
 // de supabase.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 /** Respuesta común de las Edge Functions de cuenta. */
@@ -106,7 +107,8 @@ export async function signOutGlobal(): Promise<void> {
 
 /** Proveedor de auth del usuario actual ('email' | 'google' | …); undefined si no hay sesión. */
 export async function fetchCurrentAuthProvider(): Promise<string | undefined> {
-  const { data } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getUser()
+  reportDegradedQuery('auth.fetchCurrentAuthProvider', error)
   return data.user?.app_metadata?.provider as string | undefined
 }
 

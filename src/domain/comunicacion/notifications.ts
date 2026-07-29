@@ -4,6 +4,7 @@
 // T7/PR3 #1: baja el CRUD directo de `user_notifications` que vivía inline en
 // useNotifications. El hook conserva la suscripción Realtime, el poll de respaldo
 // y el estado local optimista; aquí queda solo el I/O.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import type { UserNotification } from '../../types'
 
@@ -12,11 +13,12 @@ import type { UserNotification } from '../../types'
  * RLS acota las filas a las propias.
  */
 export async function fetchUserNotifications(limit: number): Promise<UserNotification[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_notifications')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
+  reportDegradedQuery('comunicacion.fetchUserNotifications', error)
   return (data ?? []) as UserNotification[]
 }
 

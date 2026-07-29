@@ -1,23 +1,26 @@
 // domain/calidad/queries.ts — Lecturas de calidad de agua (serv:S24). T7/PR3:
 // el acceso directo a Supabase (DB + Storage) sale de CalidadSection.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import type { FuenteAgua, RegistroCalidad } from '../../types'
 
 /** Fuentes de agua del tenant (RLS por empresa), más recientes primero. */
 export async function fetchFuentes(): Promise<FuenteAgua[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('fuentes_agua')
     .select('*')
     .order('created_at', { ascending: false })
+  reportDegradedQuery('calidad.fetchFuentes', error)
   return (data ?? []) as FuenteAgua[]
 }
 
 /** Registros de calidad con la fuente embebida, más recientes primero. */
 export async function fetchRegistrosCalidad(): Promise<RegistroCalidad[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('registros_calidad')
     .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
     .order('fecha', { ascending: false })
+  reportDegradedQuery('calidad.fetchRegistrosCalidad', error)
   return (data ?? []) as RegistroCalidad[]
 }
 

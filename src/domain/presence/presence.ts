@@ -3,6 +3,7 @@
 // T7/PR3 #1: baja el CRUD directo de `user_presence` que vivía inline en
 // usePresence. El hook conserva lo que es de su capa (heartbeat con setInterval,
 // el canal Realtime y el filtrado por TTL/sección); aquí queda solo el I/O.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 /** Una fila de presencia activa (quién está dónde, con su último latido). */
@@ -50,10 +51,11 @@ export async function upsertPresence(beat: PresenceHeartbeat): Promise<void> {
  * tenant; además replicamos `.eq('company_id', …)` como defensa en profundidad.
  */
 export async function fetchActivePresence(companyId: string, since: string): Promise<PresenceRow[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_presence')
     .select('user_id, company_id, project_id, section, record_id, last_seen')
     .eq('company_id', companyId)
     .gte('last_seen', since)
+  reportDegradedQuery('presence.fetchActivePresence', error)
   return (data ?? []) as PresenceRow[]
 }

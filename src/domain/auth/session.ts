@@ -4,6 +4,7 @@
 // I/O a Supabase + el parsing de RBAC (permisos, roles asignados, flags de
 // servicio) de la MÁQUINA DE ESTADO React del hook. Sin React aquí — funciones
 // puras de datos, testeables de forma aislada.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import { APP_CONFIG } from '../../lib/config'
 import { storeSession } from '../../lib/authSession'
@@ -66,11 +67,12 @@ export async function buildSessionFromSupabase(
   try {
     const batch2: Promise<void> = (async () => {
       if (companyId) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('companies')
           .select('servicio_agua, servicio_condominios, activa, mfa_required')
           .eq('id', companyId)
           .single()
+        reportDegradedQuery('auth.buildSessionFromSupabase', error)
         if (data) {
           const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean; mfa_required?: boolean }
           servicio_agua = flags.servicio_agua
@@ -192,11 +194,12 @@ export function buildAssignedRoles(result: { data: unknown; error: unknown }): A
  * OAuth para decidir si el usuario nuevo (sin perfil) debe pasar por onboarding.
  */
 export async function appUserProfileExists(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('app_users')
     .select('id')
     .eq('id', userId)
     .maybeSingle()
+  reportDegradedQuery('auth.appUserProfileExists', error)
   return !!data
 }
 

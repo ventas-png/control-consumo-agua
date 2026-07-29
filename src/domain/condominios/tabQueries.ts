@@ -8,6 +8,7 @@
 // P2 tipos: migrado al cliente tipado `db` (tablas/columnas/embeds chequeados
 // contra el esquema generado). `supabase` (sin tipar) queda SOLO para las dos
 // tablas que no existen en el esquema generado (ver comentarios in situ).
+import { reportDegradedQuery } from '../queryFetch'
 import { db } from '../../lib/supabase'
 
 // ── DirectorioTab ──
@@ -16,11 +17,12 @@ import { db } from '../../lib/supabase'
 export async function fetchDirectorioResidentes(
   projectId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await db
+  const { data, error } = await db
     .from('unidades')
     .select('nombre, clientes(nombre, telefono, email, identificacion)')
     .eq('project_id', projectId)
     .order('nombre')
+  reportDegradedQuery('condominios.fetchDirectorioResidentes', error)
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
@@ -67,11 +69,12 @@ export async function fetchProyectosResumen(
 
 /** Mensajes del portal de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchMensajesPortal<T>(unidadId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('mensajes_portal')
     .select('*')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: false })
+  reportDegradedQuery('condominios.fetchMensajesPortal', error)
   return (data as T[] | null) ?? []
 }
 
@@ -96,7 +99,7 @@ export async function activarPortalUnidad(
 // shape de `FondoReserva`) es `fondo_reserva_condominio`; lleva soft-delete,
 // así que se filtra deleted_at como hace sectionData.
 export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('fondo_reserva_condominio')
     .select('*')
     .eq('project_id', projectId)
@@ -104,6 +107,7 @@ export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T
     .is('deleted_at', null)
     .order('fecha', { ascending: false })
     .limit(50)
+  reportDegradedQuery('condominios.fetchFondoReservaAprobado', error)
   return (data as T[] | null) ?? []
 }
 
@@ -112,12 +116,13 @@ export async function fetchFondoReservaAprobado<T>(projectId: string): Promise<T
 // inexistente. El ledger de movimientos (tipo/concepto/monto/fecha/referencia —
 // el shape de `FondoReservaMovimiento`) es la tabla `fondo_reserva`.
 export async function fetchFondoReservaMovimientos<T>(projectId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('fondo_reserva')
     .select('*')
     .eq('project_id', projectId)
     .order('fecha', { ascending: false })
     .limit(50)
+  reportDegradedQuery('condominios.fetchFondoReservaMovimientos', error)
   return (data as T[] | null) ?? []
 }
 
@@ -126,12 +131,13 @@ export async function fetchFondoReservaMovimientos<T>(projectId: string): Promis
 // inexistente — la real es `presupuesto_condominio` (singular; su Row calza
 // 1:1 con el tipo PresupuestoCondominio del dominio).
 export async function fetchPresupuestosAnio<T>(projectId: string, anio: number): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('presupuesto_condominio')
     .select('*')
     .eq('project_id', projectId)
     .eq('anio', anio)
     .order('categoria')
+  reportDegradedQuery('condominios.fetchPresupuestosAnio', error)
   return (data as T[] | null) ?? []
 }
 
@@ -139,11 +145,12 @@ export async function fetchPresupuestosAnio<T>(projectId: string, anio: number):
 
 /** Ejecuciones de un plan de mantenimiento (más recientes primero). Degrada a `[]`. */
 export async function fetchEjecucionesMantenimiento<T>(planId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('ejecuciones_mantenimiento')
     .select('*')
     .eq('plan_id', planId)
     .order('fecha', { ascending: false })
+  reportDegradedQuery('condominios.fetchEjecucionesMantenimiento', error)
   return (data as T[] | null) ?? []
 }
 
@@ -153,41 +160,45 @@ export async function fetchEjecucionesMantenimiento<T>(planId: string): Promise<
 export async function fetchPuntosAsambleaConVotos(
   asambleaId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await db
+  const { data, error } = await db
     .from('puntos_asamblea')
     .select('*, votos_asamblea(*, unidades(nombre))')
     .eq('asamblea_id', asambleaId)
     .order('orden')
+  reportDegradedQuery('condominios.fetchPuntosAsambleaConVotos', error)
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
 /** Asambleas digitales de un proyecto (20 más recientes). Degrada a `[]`. */
 export async function fetchAsambleasDigital<T>(projectId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('asambleas_digital')
     .select('*')
     .eq('project_id', projectId)
     .order('fecha_hora', { ascending: false })
     .limit(20)
+  reportDegradedQuery('condominios.fetchAsambleasDigital', error)
   return (data as T[] | null) ?? []
 }
 
 /** Puntos de varias asambleas por id (`.in`), ordenados. Degrada a `[]`. */
 export async function fetchPuntosByAsambleaIds<T>(ids: string[]): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('puntos_asamblea')
     .select('*')
     .in('asamblea_id', ids)
     .order('orden')
+  reportDegradedQuery('condominios.fetchPuntosByAsambleaIds', error)
   return (data as T[] | null) ?? []
 }
 
 /** Votos previos de una unidad (punto_id + voto) para precargar el portal. */
 export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('votos_asamblea')
     .select('punto_id, voto')
     .eq('unidad_id', unidadId)
+  reportDegradedQuery('condominios.fetchVotosUnidad', error)
   return (data as T[] | null) ?? []
 }
 
@@ -195,10 +206,11 @@ export async function fetchVotosUnidad<T>(unidadId: string): Promise<T[]> {
 export async function fetchVotosVotacion(
   votacionId: string,
 ): Promise<Array<Record<string, unknown>>> {
-  const { data } = await db
+  const { data, error } = await db
     .from('votos')
     .select('*, unidades(nombre)')
     .eq('votacion_id', votacionId)
+  reportDegradedQuery('condominios.fetchVotosVotacion', error)
   return (data as Array<Record<string, unknown>> | null) ?? []
 }
 
@@ -207,10 +219,11 @@ export async function fetchVotosVotacion(
 /** Huéspedes de un conjunto de reservas STR (`.in`). Degrada a `[]`. */
 export async function fetchHuespedesByReservas<T>(reservaIds: string[]): Promise<T[]> {
   if (reservaIds.length === 0) return []
-  const { data } = await db
+  const { data, error } = await db
     .from('huespedes_str')
     .select('*')
     .in('reserva_str_id', reservaIds)
+  reportDegradedQuery('condominios.fetchHuespedesByReservas', error)
   return (data as T[] | null) ?? []
 }
 
@@ -219,31 +232,34 @@ export async function fetchVisitantesActivosByReservas(
   reservaIds: string[],
 ): Promise<Array<{ reserva_str_id?: string | null }>> {
   if (reservaIds.length === 0) return []
-  const { data } = await db
+  const { data, error } = await db
     .from('visitantes')
     .select('reserva_str_id')
     .in('reserva_str_id', reservaIds)
     .is('hora_salida', null)
+  reportDegradedQuery('condominios.fetchVisitantesActivosByReservas', error)
   return (data as Array<{ reserva_str_id?: string | null }> | null) ?? []
 }
 
 /** Contratos de arrendamiento de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchContratosByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('contratos_arrendamiento')
     .select('*')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: false })
+  reportDegradedQuery('condominios.fetchContratosByUnidad', error)
   return (data as T[] | null) ?? []
 }
 
 /** Reservas STR de una unidad (por fecha de entrada desc). Degrada a `[]`. */
 export async function fetchReservasStrByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('reservas_str')
     .select('*')
     .eq('unidad_id', unidadId)
     .order('fecha_entrada', { ascending: false })
+  reportDegradedQuery('condominios.fetchReservasStrByUnidad', error)
   return (data as T[] | null) ?? []
 }
 
@@ -272,11 +288,12 @@ export async function fetchVisitantesPorDpi<T>(
 
 /** Cuotas de un plan de pago, ordenadas por número. Degrada a `[]`. */
 export async function fetchCuotasPlanPago<T>(planId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('cuotas_plan_pago')
     .select('*')
     .eq('plan_id', planId)
     .order('numero')
+  reportDegradedQuery('condominios.fetchCuotasPlanPago', error)
   return (data as T[] | null) ?? []
 }
 
@@ -291,23 +308,25 @@ export async function countRecibosByProyecto(projectId: string): Promise<number>
 
 /** Bitácora de generación de cuotas de un proyecto (50 más recientes). Degrada a `[]`. */
 export async function fetchGeneracionCuotasLogs<T>(projectId: string, companyId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('generacion_cuotas_log')
     .select('*')
     .eq('project_id', projectId)
     .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .limit(50)
+  reportDegradedQuery('condominios.fetchGeneracionCuotasLogs', error)
   return (data as T[] | null) ?? []
 }
 
 /** Notas actuales de una cuota de condominio (para anexar en conciliación). */
 export async function fetchCuotaCondominioNotas(id: string): Promise<string | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('cuotas_condominio')
     .select('notas')
     .eq('id', id)
     .single()
+  reportDegradedQuery('condominios.fetchCuotaCondominioNotas', error)
   return (data as { notas?: string | null } | null)?.notas ?? null
 }
 
@@ -315,21 +334,23 @@ export async function fetchCuotaCondominioNotas(id: string): Promise<string | nu
 
 /** Solicitudes de mudanza de una unidad (más recientes primero). Degrada a `[]`. */
 export async function fetchSolicitudesMudanzaByUnidad<T>(unidadId: string): Promise<T[]> {
-  const { data } = await db
+  const { data, error } = await db
     .from('solicitud_mudanza_unidad')
     .select('*')
     .eq('unidad_id', unidadId)
     .order('created_at', { ascending: false })
+  reportDegradedQuery('condominios.fetchSolicitudesMudanzaByUnidad', error)
   return (data as T[] | null) ?? []
 }
 
 /** Términos de mudanza del proyecto (vista del residente, sólo por project_id). */
 export async function fetchTerminosMudanzaPorProyecto(projectId: string): Promise<string | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('config_condominio')
     .select('terminos_mudanza')
     .eq('project_id', projectId)
     .maybeSingle()
+  reportDegradedQuery('condominios.fetchTerminosMudanzaPorProyecto', error)
   return (data as { terminos_mudanza: string | null } | null)?.terminos_mudanza ?? null
 }
 
@@ -338,12 +359,13 @@ export async function fetchConfigCondominioTerminos(
   projectId: string,
   companyId: string,
 ): Promise<{ id: string; terminos_mudanza: string | null } | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('config_condominio')
     .select('id, terminos_mudanza')
     .eq('project_id', projectId)
     .eq('company_id', companyId)
     .maybeSingle()
+  reportDegradedQuery('condominios.fetchConfigCondominioTerminos', error)
   return (data as { id: string; terminos_mudanza: string | null } | null) ?? null
 }
 
@@ -352,11 +374,12 @@ export async function fetchGastosAnioMontos(
   projectId: string,
   year: number,
 ): Promise<Array<{ monto: number }>> {
-  const { data } = await db
+  const { data, error } = await db
     .from('gastos_condominio')
     .select('monto')
     .eq('project_id', projectId)
     .gte('fecha', `${year}-01-01`)
     .lte('fecha', `${year}-12-31`)
+  reportDegradedQuery('condominios.fetchGastosAnioMontos', error)
   return (data as Array<{ monto: number }> | null) ?? []
 }

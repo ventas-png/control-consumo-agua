@@ -4,6 +4,7 @@
 // PapeleraModal (soft-delete + restore). Los filtros/paginación los decide la
 // UI y se pasan como parámetros; la resolución de nombres de actor reusa
 // `domain/usuarios.fetchAppUserNamesByIds`. Sólo I/O aquí.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 // ── permission_audit_log (roles/permisos) — AuditLogModal ──
@@ -43,7 +44,8 @@ export async function fetchPermissionAuditLog(
 export async function fetchRoleNamesByIds(
   ids: string[],
 ): Promise<Array<{ id: string; name: string; color: string }>> {
-  const { data } = await supabase.from('roles').select('id, name, color').in('id', ids)
+  const { data, error } = await supabase.from('roles').select('id, name, color').in('id', ids)
+  reportDegradedQuery('empresa.fetchRoleNamesByIds', error)
   return (data as Array<{ id: string; name: string; color: string }>) ?? []
 }
 

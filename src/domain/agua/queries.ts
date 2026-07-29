@@ -8,6 +8,7 @@
 //
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
+import { reportDegradedQuery } from '../queryFetch'
 import { useQuery } from '@tanstack/react-query'
 import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad, Empresa, Proyecto } from '../../types'
 // `db` = cliente TIPADO (P2 tipos). `supabase` (sin tipar) queda SOLO para los
@@ -50,12 +51,13 @@ export async function registroExiste(contadorId: string, lecturaActual: number, 
  * tenant/cliente autorizado.
  */
 export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from('registros')
     .select('foto')
     .eq('id', registroId)
     .is('deleted_at', null) // E2
     .maybeSingle()
+  reportDegradedQuery('agua.fetchRegistroFoto', error)
   // El select tipado ya devuelve { foto: string | null } — sin cast.
   return data?.foto ?? null
 }
