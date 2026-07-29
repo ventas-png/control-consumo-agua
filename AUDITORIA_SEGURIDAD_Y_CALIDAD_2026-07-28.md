@@ -103,31 +103,28 @@ Fix: una migración con los tres `ENABLE ROW LEVEL SECURITY` (o `DROP TABLE` par
 que confirmarlo antes), más añadir `fuentes_agua` a `ANON_DENY_TABLES` en el
 harness.
 
-### PR-2 · `user_module_permissions`: la rama `admin` no tiene predicado de tenant 🔴
+### ~~PR-2 · `user_module_permissions`: la rama `admin` no tiene predicado de tenant~~ ❌ RETIRADO — falso positivo
 
-`20260417000013_consolidate_rls_policies_part2.sql:480,491,501,518`
+**Este hallazgo era incorrecto y se retira.** Se conserva escrito, en lugar de
+borrarlo, porque el modo de fallo es instructivo.
 
-```sql
-WITH CHECK (
-  is_super_admin()
-  OR (is_company_owner() AND user_id IN (
-    SELECT id FROM app_users WHERE company_id = get_my_company_id()
-  ))
-  OR current_user_role() = 'admin'          -- ← sin predicado de tenant
-);
-```
+Las 4 policies de `20260417000013_consolidate_rls_policies_part2.sql:480,491,501,518`
+efectivamente tienen una rama `OR current_user_role() = 'admin'` sin predicado de
+tenant. Pero **la tabla ya no existe**: `20260518000014_rbac_drop_legacy.sql:36`
+hace `DROP TABLE IF EXISTS public.user_module_permissions CASCADE`, y `CASCADE`
+se llevó las policies con ella. RBAC (`user_roles` + `role_permissions`) la
+sustituyó un mes después de que se escribieran esas policies.
 
-La rama `company_owner` está bien acotada; la de `admin` **no tiene acotación
-alguna**, y como las policies permisivas se combinan con OR, **se traga la rama
-acotada**. El mismo defecto en `_select`, `_update` (en `USING` y en
-`WITH CHECK`) y `_delete`. Verificado: ninguna migración posterior las redefine —
-solo la baseline y ésta.
+Confirmado por dos vías independientes: la tabla no aparece en
+`src/types/database.types.ts` (tipos generados del esquema real), y no hay una
+sola referencia a ella en `src/`.
 
-Un `admin` del tenant A puede conceder permisos de módulo a cuentas del tenant B,
-revocar los del admin de B (denegación de servicio) y enumerar toda la tabla de
-concesiones cross-tenant.
-
-Fix: acotar la rama `admin` con la misma forma que la de `company_owner`.
+**La lección, que aplica al resto del informe:** encontrar una policy vulnerable
+en una migración no basta — hay que comprobar que el objeto sobre el que actúa
+sigue vivo. La reconciliación «último escritor gana» sobre policies no captura un
+`DROP TABLE ... CASCADE` posterior. Los demás hallazgos de este bloque sí se
+verificaron contra los tipos generados o contra el historial completo de la
+tabla.
 
 ### PR-3 · `clientes`: la policy de INSERT no valida el tenant 🔴
 
@@ -154,8 +151,24 @@ pueden **ocupar códigos y DPIs reales**, bloqueando de forma permanente el alta
 de esos clientes en el tenant B. Es una denegación de servicio cross-tenant
 barata y difícil de diagnosticar.
 
-Fix: reemplazar por una policy que exija
+**Corrección al fix propuesto originalmente.** La primera versión de este plan
+proponía exigir
 `project_id IN (SELECT p.id FROM projects p WHERE p.company_id = get_my_company_id())`.
+**Eso habría roto el importador de clientes.** `clientes` no tiene `company_id`:
+su vínculo con la empresa es la junction `company_clientes`, que se crea *después*
+del insert (`ImportClientesModal.tsx:322` inserta, `:338` enlaza; el comentario de
+`:321` lo explica). Y ese importador —único camino de INSERT autenticado que
+existe— **no envía `project_id`**, lo deja NULL. Un `WITH CHECK` que exigiera
+`project_id` no nulo habría rechazado cada import.
+
+Fix real: permitir `project_id IS NULL` (comportamiento actual) y exigir
+pertenencia solo cuando venga informado.
+
+**Lo que este fix NO resuelve:** la ocupación de `codigo`/`cui_dui`. Un atacante
+puede seguir insertando con `project_id` NULL y quemar códigos y DPIs reales.
+Eso no se cierra con RLS — es consecuencia de que `clientes` sea una tabla global
+con unicidad global. Cerrarlo exige decidir el modelo (¿`company_id` en
+`clientes`? ¿unicidad por empresa?) y es cambio de diseño, no parche de policy.
 
 ### PR-4 · Restaurar el guard de `get_company_effective_limits` y hacerlo no-borrable 🟠
 
@@ -565,7 +578,8 @@ con #663, en cuyo caso se ordenan.
 # Orden de ejecución
 
 1. **PR-9** (guard estático en CI) — primero, para que lo demás no regrese.
-2. **PR-1, PR-2, PR-3** — aislamiento multi-tenant; los tres son diffs pequeños.
+2. **PR-1, PR-3** — aislamiento multi-tenant; ambos son diffs pequeños. (PR-2
+   retirado: falso positivo, la tabla ya no existe.)
 3. **PR-4**, luego **PR-5**, luego **PR-6** — en ese orden: PR-5 debe aterrizar
    **antes** que PR-6 o se abre la divulgación cross-tenant de estados financieros.
 4. **PR-11** (bypass de auth) y **PR-22** (`redondear2`) — máximo riesgo y máxima
@@ -587,7 +601,7 @@ con #663, en cuyo caso se ordenan.
 - **Bloques A/E (base de datos).** `node scripts/security-guard.mjs` tras cada
   migración. Para PR-1, un test que confirme que `anon` **no** puede leer
   `fuentes_agua` (hoy ese test pasaría contra prod y fallaría contra un deploy
-  fresco — ésa es exactamente la prueba que falta). Para PR-2/PR-3, sembrar dos
+  fresco — ésa es exactamente la prueba que falta). Para PR-3, sembrar dos
   tenants y afirmar que A no puede insertar ni leer filas de B.
   `src/test/rls/rlsHarness.test.ts` existe pero **nunca corre** (gated por
   `RLS_SUPABASE_URL`/`RLS_USER_A/B_*`): **PR-27 es la ocasión de activarlo**.
