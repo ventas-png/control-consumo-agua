@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import {
   listMfaFactors,
@@ -54,7 +55,7 @@ export function MfaGate({ onSatisfied, onLogout }: Props) {
     for (const o of (data?.all ?? []).filter(f => f.factor_type === 'totp' && f.status === 'unverified')) {
       await unenrollMfaFactor(o.id).catch(() => undefined)
     }
-    const res = await enrollTotpFactor(`Authenticator (${new Date().toISOString().slice(0, 10)})`)
+    const res = await enrollTotpFactor(`Authenticator (${hoyLocalISO()})`)
     setBusy(false)
     if (res.error || !res.data) {
       setErr(res.error ?? 'No fue posible iniciar el enrolamiento.')

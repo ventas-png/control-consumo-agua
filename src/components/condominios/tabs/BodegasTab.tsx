@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { BodegaCondominio, EstadoBodega, Unidad } from '../../../types'
@@ -86,7 +87,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
   async function handleEstado(id: string, estado: EstadoBodega) {
     const updates: Partial<BodegaCondominio> = { estado }
     if (estado === 'disponible') { updates.unidad_id = null; updates.fecha_asignacion = null }
-    if (estado === 'asignada') updates.fecha_asignacion = new Date().toISOString().slice(0, 10)
+    if (estado === 'asignada') updates.fecha_asignacion = hoyLocalISO()
     const { error } = await updateCondominioRow('bodegas_condominio', id, updates)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()

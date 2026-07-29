@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -55,7 +56,7 @@ export function TareasPersonalTab({
   bloques, tareas, plantillas, personal, areas,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [saving, setSaving] = useState(false)
   const [showBloqueForm, setShowBloqueForm] = useState(false)
   const [bloqueForm, setBloqueForm] = useState(blankBloque(hoy))

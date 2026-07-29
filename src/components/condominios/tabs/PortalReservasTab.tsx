@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -89,7 +90,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     notas:      `${uid}-notas`,
   }), [uid])
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const misReservas = reservas.filter(r => r.unidad_id === unidadId)
   const futuras = misReservas.filter(r => r.fecha >= hoy && r.estado !== 'cancelada')
   const pasadas = misReservas.filter(r => r.fecha < hoy || r.estado === 'cancelada')

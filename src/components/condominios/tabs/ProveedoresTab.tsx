@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
@@ -42,7 +43,7 @@ const blank = (): Partial<ContratoProveedor> => ({
   servicio: 'otro',
   descripcion: '',
   monto_mensual: undefined,
-  fecha_inicio: new Date().toISOString().slice(0, 10),
+  fecha_inicio: hoyLocalISO(),
   fecha_fin: '',
   estado: 'activo',
   documento_url: '',
@@ -57,7 +58,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const filtered = contratos.filter(c => {
     if (filtroEstado !== 'todos' && c.estado !== filtroEstado) return false
@@ -156,13 +157,13 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
       rows: filtered.map(c => [c.proveedor_nombre, servicioInfo(c.servicio).label, c.proveedor_contacto ?? '—', c.proveedor_telefono ?? '—', c.monto_mensual != null ? `${moneda} ${c.monto_mensual.toFixed(2)}` : '—', c.fecha_inicio, c.fecha_fin ?? '—', c.estado]),
       totalesRow: ['TOTAL ACTIVOS', '', '', '', `${moneda} ${totalMensual.toFixed(2)}`, '', '', ''],
       rightAlignCols: [4],
-      filename: `proveedores-${new Date().toISOString().slice(0, 10)}`,
+      filename: `proveedores-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`proveedores-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`proveedores-${hoyLocalISO()}`, [{
       name: 'Proveedores',
       headers: ['Proveedor', 'Servicio', 'Contacto', 'Teléfono', 'Email', 'Monto Mensual', 'Inicio', 'Fin', 'Estado', 'Notas'],
       rows: contratos.map(c => [c.proveedor_nombre, servicioInfo(c.servicio).label, c.proveedor_contacto ?? '', c.proveedor_telefono ?? '', c.proveedor_email ?? '', c.monto_mensual ?? '', c.fecha_inicio, c.fecha_fin ?? '', c.estado, c.notas ?? '']),

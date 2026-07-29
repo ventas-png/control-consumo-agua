@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { softDelete } from '../../../lib/softDelete'
@@ -29,7 +30,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
 }
 
 const BLANK = {
-  tipo: 'aporte', concepto: '', monto: '', fecha: new Date().toISOString().slice(0, 10),
+  tipo: 'aporte', concepto: '', monto: '', fecha: hoyLocalISO(),
   justificacion: '', aprobado_por: '', estado: 'aprobado', notas: '',
 }
 

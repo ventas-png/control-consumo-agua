@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
@@ -96,7 +97,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         rows: deudaPorResponsable.filas.map(f => [f.label, f.monto] as (string | number)[]),
       })
     }
-    exportarExcel(`deudores-${new Date().toISOString().slice(0, 10)}`, sheets)
+    exportarExcel(`deudores-${hoyLocalISO()}`, sheets)
   }
 
   function cartaCobro(row: DeudorRow) {
@@ -115,7 +116,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
     const csv = [header, ...rows].join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = `deudores-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `deudores-${hoyLocalISO()}.csv`
     a.click()
   }
 

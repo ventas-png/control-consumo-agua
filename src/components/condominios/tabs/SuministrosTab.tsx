@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -50,7 +51,7 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
 
   const [movForm, setMovForm] = useState({
     tipo: 'salida' as TipoMovimientoSum, cantidad: '', motivo: '',
-    area_destino: '', realizado_por: '', fecha: new Date().toISOString().split('T')[0], notas: '',
+    area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '',
   })
 
   const lista = suministros.filter(s =>
@@ -119,7 +120,7 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
     setSaving(false)
     if (errStock) { notify({ variant: 'error', title: 'Error', text: errStock.message }); return }
 
-    setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: new Date().toISOString().split('T')[0], notas: '' })
+    setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '' })
     setVista('lista')
     onRefresh()
   }

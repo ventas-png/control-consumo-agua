@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -14,7 +15,7 @@ interface Props {
   onRefresh: () => void
 }
 
-const BLANK = { proveedor_id: '', nombre_proveedor: '', calificacion: 5, puntualidad: 5, calidad: 5, precio: 5, comentarios: '', evaluado_por: '', fecha: new Date().toISOString().slice(0, 10) }
+const BLANK = { proveedor_id: '', nombre_proveedor: '', calificacion: 5, puntualidad: 5, calidad: 5, precio: 5, comentarios: '', evaluado_por: '', fecha: hoyLocalISO() }
 
 function Stars({ value, onChange, readOnly = false }: { value: number; onChange?: (n: number) => void; readOnly?: boolean }) {
   return (

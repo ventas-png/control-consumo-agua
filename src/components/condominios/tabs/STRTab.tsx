@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect, type CSSProperties } from 'react'
 import {
   createCondominioRow,
@@ -88,7 +89,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   const [reservaHuespedes, setReservaHuespedes] = useState<Record<string, HuespedSTR[]>>({})
   const [entryCount, setEntryCount] = useState<Record<string, number>>({})
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
 
   useEffect(() => {
     if (reservasSTR.length === 0) return

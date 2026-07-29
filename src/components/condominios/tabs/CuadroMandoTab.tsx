@@ -1,3 +1,4 @@
+import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, Visitante, GastoCondominio,
@@ -50,8 +51,8 @@ function KpiBox({ k }: { k: KpiCard }) {
 }
 
 export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, presupuestos, incidentes, sugerencias, polizas, contratosProveedores, inspecciones, vencimientosExtra, encuestas, moneda, proyectoNombre = 'Condominio' }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
-  const en30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
+  const en30 = dateLocalISO(new Date(Date.now() + 30 * 86400000))
   const mes = hoy.slice(0, 7)
 
   const kpisFinanciero: KpiCard[] = useMemo(() => {

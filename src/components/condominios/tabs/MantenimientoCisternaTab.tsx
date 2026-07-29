@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -47,7 +48,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
 
   const [form, setForm] = useState({
     cisterna: 'Cisterna principal',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     tipo: 'lectura' as TipoMantenimientoCisterna,
     nivel_agua_pct: '', cloro_residual: '', ph: '',
     estado: 'normal' as EstadoCisterna,

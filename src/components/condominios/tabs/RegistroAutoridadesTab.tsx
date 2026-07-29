@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -40,7 +41,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
   const [form, setForm] = useState({
     tipo_autoridad: 'policia' as TipoAutoridad,
     nombre_institucion: '', nombre_funcionario: '', motivo: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     hora_llegada: '', hora_salida: '',
     resultado: 'sin_novedad' as ResultadoAutoridad,
     documento_referencia: '',
@@ -78,7 +79,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ tipo_autoridad: 'policia', nombre_institucion: '', nombre_funcionario: '', motivo: '', fecha: new Date().toISOString().split('T')[0], hora_llegada: '', hora_salida: '', resultado: 'sin_novedad', documento_referencia: '', requiere_seguimiento: false, fecha_seguimiento: '', observaciones: '' })
+    setForm({ tipo_autoridad: 'policia', nombre_institucion: '', nombre_funcionario: '', motivo: '', fecha: hoyLocalISO(), hora_llegada: '', hora_salida: '', resultado: 'sin_novedad', documento_referencia: '', requiere_seguimiento: false, fecha_seguimiento: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }

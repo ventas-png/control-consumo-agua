@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
@@ -53,7 +54,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
   const [showAcompForm, setShowAcompForm]     = useState(false)
   const [acompForm, setAcompForm]             = useState(defaultAcompForm())
 
-  const hoy      = new Date().toISOString().slice(0, 10)
+  const hoy      = hoyLocalISO()
   const recientes = visitantes.filter(v => v.hora_entrada.slice(0, 10) === hoy && !v.visitante_principal_id)
 
   function resetForm() {

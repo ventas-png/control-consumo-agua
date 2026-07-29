@@ -53,6 +53,30 @@ export function hoyLocalISO(): string {
   return dateLocalISO(new Date())
 }
 
+/**
+ * Período LOCAL como 'YYYY-MM' (auditoría 2026-07-28, Bloque D · PR-24).
+ *
+ * Mismo defecto que `dateLocalISO` pero con consecuencia mayor: el patrón
+ * `new Date().toISOString().slice(0, 7)` toma el mes UTC, así que en GMT-6 la
+ * noche del ÚLTIMO día del mes ya reporta el mes siguiente. Un cierre contable
+ * o una emisión de cuotas lanzada a las 19:00 del día 31 se etiquetaba con el
+ * período equivocado.
+ */
+export function mesLocalISO(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Fecha-hora LOCAL como 'YYYY-MM-DDTHH:mm', el formato que espera
+ * `<input type="datetime-local">`. El patrón `toISOString().slice(0, 16)`
+ * prellenaba el control con la hora UTC: en GMT-6, seis horas en el futuro.
+ */
+export function datetimeLocalISO(d: Date = new Date()): string {
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${dateLocalISO(d)}T${hh}:${mm}`
+}
+
 /** Fecha sin hora — '15 de mayo de 2026' o similar según locale. */
 export function formatDate(
   value: string | Date | null | undefined,

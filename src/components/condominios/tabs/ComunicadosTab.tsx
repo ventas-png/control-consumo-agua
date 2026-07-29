@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -35,7 +36,7 @@ const DEST_LABELS: Record<DestinatarioComunicado, string> = {
 const BLANK = {
   titulo: '', contenido: '', tipo: 'circular' as TipoComunicado,
   destinatario: 'todos' as DestinatarioComunicado, unidad_id: '',
-  enviado_por: '', fecha_envio: new Date().toISOString().slice(0,10), firmado: false,
+  enviado_por: '', fecha_envio: hoyLocalISO(), firmado: false,
 }
 
 const TEMPLATES: Record<TipoComunicado, string> = {

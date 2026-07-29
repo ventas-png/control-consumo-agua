@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, type ReactNode} from 'react'
 import { upsertCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -37,7 +38,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
         label: 'Período (YYYY-MM)',
         type: 'month',
         required: true,
-        initialValue: new Date().toISOString().slice(0, 7),
+        initialValue: mesLocalISO(),
         autoFocus: true,
       }],
       submitText: 'Generar',

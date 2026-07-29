@@ -3,7 +3,7 @@ import { DataTable, type DataTableColumn } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
 import { StatusBadge } from '../shared/StatusBadge'
 import { useAsientosQuery } from '../../domain/contabilidad/queries'
-import { formatCurrency, formatDateShort } from '../../lib/format'
+import { formatCurrency, formatDateShort, mesLocalISO } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type AsientoContable } from '../../types/contabilidad'
 import { AsientoFormModal } from './AsientoFormModal'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
@@ -20,7 +20,7 @@ interface Props {
 type FiltroEstado = 'todos' | 'borrador' | 'publicado' | 'anulado'
 
 function periodoActual(): string {
-  return new Date().toISOString().slice(0, 7)
+  return mesLocalISO()
 }
 
 const TONO_ESTADO = { borrador: 'warning', publicado: 'success', anulado: 'neutral' } as const

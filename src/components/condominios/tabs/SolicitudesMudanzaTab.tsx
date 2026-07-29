@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -66,7 +67,7 @@ const ESTADOS_OPERATIVOS: EstadoSolicitudMudanza[] = ['aprobada', 'programada', 
 type Filtro = EstadoSolicitudMudanza | 'all' | 'operativas'
 
 export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, companyId, moneda, autorNombre, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroEstado, setFiltroEstado] = useState<Filtro>('pendiente')
   const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [fechaAut, setFechaAut]         = useState('')

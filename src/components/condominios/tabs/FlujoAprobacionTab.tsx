@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -59,7 +60,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
       monto: form.monto ? parseFloat(form.monto) : null,
       solicitado_por: autorNombre || null,
       estado: 'pendiente',
-      fecha_solicitud: new Date().toISOString().slice(0, 10),
+      fecha_solicitud: hoyLocalISO(),
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -86,7 +87,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
     const { error } = await updateCondominioRow('flujo_aprobacion_cond', flujo.id, {
       estado: nuevoEstado,
       aprobado_por: autorNombre || null,
-      fecha_resolucion: new Date().toISOString().slice(0, 10),
+      fecha_resolucion: hoyLocalISO(),
       comentario_resolucion: comentario || null,
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }

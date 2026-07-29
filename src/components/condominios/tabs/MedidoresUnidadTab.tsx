@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, useMemo, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { MedidorUnidad, Unidad } from '../../../types'
@@ -27,7 +28,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   const [selectedContador, setSelectedContador] = useState('')
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
-  const [mesFiltro, setMesFiltro] = useState(new Date().toISOString().slice(0, 7))
+  const [mesFiltro, setMesFiltro] = useState(mesLocalISO())
 
   // Capa de datos (T7): lecturas con scope vía TanStack Query. Reemplaza el
   // useEffect + Promise.all + useState manual. Comparte caché entre vistas que

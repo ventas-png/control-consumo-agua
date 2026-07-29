@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
 import { useCarteraMorosidadQuery, bandaRiesgo, type BandaRiesgo } from '../../../domain/cobros/morosidad'
@@ -21,7 +22,7 @@ function diasVencido(fechaVenc: string): number {
 }
 
 export default function AnalisisCarteraTab({ cuotas, unidades, moneda, companyId, projectId }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const vencidas = cuotas.filter(c =>
     (c.estado === 'pendiente' || c.estado === 'moroso') &&

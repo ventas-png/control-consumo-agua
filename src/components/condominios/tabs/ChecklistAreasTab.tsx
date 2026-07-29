@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -46,7 +47,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [formArea, setFormArea] = useState('')
-  const [formFecha, setFormFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [formFecha, setFormFecha] = useState(hoyLocalISO())
   const [formInspector, setFormInspector] = useState('')
   const [formNotas, setFormNotas] = useState('')
   const [formItems, setFormItems] = useState<ChecklistItem[]>([])
@@ -56,7 +57,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   const [predefinidoSel, setPredefinidoSel] = useState('')
 
   const openNew = () => {
-    setFormArea(''); setFormFecha(new Date().toISOString().slice(0, 10))
+    setFormArea(''); setFormFecha(hoyLocalISO())
     setFormInspector(''); setFormNotas(''); setFormItems([])
     setEditId(null); setShowForm(true); setSelected(null)
   }

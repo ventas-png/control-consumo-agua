@@ -1,3 +1,4 @@
+import { dateLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
@@ -126,7 +127,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
         label: 'Período (YYYY-MM)',
         type: 'month',
         required: true,
-        initialValue: new Date().toISOString().slice(0, 7),
+        initialValue: mesLocalISO(),
         autoFocus: true,
       }],
       submitText: 'Generar',
@@ -155,7 +156,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
     setGenerando(p.id)
     const [year, month] = periodo.split('-').map(Number)
-    const fechaVenc = new Date(year, month - 1, p.dia_vencimiento).toISOString().slice(0, 10)
+    const fechaVenc = dateLocalISO(new Date(year, month - 1, p.dia_vencimiento))
 
     const rows = unidadesTarget.map(u => {
       const monto = usaRubros

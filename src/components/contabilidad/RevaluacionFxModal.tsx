@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { EditModal } from '../shared/EditModal'
 import { notify } from '../shared/Dialog'
 import { useRevaluarFxMutation } from '../../domain/contabilidad/mutations'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, hoyLocalISO } from '../../lib/format'
 import {
   REVALUACION_RESULTADO_LABELS,
   type RevaluacionFxFila,
@@ -23,7 +23,7 @@ const RESULTADO_COLOR: Record<RevaluacionFxResultado, { bg: string; color: strin
 }
 
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10)
+  return hoyLocalISO()
 }
 
 export function RevaluacionFxModal({ projectId, monedaBase, onClose }: { projectId: string | null; monedaBase: string; onClose: () => void }) {

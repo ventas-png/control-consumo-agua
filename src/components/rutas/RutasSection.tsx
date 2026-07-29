@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useRef, type DragEvent } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
@@ -367,7 +368,7 @@ export function RutasSection({
   const contadoresDisponibles = filtrarContadoresDisponibles(contadores, contadoresEnRuta, busqueda, form.project_id)
   const unidadesDisponibles = filtrarUnidadesDisponibles(unidades, unidadesEnRuta, busqueda, form.project_id)
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
 
   const ctx: RutasCtx = {
     clientes, contadores, unidades, proyectos, canEdit, canDelete, onEjecutarRuta,

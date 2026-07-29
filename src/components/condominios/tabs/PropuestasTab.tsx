@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PropuestaInversion, CategoriaPropuesta, EstadoPropuesta, PrioridadPropuesta } from '../../../types'
@@ -40,7 +41,7 @@ const ESTADO_CONFIG: Record<EstadoPropuesta, { label: string; color: string; bg:
 
 const blank = (): Partial<PropuestaInversion> => ({
   titulo: '', descripcion: '', categoria: 'mejora', monto_estimado: undefined,
-  prioridad: 'media', estado: 'propuesta', fecha_propuesta: new Date().toISOString().slice(0, 10),
+  prioridad: 'media', estado: 'propuesta', fecha_propuesta: hoyLocalISO(),
   votos_favor: 0, votos_contra: 0, notas: '',
 })
 
@@ -104,8 +105,8 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
 
   async function handleEstado(id: string, estado: EstadoPropuesta) {
     const updates: Partial<PropuestaInversion> = { estado }
-    if (estado === 'aprobada') updates.fecha_aprobacion = new Date().toISOString().slice(0, 10)
-    if (estado === 'en_ejecucion') updates.fecha_ejecucion = new Date().toISOString().slice(0, 10)
+    if (estado === 'aprobada') updates.fecha_aprobacion = hoyLocalISO()
+    if (estado === 'en_ejecucion') updates.fecha_ejecucion = hoyLocalISO()
     const { error } = await updateCondominioRow('propuestas_inversion', id, updates)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()

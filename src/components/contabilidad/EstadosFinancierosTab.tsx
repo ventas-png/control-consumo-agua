@@ -12,7 +12,7 @@ import { useCierreAnualMutation } from '../../domain/eeff/mutations'
 import { compararPyG, rangoAnterior, resumirBalance, resumirConsolidado, resumirPyG, type PyGComparadaFila } from '../../domain/eeff/calculos'
 import { exportarExcel } from '../condominios/exportUtils'
 import { generarReporteAsamblea } from './reporteAsamblea'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, mesLocalISO } from '../../lib/format'
 import { btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
@@ -27,7 +27,7 @@ interface Props {
 type Vista = 'pyg' | 'balance' | 'flujo' | 'consolidado'
 
 function periodoActual(): string {
-  return new Date().toISOString().slice(0, 7)
+  return mesLocalISO()
 }
 
 export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, monedaBase }: Props) {

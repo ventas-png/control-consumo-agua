@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, GastoCondominio, PresupuestoCondominio, TicketMantenimiento,
@@ -23,7 +24,7 @@ interface Props {
   proyectoNombre?: string
 }
 
-const hoy = new Date().toISOString().slice(0, 10)
+const hoy = hoyLocalISO()
 const mesActual = hoy.slice(0, 7)
 
 function diasHasta(fecha: string): number {

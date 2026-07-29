@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -25,7 +26,7 @@ const TIPOS_NOV: { value: TipoNovedadGuardia; label: string; color: string }[] =
 ]
 
 export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
   const [selected, setSelected] = useState<BitacoraGuardia | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)

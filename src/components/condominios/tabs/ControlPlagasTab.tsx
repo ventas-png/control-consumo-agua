@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -44,7 +45,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
   const [form, setForm] = useState({
     tipo: 'fumigacion' as TipoControlPlagas,
     empresa: '', tecnico: '', productos: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     hora_inicio: '', hora_fin: '',
     resultado: 'satisfactorio' as ResultadoControlPlagas,
     proxima_visita: '', costo: '', observaciones: '',
@@ -82,7 +83,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ tipo: 'fumigacion', empresa: '', tecnico: '', productos: '', fecha: new Date().toISOString().split('T')[0], hora_inicio: '', hora_fin: '', resultado: 'satisfactorio', proxima_visita: '', costo: '', observaciones: '' })
+    setForm({ tipo: 'fumigacion', empresa: '', tecnico: '', productos: '', fecha: hoyLocalISO(), hora_inicio: '', hora_fin: '', resultado: 'satisfactorio', proxima_visita: '', costo: '', observaciones: '' })
     setAreasSeleccionadas([])
     setMostrarForm(false)
     onRefresh()

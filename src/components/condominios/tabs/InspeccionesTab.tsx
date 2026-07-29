@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
@@ -32,13 +33,13 @@ const RESULTADO_CONFIG: Record<ResultadoInspeccion, { label: string; color: stri
 }
 
 const blank = (): Partial<InspeccionNormativa> => ({
-  tipo: 'bomberos', entidad_inspectora: '', fecha: new Date().toISOString().slice(0, 10),
+  tipo: 'bomberos', entidad_inspectora: '', fecha: hoyLocalISO(),
   resultado: 'aprobado', hallazgos: '', acciones_correctivas: '',
   fecha_proxima: '', inspector_nombre: '', certificado_url: '', notas: '',
 })
 
 export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroTipo, setFiltroTipo] = useState<TipoInspeccion | 'todos'>('todos')
   const [filtroResultado, setFiltroResultado] = useState<ResultadoInspeccion | 'todos'>('todos')
   const [form, setForm] = useState<Partial<InspeccionNormativa>>(blank())

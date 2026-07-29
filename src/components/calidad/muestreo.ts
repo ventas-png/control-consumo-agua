@@ -1,3 +1,4 @@
+import { dateLocalISO } from '../../lib/format'
 // serv:S26 — Programa de muestreo de calidad. Lógica pura y testeable: deriva el
 // estado de muestreo de cada fuente a partir de su frecuencia (días) y la fecha
 // de su última muestra registrada (registros_calidad). Sin React/DOM.
@@ -48,7 +49,7 @@ export function estadoMuestreo(
     return { estado: 'sin_muestras', proximaFecha: null, dias: null }
   }
   const proxMs = parseUTC(aFecha(ultimaFecha)) + frecuenciaDias * MS_DIA
-  const proximaFecha = new Date(proxMs).toISOString().slice(0, 10)
+  const proximaFecha = dateLocalISO(new Date(proxMs))
   const dias = Math.round((proxMs - parseUTC(aFecha(hoy))) / MS_DIA)
   const ventana = Math.max(2, Math.ceil(frecuenciaDias * 0.2))
   const estado: EstadoMuestreo = dias < 0 ? 'vencido' : dias <= ventana ? 'proximo' : 'al_dia'

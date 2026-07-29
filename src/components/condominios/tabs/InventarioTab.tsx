@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ItemInventario, CategoriaInventario, EstadoInventario } from '../../../types'
@@ -51,7 +52,7 @@ const blank = (): Partial<ItemInventario> => ({
 
 export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const { t } = useTranslation()
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoInventario | 'todos'>('todos')
   const [form, setForm] = useState<Partial<ItemInventario>>(blank())

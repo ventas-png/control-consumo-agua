@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -22,7 +23,7 @@ const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; ico
   biometrico:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Biométrico',     icon: '🔏' },
 }
 
-const BLANK = { unidad_id: '', tipo: 'tarjeta', identificador: '', titular: '', activo: true, fecha_emision: new Date().toISOString().slice(0, 10), fecha_vencimiento: '', notas: '' }
+const BLANK = { unidad_id: '', tipo: 'tarjeta', identificador: '', titular: '', activo: true, fecha_emision: hoyLocalISO(), fecha_vencimiento: '', notas: '' }
 
 export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
@@ -74,7 +75,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
     onRefresh()
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   let filtered = accesos
   if (filtroUnidad) filtered = filtered.filter(a => a.unidad_id === filtroUnidad)
   if (filtroTipo !== 'todos') filtered = filtered.filter(a => a.tipo === filtroTipo)

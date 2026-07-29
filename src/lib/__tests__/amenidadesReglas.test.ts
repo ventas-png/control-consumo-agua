@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../format'
 import { describe, it, expect } from 'vitest'
 import {
   addMinutosToTime,
@@ -97,7 +98,7 @@ describe('validarReglasAmenidad', () => {
 
   it('rechaza reservas sin la antelación mínima', () => {
     const a = amenidad({ horas_minimas_antelacion: 48 })
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     expect(validarReglasAmenidad(a, hoy, '23:59', '23:59', 'u1', [])).toMatch(/anticipación/)
     expect(validarReglasAmenidad(a, fechaFutura, '10:00', '11:00', 'u1', [])).toBeNull()
   })

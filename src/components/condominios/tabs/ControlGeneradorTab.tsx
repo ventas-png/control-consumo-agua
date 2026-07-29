@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -44,7 +45,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
 
   const [form, setForm] = useState({
     generador: 'Generador principal',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     tipo: 'lectura' as TipoRegistroGenerador,
     nivel_combustible_pct: '', horas_operacion: '', horas_acumuladas: '',
     estado: 'standby' as EstadoGenerador,

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -99,13 +100,13 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         t.costo_real != null ? t.costo_real.toFixed(2) : '—',
       ]),
       rightAlignCols: [6, 7],
-      filename: `tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`,
+      filename: `tickets-mantenimiento-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`tickets-mantenimiento-${hoyLocalISO()}`, [{
       name: 'Tickets',
       headers: ['Título', 'Descripción', 'Tipo', 'Prioridad', 'Unidad', 'Estado', 'Fecha límite', 'Costo estimado', 'Costo real', 'Fecha creación', 'Fecha cierre'],
       rows: filtrados.map(t => [
@@ -312,7 +313,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
           {filtrados.map(t => {
             const pColor = PRIORIDAD_COLORS[t.prioridad] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const eColor = ESTADO_COLORS[t.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
-            const vencido = t.fecha_limite && t.fecha_limite < new Date().toISOString().slice(0, 10) && t.estado !== 'cerrado'
+            const vencido = t.fecha_limite && t.fecha_limite < hoyLocalISO() && t.estado !== 'cerrado'
             return (
               <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>

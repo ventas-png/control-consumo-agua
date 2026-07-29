@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import { notify, confirm } from '../../shared/Dialog'
@@ -71,7 +72,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [editAmenidadForm, setEditAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
   const [savingEdit, setSavingEdit] = useState(false)
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const amenidadesActivas = amenidades.filter(a => a.activo)
   const dias = diasDeSemana(semana)
   // Firma las fotos (paths bare en condominios-media tras la migración S6) en
@@ -480,7 +481,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           concepto: 'amenidad',
           monto: form.monto,
           periodo,
-          fecha_vencimiento: new Date().toISOString().slice(0, 10),
+          fecha_vencimiento: hoyLocalISO(),
           estado: 'pendiente',
           notas: `Retención por daños — ${amen?.nombre || 'amenidad'} · ${r.fecha} · ${form.motivo}`,
           created_by: userId,

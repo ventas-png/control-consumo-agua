@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -98,7 +99,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       if (!result) return
       const montoReal = result.montoReal
       updates.monto_real = montoReal ? parseFloat(montoReal) : orden.monto_estimado
-      updates.fecha_entrega_esperada = new Date().toISOString().slice(0, 10)
+      updates.fecha_entrega_esperada = hoyLocalISO()
     }
     const { error } = await updateCondominioRow('ordenes_compra', orden.id, updates)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
