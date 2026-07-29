@@ -388,6 +388,13 @@ verificación, y **hacer visible el error del insert de `pagos`**. Nótese que
 duplica cobros — pero hoy falla en silencio. Además el bucle prueba el secreto de
 **todas** las empresas en cada petición: un escaneo HMAC O(n) sin autenticar.
 
+> **Implementado.** Al migrar a `constructEventAsync` con el SDK 17.4.0 se
+> añadió también la distinción entre «la firma no casa con este tenant» (caso
+> normal del barrido multi-tenant) y «el verificador está roto» (cualquier otra
+> excepción). Tragarse ambas por igual en un `catch { continue }` fue justo lo
+> que mantuvo este bug invisible: el segundo caso ahora devuelve 500 y se
+> registra, en vez de disfrazarse de 403.
+
 ### PR-13 · `create-payment-intent`: validar pertenencia de `registro_id`/`cliente_id` 🟠
 
 `index.ts:107-126,215-229` valida **solo** `company_id` contra el perfil del
