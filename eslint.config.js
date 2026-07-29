@@ -14,6 +14,13 @@ export default [
       'dist/**',
       'dev-dist/**',
       'coverage/**',
+      // Segundo reporte del gate de cobertura (PR-31). Va aparte de `coverage/`
+      // para no pisarlo, y hay que ignorarlo EXPLÍCITAMENTE: el patrón
+      // `coverage/**` no lo cubre —casa componentes de ruta completos, no
+      // prefijos— así que tras correr el gate en local, ESLint entraba a lintar
+      // los .js generados del reporte (block-navigation, prettify, sorter) y
+      // sacaba 3 avisos de directivas muertas que no son de este repo.
+      'coverage-domain/**',
       'node_modules/**',
       'storybook-static/**',
       'supabase/**',
@@ -33,6 +40,17 @@ export default [
     // archivos con `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
     // y una directiva que apunta a una regla no registrada es un error de ESLint.
     // Encenderlas de verdad es un follow-up (requiere linting con tipos).
+    //
+    // ⚠️ NO EJECUTAR `eslint --fix` PARA QUITAR LAS DIRECTIVAS «NO USADAS».
+    // `reportUnusedDisableDirectives` avisa de 7 supresiones que hoy no hacen
+    // nada, y es tentador barrerlas. Son 6 de
+    // `@typescript-eslint/no-explicit-any` (i18n.tsx, lazyWithPreload.ts ×2,
+    // validatedInsert.ts ×3) y 1 de `no-console` (logger.ts). Están «sin usar»
+    // SÓLO porque esas reglas están apagadas o no registradas: el día que se
+    // enciendan, cada una vuelve a ser necesaria, y borrarlas ahora convierte
+    // ese follow-up en 8 errores nuevos que hay que re-descubrir. Se dejan a
+    // propósito. Las que sí se retiraron (2) fueron las de reglas ACTIVAS, donde
+    // «sin usar» significa de verdad muerta.
     plugins: { 'react-hooks': reactHooks, '@typescript-eslint': tseslint.plugin },
     languageOptions: {
       parser: tseslint.parser,

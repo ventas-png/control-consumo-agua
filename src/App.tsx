@@ -217,13 +217,15 @@ function AppShell() {
   // Legacy: kept for backward compatibility with old reset links already sent
   const [resetToken] = useState<string | null>(getResetToken)
 
-  // Handle Gmail OAuth callback when Google redirects back to the app
+  // Handle Gmail OAuth callback when Google redirects back to the app.
+  // `[]` es exhaustivo de verdad: las dos funciones son imports de módulo
+  // (`lib/gmailOAuth`), no valores del render — de ahí que ya no lleve la
+  // supresión de `exhaustive-deps` que tenía.
   useEffect(() => {
     const gmailParams = detectGmailOAuthCallback()
     if (gmailParams) {
       void handleGmailOAuthCallback(gmailParams)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const onEjecutarRuta = useCallback((ruta: Ruta) => {
