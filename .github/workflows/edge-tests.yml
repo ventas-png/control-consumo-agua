@@ -61,16 +61,37 @@ jobs:
         run: npx vitest run --dir supabase/functions
 
   deno-check:
-    name: deno check (advisory)
+    name: deno check — helpers puros (bloqueante)
     runs-on: ubuntu-latest
-    # Advisory: los tests usan vitest, así que NO corremos `deno test`. Aquí
-    # typecheckeamos con Deno SOLO los helpers puros extraídos (render.ts /
-    # validate.ts), que NO importan supabase-js. Los handlers (index.ts) usan el
-    # cliente Supabase sin tipos generados (`.from().select()` infiere `never`,
-    # casteado con `as`): `deno check` sobre ellos da falsos positivos de tipo, no
-    # bugs reales. Apuntando a los helpers, el chequeo caza drift de tipos REAL en
-    # la lógica pura. Se mantiene continue-on-error como red de seguridad.
-    continue-on-error: true
+    # PR-30 (auditoría 2026-07-28). Antes: advisory (`continue-on-error: true`) y
+    # con una lista de 5 archivos escrita a mano.
+    #
+    # POR QUÉ IMPORTA: `tsconfig.json` tiene `include: ["src"]`, así que
+    # `npm run type-check` NO MIRA NADA de supabase/functions. Toda la ruta de
+    # dinero del servidor —los proveedores de pago y fiscales, el cálculo de
+    # comisión y recargo, la conciliación— no tenía typecheck de ninguna clase.
+    # Deno sí resuelve los imports `https://`, así que es la herramienta correcta.
+    #
+    # Se pasa a BLOQUEANTE y la lista se genera SOLA: se typechequea todo `.ts`
+    # de supabase/functions que no importe supabase-js ni el SDK de Stripe. Esos
+    # son los únicos que dan falsos positivos —usan el cliente sin tipos
+    # generados, así que `.from().select()` infiere `never` y va casteado con
+    # `as`—; el resto es lógica pura y su chequeo es real.
+    #
+    # Generar la lista en vez de fijarla es deliberado: la lista de 5 escrita a
+    # mano se quedó cubriendo el 12% de los helpers puros sin que nadie lo notara.
+    # Así, un helper nuevo entra al gate el día que se escribe.
+    #
+    # POR QUÉ NO HAY UN JOB EQUIVALENTE PARA LOS HANDLERS (index.ts):
+    # Se probó en este mismo PR y devolvió 91 errores, TODOS ruido del entorno de
+    # tipos, ninguno un defecto: `SupabaseClient<any,…>` no asignable a
+    # `SupabaseClient<unknown,…>`, `.update({…})` contra `never` (el cliente sin
+    # tipos generados), y un `file instanceof File` que depende de las libs DOM
+    # que cargue Deno. Un check "advisory" permanentemente rojo es PEOR que no
+    # tenerlo: normaliza el rojo en los PRs y entrena a ignorarlo. Para que los
+    # handlers sean verificables hay que generar antes los tipos de la BD para el
+    # lado Deno (`supabase gen types` + un import_map); hasta entonces, el gate
+    # honesto es este, sobre lógica pura.
     steps:
       - uses: actions/checkout@v4
 
@@ -78,13 +99,17 @@ jobs:
         with:
           deno-version: v1.x
 
-      # Typecheck Deno de los helpers puros (sin I/O ni supabase-js). Detecta drift
-      # de tipos que `tsc` no ve (tsconfig solo incluye src/).
-      - name: deno check pure helpers
+      - name: deno check (helpers puros, lista generada)
         run: |
-          deno check \
-            supabase/functions/notifications-dispatcher/render.ts \
-            supabase/functions/invite-user/validate.ts \
-            supabase/functions/accept-invitation/validate.ts \
-            supabase/functions/_shared/uploadValidation.ts \
-            supabase/functions/_shared/emailHeaders.ts
+          set -euo pipefail
+          mapfile -t FILES < <(
+            find supabase/functions -name '*.ts' \
+              ! -path '*__tests__*' \
+              ! -name 'index.ts' \
+              -print0 \
+            | xargs -0 grep -LE "^[[:space:]]*import.*(supabase-js|esm\.sh/stripe)" \
+            | sort
+          )
+          echo "Helpers puros a verificar: ${#FILES[@]}"
+          printf '  %s\n' "${FILES[@]}"
+          deno check "${FILES[@]}"
