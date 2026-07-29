@@ -4,6 +4,10 @@ node_modules
 # Build output
 dist
 coverage
+# Segundo reporte del gate de cobertura (cálculo puro de src/domain/**). Va a
+# su propio directorio para no pisar el de src/lib/, y `coverage` no lo tapa:
+# los patrones de .gitignore casan componentes completos, no prefijos.
+coverage-domain
 storybook-static
 
 # Playwright (E2E) artifacts
