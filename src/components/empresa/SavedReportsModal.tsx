@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import {
   fetchReportTemplates,
@@ -194,7 +195,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
         accessor: c.accessor,
       }))
       await exportData(t.default_format, {
-        filename: `${t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().slice(0, 10)}`,
+        filename: `${t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${hoyLocalISO()}`,
         data: rows,
         columns: exportColumns,
         title: t.name,

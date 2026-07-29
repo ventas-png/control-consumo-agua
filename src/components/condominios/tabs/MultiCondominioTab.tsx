@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect } from 'react'
 import { fetchProyectosResumen } from '../../../domain/condominios/tabQueries'
 import { Proyecto } from '../../../types'
@@ -26,7 +27,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
   const [loading, setLoading] = useState(true)
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   useEffect(() => {
     if (proyectosActivos.length === 0) { setLoading(false); return }

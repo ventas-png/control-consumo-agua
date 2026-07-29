@@ -1,5 +1,6 @@
 // Modal de verificación/registro de accesos (DPI y renta corta) (P1 #3,
 // extraído de SeguridadTab con el JSX intacto).
+import { hoyLocalISO } from '../../../../lib/format'
 import { SecureImage } from '../../../shared/SecureImage'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import type { SeguridadCtx } from './ctx'
@@ -182,7 +183,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
 
               {/* Lista de reservas STR activas/próximas */}
               {(() => {
-                const hoy = new Date().toISOString().slice(0, 10)
+                const hoy = hoyLocalISO()
                 const reservasFiltradas = filtrarReservasSTRAcceso(reservasSTR, hoy, strSearch, strIngresados)
 
                 if (reservasFiltradas.length === 0) {

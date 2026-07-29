@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { toast } from '../../../lib/toast'
@@ -42,7 +43,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   const [filtroEstado, setFiltroEstado] = useState<EstadoInfraccion | 'todos'>('todos')
   const [form, setForm] = useState({
     unidad_id: '', tipo: 'ruido' as TipoInfraccion, descripcion: '',
-    monto_multa: '', fecha_infraccion: new Date().toISOString().slice(0, 10),
+    monto_multa: '', fecha_infraccion: hoyLocalISO(),
     fecha_limite_descargo: '',
   })
 
@@ -54,7 +55,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   }
 
   function resetForm() {
-    setForm({ unidad_id: '', tipo: 'ruido', descripcion: '', monto_multa: '', fecha_infraccion: new Date().toISOString().slice(0, 10), fecha_limite_descargo: '' })
+    setForm({ unidad_id: '', tipo: 'ruido', descripcion: '', monto_multa: '', fecha_infraccion: hoyLocalISO(), fecha_limite_descargo: '' })
     setShowForm(false)
   }
 
@@ -215,7 +216,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
           {
             key: 'fecha_infraccion', header: t('condominios.infracciones.date'), sortable: true, hideOnMobile: true,
             render: i => {
-              const hoy = new Date().toISOString().slice(0, 10)
+              const hoy = hoyLocalISO()
               const vencida = i.fecha_limite_descargo && i.fecha_limite_descargo < hoy && i.estado === 'en_descargo'
               return (
                 <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>

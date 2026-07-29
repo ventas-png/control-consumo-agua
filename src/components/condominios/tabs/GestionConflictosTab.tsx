@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
@@ -121,7 +122,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
     const respuesta = result.respuesta
     setResolviendo(sug.id)
     const { error } = await updateCondominioRow('sugerencias_condominio', sug.id, {
-      respuesta, estado: 'respondida', fecha_respuesta: new Date().toISOString().slice(0, 10),
+      respuesta, estado: 'respondida', fecha_respuesta: hoyLocalISO(),
     })
     setResolviendo(null)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }

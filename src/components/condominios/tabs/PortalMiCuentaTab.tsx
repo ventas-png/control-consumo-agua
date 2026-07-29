@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties } from 'react'
 import type { CuotaCondominio, EstadoCuota } from '../../../types'
 import { notify } from '../../shared/Dialog'
@@ -29,7 +30,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
   const pagadas     = cuotas.filter(c => c.estado === 'pagado')
   const totalDeuda  = pendientes.reduce((s, c) => s + c.monto, 0)
   const totalPagado = pagadas.reduce((s, c) => s + c.monto, 0)
-  const hoy         = new Date().toISOString().slice(0, 10)
+  const hoy         = hoyLocalISO()
   const vencidas    = pendientes.filter(c => c.fecha_vencimiento && c.fecha_vencimiento < hoy)
 
   // F1 pago en línea: modal de pago sobre una cuota (permite abono parcial).

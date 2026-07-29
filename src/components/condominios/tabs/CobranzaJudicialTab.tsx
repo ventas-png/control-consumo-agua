@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, Fragment, type CSSProperties } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -31,7 +32,7 @@ const ESTADO_CFG: Record<EstadoCobranzaJudicial, { label: string; bg: string; co
 
 const BLANK = {
   unidad_id: '', etapa: 'carta_notarial' as EtapaCobranzaJudicial,
-  monto_adeudado: '', fecha_inicio: new Date().toISOString().slice(0, 10),
+  monto_adeudado: '', fecha_inicio: hoyLocalISO(),
   abogado: '', expediente: '', notas: '',
 }
 
@@ -70,7 +71,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
     if (idx >= ETAPAS.length - 1) return
     const siguienteEtapa = ETAPAS[idx + 1]
     await updateCondominioRow('cobranza_judicial', c.id, {
-      etapa: siguienteEtapa, fecha_actualizacion: new Date().toISOString().slice(0, 10),
+      etapa: siguienteEtapa, fecha_actualizacion: hoyLocalISO(),
     })
     onRefresh()
   }

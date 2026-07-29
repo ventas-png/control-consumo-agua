@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -52,7 +53,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
   const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({
-    piscina: 'Principal', fecha: new Date().toISOString().split('T')[0],
+    piscina: 'Principal', fecha: hoyLocalISO(),
     hora: new Date().toTimeString().slice(0, 5),
     ph: '', cloro: '', temperatura: '',
     turbiedad: 'cristalina' as TurbiededadPiscina,

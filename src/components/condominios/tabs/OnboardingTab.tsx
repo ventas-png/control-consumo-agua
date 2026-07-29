@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { OnboardingResidente, EstadoOnboarding, Unidad } from '../../../types'
@@ -30,7 +31,7 @@ const ESTADO_CONFIG: Record<EstadoOnboarding, { label: string; color: string; bg
 }
 
 const blank = (): Partial<OnboardingResidente> => ({
-  nombre_residente: '', unidad_id: undefined, fecha_ingreso: new Date().toISOString().slice(0, 10),
+  nombre_residente: '', unidad_id: undefined, fecha_ingreso: hoyLocalISO(),
   tipo: 'propietario', estado: 'en_proceso',
   llaves_entregadas: false, reglamento_firmado: false, deposito_pagado: false,
   datos_registrados: false, accesos_configurados: false, inspeccion_unidad: false,

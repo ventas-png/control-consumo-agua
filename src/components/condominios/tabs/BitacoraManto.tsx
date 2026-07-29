@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -22,7 +23,7 @@ const TURNO_STYLE: Record<string, { bg: string; color: string; label: string; ic
   'noche':  { bg: 'var(--at-accent-soft-2)', color: 'var(--at-accent-dark)', label: 'Noche',    icon: '🌙' },
 }
 
-const BLANK = { fecha: new Date().toISOString().slice(0, 10), turno: 'mañana', responsable: '', area: '', observaciones: '' }
+const BLANK = { fecha: hoyLocalISO(), turno: 'mañana', responsable: '', area: '', observaciones: '' }
 const BLANK_TAREA: TareaItem = { tarea: '', completado: false, observaciones: '' }
 
 const TAREAS_PREDEFINIDAS = [

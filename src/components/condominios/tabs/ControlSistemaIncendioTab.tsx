@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -46,7 +47,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
   const [filtroResultado, setFiltroResultado] = useState<ResultadoInspeccionIncendio | ''>('')
 
   const [form, setForm] = useState({
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     tipo_sistema: 'extintor' as TipoSistemaIncendio,
     identificador: '', ubicacion: '',
     tipo_inspeccion: 'revision_visual' as TipoInspeccionIncendio,

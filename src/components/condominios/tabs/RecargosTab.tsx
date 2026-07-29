@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useCallback, type CSSProperties} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } from '../../../domain/condominios/tabMutations'
@@ -63,7 +64,7 @@ function reglaMoraDe(regla: ReglaMoraConfig): ReglaMora {
  *
  * Dos correcciones de la auditoría 2026-07-28 (Bloque D · PR-23):
  *
- *  1. `ahora` era `new Date().toISOString().slice(0, 10)`, es decir MEDIANOCHE
+ *  1. `ahora` era `new Date().toISOString().slice(0,10)`, es decir MEDIANOCHE
  *     UTC del día en curso, mientras que `emitida_at` es un `timestamptz` con
  *     hora real y el cron compara contra `now()` (instante completo). Restar un
  *     instante a una medianoche descuenta sistemáticamente la fracción de día ya
@@ -96,7 +97,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   const [filtroUnidad, setFiltroUnidad] = useState('')
   const [form, setForm] = useState({
     unidad_id: '', cuota_id: '', tipo: 'porcentaje' as TipoRecargo,
-    valor: '', fecha_aplicacion: new Date().toISOString().slice(0, 10), motivo: '',
+    valor: '', fecha_aplicacion: hoyLocalISO(), motivo: '',
   })
 
   const cuotasVencidas = cuotas.filter(c => c.estado === 'moroso' || c.estado === 'pendiente')
@@ -146,7 +147,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   const montoPreview = calcularMonto()
 
   function resetForm() {
-    setForm({ unidad_id: '', cuota_id: '', tipo: 'porcentaje', valor: '', fecha_aplicacion: new Date().toISOString().slice(0, 10), motivo: '' })
+    setForm({ unidad_id: '', cuota_id: '', tipo: 'porcentaje', valor: '', fecha_aplicacion: hoyLocalISO(), motivo: '' })
     setMostrarForm(false)
   }
 
@@ -178,7 +179,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   }
 
   async function aplicarMasivo() {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const reglaActiva = reglas.find(r => r.activa)
     // cuotas vencidas: moroso o pendiente con fecha_vencimiento superada.
     // IDEMPOTENCIA: se excluyen las cuotas que YA tienen mora aplicada

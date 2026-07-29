@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -26,7 +27,7 @@ interface AsistenteFila { nombre: string; unidad: string; rol: string }
 interface PuntoAgenda   { punto: string; descripcion: string; acuerdo: string }
 
 const BLANK_FORM = {
-  titulo: '', tipo: 'ordinaria' as TipoActa, fecha: new Date().toISOString().slice(0,10),
+  titulo: '', tipo: 'ordinaria' as TipoActa, fecha: hoyLocalISO(),
   hora_inicio: '', hora_fin: '', lugar: '', quorum: '', quorum_requerido: '',
   acuerdos: '', observaciones: '', redactada_por: '', aprobada: false,
 }

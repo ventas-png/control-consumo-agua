@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, GastoCondominio } from '../../../types'
 
@@ -31,7 +32,7 @@ function ultimosMeses(n: number): string[] {
 }
 
 export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Props) {
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = mesLocalISO()
   const historico = useMemo(() => ultimosMeses(6), [])
 
   // Promedio histórico de ingresos (cuotas pagadas) y egresos (gastos)

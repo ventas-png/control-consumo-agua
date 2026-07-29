@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -40,7 +41,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     elevador: 'Elevador 1',
     tipo: 'falla' as TipoIncidenciaElevador,
     descripcion: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     hora_inicio: '', hora_fin: '',
     empresa_servicio: '', tecnico: '',
     estado: 'reportado' as EstadoIncidenciaElevador,
@@ -89,7 +90,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ elevador: 'Elevador 1', tipo: 'falla', descripcion: '', fecha: new Date().toISOString().split('T')[0], hora_inicio: '', hora_fin: '', empresa_servicio: '', tecnico: '', estado: 'reportado', costo: '', proxima_inspeccion: '', observaciones: '' })
+    setForm({ elevador: 'Elevador 1', tipo: 'falla', descripcion: '', fecha: hoyLocalISO(), hora_inicio: '', hora_fin: '', empresa_servicio: '', tecnico: '', estado: 'reportado', costo: '', proxima_inspeccion: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }

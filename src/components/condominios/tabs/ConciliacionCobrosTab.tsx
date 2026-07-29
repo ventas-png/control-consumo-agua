@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -22,7 +23,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
   const [subTab, setSubTab] = useState<'pendientes' | 'historial'>('pendientes')
   const [filtroUnidad, setFiltroUnidad] = useState('')
   const [conciliando, setConciliando] = useState<string | null>(null)
-  const [form, setForm] = useState({ monto: '', referencia: '', fecha: new Date().toISOString().slice(0, 10), metodo: 'Transferencia', notas: '' })
+  const [form, setForm] = useState({ monto: '', referencia: '', fecha: hoyLocalISO(), metodo: 'Transferencia', notas: '' })
   const [saving, setSaving] = useState(false)
 
   const cuotasPendientes = useMemo(() =>
@@ -34,12 +35,12 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
 
   function iniciarConciliacion(cuota: CuotaCondominio) {
     setConciliando(cuota.id)
-    setForm(f => ({ ...f, monto: String(cuota.monto), fecha: new Date().toISOString().slice(0, 10) }))
+    setForm(f => ({ ...f, monto: String(cuota.monto), fecha: hoyLocalISO() }))
   }
 
   function cancelarConciliacion() {
     setConciliando(null)
-    setForm({ monto: '', referencia: '', fecha: new Date().toISOString().slice(0, 10), metodo: 'Transferencia', notas: '' })
+    setForm({ monto: '', referencia: '', fecha: hoyLocalISO(), metodo: 'Transferencia', notas: '' })
   }
 
   async function aplicarConciliacion() {
@@ -100,7 +101,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
   }
 
   const totalPendiente = cuotasPendientes.reduce((s, c) => s + c.monto, 0)
-  const conciliacionesHoy = conciliaciones.filter(c => c.fecha_pago === new Date().toISOString().slice(0, 10))
+  const conciliacionesHoy = conciliaciones.filter(c => c.fecha_pago === hoyLocalISO())
   const montoConciliadoHoy = conciliacionesHoy.reduce((s, c) => s + c.monto_recibido, 0)
 
   return (
@@ -150,7 +151,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
               {cuotasPendientes.map(cuota => {
                 const unidad = unidades.find(u => u.id === cuota.unidad_id)
                 const esConciliando = conciliando === cuota.id
-                const vencida = cuota.fecha_vencimiento && cuota.fecha_vencimiento < new Date().toISOString().slice(0, 10)
+                const vencida = cuota.fecha_vencimiento && cuota.fecha_vencimiento < hoyLocalISO()
                 return (
                   <div key={cuota.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 10, overflow: 'hidden' }}>
                     <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

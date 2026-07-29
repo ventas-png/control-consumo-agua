@@ -9,7 +9,7 @@ import {
   totalesLineas,
   type AsientoLineaFormInput,
 } from '../../domain/contabilidad/schemas'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, hoyLocalISO } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type TipoAsiento } from '../../types/contabilidad'
 import { Campo, btnPrimario, btnSecundario, btnLink, input } from './ui'
 
@@ -37,7 +37,7 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(hoyLocalISO())
   const [tipo, setTipo] = useState<TipoAsiento>('diario')
   const [concepto, setConcepto] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }, { ...LINEA_VACIA, lado: 'haber' }])

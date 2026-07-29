@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -96,7 +97,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
     if (idx < 0 || idx >= FLUJO.length - 1) return
     const siguiente = FLUJO[idx + 1]
     const patch: Record<string, unknown> = { estado: siguiente }
-    if (siguiente === 'completada') patch.fecha_cierre = new Date().toISOString().split('T')[0]
+    if (siguiente === 'completada') patch.fecha_cierre = hoyLocalISO()
     const { error } = await updateCondominioRow('tareas_condominio', t.id, patch)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === t.id) setSelected(prev => prev ? { ...prev, ...patch } as TareaCondominio : null)
@@ -114,7 +115,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   async function agregarComentario(t: TareaCondominio) {
     if (!comentario.texto.trim()) return
     const nuevo: ComentarioTarea = {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: hoyLocalISO(),
       autor: comentario.autor.trim() || 'Admin',
       texto: comentario.texto.trim(),
     }

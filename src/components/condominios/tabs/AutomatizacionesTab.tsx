@@ -1,3 +1,4 @@
+import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import {
   createCondominioRow,
@@ -42,7 +43,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(BLANK)
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   function evaluar(a: AutomatizacionCond): number {
     const dias = a.trigger_valor
@@ -104,7 +105,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       })
       if (!isConfirmed) return
 
-      const limitDate = new Date(Date.now() - a.trigger_valor * 86400000).toISOString().slice(0, 10)
+      const limitDate = dateLocalISO(new Date(Date.now() - a.trigger_valor * 86400000))
       const afectadas = cuotas.filter(c =>
         c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < limitDate
       )

@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -25,10 +26,10 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
   const [form, setForm] = useState({
     unidad_id: '', area: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     lectura_anterior: '', lectura_actual: '',
     costo_unitario: '', alerta_fuga: false,
-    periodo: new Date().toISOString().slice(0, 7),
+    periodo: mesLocalISO(),
     leido_por: '', observaciones: '',
   })
 

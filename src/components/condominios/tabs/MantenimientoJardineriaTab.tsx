@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -41,7 +42,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   const [areaCustom, setAreaCustom] = useState('')
 
   const [form, setForm] = useState({
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyLocalISO(),
     tipo: 'mantenimiento_general' as TipoJardineria,
     areas: [] as string[],
     proveedor: '', trabajadores: '', horas_trabajo: '',
@@ -90,7 +91,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ fecha: new Date().toISOString().split('T')[0], tipo: 'mantenimiento_general', areas: [], proveedor: '', trabajadores: '', horas_trabajo: '', insumos: '', costo: '', estado: 'completado', proxima_visita: '', observaciones: '' })
+    setForm({ fecha: hoyLocalISO(), tipo: 'mantenimiento_general', areas: [], proveedor: '', trabajadores: '', horas_trabajo: '', insumos: '', costo: '', estado: 'completado', proxima_visita: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }

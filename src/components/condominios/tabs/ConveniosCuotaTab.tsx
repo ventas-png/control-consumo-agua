@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -29,7 +30,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
   const [filtroEstado, setFiltroEstado] = useState<EstadoConvenioCuota | ''>('')
   const [form, setForm] = useState({
     unidad_id: '', descripcion: '', monto_total: '', num_cuotas: '3', dia_pago: '5',
-    fecha_inicio: new Date().toISOString().slice(0, 10), notas: '',
+    fecha_inicio: hoyLocalISO(), notas: '',
   })
 
   const montoC = form.monto_total && form.num_cuotas
@@ -41,7 +42,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
   const incumplidos = convenios.filter(c => c.estado === 'incumplido').length
 
   function resetForm() {
-    setForm({ unidad_id: '', descripcion: '', monto_total: '', num_cuotas: '3', dia_pago: '5', fecha_inicio: new Date().toISOString().slice(0, 10), notas: '' })
+    setForm({ unidad_id: '', descripcion: '', monto_total: '', num_cuotas: '3', dia_pago: '5', fecha_inicio: hoyLocalISO(), notas: '' })
     setMostrarForm(false)
   }
 

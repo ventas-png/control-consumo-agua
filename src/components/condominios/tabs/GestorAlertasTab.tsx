@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, PolizaSeguro,
@@ -58,7 +59,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
 
   const alertas: Alerta[] = useMemo(() => {
     const list: Alerta[] = []
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
 
     // Cuotas morosas / vencidas
     cuotas

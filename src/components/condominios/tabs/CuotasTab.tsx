@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -79,7 +80,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     unidad_id: '',
     concepto: 'mantenimiento' as ConceptoCuota,
     monto: '',
-    periodo: new Date().toISOString().slice(0, 7),
+    periodo: mesLocalISO(),
     fecha_vencimiento: '',
     rol_responsable: '',
     notas: '',
@@ -124,7 +125,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     const emitibles = cuotas.filter(c => puedeTransicionarCuota(estadoCanonicoDe(c), 'emitir').ok)
     const periodosEmitibles = emitibles.map(c => c.periodo).sort()
     const periodoDefault = periodosEmitibles[periodosEmitibles.length - 1]
-      ?? new Date().toISOString().slice(0, 7)
+      ?? mesLocalISO()
     const datos = await openPromptDialog({
       title: '📤 Emitir período (cerrar ciclo)',
       description: 'Emite todas las cuotas pendientes del período y avisa a los residentes responsables en su portal.',
@@ -180,7 +181,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   }
 
   async function handlePagar(cuota: CuotaCondominio) {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const datos = await openPromptDialog({
       title: 'Registrar pago',
       fields: [
@@ -373,7 +374,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   }
 
   function resetForm() {
-    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: new Date().toISOString().slice(0, 7), fecha_vencimiento: '', rol_responsable: '', notas: '' })
+    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: mesLocalISO(), fecha_vencimiento: '', rol_responsable: '', notas: '' })
     setShowForm(false)
   }
 
@@ -430,7 +431,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
     const ids = [...seleccionadas]
     const items = cuotas.filter(c => ids.includes(c.id))
     const totalMonto = items.reduce((s, c) => s + c.monto, 0)
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
 
     const datos = await openPromptDialog({
       title: `Registrar pago para ${ids.length} cuota${ids.length > 1 ? 's' : ''}`,
@@ -478,7 +479,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
   }
 
   async function aplicarMoraMasiva() {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const vencidas = cuotas.filter(c => c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
     if (vencidas.length === 0) {
       notify({ variant: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', duration: 2000 })
@@ -510,7 +511,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
       numero_recibo: numero,
       monto: cuota.monto,
       concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
-      fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+      fecha_emision: cuota.fecha_pago ?? hoyLocalISO(),
       estado: 'generado',
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -526,7 +527,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
         numero_recibo: numero,
         concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
         monto: cuota.monto,
-        fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+        fecha_emision: cuota.fecha_pago ?? hoyLocalISO(),
         unidadNombre: cuota.unidad_nombre,
         metodo_pago: cuota.metodo_pago,
         referencia_pago: cuota.referencia_pago,
@@ -546,7 +547,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
-            onClick={() => exportarExcel(`cuotas-${new Date().toISOString().slice(0,10)}`, [{
+            onClick={() => exportarExcel(`cuotas-${hoyLocalISO()}`, [{
               name: 'Cuotas',
               headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
               rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
@@ -859,7 +860,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
             key: 'vencimiento', header: 'Vencimiento', sortable: true,
             accessor: c => c.fecha_vencimiento ?? '',
             render: c => {
-              const hoy = new Date().toISOString().slice(0, 10)
+              const hoy = hoyLocalISO()
               const vencida = c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado'
               return <span style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{c.fecha_vencimiento || '—'}</span>
             },
@@ -960,7 +961,7 @@ export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, 
             id: 'exportar',
             label: 'Exportar',
             icon: '📊',
-            onClick: () => exportarExcel(`cuotas-seleccion-${new Date().toISOString().slice(0, 10)}`, [{
+            onClick: () => exportarExcel(`cuotas-seleccion-${hoyLocalISO()}`, [{
               name: 'Cuotas',
               headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado'],
               rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),

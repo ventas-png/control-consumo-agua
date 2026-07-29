@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -82,7 +83,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   const activos = anuncios.filter(a => a.activo).length
-  const eventos = anuncios.filter(a => a.tipo === 'evento' && a.fecha_evento && a.fecha_evento >= new Date().toISOString().slice(0, 10)).length
+  const eventos = anuncios.filter(a => a.tipo === 'evento' && a.fecha_evento && a.fecha_evento >= hoyLocalISO()).length
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>

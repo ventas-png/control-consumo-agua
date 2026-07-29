@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -27,7 +28,7 @@ const ESTADO_CFG: Record<EstadoReciboDigital, { label: string; bg: string; color
 
 const BLANK = {
   unidad_id: '', cuota_id: '', monto: '', concepto: '',
-  fecha_emision: new Date().toISOString().slice(0, 10),
+  fecha_emision: hoyLocalISO(),
   destinatario_nombre: '', destinatario_email: '', notas: '',
 }
 
@@ -134,7 +135,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => exportarExcel(`recibos-${new Date().toISOString().slice(0,10)}`, [{
+            onClick={() => exportarExcel(`recibos-${hoyLocalISO()}`, [{
               name: 'Recibos',
               headers: ['N° Recibo', 'Unidad', 'Concepto', `Monto (${moneda})`, 'Fecha emisión', 'Destinatario', 'Email', 'Estado'],
               rows: lista.map(r => [

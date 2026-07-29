@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
@@ -31,7 +32,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   const [numeroConvenio, setNumeroConvenio] = useState(`CONV-${Date.now().toString().slice(-6)}`)
   const [descripcion, setDescripcion] = useState('')
   const [cuotasPactadas, setCuotasPactadas] = useState('')
-  const [fechaPrimeraCuota, setFechaPrimeraCuota] = useState(new Date().toISOString().split('T')[0])
+  const [fechaPrimeraCuota, setFechaPrimeraCuota] = useState(hoyLocalISO())
   const [frecuencia, setFrecuencia] = useState<FrecuenciaConvenio>('mensual')
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
@@ -58,7 +59,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         cuotas_pactadas: numCuotas || null,
         // Calendario (P1): fecha_inicio = primera cuota; vencimiento = última cuota.
         cuotas: calendario.length ? calendario : null,
-        fecha_inicio: fechaPrimeraCuota || new Date().toISOString().split('T')[0],
+        fecha_inicio: fechaPrimeraCuota || hoyLocalISO(),
         fecha_vencimiento: calendario.length
           ? calendario[calendario.length - 1].fecha_vencimiento
           : (fechaPrimeraCuota || null),

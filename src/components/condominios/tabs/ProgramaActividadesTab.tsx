@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -41,7 +42,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
 
   const [form, setForm] = useState({
     nombre: '', descripcion: '', categoria: 'recreativa' as CategoriaActividad,
-    instructor: '', lugar: '', fecha_inicio: new Date().toISOString().split('T')[0],
+    instructor: '', lugar: '', fecha_inicio: hoyLocalISO(),
     fecha_fin: '', hora_inicio: '', hora_fin: '', dias_semana: [] as string[],
     cupo_maximo: '', costo: '0', notas: '',
   })
@@ -88,7 +89,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ nombre: '', descripcion: '', categoria: 'recreativa', instructor: '', lugar: '', fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin: '', hora_inicio: '', hora_fin: '', dias_semana: [], cupo_maximo: '', costo: '0', notas: '' })
+    setForm({ nombre: '', descripcion: '', categoria: 'recreativa', instructor: '', lugar: '', fecha_inicio: hoyLocalISO(), fecha_fin: '', hora_inicio: '', hora_fin: '', dias_semana: [], cupo_maximo: '', costo: '0', notas: '' })
     setMostrarForm(false)
     onRefresh()
   }

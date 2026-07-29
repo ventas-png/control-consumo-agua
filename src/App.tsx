@@ -1,3 +1,4 @@
+import { hoyLocalISO } from './lib/format'
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/promptUpgrade'
@@ -377,7 +378,7 @@ export default function App() {
   }
 
   // Banner: rutas pendientes asignadas al usuario actual
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
   const rutasPendientes = agua.rutas.filter((r: Ruta) =>
     r.asignado_a === currentUser.user_id &&
     !r.completada &&

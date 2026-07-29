@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, IncidenteSeguridad,
@@ -18,9 +19,9 @@ interface Props {
   moneda: string
 }
 
-function mesActual() { return new Date().toISOString().slice(0, 7) }
+function mesActual() { return mesLocalISO() }
 function hace30Dias() { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) }
-function hoy() { return new Date().toISOString().slice(0, 10) }
+function hoy() { return hoyLocalISO() }
 
 function semaforo(score: number): { color: string; bg: string; label: string; emoji: string } {
   if (score >= 80) return { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Excelente', emoji: '🟢' }

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -19,7 +20,7 @@ interface Incidente { hora: string; descripcion: string; tipo: string }
 const BLANK_INCIDENTE: Incidente = { hora: '', descripcion: '', tipo: 'observacion' }
 
 const BLANK = {
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: hoyLocalISO(),
   turno: 'mañana', responsable: '', hora_inicio: '', hora_fin: '',
   novedades: '', incidentes: [] as Incidente[], firmado: false,
 }

@@ -11,6 +11,7 @@
 // (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
 // `supabase` (laxo) solo para tablas aún fuera del esquema generado
 // (recargo_tarjeta_config, migración 20260717190000).
+import { hoyLocalISO } from '../../lib/format'
 import { db, supabase } from '../../lib/supabase'
 import type { ComunidadMensual } from '../../lib/portalDashboard'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
@@ -242,7 +243,7 @@ export async function fetchCondominiosPortalData(
   projectIds: string[],
   unidadIds: string[],
 ): Promise<CondominiosPortalData> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const sesentaDias = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
   const noventaDias = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
   const haceDosAnos = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)

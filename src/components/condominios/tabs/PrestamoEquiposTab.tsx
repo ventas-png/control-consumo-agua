@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PrestamoEquipo, EstadoPrestamo, Unidad } from '../../../types'
@@ -26,7 +27,7 @@ const EQUIPOS_COMUNES = ['Sillas','Mesas','Proyector','Pantalla','Micrófono','T
 
 const BLANK = {
   unidad_id: '', equipo_nombre: '', cantidad: 1,
-  fecha_prestamo: new Date().toISOString().slice(0,10), hora_prestamo: '',
+  fecha_prestamo: hoyLocalISO(), hora_prestamo: '',
   fecha_devolucion: '', deposito: '', deposito_pagado: false,
   entregado_por: '', observaciones: '',
 }
@@ -80,7 +81,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
     if (!result) return
     await updateCondominioRow('prestamos_equipo', p.id, {
       estado: 'devuelto',
-      fecha_devolucion: new Date().toISOString().slice(0, 10),
+      fecha_devolucion: hoyLocalISO(),
       hora_devolucion: new Date().toTimeString().slice(0, 5),
       observaciones: result.observaciones || p.observaciones,
     })

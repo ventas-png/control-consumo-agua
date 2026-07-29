@@ -21,7 +21,7 @@ import {
   useMarcarOrdenPagadaMutation,
 } from '../../domain/cxp/mutations'
 import { facturaProveedorFormSchema, ordenPagoFormSchema, saldoFactura } from '../../domain/cxp/schemas'
-import { formatCurrency, formatDateShort } from '../../lib/format'
+import { formatCurrency, formatDateShort, hoyLocalISO } from '../../lib/format'
 import {
   CATEGORIAS_GASTO_CXP,
   ESTADO_FACTURA_PROV_LABELS,
@@ -360,7 +360,7 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
   const crear = useCrearFacturaProveedorMutation(companyId)
   const [f, setF] = useState({
     proveedor_id: '', numero_factura: '',
-    fecha_emision: new Date().toISOString().slice(0, 10), fecha_vencimiento: '',
+    fecha_emision: hoyLocalISO(), fecha_vencimiento: '',
     concepto: '', categoria: 'otros', moneda: '', monto_total: '', iva_monto: '', notas: '',
   })
 
@@ -472,7 +472,7 @@ function OrdenFormModal({ companyId, factura, monedaBase, onClose }: {
   const [o, setO] = useState({
     monto: String(saldo),
     metodo_pago: 'transferencia' as MetodoPagoCxP,
-    fecha_pago: new Date().toISOString().slice(0, 10),
+    fecha_pago: hoyLocalISO(),
     referencia: '',
     notas: '',
   })

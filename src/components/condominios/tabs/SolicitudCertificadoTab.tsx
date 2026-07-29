@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -39,7 +40,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
 
   const [form, setForm] = useState({
     unidad_id: '', solicitante: '', tipo: 'solvencia' as TipoCertificado,
-    motivo: '', fecha_solicitud: new Date().toISOString().split('T')[0], observaciones: '',
+    motivo: '', fecha_solicitud: hoyLocalISO(), observaciones: '',
   })
 
   const lista = solicitudes.filter(s => filtroEstado === '' || s.estado === filtroEstado)
@@ -58,7 +59,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ unidad_id: '', solicitante: '', tipo: 'solvencia', motivo: '', fecha_solicitud: new Date().toISOString().split('T')[0], observaciones: '' })
+    setForm({ unidad_id: '', solicitante: '', tipo: 'solvencia', motivo: '', fecha_solicitud: hoyLocalISO(), observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }
@@ -68,8 +69,8 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
     if (idx < 0 || idx >= FLUJO.length - 1) return
     const siguiente = FLUJO[idx + 1]
     const patch: Record<string, unknown> = { estado: siguiente }
-    if (siguiente === 'aprobado') patch.fecha_aprobacion = new Date().toISOString().split('T')[0]
-    if (siguiente === 'entregado') patch.fecha_entrega = new Date().toISOString().split('T')[0]
+    if (siguiente === 'aprobado') patch.fecha_aprobacion = hoyLocalISO()
+    if (siguiente === 'entregado') patch.fecha_entrega = hoyLocalISO()
     const { error } = await updateCondominioRow('solicitudes_certificado', s.id, patch)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, ...patch } as SolicitudCertificado : null)

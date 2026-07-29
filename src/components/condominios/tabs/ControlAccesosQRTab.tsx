@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { notify } from '../../shared/Dialog'
@@ -31,7 +32,7 @@ interface QRGenerado {
 // (12 chars × ~4.95 bits ≈ 59 bits — no adivinable en la ventana del pase).
 
 export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate: _canCreate, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [tab, setTab] = useState<'generar' | 'validar' | 'pendientes'>('generar')
   const [form, setForm] = useState({ nombre: '', motivo: '', unidadId: '', validoHasta: hoy, identificacion: '' })
   const [qrGenerado, setQrGenerado] = useState<QRGenerado | null>(null)

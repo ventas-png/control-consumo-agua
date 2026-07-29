@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { fetchConvCountsForProject, fetchConvRowsAllProjects } from '../../domain/admin-dashboard/queries'
@@ -47,7 +48,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
   const [projectInitialized, setProjectInitialized] = useState(false)
 
   const defaultDesde = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) })()
-  const defaultHasta = new Date().toISOString().slice(0, 10)
+  const defaultHasta = hoyLocalISO()
   const [fechaDesde, setFechaDesde] = useState(defaultDesde)
   const [fechaHasta, setFechaHasta] = useState(defaultHasta)
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
 import {
@@ -237,7 +238,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     for (const o of orphans) {
       await unenrollMfaFactor(o.id).catch(() => undefined)
     }
-    const { data, error } = await enrollTotpFactor(`Authenticator (${new Date().toISOString().slice(0, 10)})`)
+    const { data, error } = await enrollTotpFactor(`Authenticator (${hoyLocalISO()})`)
     if (error || !data) {
       setMfaFb({ type: 'error', msg: error ?? 'No fue posible iniciar el enrolamiento.' })
       setMfaLoading(false)

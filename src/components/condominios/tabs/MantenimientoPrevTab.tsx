@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -31,7 +32,7 @@ function addDays(dateStr: string, days: number): string {
 
 function getStatus(p: PlanMantenimiento): 'vencido' | 'urgente' | 'proximo' | 'ok' | 'sin_fecha' {
   if (!p.proxima_ejecucion) return 'sin_fecha'
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const diff = Math.ceil((new Date(p.proxima_ejecucion).getTime() - new Date(today).getTime()) / 86400000)
   if (diff < 0) return 'vencido'
   if (diff <= 3) return 'urgente'
@@ -48,7 +49,7 @@ const STATUS: Record<string, { bg: string; color: string; label: string }> = {
 }
 
 const BLANK_PLAN = { equipo: '', descripcion: '', frecuencia: 'mensual', responsable: '', ultima_ejecucion: '', proxima_ejecucion: '', costo_estimado: 0 }
-const BLANK_EJEC = { fecha: new Date().toISOString().slice(0, 10), realizado_por: '', costo_real: 0, observaciones: '', estado: 'completado' }
+const BLANK_EJEC = { fecha: hoyLocalISO(), realizado_por: '', costo_real: 0, observaciones: '', estado: 'completado' }
 
 export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)

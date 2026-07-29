@@ -51,6 +51,25 @@ export default [
             '(queries/mutations). Ver src/domain/README.md. `warmUpSupabase` sí está permitido.',
         }],
       }],
+      // Fecha LOCAL, no UTC (auditoría 2026-07-28, Bloque D · PR-24).
+      //
+      // `new Date().toISOString()` da la fecha UTC. En GMT-6, a partir de las
+      // 18:00 locales ya es "mañana": el default de un <input type="date"> sale
+      // con el día siguiente, y un payload a una columna DATE cae en el ciclo de
+      // facturación equivocado. `src/lib/format.ts` trae `hoyLocalISO()` desde
+      // que se detectó (E4/D5), pero solo lo usaban 6 archivos: el barrido de
+      // PR-24 migró 204 ocurrencias en 128 archivos.
+      //
+      // Sin esta regla el patrón vuelve solo — es lo que pasó entre que se
+      // escribió el helper y esta auditoría.
+      'no-restricted-syntax': ['error', {
+        selector:
+          "CallExpression[callee.object.callee.object.callee.name='Date'][callee.object.callee.property.name='toISOString']",
+        message:
+          'No derives la fecha de `new Date().toISOString()`: devuelve la fecha UTC, ' +
+          'que en husos negativos adelanta un día tras las 18:00 locales. Usá ' +
+          '`hoyLocalISO()` de src/lib/format.ts (o `dateLocalISO(d)` para una fecha dada).',
+      }],
     },
   },
 ]

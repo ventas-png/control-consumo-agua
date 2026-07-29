@@ -1,3 +1,4 @@
+import { hoyLocalISO, datetimeLocalISO } from '../../lib/format'
 import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
@@ -39,11 +40,11 @@ export function CalidadSection({
   const [savingFuente, setSavingFuente] = useState(false)
   // serv:S26 — última muestra por fuente (deriva el estado de muestreo en la lista).
   const ultimaMuestra = useMemo(() => ultimaMuestraPorFuente(registrosCalidad), [registrosCalidad])
-  const hoyISO = new Date().toISOString().slice(0, 10)
+  const hoyISO = hoyLocalISO()
 
   // Análisis form state
   const [analisisFuenteId, setAnalisisFuenteId] = useState('')
-  const [analisisFecha, setAnalisisFecha] = useState(new Date().toISOString().slice(0, 16))
+  const [analisisFecha, setAnalisisFecha] = useState(datetimeLocalISO())
   const [analisisObs, setAnalisisObs] = useState('')
   const [parametroValues, setParametroValues] = useState<Record<string, string>>({})
   // serv:S24 — archivo del reporte (se sube a Storage, no a base64).
@@ -188,7 +189,7 @@ export function CalidadSection({
       onRegistrosCalidadUpdated(await fetchRegistrosCalidad())
       // Reset form
       setAnalisisFuenteId('')
-      setAnalisisFecha(new Date().toISOString().slice(0, 16))
+      setAnalisisFecha(datetimeLocalISO())
       setAnalisisObs('')
       setParametroValues({})
       setReporteFile(null); setReporteNombre(null)
@@ -521,7 +522,7 @@ export function CalidadSection({
               const csv = registrosCalidadToCSV(historialFiltrado)
               const a = document.createElement('a')
               a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-              a.download = `historial_calidad_${new Date().toISOString().slice(0, 10)}.csv`
+              a.download = `historial_calidad_${hoyLocalISO()}.csv`
               a.click()
             }} disabled={historialFiltrado.length === 0} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: historialFiltrado.length === 0 ? 'not-allowed' : 'pointer', opacity: historialFiltrado.length === 0 ? 0.5 : 1 }}>
               📊 Exportar CSV

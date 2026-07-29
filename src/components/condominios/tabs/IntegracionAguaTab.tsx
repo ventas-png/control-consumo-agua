@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { useMedidoresAguaPorProyectoQuery } from '../../../domain/agua/queries'
 import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
@@ -51,7 +52,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
 
   // Generación de cuotas
   const [tarifa, setTarifa] = useState('')
-  const [periodo, setPeriodo] = useState(new Date().toISOString().slice(0, 7))
+  const [periodo, setPeriodo] = useState(mesLocalISO())
   const [fechaVenc, setFechaVenc] = useState('')
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [generando, setGenerando] = useState(false)

@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
@@ -349,7 +350,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
       description: 'Emite todos los recibos de agua pendientes del proyecto y período elegidos, y avisa a cada cliente (campana + email si tiene correo).',
       fields: [
         { name: 'project_id', label: 'Proyecto', control: 'select', required: true, autoFocus: true, options: opciones },
-        { name: 'periodo', label: 'Período (YYYY-MM)', type: 'month', required: true, initialValue: new Date().toISOString().slice(0, 7) },
+        { name: 'periodo', label: 'Período (YYYY-MM)', type: 'month', required: true, initialValue: mesLocalISO() },
       ],
       submitText: 'Continuar',
     })
@@ -552,7 +553,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
         {[
           { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', },
           { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,var(--at-danger),var(--at-danger))', },
-          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(new Date().toISOString().split('T')[0])).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
+          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(hoyLocalISO())).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
           { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', },
         ].map((s, i) => (
           <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}>

@@ -4,7 +4,7 @@ import { notify } from '../shared/Dialog'
 import { useCuentasQuery } from '../../domain/contabilidad/queries'
 import { useCrearAsientoBorradorMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
 import { convertirMontoBase, round2, type AsientoLineaFormInput } from '../../domain/contabilidad/schemas'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, hoyLocalISO } from '../../lib/format'
 import { Campo, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
@@ -27,7 +27,7 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(hoyLocalISO())
   const [saldos, setSaldos] = useState<Record<string, { monto: string; tipo_cambio: string }>>({})
   const [guardando, setGuardando] = useState(false)
 

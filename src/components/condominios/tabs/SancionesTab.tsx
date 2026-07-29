@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
@@ -18,7 +19,7 @@ interface Props {
 
 const BLANK = {
   unidad_id: '', infraccion_id: '', concepto: '', monto: 0,
-  fecha_emision: new Date().toISOString().slice(0, 10),
+  fecha_emision: hoyLocalISO(),
   fecha_vencimiento: '', observaciones: '',
 }
 
@@ -62,7 +63,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
     onRefresh()
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const filtered = filtro === 'todos' ? sanciones : sanciones.filter(s => s.estado === filtro)
   const pendientes = sanciones.filter(s => s.estado === 'pendiente')
   const vencidas = pendientes.filter(s => s.fecha_vencimiento && s.fecha_vencimiento < today)

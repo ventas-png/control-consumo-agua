@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -37,7 +38,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
     raza: '', color: '', fecha_nacimiento: '', fecha_ultima_vacuna: '', notas: '',
   })
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const filtradas = mascotas.filter(m => {
     const matchEspecie = filtroEspecie === 'todos' || m.especie === filtroEspecie

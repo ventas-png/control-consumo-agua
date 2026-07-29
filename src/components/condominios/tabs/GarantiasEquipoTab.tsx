@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { GarantiaEquipo, EstadoGarantia } from '../../../types'
@@ -83,7 +84,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
     onRefresh()
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const filtered = filtroEstado === 'todos' ? garantias : garantias.filter(g => g.estado === filtroEstado)
 
   const porVencer  = garantias.filter(g => g.estado === 'vigente' && g.fecha_vencimiento && g.fecha_vencimiento <= addDays(today, 60) && g.fecha_vencimiento >= today).length

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -33,7 +34,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
   anulado:    { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anulado' },
 }
 
-const BLANK = { unidad_id: '', tipo: 'primer_aviso', fecha_emision: new Date().toISOString().slice(0, 10), fecha_limite: '', enviado_por: '', notas: '' }
+const BLANK = { unidad_id: '', tipo: 'primer_aviso', fecha_emision: hoyLocalISO(), fecha_limite: '', enviado_por: '', notas: '' }
 const BLANK_ITEM: DetalleItem = { concepto: '', monto: '', periodo: '' }
 
 function fmt(n: number, moneda: string) { return `${moneda} ${Number(n).toLocaleString('es', { minimumFractionDigits: 2 })}` }
@@ -263,7 +264,7 @@ ${a.notas ? raw(printHtml`<p style="margin-top:16px;font-style:italic">${a.notas
             const unidad = unidades.find(u => u.id === a.unidad_id)
             const ts = TIPO_STYLE[a.tipo] ?? TIPO_STYLE.primer_aviso
             const es = ESTADO_STYLE[a.estado] ?? ESTADO_STYLE.emitido
-            const today = new Date().toISOString().slice(0, 10)
+            const today = hoyLocalISO()
             const vencido = a.estado === 'emitido' && a.fecha_limite && a.fecha_limite < today
             return (
               <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px' }}>

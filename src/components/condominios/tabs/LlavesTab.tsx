@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { LlaveCondominio, EstadoLlave, TipoLlave, Unidad } from '../../../types'
@@ -101,7 +102,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
 
   async function handleEstado(id: string, estado: EstadoLlave) {
     const updates: Record<string, unknown> = { estado }
-    if (estado === 'devuelta') updates.fecha_devolucion = new Date().toISOString().slice(0, 10)
+    if (estado === 'devuelta') updates.fecha_devolucion = hoyLocalISO()
     const { error } = await updateCondominioRow('llaves_condominio', id, updates)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     onRefresh()

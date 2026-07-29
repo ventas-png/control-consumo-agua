@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import type {
   CuotaCondominio, TicketMantenimiento, Visitante, Amenidad,
   ReservaAmenidad, PolizaSeguro, InspeccionNormativa, GastoCondominio, PaqueteRecibido,
@@ -34,7 +35,7 @@ function mesLabel(periodo: string): string {
 }
 
 export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, moneda, proyectoNombre }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   // ── KPI base ─────────────────────────────────────────────────────────────────
   const cuotasPendientes  = cuotas.filter(c => c.estado === 'pendiente')

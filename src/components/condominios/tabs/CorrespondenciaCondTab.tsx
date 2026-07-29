@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
@@ -25,7 +26,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
 
 const BLANK = {
   tipo: 'entrada', categoria: 'carta', asunto: '', remitente: '', destinatario: '',
-  fecha: new Date().toISOString().slice(0, 10), numero_guia: '', prioridad: 'normal',
+  fecha: hoyLocalISO(), numero_guia: '', prioridad: 'normal',
   observaciones: '', unidad_id: '',
 }
 

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -85,7 +86,7 @@ export function SeguridadTab({
   )
 
   const rondaEnCurso = rondas.find(r => r.estado === 'en_curso')
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const novedadesHoy = novedades.filter(n => n.created_at.startsWith(hoy))
   const criticas = novedades.filter(n => n.prioridad === 'critica').length
 

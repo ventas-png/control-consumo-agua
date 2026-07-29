@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -34,7 +35,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
     prioridad: 'normal' as PrioridadRecordatorio,
   })
 
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const lista = recordatorios.filter(r => {
     const matchEstado = filtroEstado === 'todos' || (filtroEstado === 'pendientes' ? !r.completado : r.completado)

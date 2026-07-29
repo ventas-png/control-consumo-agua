@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -22,7 +23,7 @@ const ESTADO_CFG: Record<EstadoCapacitacion, { label: string; bg: string; color:
 
 const BLANK = {
   nombre_empleado: '', cargo: '', curso: '', proveedor: '',
-  fecha_inicio: new Date().toISOString().slice(0, 10),
+  fecha_inicio: hoyLocalISO(),
   fecha_fin: '', fecha_vencimiento_cert: '',
   costo: '', estado: 'completado' as EstadoCapacitacion, notas: '',
 }

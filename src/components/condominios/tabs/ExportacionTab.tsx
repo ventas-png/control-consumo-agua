@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, unidades, moneda, proyectoNombre }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const periodos = [...new Set(cuotas.map(c => c.periodo).filter(Boolean))].sort().reverse()
   const anios = [...new Set((gastos.map(g => g.fecha?.slice(0, 4)).filter(Boolean) as string[]))].sort().reverse()

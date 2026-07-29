@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, type ReactNode } from 'react'
 import { EditModal } from '../shared/EditModal'
 import { StatusBadge } from '../shared/StatusBadge'
@@ -318,7 +319,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `export-${slug}-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `export-${slug}-${hoyLocalISO()}.json`
     a.click()
     URL.revokeObjectURL(url)
     notify({ variant: 'success', title: 'Export descargado', duration: 1500 })
