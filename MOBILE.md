@@ -92,11 +92,11 @@ y despachador (`supabase/functions/send-push`) ya están. Falta lo externo:
    Firebase → Cloud Messaging para que FCM enrute a iOS.
 2. **iOS**: en Xcode habilita *Push Notifications* y *Background Modes → Remote
    notifications*.
-3. **Backend**:
+3. **Backend**: la tabla `device_tokens` y la función `send-push` **se despliegan
+   solas** al fusionar a `main` (workflows *Apply Migrations to Production* y
+   *Deploy Supabase Edge Functions*). Lo único manual es el secret:
    ```bash
-   supabase db push                                    # crea device_tokens
    supabase secrets set FCM_SERVICE_ACCOUNT="$(cat firebase-service-account.json)"
-   supabase functions deploy send-push
    ```
 4. **Disparo**: llama a `send-push` con `{ user_id, title, body }` desde donde ya
    insertas en `user_notifications` (p. ej. `notifications-dispatcher`).

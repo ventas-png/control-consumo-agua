@@ -224,6 +224,14 @@ jobs:
       - name: Deploy backfill-tenant-secrets (no JWT — cifrado en reposo; auth por CRON_SECRET/service_role en tiempo constante)
         run: bash .github/scripts/deploy-fn.sh backfill-tenant-secrets --no-verify-jwt
 
+      # Push nativas de la app móvil. JWT requerido a nivel platform: la llaman el
+      # backend con la service-role key y el propio usuario con su JWT, y ambas
+      # pasan la verificación. Además valida el caller por su cuenta (solo interno
+      # o el usuario sobre sí mismo). Sin FCM_SERVICE_ACCOUNT responde
+      # not_configured, así que es seguro desplegarla antes de configurar Firebase.
+      - name: Deploy send-push (JWT requerido — service-role del backend o JWT del propio usuario)
+        run: bash .github/scripts/deploy-fn.sh send-push
+
       # Workers de cron: los invoca pg_cron/pg_net con un secreto propio, nunca el
       # navegador. verify_jwt debe ser false porque no llega ningún JWT de usuario.
       - name: Deploy process-email-queue (no JWT — worker de pg_cron; auth por CRON_SECRET en tiempo constante)
