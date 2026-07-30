@@ -127,9 +127,16 @@ no rompe nada.
 
 ## 4. Notas de diseño (por qué)
 
-- **Sesión persistente en nativo**: `src/lib/supabase.ts` usa
-  `@capacitor/preferences` en nativo (el `sessionStorage` del WebView se borra al
-  cerrar la app) y mantiene `sessionStorage` en web (endurecimiento anti-XSS).
+- **Sesión persistente en nativo**: `src/lib/supabase.ts` usa `localStorage` en
+  nativo (el `sessionStorage` del WebView se vacía al cerrar la app) y mantiene
+  `sessionStorage` en web (endurecimiento anti-XSS).
+  Se probó antes con `@capacitor/preferences` y **se revirtió**: en un iPhone real
+  el login se colgaba — el token llegaba correctamente pero el guardado asíncrono
+  de la sesión quedaba pendiente y `signInWithPassword` nunca resolvía, así que el
+  usuario solo veía "la conexión tardó demasiado" a los 20 s. Un storage síncrono
+  no puede introducir ese cuelgue. En la app nativa el WebView solo carga nuestro
+  propio bundle (no hay contenido remoto), así que no aplica el motivo por el que
+  la web evita `localStorage`.
 - **PKCE solo en nativo**: activarlo también en web rompería la recuperación de
   contraseña, porque el *code verifier* vive en `sessionStorage` y no sobrevive a
   abrir el enlace del correo en otra pestaña o navegador.
