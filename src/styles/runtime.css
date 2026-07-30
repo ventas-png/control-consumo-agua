@@ -77,6 +77,31 @@
   .app-backdrop { display: block !important; }
   .app-hamburger { display: flex !important; }
   .app-main { padding: 16px !important; }
+
+  /* ── Sin desplazamiento horizontal en teléfonos ──────────────────────────
+   * Medido en un iPhone real (app nativa): viewport 352px, documento 402px —
+   * la página entera se podía arrastrar de lado y el contenido quedaba cortado
+   * por la izquierda. Tres causas, de la más concreta a la más general:
+   *
+   * 1) Los <input type="date"> de Safari iOS tienen un ancho intrínseco mínimo
+   *    y NO se encogen: una fila con dos fechas (p. ej. el filtro "Período")
+   *    empuja el layout mucho más allá del ancho de la pantalla. */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  input[type="month"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* 2) Palabras largas sin espacios (títulos como "Administrador de Empresa",
+   *    correos, URLs) fuerzan el ancho del contenedor si no se permiten cortar. */
+  .app-main h1,
+  .app-main h2,
+  .app-main h3 { overflow-wrap: anywhere; }
+  /* 3) Red de seguridad: el shell no debe panear de lado pase lo que pase. No
+   *    afecta a las tablas ni a la tira de pestañas, que scrollean dentro de su
+   *    propio contenedor con overflow-x: auto. */
+  .app-main { overflow-x: hidden; }
   /* Topbar en móvil: el alto fijo de 62px (inline) + flex-wrap hacía que la
    * 2ª fila (campana/tema/usuario) se desbordara y quedara SUPERPUESTA sobre el
    * contenido. height:auto + min-height deja que crezca al envolver; el grupo
