@@ -200,6 +200,13 @@ export async function appUserProfileExists(userId: string): Promise<boolean> {
     .eq('id', userId)
     .maybeSingle()
   reportDegradedQuery('auth.appUserProfileExists', error)
+  // Un fallo de la consulta NO significa "no tiene perfil": devolver false haría
+  // que un usuario existente cayera en el onboarding de cuenta nueva. Se propaga
+  // el error para que el caller lo trate como fallo recuperable y ofrezca
+  // reintentar. Importa sobre todo en la app móvil: como la sesión de app vive en
+  // sessionStorage (que el WebView borra al cerrar la app), este chequeo corre en
+  // CADA arranque en frío, y ahí las redes móviles fallan con frecuencia.
+  if (error) throw new Error(error.message)
   return !!data
 }
 

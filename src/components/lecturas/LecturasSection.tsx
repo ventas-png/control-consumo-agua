@@ -15,6 +15,8 @@ import {
   sincronizarPendientes,
 } from '../../lib/lecturasOutbox'
 import { APP_CONFIG } from '../../lib/config'
+import { watchLocation } from '../../lib/nativeGeo'
+import { isNative } from '../../lib/platform'
 
 interface Props {
   clientes: Cliente[]
@@ -126,27 +128,23 @@ export function LecturasSection({
   // El flag "medidor reseteado" es por-lectura: limpiarlo al cambiar de contexto.
   useEffect(() => { setResetContador(false) }, [selectedUnidadId, selectedContadorId])
 
-  // GPS automático con watchPosition
+  // GPS automático. En web usa navigator.geolocation; en la app nativa usa
+  // @capacitor/geolocation (pide permiso del SO y funciona en iOS WKWebView,
+  // donde navigator.geolocation no está disponible). Ver src/lib/nativeGeo.ts.
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsError('Geolocalización no disponible en este dispositivo')
-      return
-    }
     setGpsLoading(true)
     setGpsError(null)
-    const watchId = navigator.geolocation.watchPosition(
-      pos => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    return watchLocation(
+      ({ lat, lng }) => {
+        setGps({ lat, lng })
         setGpsLoading(false)
         setGpsError(null)
       },
-      err => {
+      message => {
         setGpsLoading(false)
-        setGpsError(err.message)
+        setGpsError(message)
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     )
-    return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
   // Quién puede registrar lecturas se decide por permiso RBAC (agua.lecturas.create),
@@ -220,13 +218,26 @@ export function LecturasSection({
       ? calcularCostoTarifa(consumoEfectivo, tarifaDelContador, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
 
-  function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
+  function aplicarFoto(f: File) {
     setFotoFile(f)
     const reader = new FileReader()
     reader.onload = ev => setFoto(ev.target?.result as string)
     reader.readAsDataURL(f)
+  }
+
+  function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    aplicarFoto(f)
+  }
+
+  // Foto del medidor. En la app nativa abrimos la cámara del SO
+  // (@capacitor/camera): permisos nativos y captura más fiable que el <input
+  // capture> dentro del WebView, sobre todo en iOS. En web no cambia nada.
+  async function handlePhotoNativa() {
+    const { takeNativePhoto } = await import('../../lib/nativeCamera')
+    const f = await takeNativePhoto(true)
+    if (f) aplicarFoto(f)
   }
 
   function enviarWhatsApp(registro: Registro) {
@@ -772,10 +783,22 @@ export function LecturasSection({
                     )}
                   </div>
                   <div>
-                    <label style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block' }}>
-                      <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
-                      {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
-                    </label>
+                    {/* En nativo el <label>+<input file> se sustituye por un botón
+                        que abre la cámara del SO; en web se mantiene igual. */}
+                    {isNative() ? (
+                      <button
+                        type="button"
+                        onClick={handlePhotoNativa}
+                        style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block', width: '100%', color: 'inherit', font: 'inherit' }}
+                      >
+                        {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
+                      </button>
+                    ) : (
+                      <label style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block' }}>
+                        <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
+                        {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
+                      </label>
+                    )}
                   </div>
                 </div>
 

@@ -19,6 +19,9 @@ import { FeatureFlagsProvider } from './lib/featureFlags'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 import { applyStoredConsent } from './lib/cookieConsent'
+import { isNative } from './lib/platform'
+import { initNativeApp } from './lib/nativeApp'
+import { initNativeAuthListener } from './lib/nativeAuth'
 
 // Error monitoring + product analytics. Both no-op without their env vars.
 // PostHog arranca OPTED-OUT (RGPD); aplicamos el consentimiento ya guardado para que
@@ -64,7 +67,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <BrowserRouter>
                 <App />
               </BrowserRouter>
-              <PwaUpdatePrompt />
+              {/* El aviso de actualización de la PWA (service worker) solo aplica
+                  en web. En la app nativa el bundle se sirve localmente y se
+                  actualiza vía las tiendas, así que no se registra ningún SW. */}
+              {!isNative() && <PwaUpdatePrompt />}
               <PromptDialogRoot />
               <CookieConsent />
             </DialogProvider>
@@ -74,3 +80,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>
 )
+
+// Inicialización nativa (Capacitor). No-op en web: ajusta la barra de estado,
+// oculta el splash y registra el listener de deep links que completa el login
+// con Google (ver src/lib/nativeAuth.ts).
+initNativeApp()
+initNativeAuthListener()

@@ -35,6 +35,13 @@ describe('appUserProfileExists', () => {
     maybeSingle.mockResolvedValueOnce({ data: null, error: null })
     expect(await appUserProfileExists('u1')).toBe(false)
   })
+  // Distinguir "no hay perfil" de "la consulta falló": si el error se tragara
+  // devolviendo false, un usuario existente entraría al onboarding de cuenta
+  // nueva cada vez que la red fallara (caso frecuente en la app móvil).
+  it('error de consulta → lanza, no lo confunde con "sin perfil"', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: null, error: { message: 'network error' } })
+    await expect(appUserProfileExists('u1')).rejects.toThrow('network error')
+  })
 })
 
 describe('buildPermissionsSet', () => {
