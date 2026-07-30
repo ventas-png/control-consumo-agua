@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient, type SupportedStorage } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database.types'
 import { extractOAuthCallbackError, type OAuthCallbackError } from '../domain/auth/oauthCallbackError'
 import { isNative } from './platform'
@@ -13,35 +13,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Almacenamiento de la sesión según plataforma:
 //   - Web: sessionStorage. Endurecimiento anti-XSS (nunca localStorage) — la sesión
 //     no sobrevive al cierre de la pestaña, decisión de seguridad previa.
-//   - Nativo (Capacitor): el sessionStorage del WebView se borra al terminar el
-//     proceso, así que la sesión no sobreviviría a cerrar la app. Usamos
-//     @capacitor/preferences (almacenamiento del SO, fuera del alcance del XSS del
-//     WebView) para que el usuario siga autenticado al reabrir.
-// El adaptador es asíncrono (soportado por supabase-js); el plugin se carga de
-// forma perezosa y se cachea la promesa para no re-importarlo en cada acceso.
-let preferencesPromise: Promise<typeof import('@capacitor/preferences')['Preferences']> | null = null
-function getPreferences() {
-  if (!preferencesPromise) {
-    preferencesPromise = import('@capacitor/preferences').then((m) => m.Preferences)
-  }
-  return preferencesPromise
-}
-
-const capacitorPreferencesStorage: SupportedStorage = {
-  async getItem(key) {
-    const Preferences = await getPreferences()
-    const { value } = await Preferences.get({ key })
-    return value
-  },
-  async setItem(key, value) {
-    const Preferences = await getPreferences()
-    await Preferences.set({ key, value })
-  },
-  async removeItem(key) {
-    const Preferences = await getPreferences()
-    await Preferences.remove({ key })
-  },
-}
+//   - Nativo (Capacitor): sessionStorage se vacía al terminar el proceso del
+//     WebView, así que la sesión no sobreviviría a cerrar la app; localStorage sí
+//     persiste entre aperturas y es SÍNCRONO.
+//
+// Aquí hubo un adaptador asíncrono sobre @capacitor/preferences. Se revirtió: en
+// un iPhone real el login se colgaba: el token llegaba (respuesta HTTP correcta)
+// pero `signInWithPassword` nunca resolvía porque el guardado de sesión se quedaba
+// pendiente, y el usuario solo veía "la conexión tardó demasiado" a los 20 s.
+// Un storage síncrono no puede introducir ese cuelgue.
+//
+// El cambio no debilita la defensa que motivó sessionStorage en web: allí protege
+// frente a XSS con contenido de terceros, mientras que en la app nativa el WebView
+// solo carga nuestro propio bundle empaquetado (no hay contenido remoto), y
+// Preferences tampoco aportaba aislamiento real frente a ese código.
+const nativeSessionStorage = isNative() ? window.localStorage : window.sessionStorage
 
 // Intercept Gmail OAuth callbacks BEFORE Supabase initializes.
 // With detectSessionInUrl: true, Supabase would try to exchange any ?code= param
@@ -92,7 +78,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: isNative() ? capacitorPreferencesStorage : window.sessionStorage,
+    storage: nativeSessionStorage,
     // PKCE SOLO en nativo. El deep link del login con Google vuelve con ?code=
     // y src/lib/nativeAuth.ts lo canjea con exchangeCodeForSession, que exige
     // PKCE; con el flujo implícito (default de supabase-js) GoTrue devolvería
