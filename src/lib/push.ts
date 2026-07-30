@@ -25,13 +25,15 @@ export async function initPushNotifications(userId: string): Promise<void> {
     if (perm.receive !== 'granted') return
 
     // El token llega de forma asíncrona por el evento 'registration'.
+    // Se registra con una función SECURITY DEFINER en vez de un upsert directo:
+    // si otro usuario había iniciado sesión antes en este mismo teléfono, la fila
+    // del token es suya y RLS bloquearía el update (ver la migración).
     await PushNotifications.addListener('registration', (token) => {
       void supabase
-        .from('device_tokens')
-        .upsert(
-          { user_id: userId, token: token.value, platform: getPlatform() },
-          { onConflict: 'token' },
-        )
+        .rpc('register_device_token', { p_token: token.value, p_platform: getPlatform() })
+        .then(({ error }) => {
+          if (error) console.warn('[push] no se pudo registrar el token:', error.message)
+        })
     })
 
     await PushNotifications.addListener('registrationError', (err) => {

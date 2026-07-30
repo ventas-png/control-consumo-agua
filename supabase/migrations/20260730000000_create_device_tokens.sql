@@ -33,3 +33,37 @@ create policy device_tokens_update_own on public.device_tokens
 
 create policy device_tokens_delete_own on public.device_tokens
   for delete using ((select auth.uid()) = user_id);
+
+-- Registro del token del dispositivo.
+--
+-- No se hace con un upsert desde el cliente: si el usuario A cierra sesión y el
+-- usuario B entra en el MISMO teléfono, FCM/APNs devuelve el mismo token. El
+-- upsert tomaría la rama UPDATE y la policy la bloquearía (la fila todavía es de
+-- A), así que B nunca recibiría notificaciones — y la fila de A seguiría viva,
+-- con lo que las notificaciones de A llegarían al teléfono que ahora usa B.
+--
+-- SECURITY DEFINER para poder borrar la fila previa de ese token sea de quien
+-- sea, y volver a insertarla siempre a nombre de auth.uid(): un token pertenece
+-- a un único usuario, el que tiene la sesión activa en ese dispositivo.
+create or replace function public.register_device_token(p_token text, p_platform text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'no authenticated user';
+  end if;
+  if p_platform not in ('ios', 'android', 'web') then
+    raise exception 'invalid platform: %', p_platform;
+  end if;
+
+  delete from public.device_tokens where token = p_token;
+  insert into public.device_tokens (user_id, token, platform)
+  values (auth.uid(), p_token, p_platform);
+end;
+$$;
+
+revoke all on function public.register_device_token(text, text) from public, anon;
+grant execute on function public.register_device_token(text, text) to authenticated;

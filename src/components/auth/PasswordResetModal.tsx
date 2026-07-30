@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { requestPasswordReset } from '../../domain/auth/account'
+import { isNative } from '../../lib/platform'
+import { NATIVE_OAUTH_REDIRECT } from '../../lib/nativeAuth'
 import { sanitizeInput, validateEmail } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
@@ -25,7 +27,14 @@ export function PasswordResetModal({ onClose }: Props) {
     setLoading(true)
 
     try {
-      const { error } = await requestPasswordReset(cleanEmail.toLowerCase(), window.location.origin)
+      // En la app nativa window.location.origin es https://localhost /
+      // capacitor://localhost, que en un correo no lleva a ninguna parte. Se usa
+      // el deep link para que el enlace reabra la app: allí está el code_verifier
+      // del flujo PKCE y auth-js emite PASSWORD_RECOVERY al canjear el código,
+      // que es justo lo que useOAuthSession espera para mostrar el formulario.
+      // Hay que abrir el correo en el MISMO teléfono que pidió el restablecimiento.
+      const redirectTo = isNative() ? NATIVE_OAUTH_REDIRECT : window.location.origin
+      const { error } = await requestPasswordReset(cleanEmail.toLowerCase(), redirectTo)
 
       if (error) {
         setEmailError('Error al solicitar restablecimiento. Intenta de nuevo.')

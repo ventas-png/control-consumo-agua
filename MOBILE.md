@@ -143,3 +143,17 @@ no rompe nada.
 - **La CSP de `vercel.json` no aplica en nativo**: son cabeceras HTTP de Vercel y
   los archivos se sirven localmente. Por eso el CORS de las Edge Functions (paso
   2) sí hay que configurarlo aparte.
+- **Recuperación de contraseña desde la app**: en nativo el enlace del correo
+  apunta al deep link, no a `window.location.origin` (que dentro del WebView es
+  `https://localhost` y en un correo no lleva a ninguna parte). auth-js guarda el
+  *code verifier* marcado como `recovery` y al canjearlo emite
+  `PASSWORD_RECOVERY`, que es lo que la app ya escucha para mostrar el formulario.
+  **Limitación:** hay que abrir el correo en el mismo teléfono que pidió el
+  restablecimiento; desde otro dispositivo no hay verifier. Quien necesite
+  cambiarla en otro equipo puede hacerlo desde la web.
+- **Token de push por dispositivo**: se registra con la función
+  `register_device_token` (SECURITY DEFINER) en vez de un `upsert`. Si el usuario
+  A cierra sesión y B entra en el mismo teléfono, el token es el mismo: el upsert
+  quedaría bloqueado por RLS (la fila aún es de A) y, peor, las notificaciones de
+  A seguirían llegando al teléfono que ahora usa B. La función reasigna el token
+  al usuario con sesión activa de forma atómica.
