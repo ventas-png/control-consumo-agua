@@ -238,7 +238,25 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "RLS secrets no configurados — harness omitido (no-op verde). Ver src/test/rls/README.md."
+            # Igualado al gate de E2E: warning + step summary. Antes era un `echo`
+            # suelto que no dejaba rastro en la UI, así que el job aparecía como
+            # verde a secas y NADIE veía que las 22 aserciones de aislamiento
+            # multi-tenant no se habían ejecutado nunca. Un no-op invisible es
+            # peor que un fallo: se contabiliza como cobertura que no existe.
+            echo "::warning title=Harness RLS omitido::RLS_SUPABASE_URL no configurado — las aserciones de aislamiento multi-tenant NO se ejecutaron (no-op verde). Ver docs/ACTIVAR_HARNESS_RLS.md."
+            {
+              echo "### ⚠️ Harness RLS omitido — el aislamiento multi-tenant NO se verificó"
+              echo ""
+              echo "Este job quedó **verde sin correr** por falta del secreto \`RLS_SUPABASE_URL\`."
+              echo "Las aserciones que NO se ejecutaron incluyen la principal de la auditoría:"
+              echo "que dos usuarios de **empresas distintas** vean \`company_id\` **disjuntos**."
+              echo ""
+              echo "Para activarlo hay un script que crea el sandbox y lo verifica:"
+              echo "**\`docs/ACTIVAR_HARNESS_RLS.md\`** → \`scripts/seed-rls-sandbox.mjs\`."
+              echo ""
+              echo "Secretos: \`RLS_SUPABASE_URL\`, \`RLS_SUPABASE_ANON_KEY\`,"
+              echo "\`RLS_USER_A_EMAIL\`/\`RLS_USER_A_PASSWORD\`, \`RLS_USER_B_EMAIL\`/\`RLS_USER_B_PASSWORD\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - uses: actions/setup-node@v7
