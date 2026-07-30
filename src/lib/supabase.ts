@@ -1,12 +1,46 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient, type SupportedStorage } from '@supabase/supabase-js'
 import type { Database } from '../types/database.types'
 import { extractOAuthCallbackError, type OAuthCallbackError } from '../domain/auth/oauthCallbackError'
+import { isNative } from './platform'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Check your .env file.')
+}
+
+// Almacenamiento de la sesión según plataforma:
+//   - Web: sessionStorage. Endurecimiento anti-XSS (nunca localStorage) — la sesión
+//     no sobrevive al cierre de la pestaña, decisión de seguridad previa.
+//   - Nativo (Capacitor): el sessionStorage del WebView se borra al terminar el
+//     proceso, así que la sesión no sobreviviría a cerrar la app. Usamos
+//     @capacitor/preferences (almacenamiento del SO, fuera del alcance del XSS del
+//     WebView) para que el usuario siga autenticado al reabrir.
+// El adaptador es asíncrono (soportado por supabase-js); el plugin se carga de
+// forma perezosa y se cachea la promesa para no re-importarlo en cada acceso.
+let preferencesPromise: Promise<typeof import('@capacitor/preferences')['Preferences']> | null = null
+function getPreferences() {
+  if (!preferencesPromise) {
+    preferencesPromise = import('@capacitor/preferences').then((m) => m.Preferences)
+  }
+  return preferencesPromise
+}
+
+const capacitorPreferencesStorage: SupportedStorage = {
+  async getItem(key) {
+    const Preferences = await getPreferences()
+    const { value } = await Preferences.get({ key })
+    return value
+  },
+  async setItem(key, value) {
+    const Preferences = await getPreferences()
+    await Preferences.set({ key, value })
+  },
+  async removeItem(key) {
+    const Preferences = await getPreferences()
+    await Preferences.remove({ key })
+  },
 }
 
 // Intercept Gmail OAuth callbacks BEFORE Supabase initializes.
@@ -58,7 +92,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.sessionStorage,
+    storage: isNative() ? capacitorPreferencesStorage : window.sessionStorage,
+    // PKCE SOLO en nativo. El deep link del login con Google vuelve con ?code=
+    // y src/lib/nativeAuth.ts lo canjea con exchangeCodeForSession, que exige
+    // PKCE; con el flujo implícito (default de supabase-js) GoTrue devolvería
+    // #access_token= en el fragmento y el canje fallaría EN SILENCIO.
+    // En web se mantiene el implícito a propósito: PKCE exige guardar un
+    // code_verifier en el mismo storage, y la web usa sessionStorage — abrir el
+    // enlace de recuperación de contraseña en otra pestaña o navegador se
+    // quedaría sin verifier y rompería el flujo.
+    flowType: isNative() ? 'pkce' : 'implicit',
   },
   global: {
     headers: { 'x-application-name': 'aquacontrol' },

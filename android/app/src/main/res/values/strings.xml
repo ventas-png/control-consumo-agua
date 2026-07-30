@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AdministraTodo</string>
+    <string name="title_activity_main">AdministraTodo</string>
+    <string name="package_name">com.administratodo.app</string>
+    <string name="custom_url_scheme">com.administratodo.app</string>
+</resources>

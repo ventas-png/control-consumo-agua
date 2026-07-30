@@ -5,7 +5,7 @@
 //   - hooks/auth/useCredentialsLogin   — login email/contraseña + step-up MFA + Google
 // useAuth conserva la API pública intacta (App.tsx es su único consumidor) y
 // las acciones que tocan la sesión completa (logout, updateProfile).
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { confirm } from '../components/shared/Dialog'
 import type { UserSession } from '../types'
 import { supabase } from '../lib/supabase'
@@ -16,6 +16,7 @@ import { updateAppUserName } from '../domain/auth/account'
 import { useOAuthSession } from './auth/useOAuthSession'
 import { useSessionMaintenance } from './auth/useSessionMaintenance'
 import { useCredentialsLogin } from './auth/useCredentialsLogin'
+import { isNative } from '../lib/platform'
 
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
@@ -25,6 +26,14 @@ export function useAuth() {
   useSessionMaintenance(currentUser, setCurrentUser)
   const { login, loginWithGoogle, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } =
     useCredentialsLogin(setCurrentUser)
+
+  // Push nativas: registrar el dispositivo cuando hay sesión activa. No-op en web
+  // y si FCM/APNs todavía no están configurados (ver src/lib/push.ts).
+  const pushUserId = currentUser?.user_id
+  useEffect(() => {
+    if (!pushUserId || !isNative()) return
+    void import('../lib/push').then(({ initPushNotifications }) => initPushNotifications(pushUserId))
+  }, [pushUserId])
 
   const logout = useCallback(async () => {
     // F3.2: confirm() de shared/Dialog (Radix AlertDialog + a11y).

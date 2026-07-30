@@ -10,6 +10,7 @@ import { logSecurityEvent } from '../../lib/security'
 import { measureSLO, reportSLOError } from '../../lib/slo'
 import { storeSession } from '../../lib/authSession'
 import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../../lib/loginRateLimit'
+import { isNative } from '../../lib/platform'
 import { buildSessionFromSupabase } from '../../domain/auth/session'
 import { waitForLateSession } from '../../domain/auth/lateSession'
 import { type MfaChallenge, needsTotpStepUp, findVerifiedTotpFactor, isValidTotpCode, classifyMfaVerifyError } from '../../domain/auth/mfa'
@@ -202,6 +203,13 @@ export function useCredentialsLogin(setCurrentUser: (s: UserSession) => void) {
   }, [])
 
   const loginWithGoogle = useCallback(async (): Promise<string | null> => {
+    // En la app nativa el redirect web no sirve: el WebView no puede recibir el
+    // callback de Google. Se usa el navegador del sistema + deep link y el canje
+    // PKCE lo hace el listener de appUrlOpen (ver src/lib/nativeAuth.ts).
+    if (isNative()) {
+      const { nativeGoogleLogin } = await import('../../lib/nativeAuth')
+      return nativeGoogleLogin()
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
