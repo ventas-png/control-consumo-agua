@@ -3,6 +3,7 @@
 # Verificación EJECUTABLE de la trazabilidad de usuario
 #   20260731000000_trazabilidad_creado_por.sql
 #   20260731000100_bitacora_acciones_trigger.sql
+#   20260731000200_retencion_bitacora.sql
 #
 # POR QUÉ EXISTE
 # Ninguna de las dos migraciones es SQL trivial: son DO blocks con DDL dinámico
@@ -25,8 +26,10 @@
 #         escrituras de sistema, hereda el scope del padre en tablas hijas,
 #         guarda solo el delta y traduce el cambio de estado a acción
 #
-# Además comprueba IDEMPOTENCIA (re-aplicar no rompe) y —lo más importante del
-# trigger de bitácora— que un fallo suyo NO tumbe la escritura original.
+# Además comprueba IDEMPOTENCIA (re-aplicar no rompe), que un fallo del trigger
+# de bitácora NO tumbe la escritura original, y que la reescritura de
+# purgar_datos_expirados() no colisione con la firma vigente ni pierda pasos —
+# el preview de este PR falló justamente por ahí (42P13).
 #
 # USO
 #   supabase/tests/trazabilidad/run.sh
@@ -39,6 +42,8 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIG_SELLO="$RAIZ/supabase/migrations/20260731000000_trazabilidad_creado_por.sql"
 MIG_BITACORA="$RAIZ/supabase/migrations/20260731000100_bitacora_acciones_trigger.sql"
+MIG_RETENCION="$RAIZ/supabase/migrations/20260731000200_retencion_bitacora.sql"
+FN_VIGENTE="$RAIZ/supabase/migrations/20260723000000_purga_fotos_registros.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -75,18 +80,18 @@ psql -q -d postgres -c "CREATE DATABASE traz" >/dev/null
 # comprobar los REVOKE igual que en Supabase.
 psql -q -d traz -c "CREATE ROLE anon; CREATE ROLE authenticated;" >/dev/null 2>&1 || true
 
-echo "── 1/4 · fixture + migraciones + 14 invariantes ────────────────────────"
+echo "── 1/5 · fixture + migraciones + 14 invariantes ────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d traz -f "$AQUI/fixture.sql"     >/dev/null
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d traz -f "$MIG_SELLO"           >/dev/null
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d traz -f "$MIG_BITACORA"        >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d traz -f "$AQUI/assert.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 2/4 · idempotencia (re-aplicar ambas migraciones) ───────────────────"
+echo "── 2/5 · idempotencia (re-aplicar ambas migraciones) ───────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d traz -f "$MIG_SELLO"    >/dev/null
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d traz -f "$MIG_BITACORA" >/dev/null
 echo "  OK    re-aplicar no falla (ADD COLUMN IF NOT EXISTS + DROP/CREATE TRIGGER)"
 
-echo "── 3/4 · un fallo de la bitácora NO tumba la escritura del usuario ─────"
+echo "── 3/5 · un fallo de la bitácora NO tumba la escritura del usuario ─────"
 # La invariante que justifica el EXCEPTION WHEN OTHERS del trigger AFTER: si la
 # bitácora revienta, la lectura/limpieza que la persona estaba guardando se
 # guarda igual. Se fuerza el fallo rompiendo la tabla de destino.
@@ -110,7 +115,7 @@ else
 fi
 psql -q -d traz -c "ALTER TABLE public.bitacora_acciones DROP CONSTRAINT revienta" >/dev/null
 
-echo "── 4/4 · las funciones de sellado no quedan anon-ejecutables ───────────"
+echo "── 4/5 · las funciones de sellado no quedan anon-ejecutables ───────────"
 # Regresa-guarda de #378/#380: CREATE FUNCTION concede EXECUTE a PUBLIC por
 # defecto, y security-guard.yml falla el build si eso llega a producción.
 for fn in "public.sellar_actor()" "public.sellar_cierre()" "public.registrar_bitacora()"; do
@@ -121,6 +126,44 @@ for fn in "public.sellar_actor()" "public.sellar_cierre()" "public.registrar_bit
     echo "  ❌    anon puede ejecutar $fn"; exit 1
   fi
 done
+
+echo "── 5/5 · retención: la firma de purgar_datos_expirados() no colisiona ──"
+# El preview de Supabase falló con «cannot change name of input parameter
+# "p_dias_fotos"» (42P13): la función vigente ya tenía 5 parámetros por
+# 20260723000000, no los 4 que suponía la migración. Postgres identifica las
+# funciones por (nombre, tipos) y CREATE OR REPLACE no renombra parámetros.
+# Aquí se reproduce el escenario real —función de 5 args primero— para que la
+# deriva de firma se cace en local y no en el preview.
+psql -q -d postgres -c "CREATE DATABASE ret" >/dev/null
+psql -q -d ret -c "CREATE ROLE anon; CREATE ROLE authenticated;" >/dev/null 2>&1 || true
+# Se extrae solo el CREATE FUNCTION de la migración vigente (el resto usa pg_net
+# y Vault, que no existen en un Postgres pelado).
+awk '/^CREATE OR REPLACE FUNCTION public.purgar_datos_expirados\(/,/^\$\$;$/' \
+  "$FN_VIGENTE" > "$DATA/fn_vigente.sql"
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d ret -f "$DATA/fn_vigente.sql" >/dev/null
+
+SALIDA=$(psql -v ON_ERROR_STOP=1 -d ret -f "$MIG_RETENCION" 2>&1) || {
+  echo "  ❌    la migración de retención falló:"; echo "$SALIDA" | grep -i error; exit 1; }
+
+params=$(psql -tAq -d ret -c "SELECT array_to_string(proargnames,',') FROM pg_proc WHERE proname='purgar_datos_expirados'")
+esperado="p_meses_audit,p_meses_notif,p_meses_email,p_dias_soft_del,p_dias_fotos,p_meses_bitacora"
+if [ "$params" = "$esperado" ]; then
+  echo "  OK    p_dias_fotos conserva nombre y posición; p_meses_bitacora se suma al final"
+else
+  echo "  ❌    firma inesperada: $params"; exit 1
+fi
+
+n=$(psql -tAq -d ret -c "SELECT count(*) FROM pg_proc WHERE proname='purgar_datos_expirados'")
+[ "$n" = "1" ] && echo "  OK    queda UNA sola función (el cron la llama sin args)" \
+               || { echo "  ❌    quedaron $n funciones homónimas: la llamada del cron sería ambigua"; exit 1; }
+
+# El paso de fotos base64 debe SEGUIR existiendo: un CREATE OR REPLACE que se
+# olvide de reproducirlo lo borraría en silencio.
+if psql -tAq -d ret -c "SELECT prosrc FROM pg_proc WHERE proname='purgar_datos_expirados'" | grep -q "fotos_base64"; then
+  echo "  OK    el paso de purga de fotos sigue en la función"
+else
+  echo "  ❌    la reescritura PERDIÓ el paso de fotos base64"; exit 1
+fi
 
 echo
 echo "✅ trazabilidad: todas las invariantes pasan"

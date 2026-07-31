@@ -1,31 +1,36 @@
 -- ============================================================================
 -- Retención de `bitacora_acciones` (24 meses)
 -- ============================================================================
--- La migración 20260731000100 puso triggers que escriben en bitacora_acciones en
--- ~39 tablas de hechos. Sin política de retención esa tabla crece sin límite:
--- es EXACTAMENTE el hallazgo D8 de AUDITORIA_LOGICA_SAAS_2026-07-16
--- ("cero particionado y cero retención") y además retendría datos personales
--- (nombre de usuario) indefinidamente. Por eso la retención entra en la misma
--- entrega que el trigger, no después.
+-- La migración 20260731000100 puso triggers que escriben en bitacora_acciones
+-- en ~39 tablas de hechos. Sin política de retención esa tabla crece sin límite
+-- (hallazgo D8 de AUDITORIA_LOGICA_SAAS_2026-07-16) y además retendría datos
+-- personales —el nombre del usuario— indefinidamente. Por eso la retención va
+-- en la misma entrega que el trigger, no después.
 --
--- 24 meses: más que audit_log (18) porque la bitácora es la vista que consulta
--- el administrador del condominio para revisar el ejercicio anterior completo,
--- y pesa mucho menos por fila (delta legible en vez del row entero).
+-- POR QUÉ SE REESCRIBE LA FUNCIÓN ENTERA. Postgres identifica las funciones por
+-- (nombre, tipos de argumentos) y CREATE OR REPLACE no permite RENOMBRAR un
+-- parámetro existente: agregar `p_meses_bitacora` como 5º daría
+-- «cannot change name of input parameter "p_dias_fotos"» (42P13), que es
+-- exactamente lo que falló en el preview de este PR. El 6º parámetro se agrega
+-- AL FINAL y `p_dias_fotos` conserva su nombre y su posición.
 --
--- La firma de purgar_datos_expirados() cambia de 4 a 5 parámetros. Hay que
--- DROPear la anterior: dos funciones homónimas con todos los parámetros por
--- defecto harían ambigua la llamada sin argumentos que hace el cron
--- ("function purgar_datos_expirados() is not unique").
+-- El cuerpo se reproduce COMPLETO desde 20260723000000 —incluido el paso de
+-- fotos base64— porque un CREATE OR REPLACE parcial borraría los pasos que no
+-- se repitan. El resto queda idéntico: solo se suma el bloque de bitácora.
 -- ============================================================================
 
-DROP FUNCTION IF EXISTS public.purgar_datos_expirados(int, int, int, int);
+-- La firma vigente es la de 5 args (20260723000000). Se DROPea para poder
+-- cambiarla: dos funciones homónimas con todos los parámetros por defecto
+-- harían ambigua la llamada sin argumentos que hace el cron.
+DROP FUNCTION IF EXISTS public.purgar_datos_expirados(int, int, int, int, int);
 
 CREATE OR REPLACE FUNCTION public.purgar_datos_expirados(
-  p_meses_audit     int DEFAULT 18,
-  p_meses_notif     int DEFAULT 6,
-  p_meses_email     int DEFAULT 3,
-  p_dias_soft_del   int DEFAULT 90,
-  p_meses_bitacora  int DEFAULT 24
+  p_meses_audit    int DEFAULT 18,
+  p_meses_notif    int DEFAULT 6,
+  p_meses_email    int DEFAULT 3,
+  p_dias_soft_del  int DEFAULT 90,
+  p_dias_fotos     int DEFAULT 90,
+  p_meses_bitacora int DEFAULT 24
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -47,6 +52,11 @@ BEGIN
   END;
 
   -- ── bitacora_acciones > p_meses_bitacora ───────────────────────────────
+  -- La alimenta trg_bitacora (20260731000100) desde ~39 tablas de hechos. Sin
+  -- esto crecería sin límite y retendría el nombre del usuario para siempre:
+  -- es el hallazgo D8 de AUDITORIA_LOGICA_SAAS_2026-07-16. 24 meses (más que
+  -- audit_log) porque es la vista que consulta el administrador para revisar el
+  -- ejercicio anterior completo, y pesa mucho menos por fila.
   BEGIN
     DELETE FROM public.bitacora_acciones
     WHERE created_at < now() - make_interval(months => p_meses_bitacora);
@@ -130,33 +140,35 @@ BEGIN
     v_resultado := v_resultado || jsonb_build_object('tickets_mantenimiento_error', SQLERRM);
   END;
 
+  -- ── fotos base64 de lecturas > p_dias_fotos: liberar el bloat inline ──────
+  -- Solo el formato base64 (data-URI en la columna). Se pasa a NULL: se conserva
+  -- TODO el dato de la lectura, solo se descarta la imagen. Los objetos de
+  -- Storage (formato path) los limpia la Edge Function purgar-fotos-registros.
+  -- No se filtra por estado (política: todas) ni por deleted_at (también las
+  -- soft-deleted que sobreviven por guards de FK).
+  BEGIN
+    UPDATE public.registros
+    SET foto = NULL
+    WHERE foto LIKE 'data:%'
+      AND fecha < now() - make_interval(days => p_dias_fotos);
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    v_resultado := v_resultado || jsonb_build_object('fotos_base64', v_n);
+  EXCEPTION WHEN OTHERS THEN
+    v_resultado := v_resultado || jsonb_build_object('fotos_base64_error', SQLERRM);
+  END;
+
   v_resultado := v_resultado || jsonb_build_object('ejecutado_en', now());
   RETURN v_resultado;
 END;
 $$;
 
-COMMENT ON FUNCTION public.purgar_datos_expirados(int, int, int, int, int) IS
-  'Purga programada por política de retención (audit 18m, bitácora 24m, notif 6m, email terminal 3m, soft-deleted 90d con guards de FK). Cada paso aislado con EXCEPTION; devuelve jsonb con conteos/errores por tabla. Auditoría 2026-07-16 E3 + trazabilidad 2026-07-31.';
+COMMENT ON FUNCTION public.purgar_datos_expirados(int, int, int, int, int, int) IS
+  'Purga programada por política de retención (audit 18m, bitácora 24m, notif 6m, email terminal 3m, soft-deleted 90d con guards de FK, fotos base64 de lecturas >90d). Cada paso aislado con EXCEPTION; devuelve jsonb con conteos/errores por tabla. Auditoría 2026-07-16 E3 + fotos 2026-07-23 + trazabilidad 2026-07-31.';
 
 -- Solo el cron (service context) la ejecuta — jamás un cliente.
-REVOKE EXECUTE ON FUNCTION public.purgar_datos_expirados(int, int, int, int, int)
+REVOKE EXECUTE ON FUNCTION public.purgar_datos_expirados(int, int, int, int, int, int)
   FROM PUBLIC, anon, authenticated;
 
--- ── Re-agendar el cron ──────────────────────────────────────────────────────
--- El DROP de la firma anterior deja el job apuntando a una función que ya no
--- existe con esa signatura; se reprograma igual (día 1, 03:00 UTC).
-DO $$
-BEGIN
-  PERFORM cron.unschedule(jobid)
-  FROM cron.job
-  WHERE jobname = 'purgar_datos_expirados';
-EXCEPTION WHEN OTHERS THEN
-  NULL;
-END;
-$$;
-
-SELECT cron.schedule(
-  'purgar_datos_expirados',
-  '0 3 1 * *',
-  $$SELECT public.purgar_datos_expirados()$$
-);
+-- El cron mensual `purgar_datos_expirados` ('0 3 1 * *') llama la función SIN
+-- argumentos, así que resuelve por defaults a esta versión. No se reprograma:
+-- tocar el schedule aquí duplicaría el job si el unschedule fallara.
