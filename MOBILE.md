@@ -125,7 +125,31 @@ no rompe nada.
 
 ---
 
-## 4. Notas de diseño (por qué)
+## 4. Layout en teléfono (shell responsive)
+
+Todo el CSS del shell móvil vive en **un solo sitio**: el bloque
+`@media (max-width: 767px)` de `src/index.css`. `src/styles/runtime.css` se
+carga *después* (ver los imports de `src/main.tsx`), así que cualquier regla
+duplicada allí gana la cascada aunque no lleve `!important` — que es
+exactamente cómo apareció el bug del menú que se veía sin abrirlo. Si tocas el
+drawer, hazlo en `index.css`.
+
+| Decisión | Por qué |
+| --- | --- |
+| El drawer se esconde con `translateX(-100%)`, nunca con píxeles | Su ancho es `min(280px, 85vw)`. Un desplazamiento fijo de `-256px` dejaba **24px del menú dentro de la pantalla** en cualquier teléfono de ≥330px: como va con `z-index: 200`, tapaba el borde izquierdo de todas las vistas (títulos y breadcrumbs cortados) sin que nadie hubiera tocado el hamburguesa. |
+| La sombra del drawer solo con `.open` | `box-shadow: 0 0 30px` no tiene desplazamiento, así que con el panel fuera de pantalla el halo se seguía dibujando sobre los primeros 30px del contenido. |
+| `.app-shell` mide `100dvh` y el scroll vive en `.app-main` | Antes el shell solo tenía `min-height: 100vh` y ningún alto definido, así que `.app-main` crecía con el contenido y el que scrolleaba era el documento: al bajar, la topbar (con el botón de menú) se iba de pantalla y el contenido se metía bajo la barra de estado de iOS, transparente por `viewport-fit=cover`. Se deja `100vh` como fallback para WebViews sin soporte de `dvh`. |
+| `scrollAppToTop()` (`src/lib/scroll.ts`) en vez de `window.scrollTo` | Consecuencia de lo anterior: en teléfono el documento no scrollea, así que un `window.scrollTo` es un no-op. El helper elige el contenedor que sí tiene scroll. |
+| Los sub-menús de sección usan `<TabStrip>` | Una sola fila con scroll horizontal, el patrón que ya tenía Condominios. Con `flex-wrap`, un módulo como Contabilidad (9 pestañas) ocupaba cuatro líneas antes de llegar al contenido. |
+
+Los tres invariantes que conviene comprobar al tocar esto, en un viewport de
+teléfono: el drawer cerrado no asoma ni un píxel, `document.scrollWidth` no
+supera el ancho del viewport, y el documento no scrollea en vertical (lo hace
+`.app-main`).
+
+---
+
+## 5. Notas de diseño (por qué)
 
 - **Sesión persistente en nativo**: `src/lib/supabase.ts` usa `localStorage` en
   nativo (el `sessionStorage` del WebView se vacía al cerrar la app) y mantiene

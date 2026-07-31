@@ -16,6 +16,7 @@ import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
 import { AccessDenied } from '../shared/AccessDenied'
 import { MediaScopeProvider } from '../shared/MediaScopeContext'
+import { TabStrip } from '../shared/TabStrip'
 import { ActiveCondominioProvider, useActiveCondominio } from './ActiveCondominioContext'
 import { CondominioContextBar } from './CondominioContextBar'
 import type {
@@ -816,32 +817,18 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
           <CondominioContextBar loading={loading} />
         </div>
 
-        {/* Barra de pestañas de la sección activa (nivel 2) — scroll horizontal */}
-        <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }} role="tablist" aria-label="Pestañas de la sección activa">
-          {visibleSections.find(s => s.id === activeSection)?.tabs
-            .map(tid => TABS.find(t => t.id === tid))
-            .filter(Boolean)
-            .map(tab => {
-              if (!tab) return null
-              const activa = activeTab === tab.id
-              return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
-                  type="button" role="tab" aria-selected={activa} aria-current={activa ? 'page' : undefined}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                    fontSize: 12, fontWeight: activa ? 700 : 500,
-                    background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
-                    color: activa ? 'white' : 'var(--at-ink-3)',
-                    borderRadius: '6px 6px 0 0',
-                    borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
-                    marginBottom: -2,
-                  }}>
-                  <span aria-hidden="true">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              )
-            })}
+        {/* Barra de pestañas de la sección activa (nivel 2) — scroll horizontal.
+            El visual vive en <TabStrip>, compartido con el resto de módulos. */}
+        <div style={{ marginTop: 8 }}>
+          <TabStrip
+            ariaLabel="Pestañas de la sección activa"
+            value={activeTab}
+            onChange={(id) => setActiveTab(id as CondominioTab)}
+            items={(visibleSections.find(s => s.id === activeSection)?.tabs ?? [])
+              .map(tid => TABS.find(t => t.id === tid))
+              .filter((t): t is NonNullable<typeof t> => Boolean(t))
+              .map(t => ({ id: t.id as CondominioTab, label: t.label, icon: t.icon }))}
+          />
         </div>
 
       </div>

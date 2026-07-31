@@ -529,6 +529,24 @@ button:focus:not(:focus-visible) {
  * en mobile bloqueando todo el viewport. Ahora se oculta off-canvas y se
  * activa via .open (controlado por sidebarOpen en App.tsx). */
 @media (max-width: 767px) {
+  /* Shell a la altura EXACTA del viewport: el scroll vive dentro de .app-main.
+   *
+   * Antes el shell solo tenía `min-height: 100vh` (inline) y ningún alto
+   * definido, así que .app-main —pese a su `overflow-y: auto`— crecía con el
+   * contenido y era el DOCUMENTO el que scrolleaba. En un teléfono eso deja la
+   * topbar (y con ella el botón de menú) fuera de pantalla al bajar, y el
+   * contenido se mete bajo la barra de estado de iOS, que con
+   * `viewport-fit=cover` es transparente.
+   *
+   * `min-height: 0 !important` es necesario para ganarle al `minHeight: 100vh`
+   * inline del shell; sin eso el alto de 100dvh no serviría de nada. Se deja
+   * `100vh` como fallback para WebViews antiguas sin soporte de dvh. */
+  .app-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
   .app-sidebar {
     position: fixed !important;
     top: 0; left: 0; bottom: 0;
@@ -537,9 +555,12 @@ button:focus:not(:focus-visible) {
      * limitar a 85vw asegura que siempre quede un margen visible. */
     width: min(280px, 85vw) !important;
     min-width: min(280px, 85vw) !important;
+    /* OJO: el desplazamiento tiene que ser -100%, NUNCA un valor en px. El
+     * ancho es min(280px, 85vw), así que cualquier px fijo deja una franja del
+     * drawer dentro del viewport, tapando el borde izquierdo de TODAS las
+     * pantallas (con z-index 200) aunque nadie haya tocado el hamburguesa. */
     transform: translateX(-100%);
     z-index: 200;
-    box-shadow: 0 0 30px rgba(0,0,0,0.3);
     /* iOS safe-area: notch en iPhone X+ corta el contenido si no usamos
      * env(safe-area-inset-*) en padding. */
     padding-top: env(safe-area-inset-top, 0);
@@ -547,6 +568,10 @@ button:focus:not(:focus-visible) {
   }
   .app-sidebar.open {
     transform: translateX(0);
+    /* La sombra SOLO con el drawer abierto: `0 0 30px` no tiene desplazamiento,
+     * así que con el panel fuera de pantalla el halo se seguía dibujando sobre
+     * los primeros 30px del contenido. */
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
   }
   .app-backdrop {
     display: block !important;
@@ -554,7 +579,10 @@ button:focus:not(:focus-visible) {
   /* Main content takes full width when sidebar is off-canvas */
   .app-main {
     padding: 12px !important;
+    /* Home indicator: el último elemento no debe quedar bajo la barra táctil. */
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
     width: 100% !important;
+    -webkit-overflow-scrolling: touch;
   }
   /* iOS safe-area en topbar (notch) y main (home indicator). */
   .app-topbar {
