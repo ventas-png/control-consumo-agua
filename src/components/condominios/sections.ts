@@ -61,6 +61,7 @@ export const SECTIONS: SectionDef[] = [
   { id: 'administracion', label: 'Administración', tabs: [
     'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
     'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
+    'actividad_equipo',
     'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
     'automatizaciones', 'plantillas_mensaje', 'flujo_aprobacion', 'envio_masivo',
     'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',

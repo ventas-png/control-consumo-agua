@@ -79,7 +79,7 @@ export type CondominioTab =
   | 'cargos_adicionales' | 'programa_actividades' | 'reg_autoridades' | 'notas_admin'
   | 'control_piscina' | 'jardineria' | 'elevadores' | 'cisternas'
   | 'generador' | 'incendio' | 'camaras' | 'gas'
-  | 'recordatorios' | 'plantillas_cuota' | 'bitacora_acciones'
+  | 'recordatorios' | 'plantillas_cuota' | 'bitacora_acciones' | 'actividad_equipo'
   | 'recargos_mora' | 'convenios_cuota' | 'historial_saldos' | 'notificaciones_enviadas'
   | 'reglas_mora' | 'campanas_cobro' | 'cierre_anual' | 'kpis_financieros'
   | 'cobranza_judicial' | 'recibos_digitales' | 'informe_mensual' | 'buzon_sugerencias'
@@ -389,6 +389,7 @@ const LecturasMedidorGasTab = lazy(() => import('./tabs/LecturasMedidorGasTab'))
 const RecordatoriosTab = lazy(() => import('./tabs/RecordatoriosTab'))
 const PlantillasCuotaTab = lazy(() => import('./tabs/PlantillasCuotaTab'))
 const BitacoraAccionesTab = lazy(() => import('./tabs/BitacoraAccionesTab'))
+const ActividadEquipoTab = lazy(() => import('./tabs/ActividadEquipoTab'))
 const RecargosTab = lazy(() => import('./tabs/RecargosTab'))
 const ConveniosCuotaTab = lazy(() => import('./tabs/ConveniosCuotaTab'))
 const HistorialSaldosTab = lazy(() => import('./tabs/HistorialSaldosTab'))
@@ -697,6 +698,8 @@ export const TAB_REGISTRY: TabDef[] = [
     <PlantillasCuotaTab plantillas={ctx.plantillasCuota} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('plantillas_cuota')} canEdit={ctx.canEdit('plantillas_cuota')} onRefresh={ctx.onRefresh} /> },
   { id: 'bitacora_acciones', label: 'Bitácora', icon: '🔎', render: (ctx) =>
     <BitacoraAccionesTab bitacora={ctx.bitacoraAcciones} /> },
+  { id: 'actividad_equipo', label: 'Actividad equipo', icon: '📊', render: (ctx) =>
+    <ActividadEquipoTab proyectoId={ctx.proyectoId} companyId={ctx.cid} /> },
   { id: 'recargos_mora', label: 'Recargos mora', icon: '📈', render: (ctx) =>
     <RecargosTab recargos={ctx.recargosMora} cuotas={ctx.cuotas} reglas={ctx.reglasMora} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('recargos_mora')} canEdit={ctx.canEdit('recargos_mora')} onRefresh={ctx.onRefresh} /> },
   { id: 'convenios_cuota', label: 'Convenios pago', icon: '🤝', render: (ctx) =>
