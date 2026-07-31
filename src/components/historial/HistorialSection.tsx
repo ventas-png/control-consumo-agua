@@ -5,6 +5,7 @@ import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
+import { UsuarioChip } from '../shared/UsuarioChip'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 import {
   registroCoincide,
@@ -270,6 +271,14 @@ export function HistorialSection({
           </span>
         )
       },
+    },
+    {
+      // Trazabilidad (20260731000000): quién capturó la lectura. Las lecturas
+      // anteriores al sellado no tienen `creado_por` — de ahí `historico`, que
+      // las muestra como "—" en vez de atribuirlas al "Sistema".
+      key: 'capturo', header: 'Capturó', hideOnMobile: true,
+      accessor: r => r.creado_por ?? '',
+      render: r => <UsuarioChip userId={r.creado_por} historico />,
     },
     {
       key: 'acciones', header: 'Acciones',

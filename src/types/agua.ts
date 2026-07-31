@@ -78,6 +78,12 @@ export interface Registro {
   notas?: string;
   gps?: GPS;
   foto?: string;
+  /**
+   * Trazabilidad (migración 20260731000000): usuario que capturó la lectura.
+   * Lo sella la BD y es inmutable. `null` = escritura de sistema; ausente en
+   * las lecturas anteriores a la migración.
+   */
+  creado_por?: string | null;
 }
 
 // ── Calidad de agua ─────────────────────────────────────────────────────────

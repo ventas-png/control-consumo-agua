@@ -17,4 +17,8 @@ export const condominiosKeys = {
   // Recargos de mora (ledger recargos_mora) por empresa.
   recargosMora: (companyId?: string) =>
     [...condominiosKeys.all, 'recargos-mora', companyId ?? null] as const,
+  // Actividad operativa por usuario (RPC actividad_equipo). El rango de fechas
+  // entra en la key: cambiar el período es otra consulta, no una invalidación.
+  actividadEquipo: (projectId?: string, desde?: string, hasta?: string) =>
+    [...condominiosKeys.all, 'actividad-equipo', projectId ?? null, desde ?? null, hasta ?? null] as const,
 } as const

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Registro, Contador } from '../../../types'
 
 // HistorialSection importa la capa de mutaciones (que a su vez importa supabase,
@@ -43,8 +44,13 @@ const baseRegistro: Registro = {
   gps: { lat: 14.6349, lng: -90.5069 },
 }
 
+// La columna "Capturó" (<UsuarioChip>) resuelve el nombre del usuario con un
+// useQuery real sobre app_users, así que la sección necesita un cliente de
+// query. `retry: false` para que el fallo del fetch mockeado no reintente.
 function renderSection(registros: Registro[] = [baseRegistro]) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
+    <QueryClientProvider client={qc}>
     <HistorialSection
       registros={registros}
       clientes={[]}
@@ -52,7 +58,8 @@ function renderSection(registros: Registro[] = [baseRegistro]) {
       userRole="admin"
       moneda="Q"
       onEstadoUpdated={vi.fn()}
-    />,
+    />
+    </QueryClientProvider>,
   )
 }
 
