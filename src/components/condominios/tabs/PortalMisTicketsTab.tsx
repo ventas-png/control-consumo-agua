@@ -1,6 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { notify } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
+import { ImageGallery } from '../../shared/ImageGallery'
+import { MultiImageUploader } from '../../shared/ImageUploader'
+import { TicketChatModal } from './TicketChatModal'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchConteoComentariosTickets } from '../../../domain/condominios/tabQueries'
 import type { TicketMantenimiento } from '../../../types'
 
 interface Props {
@@ -8,6 +13,10 @@ interface Props {
   unidadId: string
   proyectoId: string
   companyId: string
+  /** Nombre con el que se firman los mensajes del residente en la conversación. */
+  autorNombre?: string
+  /** auth user id del residente: distingue sus mensajes en el hilo. */
+  autorUserId?: string
   onRefresh: () => void
 }
 
@@ -32,14 +41,34 @@ function blankForm() {
   return { titulo: '', descripcion: '', prioridad: 'media' as PrioridadTicket }
 }
 
-export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, onRefresh }: Props) {
+export function PortalMisTicketsTab({
+  tickets, unidadId, proyectoId, companyId, autorNombre = '', autorUserId, onRefresh,
+}: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState(blankForm())
+  const [fotos, setFotos]       = useState<string[]>([])
   const [filtro, setFiltro]     = useState<EstadoTicket | 'todos'>('todos')
+  const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
+  const [conteoMensajes, setConteoMensajes] = useState<Record<string, number>>({})
 
   const filtered = filtro === 'todos' ? tickets : tickets.filter(t => t.estado === filtro)
   const abiertos = tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length
+
+  // Badge "N mensajes" de cada tarjeta: un solo conteo para toda la lista, no un
+  // hilo por ticket (los hilos se bajan al abrir la conversación).
+  const ids = tickets.map(t => t.id).join(',')
+  const cargarConteos = useCallback(async () => {
+    const lista = ids ? ids.split(',') : []
+    setConteoMensajes(await fetchConteoComentariosTickets(lista))
+  }, [ids])
+  useEffect(() => { void cargarConteos() }, [cargarConteos])
+
+  function cerrarForm() {
+    setShowForm(false)
+    setForm(blankForm())
+    setFotos([])
+  }
 
   async function enviarSolicitud() {
     if (!form.titulo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el título de la solicitud.' }); return }
@@ -49,11 +78,12 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
       unidad_id: unidadId, tipo: 'correctivo',
       titulo: form.titulo.trim(), descripcion: form.descripcion.trim() || null,
       prioridad: form.prioridad, estado: 'abierto',
+      foto_urls: fotos,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'El equipo de mantenimiento la atenderá pronto.', duration: 2000 })
-    setForm(blankForm()); setShowForm(false); onRefresh()
+    cerrarForm(); onRefresh()
   }
 
   return (
@@ -69,19 +99,32 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
         </button>
       </div>
 
-      {/* Formulario */}
+      {/* Formulario — ventana emergente: el reporte no compite por espacio con la
+          lista de solicitudes, y en móvil ocupa la pantalla completa. */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
-          <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Reportar problema</h4>
+        <EditModal
+          title="Reportar problema"
+          subtitle="Cuéntenos qué necesita atención y adjunte fotos si ayudan a entenderlo."
+          size="sm"
+          onClose={cerrarForm}
+          footer={
+            <>
+              <button onClick={cerrarForm} style={{ padding: '10px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={enviarSolicitud} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer' }}>
+                {saving ? 'Enviando...' : '📤 Enviar solicitud'}
+              </button>
+            </>
+          }
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>¿Qué necesita atención? *</label>
-              <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Fuga de agua en baño, Luz quemada en pasillo..."
+              <label htmlFor="ticket-titulo" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>¿Qué necesita atención? *</label>
+              <input id="ticket-titulo" autoFocus value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Fuga de agua en baño, Luz quemada en pasillo..."
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción detallada</label>
-              <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Cuéntenos más detalles del problema..." rows={3}
+              <label htmlFor="ticket-descripcion" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción detallada</label>
+              <textarea id="ticket-descripcion" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Cuéntenos más detalles del problema..." rows={3}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
             </div>
             <div>
@@ -91,6 +134,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
                   const pc = PRIORIDAD_CONFIG[p]
                   return (
                     <button key={p} onClick={() => setForm(f => ({ ...f, prioridad: p }))}
+                      aria-pressed={form.prioridad === p}
                       style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: form.prioridad === p ? pc.color : 'var(--at-line)', background: form.prioridad === p ? pc.bg : 'var(--at-surface)', color: form.prioridad === p ? pc.color : 'var(--at-ink-3)' }}>
                       {pc.label}
                     </button>
@@ -98,14 +142,15 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
                 })}
               </div>
             </div>
+            <MultiImageUploader
+              values={fotos}
+              onChange={setFotos}
+              folder="tickets"
+              label="Fotos del problema"
+              maxFiles={4}
+            />
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button onClick={enviarSolicitud} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Enviando...' : '📤 Enviar solicitud'}
-            </button>
-            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filtros */}
@@ -126,9 +171,10 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtered.sort((a, b) => b.created_at.localeCompare(a.created_at)).map(t => {
+          {filtered.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).map(t => {
             const ec = ESTADO_CONFIG[t.estado as EstadoTicket] ?? ESTADO_CONFIG.abierto
             const pc = PRIORIDAD_CONFIG[t.prioridad as PrioridadTicket] ?? PRIORIDAD_CONFIG.media
+            const nMensajes = conteoMensajes[t.id] ?? 0
             return (
               <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.estado === 'resuelto' || t.estado === 'cerrado' ? 'var(--at-line)' : 'var(--at-primary-soft-2)'}`, borderRadius: '12px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -141,13 +187,33 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
                       <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
                       <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
+                    {t.foto_urls?.length > 0 && (
+                      <div style={{ marginTop: '8px' }}>
+                        <ImageGallery urls={t.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
                     {t.fecha_cierre && <div style={{ fontSize: '12px', color: 'var(--at-success)', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
+                    <button
+                      onClick={() => setConversacion(t)}
+                      style={{ marginTop: '9px', padding: '6px 13px', background: nMensajes > 0 ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nMensajes > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                      💬 {nMensajes > 0 ? `Conversación (${nMensajes})` : 'Escribir al equipo'}
+                    </button>
                   </div>
                 </div>
               </div>
             )
           })}
         </div>
+      )}
+
+      {conversacion && (
+        <TicketChatModal
+          ticket={conversacion}
+          companyId={companyId}
+          autorNombre={autorNombre}
+          autorUserId={autorUserId}
+          onClose={() => { setConversacion(null); void cargarConteos() }}
+        />
       )}
     </div>
   )

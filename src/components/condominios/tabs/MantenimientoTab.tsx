@@ -6,6 +6,7 @@ import { softDelete } from '../../../lib/softDelete'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
+import { TicketChatModal } from './TicketChatModal'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
   proyectoId: string
   companyId: string
   userId: string
+  /** Firma las respuestas del equipo en la conversación del ticket. */
+  autorNombre?: string
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
@@ -34,13 +37,14 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<string>('activos')
   const [busqueda, setBusqueda] = useState('')
   const [fotoUrls, setFotoUrls] = useState<string[]>([])
+  const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
   const [form, setForm] = useState({
     tipo: 'correctivo',
     titulo: '',
@@ -352,6 +356,12 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                         {t.estado.replace('_', ' ')}
                       </span>
                     )}
+                    {/* Mismo hilo que ve el residente en su portal (las notas
+                        internas quedan solo de este lado). */}
+                    <button onClick={() => setConversacion(t)} title="Conversación con el residente"
+                      style={{ padding: '4px 11px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                      💬 Conversación
+                    </button>
                     <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                   </div>
                 </div>
@@ -359,6 +369,19 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             )
           })}
         </div>
+      )}
+
+      {conversacion && (
+        <TicketChatModal
+          ticket={conversacion}
+          companyId={companyId}
+          autorNombre={autorNombre}
+          autorUserId={userId}
+          canWrite={canEdit}
+          esStaff
+          onClose={() => setConversacion(null)}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   )
