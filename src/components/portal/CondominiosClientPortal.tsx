@@ -441,6 +441,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
+                autorNombre={currentUser.name}
+                autorUserId={currentUser.user_id}
                 onRefresh={cargarDatos}
               />
             )}

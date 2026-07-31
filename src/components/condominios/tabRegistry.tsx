@@ -469,7 +469,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'amenidades', label: 'Amenidades', icon: '🏊', render: (ctx) =>
     <AmenidadesTab amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueos={ctx.bloqueosAmenidades} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('amenidades')} canEdit={ctx.canEdit('amenidades')} onRefresh={ctx.onRefresh} /> },
   { id: 'mantenimiento', label: 'Mantenimiento', icon: '🔧', render: (ctx) =>
-    <MantenimientoTab tickets={ctx.tickets} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('mantenimiento')} canEdit={ctx.canEdit('mantenimiento')} onRefresh={ctx.onRefresh} /> },
+    <MantenimientoTab tickets={ctx.tickets} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} autorNombre={ctx.currentUser.name ?? ''} proyectoNombre={ctx.proyectoActual?.nombre} canCreate={ctx.canCreate('mantenimiento')} canEdit={ctx.canEdit('mantenimiento')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunidad', label: 'Comunidad', icon: '📢', render: (ctx) =>
     <ComunidadTab anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('comunidad')} onRefresh={ctx.onRefresh} /> },
   { id: 'parqueos', label: 'Parqueos', icon: '🅿️', render: (ctx) =>
@@ -597,7 +597,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'mant_preventivo', label: 'Mant. Prev.', icon: '🔩', render: (ctx) =>
     <MantenimientoPrevTab planes={ctx.planesMantenimiento} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('mant_preventivo')} canEdit={ctx.canEdit('mant_preventivo')} onRefresh={ctx.onRefresh} /> },
   { id: 'portal', label: 'Portal Resid.', icon: '👤', render: (ctx) =>
-    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} onRefresh={ctx.onRefresh} /> },
+    <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
   { id: 'correspondencia', label: 'Correspondencia', icon: '📬', render: (ctx) =>
     <CorrespondenciaCondTab correspondencia={ctx.correspondencia} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('correspondencia')} canEdit={ctx.canEdit('correspondencia')} onRefresh={ctx.onRefresh} /> },
   { id: 'libro_novedades', label: 'Libro Novedades', icon: '📖', render: (ctx) =>

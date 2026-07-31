@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import {
   fetchCondominiosPanelData,
   fetchCondominiosSectionData,
@@ -50,7 +50,7 @@ import type {
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
   ControlPiscina, MantenimientoJardineria, IncidenciaElevador, MantenimientoCisterna,
   ControlGenerador, ControlSistemaIncendio, ControlCamaraSeguridad, LecturaMedidorGas,
-  ComentarioTicket, RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
+  RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
@@ -68,10 +68,6 @@ import type {
 // quitar tab no toca este archivo).
 import { useParams, useNavigate } from 'react-router-dom'
 import { TAB_REGISTRY, TAB_BY_ID, tabToPath, pathParamToTab, type CondominioTab, type CondominiosTabContext } from './tabRegistry'
-// Overlay: se renderiza encima del tab activo cuando hay un ticket seleccionado.
-// No es un tab del registry porque no aparece en la nav; vive aquí.
-const ComentariosTicketTab = lazy(() => import('./tabs/ComentariosTicketTab'))
-
 // Shown while a lazily-loaded tab chunk is fetched. Each tab is code-split, so
 // only the active tab's JS is downloaded instead of one ~2 MB bundle.
 function TabFallback() {
@@ -299,8 +295,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [recordatorios, setRecordatorios] = useState<RecordatorioCondominio[]>([])
   const [plantillasCuota, setPlantillasCuota] = useState<PlantillaCuota[]>([])
   const [bitacoraAcciones, setBitacoraAcciones] = useState<BitacoraAccion[]>([])
-  const [comentariosTicket] = useState<ComentarioTicket[]>([])
-  const [ticketSeleccionado, setTicketSeleccionado] = useState<import('../../types').TicketMantenimiento | null>(null)
   // Fase 29
   const [recargosMora, setRecargosMora] = useState<RecargoMora[]>([])
   const [conveniosCuota, setConveniosCuota] = useState<ConvenioCuotaCond[]>([])
@@ -845,17 +839,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
         {TAB_BY_ID[activeTab] && !canViewCondominiosTabByPermission(currentUser, activeTab)
           ? <AccessDenied />
           : TAB_BY_ID[activeTab]?.render(tabCtx)}
-        {ticketSeleccionado && (
-          <ComentariosTicketTab
-            ticket={ticketSeleccionado}
-            comentarios={comentariosTicket}
-            companyId={cid}
-            autorNombre={currentUser.name ?? ''}
-            canCreate={canCreate('mantenimiento')}
-            onRefresh={cargarDatos}
-            onClose={() => setTicketSeleccionado(null)}
-          />
-        )}
         </Suspense>
         </MediaScopeProvider>
       </div>

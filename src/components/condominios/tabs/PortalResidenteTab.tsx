@@ -26,6 +26,9 @@ interface Props {
   companyId:  string
   moneda:     string
   canEdit:    boolean
+  /** Firma los mensajes que el staff escriba desde la vista previa del portal. */
+  autorNombre?: string
+  autorUserId?: string
   onRefresh:  () => void
 }
 
@@ -42,7 +45,7 @@ const SUB_TABS: { id: PortalTab; label: string; icon: string }[] = [
 
 export function PortalResidenteTab({
   unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, visitantes, anuncios,
-  proyectoId, companyId, moneda, canEdit, onRefresh,
+  proyectoId, companyId, moneda, canEdit, autorNombre, autorUserId, onRefresh,
 }: Props) {
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [subTab, setSubTab]                     = useState<PortalTab>('cuenta')
@@ -165,6 +168,8 @@ export function PortalResidenteTab({
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
                 companyId={companyId}
+                autorNombre={autorNombre}
+                autorUserId={autorUserId}
                 onRefresh={onRefresh}
               />
             )}

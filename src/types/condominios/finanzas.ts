@@ -232,6 +232,12 @@ export interface ComentarioTicket {
   autor_nombre: string
   contenido: string
   estado_nuevo?: string | null
+  /** Paths de `condominios-media` adjuntos al mensaje (se firman al render). */
+  foto_urls: string[]
+  /** Nota interna del equipo: el residente no la ve (RLS la filtra igual). */
+  es_interno: boolean
+  /** auth.uid() sellado por la BD; identifica los mensajes propios en el hilo. */
+  creado_por?: string | null
   created_at: string
 }
 

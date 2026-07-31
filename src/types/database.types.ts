@@ -2571,7 +2571,10 @@ export type Database = {
           company_id: string
           contenido: string
           created_at: string
+          creado_por: string | null
+          es_interno: boolean
           estado_nuevo: string | null
+          foto_urls: Json
           id: string
           ticket_id: string
         }
@@ -2581,7 +2584,10 @@ export type Database = {
           company_id: string
           contenido: string
           created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
           estado_nuevo?: string | null
+          foto_urls?: Json
           id?: string
           ticket_id: string
         }
@@ -2591,7 +2597,10 @@ export type Database = {
           company_id?: string
           contenido?: string
           created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
           estado_nuevo?: string | null
+          foto_urls?: Json
           id?: string
           ticket_id?: string
         }
