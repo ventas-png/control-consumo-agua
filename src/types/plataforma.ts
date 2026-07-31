@@ -180,11 +180,30 @@ export interface MensajePortal {
   cuerpo: string
   tipo: TipoMensajePortal
   estado: EstadoMensajePortal
+  /** Paths de `condominios-media` adjuntos al mensaje (se firman al render). */
+  foto_urls: string[]
+  /** Respuesta única heredada (pre-hilo); las nuevas van a comentarios. */
   respuesta?: string | null
   respondido_en?: string | null
   created_at: string
   // joins
   unidad_nombre?: string
+}
+
+/** Mensaje del hilo de conversación de un `mensajes_portal`. */
+export interface ComentarioMensajePortal {
+  id: string
+  company_id: string
+  mensaje_id: string
+  autor_nombre: string
+  contenido: string
+  /** Paths de `condominios-media` adjuntos al mensaje. */
+  foto_urls: string[]
+  /** Nota interna del equipo: el residente no la ve (RLS la filtra igual). */
+  es_interno: boolean
+  /** auth.uid() sellado por la BD; identifica los mensajes propios en el hilo. */
+  creado_por?: string | null
+  created_at: string
 }
 
 export type EstadoProyecto = 'activo' | 'inactivo' | 'suspendido'
