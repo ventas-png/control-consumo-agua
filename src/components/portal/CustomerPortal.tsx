@@ -454,11 +454,16 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{
+        {/* Tabs — misma tira que el portal de Condominios: una sola línea con
+            scroll horizontal. Sin `overflow-x: auto` + `white-space: nowrap`
+            las 5 pestañas no caben en un teléfono: las etiquetas se partían en
+            dos líneas ("Mis / Servicios") y, aun así, la fila ensanchaba el
+            documento y TODO el portal se podía arrastrar de lado. Aquí no hay
+            red de seguridad de `.app-main`, que solo cubre el panel de admin. */}
+        <div className="tab-strip-scrollable" style={{
           maxWidth: '900px', margin: '0 auto',
           padding: '0 24px',
-          display: 'flex', gap: '4px',
+          display: 'flex', gap: '4px', overflowX: 'auto',
         }}>
           {([
             { key: 'dashboard', label: 'Dashboard', icon: '📈' },
@@ -472,14 +477,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               className={`portal-tab${tab === t.key ? ' active' : ''}`}
               onClick={() => setTab(t.key)}
               style={{
-                padding: '10px 18px',
+                padding: '10px 16px',
                 background: tab === t.key ? 'var(--at-surface)' : 'transparent',
                 color: tab === t.key ? 'var(--at-primary)' : 'rgba(255,255,255,0.85)',
                 border: 'none',
                 borderRadius: '10px 10px 0 0',
-                fontSize: '13.5px', fontWeight: 600,
+                fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.18s',
                 display: 'flex', alignItems: 'center', gap: '6px',
+                whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
               <span>{t.icon}</span> {t.label}

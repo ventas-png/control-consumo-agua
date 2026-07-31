@@ -343,7 +343,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               className={`condo-tab${tab === t.id ? ' active' : ''}`}
               onClick={() => setTab(t.id)}
               style={{
-                padding: '10px 16px', whiteSpace: 'nowrap',
+                padding: '10px 16px', whiteSpace: 'nowrap', flexShrink: 0,
                 background: tab === t.id ? 'var(--at-surface)' : 'transparent',
                 color: tab === t.id ? 'var(--at-accent-hover)' : 'rgba(255,255,255,0.85)',
                 border: 'none', borderRadius: '10px 10px 0 0',
