@@ -2,6 +2,7 @@ import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { fetchConvCountsForProject, fetchConvRowsAllProjects } from '../../domain/admin-dashboard/queries'
+import { TabStrip } from '../shared/TabStrip'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
@@ -240,36 +241,13 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
           ))}
         </div>
 
-        {/* Tabs de navegación */}
-        <div className="tab-strip-scrollable" style={{
-          display: 'flex',
-          gap: '12px',
-          borderBottom: '2px solid var(--at-line)',
-          overflowX: 'auto',
-          paddingBottom: '12px',
-        }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '10px 18px',
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span style={{ marginRight: '6px' }}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tabs de navegación — mismo <TabStrip> que el resto de módulos. */}
+        <TabStrip
+          ariaLabel="Secciones del panel"
+          items={tabs}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       {/* Contenido de pestañas */}

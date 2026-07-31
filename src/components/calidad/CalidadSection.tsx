@@ -7,6 +7,7 @@ import { fetchFuentes, fetchRegistrosCalidad, getReporteCalidadSignedUrl } from 
 import { createFuente, updateFuente, setFuenteActiva, createRegistroCalidad, uploadReporteCalidad } from '../../domain/calidad/mutations'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
 import { scrollAppToTop } from '../../lib/scroll'
+import { TabStrip, type TabStripItem } from '../shared/TabStrip'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
@@ -15,6 +16,12 @@ import { ultimaMuestraPorFuente, estadoMuestreo, MUESTREO_META } from './muestre
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
+
+const SUB_TABS: TabStripItem<SubTab>[] = [
+  { id: 'fuentes', label: 'Fuentes de Agua', icon: '🗂️' },
+  { id: 'analisis', label: 'Nuevo Análisis', icon: '🧪' },
+  { id: 'historial', label: 'Historial Calidad', icon: '📋' },
+]
 
 interface Props {
   fuentesAgua: FuenteAgua[]
@@ -265,18 +272,16 @@ export function CalidadSection({
 
   return (
     <div>
-      {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {(['fuentes', 'analisis', 'historial'] as SubTab[]).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} style={{
-            padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600,
-            background: subTab === t ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-chip)',
-            color: subTab === t ? 'white' : 'var(--at-ink-2)',
-          }}>
-            {t === 'fuentes' ? '🗂️ Fuentes de Agua' : t === 'analisis' ? '🧪 Nuevo Análisis' : '📋 Historial Calidad'}
-          </button>
-        ))}
-      </div>
+      {/* Sub-menú: mismo <TabStrip> que Condominios, Contabilidad y Servicio
+          Energético. Con `flex-wrap` estas tres pestañas ocupaban dos líneas en
+          un teléfono antes de llegar al formulario. */}
+      <TabStrip
+        ariaLabel="Secciones de calidad de agua"
+        items={SUB_TABS}
+        value={subTab}
+        onChange={setSubTab}
+        marginBottom={20}
+      />
 
       {/* FUENTES */}
       {subTab === 'fuentes' && (

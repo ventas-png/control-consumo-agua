@@ -529,23 +529,32 @@ button:focus:not(:focus-visible) {
  * en mobile bloqueando todo el viewport. Ahora se oculta off-canvas y se
  * activa via .open (controlado por sidebarOpen en App.tsx). */
 @media (max-width: 767px) {
-  /* Shell a la altura EXACTA del viewport: el scroll vive dentro de .app-main.
+  /* Topbar pegada arriba — y el scroll SIGUE siendo el del documento.
    *
-   * Antes el shell solo tenía `min-height: 100vh` (inline) y ningún alto
-   * definido, así que .app-main —pese a su `overflow-y: auto`— crecía con el
-   * contenido y era el DOCUMENTO el que scrolleaba. En un teléfono eso deja la
-   * topbar (y con ella el botón de menú) fuera de pantalla al bajar, y el
-   * contenido se mete bajo la barra de estado de iOS, que con
-   * `viewport-fit=cover` es transparente.
+   * El problema a resolver era que al bajar, la topbar (con el botón de menú)
+   * se iba de pantalla y el contenido se metía bajo la barra de estado de iOS,
+   * transparente por `viewport-fit=cover`. `position: sticky` lo arregla: la
+   * barra queda anclada con su fondo opaco y su padding de safe-area.
    *
-   * `min-height: 0 !important` es necesario para ganarle al `minHeight: 100vh`
-   * inline del shell; sin eso el alto de 100dvh no serviría de nada. Se deja
-   * `100vh` como fallback para WebViews antiguas sin soporte de dvh. */
-  .app-shell {
-    height: 100vh;
-    height: 100dvh;
-    min-height: 0 !important;
-    overflow: hidden;
+   * NO usar aquí `height: 100dvh` + `overflow: hidden` en el shell para que
+   * scrollee `.app-main`. Se probó y hubo que revertirlo: en iOS Safari un
+   * `position: fixed` dentro de un contenedor con scroll se posiciona respecto
+   * a ESE contenedor, no al viewport. Los ~40 overlays de modal de la app son
+   * `position: fixed` y viven dentro de `.app-main`, así que todos quedaban
+   * recortados a la caja del contenedor y sin poder scrollear (se vio en el
+   * detalle de visitante de Condominios). Mientras el scroll siga siendo el del
+   * documento, `.app-main` nunca llega a scrollear y los modales se posicionan
+   * contra el viewport, que es el comportamiento correcto.
+   *
+   * z-index 100: por encima del contenido y de la fila de pestañas de las
+   * secciones, por debajo del drawer (200) y de los modales (1000).
+   *
+   * `!important` en position porque Topbar.tsx lleva `position: relative`
+   * inline y un estilo en atributo gana a la hoja sin él. */
+  .app-topbar {
+    position: sticky !important;
+    top: 0;
+    z-index: 100;
   }
   .app-sidebar {
     position: fixed !important;
@@ -582,7 +591,6 @@ button:focus:not(:focus-visible) {
     /* Home indicator: el último elemento no debe quedar bajo la barra táctil. */
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
     width: 100% !important;
-    -webkit-overflow-scrolling: touch;
   }
   /* iOS safe-area en topbar (notch) y main (home indicator). */
   .app-topbar {

@@ -1,6 +1,7 @@
 import { hoyLocalISO, mesLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
+import { TabStrip } from '../shared/TabStrip'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { configurarCierreAutomatico } from '../shared/cierreAutomaticoDialog'
 import { fetchPagosYConvenios } from '../../domain/cobros/queries'
@@ -568,20 +569,14 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="tab-strip-scrollable" style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-            padding: '10px 20px', fontSize: '14px', fontWeight: activeTab === tab.id ? 700 : 500,
-            color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
-            background: 'transparent', border: 'none',
-            borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : '3px solid transparent',
-            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-          }}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — mismo <TabStrip> que el resto de módulos. */}
+      <TabStrip
+        ariaLabel="Secciones de cobros"
+        items={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        marginBottom={24}
+      />
 
       {/* ── TAB: Cargos Pendientes ── */}
       {activeTab === 'pendientes' && (

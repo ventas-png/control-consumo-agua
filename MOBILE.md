@@ -138,14 +138,21 @@ drawer, hazlo en `index.css`.
 | --- | --- |
 | El drawer se esconde con `translateX(-100%)`, nunca con píxeles | Su ancho es `min(280px, 85vw)`. Un desplazamiento fijo de `-256px` dejaba **24px del menú dentro de la pantalla** en cualquier teléfono de ≥330px: como va con `z-index: 200`, tapaba el borde izquierdo de todas las vistas (títulos y breadcrumbs cortados) sin que nadie hubiera tocado el hamburguesa. |
 | La sombra del drawer solo con `.open` | `box-shadow: 0 0 30px` no tiene desplazamiento, así que con el panel fuera de pantalla el halo se seguía dibujando sobre los primeros 30px del contenido. |
-| `.app-shell` mide `100dvh` y el scroll vive en `.app-main` | Antes el shell solo tenía `min-height: 100vh` y ningún alto definido, así que `.app-main` crecía con el contenido y el que scrolleaba era el documento: al bajar, la topbar (con el botón de menú) se iba de pantalla y el contenido se metía bajo la barra de estado de iOS, transparente por `viewport-fit=cover`. Se deja `100vh` como fallback para WebViews sin soporte de `dvh`. |
-| `scrollAppToTop()` (`src/lib/scroll.ts`) en vez de `window.scrollTo` | Consecuencia de lo anterior: en teléfono el documento no scrollea, así que un `window.scrollTo` es un no-op. El helper elige el contenedor que sí tiene scroll. |
+| La topbar es `position: sticky` y **el scroll sigue siendo el del documento** | Antes la topbar (con el botón de menú) se iba de pantalla al bajar y el contenido se metía bajo la barra de estado de iOS, transparente por `viewport-fit=cover`. `sticky` lo arregla sin cambiar quién scrollea. Lleva `!important` porque `Topbar.tsx` trae `position: relative` inline. |
+| **NO** dar altura fija al shell para que scrollee `.app-main` | Se probó (`height: 100dvh` + `overflow: hidden`) y hubo que revertirlo: en iOS Safari un `position: fixed` dentro de un contenedor con scroll se posiciona respecto a **ese contenedor**, no al viewport. Los ~40 overlays de modal de la app son `position: fixed` y viven dentro de `.app-main`, así que **todos** quedaban recortados y sin poder scrollear. Mientras scrollee el documento, `.app-main` nunca llega a scrollear y los modales se posicionan contra el viewport. |
+| `scrollAppToTop()` (`src/lib/scroll.ts`) en vez de `window.scrollTo` | Elige el contenedor que realmente tiene scroll, así sigue funcionando si algún día una vista sí monta su propio scroller. |
 | Los sub-menús de sección usan `<TabStrip>` | Una sola fila con scroll horizontal, el patrón que ya tenía Condominios. Con `flex-wrap`, un módulo como Contabilidad (9 pestañas) ocupaba cuatro líneas antes de llegar al contenido. |
 
-Los tres invariantes que conviene comprobar al tocar esto, en un viewport de
-teléfono: el drawer cerrado no asoma ni un píxel, `document.scrollWidth` no
-supera el ancho del viewport, y el documento no scrollea en vertical (lo hace
-`.app-main`).
+Los cuatro invariantes que conviene comprobar al tocar esto, en un viewport de
+teléfono:
+
+1. El drawer cerrado no asoma ni un píxel.
+2. `document.scrollWidth` no supera el ancho del viewport.
+3. La topbar se queda en `top: 0` después de scrollear.
+4. **Ningún ancestro de un modal es un contenedor que scrollee de verdad**
+   (`overflow: auto/scroll` con `scrollHeight > clientHeight`). Es lo que en
+   iOS Safari atrapa a los `position: fixed`, y no se reproduce en Chromium —
+   hay que razonarlo o probarlo en un dispositivo.
 
 ---
 
