@@ -6,6 +6,7 @@ import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { fetchFuentes, fetchRegistrosCalidad, getReporteCalidadSignedUrl } from '../../domain/calidad/queries'
 import { createFuente, updateFuente, setFuenteActiva, createRegistroCalidad, uploadReporteCalidad } from '../../domain/calidad/mutations'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
+import { scrollAppToTop } from '../../lib/scroll'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
@@ -102,7 +103,7 @@ export function CalidadSection({
     setEditandoId(f.id)
     setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '', frecuencia_muestreo_dias: f.frecuencia_muestreo_dias != null ? String(f.frecuencia_muestreo_dias) : '' })
     setSubTab('fuentes')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollAppToTop()
   }
 
   async function toggleFuente(id: string, activo: boolean) {

@@ -64,19 +64,15 @@
 }
 
 /* ── App shell: sidebar responsive (antes en App.tsx) ───────────────────── */
+/* OJO: el drawer off-canvas (.app-sidebar / .app-sidebar.open / .app-backdrop)
+ * y el padding de .app-main se declaran UNA sola vez, en src/index.css. Aquí
+ * había una copia con `transform: translateX(-256px)` que, al cargarse esta
+ * hoja después (ver el orden de imports de src/main.tsx), ganaba la cascada
+ * contra el `-100%` de index.css. Como el ancho es `min(280px, 85vw)`, en
+ * cualquier teléfono de ≥330px quedaban 24px del menú dentro de la pantalla,
+ * encima del contenido y sin haber tocado el hamburguesa. */
 @media (max-width: 767px) {
-  .app-sidebar {
-    position: fixed !important;
-    top: 0; left: 0;
-    height: 100vh;
-    z-index: 200;
-    transform: translateX(-256px);
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .app-sidebar.open { transform: translateX(0); }
-  .app-backdrop { display: block !important; }
   .app-hamburger { display: flex !important; }
-  .app-main { padding: 16px !important; }
 
   /* ── Sin desplazamiento horizontal en teléfonos ──────────────────────────
    * Medido en un iPhone real (app nativa): viewport 352px, documento 402px —
