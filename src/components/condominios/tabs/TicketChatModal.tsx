@@ -56,7 +56,7 @@ export function TicketChatModal({
     return fetchComentariosTicket<ComentarioTicket>(ticket.id)
   }
 
-  async function enviar({ contenido, fotos, interno }: EnvioHilo): Promise<string | null> {
+  async function enviar({ contenido, fotos, archivos, interno }: EnvioHilo): Promise<string | null> {
     const cambiaEstado = esStaff && estadoNuevo && estadoNuevo !== ticket.estado
     const { error } = await createCondominioRow('comentarios_ticket', {
       company_id: companyId,
@@ -64,6 +64,7 @@ export function TicketChatModal({
       autor_nombre: autorNombre.trim() || 'Residente',
       contenido,
       foto_urls: fotos,
+      archivo_urls: archivos,
       // Solo el staff registra cambios de estado / notas internas: RLS rechaza
       // ambos en la rama del residente, así que ni se envían.
       estado_nuevo: cambiaEstado ? estadoNuevo : null,
@@ -97,6 +98,7 @@ export function TicketChatModal({
         etiqueta: 'Reporte original',
         texto: ticket.descripcion || 'Sin descripción.',
         fotos: ticket.foto_urls ?? [],
+        archivos: ticket.archivo_urls ?? [],
       }}
       cargar={cargar}
       enviar={enviar}

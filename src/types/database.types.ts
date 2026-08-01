@@ -2566,6 +2566,7 @@ export type Database = {
       }
       comentarios_mensaje_portal: {
         Row: {
+          archivo_urls: Json
           autor_nombre: string
           company_id: string
           contenido: string
@@ -2577,6 +2578,7 @@ export type Database = {
           mensaje_id: string
         }
         Insert: {
+          archivo_urls?: Json
           autor_nombre: string
           company_id: string
           contenido?: string
@@ -2588,6 +2590,7 @@ export type Database = {
           mensaje_id: string
         }
         Update: {
+          archivo_urls?: Json
           autor_nombre?: string
           company_id?: string
           contenido?: string
@@ -2617,6 +2620,7 @@ export type Database = {
       }
       comentarios_ticket: {
         Row: {
+          archivo_urls: Json
           autor_id: string | null
           autor_nombre: string
           company_id: string
@@ -2630,6 +2634,7 @@ export type Database = {
           ticket_id: string
         }
         Insert: {
+          archivo_urls?: Json
           autor_id?: string | null
           autor_nombre: string
           company_id: string
@@ -2643,6 +2648,7 @@ export type Database = {
           ticket_id: string
         }
         Update: {
+          archivo_urls?: Json
           autor_id?: string | null
           autor_nombre?: string
           company_id?: string
@@ -9797,6 +9803,7 @@ export type Database = {
       }
       mensajes_portal: {
         Row: {
+          archivo_urls: Json
           asunto: string
           company_id: string
           created_at: string
@@ -9811,6 +9818,7 @@ export type Database = {
           unidad_id: string
         }
         Insert: {
+          archivo_urls?: Json
           asunto: string
           company_id: string
           created_at?: string
@@ -9825,6 +9833,7 @@ export type Database = {
           unidad_id: string
         }
         Update: {
+          archivo_urls?: Json
           asunto?: string
           company_id?: string
           created_at?: string
@@ -16873,6 +16882,7 @@ export type Database = {
       }
       tickets_mantenimiento: {
         Row: {
+          archivo_urls: Json
           asignado_a: string | null
           cliente_id: string | null
           company_id: string
@@ -16897,6 +16907,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archivo_urls?: Json
           asignado_a?: string | null
           cliente_id?: string | null
           company_id: string
@@ -16921,6 +16932,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archivo_urls?: Json
           asignado_a?: string | null
           cliente_id?: string | null
           company_id?: string

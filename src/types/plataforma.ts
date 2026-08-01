@@ -182,6 +182,8 @@ export interface MensajePortal {
   estado: EstadoMensajePortal
   /** Paths de `condominios-media` adjuntos al mensaje (se firman al render). */
   foto_urls: string[]
+  /** Documentos adjuntos (PDF/Word/Excel) del mensaje. */
+  archivo_urls: string[]
   /** Respuesta única heredada (pre-hilo); las nuevas van a comentarios. */
   respuesta?: string | null
   respondido_en?: string | null
@@ -199,6 +201,8 @@ export interface ComentarioMensajePortal {
   contenido: string
   /** Paths de `condominios-media` adjuntos al mensaje. */
   foto_urls: string[]
+  /** Documentos adjuntos (PDF/Word/Excel) del mensaje. */
+  archivo_urls: string[]
   /** Nota interna del equipo: el residente no la ve (RLS la filtra igual). */
   es_interno: boolean
   /** auth.uid() sellado por la BD; identifica los mensajes propios en el hilo. */

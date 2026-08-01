@@ -234,6 +234,8 @@ export interface ComentarioTicket {
   estado_nuevo?: string | null
   /** Paths de `condominios-media` adjuntos al mensaje (se firman al render). */
   foto_urls: string[]
+  /** Documentos adjuntos (PDF/Word/Excel) del mensaje. */
+  archivo_urls: string[]
   /** Nota interna del equipo: el residente no la ve (RLS la filtra igual). */
   es_interno: boolean
   /** auth.uid() sellado por la BD; identifica los mensajes propios en el hilo. */

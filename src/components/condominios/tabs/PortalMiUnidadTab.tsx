@@ -3,6 +3,7 @@ import { notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { ImageGallery } from '../../shared/ImageGallery'
 import { MultiImageUploader } from '../../shared/ImageUploader'
+import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
 import { MensajePortalChatModal } from './MensajePortalChatModal'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchConteoComentariosMensajePortal } from '../../../domain/condominios/tabQueries'
@@ -44,6 +45,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
   const [saving, setSaving]           = useState(false)
   const [msgForm, setMsgForm]         = useState(blankMsg())
   const [fotos, setFotos]             = useState<string[]>([])
+  const [archivos, setArchivos]       = useState<string[]>([])
   const [conversacion, setConversacion] = useState<MensajePortal | null>(null)
   const [conteoMensajes, setConteoMensajes] = useState<Record<string, number>>({})
 
@@ -59,6 +61,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
     setShowMsgForm(false)
     setMsgForm(blankMsg())
     setFotos([])
+    setArchivos([])
   }
 
   async function enviarMensaje() {
@@ -70,6 +73,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
       company_id: companyId, project_id: proyectoId, unidad_id: unidad.id,
       asunto: msgForm.asunto.trim(), cuerpo: msgForm.cuerpo.trim(), tipo: msgForm.tipo,
       foto_urls: fotos,
+      archivo_urls: archivos,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -189,6 +193,13 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
               label="Fotos"
               maxFiles={4}
             />
+            <MultiFileUploader
+              values={archivos}
+              onChange={setArchivos}
+              folder="mensajes-portal"
+              label="Documentos"
+              maxFiles={4}
+            />
           </div>
         </EditModal>
       )}
@@ -216,6 +227,11 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                     {m.foto_urls?.length > 0 && (
                       <div style={{ margin: '6px 0' }}>
                         <ImageGallery urls={m.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
+                    {m.archivo_urls?.length > 0 && (
+                      <div style={{ margin: '6px 0' }}>
+                        <ListaAdjuntos paths={m.archivo_urls} />
                       </div>
                     )}
                     {m.respuesta && (
