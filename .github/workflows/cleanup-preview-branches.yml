@@ -98,11 +98,32 @@ jobs:
             echo "|---|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          branches=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+          code=$(curl -s -o /tmp/branches.json -w "%{http_code}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
             "$SB_API/projects/$PROJECT_ID/branches")
+          branches=$(cat /tmp/branches.json)
+
+          # 401 se nombra aparte: es credencial, no datos. El mensaje genérico de
+          # abajo manda a leer la respuesta cuando lo único accionable es rotar el
+          # token — y el token lo comparten otros seis workflows, así que el fallo
+          # nunca viene solo. El 403 no se colapsa con el 401: ahí el token vive
+          # pero no alcanza para el proyecto, y rotarlo no arregla nada.
+          if [ "$code" = "401" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN inválido, expirado o revocado (HTTP 401): $(head -c 300 /tmp/branches.json)"
+            echo "Rotar en Supabase → Account → Access Tokens y actualizarlo en Settings → Secrets and variables → Actions."
+            echo "Comparten el mismo token: apply-migration, apply-migrations-prod, deploy-functions, types-drift, auth-hardening y security-guard."
+            echo "| — | — | ❌ token inválido (401) — rotar \`SUPABASE_ACCESS_TOKEN\` |" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$code" = "403" ]; then
+            echo "::error::El token no tiene permiso sobre el proyecto (HTTP 403): $(head -c 300 /tmp/branches.json)"
+            echo "Revisar el scope del token y SUPABASE_PROJECT_ID antes de rotar nada."
+            echo "| — | — | ❌ sin permiso (403) — revisar scope del token |" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
           if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$branches"; then
-            echo "::error::La API de Supabase no devolvió una lista de ramas:"
+            echo "::error::La API de Supabase no devolvió una lista de ramas (HTTP $code):"
             echo "$branches" | head -c 500
             exit 1
           fi
