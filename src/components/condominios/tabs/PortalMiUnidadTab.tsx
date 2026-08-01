@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { notify } from '../../shared/Dialog'
-import { openPromptDialog } from '../../shared/PromptDialog'
-import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { EditModal } from '../../shared/EditModal'
+import { ImageGallery } from '../../shared/ImageGallery'
+import { MultiImageUploader } from '../../shared/ImageUploader'
+import { MensajePortalChatModal } from './MensajePortalChatModal'
+import { createCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchConteoComentariosMensajePortal } from '../../../domain/condominios/tabQueries'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
 interface Props {
@@ -10,6 +14,9 @@ interface Props {
   proyectoId: string
   companyId: string
   isAdmin: boolean
+  /** Firma los mensajes del hilo (residente o miembro del equipo). */
+  autorNombre?: string
+  autorUserId?: string
   onRefresh: () => void
   onGenerarToken: () => void
 }
@@ -32,10 +39,27 @@ function blankMsg() {
   return { asunto: '', cuerpo: '', tipo: 'consulta' as TipoMensajePortal }
 }
 
-export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isAdmin, onRefresh, onGenerarToken }: Props) {
+export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isAdmin, autorNombre = '', autorUserId, onRefresh, onGenerarToken }: Props) {
   const [showMsgForm, setShowMsgForm] = useState(false)
   const [saving, setSaving]           = useState(false)
   const [msgForm, setMsgForm]         = useState(blankMsg())
+  const [fotos, setFotos]             = useState<string[]>([])
+  const [conversacion, setConversacion] = useState<MensajePortal | null>(null)
+  const [conteoMensajes, setConteoMensajes] = useState<Record<string, number>>({})
+
+  // Badge "N" por tarjeta: un solo conteo para toda la lista; los hilos se bajan
+  // al abrir la conversación.
+  const ids = mensajes.map(m => m.id).join(',')
+  const cargarConteos = useCallback(async () => {
+    setConteoMensajes(await fetchConteoComentariosMensajePortal(ids ? ids.split(',') : []))
+  }, [ids])
+  useEffect(() => { void cargarConteos() }, [cargarConteos])
+
+  function cerrarForm() {
+    setShowMsgForm(false)
+    setMsgForm(blankMsg())
+    setFotos([])
+  }
 
   async function enviarMensaje() {
     if (!msgForm.asunto.trim() || !msgForm.cuerpo.trim()) {
@@ -45,30 +69,12 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
     const { error } = await createCondominioRow('mensajes_portal', {
       company_id: companyId, project_id: proyectoId, unidad_id: unidad.id,
       asunto: msgForm.asunto.trim(), cuerpo: msgForm.cuerpo.trim(), tipo: msgForm.tipo,
+      foto_urls: fotos,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Mensaje enviado!', text: 'La administración lo revisará pronto.', duration: 1800 })
-    setMsgForm(blankMsg()); setShowMsgForm(false); onRefresh()
-  }
-
-  async function responderMensaje(id: string) {
-    const result = await openPromptDialog({
-      title: 'Responder al residente',
-      fields: [{
-        name: 'respuesta',
-        label: 'Respuesta',
-        control: 'textarea',
-        rows: 4,
-        placeholder: 'Escriba la respuesta...',
-        required: true,
-        autoFocus: true,
-      }],
-      submitText: 'Enviar respuesta',
-    })
-    if (!result?.respuesta) return
-    await updateCondominioRow('mensajes_portal', id, { estado: 'respondido', respuesta: result.respuesta, respondido_en: new Date().toISOString() })
-    onRefresh()
+    cerrarForm(); onRefresh()
   }
 
   const portalUrl = unidad.token_portal
@@ -139,29 +145,52 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
         )}
       </div>
 
+      {/* Ventana emergente: el formulario no empuja la lista de mensajes hacia
+          abajo, y en móvil ocupa la pantalla. */}
       {showMsgForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '12px', padding: '16px', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <EditModal
+          title="Enviar mensaje a la administración"
+          subtitle="Cuéntenos qué necesita y adjunte fotos si ayudan a entenderlo."
+          size="sm"
+          onClose={cerrarForm}
+          footer={
+            <>
+              <button onClick={cerrarForm} style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer' }}>
+                {saving ? 'Enviando...' : '📤 Enviar'}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
               {(Object.entries(TIPO_MSG) as [TipoMensajePortal, typeof TIPO_MSG[TipoMensajePortal]][]).map(([k, v]) => (
                 <button key={k} onClick={() => setMsgForm(f => ({ ...f, tipo: k }))}
+                  aria-pressed={msgForm.tipo === k}
                   style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-line)', background: msgForm.tipo === k ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                   {v.icon} {v.label}
                 </button>
               ))}
             </div>
-            <input value={msgForm.asunto} onChange={e => setMsgForm(f => ({ ...f, asunto: e.target.value }))} placeholder="Asunto *"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
-            <textarea value={msgForm.cuerpo} onChange={e => setMsgForm(f => ({ ...f, cuerpo: e.target.value }))} placeholder="Escriba su mensaje..." rows={3}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
+            <div>
+              <label htmlFor="msg-asunto" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Asunto *</label>
+              <input id="msg-asunto" autoFocus value={msgForm.asunto} onChange={e => setMsgForm(f => ({ ...f, asunto: e.target.value }))} placeholder="Ej. Ruido en el pasillo, Consulta de cuota..."
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+            </div>
+            <div>
+              <label htmlFor="msg-cuerpo" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Mensaje *</label>
+              <textarea id="msg-cuerpo" value={msgForm.cuerpo} onChange={e => setMsgForm(f => ({ ...f, cuerpo: e.target.value }))} placeholder="Escriba su mensaje..." rows={4}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
+            </div>
+            <MultiImageUploader
+              values={fotos}
+              onChange={setFotos}
+              folder="mensajes-portal"
+              label="Fotos"
+              maxFiles={4}
+            />
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Enviando...' : '📤 Enviar'}
-            </button>
-            <button onClick={() => { setShowMsgForm(false); setMsgForm(blankMsg()) }} style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {mensajes.length === 0 ? (
@@ -170,9 +199,10 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {mensajes.sort((a, b) => b.created_at.localeCompare(a.created_at)).map(m => {
+          {mensajes.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).map(m => {
             const tc = TIPO_MSG[m.tipo]
             const ec = ESTADO_MSG[m.estado] ?? ESTADO_MSG.nuevo
+            const nHilo = conteoMensajes[m.id] ?? 0
             return (
               <div key={m.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -183,6 +213,11 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                       <span style={{ fontSize: '11.5px', fontWeight: 700, color: ec.color }}>{ec.label}</span>
                     </div>
                     <p style={{ margin: '0 0 5px', fontSize: '13px', color: 'var(--at-ink-2)' }}>{m.cuerpo}</p>
+                    {m.foto_urls?.length > 0 && (
+                      <div style={{ margin: '6px 0' }}>
+                        <ImageGallery urls={m.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
                     {m.respuesta && (
                       <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
                         <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta de administración:</div>
@@ -192,18 +227,28 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
                       {new Date(m.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </div>
-                  </div>
-                  {isAdmin && m.estado !== 'respondido' && m.estado !== 'cerrado' && (
-                    <button onClick={() => responderMensaje(m.id)}
-                      style={{ padding: '5px 12px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-success)', fontWeight: 600, flexShrink: 0 }}>
-                      Responder
+                    <button
+                      onClick={() => setConversacion(m)}
+                      style={{ marginTop: '9px', padding: '6px 13px', background: nHilo > 0 ? 'var(--at-primary-tint)' : 'var(--at-chip)', color: nHilo > 0 ? 'var(--at-primary)' : 'var(--at-ink-2)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                      💬 {nHilo > 0 ? `Conversación (${nHilo})` : (isAdmin ? 'Responder' : 'Escribir a la administración')}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             )
           })}
         </div>
+      )}
+
+      {conversacion && (
+        <MensajePortalChatModal
+          mensaje={conversacion}
+          autorNombre={autorNombre}
+          autorUserId={autorUserId}
+          esStaff={isAdmin}
+          onClose={() => { setConversacion(null); void cargarConteos() }}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   )

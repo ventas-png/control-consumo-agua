@@ -204,6 +204,8 @@ export function PortalResidenteTab({
                 proyectoId={proyectoId}
                 companyId={companyId}
                 isAdmin={canEdit}
+                autorNombre={autorNombre}
+                autorUserId={autorUserId}
                 onRefresh={() => {
                   void fetchMensajesPortal<MensajePortal>(selectedUnidadId).then(setMensajes)
                   onRefresh()

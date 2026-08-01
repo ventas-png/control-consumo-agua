@@ -102,6 +102,41 @@ export async function fetchConteoComentariosTickets(
   return conteo
 }
 
+// ── MensajePortalChatModal ──
+
+/**
+ * Hilo de conversación de un mensaje a la administración, en orden cronológico.
+ * RLS decide qué ve cada quien: el staff ve todo el hilo; el residente, solo los
+ * mensajes no internos de los hilos de sus unidades. Degrada a `[]`.
+ */
+export async function fetchComentariosMensajePortal<T>(mensajeId: string): Promise<T[]> {
+  const { data, error } = await db
+    .from('comentarios_mensaje_portal')
+    .select('*')
+    .eq('mensaje_id', mensajeId)
+    .order('created_at', { ascending: true })
+  reportDegradedQuery('condominios.fetchComentariosMensajePortal', error)
+  return (data as T[] | null) ?? []
+}
+
+/**
+ * Cuántos mensajes tiene cada hilo de la lista (para el badge, sin bajar los
+ * hilos completos). Mapa mensaje_id → conteo; los que no tienen quedan fuera.
+ */
+export async function fetchConteoComentariosMensajePortal(
+  mensajeIds: string[],
+): Promise<Record<string, number>> {
+  if (mensajeIds.length === 0) return {}
+  const { data, error } = await db
+    .from('comentarios_mensaje_portal')
+    .select('mensaje_id')
+    .in('mensaje_id', mensajeIds)
+  reportDegradedQuery('condominios.fetchConteoComentariosMensajePortal', error)
+  const conteo: Record<string, number> = {}
+  for (const row of data ?? []) conteo[row.mensaje_id] = (conteo[row.mensaje_id] ?? 0) + 1
+  return conteo
+}
+
 // ── PortalResidenteTab ──
 
 /** Mensajes del portal de una unidad (más recientes primero). Degrada a `[]`. */

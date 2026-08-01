@@ -2564,6 +2564,57 @@ export type Database = {
           },
         ]
       }
+      comentarios_mensaje_portal: {
+        Row: {
+          autor_nombre: string
+          company_id: string
+          contenido: string
+          created_at: string
+          creado_por: string | null
+          es_interno: boolean
+          foto_urls: Json
+          id: string
+          mensaje_id: string
+        }
+        Insert: {
+          autor_nombre: string
+          company_id: string
+          contenido?: string
+          created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
+          foto_urls?: Json
+          id?: string
+          mensaje_id: string
+        }
+        Update: {
+          autor_nombre?: string
+          company_id?: string
+          contenido?: string
+          created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
+          foto_urls?: Json
+          id?: string
+          mensaje_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comentarios_mensaje_portal_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comentarios_mensaje_portal_mensaje_id_fkey"
+            columns: ["mensaje_id"]
+            isOneToOne: false
+            referencedRelation: "mensajes_portal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comentarios_ticket: {
         Row: {
           autor_id: string | null
@@ -9751,6 +9802,7 @@ export type Database = {
           created_at: string
           cuerpo: string
           estado: string
+          foto_urls: Json
           id: string
           project_id: string
           respondido_en: string | null
@@ -9764,6 +9816,7 @@ export type Database = {
           created_at?: string
           cuerpo: string
           estado?: string
+          foto_urls?: Json
           id?: string
           project_id: string
           respondido_en?: string | null
@@ -9777,6 +9830,7 @@ export type Database = {
           created_at?: string
           cuerpo?: string
           estado?: string
+          foto_urls?: Json
           id?: string
           project_id?: string
           respondido_en?: string | null
