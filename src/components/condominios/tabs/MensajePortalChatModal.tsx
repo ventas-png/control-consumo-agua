@@ -48,7 +48,7 @@ export function MensajePortalChatModal({
     return fetchComentariosMensajePortal<ComentarioMensajePortal>(mensaje.id)
   }
 
-  async function enviar({ contenido, fotos, interno }: EnvioHilo): Promise<string | null> {
+  async function enviar({ contenido, fotos, archivos, interno }: EnvioHilo): Promise<string | null> {
     const { error } = await createCondominioRow('comentarios_mensaje_portal', {
       // El company_id tiene que ser el del mensaje: RLS lo exige en las dos
       // ramas, y el residente no tiene company propia.
@@ -57,6 +57,7 @@ export function MensajePortalChatModal({
       autor_nombre: autorNombre.trim() || 'Residente',
       contenido,
       foto_urls: fotos,
+      archivo_urls: archivos,
       es_interno: interno,
     })
     if (error) return error.message
@@ -95,6 +96,7 @@ export function MensajePortalChatModal({
           ? `${mensaje.cuerpo}\n\n— Respuesta de administración —\n${mensaje.respuesta}`
           : mensaje.cuerpo,
         fotos: mensaje.foto_urls ?? [],
+        archivos: mensaje.archivo_urls ?? [],
       }}
       cargar={cargar}
       enviar={enviar}

@@ -209,6 +209,8 @@ export interface TicketMantenimiento {
   reportado_por?: string | null
   cliente_id?: string | null
   foto_urls: string[]
+  /** Paths de documentos adjuntos (PDF/Word/Excel) en `condominios-media`. */
+  archivo_urls: string[]
   costo_estimado?: number | null
   costo_real?: number | null
   fecha_limite?: string | null

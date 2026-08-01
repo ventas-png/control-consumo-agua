@@ -16,6 +16,11 @@ vi.mock('../../../../lib/supabase', () => ({
   supabase: { from: () => ({}) },
   db: { from: () => ({}) },
 }))
+vi.mock('../../../../lib/storageUrls', () => ({
+  // SecureFileLink/SecureImage no renderizan hasta tener la URL firmada, y el
+  // cliente de storage está mockeado; se devuelve una firma fija.
+  useSignedUrl: (src: string | null) => (src ? `https://firmado.test/${src}` : null),
+}))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
@@ -33,7 +38,7 @@ function mensaje(over: Partial<MensajePortal> = {}): MensajePortal {
   return {
     id: 'm1', company_id: 'c1', project_id: 'p1', unidad_id: 'u1',
     asunto: 'Ruido en el pasillo', cuerpo: 'Todas las noches después de las 11',
-    tipo: 'queja', estado: 'nuevo', foto_urls: [],
+    tipo: 'queja', estado: 'nuevo', foto_urls: [], archivo_urls: [],
     created_at: '2026-07-20T10:00:00.000Z',
     ...over,
   }
@@ -43,7 +48,7 @@ function comentario(over: Partial<ComentarioMensajePortal> = {}): ComentarioMens
   return {
     id: 'h1', company_id: 'c1', mensaje_id: 'm1',
     autor_nombre: 'Administración', contenido: 'Ya hablamos con el vecino',
-    foto_urls: [], es_interno: false, created_at: '2026-07-21T09:00:00.000Z',
+    foto_urls: [], archivo_urls: [], es_interno: false, created_at: '2026-07-21T09:00:00.000Z',
     ...over,
   }
 }
@@ -116,7 +121,20 @@ describe('PortalMiUnidadTab — mensaje en ventana emergente', () => {
       asunto: 'Fuga', cuerpo: 'Gotea el techo', tipo: 'emergencia',
     })
     expect(payload.foto_urls).toEqual([])
+    expect(payload.archivo_urls).toEqual([])
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('ofrece adjuntar documentos además de fotos', () => {
+    renderTab()
+    fireEvent.click(screen.getByText('+ Enviar mensaje'))
+    expect(screen.getByText(/Documentos/)).toBeTruthy()
+    expect(screen.getByText(/PDF, Word o Excel/)).toBeTruthy()
+  })
+
+  it('lista los documentos ya adjuntos en la tarjeta', async () => {
+    renderTab({ mensajes: [mensaje({ archivo_urls: ['p1/mensajes-portal/1785540000000-a3f9x2-contrato.pdf'] })] })
+    expect(await screen.findByText('contrato.pdf')).toBeTruthy()
   })
 })
 

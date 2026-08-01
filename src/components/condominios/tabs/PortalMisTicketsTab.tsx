@@ -3,6 +3,7 @@ import { notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { ImageGallery } from '../../shared/ImageGallery'
 import { MultiImageUploader } from '../../shared/ImageUploader'
+import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
 import { TicketChatModal } from './TicketChatModal'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchConteoComentariosTickets } from '../../../domain/condominios/tabQueries'
@@ -48,6 +49,7 @@ export function PortalMisTicketsTab({
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState(blankForm())
   const [fotos, setFotos]       = useState<string[]>([])
+  const [archivos, setArchivos] = useState<string[]>([])
   const [filtro, setFiltro]     = useState<EstadoTicket | 'todos'>('todos')
   const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
   const [conteoMensajes, setConteoMensajes] = useState<Record<string, number>>({})
@@ -68,6 +70,7 @@ export function PortalMisTicketsTab({
     setShowForm(false)
     setForm(blankForm())
     setFotos([])
+    setArchivos([])
   }
 
   async function enviarSolicitud() {
@@ -79,6 +82,7 @@ export function PortalMisTicketsTab({
       titulo: form.titulo.trim(), descripcion: form.descripcion.trim() || null,
       prioridad: form.prioridad, estado: 'abierto',
       foto_urls: fotos,
+      archivo_urls: archivos,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -149,6 +153,13 @@ export function PortalMisTicketsTab({
               label="Fotos del problema"
               maxFiles={4}
             />
+            <MultiFileUploader
+              values={archivos}
+              onChange={setArchivos}
+              folder="tickets"
+              label="Documentos (cotización, garantía…)"
+              maxFiles={4}
+            />
           </div>
         </EditModal>
       )}
@@ -190,6 +201,11 @@ export function PortalMisTicketsTab({
                     {t.foto_urls?.length > 0 && (
                       <div style={{ marginTop: '8px' }}>
                         <ImageGallery urls={t.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
+                    {t.archivo_urls?.length > 0 && (
+                      <div style={{ marginTop: '8px' }}>
+                        <ListaAdjuntos paths={t.archivo_urls} />
                       </div>
                     )}
                     {t.fecha_cierre && <div style={{ fontSize: '12px', color: 'var(--at-success)', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}

@@ -6,6 +6,7 @@ import { softDelete } from '../../../lib/softDelete'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
+import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
 import { TicketChatModal } from './TicketChatModal'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -44,6 +45,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   const [filtroEstado, setFiltroEstado] = useState<string>('activos')
   const [busqueda, setBusqueda] = useState('')
   const [fotoUrls, setFotoUrls] = useState<string[]>([])
+  const [archivoUrls, setArchivoUrls] = useState<string[]>([])
   const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
   const [form, setForm] = useState({
     tipo: 'correctivo',
@@ -84,6 +86,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   function resetForm() {
     setForm({ tipo: 'correctivo', titulo: '', descripcion: '', prioridad: 'media', unidad_id: '', fecha_limite: '', costo_estimado: '' })
     setFotoUrls([])
+    setArchivoUrls([])
     setShowForm(false)
   }
 
@@ -139,6 +142,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       fecha_limite: form.fecha_limite || null,
       costo_estimado: form.costo_estimado ? Number(form.costo_estimado) : null,
       foto_urls: fotoUrls,
+      archivo_urls: archivoUrls,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -296,6 +300,9 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             <div style={{ gridColumn: '1 / -1' }}>
               <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiFileUploader values={archivoUrls} onChange={setArchivoUrls} folder="tickets" label="Documentos (cotización, garantía…)" maxFiles={6} />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -339,6 +346,11 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                     {t.foto_urls?.length > 0 && (
                       <div style={{ marginTop: 8 }}>
                         <ImageGallery urls={t.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
+                    {t.archivo_urls?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <ListaAdjuntos paths={t.archivo_urls} />
                       </div>
                     )}
                   </div>

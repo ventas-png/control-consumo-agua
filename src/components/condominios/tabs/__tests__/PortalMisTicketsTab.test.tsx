@@ -16,6 +16,11 @@ vi.mock('../../../../lib/supabase', () => ({
   supabase: { from: () => ({}) },
   db: { from: () => ({}) },
 }))
+vi.mock('../../../../lib/storageUrls', () => ({
+  // SecureFileLink/SecureImage no renderizan hasta tener la URL firmada, y el
+  // cliente de storage está mockeado; se devuelve una firma fija.
+  useSignedUrl: (src: string | null) => (src ? `https://firmado.test/${src}` : null),
+}))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
@@ -31,7 +36,7 @@ function ticket(over: Partial<TicketMantenimiento> = {}): TicketMantenimiento {
   return {
     id: 't1', company_id: 'c1', project_id: 'p1', unidad_id: 'u1',
     tipo: 'correctivo', titulo: 'Fuga en el baño', descripcion: 'Gotea la regadera',
-    prioridad: 'media', estado: 'abierto', foto_urls: [],
+    prioridad: 'media', estado: 'abierto', foto_urls: [], archivo_urls: [],
     created_at: '2026-07-20T10:00:00.000Z', updated_at: '2026-07-20T10:00:00.000Z',
     ...over,
   }
@@ -41,7 +46,7 @@ function comentario(over: Partial<ComentarioTicket> = {}): ComentarioTicket {
   return {
     id: 'm1', company_id: 'c1', ticket_id: 't1',
     autor_nombre: 'Administración', contenido: 'Vamos hoy en la tarde',
-    foto_urls: [], es_interno: false, created_at: '2026-07-21T09:00:00.000Z',
+    foto_urls: [], archivo_urls: [], es_interno: false, created_at: '2026-07-21T09:00:00.000Z',
     ...over,
   }
 }
@@ -110,7 +115,20 @@ describe('PortalMisTicketsTab — reporte en ventana emergente', () => {
       titulo: 'Luz quemada', prioridad: 'alta', estado: 'abierto',
     })
     expect(payload.foto_urls).toEqual([])
+    expect(payload.archivo_urls).toEqual([])
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('ofrece adjuntar documentos además de fotos', () => {
+    renderTab()
+    fireEvent.click(screen.getByText('+ Nueva solicitud'))
+    expect(screen.getByText(/Documentos \(cotización, garantía…\)/)).toBeTruthy()
+    expect(screen.getByText(/PDF, Word o Excel/)).toBeTruthy()
+  })
+
+  it('lista los documentos ya adjuntos en la tarjeta, con enlace para abrirlos', async () => {
+    renderTab({ tickets: [ticket({ archivo_urls: ['p1/tickets/1785540000000-a3f9x2-cotizacion.pdf'] })] })
+    expect(await screen.findByText('cotizacion.pdf')).toBeTruthy()
   })
 })
 
@@ -149,11 +167,19 @@ describe('PortalMisTicketsTab — conversación del ticket', () => {
       autor_nombre: 'Marco Santos', contenido: 'Sigue goteando',
       estado_nuevo: null, es_interno: false,
     })
+    expect(payload.archivo_urls).toEqual([])
     // Sin permiso para mover el ticket: el residente no ve el selector de estado.
     expect(screen.queryByLabelText('Cambiar estado del ticket')).toBeNull()
   })
 
-  it('no envía un mensaje vacío sin adjuntos', async () => {
+  it('el hilo acepta documentos, no solo fotos', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText('💬 Escribir al equipo'))
+    await screen.findByLabelText('Mensaje')
+    expect(screen.getByText(/Adjuntar documentos/)).toBeTruthy()
+  })
+
+  it('no envía un mensaje vacío sin fotos ni documentos', async () => {
     renderTab()
     fireEvent.click(screen.getByText('💬 Escribir al equipo'))
     await screen.findByLabelText('Mensaje')

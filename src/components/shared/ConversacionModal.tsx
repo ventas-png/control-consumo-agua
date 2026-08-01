@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { EditModal } from './EditModal'
 import { ImageGallery } from './ImageGallery'
 import { MultiImageUploader } from './ImageUploader'
+import { MultiFileUploader, ListaAdjuntos } from './FileUploader'
 import { notify } from './Dialog'
 
 /** Fila del hilo, ya normalizada por el consumidor. */
@@ -20,6 +21,8 @@ export interface MensajeHilo {
   autor_nombre: string
   contenido: string
   foto_urls: string[]
+  /** Documentos adjuntos (PDF/Word/Excel). */
+  archivo_urls: string[]
   es_interno: boolean
   /** auth.uid() sellado por la BD; identifica los mensajes propios. */
   creado_por?: string | null
@@ -30,6 +33,7 @@ export interface MensajeHilo {
 export interface EnvioHilo {
   contenido: string
   fotos: string[]
+  archivos: string[]
   interno: boolean
 }
 
@@ -46,7 +50,7 @@ interface Props<T extends MensajeHilo> {
   titulo: string
   subtitulo?: ReactNode
   /** Bloque que encabeza el hilo: el reporte/mensaje que lo originó. */
-  original: { etiqueta: string; texto: string; fotos: string[] }
+  original: { etiqueta: string; texto: string; fotos: string[]; archivos: string[] }
   /** Baja el hilo. Se re-invoca después de cada envío. */
   cargar: () => Promise<T[]>
   /** Persiste el mensaje. Devuelve el error legible, o null si salió bien. */
@@ -86,6 +90,7 @@ export function ConversacionModal<T extends MensajeHilo>({
   const [cargando, setCargando] = useState(true)
   const [texto, setTexto]       = useState('')
   const [fotos, setFotos]       = useState<string[]>([])
+  const [archivos, setArchivos] = useState<string[]>([])
   const [interno, setInterno]   = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [recarga, setRecarga]   = useState(0)
@@ -115,15 +120,15 @@ export function ConversacionModal<T extends MensajeHilo>({
 
   async function onEnviar() {
     const contenido = texto.trim()
-    if (!contenido && fotos.length === 0) {
-      notify({ variant: 'warning', title: 'Mensaje vacío', text: 'Escriba un mensaje o adjunte una foto.' })
+    if (!contenido && fotos.length === 0 && archivos.length === 0) {
+      notify({ variant: 'warning', title: 'Mensaje vacío', text: 'Escriba un mensaje o adjunte una foto o documento.' })
       return
     }
     setEnviando(true)
-    const error = await enviar({ contenido, fotos, interno: esStaff && interno })
+    const error = await enviar({ contenido, fotos, archivos, interno: esStaff && interno })
     setEnviando(false)
     if (error) { notify({ variant: 'error', title: 'No se pudo enviar', text: error }); return }
-    setTexto(''); setFotos([]); setInterno(false)
+    setTexto(''); setFotos([]); setArchivos([]); setInterno(false)
     setRecarga(r => r + 1)
   }
 
@@ -148,6 +153,13 @@ export function ConversacionModal<T extends MensajeHilo>({
             onChange={setFotos}
             folder={folder}
             label="Adjuntar fotos"
+            maxFiles={maxFotos}
+          />
+          <MultiFileUploader
+            values={archivos}
+            onChange={setArchivos}
+            folder={folder}
+            label="Adjuntar documentos"
             maxFiles={maxFotos}
           />
           {esStaff && (
@@ -181,6 +193,11 @@ export function ConversacionModal<T extends MensajeHilo>({
         {original.fotos.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <ImageGallery urls={original.fotos} maxVisible={4} />
+          </div>
+        )}
+        {original.archivos.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <ListaAdjuntos paths={original.archivos} />
           </div>
         )}
       </div>
@@ -228,6 +245,11 @@ export function ConversacionModal<T extends MensajeHilo>({
                   {m.foto_urls.length > 0 && (
                     <div style={{ marginTop: m.contenido ? 8 : 0 }}>
                       <ImageGallery urls={m.foto_urls} maxVisible={4} />
+                    </div>
+                  )}
+                  {m.archivo_urls.length > 0 && (
+                    <div style={{ marginTop: m.contenido || m.foto_urls.length > 0 ? 8 : 0 }}>
+                      <ListaAdjuntos paths={m.archivo_urls} />
                     </div>
                   )}
                 </div>
