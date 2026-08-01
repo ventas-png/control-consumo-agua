@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
+import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
@@ -180,6 +180,20 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Acuse de lectura: al abrir Anuncios se sella la lectura de los que se le
+  // muestran. Best-effort y idempotente (UNIQUE anuncio_id+cliente_id), así que
+  // volver al tab no re-marca ni duplica. No bloquea el render.
+  useEffect(() => {
+    if (tab !== 'anuncios' || loading) return
+    // El proyecto se deriva aquí (y no de `proyectoId`, que se calcula más
+    // abajo, después del guard de "sin unidades"): los hooks van todos arriba.
+    const pid = unidades.find(u => u.id === selectedUnidadId)?.project_id ?? unidades[0]?.project_id
+    if (!pid || !clienteId || !resolvedCompanyId) return
+    const visibles = anuncios.filter(a => a.project_id === pid && a.activo).map(a => a.id)
+    if (visibles.length === 0) return
+    void marcarAnunciosLeidos(visibles, clienteId, resolvedCompanyId)
+  }, [tab, loading, anuncios, unidades, selectedUnidadId, clienteId, resolvedCompanyId])
 
   // Pop-up de aviso: muestra los paquetes pendientes una vez por sesión (set de
   // ids vistos en sessionStorage para no repetir en cada refresco).

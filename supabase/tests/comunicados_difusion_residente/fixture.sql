@@ -24,6 +24,29 @@ CREATE TABLE public.app_users (
   activo     boolean NOT NULL DEFAULT true
 );
 
+CREATE TABLE public.companies (
+  id     uuid PRIMARY KEY,
+  nombre text NOT NULL
+);
+
+CREATE TABLE public.clientes (
+  id     uuid PRIMARY KEY,
+  nombre text NOT NULL,
+  email  text
+);
+
+-- Outbox del orquestador de notificaciones (subconjunto usado por el trigger).
+CREATE TABLE public.notifications_outbox (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id   uuid,
+  channel      text NOT NULL CHECK (channel IN ('in_app','email','whatsapp','push')),
+  template_key text,
+  payload      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  recipient    text,
+  status       text NOT NULL DEFAULT 'queued',
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE public.company_clientes (
   company_id uuid NOT NULL,
   cliente_id uuid NOT NULL
@@ -174,6 +197,16 @@ INSERT INTO public.app_users (id, full_name, role, company_id, cliente_id) VALUE
   ('50000000-0000-0000-0000-000000000003', 'Residente R3', 'cliente',       'aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000003'),
   ('50000000-0000-0000-0000-000000000004', 'Staff Z',      'company_owner', 'ffffffff-0000-0000-0000-00000000000f', NULL);
 
+INSERT INTO public.companies (id, nombre) VALUES
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Mayan Residenciales'),
+  ('ffffffff-0000-0000-0000-00000000000f', 'Otra Empresa');
+
+-- C1 tiene correo; C3 no (comprueba que el email se omite y el in_app no).
+INSERT INTO public.clientes (id, nombre, email) VALUES
+  ('cccccccc-0000-0000-0000-000000000001', 'Residente Uno',  'uno@example.com'),
+  ('cccccccc-0000-0000-0000-000000000002', 'Residente Dos',  'dos@example.com'),
+  ('cccccccc-0000-0000-0000-000000000003', 'Residente Tres', NULL);
+
 INSERT INTO public.company_clientes (company_id, cliente_id) VALUES
   ('aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000001'),
   ('aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000002'),
@@ -181,7 +214,8 @@ INSERT INTO public.company_clientes (company_id, cliente_id) VALUES
 
 INSERT INTO public.unidades (id, project_id, company_id, cliente_id, activo) VALUES
   ('d1111111-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000001', true),
-  ('d2222222-0000-0000-0000-000000000002', '22222222-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000002', true);
+  ('d2222222-0000-0000-0000-000000000002', '22222222-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000002', true),
+  ('d3333333-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', 'cccccccc-0000-0000-0000-000000000003', true);
 
 -- Anuncio en el proyecto del residente + otro en un proyecto ajeno.
 INSERT INTO public.anuncios_comunidad (id, company_id, project_id, titulo, contenido, publicado_por) VALUES

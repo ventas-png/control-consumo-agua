@@ -1,25 +1,31 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20260801000300 (comunicados / difusión · residente).
+# Verificación EJECUTABLE de las migraciones de comunicados/difusión del
+# residente: 20260801000300, 000400 y 000500.
 #
 # POR QUÉ EXISTE
-# El bug que arregla la migración no se ve en la UI del administrador: RLS no
+# El bug que arranca esta serie no se ve en la UI del administrador: RLS no
 # lanza error, devuelve 0 filas, y la pantalla del residente cae en su estado
 # vacío ("Sin anuncios" / "Sin comunicados"). Una revisión a ojo del SQL no
 # distingue "la policy no alcanza al residente" de "no hay nada publicado", así
 # que la única prueba que vale es ejecutar las policies contra un Postgres real
 # con un residente y un miembro del staff sentados en la misma empresa.
 #
-# QUÉ COMPRUEBA
-#   Paso 1 · PRE-FIX  → reproduce el bug con las policies actuales de prod:
-#                       el residente ve 0 anuncios y 0 comunicados, y un
-#                       residente legacy ve los acuses de toda la empresa.
-#   Paso 2 · fix      → aplica la migración.
-#   Paso 3 · POST-FIX → 13 invariantes: el residente ve lo suyo y sólo lo suyo,
-#                       el staff conserva su CRUD y el aislamiento por empresa
-#                       sigue en pie.
-#   Paso 4 · idempotencia → re-aplicar la migración no falla ni cambia el
-#                       resultado (se re-corren las 13 invariantes).
+# QUÉ COMPRUEBA (26 invariantes)
+#   1 · PRE-FIX     reproduce el bug con las policies actuales de prod: el
+#                   residente ve 0 anuncios y 0 comunicados, y un residente
+#                   legacy ve los acuses de toda la empresa.
+#   2-3 · 000300    tras el fix, 13 invariantes: el residente ve lo suyo y sólo
+#                   lo suyo, el staff conserva su CRUD, el aislamiento por
+#                   empresa sigue en pie.
+#   4 · idempotencia de 000300.
+#   5-6 · 000400    la invariante "cliente ⇒ company_id NULL": normaliza el
+#                   drift, el trigger la mantiene en INSERT y UPDATE, el staff
+#                   queda intacto (+ idempotencia).
+#   7 · 000500      al publicar un anuncio se encola in_app a todos los
+#                   residentes del proyecto y email a los que tienen correo;
+#                   un borrador no avisa; el acuse de lectura sólo lo sella su
+#                   dueño y el staff lo lee para el contador del tablón.
 #
 # USO
 #   supabase/tests/comunicados_difusion_residente/run.sh
@@ -32,6 +38,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20260801000300_rls_comunicados_difusion_residente.sql"
 INVARIANTE="$RAIZ/supabase/migrations/20260801000400_app_users_cliente_sin_company_id.sql"
+ANUNCIOS="$RAIZ/supabase/migrations/20260801000500_anuncios_notificacion_y_acuse.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -77,23 +84,31 @@ echo "  OK    migración aplicada"
 echo "── 3/4 · invariantes post-fix ──────────────────────────────────────────"
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_post.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 4/6 · idempotencia (re-aplicar la migración) ────────────────────────"
+echo "── 4/7 · idempotencia (re-aplicar la migración) ────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$MIGRACION" >/dev/null
 # El paso 3 dejó un read_at marcado; se limpia para que las 13 vuelvan a valer.
 psql -q -d comdif -c "UPDATE public.broadcast_recipients SET read_at = NULL" >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_post.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 5/6 · invariante cliente ⇒ company_id NULL (20260801000400) ─────────"
+echo "── 5/7 · invariante cliente ⇒ company_id NULL (20260801000400) ─────────"
 # El WARNING de normalización es señal, no ruido: se muestra.
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$INVARIANTE" 2>&1 \
   | sed -n 's/.*WARNING:  /  ⚠ /p'
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_invariante.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 6/6 · idempotencia de 20260801000400 ────────────────────────────────"
+echo "── 6/7 · idempotencia de 20260801000400 ────────────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$INVARIANTE" >/dev/null
 psql -q -d comdif -c "DELETE FROM public.app_users WHERE id = '50000000-0000-0000-0000-000000000009'" >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_invariante.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
+echo "── 7/7 · aviso al residente + acuse de lectura (20260801000500) ────────"
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$ANUNCIOS" >/dev/null
+# En Supabase los DEFAULT PRIVILEGES le dan a `authenticated` el DML de toda
+# tabla nueva de `public`; en un Postgres pelado hay que concederlo a mano
+# DESPUÉS de crearla (el GRANT del fixture corrió cuando aún no existía).
+psql -q -d comdif -c "GRANT SELECT, INSERT, UPDATE, DELETE ON public.anuncio_lecturas TO authenticated" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_anuncios.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
+
 echo
-echo "✅ 20260801000300 + 20260801000400: bugs reproducidos, corregidos y"
-echo "   verificados (18 invariantes), ambas migraciones idempotentes."
+echo "✅ 20260801000300 + 400 + 500: bugs reproducidos, corregidos y verificados"
+echo "   (26 invariantes), migraciones idempotentes."

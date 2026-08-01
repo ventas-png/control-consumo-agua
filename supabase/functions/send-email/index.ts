@@ -233,6 +233,23 @@ function renderTemplate(key: string, vars: Record<string, string>): { subject: s
     }
   }
 
+  // Anuncio del tablón del condominio (trigger fn_notificar_anuncio_comunidad).
+  // Mismo esqueleto que 'difusion' pero con el encabezado del condominio y sin
+  // firma de remitente: un anuncio lo publica la administración, no una persona.
+  if (key === 'anuncio_condominio') {
+    return {
+      subject: vars.subject ?? `Nuevo anuncio | ${empresa}`,
+      html: baseLayout(`
+        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">${vars.subject ?? 'Nuevo anuncio'}</h2>
+        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${vars.to_name ?? 'residente'}</strong>, la administración publicó un anuncio en el tablón del condominio.</p>
+        <div style="background:#f8fafc;border-radius:12px;border-left:4px solid #0d9488;padding:20px 24px;margin-bottom:24px;">
+          <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${vars.message ?? ''}</p>
+        </div>
+        <p style="margin:0;font-size:13px;color:#64748b;">Podés verlo también en tu portal de residente, en la sección <strong>Anuncios</strong>.</p>
+      `, empresa, logo),
+    }
+  }
+
   if (key === 'password_reset') {
     return {
       subject: `Restablecer contraseña | ${empresa}`,

@@ -110,6 +110,13 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   )
 
   const clientesTabLabel = serviceType === 'condominios' ? 'Residentes' : 'Clientes'
+  // Difusión es el canal masivo de AGUA. En condominios se deja fuera a
+  // propósito: el condominio ya tiene el suyo —el tablón (`anuncios_comunidad`),
+  // que además llega al portal del residente— y montar Difusión encima serían
+  // dos canales compitiendo por lo mismo. Lo único que Difusión sumaba (entrega
+  // por email y acuse de lectura) se le añadió al tablón en 20260801000500, así
+  // que ya no hay nada que ganar duplicándolo. Además el registry entra aquí con
+  // `clientes={[]}`: sin padrón el modal no podría resolver la audiencia.
   const showDifusion = serviceType !== 'condominios'
   const mainTabs: MainTab[] = ['conversaciones', ...(showDifusion ? ['difusion' as const] : []), 'preferencias']
 

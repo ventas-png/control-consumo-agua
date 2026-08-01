@@ -10,7 +10,8 @@
 // se chequean en compile-time contra el esquema generado. Los shapes públicos
 // (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
 // `supabase` (laxo) solo para tablas aún fuera del esquema generado
-// (recargo_tarjeta_config, migración 20260717190000).
+// (recargo_tarjeta_config, migración 20260717190000; anuncio_lecturas,
+// migración 20260801000500 — entran al tipado con el próximo gen:db-types).
 import { reportDegradedQuery } from '../queryFetch'
 import { hoyLocalISO, dateLocalISO } from '../../lib/format'
 import { db, supabase } from '../../lib/supabase'
@@ -309,4 +310,39 @@ export async function fetchCondominiosPortalData(
     paquetesData: paquetesRes.data,
     comunicadosData: comunicadosRes.data,
   }
+}
+
+/**
+ * Sella el acuse de lectura de los anuncios que el residente acaba de ver.
+ * Idempotente por el UNIQUE (anuncio_id, cliente_id): reabrir el tab no duplica
+ * ni "re-lee". Best-effort — un fallo aquí no debe romper la pantalla, el acuse
+ * es telemetría para la administración, no algo que el residente pidió.
+ */
+export async function marcarAnunciosLeidos(
+  anuncioIds: string[],
+  clienteId: string,
+  companyId: string,
+): Promise<void> {
+  if (anuncioIds.length === 0 || !clienteId || !companyId) return
+  await supabase
+    .from('anuncio_lecturas')
+    .upsert(
+      anuncioIds.map(anuncio_id => ({ anuncio_id, cliente_id: clienteId, company_id: companyId })),
+      { onConflict: 'anuncio_id,cliente_id', ignoreDuplicates: true },
+    )
+}
+
+/** Conteo de lecturas por anuncio, para el "X de Y leyeron" del tablón (admin). */
+export async function fetchAnuncioLecturas(anuncioIds: string[]): Promise<Record<string, number>> {
+  if (anuncioIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from('anuncio_lecturas')
+    .select('anuncio_id')
+    .in('anuncio_id', anuncioIds)
+  if (error || !data) return {}
+  const out: Record<string, number> = {}
+  for (const row of data as { anuncio_id: string }[]) {
+    out[row.anuncio_id] = (out[row.anuncio_id] ?? 0) + 1
+  }
+  return out
 }
