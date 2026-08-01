@@ -509,6 +509,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             registros={registros}
             clientes={[]}
             currentUser={currentUser}
+            companyId={companies[0]?.id}
             moneda={projects[0]?.moneda ?? 'Q'}
             onDataChange={cargarDatos}
           />

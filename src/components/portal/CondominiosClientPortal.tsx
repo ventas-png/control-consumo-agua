@@ -10,6 +10,7 @@ import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
   AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido,
+  ComunicadoCondominio,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
 import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
@@ -75,6 +76,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
   const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
+  const [comunicados, setComunicados]             = useState<ComunicadoCondominio[]>([])
   const [popupOpen, setPopupOpen]                 = useState(false)
 
   const cargarDatos = useCallback(async () => {
@@ -98,7 +100,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       const {
         projData, amenidadesData, cuotasData, reservasData, bloqueosData,
         ticketsData, anunciosData, visitantesData, mensajesData,
-        solicitudesRentaData, paquetesData,
+        solicitudesRentaData, paquetesData, comunicadosData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -121,6 +123,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
       setPaquetes(((paquetesData as (PaqueteRecibido & { unidades?: { nombre: string } | null })[]) ?? [])
         .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
+      setComunicados((comunicadosData as ComunicadoCondominio[]) ?? [])
     } finally {
       setLoading(false)
     }
@@ -237,6 +240,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
   const paquetesU      = paquetes.filter(p => p.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
+  const comunicadosU   = comunicados.filter(c => c.unidad_id === selectedUnidadId)
   const paquetesPendientes = paquetes.filter(p => p.estado === 'pendiente')
 
   function cerrarPopup(irA?: boolean) {
@@ -466,10 +470,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               />
             )}
             {tab === 'anuncios' && (
-              anunciosP.length === 0 ? (
+              anunciosP.length === 0 && comunicadosU.length === 0 ? (
                 <EmptyState icon="📢" title="Sin anuncios" text="No hay anuncios publicados en este momento." />
               ) : (
-                <PortalAnunciosTab anuncios={anunciosP} />
+                <PortalAnunciosTab anuncios={anunciosP} comunicados={comunicadosU} unidadNombre={unidad.nombre} />
               )
             )}
             {tab === 'rentas' && (

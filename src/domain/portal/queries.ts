@@ -239,13 +239,15 @@ export interface CondominiosPortalData {
   mensajesData: unknown[] | null
   solicitudesRentaData: unknown[] | null
   paquetesData: unknown[] | null
+  comunicadosData: unknown[] | null
 }
 
 /**
  * Carga TODO el portal de condominios de un residente en paralelo (proyecto +
  * amenidades, cuotas, reservas, bloqueos, tickets, anuncios, visitantes, mensajes,
- * solicitudes de renta y paquetes). Las ventanas de tiempo (caps de 60/90/730 días)
- * son del portal (actividad reciente); el admin tiene su propio loader completo.
+ * solicitudes de renta, paquetes y comunicados dirigidos a su unidad). Las ventanas
+ * de tiempo (caps de 60/90/730 días) son del portal (actividad reciente); el admin
+ * tiene su propio loader completo.
  */
 export async function fetchCondominiosPortalData(
   projectIds: string[],
@@ -259,6 +261,7 @@ export async function fetchCondominiosPortalData(
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
     anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
+    comunicadosRes,
   ] = await Promise.all([
     db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
     db.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
@@ -282,6 +285,14 @@ export async function fetchCondominiosPortalData(
       .limit(100),
     db.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
     db.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
+    // Comunicados formales DIRIGIDOS a la unidad del residente (destinatario
+    // 'especifico' → unidad_id). Los de audiencia amplia NO se piden a
+    // propósito: para esos la administración usa "Publicar en portal", que los
+    // copia a anuncios_comunidad — publicar es un acto explícito y así un
+    // borrador no se filtra. La RLS ya concedía estas filas al residente
+    // (20260602000030, rama `unidad_id IN mis_unidades_ids()`), pero ninguna
+    // pantalla las leía.
+    db.from('comunicados_condominio').select('*').in('unidad_id', unidadIds).order('fecha_envio', { ascending: false }).limit(100),
   ])
 
   return {
@@ -296,5 +307,6 @@ export async function fetchCondominiosPortalData(
     mensajesData: mensajesRes.data,
     solicitudesRentaData: solicitudesRentaRes.data,
     paquetesData: paquetesRes.data,
+    comunicadosData: comunicadosRes.data,
   }
 }

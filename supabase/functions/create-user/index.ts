@@ -60,6 +60,20 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Este edge crea usuarios de STAFF y siempre escribe company_id. Un usuario
+    // con role 'cliente' NO puede salir de aquí: la separación residente/staff
+    // de las policies descansa en que la cuenta de cliente tenga company_id
+    // NULL (ver 20260801000400), y las cuentas de residente se dan de alta por
+    // create-cliente-account / complete-oauth-onboarding. El trigger de la BD
+    // lo normalizaría igual, pero fallar aquí dice POR QUÉ.
+    if (role === 'cliente') {
+      return new Response(JSON.stringify({
+        error: 'Las cuentas de cliente/residente se crean desde el portal de clientes, no desde alta de usuarios.',
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Non-superadmins can only create users within their own company
     const allowedRolesForNonSuper = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
     if (!isSuperAdmin) {

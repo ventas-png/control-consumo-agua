@@ -31,6 +31,7 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20260801000300_rls_comunicados_difusion_residente.sql"
+INVARIANTE="$RAIZ/supabase/migrations/20260801000400_app_users_cliente_sin_company_id.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -76,11 +77,23 @@ echo "  OK    migración aplicada"
 echo "── 3/4 · invariantes post-fix ──────────────────────────────────────────"
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_post.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
-echo "── 4/4 · idempotencia (re-aplicar la migración) ────────────────────────"
+echo "── 4/6 · idempotencia (re-aplicar la migración) ────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$MIGRACION" >/dev/null
 # El paso 3 dejó un read_at marcado; se limpia para que las 13 vuelvan a valer.
 psql -q -d comdif -c "UPDATE public.broadcast_recipients SET read_at = NULL" >/dev/null
 psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_post.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
 
+echo "── 5/6 · invariante cliente ⇒ company_id NULL (20260801000400) ─────────"
+# El WARNING de normalización es señal, no ruido: se muestra.
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$INVARIANTE" 2>&1 \
+  | sed -n 's/.*WARNING:  /  ⚠ /p'
+psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_invariante.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
+
+echo "── 6/6 · idempotencia de 20260801000400 ────────────────────────────────"
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d comdif -f "$INVARIANTE" >/dev/null
+psql -q -d comdif -c "DELETE FROM public.app_users WHERE id = '50000000-0000-0000-0000-000000000009'" >/dev/null
+psql -q -v ON_ERROR_STOP=1 -d comdif -f "$AQUI/assert_invariante.sql" 2>&1 | sed -n 's/.*NOTICE:  /  /p'
+
 echo
-echo "✅ 20260801000300: bug reproducido, corregido y verificado (13 invariantes)."
+echo "✅ 20260801000300 + 20260801000400: bugs reproducidos, corregidos y"
+echo "   verificados (18 invariantes), ambas migraciones idempotentes."
