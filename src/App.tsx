@@ -1,5 +1,6 @@
 import { hoyLocalISO } from './lib/format'
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { lazySafe as lazy } from './lib/lazyWithPreload'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'

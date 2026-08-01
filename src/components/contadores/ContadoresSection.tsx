@@ -1,4 +1,5 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
+import { useState, useMemo, Suspense } from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
 import type { Contador, Tarifa, TipoAgua, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'

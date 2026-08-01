@@ -3,7 +3,9 @@
 // Cada entrada tiene `render(ctx)`, lo que mantiene el type-checking estático
 // (no usamos `Record<string, unknown>`) y permite que CondominiosSection se
 // quede sólo con el dueño del estado + el contenedor visual.
-import { lazy, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
+// lazySafe, no `lazy` de react: absorbe el chunk swallowed tras un deploy (ver helper).
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { FeatureGate } from '../../lib/featureFlags'
 import { UpgradeCTA } from '../shared/UpgradeCTA'
 import type {

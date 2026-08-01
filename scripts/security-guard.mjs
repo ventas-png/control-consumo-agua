@@ -66,6 +66,19 @@ async function runQuery(sql) {
     },
   )
   const text = await res.text()
+  if (res.status === 401 || res.status === 403) {
+    // Se nombra aparte porque es la ÚNICA causa de fallo del guard que no se
+    // arregla en el repo: no hay hueco de aislamiento que investigar, hay una
+    // credencial que atender. Sin esto el rojo se lee como hallazgo de seguridad.
+    //
+    // 401 y 403 NO son el mismo problema y no se colapsan: 401 es el token
+    // muerto (lo que pasó el 2026-08-01); un 403 puede ser falta de permiso
+    // sobre el proyecto o —fuera de Actions— un proxy de egreso contestando por
+    // Supabase. Decir "token revocado" ante un 403 manda a rotar un token sano.
+    const err = new Error(`Management API ${res.status}: ${text.slice(0, 300)}`)
+    err.authStatus = res.status
+    throw err
+  }
   if (!res.ok) {
     throw new Error(`Management API ${res.status}: ${text.slice(0, 500)}`)
   }
@@ -121,6 +134,24 @@ async function main() {
     ])
   } catch (err) {
     console.error(`❌ security-guard: no se pudo consultar el catálogo — ${err.message}`)
+    if (err.authStatus) {
+      console.error('')
+      console.error('   CREDENCIAL, NO HALLAZGO: el catálogo no se leyó, así que este rojo')
+      console.error('   no dice nada sobre el aislamiento multi-tenant.')
+      if (err.authStatus === 401) {
+        console.error('   401 = SUPABASE_ACCESS_TOKEN inválido, expirado o revocado.')
+        console.error('   Rotar en Supabase → Account → Access Tokens y actualizar el secret')
+        console.error('   del repo (Settings → Secrets and variables → Actions).')
+      } else {
+        console.error('   403 = el token existe pero no tiene permiso sobre este proyecto')
+        console.error('   (o, fuera de Actions, un proxy de egreso contestó por Supabase).')
+        console.error('   Revisar el scope del token y SUPABASE_PROJECT_ID antes de rotar nada.')
+      }
+      console.error('   El mismo token lo comparten apply-migration, apply-migrations-prod,')
+      console.error('   deploy-functions, types-drift, auth-hardening y cleanup-preview-branches:')
+      console.error('   los seis fallan igual hasta que se resuelva.')
+      console.error('')
+    }
     console.error('   Fail-closed: un guard que no puede verificar NO pasa.')
     process.exit(1)
   }

@@ -36,6 +36,14 @@ applyStoredConsent()
 // el index nuevo con los hashes vigentes. El guard de sessionStorage evita un
 // loop de recargas si el fallo persiste (p. ej. sin conexión): en ese caso
 // dejamos que Vite lance el error y lo capture el ErrorBoundary.
+//
+// OJO al `preventDefault()`: el helper de Vite solo relanza si NADIE lo llamó,
+// así que al llamarlo aquí su `.catch()` deja de rechazar y RESUELVE la promesa
+// del chunk con `undefined`. React.lazy guardaría ese undefined como módulo y
+// rompería en el siguiente render (`_result.default`). Esa resolución vacía la
+// absorbe `lazySafe`/`lazyWithPreload` en lib/lazyWithPreload.ts — que es lo que
+// mantiene el spinner de Suspense hasta que esta recarga entra. Si algún día se
+// crean componentes con el `lazy` de react directamente, el crash vuelve.
 window.addEventListener('vite:preloadError', (event) => {
   const KEY = 'at-chunk-reload-at'
   const last = Number(sessionStorage.getItem(KEY) ?? 0)
