@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, ClienteLookupResult, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'

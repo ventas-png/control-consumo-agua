@@ -2,9 +2,8 @@
 // Mantiene la estrategia de chunks: auth/portales con lazy plano (no entran al
 // bundle autenticado) y secciones navegables con lazyWithPreload para el
 // prefetch on-hover del Sidebar.
-import { lazy } from 'react'
 import type { AppSection } from '../../types'
-import { lazyWithPreload } from '../../lib/lazyWithPreload'
+import { lazySafe as lazy, lazyWithPreload } from '../../lib/lazyWithPreload'
 
 // Auth + landing flow — lazy para que NO entre al bundle principal de la app
 // autenticada (donde el ~99% del tiempo de uso ocurre). En primer load el
