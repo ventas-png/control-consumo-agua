@@ -653,7 +653,28 @@ button:focus:not(:focus-visible) {
   input[type="url"], input[type="date"], input[type="month"],
   input[type="time"], textarea, select {
     min-height: 44px;
-    font-size: 16px;
+  }
+
+  /* ── Anti-autozoom de iOS: el font-size manda y va con !important ────────
+   *
+   * Safari amplía la página al enfocar un campo cuyo font-size computado sea
+   * MENOR de 16px, y al cerrar el formulario NO deshace el zoom: la página se
+   * queda ampliada y a partir de ahí se puede arrastrar de lado con el dedo.
+   * Es lo que se reportaba como "desborde" en varias pantallas — no había tal
+   * desborde, había zoom pegado.
+   *
+   * La regla ya existía sin `!important` y por eso nunca llegó a aplicarse:
+   * hay ~235 archivos con `style={{ fontSize: '13px' }}` en sus inputs, y un
+   * estilo en atributo gana siempre a la hoja. Con `!important` la hoja manda.
+   *
+   * El selector cubre además los que faltaban: `input` sin atributo `type`
+   * (equivale a text), `datetime-local` y `week`. Se excluyen los controles
+   * donde el tamaño de letra no aplica o estorba (casillas, radios, sliders,
+   * color, archivo y botones), que además no disparan el zoom. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 
