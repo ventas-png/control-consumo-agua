@@ -51,7 +51,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.18.2",
     "sonner": "^1.7.4",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
