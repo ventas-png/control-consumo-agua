@@ -16,6 +16,24 @@ updates:
       minor-y-patch:
         update-types: ["minor", "patch"]
     labels: ["dependencies"]
+    # Majors que Dependabot NO debe reabrir solo. Cada uno rompe el pipeline de
+    # una forma distinta y ninguno se arregla mergeando el PR tal cual; hay que
+    # migrar a mano. Sin estas reglas el PR vuelve cada lunes y deja un
+    # deployment ROJO en Vercel (Vercel construye un preview por PR).
+    ignore:
+      # typescript@6/7 no resuelve: typescript-eslint@8 declara el peer
+      # `typescript >=4.8.4 <6.1.0`, así que `npm ci` aborta con ERESOLVE
+      # ANTES de compilar nada — el preview de Vercel falla en la instalación.
+      # Levantar este ignore cuando typescript-eslint amplíe ese rango.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # zod@4 cambia la API de errores (`.issues`, formato de `invalid_format`)
+      # y los schemas de dominio dependen de ella. Ojo: el build de Vercel NO
+      # corre `tsc` ni los tests, así que este PR sale VERDE en Vercel mientras
+      # CI está en rojo — mergearlo desplegaría validaciones rotas. Levantar
+      # este ignore junto con la migración de los schemas a la API v4.
+      - dependency-name: zod
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
