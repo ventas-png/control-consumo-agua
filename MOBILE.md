@@ -154,6 +154,18 @@ teléfono:
    iOS Safari atrapa a los `position: fixed`, y no se reproduce en Chromium —
    hay que razonarlo o probarlo en un dispositivo.
 
+El guard contra el arrastre lateral vive en `#root { overflow-x: clip }`, y esa
+elección tiene dos trampas detrás:
+
+- **No sirve en `html` ni en `body`.** El overflow del elemento raíz se propaga
+  al viewport y la propagación solo contempla `visible/hidden/scroll/auto`, así
+  que un `clip` ahí no hace nada; y como `html` es `visible`, el overflow de
+  `body` también propaga. Medido en ambos: el documento seguía arrastrándose.
+- **Tiene que ser `clip`, no `hidden`.** `overflow-x: hidden` con
+  `overflow-y: visible` es inválido: el segundo se convierte en `auto` y el
+  elemento pasa a ser un contenedor con scroll — que es justo lo que atrapa a
+  los `position: fixed` en iOS (invariante 4). `clip` no crea scrollport.
+
 ---
 
 ## 5. Notas de diseño (por qué)
