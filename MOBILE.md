@@ -123,6 +123,32 @@ no rompe nada.
 | minSdk / target-compileSdk | 24 / 36 |
 | Deep link OAuth | `com.administratodo.app://auth-callback` |
 
+### iOS: ciclo de vida por UIScene
+
+Xcode avisa desde iOS 26 que `UIScene lifecycle will soon be required` y que no
+adoptarlo **acabará en un assert** — es decir, un crash al arrancar en alguna iOS
+futura. La plantilla de Capacitor 8 aún no lo trae (su código Swift no menciona
+`UIScene`), así que la adopción está hecha a mano:
+
+- `ios/App/App/Info.plist` declara `UIApplicationSceneManifest`, con
+  `UISceneStoryboardFile = Main` para que UIKit siga montando la window y el
+  `CAPBridgeViewController` desde el storyboard.
+- `ios/App/App/SceneDelegate.swift` recibe las aperturas por URL —incluido el
+  arranque en frío vía `connectionOptions`— y las reenvía al
+  `ApplicationDelegateProxy` de Capacitor, que es quien emite `appUrlOpen`.
+- `AppDelegate.swift` pierde `window` y los callbacks que UIKit ya no llama en una
+  app con escenas; conserva `configurationForConnecting`.
+
+**Al tocar cualquiera de esos tres archivos, probar en dispositivo el login con
+Google**: es el único consumidor real del deep link (`src/lib/nativeAuth.ts`), y
+si el puente se rompe, el OAuth se queda colgado en el navegador sin volver a la
+app. Probar los dos casos, que van por caminos distintos: con la app **abierta**
+en segundo plano (`scene(_:openURLContexts:)`) y con la app **cerrada del todo**
+(`connectionOptions` en `willConnectTo`).
+
+Cuando Capacitor adopte escenas upstream, conviene volver a su plantilla y borrar
+esta adaptación.
+
 ---
 
 ## 4. Layout en teléfono (shell responsive)
