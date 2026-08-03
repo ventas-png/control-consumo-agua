@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
+import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
@@ -10,6 +10,7 @@ import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
   AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido,
+  ComunicadoCondominio,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
 import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
@@ -75,6 +76,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
   const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
+  const [comunicados, setComunicados]             = useState<ComunicadoCondominio[]>([])
   const [popupOpen, setPopupOpen]                 = useState(false)
 
   const cargarDatos = useCallback(async () => {
@@ -98,7 +100,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       const {
         projData, amenidadesData, cuotasData, reservasData, bloqueosData,
         ticketsData, anunciosData, visitantesData, mensajesData,
-        solicitudesRentaData, paquetesData,
+        solicitudesRentaData, paquetesData, comunicadosData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -121,6 +123,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
       setPaquetes(((paquetesData as (PaqueteRecibido & { unidades?: { nombre: string } | null })[]) ?? [])
         .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
+      setComunicados((comunicadosData as ComunicadoCondominio[]) ?? [])
     } finally {
       setLoading(false)
     }
@@ -177,6 +180,20 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Acuse de lectura: al abrir Anuncios se sella la lectura de los que se le
+  // muestran. Best-effort y idempotente (UNIQUE anuncio_id+cliente_id), así que
+  // volver al tab no re-marca ni duplica. No bloquea el render.
+  useEffect(() => {
+    if (tab !== 'anuncios' || loading) return
+    // El proyecto se deriva aquí (y no de `proyectoId`, que se calcula más
+    // abajo, después del guard de "sin unidades"): los hooks van todos arriba.
+    const pid = unidades.find(u => u.id === selectedUnidadId)?.project_id ?? unidades[0]?.project_id
+    if (!pid || !clienteId || !resolvedCompanyId) return
+    const visibles = anuncios.filter(a => a.project_id === pid && a.activo).map(a => a.id)
+    if (visibles.length === 0) return
+    void marcarAnunciosLeidos(visibles, clienteId, resolvedCompanyId)
+  }, [tab, loading, anuncios, unidades, selectedUnidadId, clienteId, resolvedCompanyId])
 
   // Pop-up de aviso: muestra los paquetes pendientes una vez por sesión (set de
   // ids vistos en sessionStorage para no repetir en cada refresco).
@@ -237,6 +254,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
   const paquetesU      = paquetes.filter(p => p.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
+  const comunicadosU   = comunicados.filter(c => c.unidad_id === selectedUnidadId)
   const paquetesPendientes = paquetes.filter(p => p.estado === 'pendiente')
 
   function cerrarPopup(irA?: boolean) {
@@ -466,10 +484,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               />
             )}
             {tab === 'anuncios' && (
-              anunciosP.length === 0 ? (
+              anunciosP.length === 0 && comunicadosU.length === 0 ? (
                 <EmptyState icon="📢" title="Sin anuncios" text="No hay anuncios publicados en este momento." />
               ) : (
-                <PortalAnunciosTab anuncios={anunciosP} />
+                <PortalAnunciosTab anuncios={anunciosP} comunicados={comunicadosU} unidadNombre={unidad.nombre} />
               )
             )}
             {tab === 'rentas' && (

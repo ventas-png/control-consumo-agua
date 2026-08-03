@@ -1,8 +1,9 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
+import { fetchAnuncioLecturas } from '../../../domain/portal/queries'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 
@@ -28,12 +29,24 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   const [filtroTipo, setFiltroTipo] = useState<TipoAnuncio | 'todos'>('todos')
   const [soloActivos, setSoloActivos] = useState(true)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  // Acuse de lectura por anuncio (20260801000500). Se pide aquí y no en el
+  // loader gigante de CondominiosSection: ese es un Promise.all posicional de
+  // ~131 entradas y este contador no justifica tocarlo.
+  const [lecturas, setLecturas] = useState<Record<string, number>>({})
   const [form, setForm] = useState({
     titulo: '',
     contenido: '',
     tipo: 'aviso' as TipoAnuncio,
     fecha_evento: '',
   })
+
+  useEffect(() => {
+    const ids = anuncios.map(a => a.id)
+    if (ids.length === 0) { setLecturas({}); return }
+    let cancelado = false
+    void fetchAnuncioLecturas(ids).then(m => { if (!cancelado) setLecturas(m) })
+    return () => { cancelado = true }
+  }, [anuncios])
 
   const filtrados = anuncios.filter(a => {
     const matchTipo = filtroTipo === 'todos' || a.tipo === filtroTipo
@@ -192,9 +205,18 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                       <SecureImage src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--at-line)', cursor: 'zoom-in' }}
                         onClick={() => window.open(a.foto_url!, '_blank')} />
                     )}
-                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '8px' }}>
-                      {a.publicado_por_nombre && `Publicado por ${a.publicado_por_nombre} · `}
-                      {new Date(a.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span>
+                        {a.publicado_por_nombre && `Publicado por ${a.publicado_por_nombre} · `}
+                        {new Date(a.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                      {/* Acuse de lectura. Solo se pinta si alguien ya lo abrió:
+                          un "0 leyeron" recién publicado no dice nada útil. */}
+                      {(lecturas[a.id] ?? 0) > 0 && (
+                        <span style={{ padding: '2px 8px', borderRadius: '20px', fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>
+                          👁 {lecturas[a.id]} {lecturas[a.id] === 1 ? 'residente lo leyó' : 'residentes lo leyeron'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>

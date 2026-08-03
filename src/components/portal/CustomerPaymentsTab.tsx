@@ -11,6 +11,14 @@ interface Props {
   registros: Registro[]
   clientes: Cliente[]
   currentUser: UserSession
+  /**
+   * Empresa del cliente, resuelta por el portal desde `company_clientes`. NO se
+   * usa `currentUser.company_id`: en una cuenta de cliente ese campo es SIEMPRE
+   * NULL a propósito (es la frontera de privilegio de las policies, ver
+   * 20260801000400), así que leerlo aquí dejaba la config de pago sin cargar y
+   * el portal sin opciones de pago en línea, en silencio.
+   */
+  companyId?: string
   moneda: string
   /** F2: refrescar los recibos del portal tras un pago/abono en línea. */
   onDataChange?: () => void
@@ -20,7 +28,7 @@ interface Props {
  *  aprobación inmediata en sandbox). Stripe/PayPal usan sus flujos dedicados. */
 const PAYFAC_PLUGGABLE = ['sandbox', 'qpaypro']
 
-export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChange }: Props) {
+export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda, onDataChange }: Props) {
   const [paymentConfig, setPaymentConfig] = useState<{
     stripe_configured: boolean
     stripe_activo: boolean
@@ -43,14 +51,15 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda, onDataChan
 
   useEffect(() => {
     cargarConfig()
-  }, [currentUser.company_id])
+  }, [companyId])
 
   async function cargarConfig() {
-    // Sin company_id no hay config que leer: salimos del loading igual (no colgar).
-    if (!currentUser.company_id) { setLoading(false); return }
+    // Sin empresa resuelta no hay config que leer: salimos del loading igual
+    // (no colgar). Llega vacío solo mientras el portal termina el bootstrap.
+    if (!companyId) { setLoading(false); return }
     const [data, recargos] = await Promise.all([
-      fetchPortalPaymentConfig(currentUser.company_id),
-      fetchPortalRecargoTarjeta(currentUser.company_id),
+      fetchPortalPaymentConfig(companyId),
+      fetchPortalRecargoTarjeta(companyId),
     ])
     setRecargoRows(recargos)
     if (data) {

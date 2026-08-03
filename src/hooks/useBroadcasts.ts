@@ -16,11 +16,23 @@ export function useBroadcasts() {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [clienteBroadcasts, setClienteBroadcasts] = useState<BroadcastRecipient[]>([])
   const [loading, setLoading] = useState(false)
+  // fetchBroadcastsWithReadCounts LANZA si falla la lectura (contrato de la capa
+  // domain). Sin este catch la promesa quedaba rechazada sin manejar y la lista
+  // se quedaba vacía: en pantalla, un fallo real (RLS, red, sesión caducada) era
+  // indistinguible de "no hay comunicados enviados todavía".
+  const [error, setError] = useState<string | null>(null)
 
   const loadBroadcasts = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       setBroadcasts(await fetchBroadcastsWithReadCounts())
+    } catch (err: unknown) {
+      const msg = err instanceof Error
+        ? err.message
+        : (err as { message?: string } | null)?.message ?? 'Error desconocido'
+      setError(msg)
+      setBroadcasts([])
     } finally {
       setLoading(false)
     }
@@ -49,5 +61,5 @@ export function useBroadcasts() {
     )
   }, [])
 
-  return { broadcasts, clienteBroadcasts, loading, loadBroadcasts, createBroadcast, loadClienteBroadcasts, markAsRead }
+  return { broadcasts, clienteBroadcasts, loading, error, loadBroadcasts, createBroadcast, loadClienteBroadcasts, markAsRead }
 }
