@@ -1,7 +1,10 @@
 import UIKit
 import Capacitor
 
-@UIApplicationMain
+// `@main` en vez del `@UIApplicationMain` que traía la plantilla de Capacitor:
+// aquel está deprecado desde Swift 5.3 y es otro resto del arranque pre-escenas.
+// Hacen exactamente lo mismo (UIKit sintetiza el `main()` del delegate).
+@main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // Sin `var window`: con el ciclo de vida por escenas la ventana la posee

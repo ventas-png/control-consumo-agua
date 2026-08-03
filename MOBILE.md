@@ -132,7 +132,10 @@ futura. La plantilla de Capacitor 8 aún no lo trae (su código Swift no mencion
 
 - `ios/App/App/Info.plist` declara `UIApplicationSceneManifest`, con
   `UISceneStoryboardFile = Main` para que UIKit siga montando la window y el
-  `CAPBridgeViewController` desde el storyboard.
+  `CAPBridgeViewController` desde el storyboard. **`UIMainStoryboardFile` ya no
+  está**: era el equivalente pre-escenas y con el manifest presente UIKit lo
+  ignora, así que quedaba solo como resto del arranque viejo. Si algún día la app
+  abre en negro, ese es el primer sitio donde mirar.
 - `ios/App/App/SceneDelegate.swift` recibe las aperturas por URL —incluido el
   arranque en frío vía `connectionOptions`— y las reenvía al
   `ApplicationDelegateProxy` de Capacitor, que es quien emite `appUrlOpen`.
