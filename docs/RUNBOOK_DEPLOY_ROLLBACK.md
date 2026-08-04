@@ -126,6 +126,39 @@ hay "down". Reglas:
    (`apply-migration.yml`) con un archivo idempotente. Es la vía auditable; evita
    ejecutar SQL suelto desde un dashboard.
 
+### ⛔ El dispatch de reconciliación (`migration_file` vacío)
+
+*Apply Migrations to Production* aceptado sin `migration_file` **reconcilia**:
+aplica todo lo que esté en `supabase/migrations/` y no en
+`supabase_migrations.schema_migrations`. Suena inofensivo y no lo es.
+
+**El 2026-08-03 esa opción tumbó producción.** El historial estaba incompleto
+—solo registraba lo posterior al 2026-06-05, porque las anteriores se aplicaron
+en su día por otra vía y nadie las apuntó—, así que el reconciliador dio por
+pendientes **257 migraciones ya aplicadas** y las reejecutó en orden. Entre
+ellas, `20260320000000_fix_superadmin_app_users_uuid`, que empieza con:
+
+```sql
+DROP TABLE IF EXISTS public.app_users CASCADE;
+```
+
+Se llevó todos los perfiles. Nadie pudo entrar, la autenticación seguía bien pero
+la app trataba a todo el mundo como usuario nuevo, y hubo que restaurar el backup
+de las 06:22 UTC perdiendo la mañana completa de trabajo.
+
+Reglas que salen de ahí:
+
+- **Antes de reconciliar, comprobar que el historial está completo.** Si no lo
+  está: `scripts/backfill-schema-migrations.sql` (se ejecuta a mano, una vez).
+- **Preferir siempre `migration_file` con UN archivo concreto.** Es más lento y
+  es el punto: se ve qué se va a ejecutar antes de ejecutarlo.
+- El workflow tiene un **tope duro** (`MAX_APPLY`, hoy 10). Si salta, NO subirlo
+  para "que pase" — revisar por qué la selección se disparó. Un despliegue sano
+  nunca trae decenas de migraciones pendientes.
+- La regla 2 de arriba (SQL idempotente) **no** basta como red: una migración de
+  marzo puede ser perfectamente idempotente y aun así destruir, porque
+  reconstruye el estado de marzo sobre datos de agosto.
+
 ### Si una migración falla a medias
 
 - Postgres aplica cada archivo en su propia transacción → un fallo deja ESA
