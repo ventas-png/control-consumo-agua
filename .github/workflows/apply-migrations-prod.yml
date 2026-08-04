@@ -84,6 +84,10 @@ jobs:
       INPUT_FILE: ${{ github.event.inputs.migration_file }}
       PUSH_BEFORE: ${{ github.event.before }}
       PUSH_AFTER: ${{ github.sha }}
+      # Tope duro de migraciones por corrida (ver el paso `list`). Mismo criterio
+      # que el MAX_DELETIONS de cleanup-preview-branches: acotar el daño de una
+      # selección disparatada en vez de ejecutarla entera contra producción.
+      MAX_APPLY: '10'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,6 +173,48 @@ jobs:
 
           files=$(printf '%s\n' $files | sed '/^$/d' | sort -u | tr '\n' ' ')
           echo "Migraciones a aplicar: ${files:-(ninguna)}"
+
+          # ── Tope duro ─────────────────────────────────────────────────────
+          #
+          # Un despliegue sano nunca trae decenas de migraciones pendientes. Si
+          # la selección se dispara, NO es un despliegue grande: es que algo se
+          # descuadró, y lo correcto es parar y avisar en vez de reescribir
+          # producción a ciegas.
+          #
+          # El 2026-08-03 faltaba esto. `schema_migrations` estaba incompleto
+          # (solo registraba lo posterior al 2026-06-05), el reconciliador dio
+          # por pendientes 257 migraciones YA aplicadas y las reejecutó. Una de
+          # ellas, `20260320000000_fix_superadmin_app_users_uuid`, empieza con
+          # `DROP TABLE IF EXISTS public.app_users CASCADE`: se llevó por delante
+          # todos los perfiles, nadie pudo entrar y hubo que restaurar el backup
+          # de las 06:22 UTC perdiendo la mañana entera.
+          #
+          # cleanup-preview-branches ya tenía esta idea con MAX_DELETIONS, y su
+          # comentario la explica: "si algún día la API devolviera basura, el
+          # daño queda acotado y visible en vez de barrer el proyecto entero".
+          # Estaba en el workflow que borra ramas de preview y no en el que
+          # escribe en la base de producción.
+          #
+          # Si el tope salta de forma legítima (un backlog real tras semanas sin
+          # desplegar), se aplica por lotes con `migration_file`, revisando cada
+          # una. Nunca subir el número para "que pase".
+          count=$(printf '%s\n' $files | sed '/^$/d' | wc -l)
+          if [ "$count" -gt "$MAX_APPLY" ]; then
+            {
+              echo "### ⛔ Abortado: $count migraciones pendientes (tope: $MAX_APPLY)"
+              echo ""
+              echo "Un despliegue normal no trae tantas. Antes de tocar producción, revisar"
+              echo "si \`supabase_migrations.schema_migrations\` está completo — si le faltan"
+              echo "versiones ya aplicadas, esto reejecutaría migraciones antiguas contra la"
+              echo "base. Ver \`scripts/backfill-schema-migrations.sql\`."
+              echo ""
+              echo "Seleccionadas:"
+              printf '%s\n' $files | sed '/^$/d' | sed 's/^/- /'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$count migraciones pendientes supera el tope de $MAX_APPLY — abortado sin tocar producción. Revisar el historial en schema_migrations (scripts/backfill-schema-migrations.sql)."
+            exit 1
+          fi
+
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
       - name: Apply migrations via Management API
