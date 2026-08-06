@@ -108,7 +108,7 @@
     flex-wrap: wrap;
     gap: 6px 8px;
     padding: 8px 14px !important;
-    padding-top: max(8px, env(safe-area-inset-top, 0)) !important;
+    padding-top: max(8px, env(safe-area-inset-top, 0px), var(--at-safe-top, 0px)) !important;
   }
   .app-topbar > div:last-child { margin-left: auto; }
   .app-breadcrumbs { padding: 7px 14px !important; }
