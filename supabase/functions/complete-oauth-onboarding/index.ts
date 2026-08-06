@@ -2,9 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { requireUser } from '../_shared/auth.ts'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
-
-// Generic identity error — same message for all failure modes to prevent enumeration
-const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI y fecha de nacimiento.'
+// Lógica pura (error genérico anti-enumeración, resolución de nombre, match de
+// identidad 3-de-3, fila de perfil) extraída a ./logic.ts para testearla en
+// vitest (infra:I22).
+import {
+  IDENTITY_ERROR,
+  buildClienteProfileRow,
+  isIdentityMatch,
+  resolveFullName,
+  type OnboardingLookup,
+} from './logic.ts'
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -56,10 +63,7 @@ Deno.serve(async (req) => {
     }
 
     // Full name from Google metadata
-    const fullName: string =
-      oauthUser.user_metadata?.full_name ??
-      oauthUser.user_metadata?.name ??
-      email
+    const fullName: string = resolveFullName(oauthUser.user_metadata, email)
 
     // Step 2: Parse and validate body
     const body = await req.json() as { cui_dui?: string; fecha_nacimiento?: string }
@@ -94,13 +98,13 @@ Deno.serve(async (req) => {
       return err('Error al verificar su identidad. Intente nuevamente.')
     }
 
-    const result = lookupResult as { match_count: number; cliente_id: string | null }
+    const result = lookupResult as OnboardingLookup
 
-    if (result.match_count < 3 || !result.cliente_id) {
+    if (!isIdentityMatch(result)) {
       return err(IDENTITY_ERROR)
     }
 
-    const clienteId = result.cliente_id
+    const clienteId = result.cliente_id as string
 
     // Step 5: Verify the cliente has permission to create an account
     const { data: clienteRecord, error: clienteError } = await adminClient
@@ -128,16 +132,11 @@ Deno.serve(async (req) => {
       return err(IDENTITY_ERROR)
     }
 
-    // Step 7: Create app_users profile (auth user already exists from OAuth)
+    // Step 7: Create app_users profile (auth user already exists from OAuth,
+    // rol SIEMPRE 'cliente')
     const { error: profileError } = await adminClient
       .from('app_users')
-      .insert({
-        id: oauthUser.id,
-        full_name: fullName.trim(),
-        role: 'cliente',
-        cliente_id: clienteId,
-        activo: true,
-      })
+      .insert(buildClienteProfileRow(oauthUser.id, fullName, clienteId))
 
     if (profileError) {
       console.error('Profile insert error:', profileError)

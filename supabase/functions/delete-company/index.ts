@@ -2,6 +2,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { requireUser } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+// Lógica pura (gates de confirmación/gracia, partición de usuarios, snapshot
+// de auditoría) extraída a ./logic.ts para testearla en vitest (infra:I22).
+import {
+  buildPurgeAuditBefore,
+  checkPurgeGates,
+  isBenignStripeCancelError,
+  isSuperAdminRole,
+  partitionCompanyUsers,
+  resolveGraceDays,
+  type CompanyRow,
+  type CompanyUser,
+} from './logic.ts'
 
 // ============================================================================
 // delete-company — purga definitiva de una empresa (solo super_admin).
@@ -28,8 +40,6 @@ function jsonResponse(body: unknown, status: number, corsHeaders: ReturnType<typ
     status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
-
-const DEFAULT_GRACE_DAYS = 90
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -58,7 +68,7 @@ Deno.serve(async (req) => {
       .eq('id', caller.id)
       .single()
     const callerRole = (callerProfile as { role: string } | null)?.role ?? ''
-    if (callerRole !== 'super_admin' && callerRole !== 'superadmin') {
+    if (!isSuperAdminRole(callerRole)) {
       return jsonResponse({ error: 'Solo el superadministrador puede eliminar empresas' }, 403, corsHeaders)
     }
 
@@ -77,27 +87,12 @@ Deno.serve(async (req) => {
     if (companyError || !company) {
       return jsonResponse({ error: 'Empresa no encontrada' }, 404, corsHeaders)
     }
-    const companyRow = company as {
-      id: string; nombre: string; activa: boolean
-      suspended_at: string | null; suspended_reason: string | null
-      logo_url: string | null; created_at: string | null
-    }
+    const companyRow = company as CompanyRow
 
-    if (confirmName !== companyRow.nombre) {
-      return jsonResponse({ error: 'El nombre de confirmación no coincide con el nombre de la empresa' }, 400, corsHeaders)
-    }
-
-    if (companyRow.activa) {
-      return jsonResponse({ error: 'La empresa debe estar suspendida antes de eliminarse' }, 409, corsHeaders)
-    }
-    const graceDays = parseInt(Deno.env.get('DELETE_COMPANY_GRACE_DAYS') ?? '', 10) || DEFAULT_GRACE_DAYS
-    const suspendedAt = companyRow.suspended_at ? new Date(companyRow.suspended_at) : null
-    const graceEnds = suspendedAt ? new Date(suspendedAt.getTime() + graceDays * 24 * 60 * 60 * 1000) : null
-    if (!suspendedAt || !graceEnds || graceEnds > new Date()) {
-      return jsonResponse({
-        error: `La empresa debe llevar al menos ${graceDays} días suspendida antes de la purga definitiva` +
-          (graceEnds ? ` (elegible el ${graceEnds.toISOString().slice(0, 10)})` : ''),
-      }, 409, corsHeaders)
+    const graceDays = resolveGraceDays(Deno.env.get('DELETE_COMPANY_GRACE_DAYS'))
+    const gate = checkPurgeGates(companyRow, confirmName, graceDays)
+    if (!gate.ok) {
+      return jsonResponse({ error: gate.error }, gate.status, corsHeaders)
     }
 
     // ── Stripe: cancelar la suscripción viva antes de borrar la empresa ──
@@ -123,7 +118,7 @@ Deno.serve(async (req) => {
         const msg = err instanceof Error ? err.message : String(err)
         // Ya cancelada/inexistente en Stripe → seguir; cualquier otro fallo aborta
         // para no dejar un cobro recurrente huérfano.
-        if (!/No such subscription|canceled/i.test(msg)) {
+        if (!isBenignStripeCancelError(msg)) {
           return jsonResponse({ error: `No se pudo cancelar la suscripción en Stripe: ${msg}` }, 502, corsHeaders)
         }
       }
@@ -141,18 +136,17 @@ Deno.serve(async (req) => {
       .from('app_users')
       .select('id, role, full_name')
       .eq('company_id', companyId)
-    const users = (companyUsers ?? []) as Array<{ id: string; role: string; full_name: string | null }>
+    const users = (companyUsers ?? []) as CompanyUser[]
 
     if (users.some(u => u.id === caller.id)) {
       return jsonResponse({ error: 'No puedes eliminar una empresa a la que pertenece tu propia cuenta' }, 400, corsHeaders)
     }
     // Un super_admin nunca debería colgar de una empresa; si ocurre, se le
     // desliga (company_id=null) en vez de eliminarlo junto con el tenant.
-    const superAdmins = users.filter(u => u.role === 'super_admin' || u.role === 'superadmin')
+    const { superAdmins, deletables } = partitionCompanyUsers(users)
     for (const sa of superAdmins) {
       await adminClient.from('app_users').update({ company_id: null }).eq('id', sa.id)
     }
-    const deletables = users.filter(u => u.role !== 'super_admin' && u.role !== 'superadmin')
 
     for (const u of deletables) {
       const { error: rolesErr } = await adminClient.from('user_roles').delete().eq('user_id', u.id)
@@ -182,16 +176,12 @@ Deno.serve(async (req) => {
       action: 'DELETE',
       actor_id: caller.id,
       company_id: companyId,
-      before: {
-        ...companyRow,
-        deleted_counts: {
-          projects: projectCount ?? 0,
-          unidades: unitCount ?? 0,
-          usuarios: users.length,
-        },
-        grace_days: graceDays,
-        stripe_subscription_canceled: stripeSubId,
-      },
+      before: buildPurgeAuditBefore(
+        companyRow,
+        { projects: projectCount, unidades: unitCount, usuarios: users.length },
+        graceDays,
+        stripeSubId,
+      ),
     })
 
     // ── DELETE: las FK ON DELETE CASCADE limpian las tablas dependientes ──
