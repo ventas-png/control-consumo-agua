@@ -123,6 +123,35 @@ no rompe nada.
 | minSdk / target-compileSdk | 24 / 36 |
 | Deep link OAuth | `com.administratodo.app://auth-callback` |
 
+### iOS: ciclo de vida por UIScene
+
+Xcode avisa desde iOS 26 que `UIScene lifecycle will soon be required` y que no
+adoptarlo **acabará en un assert** — es decir, un crash al arrancar en alguna iOS
+futura. La plantilla de Capacitor 8 aún no lo trae (su código Swift no menciona
+`UIScene`), así que la adopción está hecha a mano:
+
+- `ios/App/App/Info.plist` declara `UIApplicationSceneManifest`, con
+  `UISceneStoryboardFile = Main` para que UIKit siga montando la window y el
+  `CAPBridgeViewController` desde el storyboard. **`UIMainStoryboardFile` ya no
+  está**: era el equivalente pre-escenas y con el manifest presente UIKit lo
+  ignora, así que quedaba solo como resto del arranque viejo. Si algún día la app
+  abre en negro, ese es el primer sitio donde mirar.
+- `ios/App/App/SceneDelegate.swift` recibe las aperturas por URL —incluido el
+  arranque en frío vía `connectionOptions`— y las reenvía al
+  `ApplicationDelegateProxy` de Capacitor, que es quien emite `appUrlOpen`.
+- `AppDelegate.swift` pierde `window` y los callbacks que UIKit ya no llama en una
+  app con escenas; conserva `configurationForConnecting`.
+
+**Al tocar cualquiera de esos tres archivos, probar en dispositivo el login con
+Google**: es el único consumidor real del deep link (`src/lib/nativeAuth.ts`), y
+si el puente se rompe, el OAuth se queda colgado en el navegador sin volver a la
+app. Probar los dos casos, que van por caminos distintos: con la app **abierta**
+en segundo plano (`scene(_:openURLContexts:)`) y con la app **cerrada del todo**
+(`connectionOptions` en `willConnectTo`).
+
+Cuando Capacitor adopte escenas upstream, conviene volver a su plantilla y borrar
+esta adaptación.
+
 ---
 
 ## 4. Layout en teléfono (shell responsive)
@@ -141,6 +170,9 @@ drawer, hazlo en `index.css`.
 | La topbar es `position: sticky` y **el scroll sigue siendo el del documento** | Antes la topbar (con el botón de menú) se iba de pantalla al bajar y el contenido se metía bajo la barra de estado de iOS, transparente por `viewport-fit=cover`. `sticky` lo arregla sin cambiar quién scrollea. Lleva `!important` porque `Topbar.tsx` trae `position: relative` inline. |
 | **NO** dar altura fija al shell para que scrollee `.app-main` | Se probó (`height: 100dvh` + `overflow: hidden`) y hubo que revertirlo: en iOS Safari un `position: fixed` dentro de un contenedor con scroll se posiciona respecto a **ese contenedor**, no al viewport. Los ~40 overlays de modal de la app son `position: fixed` y viven dentro de `.app-main`, así que **todos** quedaban recortados y sin poder scrollear. Mientras scrollee el documento, `.app-main` nunca llega a scrollear y los modales se posicionan contra el viewport. |
 | `scrollAppToTop()` (`src/lib/scroll.ts`) en vez de `window.scrollTo` | Elige el contenedor que realmente tiene scroll, así sigue funcionando si algún día una vista sí monta su propio scroller. |
+| En la app NATIVA el zoom se desactiva por viewport (`src/lib/nativeApp.ts`) | Complemento del anterior, no sustituto. **Safari ignora `maximum-scale` y `user-scalable` desde iOS 10** por accesibilidad, así que en la web el único freno es el font-size. **WKWebView sí los respeta**, de modo que el arreglo del font-size no bastaba dentro de la app: había que cortarlo también por viewport. Solo corre bajo `isNative()`, así que el navegador conserva el pinch-zoom. Se mantiene `viewport-fit=cover`, del que dependen los `env(safe-area-inset-*)`. |
+| El conmutador del portal y las cabeceras reservan `env(safe-area-inset-top)` | Con `viewport-fit=cover` la página arranca bajo la barra de estado. El conmutador Condominios/Agua es `sticky; top: 0` y quedaba bajo el reloj y la batería, **sin poder tocarse**. Los dos casos son excluyentes (con conmutador manda él; sin él, la cabecera), y una regla de selector hermano evita sumar el hueco dos veces. |
+| Todo campo de formulario va a `font-size: 16px !important` en teléfono | Safari amplía la página al enfocar un campo cuyo font-size computado sea **menor de 16px**, y al cerrar el formulario **no deshace el zoom**: la página se queda ampliada y a partir de ahí se arrastra de lado con el dedo. Se reportó como "desborde" en varias pantallas; no había tal desborde. El `!important` no es opcional: hay ~235 archivos con `style={{ fontSize: '13px' }}` en sus inputs y un estilo en atributo gana siempre a la hoja, así que la regla existía desde antes y nunca llegó a aplicarse. |
 | Los sub-menús de sección usan `<TabStrip>` | Una sola fila con scroll horizontal, el patrón que ya tenía Condominios. Con `flex-wrap`, un módulo como Contabilidad (9 pestañas) ocupaba cuatro líneas antes de llegar al contenido. |
 
 Los cuatro invariantes que conviene comprobar al tocar esto, en un viewport de
@@ -153,6 +185,18 @@ teléfono:
    (`overflow: auto/scroll` con `scrollHeight > clientHeight`). Es lo que en
    iOS Safari atrapa a los `position: fixed`, y no se reproduce en Chromium —
    hay que razonarlo o probarlo en un dispositivo.
+
+El guard contra el arrastre lateral vive en `#root { overflow-x: clip }`, y esa
+elección tiene dos trampas detrás:
+
+- **No sirve en `html` ni en `body`.** El overflow del elemento raíz se propaga
+  al viewport y la propagación solo contempla `visible/hidden/scroll/auto`, así
+  que un `clip` ahí no hace nada; y como `html` es `visible`, el overflow de
+  `body` también propaga. Medido en ambos: el documento seguía arrastrándose.
+- **Tiene que ser `clip`, no `hidden`.** `overflow-x: hidden` con
+  `overflow-y: visible` es inválido: el segundo se convierte en `auto` y el
+  elemento pasa a ser un contenedor con scroll — que es justo lo que atrapa a
+  los `position: fixed` en iOS (invariante 4). `clip` no crea scrollport.
 
 ---
 

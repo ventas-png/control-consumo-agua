@@ -33,14 +33,50 @@ on:
 
 permissions:
   contents: read
+  actions: read # para consultar los jobs del run observado (triage)
 
 jobs:
   notify:
     # Solo cuando el workflow observado terminó en fallo.
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      # Un run puede figurar en rojo sin que el código tenga nada que ver: si
+      # GitHub no asigna runner, el job se queda en cola y acaba `cancelled`
+      # (sin logs, sin steps) mientras el run entero se marca `failure`. Eso
+      # generaba alertas fantasma — ruido que erosiona la confianza en la
+      # alerta. Antes de avisar, comprobamos que ALGÚN job llegó a fallar de
+      # verdad.
+      - name: Triage — ¿fallo real o el runner nunca arrancó?
+        id: triage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+        run: |
+          jobs_json=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" 2>/dev/null || echo '')
+          if [ -z "$jobs_json" ]; then
+            echo "::warning::No se pudieron consultar los jobs del run; se alerta por defecto."
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          total=$(echo "$jobs_json" | jq '.jobs | length')
+          fallidos=$(echo "$jobs_json" | jq '[.jobs[] | select(.conclusion == "failure")] | length')
+          fantasma=$(echo "$jobs_json" | jq '[.jobs[] | select(.conclusion == "cancelled" and ((.steps // []) | length) == 0)] | length')
+          echo "jobs=$total  fallidos=$fallidos  nunca-arrancaron=$fantasma"
+          # total == 0 → startup_failure (YAML inválido, secret ausente en el
+          # arranque): eso SÍ requiere atención humana.
+          if [ "$fallidos" -gt 0 ] || [ "$total" -eq 0 ]; then
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::${WF_NAME} figura en rojo pero ningún job llegó a ejecutarse ($fantasma job(s) cancelados en cola, sin logs). Es infraestructura de Actions, no el repo — no se alerta."
+            echo "alert=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Notify Slack
+        if: ${{ steps.triage.outputs.alert == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           WF_NAME: ${{ github.event.workflow_run.name }}
@@ -62,9 +98,9 @@ jobs:
             "*Branch:* \`${BRANCH}\`  ·  *Commit:* \`${short_sha}\`  ·  *Por:* ${ACTOR}" \
             "<${RUN_URL}|Ver el run en GitHub Actions>")
           payload=$(jq -n --arg t "$text" '{text: $t}')
-          status=$(curl -s -o /dev/null -w "%{http_code}" \
+          status=$(curl -s -m 15 --retry 2 --retry-all-errors -o /dev/null -w "%{http_code}" \
             -X POST -H 'Content-Type: application/json' \
-            -d "$payload" "$SLACK_WEBHOOK_URL")
+            -d "$payload" "$SLACK_WEBHOOK_URL" || echo "000")
           echo "Slack respondió HTTP $status"
           # No reventamos el workflow si Slack falla puntualmente (la alerta es
           # best-effort; el fallo real ya está en la pestaña Actions).
