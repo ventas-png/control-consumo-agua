@@ -24,6 +24,9 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    # El probe tarda segundos. Sin tope, un job que se queda colgado ocupa el
+    # slot 6 h (el default de Actions) antes de reportar nada.
+    timeout-minutes: 5
     steps:
       - name: GET /health
         env:
@@ -33,16 +36,25 @@ jobs:
         run: |
           echo "Probing $HEALTH_URL"
           body=$(mktemp)
-          code=$(curl -s -m 15 -o "$body" -w "%{http_code}" "$HEALTH_URL" || echo "000")
-          echo "HTTP $code"
-          cat "$body" 2>/dev/null || true
-          echo
+          code=000
+          # 3 intentos espaciados (~40 s de ventana): un 5xx puntual, un cold
+          # start del edge runtime o un corte de red del runner no deben
+          # despertar a nadie. Solo alertamos si /health falla de forma
+          # sostenida, que es lo que el SLO health.uptime mide de verdad.
+          for intento in 1 2 3; do
+            code=$(curl -s -m 15 -o "$body" -w "%{http_code}" "$HEALTH_URL" || echo "000")
+            echo "Intento $intento/3 → HTTP $code"
+            cat "$body" 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ] && ! grep -q '"status":"degraded"' "$body"; then
+              echo "Health OK ✓"
+              exit 0
+            fi
+            if [ "$intento" -lt 3 ]; then sleep 20; fi
+          done
           if [ "$code" != "200" ]; then
-            echo "::error::Health probe falló: HTTP $code (esperado 200)"
-            exit 1
+            echo "::error::Health probe falló 3/3: HTTP $code (esperado 200)"
+          else
+            echo "::error::Health probe degradado 3/3: faltan env críticas en el backend"
           fi
-          if grep -q '"status":"degraded"' "$body"; then
-            echo "::error::Health probe degradado: faltan env críticas en el backend"
-            exit 1
-          fi
-          echo "Health OK ✓"
+          exit 1
