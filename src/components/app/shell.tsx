@@ -61,7 +61,10 @@ export function DualServicePortal({ currentUser, onLogout }: { currentUser: User
   const [activeService, setActiveService] = useState<'condominios' | 'agua'>('condominios')
   return (
     <div>
-      <div style={{
+      {/* portal-service-switch: la clase la usa index.css para reservar el
+          safe-area superior de iOS — ver el bloque ≤767px. Sin eso los dos
+          chips quedan debajo del reloj y la batería, y no se pueden tocar. */}
+      <div className="portal-service-switch" style={{
         position: 'sticky', top: 0, zIndex: 200,
         background: 'var(--at-surface)',
         borderBottom: '2px solid var(--at-line)',

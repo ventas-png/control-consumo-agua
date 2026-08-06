@@ -655,6 +655,30 @@ button:focus:not(:focus-visible) {
     min-height: 44px;
   }
 
+  /* ── Portal de cliente: reservar el safe-area superior de iOS ───────────
+   *
+   * Con `viewport-fit=cover` la página arranca DEBAJO de la barra de estado,
+   * que es transparente. El elemento que quede más arriba tiene que reservar
+   * ese hueco o su contenido acaba bajo el reloj y la batería — y ahí no se
+   * puede tocar, que es como se reportó el conmutador Condominios/Agua.
+   *
+   * El `!important` es necesario porque el padding va inline en el componente.
+   *
+   * Los dos casos son excluyentes: cuando el cliente tiene los dos servicios
+   * manda el conmutador; cuando solo tiene uno, no hay conmutador y arriba
+   * queda la cabecera del portal. La regla del selector hermano quita el hueco
+   * de la cabecera cuando el conmutador ya lo reservó, para no sumarlo dos
+   * veces. */
+  .portal-service-switch {
+    padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+  }
+  .portal-header {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+  }
+  .portal-service-switch ~ * .portal-header {
+    padding-top: 16px !important;
+  }
+
   /* ── Anti-autozoom de iOS: el font-size manda y va con !important ────────
    *
    * Safari amplía la página al enfocar un campo cuyo font-size computado sea

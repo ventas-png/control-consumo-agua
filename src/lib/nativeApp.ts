@@ -9,6 +9,7 @@ import { isNative } from './platform'
  */
 export function initNativeApp(): void {
   if (!isNative()) return
+  aplicarViewportNativo()
   void (async () => {
     try {
       const { StatusBar, Style } = await import('@capacitor/status-bar')
@@ -25,4 +26,30 @@ export function initNativeApp(): void {
       // sin splash-screen: nada que ocultar
     }
   })()
+}
+
+/** Viewport que se aplica SOLO dentro de la app nativa (ver `initNativeApp`). */
+export const VIEWPORT_NATIVO =
+  'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+
+/**
+ * Desactiva el zoom del WebView en la app nativa.
+ *
+ * POR QUÉ SOLO EN NATIVO. Al enfocar un campo, iOS amplía la página y no
+ * deshace el zoom al cerrar el formulario: la página queda ampliada y se puede
+ * arrastrar de lado. En la WEB el único freno es `font-size >= 16px` (ver el
+ * bloque ≤767px de index.css), porque **Safari ignora `maximum-scale` y
+ * `user-scalable` desde iOS 10** por accesibilidad. **WKWebView sí los
+ * respeta**, así que dentro de la app propia se corta de raíz — y ese arreglo
+ * no llegaba a la app aunque el de la web estuviera bien.
+ *
+ * Contrapartida: en la app nativa se pierde el pinch-zoom. Es el comportamiento
+ * normal de una app, y el Zoom del sistema (Ajustes → Accesibilidad) sigue
+ * funcionando. En el navegador no se toca nada: `initNativeApp` sale antes.
+ *
+ * Se mantiene `viewport-fit=cover`, del que dependen los `env(safe-area-inset-*)`
+ * del conmutador del portal y de la topbar.
+ */
+export function aplicarViewportNativo(): void {
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', VIEWPORT_NATIVO)
 }

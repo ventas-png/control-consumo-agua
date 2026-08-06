@@ -298,7 +298,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         background: 'linear-gradient(135deg, var(--at-accent-hover), var(--at-accent))',
         boxShadow: '0 2px 12px rgba(156, 87, 51,0.3)',
       }}>
-        <div style={{
+        <div className="portal-header" style={{
           maxWidth: '960px', margin: '0 auto', padding: '16px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           gap: '12px', flexWrap: 'wrap',
