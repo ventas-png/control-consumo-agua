@@ -3,7 +3,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // isNative se mockea por test: initNativeApp tiene que ser un no-op en web.
 vi.mock('../platform', () => ({ isNative: vi.fn(), getPlatform: vi.fn() }))
 
-import { aplicarViewportNativo, VIEWPORT_NATIVO, initNativeApp } from '../nativeApp'
+import {
+  aplicarViewportNativo,
+  asegurarSafeAreaTop,
+  medirSafeAreaTop,
+  VIEWPORT_NATIVO,
+  VIEWPORT_NATIVO_SIN_COVER,
+  initNativeApp,
+} from '../nativeApp'
 import { isNative } from '../platform'
 
 const VIEWPORT_WEB = 'width=device-width, initial-scale=1.0, viewport-fit=cover'
@@ -40,6 +47,45 @@ describe('aplicarViewportNativo', () => {
   it('no revienta si no hay meta viewport', () => {
     document.head.innerHTML = ''
     expect(() => aplicarViewportNativo()).not.toThrow()
+  })
+})
+
+describe('asegurarSafeAreaTop', () => {
+  it('no toca el viewport cuando el WebView sí popula el inset', () => {
+    const meta = montarMetaViewport(VIEWPORT_NATIVO)
+    asegurarSafeAreaTop(() => 59)
+    expect(meta.getAttribute('content')).toBe(VIEWPORT_NATIVO)
+  })
+
+  // Sin inset, `calc(8px + env(...))` se queda en 8px y los chips
+  // Condominios/Agua acaban bajo el reloj, donde no se pueden tocar. Quitar
+  // `cover` hace que el motor encaje el viewport dentro del área segura.
+  it('quita viewport-fit=cover cuando el inset resuelve a 0', () => {
+    const meta = montarMetaViewport(VIEWPORT_NATIVO)
+    asegurarSafeAreaTop(() => 0)
+    expect(meta.getAttribute('content')).toBe(VIEWPORT_NATIVO_SIN_COVER)
+    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('viewport-fit=contain')
+  })
+
+  // La alternativa no puede reintroducir el auto-zoom que arregló el viewport nativo.
+  it('la alternativa conserva el bloqueo de zoom', () => {
+    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('maximum-scale=1.0')
+    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('user-scalable=no')
+  })
+
+  it('no revienta si no hay meta viewport', () => {
+    document.head.innerHTML = ''
+    expect(() => asegurarSafeAreaTop(() => 0)).not.toThrow()
+  })
+})
+
+describe('medirSafeAreaTop', () => {
+  // La sonda es un efecto secundario sobre el DOM: si se quedara puesta,
+  // acumularía un <div> por arranque.
+  it('retira la sonda del DOM', () => {
+    const antes = document.body.childElementCount
+    medirSafeAreaTop()
+    expect(document.body.childElementCount).toBe(antes)
   })
 })
 
