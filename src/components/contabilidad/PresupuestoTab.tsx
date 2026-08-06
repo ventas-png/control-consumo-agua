@@ -12,6 +12,8 @@ import {
   useGuardarPartidasMutation,
 } from '../../domain/presupuesto/mutations'
 import { distribuirAnual, presupuestoFormSchema, totalFila, type PartidaInput } from '../../domain/presupuesto/schemas'
+import { proyeccionPresupuesto } from '../../domain/presupuesto/proyeccion'
+import { PresupuestoVsRealChart } from './PresupuestoVsRealChart'
 import { formatCurrency, formatPercent } from '../../lib/format'
 import {
   ESTADO_PRESUPUESTO_LABELS,
@@ -436,6 +438,13 @@ function ComparativoView({ companyId, presupuestos, proyectos, monedaBase }: {
   const presupuesto = presupuestos.find((p) => p.id === presupuestoId)
   const meses = presupuesto ? periodosDelAnio(presupuesto.anio) : []
 
+  // D1 — proyección de cierre de año (run-rate) sobre TODO el año, ignorando el
+  // filtro de mes (la gráfica siempre muestra el año completo con la proyección).
+  const proyeccion = useMemo(
+    () => (presupuesto ? proyeccionPresupuesto(filas, presupuesto.anio) : null),
+    [filas, presupuesto],
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -460,6 +469,10 @@ function ComparativoView({ companyId, presupuestos, proyectos, monedaBase }: {
       ) : isLoading ? (
         <p style={{ color: 'var(--at-ink-soft)' }}>Cargando comparativo…</p>
       ) : (
+        <>
+        {proyeccion && filas.length > 0 && (
+          <PresupuestoVsRealChart proyeccion={proyeccion} anio={presupuesto?.anio ?? 0} moneda={monedaBase} />
+        )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -509,6 +522,7 @@ function ComparativoView({ companyId, presupuestos, proyectos, monedaBase }: {
             )}
           </table>
         </div>
+        </>
       )}
     </div>
   )

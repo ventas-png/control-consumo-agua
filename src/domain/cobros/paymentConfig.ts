@@ -6,8 +6,11 @@
 // quedan en la UI; aquí sólo el I/O. Convive con las mutations payfac (hooks
 // react-query) de mutations.ts: estas son funciones planas, imperativas, porque
 // StripePayPalConfig maneja su propio estado de carga/guardado.
-import { supabase } from '../../lib/supabase'
+// `db` = la misma instancia tipada (tablas/columnas chequeadas); `supabase` queda
+// para functions.invoke (edges), que no pasa por el esquema generado.
+import { db, supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
+import type { TablesUpdate } from '../../types/database.types'
 
 /** Columnas de `companies` que consume la pantalla de config Stripe/PayPal. */
 export interface CompanyPaymentConfigRow {
@@ -23,12 +26,13 @@ export interface CompanyPaymentConfigRow {
 export async function fetchCompanyPaymentConfig(
   companyId: string,
 ): Promise<{ data: CompanyPaymentConfigRow | null; error: string | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('companies')
     .select('stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_configured,paypal_activo')
     .eq('id', companyId)
     .single()
-  return { data: (data as CompanyPaymentConfigRow) ?? null, error: error?.message ?? null }
+  // La fila tipada coincide columna a columna con CompanyPaymentConfigRow (sin cast).
+  return { data: data ?? null, error: error?.message ?? null }
 }
 
 /** Activa/desactiva un proveedor (patch ya armado por la UI: {stripe_activo} | {paypal_activo}). */
@@ -36,7 +40,8 @@ export async function setCompanyProviderActivo(
   companyId: string,
   patch: Record<string, unknown>,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('companies').update(patch).eq('id', companyId)
+  // Firma pública laxa (la UI arma el patch); la frontera lo castea al Update generado.
+  const { error } = await db.from('companies').update(patch as TablesUpdate<'companies'>).eq('id', companyId)
   return { error: error?.message ?? null }
 }
 
@@ -72,17 +77,66 @@ export async function testStripeConnection(companyId: string): Promise<{ error: 
 }
 
 /**
- * Override CRUDO del payfac de una locación (`projects.proveedor_pago`): permite
- * distinguir "hereda" (NULL) de "propio" (con valor). `null` si no existe la
- * fila. Mantiene el `abortSignal` (vía runQuery) para cancelar al cambiar de
- * ámbito.
+ * Override CRUDO del payfac de una locación (`projects.proveedor_pago` +
+ * `projects.ambiente_pago`): permite distinguir "hereda" (NULL) de "propio"
+ * (con valor). `null` si no existe la fila. Mantiene el `abortSignal` (vía
+ * runQuery) para cancelar al cambiar de ámbito.
  */
 export async function fetchProjectProveedorPagoOverride(
   projectId: string,
-): Promise<{ proveedorPago: string | null } | null> {
-  const rows = await runQuery<Array<{ proveedor_pago: string | null }>>((signal) =>
-    supabase.from('projects').select('proveedor_pago').eq('id', projectId).limit(1).abortSignal(signal),
+): Promise<{ proveedorPago: string | null; ambientePago: string | null } | null> {
+  const rows = await runQuery<Array<{ proveedor_pago: string | null; ambiente_pago: string | null }>>((signal) =>
+    db.from('projects').select('proveedor_pago,ambiente_pago').eq('id', projectId).limit(1).abortSignal(signal),
   )
   const p = rows?.[0]
-  return p ? { proveedorPago: p.proveedor_pago ?? null } : null
+  return p ? { proveedorPago: p.proveedor_pago ?? null, ambientePago: p.ambiente_pago ?? null } : null
+}
+
+// ── Recargo por pago con tarjeta al cliente final (recargo_tarjeta_config) ──
+// El TENANT (company_owner, RLS) fija por canal el fee que su payfac le cobra y
+// que quiere trasladar al cliente final: el edge create-charge lo suma al total
+// del checkout y lo sella en payment_requests.recargo. `supabase` laxo porque
+// la tabla aún no está en el esquema generado (migración 20260717190000).
+
+/** Fila editable de recargo por canal ('default' aplica a todo canal sin fila). */
+export interface RecargoTarjetaConfigFila {
+  canal: string
+  activo: boolean
+  /** Fracción (0.05 = 5%). */
+  pct: number
+  /** Monto fijo por pago, en la moneda de cobro del tenant. */
+  fijo: number
+}
+
+/** Lee las filas de recargo de la empresa (todas; la UI las indexa por canal). */
+export async function fetchRecargoTarjetaConfig(
+  companyId: string,
+): Promise<{ data: RecargoTarjetaConfigFila[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('recargo_tarjeta_config')
+    .select('canal, activo, pct, fijo')
+    .eq('company_id', companyId)
+    .order('canal', { ascending: true })
+  return { data: (data as RecargoTarjetaConfigFila[] | null) ?? [], error: error?.message ?? null }
+}
+
+/** Upsert de la fila de un canal (única por company+canal). */
+export async function upsertRecargoTarjeta(
+  companyId: string,
+  fila: RecargoTarjetaConfigFila,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('recargo_tarjeta_config')
+    .upsert(
+      {
+        company_id: companyId,
+        canal: fila.canal,
+        activo: fila.activo,
+        pct: fila.pct,
+        fijo: fila.fijo,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id,canal' },
+    )
+  return { error: error?.message ?? null }
 }

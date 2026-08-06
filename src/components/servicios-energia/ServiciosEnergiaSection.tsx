@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { type EnergyTab, energiaTabToPath, pathParamToEnergiaTab } from './energiaTabs'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
+import { TabStrip } from '../shared/TabStrip'
 import { useProveedoresEnergiaQuery, useTarifasEnergiaQuery, useFuentesEnergiaQuery, useFacturasEnergiaQuery } from '../../domain/energia/queries'
 import { useFuentesAguaQuery, useProyectosQuery } from '../../domain/agua/queries'
 import { deriveProyectoConfig } from '../../lib/proyectosAccess'
@@ -20,6 +21,9 @@ export default function ServiciosEnergiaSection() {
   const perms = usePermissionsContext()
   const canCreate = perms.canCreate('servicios_energia')
   const canEdit = perms.canEdit('servicios_energia')
+  // RBAC granular: eliminar (facturas, tarifas, proveedores, fuentes) requiere
+  // el permiso delete del módulo. Crear/editar no cambian.
+  const canDelete = perms.canDelete('servicios_energia')
 
   const { tab: tabParam } = useParams<{ tab?: string }>()
   const activeTab: EnergyTab = pathParamToEnergiaTab(tabParam)
@@ -47,33 +51,14 @@ export default function ServiciosEnergiaSection() {
     <div style={{ padding: '1rem' }}>
       <h1 style={{ marginBottom: '1.5rem' }}>⚡ Servicio Energético</h1>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap',
-          borderBottom: '2px solid var(--at-line)',
-        }}
-      >
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '0.75rem 1rem',
-              border: 'none',
-              background: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-surface-2)',
-              color: activeTab === tab.id ? 'white' : 'var(--at-ink)',
-              cursor: 'pointer',
-              borderRadius: '4px 4px 0 0',
-              fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-            }}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Mismo sub-menú que Condominios/Contabilidad: una fila con scroll. */}
+      <TabStrip
+        ariaLabel="Secciones de servicio energético"
+        items={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        marginBottom="1.5rem"
+      />
 
       <div style={{ minHeight: '400px' }}>
         {activeTab === 'proveedores' && (
@@ -83,6 +68,7 @@ export default function ServiciosEnergiaSection() {
             companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -95,6 +81,7 @@ export default function ServiciosEnergiaSection() {
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -108,6 +95,7 @@ export default function ServiciosEnergiaSection() {
             companyId={companyId ?? ''}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 
@@ -122,6 +110,7 @@ export default function ServiciosEnergiaSection() {
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
 

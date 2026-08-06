@@ -5,7 +5,18 @@
 // específicas del portal, acotadas por RLS al propio cliente). Lecturas
 // imperativas (no-hook). Devuelven `data` cruda (nullable) para que la UI castee
 // como ya lo hace.
-import { supabase } from '../../lib/supabase'
+//
+// P2 tipos: migrado al cliente TIPADO `db` — tablas, columnas, filtros y embeds
+// se chequean en compile-time contra el esquema generado. Los shapes públicos
+// (`unknown`/interfaces propias) se mantienen: son la frontera que la UI ya castea.
+// `supabase` (laxo) solo para tablas aún fuera del esquema generado
+// (recargo_tarjeta_config, migración 20260717190000; anuncio_lecturas,
+// migración 20260801000500 — entran al tipado con el próximo gen:db-types).
+import { reportDegradedQuery } from '../queryFetch'
+import { hoyLocalISO, dateLocalISO } from '../../lib/format'
+import { db, supabase } from '../../lib/supabase'
+import type { ComunidadMensual } from '../../lib/portalDashboard'
+import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 
 // ── CustomerPortal (agua) ──────────────────────────────────────────────────
 
@@ -23,21 +34,22 @@ export interface PortalBootstrap {
  */
 export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBootstrap> {
   const [ccRes, uRes, rRes, clRes] = await Promise.all([
-    supabase
+    db
       .from('company_clientes')
       .select('company_id, activo, companies(id, nombre)')
       .eq('cliente_id', clienteId),
-    supabase
+    db
       .from('unidades')
       .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
       .eq('cliente_id', clienteId)
       .eq('activo', true),
-    supabase
+    db
       .from('registros')
-      .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+      .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas')
       .eq('cliente_id', clienteId)
+      .is('deleted_at', null) // E2: lecturas soft-deleted fuera del portal
       .order('fecha', { ascending: false }),
-    supabase
+    db
       .from('clientes')
       .select('email, telefono, whatsapp, telefono_alterno')
       .eq('id', clienteId)
@@ -48,45 +60,113 @@ export async function fetchPortalBootstrap(clienteId: string): Promise<PortalBoo
 
 /** Contadores activos de un conjunto de unidades (para el portal de agua). */
 export async function fetchPortalContadores(unidadIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('contadores')
     .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
     .in('unidad_id', unidadIds)
     .eq('activo', true)
+  reportDegradedQuery('portal.fetchPortalContadores', error)
   return data
 }
 
 /** Proyectos activos de un conjunto de empresas (para el portal de agua). */
 export async function fetchPortalProjectsByCompanies(companyIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('projects')
     .select('id, nombre, company_id, moneda')
     .in('company_id', companyIds)
     .eq('estado', 'activo')
+  reportDegradedQuery('portal.fetchPortalProjectsByCompanies', error)
   return data
 }
 
+// NUNCA incluir `foto` en estos listados: es un data-URI base64 de hasta ~15 MB
+// por fila (TOAST). Traerlo para TODAS las lecturas del cliente infla el payload a
+// cientos de MB y vuelve lento el portal (mismo motivo que REGISTROS_LIST_COLS en
+// domain/agua). Las fotos se bajan una a una bajo demanda con fetchRegistroFoto.
 const REGISTROS_SELECT =
-  'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
+  'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas'
 
 /** Fallback de lecturas por contador (cuando cliente_id es incorrecto/null). */
 export async function fetchRegistrosByContadores(contadorIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('contador_id', contadorIds)
+    .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
+  reportDegradedQuery('portal.fetchRegistrosByContadores', error)
   return data
 }
 
 /** Fallback de lecturas por proyecto (cuando contador_id también es null; RLS acota). */
 export async function fetchRegistrosByProjects(projectIds: string[]): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('registros')
     .select(REGISTROS_SELECT)
     .in('project_id', projectIds)
+    .is('deleted_at', null) // E2
     .order('fecha', { ascending: false })
+  reportDegradedQuery('portal.fetchRegistrosByProjects', error)
   return data
+}
+
+/**
+ * IDs de los registros del cliente que SÍ tienen foto. Se consulta aparte y se
+ * proyecta solo `id` (jamás `foto`) para no bajar el base64: el portal usa este
+ * set para saber qué lecturas tienen foto y bajar los bytes uno a uno bajo
+ * demanda (fetchRegistroFoto). Espeja el scoping de las lecturas (cliente/
+ * contador/proyecto) para cubrir los mismos fallbacks; RLS acota a lo propio.
+ */
+export async function fetchPortalFotoIds(
+  clienteId: string,
+  contadorIds: string[],
+  projectIds: string[],
+): Promise<string[]> {
+  // Tipo explícito y ancho: cada builder encadena filtros distintos y dejar
+  // que TS lo infiera del primer elemento dispara "type instantiation is
+  // excessively deep" con los genéricos de supabase-js ≥2.110 (más aún con el
+  // cliente tipado). Cada builder `db.from(...)` se chequea igual contra el
+  // esquema ANTES del widening — solo se ensancha el tipo del array.
+  const queries: PromiseLike<{ data: unknown }>[] = [
+    db.from('registros').select('id').eq('cliente_id', clienteId).not('foto', 'is', null).is('deleted_at', null),
+  ]
+  if (contadorIds.length > 0) {
+    queries.push(db.from('registros').select('id').in('contador_id', contadorIds).not('foto', 'is', null).is('deleted_at', null))
+  }
+  if (projectIds.length > 0) {
+    queries.push(db.from('registros').select('id').in('project_id', projectIds).not('foto', 'is', null).is('deleted_at', null))
+  }
+  const results = await Promise.all(queries)
+  const ids = new Set<string>()
+  for (const res of results) {
+    for (const row of ((res.data as { id: string }[] | null) ?? [])) ids.add(row.id)
+  }
+  return [...ids]
+}
+
+// `fetchRegistroFoto` es una query del dominio agua (proyección de `registros`).
+// Vive en domain/agua/queries.ts; se re-exporta aquí para no romper los
+// consumidores del portal (RegistroFotoThumb) que la importan desde este barrel.
+export { fetchRegistroFoto } from '../agua/queries'
+
+/**
+ * Referencia anónima de consumo de la comunidad del residente (O5/V6): mediana,
+ * cuartiles y promedio del consumo mensual por residente del proyecto. La RPC es
+ * SECURITY DEFINER con autorización por pertenencia y piso de k-anonimato (>=5
+ * residentes) — jamás devuelve consumos individuales de otros. Devuelve [] si el
+ * residente no pertenece al proyecto o la comunidad es demasiado chica.
+ */
+export async function fetchConsumoComunidad(
+  projectId: string,
+  meses = 12,
+): Promise<ComunidadMensual[]> {
+  const { data, error } = await db.rpc('agua_consumo_comunidad', {
+    p_project_id: projectId,
+    p_meses: meses,
+  })
+  if (error || !data) return []
+  return data as ComunidadMensual[]
 }
 
 // ── CustomerPaymentsTab ────────────────────────────────────────────────────
@@ -99,72 +179,49 @@ export interface PortalPaymentConfigRow {
   paypal_activo: boolean | null
   /** Payfac efectivo de la empresa (cobros pluggable): 'sandbox'|'qpaypro'|… */
   proveedor_pago: string | null
+  /** Flag EXPLÍCITO de demo (auditoría C1): sin él, 'sandbox' (el default de
+   *  toda empresa) no ofrece pago en línea — aprobaría cobros simulados. */
+  pago_sandbox_demo: boolean | null
 }
 
 /** Lee los flags de pago de la empresa (Stripe/PayPal + payfac) para el portal del cliente. */
 export async function fetchPortalPaymentConfig(companyId: string): Promise<PortalPaymentConfigRow | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('companies')
-    .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago')
+    .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,proveedor_pago,pago_sandbox_demo')
     .eq('id', companyId)
     .single()
-  return (data as PortalPaymentConfigRow) ?? null
-}
-
-/** Respuesta del edge `create-charge` (cobro con el payfac efectivo del tenant). */
-export interface CrearCobroResult {
-  ok?: boolean
-  estado?: string
-  proveedor?: string | null
-  referencia?: string | null
-  /** Checkout hospedado (QPayPro): URL a la que redirigir al cliente para pagar. */
-  redirectUrl?: string | null
-  clientSecret?: string | null
-  payment_request_id?: string | null
-  error?: string | null
-}
-
-export interface IniciarCobroVars {
-  clienteId: string
-  registroId: string
-  companyId: string
-  projectId?: string | null
-  /** Monto a cobrar (saldo pendiente del registro). > 0. */
-  monto: number
-  /** Ambiente del payfac. Default 'prod' (cobro real desde el portal). */
-  ambiente?: 'prod' | 'sandbox'
+  reportDegradedQuery('portal.fetchPortalPaymentConfig', error)
+  // La fila tipada es asignable a la interfaz (proveedor_pago NOT NULL ⊂ string|null) — sin cast.
+  return data ?? null
 }
 
 /**
- * Inicia un cobro con el payfac EFECTIVO del tenant vía el edge `create-charge`.
- * Devuelve el resultado normalizado; para checkout hospedado (QPayPro) trae
- * `redirectUrl` a donde mandar al cliente. NO maneja datos de tarjeta.
+ * Recargo por pago con tarjeta del tenant (recargo_tarjeta_config; RLS permite
+ * leerlo al cliente del portal). El portal lo usa para pintar el DESGLOSE antes
+ * de pagar; el cobro real lo sella y suma el edge create-charge server-side.
  */
-export async function iniciarCobroPayfac(vars: IniciarCobroVars): Promise<CrearCobroResult> {
-  const { data, error } = await supabase.functions.invoke<CrearCobroResult>('create-charge', {
-    body: {
-      cliente_id: vars.clienteId,
-      registro_id: vars.registroId,
-      company_id: vars.companyId,
-      project_id: vars.projectId ?? null,
-      monto: vars.monto,
-      ambiente: vars.ambiente ?? 'prod',
-    },
-  })
-  if (error) throw new Error(error.message)
-  if (data && data.ok === false && !data.redirectUrl) {
-    throw new Error(data.error ?? 'No se pudo iniciar el cobro.')
-  }
-  return data ?? {}
+export async function fetchPortalRecargoTarjeta(companyId: string): Promise<RecargoTarjetaRow[]> {
+  const { data, error } = await supabase
+    .from('recargo_tarjeta_config')
+    .select('canal, activo, pct, fijo')
+    .eq('company_id', companyId)
+  reportDegradedQuery('portal.fetchPortalRecargoTarjeta', error)
+  return (data as RecargoTarjetaRow[] | null) ?? []
 }
+
+// El inicio de cobro en línea del portal vive en domain/portal/mutations.ts
+// (iniciarPagoRegistro / iniciarPagoCuota) con conciliación server-side vía
+// confirm-charge. `iniciarCobroPayfac` quedó obsoleto y se removió (F2).
 
 /** Unidades activas de un cliente (batch 1 del portal de condominios). */
 export async function fetchPortalUnidadesByCliente(clienteId: string): Promise<unknown[] | null> {
-  const { data } = await supabase
+  const { data, error } = await db
     .from('unidades')
     .select('*')
     .eq('cliente_id', clienteId)
     .eq('activo', true)
+  reportDegradedQuery('portal.fetchPortalUnidadesByCliente', error)
   return data
 }
 
@@ -183,49 +240,60 @@ export interface CondominiosPortalData {
   mensajesData: unknown[] | null
   solicitudesRentaData: unknown[] | null
   paquetesData: unknown[] | null
+  comunicadosData: unknown[] | null
 }
 
 /**
  * Carga TODO el portal de condominios de un residente en paralelo (proyecto +
  * amenidades, cuotas, reservas, bloqueos, tickets, anuncios, visitantes, mensajes,
- * solicitudes de renta y paquetes). Las ventanas de tiempo (caps de 60/90/730 días)
- * son del portal (actividad reciente); el admin tiene su propio loader completo.
+ * solicitudes de renta, paquetes y comunicados dirigidos a su unidad). Las ventanas
+ * de tiempo (caps de 60/90/730 días) son del portal (actividad reciente); el admin
+ * tiene su propio loader completo.
  */
 export async function fetchCondominiosPortalData(
   projectIds: string[],
   unidadIds: string[],
 ): Promise<CondominiosPortalData> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const sesentaDias = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
   const noventaDias = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-  const haceDosAnos = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const haceDosAnos = dateLocalISO(new Date(Date.now() - 730 * 24 * 60 * 60 * 1000))
 
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
     anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
+    comunicadosRes,
   ] = await Promise.all([
-    supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
-    supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
-    supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
+    db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
+    db.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
+    db.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
       .is('deleted_at', null)
       .gte('fecha_vencimiento', haceDosAnos)
       .order('fecha_vencimiento', { ascending: false })
       .limit(500),
-    supabase.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
-    supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
-    supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
+    db.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
+    db.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
+    db.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
       .is('deleted_at', null)
       .gte('created_at', noventaDias)
       .order('created_at', { ascending: false })
       .limit(200),
-    supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
-    supabase.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
-    supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
+    db.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
+    db.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
+    db.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
       .gte('created_at', sesentaDias)
       .order('created_at', { ascending: false })
       .limit(100),
-    supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
-    supabase.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
+    db.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
+    // Comunicados formales DIRIGIDOS a la unidad del residente (destinatario
+    // 'especifico' → unidad_id). Los de audiencia amplia NO se piden a
+    // propósito: para esos la administración usa "Publicar en portal", que los
+    // copia a anuncios_comunidad — publicar es un acto explícito y así un
+    // borrador no se filtra. La RLS ya concedía estas filas al residente
+    // (20260602000030, rama `unidad_id IN mis_unidades_ids()`), pero ninguna
+    // pantalla las leía.
+    db.from('comunicados_condominio').select('*').in('unidad_id', unidadIds).order('fecha_envio', { ascending: false }).limit(100),
   ])
 
   return {
@@ -240,5 +308,41 @@ export async function fetchCondominiosPortalData(
     mensajesData: mensajesRes.data,
     solicitudesRentaData: solicitudesRentaRes.data,
     paquetesData: paquetesRes.data,
+    comunicadosData: comunicadosRes.data,
   }
+}
+
+/**
+ * Sella el acuse de lectura de los anuncios que el residente acaba de ver.
+ * Idempotente por el UNIQUE (anuncio_id, cliente_id): reabrir el tab no duplica
+ * ni "re-lee". Best-effort — un fallo aquí no debe romper la pantalla, el acuse
+ * es telemetría para la administración, no algo que el residente pidió.
+ */
+export async function marcarAnunciosLeidos(
+  anuncioIds: string[],
+  clienteId: string,
+  companyId: string,
+): Promise<void> {
+  if (anuncioIds.length === 0 || !clienteId || !companyId) return
+  await supabase
+    .from('anuncio_lecturas')
+    .upsert(
+      anuncioIds.map(anuncio_id => ({ anuncio_id, cliente_id: clienteId, company_id: companyId })),
+      { onConflict: 'anuncio_id,cliente_id', ignoreDuplicates: true },
+    )
+}
+
+/** Conteo de lecturas por anuncio, para el "X de Y leyeron" del tablón (admin). */
+export async function fetchAnuncioLecturas(anuncioIds: string[]): Promise<Record<string, number>> {
+  if (anuncioIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from('anuncio_lecturas')
+    .select('anuncio_id')
+    .in('anuncio_id', anuncioIds)
+  if (error || !data) return {}
+  const out: Record<string, number> = {}
+  for (const row of data as { anuncio_id: string }[]) {
+    out[row.anuncio_id] = (out[row.anuncio_id] ?? 0) + 1
+  }
+  return out
 }

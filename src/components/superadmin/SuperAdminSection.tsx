@@ -10,6 +10,7 @@ import { EmpresasTable } from './EmpresasTable'
 import { EmpresaDetailDrawer } from './EmpresaDetailDrawer'
 import { type EmpresaSuperadminRow } from '../../domain/superadmin/queries'
 import { superadminKeys } from '../../domain/superadmin/keys'
+import { MONEDAS_ISO } from '../../lib/monedas'
 
 // ============================================================================
 // SuperAdminSection — shell del panel de plataforma (super_admin).
@@ -48,6 +49,14 @@ export function SuperAdminSection() {
         { name: 'telefono', label: 'Teléfono', type: 'tel', helpText: 'Opcional' },
         { name: 'maxProj', label: 'Límite de proyectos', type: 'number', min: 1, initialValue: '5' },
         { name: 'maxUnits', label: 'Límite de unidades', type: 'number', min: 1, initialValue: '50' },
+        {
+          name: 'moneda',
+          label: 'Moneda de cobro',
+          control: 'select',
+          options: MONEDAS_ISO.map(m => ({ value: m.code, label: m.label })),
+          initialValue: 'gtq',
+          helpText: 'Moneda de los cobros del tenant y base de su contabilidad.',
+        },
         { name: 'ownerNombre', label: 'Nombre del administrador', required: true },
         { name: 'ownerEmail', label: 'Email del administrador', type: 'email', required: true },
         { name: 'ownerPass', label: 'Contraseña temporal', type: 'password', required: true, helpText: 'Mínimo 8 caracteres' },
@@ -71,6 +80,7 @@ export function SuperAdminSection() {
       ownerPass: result.ownerPass,
       maxProj: parseInt(result.maxProj) || 5,
       maxUnits: parseInt(result.maxUnits) || 50,
+      moneda: result.moneda || 'gtq',
     } : null
 
     if (!formValues) return
@@ -83,6 +93,7 @@ export function SuperAdminSection() {
       telefono: formValues.telefono,
       max_projects: formValues.maxProj,
       max_units: formValues.maxUnits,
+      default_currency: formValues.moneda,
     })
 
     if (empresaError || !nuevaEmpresa) {
@@ -108,16 +119,17 @@ export function SuperAdminSection() {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      {/* Header */}
+      {/* Header — sobre var(--at-nav-bg) (oscuro FIJO en ambos temas; var(--at-ink)
+          se invertía en dark y dejaba los overlays blancos casi invisibles). */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
+        background: 'linear-gradient(135deg, var(--at-nav-bg), color-mix(in srgb, var(--at-nav-bg) 85%, var(--at-primary-2)))',
         borderRadius: '16px', padding: '24px 28px', marginBottom: '20px',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}>
-        <h1 style={{ color: 'var(--at-chip)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
+        <h1 style={{ color: 'var(--at-nav-ink)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
           Panel Superadministrador
         </h1>
-        <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', margin: '4px 0 16px' }}>
+        <p style={{ color: 'color-mix(in srgb, var(--at-nav-ink) 62%, transparent)', fontSize: '14px', margin: '4px 0 16px' }}>
           Operación de la plataforma: métricas, empresas y configuración.
         </p>
         <div role="tablist" aria-label="Secciones del panel" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -132,11 +144,11 @@ export function SuperAdminSection() {
                 style={{
                   padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
                   cursor: 'pointer',
-                  border: active ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                  border: active ? 'none' : '1px solid rgba(255,255,255,0.14)',
                   background: active
                     ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))'
-                    : 'rgba(255,255,255,0.06)',
-                  color: active ? 'white' : 'var(--at-chip)',
+                    : 'rgba(255,255,255,0.08)',
+                  color: active ? 'white' : 'var(--at-nav-ink)',
                 }}
               >
                 {t.label}
@@ -146,7 +158,12 @@ export function SuperAdminSection() {
         </div>
       </div>
 
-      {tab === 'dashboard' && <SuperAdminDashboardTab />}
+      {tab === 'dashboard' && (
+        <SuperAdminDashboardTab
+          onVerEmpresas={() => setTab('empresas')}
+          onShowHealth={() => setShowHealth(true)}
+        />
+      )}
 
       {tab === 'empresas' && (
         <EmpresasTable

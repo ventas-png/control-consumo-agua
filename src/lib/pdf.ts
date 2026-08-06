@@ -1,3 +1,4 @@
+import { dateLocalISO } from './format'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Registro, Empresa, RegistroCalidad } from '../types'
@@ -56,15 +57,21 @@ export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): st
   return pdfDataUri.split(',')[1]
 }
 
-export function exportarPDFGlobal(registros: Registro[]): void {
+export function exportarPDFGlobal(
+  registros: Registro[],
+  numeroContadorById?: Map<string, string>,
+): void {
   const doc = new jsPDF()
   doc.text('Reporte de Lecturas', 14, 20)
+  const numeroContadorDe = (r: Registro): string =>
+    (r.contador_id ? numeroContadorById?.get(r.contador_id) : undefined) ?? '—'
   autoTable(doc, {
     startY: 30,
-    head: [['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Total (Q)', 'Estado']],
+    head: [['Fecha', 'Cliente', '# Contador', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Total (Q)', 'Estado']],
     body: registros.map(r => [
       new Date(r.fecha).toLocaleDateString(),
       r.cliente_nombre,
+      numeroContadorDe(r),
       String(r.lectura_anterior),
       String(r.lectura_actual),
       r.consumo.toFixed(2),
@@ -144,7 +151,7 @@ export function generarPDFAnalisis(registro: RegistroCalidad, empresa: Empresa):
     },
   })
 
-  const nombreArchivo = `calidad_${fuente ? fuente.identificador.replace(/[^a-z0-9]/gi, '_') : 'analisis'}_${new Date(registro.fecha).toISOString().slice(0, 10)}.pdf`
+  const nombreArchivo = `calidad_${fuente ? fuente.identificador.replace(/[^a-z0-9]/gi, '_') : 'analisis'}_${dateLocalISO(new Date(registro.fecha))}.pdf`
   doc.save(nombreArchivo)
 }
 

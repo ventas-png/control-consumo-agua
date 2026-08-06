@@ -1,120 +1,420 @@
-import { useEffect, useRef } from 'react'
-import { Chart } from '../../lib/chartjs'
-import { SuperAdminMetricsCard } from './SuperAdminMetricsCard'
+import { useEffect, useRef, useState } from 'react'
+import { Chart, type ChartConfiguration } from '../../lib/chartjs'
+import { resolveChartColor, resolveChartColors, chartFill } from '../../lib/chartColors'
+import { useThemeVersion } from '../../hooks/useThemeVersion'
+import { StatTile } from '../shared/StatTile'
+import { FilterChips } from '../shared/FilterChips'
+import { ChartCard } from './ChartCard'
+import { HeroPlataforma } from './HeroPlataforma'
+import { SuperAdminOpsStrip } from './SuperAdminOpsStrip'
+import { TrialCohortesChart } from './TrialCohortesChart'
+import { parseFecha } from '../../lib/format'
+import { formatUsdCents } from './empresaHelpers'
 import {
-  useSuperadminTrendsQuery,
+  buildPlanDoughnut,
+  churnRatePct,
+  computeConversionTrial,
+  computeDeltaPct,
+  computeNetGrowth,
+  formatMesLabel,
+} from './metricsHelpers'
+import {
+  usePlataformaKpisQuery,
   useMrrTrendQuery,
+  useSuperadminTrendsQuery,
+  useTrialCohortesQuery,
   type SuperadminTrendPoint,
   type MrrTrendPoint,
+  type PlanDistributionEntry,
 } from '../../domain/superadmin/queries'
 
 // ============================================================================
-// SuperAdminDashboardTab — KPIs + gráficas de tendencia del SaaS.
+// SuperAdminDashboardTab — analítica SaaS del panel superadmin.
 // ============================================================================
-// Mantiene SuperAdminMetricsCard (MRR/activas/trial/churn desde la MV) y suma
-// dos gráficas con el patrón canvas-ref de AdminDashboardCharts:
-//   · MRR diario (platform_metrics_daily — la serie se acumula desde el primer
-//     snapshot del cron, no es reconstruible hacia atrás).
-//   · Altas de empresas vs bajas de suscripciones por mes.
+// Cuatro bandas:
+//   0. SuperAdminOpsStrip  — frescura de MV, snapshot diario, salud, refresh.
+//   1. HeroPlataforma      — MRR cobrable titular + ARR/ARPA + totales.
+//   2. StatTiles           — crecimiento y retención (activas, trial, churn, neto).
+//   3. Grid de gráficas    — MRR cobrable vs total, altas/bajas/neto, empresas
+//      activas, cohortes de trial y composición por plan.
+// Todos los agregados llegan pre-calculados por RPC SECURITY DEFINER acotadas a
+// super_admin (nada se agrega en el cliente); las fórmulas de presentación
+// viven en metricsHelpers (puras y testeadas). Colores de canvas SIEMPRE vía
+// resolveChartColor/chartFill (el canvas no resuelve var(--at-*)).
 
-const MESES_NOMBRES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+type RangoDias = '30' | '90' | '180' | '365'
+type RangoMeses = '6' | '12' | '24'
 
-/** "2026-06-01" → "Jun 2026" (etiqueta de mes para la gráfica de altas/bajas). */
-export function formatMesLabel(mes: string): string {
-  const [y, m] = mes.split('-').map(Number)
-  if (!y || !m || m < 1 || m > 12) return mes
-  return `${MESES_NOMBRES[m - 1]} ${y}`
+const RANGO_DIAS_OPTS: Array<{ value: RangoDias; label: string }> = [
+  { value: '30', label: '30 d' },
+  { value: '90', label: '90 d' },
+  { value: '180', label: '180 d' },
+  { value: '365', label: '1 año' },
+]
+const RANGO_MESES_OPTS: Array<{ value: RangoMeses; label: string }> = [
+  { value: '6', label: '6 m' },
+  { value: '12', label: '12 m' },
+  { value: '24', label: '24 m' },
+]
+
+interface Props {
+  onVerEmpresas: () => void
+  onShowHealth: () => void
 }
 
-export function SuperAdminDashboardTab() {
-  const { data: mrrSerie = [], isLoading: mrrLoading } = useMrrTrendQuery(90)
-  const { data: trends = [], isLoading: trendsLoading } = useSuperadminTrendsQuery(12)
+export function SuperAdminDashboardTab({ onVerEmpresas, onShowHealth }: Props) {
+  const [rangoDias, setRangoDias] = useState<RangoDias>('90')
+  const [rangoMeses, setRangoMeses] = useState<RangoMeses>('12')
+
+  const kpisQ = usePlataformaKpisQuery()
+  const mrrQ = useMrrTrendQuery(Number(rangoDias))
+  const trendsQ = useSuperadminTrendsQuery(Number(rangoMeses))
+  const cohortesQ = useTrialCohortesQuery(Number(rangoMeses))
+
+  const kpis = kpisQ.data
+  const serie = mrrQ.data ?? []
+  const trends = trendsQ.data ?? []
+  const cohortes = cohortesQ.data ?? []
+
+  const isFetching = kpisQ.isFetching || mrrQ.isFetching || trendsQ.isFetching || cohortesQ.isFetching
+
+  // Fórmulas de presentación (metricsHelpers, testeadas).
+  const churn = churnRatePct(
+    kpis?.suscripciones_activas ?? 0,
+    kpis?.suscripciones_trialing ?? 0,
+    kpis?.canceladas_30d ?? 0,
+  )
+  const deltaActivas = computeDeltaPct(serie, p => p.empresas_activas)
+  const neto = computeNetGrowth(trends)
+  const conversion = computeConversionTrial(cohortes)
+  const sparkActivas = serie.map(p => p.empresas_activas)
+  const cobrableSinHistoria = serie.length > 0 && serie.every(p => p.mrr_cobrable_cents == null)
 
   return (
-    <div>
-      <SuperAdminMetricsCard />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <SuperAdminOpsStrip
+        refreshedAt={kpis?.refreshed_at}
+        serie={serie}
+        isFetching={isFetching}
+        onShowHealth={onShowHealth}
+      />
 
+      <HeroPlataforma
+        kpis={kpis}
+        loading={kpisQ.isLoading}
+        error={kpisQ.error}
+        onRetry={() => { void kpisQ.refetch() }}
+        serie={serie}
+        onVerEmpresas={onVerEmpresas}
+      />
+
+      {/* Crecimiento y retención */}
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={onVerEmpresas}
+          aria-label="Empresas activas — ver la tabla de empresas"
+          // Reset explícito (no `all: unset`, que anularía el outline global de
+          // :focus-visible); el foco visible lo pone la regla de index.css.
+          style={{
+            display: 'flex', flex: '1 1 160px', cursor: 'pointer',
+            border: 'none', background: 'transparent', padding: 0,
+            textAlign: 'left', font: 'inherit',
+          }}
+        >
+          <StatTile
+            label="Empresas activas"
+            value={kpis ? kpis.empresas_activas.toLocaleString('es-GT') : '…'}
+            delta={deltaActivas ?? undefined}
+            sparkline={sparkActivas.length > 1 ? sparkActivas : undefined}
+            hint={kpis ? `de ${kpis.total_empresas.toLocaleString('es-GT')} empresas totales →` : undefined}
+            style={{ flex: 1 }}
+          />
+        </button>
+        <StatTile
+          label="En trial"
+          value={kpis ? kpis.suscripciones_trialing.toLocaleString('es-GT') : '…'}
+          tone="info"
+          hint={conversion
+            ? `conversión ${conversion.pct.toFixed(1)}% (${conversion.cohortes} cohorte${conversion.cohortes !== 1 ? 's' : ''})`
+            : 'conversión —'}
+        />
+        <StatTile
+          label="Churn 30d"
+          value={kpis ? `${churn.toFixed(1)}%` : '…'}
+          tone={churn > 5 ? 'danger' : churn > 2 ? 'warning' : undefined}
+          hint={kpis ? `${kpis.canceladas_30d} cancelada${kpis.canceladas_30d !== 1 ? 's' : ''}` : undefined}
+        />
+        <StatTile
+          label="Neto último mes"
+          value={neto ? `${neto.neto >= 0 ? '+' : ''}${neto.neto}` : '—'}
+          tone={neto ? (neto.neto >= 0 ? 'success' : 'danger') : undefined}
+          hint={neto
+            ? `${neto.altas} alta${neto.altas !== 1 ? 's' : ''} de empresas · ${neto.bajas} baja${neto.bajas !== 1 ? 's' : ''} de suscripciones`
+            : 'sin mes cerrado aún'}
+        />
+      </div>
+
+      {/* Gráficas */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
         gap: '16px',
       }}>
         <ChartCard
-          title="MRR (últimos 90 días)"
-          subtitle="Snapshot diario — la serie se acumula desde su activación"
-          loading={mrrLoading}
-          empty={mrrSerie.length === 0}
-          emptyText="Todavía no hay snapshots de MRR. El primer punto se registra hoy y el cron agrega uno diario."
+          title="MRR: cobrable vs total"
+          subtitle="Snapshot diario · el desglose cobrable existe desde su activación"
+          actions={
+            <FilterChips
+              options={RANGO_DIAS_OPTS}
+              value={rangoDias}
+              onChange={setRangoDias}
+              ariaLabel="Rango de días de la serie de MRR"
+            />
+          }
+          loading={mrrQ.isLoading}
+          refreshing={mrrQ.isFetching && !mrrQ.isLoading}
+          empty={serie.length === 0}
+          emptyText={mrrQ.isError
+            ? 'No se pudo cargar la serie de MRR. Intenta actualizar.'
+            : 'Todavía no hay snapshots de MRR. El primer punto se registra hoy y el cron agrega uno diario.'}
+          footnote={cobrableSinHistoria
+            ? 'El desglose cobrable aún no tiene historia: se muestra solo el MRR total.'
+            : undefined}
         >
-          <MrrChart serie={mrrSerie} />
+          <MrrChart serie={serie} />
         </ChartCard>
 
         <ChartCard
-          title="Altas y bajas por mes"
-          subtitle="Empresas creadas vs suscripciones canceladas (12 meses)"
-          loading={trendsLoading}
+          title="Altas, bajas y neto"
+          subtitle={`Empresas creadas vs suscripciones canceladas (${rangoMeses} meses)`}
+          actions={
+            <FilterChips
+              options={RANGO_MESES_OPTS}
+              value={rangoMeses}
+              onChange={setRangoMeses}
+              ariaLabel="Rango de meses de las tendencias"
+            />
+          }
+          loading={trendsQ.isLoading}
+          refreshing={trendsQ.isFetching && !trendsQ.isLoading}
           empty={trends.length === 0}
-          emptyText="Sin datos de tendencia todavía."
+          emptyText={trendsQ.isError
+            ? 'No se pudieron cargar las tendencias. Intenta actualizar.'
+            : 'Sin datos de tendencia todavía.'}
         >
           <TrendsChart trends={trends} />
+        </ChartCard>
+
+        <ChartCard
+          title="Empresas activas"
+          subtitle="Empresas con cuenta activa, corte diario"
+          loading={mrrQ.isLoading}
+          refreshing={mrrQ.isFetching && !mrrQ.isLoading}
+          empty={serie.length === 0}
+          emptyText={mrrQ.isError
+            ? 'No se pudo cargar la serie diaria. Intenta actualizar.'
+            : 'Sin snapshots todavía. La serie se acumula desde su activación.'}
+        >
+          <ActivasChart serie={serie} />
+        </ChartCard>
+
+        <ChartCard
+          title="Cohortes de trial por mes de alta"
+          subtitle="Estado ACTUAL de cada cohorte — no es conversión a 30 días"
+          loading={cohortesQ.isLoading}
+          refreshing={cohortesQ.isFetching && !cohortesQ.isLoading}
+          empty={cohortesQ.isError || cohortes.every(c => c.trials === 0)}
+          emptyText={cohortesQ.isError
+            ? 'No se pudieron cargar las cohortes de trial. Intenta actualizar.'
+            : 'Sin cohortes de trial todavía. Cada empresa nueva inicia un trial de 14 días.'}
+        >
+          <TrialCohortesChart cohortes={cohortes} />
+        </ChartCard>
+
+        <ChartCard
+          title="Composición por plan"
+          subtitle="Suscripciones vigentes (activas + en trial)"
+          loading={kpisQ.isLoading}
+          refreshing={kpisQ.isFetching && !kpisQ.isLoading}
+          empty={kpisQ.isError || (kpis?.plan_distribution ?? []).length === 0}
+          emptyText={kpisQ.isError
+            ? 'No se pudieron cargar los KPIs de plataforma. Intenta actualizar.'
+            : 'Sin suscripciones vigentes.'}
+        >
+          <PlanDoughnut dist={kpis?.plan_distribution ?? []} total={kpis?.suscripciones_vigentes ?? 0} />
         </ChartCard>
       </div>
     </div>
   )
 }
 
-function ChartCard({ title, subtitle, loading, empty, emptyText, children }: {
-  title: string
-  subtitle?: string
-  loading: boolean
-  empty: boolean
-  emptyText: string
-  children: React.ReactNode
-}) {
-  return (
-    <div style={{
-      background: 'var(--at-surface)',
-      borderRadius: '14px',
-      padding: '18px 20px',
-      border: '1px solid var(--at-line)',
-      boxShadow: '0 2px 12px rgba(0,0,0,.04)',
-    }}>
-      <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{subtitle}</div>}
-      </div>
-      {loading ? (
-        <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', fontSize: '13px' }}>
-          Cargando…
-        </div>
-      ) : empty ? (
-        <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', fontSize: '13px', textAlign: 'center', padding: '0 20px' }}>
-          {emptyText}
-        </div>
-      ) : (
-        <div style={{ height: '220px' }}>{children}</div>
-      )}
-    </div>
-  )
-}
+// ───── Gráficas (patrón canvas-ref + destroy; colores resueltos en runtime) ─────
 
 function MrrChart({ serie }: { serie: MrrTrendPoint[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const instance = useRef<Chart | null>(null)
+  const themeVersion = useThemeVersion()
 
   useEffect(() => {
     if (!canvasRef.current) return
     if (instance.current) instance.current.destroy()
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const inkSoft = resolveChartColor('var(--at-ink-3)')
+    const tieneCobrable = serie.some(p => p.mrr_cobrable_cents != null)
+
+    const datasets: ChartConfiguration<'line'>['data']['datasets'] = [{
+      label: 'MRR total',
+      data: serie.map(p => p.mrr_cents / 100),
+      borderColor: inkSoft,
+      borderWidth: 1.5,
+      borderDash: [4, 4],
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+    }]
+    if (tieneCobrable) {
+      datasets.push({
+        label: 'MRR cobrable',
+        // null = día sin desglose (pre-migración): hueco honesto, no cero.
+        data: serie.map(p => (p.mrr_cobrable_cents == null ? null : p.mrr_cobrable_cents / 100)),
+        borderColor: resolveChartColor('var(--at-primary)'),
+        backgroundColor: chartFill('var(--at-primary)', 0.14),
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.3,
+        spanGaps: false,
+        pointRadius: serie.length > 30 ? 0 : 3,
+      })
+    }
+
     instance.current = new Chart(canvasRef.current, {
       type: 'line',
       data: {
-        labels: serie.map(p => new Date(p.day).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })),
+        labels: serie.map(p => parseFecha(p.day).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })),
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: reduceMotion ? false : { duration: 320 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: tieneCobrable,
+            position: 'bottom',
+            labels: { boxWidth: 12, font: { size: 11 }, color: inkSoft },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${formatUsdCents(Math.round((Number(ctx.parsed.y) || 0) * 100))}`,
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { color: inkSoft, maxTicksLimit: 10 }, grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: { color: inkSoft, callback: (v) => `$${Number(v).toLocaleString('en-US')}` },
+            grid: { color: chartFill('var(--at-ink-3)', 0.14) },
+          },
+        },
+      },
+    })
+    return () => { instance.current?.destroy(); instance.current = null }
+  }, [serie, themeVersion])
+
+  return <canvas ref={canvasRef} aria-label="Tendencia de MRR cobrable y total" role="img" />
+}
+
+function TrendsChart({ trends }: { trends: SuperadminTrendPoint[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const instance = useRef<Chart | null>(null)
+  const themeVersion = useThemeVersion()
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+    if (instance.current) instance.current.destroy()
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const inkSoft = resolveChartColor('var(--at-ink-3)')
+
+    const config: ChartConfiguration<'bar' | 'line'> = {
+      type: 'bar',
+      data: {
+        labels: trends.map(t => formatMesLabel(t.mes)),
+        datasets: [
+          {
+            label: 'Altas',
+            data: trends.map(t => t.altas),
+            backgroundColor: chartFill('var(--at-primary)', 0.75),
+            borderRadius: 4,
+          },
+          {
+            label: 'Bajas',
+            data: trends.map(t => t.bajas),
+            backgroundColor: chartFill('var(--at-accent)', 0.75),
+            borderRadius: 4,
+          },
+          {
+            type: 'line',
+            label: 'Neto',
+            data: trends.map(t => t.altas - t.bajas),
+            borderColor: resolveChartColor('var(--at-info)'),
+            borderWidth: 2,
+            pointRadius: 2,
+            tension: 0.3,
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: reduceMotion ? false : { duration: 320 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: inkSoft } },
+        },
+        scales: {
+          x: { ticks: { color: inkSoft }, grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, color: inkSoft },
+            grid: { color: chartFill('var(--at-ink-3)', 0.14) },
+          },
+        },
+      },
+    }
+    instance.current = new Chart(canvasRef.current, config)
+    return () => { instance.current?.destroy(); instance.current = null }
+  }, [trends, themeVersion])
+
+  return <canvas ref={canvasRef} aria-label="Altas, bajas y crecimiento neto por mes" role="img" />
+}
+
+function ActivasChart({ serie }: { serie: MrrTrendPoint[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const instance = useRef<Chart | null>(null)
+  const themeVersion = useThemeVersion()
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+    if (instance.current) instance.current.destroy()
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const inkSoft = resolveChartColor('var(--at-ink-3)')
+
+    instance.current = new Chart(canvasRef.current, {
+      type: 'line',
+      data: {
+        labels: serie.map(p => parseFecha(p.day).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })),
         datasets: [{
-          label: 'MRR (USD)',
-          data: serie.map(p => p.mrr_cents / 100),
-          borderColor: '#1B3B36',
-          backgroundColor: 'rgba(27, 59, 54, 0.1)',
+          label: 'Empresas activas',
+          data: serie.map(p => p.empresas_activas),
+          borderColor: resolveChartColor('var(--at-accent-2)'),
+          backgroundColor: chartFill('var(--at-accent-2)', 0.12),
           borderWidth: 2,
           fill: true,
           tension: 0.3,
@@ -124,56 +424,82 @@ function MrrChart({ serie }: { serie: MrrTrendPoint[] }) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: reduceMotion ? false : { duration: 320 },
         plugins: { legend: { display: false } },
         scales: {
-          y: { beginAtZero: true, ticks: { callback: (v) => `$${v}` } },
+          x: { ticks: { color: inkSoft, maxTicksLimit: 10 }, grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, color: inkSoft },
+            grid: { color: chartFill('var(--at-ink-3)', 0.14) },
+          },
         },
       },
     })
     return () => { instance.current?.destroy(); instance.current = null }
-  }, [serie])
+  }, [serie, themeVersion])
 
-  return <canvas ref={canvasRef} aria-label="Tendencia de MRR" role="img" />
+  return <canvas ref={canvasRef} aria-label="Empresas activas por día" role="img" />
 }
 
-function TrendsChart({ trends }: { trends: SuperadminTrendPoint[] }) {
+// Paleta categórica de la dona: núcleo de 3 tokens validado (CVD + separación
+// normal) en ambos temas; el resto son fallback defensivo — hoy solo existen 3
+// planes. La codificación secundaria (leyenda, bordes de superficie entre
+// rebanadas y tooltip con conteo/%) cubre los pares límite del modo oscuro.
+const PLAN_DOUGHNUT_TOKENS = [
+  'var(--at-primary)',
+  'var(--at-accent-light)',
+  'var(--at-primary-soft-2)',
+  'var(--at-accent)',
+  'var(--at-chip)',
+  'var(--at-ink-3)',
+]
+
+function PlanDoughnut({ dist, total }: { dist: PlanDistributionEntry[]; total: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const instance = useRef<Chart | null>(null)
+  const themeVersion = useThemeVersion()
 
   useEffect(() => {
     if (!canvasRef.current) return
     if (instance.current) instance.current.destroy()
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const inkSoft = resolveChartColor('var(--at-ink-3)')
+    const { labels, counts } = buildPlanDoughnut(dist)
+
     instance.current = new Chart(canvasRef.current, {
-      type: 'bar',
+      type: 'doughnut',
       data: {
-        labels: trends.map(t => formatMesLabel(t.mes)),
-        datasets: [
-          {
-            label: 'Altas',
-            data: trends.map(t => t.altas),
-            backgroundColor: 'rgba(27, 59, 54, 0.75)',
-            borderRadius: 4,
-          },
-          {
-            label: 'Bajas',
-            data: trends.map(t => t.bajas),
-            backgroundColor: 'rgba(185, 106, 63, 0.75)',
-            borderRadius: 4,
-          },
-        ],
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: resolveChartColors(PLAN_DOUGHNUT_TOKENS).slice(0, counts.length),
+          borderColor: resolveChartColor('var(--at-surface)'),
+          borderWidth: 2,
+        }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
-        scales: {
-          y: { beginAtZero: true, ticks: { precision: 0 } },
+        cutout: '62%',
+        animation: reduceMotion ? false : { duration: 320 },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: inkSoft } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const n = Number(ctx.parsed) || 0
+                const pct = total > 0 ? Math.round((n / total) * 100) : 0
+                return `${ctx.label}: ${n} (${pct}%)`
+              },
+            },
+          },
         },
       },
     })
     return () => { instance.current?.destroy(); instance.current = null }
-  }, [trends])
+  }, [dist, total, themeVersion])
 
-  return <canvas ref={canvasRef} aria-label="Altas y bajas por mes" role="img" />
+  return <canvas ref={canvasRef} aria-label="Composición de suscripciones por plan" role="img" />
 }

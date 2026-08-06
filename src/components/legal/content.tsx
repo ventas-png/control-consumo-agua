@@ -173,6 +173,16 @@ function PrivacyBodyEs(): ReactElement {
         <li><strong>Google Analytics:</strong> herramienta de análisis web para evaluar el uso de la interfaz, generar métricas de rendimiento del software y comprender el comportamiento de los usuarios de forma agregada y anonimizada.</li>
         <li><strong>Google Maps API:</strong> utilizado para funciones geográficas, localización de proyectos y validación cartográfica de direcciones dentro de los módulos de administración.</li>
       </ul>
+      <p>
+        <strong>Uso Compartido, Transferencia y Divulgación de Datos de Google:</strong> administratodo.com no
+        vende, alquila, transfiere ni comparte los datos de los usuarios obtenidos a través de las APIs de Google
+        con terceras empresas u organizaciones con fines comerciales, publicitarios o de marketing. La información
+        de los usuarios de Google se utiliza única y exclusivamente para habilitar las funciones internas
+        contratadas por el propio Cliente (como la sincronización de comunicaciones del Administrador). Dichos datos
+        no serán divulgados a ningún tercero, a excepción de: (i) El propio Cliente corporativo que autorizó el
+        acceso para su gestión interna, y (ii) Cuando sea estrictamente requerido por una orden judicial, un juez
+        competente o una institución gubernamental amparada bajo la legislación local aplicable.
+      </p>
       <h3>B. Pasarelas de pago y adquirencia segura (PCI-DSS)</h3>
       <p>
         Con el fin de garantizar la seguridad transaccional, administratodo.com utiliza proveedores
@@ -466,6 +476,16 @@ function PrivacyBodyEn(): ReactElement {
         <li><strong>Google Analytics:</strong> a web-analytics tool to evaluate interface usage, generate software performance metrics and understand user behavior in an aggregated and anonymized way.</li>
         <li><strong>Google Maps API:</strong> used for geographic features, project localization and cartographic validation of addresses within the administration modules.</li>
       </ul>
+      <p>
+        <strong>Sharing, Transfer and Disclosure of Google Data:</strong> administratodo.com does not sell, rent,
+        transfer or share user data obtained through Google APIs with third-party companies or organizations for
+        commercial, advertising or marketing purposes. Google user information is used solely and exclusively to
+        enable the internal functions contracted by the Client itself (such as the synchronization of the
+        Administrator's communications). Such data will not be disclosed to any third party, except for: (i) The
+        corporate Client itself who authorized the access for its internal management, and (ii) When strictly
+        required by a court order, a competent judge or a governmental institution under applicable local
+        legislation.
+      </p>
       <h3>B. Payment gateways and secure acquiring (PCI-DSS)</h3>
       <p>To guarantee transactional security, administratodo.com uses specialized external providers. The Platform does not store or process full credit- or debit-card data on its servers. All financial information travels encrypted directly to:</p>
       <ul>

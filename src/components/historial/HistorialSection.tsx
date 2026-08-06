@@ -4,8 +4,15 @@ import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '..
 import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
-import { DataTable, type DataTableColumn, Icon } from '../shared'
+import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
+import { UsuarioChip } from '../shared/UsuarioChip'
 import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
+import {
+  registroCoincide,
+  numeroContadorDeRegistro,
+  unidadesDelProyecto,
+  type HistorialFiltros,
+} from '../../lib/historialFiltros'
 
 interface Props {
   registros: Registro[]
@@ -19,6 +26,7 @@ interface Props {
   onRegistroDeleted?: (id: string) => void
   canEdit?: boolean
   canChangeStatus?: boolean
+  canDelete?: boolean
 }
 
 const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> = {
@@ -46,6 +54,7 @@ export function HistorialSection({
   onRegistroDeleted,
   canEdit: canEditProp = true,
   canChangeStatus: canChangeStatusProp = true,
+  canDelete: canDeleteProp = true,
 }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
@@ -55,13 +64,28 @@ export function HistorialSection({
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
   const [filtroFechaFin, setFiltroFechaFin] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
+  // Lectura cuya foto se está viendo en el lightbox (la foto se baja bajo demanda
+  // por id; nunca viaja en el listado — ver domain/agua/queries.ts).
+  const [photoModal, setPhotoModal] = useState<{ registroId: string; label: string } | null>(null)
   const [savingEstado, setSavingEstado] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [currentPage, setCurrentPage] = useState(1)
+  // IDs de lecturas con el detalle desplegado (tabla y cards comparten el set).
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
   const itemsPerPage = 20
 
+  function toggleDetalle(id: string) {
+    setExpandidas(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  }
+
   const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
+  // Eliminar lecturas se controla con el permiso de eliminar (no el de editar).
+  const canDelete = canDeleteProp && userRole !== 'viewer'
 
   // Index contadores por id para evitar buscar el unidad_id / tipo_agua en
   // cada iteración del filter.
@@ -71,22 +95,22 @@ export function HistorialSection({
   )
 
   const filtrados = useMemo(() => {
-    const needle = filtroTexto.toLowerCase().trim()
+    const filtros: HistorialFiltros = {
+      texto: filtroTexto, estado: filtroEstado, proyecto: filtroProyecto,
+      unidad: filtroUnidad, tipoAgua: filtroTipoAgua,
+      fechaInicio: filtroFechaInicio, fechaFin: filtroFechaFin,
+    }
     return registros
-      .filter(r => {
-        const matchTxt = !needle || (r.cliente_nombre ?? '').toLowerCase().includes(needle)
-        const matchEst = !filtroEstado || r.estado === filtroEstado
-        const fecha = new Date(r.fecha)
-        const matchFechaInicio = !filtroFechaInicio || fecha >= new Date(filtroFechaInicio)
-        const matchFechaFin = !filtroFechaFin || fecha <= new Date(filtroFechaFin + 'T23:59:59')
-        const matchProyecto = !filtroProyecto || (r as Registro & { project_id?: string }).project_id === filtroProyecto
-        const contador = r.contador_id ? contadoresById.get(r.contador_id) : undefined
-        const matchUnidad = !filtroUnidad || contador?.unidad_id === filtroUnidad
-        const matchTipoAgua = !filtroTipoAgua || contador?.tipo_agua === filtroTipoAgua
-        return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad && matchTipoAgua
-      })
+      .filter(r => registroCoincide(r, filtros, contadoresById))
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
   }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadoresById])
+
+  // Unidades del dropdown limitadas al proyecto seleccionado (si hay uno), para
+  // que el filtro de unidad no liste unidades de otros proyectos.
+  const unidadesDisponibles = useMemo(
+    () => unidadesDelProyecto(unidades, filtroProyecto),
+    [unidades, filtroProyecto]
+  )
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / itemsPerPage))
   const paginados = useMemo(
@@ -182,6 +206,21 @@ export function HistorialSection({
   // ── Tabla via DataTable ─────────────────────────────────────────────────
   const columns: DataTableColumn<Registro>[] = useMemo(() => [
     {
+      key: 'expand', header: '', width: 44,
+      render: r => {
+        const abierto = expandidas.has(r.id)
+        return (
+          <button
+            onClick={() => toggleDetalle(r.id)}
+            aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
+            aria-expanded={abierto}
+            title={abierto ? 'Ocultar detalles' : 'Ver detalles'}
+            style={expandBtnStyle(abierto)}
+          >{abierto ? '▲' : '▼'}</button>
+        )
+      },
+    },
+    {
       key: 'fecha', header: 'Fecha', sortable: true,
       accessor: r => r.fecha,
       render: r => `📅 ${formatDate(r.fecha)}`,
@@ -190,6 +229,16 @@ export function HistorialSection({
       key: 'cliente', header: 'Cliente', sortable: true,
       accessor: r => r.cliente_nombre ?? '',
       render: r => r.cliente_nombre ?? '—',
+    },
+    {
+      key: 'contador', header: '# Contador', sortable: true,
+      accessor: r => numeroContadorDeRegistro(r, contadoresById) ?? '',
+      render: r => {
+        const numero = numeroContadorDeRegistro(r, contadoresById)
+        return numero
+          ? <span style={{ color: 'var(--at-ink-2)', fontVariantNumeric: 'tabular-nums' }}>{numero}</span>
+          : <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+      },
     },
     {
       key: 'lectAnt', header: 'Lect. Ant.', numeric: true,
@@ -224,6 +273,14 @@ export function HistorialSection({
       },
     },
     {
+      // Trazabilidad (20260731000000): quién capturó la lectura. Las lecturas
+      // anteriores al sellado no tienen `creado_por` — de ahí `historico`, que
+      // las muestra como "—" en vez de atribuirlas al "Sistema".
+      key: 'capturo', header: 'Capturó', hideOnMobile: true,
+      accessor: r => r.creado_por ?? '',
+      render: r => <UsuarioChip userId={r.creado_por} historico />,
+    },
+    {
       key: 'acciones', header: 'Acciones',
       render: r => (
         <div style={{ display: 'flex', gap: 5 }}>
@@ -235,11 +292,17 @@ export function HistorialSection({
             >✏️ Editar</button>
           )}
           <button
+            onClick={() => setPhotoModal({ registroId: r.id, label: fotoLabel(r) })}
+            aria-label="Ver imagen de la lectura"
+            title="Ver imagen de la lectura"
+            style={btnFotoStyle}
+          >🖼️ Imagen</button>
+          <button
             onClick={() => enviarWhatsApp(r)}
             aria-label="Enviar por WhatsApp"
             style={btnWaStyle}
           >💬 WhatsApp</button>
-          {canEdit && onRegistroDeleted && (
+          {canDelete && onRegistroDeleted && (
             <button
               onClick={() => eliminarRegistro(r)}
               aria-label="Eliminar lectura"
@@ -249,7 +312,7 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, onRegistroDeleted])
+  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, expandidas])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
@@ -273,7 +336,8 @@ export function HistorialSection({
           <button
             onClick={async () => {
               const { exportarPDFGlobal } = await import('../../lib/pdf')
-              exportarPDFGlobal(filtrados)
+              const numeroContadorById = new Map(contadores.map(c => [c.id, c.numero_serie]))
+              exportarPDFGlobal(filtrados, numeroContadorById)
             }}
             style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
           >📄 PDF</button>
@@ -295,7 +359,7 @@ export function HistorialSection({
         <div style={{ background: 'var(--at-surface-2)', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input
             type="text"
-            placeholder="🔍 Buscar cliente..."
+            placeholder="🔍 Buscar cliente o # de contador..."
             value={filtroTexto}
             onChange={e => { setFiltroTexto(e.target.value); setCurrentPage(1) }}
             style={filterFieldStyle}
@@ -307,15 +371,15 @@ export function HistorialSection({
             <option value="mora">⚠️ Mora</option>
           </select>
           {proyectos.length > 1 && (
-            <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
+            <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setFiltroUnidad(''); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todos los Proyectos</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
-          {unidades.length > 0 && (
+          {unidadesDisponibles.length > 0 && (
             <select value={filtroUnidad} onChange={e => { setFiltroUnidad(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todas las Unidades</option>
-              {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+              {unidadesDisponibles.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
           )}
           {(() => {
@@ -351,6 +415,15 @@ export function HistorialSection({
             rowKey="id"
             pageSize={0}  // paginación la hacemos en el padre para que cards también use la misma
             emptyState={{ icon: '📭', title: 'Sin registros' }}
+            isRowExpanded={r => expandidas.has(r.id)}
+            expandedContent={r => (
+              <RegistroDetalle
+                registro={r}
+                moneda={moneda}
+                total={getTotal(r)}
+                numeroContador={numeroContadorDeRegistro(r, contadoresById)}
+              />
+            )}
           />
         </div>
       )}
@@ -374,7 +447,13 @@ export function HistorialSection({
               >
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-ink)' }}>{r.cliente_nombre}</div>
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>📅 {formatDate(r.fecha)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                    📅 {formatDate(r.fecha)}
+                    {(() => {
+                      const numero = numeroContadorDeRegistro(r, contadoresById)
+                      return numero ? <span> · 🔢 {numero}</span> : null
+                    })()}
+                  </div>
                 </div>
                 <div style={{ background: 'var(--at-surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
                   <div><span style={{ color: 'var(--at-ink-3)' }}>Anterior</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_anterior}</div></div>
@@ -388,12 +467,42 @@ export function HistorialSection({
                     {canEdit && (
                       <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
+                    <button onClick={() => setPhotoModal({ registroId: r.id, label: fotoLabel(r) })} aria-label="Ver imagen de la lectura" title="Ver imagen de la lectura" style={{ padding: '6px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🖼️</button>
                     <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
-                    {canEdit && onRegistroDeleted && (
+                    {canDelete && onRegistroDeleted && (
                       <button onClick={() => eliminarRegistro(r)} aria-label="Eliminar lectura" style={{ padding: '6px 10px', background: 'var(--at-danger)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🗑️</button>
                     )}
                   </div>
                 </div>
+                {/* Toggle de detalles — mismo set que la tabla */}
+                {(() => {
+                  const abierto = expandidas.has(r.id)
+                  return (
+                    <>
+                      <button
+                        onClick={() => toggleDetalle(r.id)}
+                        aria-expanded={abierto}
+                        aria-label={abierto ? 'Ocultar detalles de la lectura' : 'Ver detalles de la lectura'}
+                        style={{
+                          marginTop: 12, width: '100%', padding: '8px',
+                          background: abierto ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+                          color: 'var(--at-ink-2)', border: '1px solid var(--at-line)',
+                          borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        }}
+                      >{abierto ? '▲ Ocultar detalles' : '▼ Ver detalles'}</button>
+                      {abierto && (
+                        <div style={{ marginTop: 10 }}>
+                          <RegistroDetalle
+                            registro={r}
+                            moneda={moneda}
+                            total={total}
+                            numeroContador={numeroContadorDeRegistro(r, contadoresById)}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             )
           })}
@@ -466,11 +575,102 @@ export function HistorialSection({
           </div>
         </div>
       )}
+
+      {/* Lightbox de la foto de la lectura — baja la imagen bajo demanda por id */}
+      {photoModal && (
+        <PhotoLightbox
+          registroId={photoModal.registroId}
+          label={photoModal.label}
+          onClose={() => setPhotoModal(null)}
+        />
+      )}
     </div>
   )
 }
 
+// Etiqueta del visor de foto: cliente + fecha de la lectura.
+function fotoLabel(r: Registro): string {
+  return `${r.cliente_nombre ?? 'Lectura'} · ${formatDate(r.fecha)}`
+}
+
 // ── Sub-componentes locales ───────────────────────────────────────────────
+
+// Panel de detalle de una lectura — muestra todos los campos que no caben en
+// la fila/card (período de servicio, desglose de tarifa, pago, notas, GPS…).
+// `foto` no se incluye: el listado nunca la trae (es base64 pesado; ver
+// REGISTROS_LIST_COLS en domain/agua/queries.ts).
+function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
+  registro: Registro; moneda: string; total: number; numeroContador: string | null
+}) {
+  const periodo = r.fecha_lectura_anterior
+    ? `${formatDate(r.fecha_lectura_anterior)} → ${formatDate(r.fecha)}`
+    : formatDate(r.fecha)
+  const gps = r.gps
+
+  return (
+    <div style={{
+      background: 'var(--at-surface)', border: '1px solid var(--at-line)',
+      borderRadius: 10, padding: 16, marginTop: 4,
+      display: 'flex', flexDirection: 'column', gap: 14,
+    }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14,
+      }}>
+        <DetailField label="Período de servicio" value={periodo} />
+        {r.dias_servicio != null && <DetailField label="Días de servicio" value={`${formatNumber(r.dias_servicio, 0)} días`} />}
+        {r.mes && <DetailField label="Mes facturado" value={r.mes} />}
+        {numeroContador && <DetailField label="# Contador" value={numeroContador} />}
+
+        <DetailField label="Lectura anterior" value={formatNumber(r.lectura_anterior, 0)} />
+        <DetailField label="Lectura actual" value={formatNumber(r.lectura_actual, 0)} accent="var(--at-primary)" />
+        <DetailField label="Consumo" value={`${formatNumber(r.consumo)} m³`} accent="var(--at-accent)" />
+
+        {r.tipo_cobro && <DetailField label="Tipo de cobro" value={r.tipo_cobro} />}
+        <DetailField label="Tarifa aplicada" value={`${formatCurrency(r.tarifa_aplicada, moneda)} / m³`} />
+        {r.tarifa_exceso_aplicada ? <DetailField label="Tarifa de exceso" value={`${formatCurrency(r.tarifa_exceso_aplicada, moneda)} / m³`} /> : null}
+        <DetailField label="Canon / cargo fijo" value={formatCurrency(r.canon_aplicado, moneda)} />
+        <DetailField label="Total calculado" value={formatCurrency(total, moneda)} accent="var(--at-primary)" />
+
+        {r.monto_pagado != null && <DetailField label="Monto pagado" value={formatCurrency(r.monto_pagado, moneda)} accent="var(--at-success-strong)" />}
+        {r.fecha_pago && <DetailField label="Fecha de pago" value={formatDate(r.fecha_pago)} />}
+      </div>
+
+      {r.notas && (
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={detailLabelStyle}>📝 Notas</div>
+          <div style={{ fontSize: 13.5, color: 'var(--at-ink)', whiteSpace: 'pre-wrap' }}>{r.notas}</div>
+        </div>
+      )}
+
+      {gps && (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+            fontSize: 13, fontWeight: 600, color: 'var(--at-primary)', textDecoration: 'none',
+          }}
+        >
+          📍 Ver ubicación en el mapa ({gps.lat.toFixed(5)}, {gps.lng.toFixed(5)})
+        </a>
+      )}
+
+      <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>ID de lectura: {r.id}</div>
+    </div>
+  )
+}
+
+function DetailField({ label, value, accent }: {
+  label: string; value: ReactNode; accent?: string
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={detailLabelStyle}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: accent ?? 'var(--at-ink)', wordBreak: 'break-word' }}>{value}</div>
+    </div>
+  )
+}
 
 function StatCard({ label, value, color, icon, moneda }: {
   label: string; value: string | number; color: string; icon: ReactNode; moneda: string
@@ -540,6 +740,21 @@ function pillStyle(p: { bg: string; color: string }): CSSProperties {
   return { padding: '6px 14px', borderRadius: 12, fontSize: 12, fontWeight: 600, ...p }
 }
 
+function expandBtnStyle(abierto: boolean): CSSProperties {
+  return {
+    width: 30, height: 30, padding: 0, lineHeight: 1,
+    background: abierto ? 'var(--at-primary)' : 'var(--at-surface-2)',
+    color: abierto ? 'white' : 'var(--at-ink-2)',
+    border: '1px solid', borderColor: abierto ? 'var(--at-primary)' : 'var(--at-line)',
+    borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+  }
+}
+
+const detailLabelStyle: CSSProperties = {
+  fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3,
+}
+
 function viewBtnStyle(active: boolean): CSSProperties {
   return {
     padding: '8px 12px', background: active ? 'var(--at-primary)' : 'transparent',
@@ -555,6 +770,12 @@ const filterFieldStyle: CSSProperties = {
 const btnEditStyle: CSSProperties = {
   padding: '8px 12px', minHeight: 36,
   background: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)',
+  color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: 600,
+}
+
+const btnFotoStyle: CSSProperties = {
+  padding: '8px 12px', minHeight: 36, background: 'var(--at-primary)',
   color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
   fontSize: 12, fontWeight: 600,
 }

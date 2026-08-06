@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ConsumoEnergiaArea } from '../../../types'
@@ -27,9 +28,9 @@ const inputStyle: CSSProperties = {
 }
 
 const BLANK = {
-  area: '', tipo: 'electricidad', periodo: new Date().toISOString().slice(0, 7),
+  area: '', tipo: 'electricidad', periodo: mesLocalISO(),
   lectura_anterior: '', lectura_actual: '', unidad: 'kWh',
-  costo_unitario: '', total_costo: '', fecha_lectura: new Date().toISOString().slice(0, 10), notas: '',
+  costo_unitario: '', total_costo: '', fecha_lectura: hoyLocalISO(), notas: '',
 }
 
 function fmt(n: number, m: string) {

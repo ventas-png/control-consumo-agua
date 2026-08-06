@@ -20,7 +20,7 @@ import {
   useImportarMovimientosMutation,
 } from '../../domain/bancos/mutations'
 import { cuentaBancariaFormSchema, validarFilaExtracto, type MovimientoImportado } from '../../domain/bancos/schemas'
-import { formatCurrency, formatDateShort } from '../../lib/format'
+import { formatCurrency, formatDateShort, mesLocalISO } from '../../lib/format'
 import {
   ESTADO_MOVIMIENTO_LABELS,
   MATCH_TIPO_LABELS,
@@ -42,7 +42,7 @@ type FiltroEstado = 'pendiente' | 'conciliado' | 'descartado' | 'todos'
 const TONO_ESTADO = { pendiente: 'warning', conciliado: 'success', descartado: 'neutral' } as const
 
 function periodoActual(): string {
-  return new Date().toISOString().slice(0, 7)
+  return mesLocalISO()
 }
 
 export function BancosTab({ companyId, projectId, monedaBase }: Props) {

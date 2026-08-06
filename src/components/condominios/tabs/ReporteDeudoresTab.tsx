@@ -1,7 +1,9 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { ROLES_RESPONSABLE_CUOTA } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -63,12 +65,39 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
     total:   acc.total   + d.total,
   }), { t0_30: 0, t31_60: 0, t61_90: 0, t90plus: 0, total: 0 }), [deudores])
 
+  // Deuda pendiente desglosada por rol responsable (cuotas diferenciadas). Solo se
+  // muestra cuando hay al menos una cuota etiquetada; si no, el reporte queda igual.
+  const deudaPorResponsable = useMemo(() => {
+    const montos: Record<string, number> = {}
+    let hayDiferenciadas = false
+    cuotas
+      .filter(c => c.estado === 'pendiente' || c.estado === 'moroso')
+      .forEach(c => {
+        const key = c.rol_responsable ?? ''
+        if (c.rol_responsable) hayDiferenciadas = true
+        montos[key] = (montos[key] ?? 0) + c.monto
+      })
+    const filas = [
+      ...ROLES_RESPONSABLE_CUOTA.map(r => ({ key: r.value as string, label: r.label, monto: montos[r.value] ?? 0 })),
+      { key: '', label: 'Sin diferenciar', monto: montos[''] ?? 0 },
+    ].filter(f => f.monto > 0)
+    return { filas, hayDiferenciadas }
+  }, [cuotas])
+
   function exportarExcelDeudores() {
-    exportarExcel(`deudores-${new Date().toISOString().slice(0, 10)}`, [{
+    const sheets = [{
       name: 'Deudores',
       headers: ['Unidad', '0–30 días', '31–60 días', '61–90 días', '+90 días', 'Total', 'Cuotas pendientes'],
-      rows: deudores.map(d => [d.unidadNombre, d.t0_30, d.t31_60, d.t61_90, d.t90plus, d.total, d.cuotasCount]),
-    }])
+      rows: deudores.map(d => [d.unidadNombre, d.t0_30, d.t31_60, d.t61_90, d.t90plus, d.total, d.cuotasCount] as (string | number)[]),
+    }]
+    if (deudaPorResponsable.hayDiferenciadas) {
+      sheets.push({
+        name: 'Por responsable',
+        headers: ['Responsable', 'Deuda pendiente'],
+        rows: deudaPorResponsable.filas.map(f => [f.label, f.monto] as (string | number)[]),
+      })
+    }
+    exportarExcel(`deudores-${hoyLocalISO()}`, sheets)
   }
 
   function cartaCobro(row: DeudorRow) {
@@ -87,7 +116,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
     const csv = [header, ...rows].join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = `deudores-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `deudores-${hoyLocalISO()}.csv`
     a.click()
   }
 
@@ -160,6 +189,21 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
                 </span>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Deuda por responsable (cuotas diferenciadas) — solo si hay etiquetadas */}
+      {deudaPorResponsable.hayDiferenciadas && (
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 8, fontWeight: 600 }}>Deuda pendiente por responsable</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {deudaPorResponsable.filas.map(f => (
+              <div key={f.key} style={{ flex: '1 1 120px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{f.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--at-ink-2)', marginTop: 2 }}>{moneda} {f.monto.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}

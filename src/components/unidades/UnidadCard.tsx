@@ -16,9 +16,11 @@ export function UnidadCard({
   proyectoNombre,
   clienteAsignado,
   canEdit,
+  canDelete = true,
   onEdit,
   onToggleActivo,
   onEliminar,
+  onResidentes,
 }: {
   unidad: Unidad
   tipo: { icon: string; label: string }
@@ -27,9 +29,13 @@ export function UnidadCard({
   proyectoNombre?: string
   clienteAsignado?: Cliente
   canEdit: boolean
+  /** RBAC granular: permiso de eliminar; default true para no romper usos existentes */
+  canDelete?: boolean
   onEdit: () => void
   onToggleActivo: () => void
   onEliminar: () => void
+  /** Portal propietario/inquilino (fase 3): abrir la gestión de residentes. */
+  onResidentes?: () => void
 }) {
   const tag = getEditedTagInfo(u.updated_at, u.updated_by_name)
   return (
@@ -174,15 +180,29 @@ export function UnidadCard({
             >
               {u.activo ? 'Desactivar' : 'Activar'}
             </button>
-            <button
-              onClick={onEliminar}
-              style={{
-                padding: '7px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
-                border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-              }}
-            >
-              Eliminar
-            </button>
+            {onResidentes && (
+              <button
+                onClick={onResidentes}
+                title="Residentes (propietario / inquilino)"
+                style={{
+                  padding: '7px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)',
+                  border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                }}
+              >
+                👥
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={onEliminar}
+                style={{
+                  padding: '7px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
+                  border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                }}
+              >
+                Eliminar
+              </button>
+            )}
           </div>
         )}
       </div>

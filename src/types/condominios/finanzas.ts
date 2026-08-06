@@ -4,6 +4,7 @@
 
 import type { RubroConfig } from './core'
 import type { CanalNotificacion } from './residentes'
+import type { TipoResidente } from './operaciones'
 
 // ━━ Fase 9: gastos, presupuesto legacy, alertas ━━
 // ── Phase 9: Contabilidad, Presupuesto, Alertas ───────────────────────────────
@@ -231,6 +232,14 @@ export interface ComentarioTicket {
   autor_nombre: string
   contenido: string
   estado_nuevo?: string | null
+  /** Paths de `condominios-media` adjuntos al mensaje (se firman al render). */
+  foto_urls: string[]
+  /** Documentos adjuntos (PDF/Word/Excel) del mensaje. */
+  archivo_urls: string[]
+  /** Nota interna del equipo: el residente no la ve (RLS la filtra igual). */
+  es_interno: boolean
+  /** auth.uid() sellado por la BD; identifica los mensajes propios en el hilo. */
+  creado_por?: string | null
   created_at: string
 }
 
@@ -272,6 +281,11 @@ export interface PlantillaCuota {
   created_at: string
   rubros?: RubroConfig[] | null
   monto_total_estimado?: number | null
+  /**
+   * Rol responsable por defecto que la generación en lote estampa en cada cuota
+   * (mismo dominio que `unidad_residentes.tipo`). NULL = sin diferenciar.
+   */
+  rol_responsable?: TipoResidente | null
 }
 
 export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'

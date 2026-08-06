@@ -26,6 +26,8 @@ export interface AppRoutesCtx {
   canCreate: (moduleKey: string) => boolean
   canEdit: (moduleKey: string) => boolean
   canChangeStatus: (moduleKey: string) => boolean
+  canApprove: (moduleKey: string) => boolean
+  canDelete: (moduleKey: string) => boolean
   agua: AguaData
   condominiosSinProyecto: boolean
   navigateSection: (section: AppSection) => void
@@ -101,7 +103,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/historial', sectionName: 'historial', module: 'tabla',
-    render: ({ currentUser, agua, canEdit, canChangeStatus }) => (
+    render: ({ currentUser, agua, canEdit, canChangeStatus, canDelete }) => (
       <HistorialSection
         registros={agua.registros}
         clientes={agua.clientes}
@@ -114,6 +116,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         onRegistroDeleted={agua.deleteRegistro}
         canEdit={canEdit('tabla')}
         canChangeStatus={canChangeStatus('tabla')}
+        canDelete={canDelete('tabla')}
       />
     ),
   },
@@ -125,6 +128,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         registros={agua.registros}
         clientes={agua.clientes}
         moneda={agua.moneda}
+        proyectos={agua.proyectos}
         onEstadoUpdated={agua.updateRegistroEstado}
         onRegistroUpdated={(id, partial) => {
           if (partial.monto_pagado !== undefined) {
@@ -136,8 +140,8 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/dashboard', sectionName: 'dashboard', module: 'dashboard',
-    render: ({ agua }) => (
-      <DashboardSection registros={agua.registros} moneda={agua.moneda} isLoading={agua.dataLoading} />
+    render: ({ agua, currentUser }) => (
+      <DashboardSection registros={agua.registros} moneda={agua.moneda} isLoading={agua.dataLoading} companyId={currentUser.company_id ?? undefined} />
     ),
   },
   {
@@ -182,7 +186,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/rutas', sectionName: 'rutas', module: 'rutas',
-    render: ({ currentUser, agua, canCreate, canEdit, onEjecutarRuta }) => (
+    render: ({ currentUser, agua, canCreate, canEdit, canDelete, onEjecutarRuta }) => (
       <RutasSection
         clientes={agua.clientes}
         contadores={agua.contadores}
@@ -197,6 +201,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         onEjecutarRuta={onEjecutarRuta}
         canCreate={canCreate('rutas')}
         canEdit={canEdit('rutas')}
+        canDelete={canDelete('rutas')}
       />
     ),
   },
@@ -262,7 +267,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/contadores', sectionName: 'contadores', module: 'contadores',
-    render: ({ agua }) => (
+    render: ({ agua, canDelete }) => (
       <ContadoresSection
         contadores={agua.contadores}
         tarifas={agua.tarifas}
@@ -271,6 +276,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         onContadorAdded={agua.addContador}
         onContadorUpdated={agua.updateContador}
         onContadorDeleted={agua.deleteContador}
+        canDelete={canDelete('contadores')}
       />
     ),
   },
@@ -292,8 +298,8 @@ export const APP_ROUTES: AppRouteDef[] = [
       />
     ),
   },
-  { path: '/energia', sectionName: 'servicios_energia', render: renderEnergia },
-  { path: '/energia/:tab', sectionName: 'servicios_energia', render: renderEnergia },
+  { path: '/energia', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
+  { path: '/energia/:tab', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
   // cond:A1 sub-rutas: `/condominios/panel` es el selector de proyecto
   // (CondominiosDashboard). Cualquier otro segmento se interpreta como un tab
   // del registry; tabs desconocidos caen a 'panel'. `/condominios` (sin
@@ -314,25 +320,23 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/condominios/:tab',
-    render: ({ currentUser, agua, canCreate, canEdit, condominiosSinProyecto }) => (
+    render: ({ currentUser, agua, condominiosSinProyecto }) => (
       condominiosSinProyecto ? <SinProyectoAsignado /> : (
         <ErrorBoundary sectionName="condominios">
-          <CondominiosSection proyectos={agua.proyectos} unidades={agua.unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} />
+          <CondominiosSection proyectos={agua.proyectos} unidades={agua.unidades} currentUser={currentUser} />
         </ErrorBoundary>
       )
     ),
   },
   {
     path: '/condominios',
-    render: ({ currentUser, agua, canCreate, canEdit, condominiosSinProyecto }) => (
+    render: ({ currentUser, agua, condominiosSinProyecto }) => (
       condominiosSinProyecto ? <SinProyectoAsignado /> : (
         <ErrorBoundary sectionName="condominios">
           <CondominiosSection
             proyectos={agua.proyectos}
             unidades={agua.unidades}
             currentUser={currentUser}
-            canCreate={canCreate}
-            canEdit={canEdit}
           />
         </ErrorBoundary>
       )

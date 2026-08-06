@@ -10,7 +10,7 @@ import type { ContadoresCtx } from './ctx'
 import { TIPO_COLORES, tipoLabel } from './ui'
 
 export function buildContadoresColumns(ctx: ContadoresCtx): DataTableColumn<Contador>[] {
-  const { tarifas, unidades, canEdit, startEdit, handleEliminar, handleToggleActivo } = ctx
+  const { tarifas, unidades, canEdit, canDelete, startEdit, handleEliminar, handleToggleActivo } = ctx
 
   const tarifaNombre = (id: string | null | undefined) =>
     id ? (tarifas.find(t => t.id === id)?.nombre ?? 'Tarifa desconocida') : null
@@ -139,13 +139,15 @@ export function buildContadoresColumns(ctx: ContadoresCtx): DataTableColumn<Cont
               border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
             }}
           >Editar</button>
-          <button
-            onClick={() => handleEliminar(c)}
-            style={{
-              padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
-              border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-            }}
-          >Eliminar</button>
+          {canDelete && (
+            <button
+              onClick={() => handleEliminar(c)}
+              style={{
+                padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
+                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >Eliminar</button>
+          )}
         </div>
       ),
     })

@@ -3,7 +3,7 @@ import { notify } from '../shared/Dialog'
 import { useCuentasQuery, useMapeoQuery, useTiposCambioQuery } from '../../domain/contabilidad/queries'
 import { useGuardarMapeoMutation, useGuardarTipoCambioMutation } from '../../domain/contabilidad/mutations'
 import { tipoCambioFormSchema } from '../../domain/contabilidad/schemas'
-import { formatDateShort, formatNumber } from '../../lib/format'
+import { formatDateShort, formatNumber, hoyLocalISO } from '../../lib/format'
 import { EVENTOS_MAPEO } from '../../types/contabilidad'
 import { Campo, btnPrimario, input } from './ui'
 
@@ -27,7 +27,7 @@ export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
   const guardarMapeo = useGuardarMapeoMutation(companyId)
   const guardarTC = useGuardarTipoCambioMutation(companyId)
 
-  const [tcForm, setTcForm] = useState({ moneda: '', fecha: new Date().toISOString().slice(0, 10), tasa: '' })
+  const [tcForm, setTcForm] = useState({ moneda: '', fecha: hoyLocalISO(), tasa: '' })
 
   const detalle = useMemo(() => cuentas.filter((c) => c.es_detalle && c.activa), [cuentas])
   const mapeoEmpresa = useMemo(() => {

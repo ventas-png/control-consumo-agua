@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { hoyLocalISO } from './lib/format'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { lazySafe as lazy } from './lib/lazyWithPreload'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { OPEN_BILLING_EVENT } from './components/shared/promptUpgrade'
+import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/promptUpgrade'
 import { TrialExpirationBanner } from './components/shared/TrialExpirationBanner'
+import { PastDueBanner } from './components/shared/PastDueBanner'
 import { CompanySuspendedBanner } from './components/shared/CompanySuspendedBanner'
+import { SetupWizard } from './components/onboarding/SetupWizard'
 import { BrandingApplier } from './components/branding/BrandingApplier'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta } from './types'
@@ -35,42 +39,68 @@ import {
 } from './components/app/lazySections'
 import { AuthSplash, DualServicePortal, PresenceBar } from './components/app/shell'
 import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/routes'
+import { MfaGate } from './components/auth/MfaGate'
 
+// F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
+// módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
+// nuevo cada vez, y React desmonta y remonta el árbol entero al cambiar el tipo.
+const LazyShowcase = lazy(() =>
+  import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })),
+)
+
+/** Rutas públicas que se resuelven ANTES del router y del gate de auth. */
+const LEGAL_ROUTES: Record<string, 'privacy' | 'tos' | 'dpa'> = {
+  '/politica-privacidad': 'privacy',
+  '/terminos-servicio': 'tos',
+  '/acuerdo-dpa-cookies': 'dpa',
+}
+
+/**
+ * Raíz de la app. SOLO resuelve las tres rutas públicas sessionless y, si no
+ * aplica ninguna, delega en `<AppShell/>`.
+ *
+ * POR QUÉ ESTÁ PARTIDO EN DOS (auditoría 2026-07-28, PR-33)
+ * Antes esto era un único componente: los tres `return` de abajo vivían al
+ * principio de `App()` y los ~31 hooks venían DESPUÉS. Eso viola las Rules of
+ * Hooks — en esas rutas el componente renderizaba con 0 hooks y en el resto con
+ * 31. No explotaba porque las tres rutas son terminales (se entra por carga
+ * completa y no se navega desde ellas dentro de la app), pero bastaba con que
+ * algo llamara a `navigate()` estando en una para que React viera 31 hooks donde
+ * antes hubo 0 y lanzara "Rendered more hooks than during the previous render".
+ *
+ * Partirlo lo hace estructuralmente imposible: aquí no hay ningún hook, y
+ * `AppShell` —que los tiene todos— o se monta entero o no se monta. El
+ * comentario que había en el bloque de atajos afirmando que los hooks se llamaban
+ * incondicionalmente ahora es cierto.
+ */
 export default function App() {
-  // F3.13: ComponentShowcase dev route (/dev/components). Solo accesible
-  // si el usuario navega manualmente — no aparece en el sidebar.
-  if (typeof window !== 'undefined' && window.location.pathname === '/dev/components') {
-    const LazyShowcase = lazy(() => import('./components/dev/ComponentShowcase').then(m => ({ default: m.ComponentShowcase })))
-    return (
-      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
-        <LazyShowcase />
-      </Suspense>
-    )
-  }
-
-  // T3/plat:P3 — landing pública de aceptación de invitación. Es sessionless
-  // (el invitado todavía no tiene cuenta), por eso se resuelve aquí arriba con
-  // el mismo patrón que /dev/components, ANTES del gate de auth/loading.
-  if (typeof window !== 'undefined' && window.location.pathname === '/aceptar-invitacion') {
-    return (
-      <Suspense fallback={<AuthSplash />}>
-        <AcceptInvitationPage />
-      </Suspense>
-    )
-  }
-
-  // Suite legal pública (RGPD/CCPA + verificación de APIs de Google). Son páginas
-  // 100% públicas e indexables: se resuelven sessionless aquí arriba, ANTES del gate
-  // de auth, con el mismo patrón que /aceptar-invitacion. El doc se mapea por ruta.
   if (typeof window !== 'undefined') {
-    const legalRoutes: Record<string, 'privacy' | 'tos' | 'dpa'> = {
-      '/politica-privacidad': 'privacy',
-      '/terminos-servicio': 'tos',
-      '/acuerdo-dpa-cookies': 'dpa',
+    const { pathname, search } = window.location
+
+    // Solo accesible si el usuario navega manualmente — no está en el sidebar.
+    if (pathname === '/dev/components') {
+      return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+          <LazyShowcase />
+        </Suspense>
+      )
     }
-    const legalDoc = legalRoutes[window.location.pathname]
+
+    // T3/plat:P3 — landing de aceptación de invitación. Es sessionless: el
+    // invitado todavía no tiene cuenta, así que se resuelve antes del gate de auth.
+    if (pathname === '/aceptar-invitacion') {
+      return (
+        <Suspense fallback={<AuthSplash />}>
+          <AcceptInvitationPage />
+        </Suspense>
+      )
+    }
+
+    // Suite legal pública (RGPD/CCPA + verificación de APIs de Google): páginas
+    // 100% públicas e indexables, también sessionless.
+    const legalDoc = LEGAL_ROUTES[pathname]
     if (legalDoc) {
-      const legalLang = new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'es'
+      const legalLang = new URLSearchParams(search).get('lang') === 'en' ? 'en' : 'es'
       return (
         <Suspense fallback={<AuthSplash />}>
           <LegalPage doc={legalDoc} lang={legalLang} />
@@ -79,8 +109,16 @@ export default function App() {
     }
   }
 
-  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
-  const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
+  return <AppShell />
+}
+
+/**
+ * La aplicación autenticada. Todos los hooks viven aquí y se ejecutan siempre:
+ * este componente solo se monta cuando ninguna ruta pública aplicó.
+ */
+function AppShell() {
+  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
+  const { canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete } = usePermissions(currentUser)
 
   // agua:A1 — navegación basada en URL (react-router-dom v6). El sidebar/topbar
   // siguen hablando AppSection; aquí derivamos sección desde location y
@@ -171,18 +209,24 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [showSignupCompany, setShowSignupCompany] = useState(false)
+  // P0 #10: enforcement de MFA por empresa. Se resetea al cambiar de usuario;
+  // el MfaGate lo pone en true si ya hay factor verificado o tras enrolar.
+  const [mfaSatisfied, setMfaSatisfied] = useState(false)
+  useEffect(() => { setMfaSatisfied(false) }, [currentUser?.user_id])
   const [unreadComunicacion, setUnreadComunicacion] = useState(0)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   // Legacy: kept for backward compatibility with old reset links already sent
   const [resetToken] = useState<string | null>(getResetToken)
 
-  // Handle Gmail OAuth callback when Google redirects back to the app
+  // Handle Gmail OAuth callback when Google redirects back to the app.
+  // `[]` es exhaustivo de verdad: las dos funciones son imports de módulo
+  // (`lib/gmailOAuth`), no valores del render — de ahí que ya no lleve la
+  // supresión de `exhaustive-deps` que tenía.
   useEffect(() => {
     const gmailParams = detectGmailOAuthCallback()
     if (gmailParams) {
       void handleGmailOAuthCallback(gmailParams)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const onEjecutarRuta = useCallback((ruta: Ruta) => {
@@ -210,6 +254,15 @@ export default function App() {
     const handler = () => navigate(sectionToPath('perfil'))
     window.addEventListener(OPEN_BILLING_EVENT, handler)
     return () => window.removeEventListener(OPEN_BILLING_EVENT, handler)
+  }, [navigate])
+
+  // Límite de proyectos/unidades alcanzado: promptUpgrade dispatcha este
+  // evento al elegir "Ampliar plan" → navegar a Empresa, donde
+  // EmpresaProyectosSection abre el modal de ampliación (flag sessionStorage).
+  useEffect(() => {
+    const handler = () => navigate(sectionToPath('empresa_proyectos'))
+    window.addEventListener(OPEN_AMPLIAR_EVENT, handler)
+    return () => window.removeEventListener(OPEN_AMPLIAR_EVENT, handler)
   }, [navigate])
 
   // Set default section based on role after login.
@@ -319,12 +372,20 @@ export default function App() {
           mfaChallenge={mfaChallenge ? { email: mfaChallenge.email } : null}
           onVerifyMfa={verifyMfaChallenge}
           onCancelMfa={cancelMfaChallenge}
+          initialAuthError={oauthError}
         />
         {showPasswordReset && (
           <PasswordResetModal onClose={() => setShowPasswordReset(false)} />
         )}
       </Suspense>
     )
+  }
+
+  // P0 #10: si la empresa exige 2FA y el usuario aún no tiene un factor
+  // verificado, bloqueá el shell hasta enrolar. El MfaGate satisface de
+  // inmediato si ya hay factor (clientes no tienen company → mfa_required falsy).
+  if (currentUser.mfa_required && !mfaSatisfied) {
+    return <MfaGate onSatisfied={() => setMfaSatisfied(true)} onLogout={logout} />
   }
 
   // Cliente users get their own portal — no admin data needed
@@ -353,7 +414,7 @@ export default function App() {
   }
 
   // Banner: rutas pendientes asignadas al usuario actual
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
   const rutasPendientes = agua.rutas.filter((r: Ruta) =>
     r.asignado_a === currentUser.user_id &&
     !r.completada &&
@@ -372,10 +433,19 @@ export default function App() {
     activeSection.startsWith('condominios') &&
     agua.proyectos.filter(p => p.estado === 'activo').length === 0
 
+  // F3.11 (P1 quick win): onboarding. Un company_owner/admin cuya empresa aún no
+  // tiene proyectos ve el SetupWizard (crea el primero). Se evalúa SOLO tras
+  // cargar los datos → nunca parpadea; empresas ya configuradas jamás lo ven.
+  const necesitaOnboarding =
+    !agua.dataLoading &&
+    (currentUser.role === 'company_owner' || currentUser.role === 'admin') &&
+    !!currentUser.company_id &&
+    agua.proyectos.length === 0
+
   // Contexto que consumen los renders del registro declarativo de rutas (P1 #4).
   const routesCtx: AppRoutesCtx = {
     currentUser,
-    canViewModule, canCreate, canEdit, canChangeStatus,
+    canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete,
     agua,
     condominiosSinProyecto,
     navigateSection,
@@ -394,6 +464,13 @@ export default function App() {
           en la esquina superior derecha para success/warning/info no críticos.
           Confirmaciones destructivas usan shared/Dialog (confirm/notify). */}
       <Toaster richColors position="top-right" closeButton />
+
+      {/* F3.11: onboarding — wizard de configuración inicial para empresas sin
+          proyectos. autoOpen al montar; onComplete recarga el dominio agua para
+          que la app muestre el proyecto recién creado y el wizard se desmonte. */}
+      {necesitaOnboarding && (
+        <SetupWizard currentUser={currentUser} autoOpen onComplete={agua.refrescarDatos} />
+      )}
 
       {/* Global CommandPalette (Cmd+K / Ctrl+K) — agrega secciones top-level
           mas los comandos registrados por componentes hijos (ej: tabs de
@@ -416,7 +493,7 @@ export default function App() {
 
       {/* El CSS responsive del shell (.app-sidebar, etc.) vive ahora en
           src/styles/runtime.css (I24: CSP sin 'unsafe-inline' en style-src). */}
-      <div data-context="admin" style={{ display: 'flex', minHeight: '100vh', background: 'var(--at-bg)' }}>
+      <div data-context="admin" className="app-shell" style={{ display: 'flex', minHeight: '100vh', background: 'var(--at-bg)' }}>
         <div
           className="app-backdrop"
           onClick={() => setSidebarOpen(false)}
@@ -490,6 +567,8 @@ export default function App() {
         <Breadcrumbs activeSection={activeSection} onNavigate={navigateSection} />
         <PresenceBar activeSection={activeSection} />
         <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
+        {/* P0 #2: dunning — aviso de pago fallido + cuenta atrás a solo-lectura. */}
+        <PastDueBanner companyId={currentUser.company_id ?? null} />
         {/* Ciclo de vida: aviso de empresa suspendida para sesiones ya abiertas. */}
         <CompanySuspendedBanner companyId={currentUser.company_id ?? null} />
         {/* plat:P20 — aplica el color de marca de la empresa a toda la app (efecto, no UI). */}

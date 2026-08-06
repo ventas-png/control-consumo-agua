@@ -1,13 +1,26 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../lib/fileValidation'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { SecureFileLink } from './SecureFileLink'
 import { useMediaScope } from './MediaScopeContext'
 
 const ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 20 * 1024 * 1024
 
-function fileIcon(name: string) {
+/**
+ * Nombre legible de un path de storage: último segmento, sin query y sin el
+ * prefijo `<timestamp>-<random>-` que `buildUploadPath` antepone para evitar
+ * colisiones. Al usuario le interesa "contrato.pdf", no
+ * "1785540000000-a3f9x2-contrato.pdf". Si el nombre no trae ese prefijo (subidas
+ * viejas), se devuelve tal cual.
+ */
+export function nombreDeArchivo(path: string): string {
+  const ultimo = decodeURIComponent(path.split('?')[0].split('/').pop() ?? 'archivo')
+  return ultimo.replace(/^\d{10,}-[a-z0-9]{1,8}-/, '') || ultimo
+}
+
+export function fileIcon(name: string) {
   const ext = name.split('.').pop()?.toLowerCase()
   if (ext === 'pdf') return '📄'
   if (['doc', 'docx'].includes(ext ?? '')) return '📝'
@@ -37,7 +50,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
   const signedUrl = useSignedUrl(value, 'condominios-media')
   // Display name: extract from the stored value (last path segment, query-stripped).
   const fileName = value
-    ? decodeURIComponent(value.split('?')[0].split('/').pop() ?? 'archivo')
+    ? nombreDeArchivo(value)
     : null
 
   async function uploadFile(file: File) {
@@ -157,6 +170,156 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
 
       <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
         onChange={e => handleFiles(e.target.files)} />
+    </div>
+  )
+}
+
+// ── Múltiple ─────────────────────────────────────────────────────────────────
+// Versión multi-archivo de FileUploader, para los hilos de conversación del
+// portal (un mensaje puede llevar varios adjuntos). Misma validación por magic
+// bytes que la versión simple: el `accept` del <input> es solo una comodidad de
+// la UI y un usuario autenticado puede saltárselo llamando a Storage directo.
+//
+// El tope es 10 MB —no los 20 de la versión simple— porque es el
+// `file_size_limit` real del bucket (20260729000400). Avisar antes de subir da
+// mejor error que el 413 opaco de Storage.
+const MAX_BYTES_MULTI = 10 * 1024 * 1024
+
+interface MultiProps {
+  values: string[]
+  onChange: (paths: string[]) => void
+  folder: string
+  label?: string
+  maxFiles?: number
+  accept?: string
+}
+
+export function MultiFileUploader({
+  values, onChange, folder, label = 'Adjuntar documentos', maxFiles = 4, accept = ACCEPT,
+}: MultiProps) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const projectId = useMediaScope()
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setError(null)
+    // infra:I14 — el path va scopeado por project_id o la policy de storage lo
+    // rechaza; fallar acá da un mensaje entendible.
+    if (!projectId) { setError('No se pudo determinar el proyecto. Recargue la página e intente de nuevo.'); return }
+    const aSubir = Array.from(files).slice(0, maxFiles - values.length)
+    if (aSubir.length === 0) { setError(`Máximo ${maxFiles} archivos`); return }
+
+    setUploading(true)
+    try {
+      const nuevos: string[] = []
+      for (const file of aSubir) {
+        if (file.size > MAX_BYTES_MULTI) { setError(`"${file.name}" excede el límite de 10 MB.`); break }
+        const magic = await validateFileMagic(file, 'document')
+        if (!magic.ok) { setError(`"${file.name}": ${magic.reason}`); break }
+        const path = buildUploadPath(`${projectId}/${folder}`, file.name)
+        const { data, error: upErr } = await uploadCondominiosMedia(path, file, {
+          contentType: resolveUploadContentType(magic.detected, file.name),
+          upsert: false,
+        })
+        if (upErr || !data) { setError(`No se pudo subir "${file.name}".`); break }
+        nuevos.push(data.path)
+      }
+      if (nuevos.length > 0) onChange([...values, ...nuevos])
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function quitar(path: string) {
+    const real = path.startsWith('http') ? path.match(/condominios-media\/(.+)$/)?.[1] : path
+    if (real) await removeCondominiosMedia([real])
+    onChange(values.filter(p => p !== path))
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault(); setDragging(false)
+    void handleFiles(e.dataTransfer.files)
+  }
+
+  return (
+    <div>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 6 }}>
+        {label} <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>({values.length}/{maxFiles})</span>
+      </label>
+
+      {values.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {values.map(path => {
+            const nombre = nombreDeArchivo(path)
+            return (
+              <div key={path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8 }}>
+                <span style={{ fontSize: 17 }}>{fileIcon(nombre)}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
+                <button onClick={() => quitar(path)} aria-label={`Quitar ${nombre}`}
+                  style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, color: 'var(--at-danger)', cursor: 'pointer', fontSize: 12 }}>
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {values.length < maxFiles && (
+        <div
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          onClick={() => !uploading && ref.current?.click()}
+          style={{
+            border: `2px dashed ${dragging ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
+            borderRadius: 8, padding: '12px', textAlign: 'center',
+            cursor: uploading ? 'default' : 'pointer',
+            background: dragging ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
+          }}>
+          {uploading ? (
+            <div style={{ fontSize: 12, color: 'var(--at-primary)' }}>Subiendo…</div>
+          ) : (
+            <>
+              <span style={{ fontSize: 18 }}>📎</span>
+              <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 2 }}>PDF, Word o Excel · Máx. 10 MB</div>
+            </>
+          )}
+        </div>
+      )}
+
+      <input ref={ref} type="file" accept={accept} multiple style={{ display: 'none' }}
+        onChange={e => { void handleFiles(e.target.files); e.target.value = '' }} />
+
+      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
+    </div>
+  )
+}
+
+// ── Lectura ──────────────────────────────────────────────────────────────────
+
+/**
+ * Lista de adjuntos ya guardados, como chips que abren el archivo firmado.
+ * Es a los documentos lo que <ImageGallery> es a las fotos.
+ */
+export function ListaAdjuntos({ paths }: { paths: string[] }) {
+  if (!paths || paths.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {paths.map(path => {
+        const nombre = nombreDeArchivo(path)
+        return (
+          <SecureFileLink key={path} src={path}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, textDecoration: 'none', color: 'var(--at-ink-2)' }}>
+            <span style={{ fontSize: 16 }}>{fileIcon(nombre)}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
+            <span style={{ fontSize: 11, color: 'var(--at-primary)', fontWeight: 700, flexShrink: 0 }}>Abrir</span>
+          </SecureFileLink>
+        )
+      })}
     </div>
   )
 }

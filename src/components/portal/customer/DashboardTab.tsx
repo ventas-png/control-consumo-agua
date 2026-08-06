@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'react'
 import type { PortalCtx } from './ctx'
 import type { ContadorInfo, LecturaInfo, UnidadInfo } from '../../../lib/portalDashboard'
-import { SecureImage } from '../../shared/SecureImage'
+import { RegistroFotoThumb } from './RegistroFotoThumb'
 import { EmptyState } from '../../shared/EmptyState'
 import { Icon } from '../../shared/Icon'
 import { parseFecha } from '../../../lib/format'
@@ -15,6 +15,7 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
       chartDatasets, availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
+      comparativoComunidad, proyeccion,
     } = dashboardData
 
     const moneda = selectedProjectId
@@ -112,6 +113,48 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
           <PctCard label="vs Mes Anterior" pct={vsAnterior} base={consumoPrevMes} baseLabel="Mes ant." />
           <PctCard label="vs Mismo Mes Año Anterior" pct={vsAnioAnterior} base={consumoSameLastYear} baseLabel="Año ant." />
         </div>
+
+        {/* Comparación con la comunidad + proyección del próximo recibo (O5/V6) */}
+        {(comparativoComunidad || proyeccion.base === 'promedio') && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+            {comparativoComunidad && (() => {
+              const { tuConsumo, mediana, pctDeMediana, posicion, n_residentes, mesLabel } = comparativoComunidad
+              const tono = posicion === 'alto' ? 'var(--at-danger)' : posicion === 'bajo' ? 'var(--at-success)' : 'var(--at-ink)'
+              const etiqueta = posicion === 'alto' ? 'Por encima del típico' : posicion === 'bajo' ? 'Por debajo del típico' : 'En el rango típico'
+              return (
+                <div style={{ background: 'var(--at-surface)', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '8px' }}>
+                    Tu consumo vs tu comunidad <span style={{ fontWeight: 500 }}>· {mesLabel}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: tono }}>{pctDeMediana}%</span>
+                    <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>de la mediana</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: tono, fontWeight: 600, marginTop: '4px' }}>{etiqueta}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px' }}>
+                    Tú: {tuConsumo.toFixed(2)} m³ · Mediana: {mediana.toFixed(2)} m³ · {n_residentes} vecinos
+                  </div>
+                </div>
+              )
+            })()}
+            {proyeccion.base === 'promedio' && (
+              <div style={{ background: 'var(--at-surface)', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '8px' }}>
+                  Próximo recibo estimado
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-primary)' }}>
+                  {moneda} {proyeccion.montoProyectado.toFixed(2)}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '5px' }}>
+                  ≈ {proyeccion.consumoProyectado.toFixed(2)} m³ · promedio de {proyeccion.mesesUsados} {proyeccion.mesesUsados === 1 ? 'mes' : 'meses'}
+                </div>
+                <div style={{ fontSize: '10.5px', color: 'var(--at-ink-3)', marginTop: '6px', fontStyle: 'italic' }}>
+                  Estimación con tu consumo reciente y tu tarifa actual.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Historial de Consumo */}
         <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
@@ -379,13 +422,11 @@ export function DashboardTab({ ctx }: { ctx: PortalCtx }) {
                               ].map(({ lectura, label }) => (
                                 <div key={label} style={{ flex: 1 }}>
                                   <div style={{ fontSize: '9.5px', color: 'var(--at-ink-3)', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
-                                  {lectura?.foto ? (
-                                    <SecureImage
-                                      bucket="registro-fotos"
-                                      src={lectura.foto}
-                                      alt={label}
-                                      onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
-                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid var(--at-line)', cursor: 'zoom-in' }}
+                                  {lectura ? (
+                                    <RegistroFotoThumb
+                                      registroId={lectura.id}
+                                      label={label}
+                                      onClick={() => setPhotoModal({ registroId: lectura.id, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
                                     />
                                   ) : (
                                     <div style={{ width: '100%', aspectRatio: '1', background: 'var(--at-chip)', borderRadius: '7px', border: '1.5px dashed var(--at-line-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: 'var(--at-ink-3)', fontSize: '10px' }}>

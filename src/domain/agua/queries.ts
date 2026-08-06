@@ -8,11 +8,14 @@
 //
 // y deja de recibir esos datos por props desde App/useData. Mientras conviven,
 // no se debe migrar la MISMA entidad en dos sitios a la vez (evita doble fetch).
+import { reportDegradedQuery } from '../queryFetch'
 import { useQuery } from '@tanstack/react-query'
 import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia, FuenteAgua, RegistroCalidad, Empresa, Proyecto } from '../../types'
-import { supabase } from '../../lib/supabase'
+// `db` = cliente TIPADO (P2 tipos). `supabase` (sin tipar) queda SOLO para los
+// call sites cuyas columnas no existen en el esquema generado (ver comentarios).
+import { db } from '../../lib/supabase'
 import { isProjectExempt } from '../../lib/proyectosAccess'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { aguaKeys } from './keys'
 
 // Columnas de listado de registros. NUNCA incluir `foto`: es base64 (hasta
@@ -20,6 +23,44 @@ import { aguaKeys } from './keys'
 // de PostgREST. Espeja REGISTROS_LIST_COLS de useData.
 const REGISTROS_LIST_COLS =
   'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
+
+/**
+ * ¿Existe ya una lectura con esta CLAVE NATURAL (contador + lectura + fecha)? Es la
+ * base de la IDEMPOTENCIA de la captura offline: antes de sincronizar una lectura
+ * encolada se verifica que no esté ya en la BD, para no duplicar en reintentos
+ * (retorno del portal + resincronización). `head:true` no baja filas, solo cuenta.
+ */
+export async function registroExiste(contadorId: string, lecturaActual: number, fecha: string): Promise<boolean> {
+  const { count } = await db
+    .from('registros')
+    .select('id', { count: 'exact', head: true })
+    .eq('contador_id', contadorId)
+    .eq('lectura_actual', lecturaActual)
+    .eq('fecha', fecha)
+    // E2: una lectura soft-deleted NO bloquea re-capturarla (espeja el índice
+    // único parcial WHERE deleted_at IS NULL de E1).
+    .is('deleted_at', null)
+  return (count ?? 0) > 0
+}
+
+/**
+ * Baja el `foto` de UN registro bajo demanda (data-URI base64 o, en lecturas
+ * nuevas, un path de Storage). Solo se llama para las fotos que se van a mostrar
+ * (miniaturas visibles y el lightbox), nunca para el listado completo — por eso
+ * `foto` se excluye de REGISTROS_LIST_COLS (base64 pesado). RLS acota la fila al
+ * tenant/cliente autorizado.
+ */
+export async function fetchRegistroFoto(registroId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('registros')
+    .select('foto')
+    .eq('id', registroId)
+    .is('deleted_at', null) // E2
+    .maybeSingle()
+  reportDegradedQuery('agua.fetchRegistroFoto', error)
+  // El select tipado ya devuelve { foto: string | null } — sin cast.
+  return data?.foto ?? null
+}
 
 // `projects` (proyectos del tenant). RLS los scopea por empresa; orden por nombre
 // igual que useData. Es la ÚLTIMA colección que vivía en useData → cierra
@@ -30,10 +71,14 @@ const REGISTROS_LIST_COLS =
 export function useProyectosQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.proyectos(companyId),
-    queryFn: async () =>
-      (await runQuery<Proyecto[]>((signal) =>
-        supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal),
-      )) ?? [],
+    queryFn: async () => {
+      const rows =
+        (await runQuery((signal) =>
+          db.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal),
+        )) ?? []
+      // La columna generada `estado` es string; el dominio la acota a EstadoProyecto (CHECK en BD).
+      return rows.map((r): Proyecto => ({ ...r, estado: r.estado as Proyecto['estado'] }))
+    },
     enabled: !!companyId,
   })
 }
@@ -48,7 +93,7 @@ export function useProyectoAssignmentsQuery(userId?: string, role?: string, assi
     queryKey: aguaKeys.proyectoAssignments(userId),
     queryFn: async () =>
       (await runQuery<{ project_id: string }[]>((signal) =>
-        supabase.from('user_project_assignments').select('project_id').eq('user_id', userId!).abortSignal(signal),
+        db.from('user_project_assignments').select('project_id').eq('user_id', userId!).abortSignal(signal),
       ))?.map((a) => a.project_id) ?? [],
     enabled: !!userId && !isProjectExempt(role, assignedRoleIds),
   })
@@ -61,9 +106,11 @@ export function useFuentesAguaQuery(companyId?: string) {
     queryKey: aguaKeys.fuentesAgua(companyId),
     queryFn: async () =>
       (await runQuery<FuenteAgua[]>((signal) => {
-        let q = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
+        let q = db.from('fuentes_agua').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Row generado: tipo_agua string (unión en el dominio) y activo/created_at NULLABLES
+        // vs FuenteAgua no-null (bug latente, reportado) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<FuenteAgua[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -71,14 +118,14 @@ export function useFuentesAguaQuery(companyId?: string) {
 
 // `registros_calidad` del tenant (scope company), con la fuente embebida. El portal
 // de calidad reemplaza la lista vía setRegistrosCalidad (setQueryData) tras editar.
-// supabase-js infiere el embed como array; se normaliza con un cast (igual que en
-// MedidoresUnidadTab).
+// El embed ahora lo tipa el cliente `db`; el cast de frontera se mantiene porque el
+// Row genera Json/nullables donde RegistroCalidad espera Record/uniones estrechas.
 export function useRegistrosCalidadQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.registrosCalidad(companyId),
     queryFn: async () =>
       ((await runQuery((signal) => {
-        let q = supabase
+        let q = db
           .from('registros_calidad')
           .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
           .order('fecha', { ascending: false })
@@ -89,14 +136,17 @@ export function useRegistrosCalidadQuery(companyId?: string) {
   })
 }
 
-// `empresa` — objeto único del tenant (RLS lo scopea). Devuelve {} si no hay fila,
-// igual que el INITIAL_DATA previo de useData.
+// `empresa` — tabla legacy SIN columna de tenant, así que RLS NO la scopea por
+// empresa (no hay por dónde): la policy `empresa_select_authenticated` solo cierra
+// el acceso de `anon` y la deja en solo-lectura. Todos los tenants ven las mismas
+// filas. La identidad real del tenant vive en `companies`, no aquí.
+// Devuelve {} si no hay fila, igual que el INITIAL_DATA previo de useData.
 export function useEmpresaQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.empresa(companyId),
     queryFn: async () => {
       const rows = await runQuery<Empresa[]>((signal) =>
-        supabase.from('empresa').select('*').limit(1).abortSignal(signal),
+        db.from('empresa').select('*').limit(1).abortSignal(signal),
       )
       return (rows?.[0] ?? {}) as Empresa
     },
@@ -110,27 +160,37 @@ export function useClientesQuery(companyId?: string) {
     queryKey: aguaKeys.clientes(companyId),
     queryFn: async () =>
       (await runQuery<Cliente[]>((signal) =>
-        supabase.from('clientes').select('*').abortSignal(signal),
+        // Row generado: medidor/lectura_inicial/email/direccion/telefono/updated_at NULLABLES
+        // vs Cliente opcional-undefined (bug latente, reportado) — override en la frontera.
+        db.from('clientes').select('*').abortSignal(signal).overrideTypes<Cliente[], { merge: false }>(),
       )) ?? [],
     enabled: !!companyId,
   })
 }
 
-// `registros`: RLS scopea por company vía projects + company_clientes. Limit 5000
-// para no exceder el statement_timeout en empresas con mucho histórico (el
-// dashboard filtra por rango de fechas, no necesita más).
+// `registros`: RLS scopea por company vía projects + company_clientes.
+// Fase 6: fetch COMPLETO por chunks (runQueryAll) — el .limit(5000) anterior
+// truncaba en silencio los totales del Historial, dashboards y exports en
+// tenants con mucho histórico. Cada chunk corre con su propio timeout, así que
+// el statement_timeout que motivó el cap ya no es riesgo. El .order('id')
+// secundario da el orden TOTAL que range() necesita para no saltar/duplicar.
 export function useRegistrosQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.registros(companyId),
     queryFn: async () =>
-      (await runQuery<Registro[]>((signal) =>
-        supabase
+      await runQueryAll<Registro>((from, to, signal) =>
+        db
           .from('registros')
           .select(REGISTROS_LIST_COLS)
+          .is('deleted_at', null) // E2: lecturas soft-deleted fuera de todo consumo
           .order('fecha', { ascending: false })
-          .limit(5000)
-          .abortSignal(signal),
-      )) ?? [],
+          .order('id', { ascending: true })
+          .range(from, to)
+          .abortSignal(signal)
+          // Esquema: casi todas las columnas NULLABLES (y estado string, gps Json) vs
+          // interfaz Registro no-null/unión (bug latente, reportado) — override frontera.
+          .overrideTypes<Registro[], { merge: false }>(),
+      ),
     enabled: !!companyId,
   })
 }
@@ -143,11 +203,14 @@ export function useRutasQuery(companyId?: string) {
     queryKey: aguaKeys.rutas(companyId),
     queryFn: async () =>
       (await runQuery<Ruta[]>((signal) =>
-        supabase
+        db
           .from('rutas')
           .select('*')
           .order('created_at', { ascending: false })
-          .abortSignal(signal),
+          .abortSignal(signal)
+          // Esquema: cliente_ids/contador_ids/unidad_ids/dias_semana… son Json y
+          // tipo_ruta/frecuencia string vs uniones/arrays de Ruta — override frontera.
+          .overrideTypes<Ruta[], { merge: false }>(),
       )) ?? [],
     enabled: !!companyId,
   })
@@ -160,9 +223,11 @@ export function useTarifasQuery(companyId?: string) {
     queryKey: aguaKeys.tarifas(companyId),
     queryFn: async () =>
       (await runQuery<Tarifa[]>((signal) => {
-        let q = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
+        let q = db.from('tarifas').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: tramos es Json y descripcion/created_at/updated_at nullables vs
+        // Tarifa (TarifaTramo[] / opcional-undefined) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<Tarifa[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -175,9 +240,11 @@ export function useContadoresQuery(companyId?: string) {
     queryKey: aguaKeys.contadores(companyId),
     queryFn: async () =>
       (await runQuery<Contador[]>((signal) => {
-        let q = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+        let q = db.from('contadores').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: tipo_agua string y descripcion/marca/modelo/fechas nullables vs
+        // Contador (unión TipoAgua / opcional-undefined) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<Contador[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -191,9 +258,11 @@ export function useUnidadesQuery(companyId?: string) {
     queryKey: aguaKeys.unidades(companyId),
     queryFn: async () =>
       (await runQuery<Unidad[]>((signal) => {
-        let q = supabase.from('unidades').select('*').order('nombre', { ascending: true })
+        let q = db.from('unidades').select('*').order('nombre', { ascending: true })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: tipo/tipo_regimen/estado_ocupacional/contrato_suministro string y
+        // varios nullables vs uniones/opcionales de Unidad — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<Unidad[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -206,9 +275,11 @@ export function useProveedoresEnergiaQuery(companyId?: string) {
     queryKey: aguaKeys.proveedoresEnergia(companyId),
     queryFn: async () =>
       (await runQuery<ProveedorEnergia[]>((signal) => {
-        let q = supabase.from('proveedores_energia').select('*').order('created_at', { ascending: false })
+        let q = db.from('proveedores_energia').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: tipo string y nit/contacto/created_at/updated_at NULLABLES vs
+        // ProveedorEnergia no-null (bug latente, reportado) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<ProveedorEnergia[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -220,9 +291,11 @@ export function useTarifasEnergiaQuery(companyId?: string) {
     queryKey: aguaKeys.tarifasEnergia(companyId),
     queryFn: async () =>
       (await runQuery<TarifaEnergia[]>((signal) => {
-        let q = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
+        let q = db.from('tarifas_energia').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: alumbrado_tipo string y descripcion/created_at/updated_at NULLABLES
+        // vs TarifaEnergia no-null (bug latente, reportado) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<TarifaEnergia[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -234,9 +307,12 @@ export function useFuentesEnergiaQuery(companyId?: string) {
     queryKey: aguaKeys.fuentesEnergia(companyId),
     queryFn: async () =>
       (await runQuery<FuenteEnergia[]>((signal) => {
-        let q = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
+        let q = db.from('fuentes_energia').select('*').order('created_at', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: modo_suministro string y fuente_agua_id/proveedor_id/tarifa_id/
+        // created_at/updated_at… NULLABLES vs FuenteEnergia (unión / opcional-undefined
+        // / no-null; bug latente, reportado) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<FuenteEnergia[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -248,9 +324,12 @@ export function useFacturasEnergiaQuery(companyId?: string) {
     queryKey: aguaKeys.facturasEnergia(companyId),
     queryFn: async () =>
       (await runQuery<FacturaEnergia[]>((signal) => {
-        let q = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
+        let q = db.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
         if (companyId) q = q.eq('company_id', companyId)
-        return q.abortSignal(signal)
+        // Esquema: estado string y proveedor_id/fecha_pago/created_at/updated_at…
+        // NULLABLES vs FacturaEnergia (unión / opcional-undefined / no-null; bug
+        // latente, reportado) — override en la frontera.
+        return q.abortSignal(signal).overrideTypes<FacturaEnergia[], { merge: false }>()
       })) ?? [],
     enabled: !!companyId,
   })
@@ -268,14 +347,16 @@ export function useContadoresPorProyectoQuery(companyId: string, proyectoId: str
     queryKey: aguaKeys.contadoresPorProyecto(companyId, proyectoId),
     queryFn: async () =>
       (await runQuery<Contador[]>((signal) =>
-        supabase
+        db
           .from('contadores')
           .select('*')
           .eq('project_id', proyectoId)
           .eq('company_id', companyId)
           .eq('activo', true)
           .order('numero_serie')
-          .abortSignal(signal),
+          .abortSignal(signal)
+          // Mismo mismatch que useContadoresQuery (tipo_agua/nullables) — override frontera.
+          .overrideTypes<Contador[], { merge: false }>(),
       )) ?? [],
     enabled: !!companyId && !!proyectoId,
   })
@@ -296,16 +377,21 @@ export interface ConsumoRow {
 export function useConsumoPorProyectoQuery(proyectoId: string, mes: string) {
   return useQuery({
     queryKey: aguaKeys.consumoPorProyecto(proyectoId, mes),
-    queryFn: async () =>
-      (await runQuery<ConsumoRow[]>((signal) =>
-        supabase
-          .from('registros')
-          .select('contador_id, consumo, fecha')
-          .eq('project_id', proyectoId)
-          .gte('fecha', `${mes}-01`)
-          .lte('fecha', `${mes}-31`)
-          .abortSignal(signal),
-      )) ?? [],
+    queryFn: async () => {
+      const rows =
+        (await runQuery((signal) =>
+          db
+            .from('registros')
+            .select('contador_id, consumo, fecha')
+            .eq('project_id', proyectoId)
+            .gte('fecha', `${mes}-01`)
+            .lte('fecha', `${mes}-31`)
+            .is('deleted_at', null) // E2
+            .abortSignal(signal),
+        )) ?? []
+      // `consumo` es NULLABLE en el esquema; 0 es neutro para la suma del consumidor.
+      return rows.map((r): ConsumoRow => ({ ...r, consumo: r.consumo ?? 0 }))
+    },
     enabled: !!proyectoId,
   })
 }
@@ -319,8 +405,11 @@ export interface ConsumoMensual {
 /**
  * Consumo mensual (m³) de un proyecto en los últimos ~6 meses, agregado por mes.
  * Lectura DEPENDIENTE en dos pasos (espeja el fetch original de SostenibilidadTab):
- * primero los contadores del proyecto, luego sus registros. Usa las columnas
- * `consumo_m3`/`fecha_lectura` tal cual venían en el componente.
+ * primero los contadores del proyecto, luego sus registros.
+ *
+ * FIX (query rota en runtime, cazada por el arco de tipado): el fetch original
+ * seleccionaba `consumo_m3`/`fecha_lectura`, columnas que NO existen en
+ * `registros` (son `consumo`/`fecha`) → PostgREST 400 y la serie quedaba vacía.
  */
 export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId: string) {
   return useQuery({
@@ -333,25 +422,27 @@ export function useConsumoMensualPorProyectoQuery(companyId: string, proyectoId:
 
       const contadores =
         (await runQuery<{ id: string }[]>((signal) =>
-          supabase.from('contadores').select('id').eq('project_id', proyectoId).abortSignal(signal),
+          db.from('contadores').select('id').eq('project_id', proyectoId).abortSignal(signal),
         )) ?? []
       if (contadores.length === 0) return []
 
       const rows =
-        (await runQuery<{ consumo_m3: number | null; fecha_lectura: string }[]>((signal) =>
-          supabase
+        (await runQuery((signal) =>
+          db
             .from('registros')
-            .select('consumo_m3, fecha_lectura')
+            .select('consumo, fecha')
             .in('contador_id', contadores.map((c) => c.id))
-            .gte('fecha_lectura', desdeStr)
-            .order('fecha_lectura')
+            .gte('fecha', desdeStr)
+            .is('deleted_at', null) // E2
+            .order('fecha')
             .abortSignal(signal),
         )) ?? []
 
       const byMes: Record<string, number> = {}
       for (const r of rows) {
-        const mes = r.fecha_lectura.slice(0, 7)
-        byMes[mes] = (byMes[mes] ?? 0) + (r.consumo_m3 ?? 0)
+        const mes = r.fecha.slice(0, 7)
+        // `consumo` es NULLABLE en el esquema; 0 es neutro para la suma mensual.
+        byMes[mes] = (byMes[mes] ?? 0) + (r.consumo ?? 0)
       }
       return Object.entries(byMes)
         .map(([mes, m3]) => ({ mes, m3 }))
@@ -393,29 +484,40 @@ export function useMedidoresAguaPorProyectoQuery(companyId: string, proyectoId: 
   return useQuery({
     queryKey: aguaKeys.medidoresAguaPorProyecto(companyId, proyectoId),
     queryFn: async (): Promise<MedidoresAguaData> => {
-      // supabase-js infiere el embed `unidades(nombre)` como array (no conoce la
-      // cardinalidad sin tipos generados), pero PostgREST devuelve un objeto en
-      // una relación to-one. Dejamos inferir y normalizamos el tipo aquí.
-      const contadores =
-        ((await runQuery((signal) =>
-          supabase
+      // FIX (query rota en runtime, cazada por el arco de tipado): la columna real
+      // es `numero_serie` (`numero_medidor` no existe en contadores → PostgREST 400
+      // y el resumen quedaba vacío). Se mapea al shape público
+      // `MedidorContador.numero_medidor` para no tocar la UI del tab.
+      const contadoresRows =
+        (await runQuery((signal) =>
+          db
             .from('contadores')
-            .select('id, numero_medidor, unidad_id, unidades(nombre)')
+            .select('id, numero_serie, unidad_id, unidades(nombre)')
             .eq('project_id', proyectoId)
             .eq('company_id', companyId)
-            .order('numero_medidor')
+            .order('numero_serie')
             .abortSignal(signal),
-        )) ?? []) as unknown as MedidorContador[]
+        )) ?? []
+      const contadores: MedidorContador[] = contadoresRows.map((c) => ({
+        id: c.id,
+        numero_medidor: c.numero_serie,
+        unidad_id: c.unidad_id,
+        unidades: c.unidades,
+      }))
       if (contadores.length === 0) return { contadores: [], registros: [] }
 
       const registros =
         (await runQuery<MedidorRegistro[]>((signal) =>
-          supabase
+          db
             .from('registros')
             .select('contador_id, lectura_actual, consumo, fecha')
             .in('contador_id', contadores.map((c) => c.id))
+            .is('deleted_at', null) // E2
             .order('fecha', { ascending: false })
-            .abortSignal(signal),
+            .abortSignal(signal)
+            // `contador_id` es nullable en el esquema, pero el .in() sobre ids no
+            // nulos garantiza filas con contador_id presente — override frontera.
+            .overrideTypes<MedidorRegistro[], { merge: false }>(),
         )) ?? []
 
       return { contadores, registros }

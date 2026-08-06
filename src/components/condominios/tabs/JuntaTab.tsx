@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -28,7 +29,7 @@ const CARGO_LABELS: Record<CargoJunta, { label: string; icon: string; color: str
 
 const BLANK = {
   cargo: 'vocal' as CargoJunta, nombre: '', unidad_id: '',
-  telefono: '', email: '', periodo_inicio: new Date().toISOString().slice(0,10),
+  telefono: '', email: '', periodo_inicio: hoyLocalISO(),
   periodo_fin: '', notas: '', activo: true,
 }
 
@@ -89,7 +90,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
   }
 
   async function toggleActivo(m: MiembroJunta) {
-    await updateCondominioRow('junta_directiva', m.id, { activo: !m.activo, periodo_fin: m.activo ? new Date().toISOString().slice(0,10) : null })
+    await updateCondominioRow('junta_directiva', m.id, { activo: !m.activo, periodo_fin: m.activo ? hoyLocalISO() : null })
     onRefresh()
   }
 

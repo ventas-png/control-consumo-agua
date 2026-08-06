@@ -1,12 +1,22 @@
-import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useEffect, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { createRegistro } from '../../domain/agua/mutations'
+import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
+import { registroExiste } from '../../domain/agua/queries'
+import { hoyLocalISO } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularCostoTarifa, validarLectura } from '../../lib/business'
+import {
+  localStorageOutbox,
+  leerPendientes,
+  encolarLectura,
+  sincronizarPendientes,
+} from '../../lib/lecturasOutbox'
 import { APP_CONFIG } from '../../lib/config'
+import { watchLocation } from '../../lib/nativeGeo'
+import { isNative } from '../../lib/platform'
 
 interface Props {
   clientes: Cliente[]
@@ -41,17 +51,30 @@ export function LecturasSection({
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
+  // P1 (quick win): confirmación de reset del medidor para el caso lectura↓ legítima.
+  const [resetContador, setResetContador] = useState(false)
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
-  const [fechaLecturaActual, setFechaLecturaActual] = useState(() => new Date().toISOString().split('T')[0])
+  // E4/D5: fecha LOCAL (el patrón toISOString() daba la fecha UTC — de noche en
+  // GMT-6 pre-llenaba "mañana" y la lectura caía al ciclo siguiente).
+  const [fechaLecturaActual, setFechaLecturaActual] = useState(() => hoyLocalISO())
   const [notas, setNotas] = useState('')
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState<string | null>(null)
+  // `foto` es SOLO la vista previa (data-URL); el archivo real va en `fotoFile` y
+  // se sube a Storage al guardar. NUNCA se persiste el base64 en registros.foto
+  // (es de hasta ~15 MB por fila y vuelve lentísimo el portal del cliente).
   const [foto, setFoto] = useState<string | null>(null)
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
   const [contadoresLeidos, setContadoresLeidos] = useState<Set<string>>(new Set())
+  // Captura offline (P1): cola local de lecturas guardadas sin conexión, para
+  // sincronizarlas después de forma idempotente (sin duplicar).
+  const outbox = useMemo(() => localStorageOutbox(), [])
+  const [pendientes, setPendientes] = useState(() => leerPendientes(outbox))
+  const [sincronizando, setSincronizando] = useState(false)
 
   // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
@@ -102,27 +125,26 @@ export function LecturasSection({
     setLecturaActual('')
   }, [selectedUnidadId])
 
-  // GPS automático con watchPosition
+  // El flag "medidor reseteado" es por-lectura: limpiarlo al cambiar de contexto.
+  useEffect(() => { setResetContador(false) }, [selectedUnidadId, selectedContadorId])
+
+  // GPS automático. En web usa navigator.geolocation; en la app nativa usa
+  // @capacitor/geolocation (pide permiso del SO y funciona en iOS WKWebView,
+  // donde navigator.geolocation no está disponible). Ver src/lib/nativeGeo.ts.
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsError('Geolocalización no disponible en este dispositivo')
-      return
-    }
     setGpsLoading(true)
     setGpsError(null)
-    const watchId = navigator.geolocation.watchPosition(
-      pos => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    return watchLocation(
+      ({ lat, lng }) => {
+        setGps({ lat, lng })
         setGpsLoading(false)
         setGpsError(null)
       },
-      err => {
+      message => {
         setGpsLoading(false)
-        setGpsError(err.message)
+        setGpsError(message)
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     )
-    return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
   // Quién puede registrar lecturas se decide por permiso RBAC (agua.lecturas.create),
@@ -176,17 +198,46 @@ export function LecturasSection({
     : null
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
+  // Promedio histórico de consumo del contador → detección de salto anómalo.
+  const promedioHistorico = (() => {
+    if (!contadorSeleccionado) return undefined
+    const consumos = registros
+      .filter(r => r.contador_id === contadorSeleccionado.id && typeof r.consumo === 'number' && r.consumo > 0)
+      .map(r => r.consumo)
+    return consumos.length ? consumos.reduce((a, b) => a + b, 0) / consumos.length : undefined
+  })()
+  // validarLectura: fuente única de validación (retroceso/reset + anomalía).
+  const validacion = !isNaN(lecturaNum)
+    ? validarLectura(ultimaLectura, lecturaNum, { resetContador, promedioHistorico })
+    : null
+  // Consumo efectivo a guardar: 0 en reset, el delta si es válido, o el crudo
+  // (negativo) para el display de error cuando no es válido.
+  const consumoEfectivo = validacion?.valid ? (validacion.consumo ?? 0) : consumo
   const calculo =
-    consumo !== null && consumo >= 0 && tarifaDelContador
-      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
+    consumoEfectivo !== null && consumoEfectivo >= 0 && tarifaDelContador
+      ? calcularCostoTarifa(consumoEfectivo, tarifaDelContador, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
+
+  function aplicarFoto(f: File) {
+    setFotoFile(f)
+    const reader = new FileReader()
+    reader.onload = ev => setFoto(ev.target?.result as string)
+    reader.readAsDataURL(f)
+  }
 
   function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    const reader = new FileReader()
-    reader.onload = ev => setFoto(ev.target?.result as string)
-    reader.readAsDataURL(f)
+    aplicarFoto(f)
+  }
+
+  // Foto del medidor. En la app nativa abrimos la cámara del SO
+  // (@capacitor/camera): permisos nativos y captura más fiable que el <input
+  // capture> dentro del WebView, sobre todo en iOS. En web no cambia nada.
+  async function handlePhotoNativa() {
+    const { takeNativePhoto } = await import('../../lib/nativeCamera')
+    const f = await takeNativePhoto(true)
+    if (f) aplicarFoto(f)
   }
 
   function enviarWhatsApp(registro: Registro) {
@@ -207,10 +258,41 @@ export function LecturasSection({
     setSelectedContadorId('')
     setLecturaActual('')
     setEstado('pendiente')
-    setFechaLecturaActual(new Date().toISOString().split('T')[0])
+    setFechaLecturaActual(hoyLocalISO())
     setFechaAnteriorManual('')
     setNotas('')
     setFoto(null)
+    setFotoFile(null)
+  }
+
+  // Sincroniza la cola offline (manual, controlado por el operador). Idempotente:
+  // una lectura que ya está en la BD (por clave natural) se descarta sin duplicar.
+  // Las insertadas se agregan a la lista; las que fallan quedan para reintentar.
+  async function sincronizar() {
+    if (sincronizando || pendientes.length === 0) return
+    setSincronizando(true)
+    try {
+      const res = await sincronizarPendientes(outbox, {
+        existe: (r) => registroExiste(r.contador_id as string, r.lectura_actual as number, r.fecha as string),
+        insertar: async (r) => {
+          const { data, error, duplicado } = await createRegistro(r)
+          // E1: la llave natural la rechazó (otro dispositivo ganó la carrera
+          // TOCTOU) → se descarta de la cola como "ya existía", no se reintenta.
+          if (duplicado) return 'duplicado'
+          if (!error && data) onRegistroAdded(data)
+          return error
+        },
+      })
+      setPendientes(leerPendientes(outbox))
+      notify({
+        variant: res.fallidas ? 'warning' : 'success',
+        title: `Sincronización: ${res.ok} subida(s)`,
+        text: `${res.yaExistian} ya estaban en el sistema · ${res.fallidas} pendiente(s).`,
+        duration: 2600,
+      })
+    } finally {
+      setSincronizando(false)
+    }
   }
 
   async function handleGuardar() {
@@ -228,27 +310,37 @@ export function LecturasSection({
       })
       return
     }
-    if (consumo === null || isNaN(consumo)) return notify({ variant: 'error', title: 'Error', text: 'Datos de lectura inválidos' })
-    if (consumo < 0) return notify({ variant: 'error', title: 'Consumo Negativo', text: 'La lectura actual debe ser mayor o igual a la anterior.' })
+    // validarLectura es la fuente única: bloquea retroceso sin reset y lecturas
+    // no numéricas; permite reset (consumo→0) y solo avisa ante salto anómalo.
+    if (!validacion || !validacion.valid) {
+      return notify({ variant: 'error', title: 'Lectura inválida', text: validacion?.error ?? 'Datos de lectura inválidos' })
+    }
+    const consumoGuardar = validacion.consumo ?? 0
 
-    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
+    const resultadoCobro = calcularCostoTarifa(consumoGuardar, tarifaDelContador!, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
 
     if (!projectId) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo determinar el proyecto del usuario' })
       return
     }
 
-    const registro = {
+    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
+    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
+    const clienteIdRegistro = unidadSeleccionada.cliente_id ?? null
+
+    // Builder del payload de la lectura. La foto se resuelve aparte (online = path
+    // subido; offline = null: se conserva el dato crítico y la foto se recaptura).
+    const construirRegistro = (fotoPath: string | null) => ({
       // El cliente se toma de la unidad (siempre cargada), no de la lista `clientes`
       // en memoria: un operador puede no tenerla por RLS y se perdía el cliente_id.
-      cliente_id: unidadSeleccionada.cliente_id ?? null,
+      cliente_id: clienteIdRegistro,
       cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
       contador_id: contadorSeleccionado.id,
       project_id: projectId,
       fecha: new Date(fechaLecturaActual + 'T12:00:00').toISOString(),
       lectura_anterior: ultimaLectura,
       lectura_actual: lecturaNum,
-      consumo,
+      consumo: consumoGuardar,
       tarifa_aplicada: tarifaDelContador!.precio_m3,
       tarifa_exceso_aplicada: tarifaDelContador!.precio_m3_exceso ?? 0,
       canon_aplicado: tarifaDelContador!.canon_fijo,
@@ -259,10 +351,38 @@ export function LecturasSection({
       dias_servicio: diasServicio,
       notas,
       gps,
-      foto,
+      foto: fotoPath,
+    })
+
+    // Captura OFFLINE: sin conexión encolamos la lectura (sin foto) en la cola local
+    // y salimos; se sincroniza luego de forma idempotente. Evita perder la lectura.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      const reg = construirRegistro(null)
+      const etiqueta = `${reg.cliente_nombre ?? 'Cliente'} · ${contadorSeleccionado.numero_serie}`
+      setPendientes(encolarLectura(outbox, reg, etiqueta, Date.now()))
+      notify({ variant: 'info', title: '📴 Guardada sin conexión', text: 'La lectura quedó en la cola local; sincronizala cuando recuperes señal.' })
+      limpiarFormulario()
+      return
     }
 
+    // Subir la foto a Storage (igual que AdminNewReading) y guardar SOLO el path
+    // (scopeado por carpeta-de-cliente para la RLS del bucket). Nunca base64 en BD.
     setSaving(true)
+    let fotoPath: string | null = null
+    if (fotoFile && clienteIdRegistro) {
+      const path = `${clienteIdRegistro}/${Date.now()}`
+      const { error: uploadError } = await uploadRegistroFoto(path, fotoFile, fotoFile.type)
+      if (uploadError) {
+        notify({ variant: 'warning', title: 'Foto no guardada', text: 'No se pudo subir la foto; la lectura se guardará sin ella.' })
+      } else {
+        fotoPath = path
+      }
+    } else if (fotoFile && !clienteIdRegistro) {
+      notify({ variant: 'warning', title: 'Foto no guardada', text: 'La unidad no tiene cliente asociado; la lectura se guardará sin foto.' })
+    }
+
+    const registro = construirRegistro(fotoPath)
+
     const { data, error } = await createRegistro(registro)
     setSaving(false)
 
@@ -329,6 +449,7 @@ export function LecturasSection({
           setLecturaActual('')
           setNotas('')
           setFoto(null)
+          setFotoFile(null)
           return
         }
       }
@@ -342,6 +463,7 @@ export function LecturasSection({
         setLecturaActual('')
         setNotas('')
         setFoto(null)
+        setFotoFile(null)
       } else {
         if (rutaActiva) {
           const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
@@ -396,7 +518,7 @@ export function LecturasSection({
   const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px', display: 'block' }
 
-  const consumoInvalido = consumo !== null && consumo < 0
+  const consumoInvalido = validacion !== null && !validacion.valid
 
   const bannerRuta = rutaActiva
     ? {
@@ -416,6 +538,22 @@ export function LecturasSection({
 
   return (
     <div>
+      {/* Captura offline (P1): lecturas guardadas sin conexión, pendientes de subir. */}
+      {pendientes.length > 0 && (
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <span style={{ color: 'var(--at-warning-strong)', fontWeight: 600, fontSize: '14px' }}>
+            📴 {pendientes.length} lectura{pendientes.length !== 1 ? 's' : ''} sin sincronizar (guardada{pendientes.length !== 1 ? 's' : ''} sin conexión)
+          </span>
+          <button
+            onClick={() => void sincronizar()}
+            disabled={sincronizando}
+            style={{ padding: '8px 16px', background: sincronizando ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: sincronizando ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {sincronizando ? '⏳ Sincronizando…' : '🔄 Sincronizar ahora'}
+          </button>
+        </div>
+      )}
+
       {/* Ruta Control */}
       <div style={{ background: bannerRuta.bg, padding: '15px', borderRadius: '12px', marginBottom: '20px', border: `1px solid ${bannerRuta.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <span style={{ color: bannerRuta.color, fontWeight: 600 }}>
@@ -548,8 +686,21 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
+                    <input type="text" readOnly value={consumoEfectivo !== null ? (consumoInvalido ? (consumo ?? 0).toFixed(2) + ' (ERROR)' : consumoEfectivo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
                   </div>
+                  {consumo !== null && consumo < 0 && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={resetContador} onChange={e => setResetContador(e.target.checked)} />
+                        El medidor fue reemplazado/reseteado (la lectura bajó). Registrá el motivo en Observaciones.
+                      </label>
+                    </div>
+                  )}
+                  {validacion?.warning && (
+                    <div style={{ gridColumn: '1 / -1', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                      ⚠️ {validacion.warning}
+                    </div>
+                  )}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
                     {calculo ? (
@@ -632,10 +783,22 @@ export function LecturasSection({
                     )}
                   </div>
                   <div>
-                    <label style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block' }}>
-                      <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
-                      {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
-                    </label>
+                    {/* En nativo el <label>+<input file> se sustituye por un botón
+                        que abre la cámara del SO; en web se mantiene igual. */}
+                    {isNative() ? (
+                      <button
+                        type="button"
+                        onClick={handlePhotoNativa}
+                        style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block', width: '100%', color: 'inherit', font: 'inherit' }}
+                      >
+                        {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
+                      </button>
+                    ) : (
+                      <label style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block' }}>
+                        <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
+                        {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
+                      </label>
+                    )}
                   </div>
                 </div>
 

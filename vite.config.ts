@@ -51,10 +51,20 @@ const sentryOrg = process.env.SENTRY_ORG
 const sentryProject = process.env.SENTRY_PROJECT
 const uploadSourcemaps = Boolean(sentryAuthToken && sentryOrg && sentryProject)
 
+// Build para la app nativa (Capacitor). Lo activa el script `mobile:build`
+// (CAPACITOR=true). Cambia dos cosas frente al build web:
+//   - Sin service worker: dentro del WebView el SW es redundante y podría servir
+//     assets obsoletos frente a las actualizaciones que llegan por las tiendas.
+//   - Sin SRI: el integrity está pensado para assets servidos por CDN/Vercel; en
+//     nativo los assets van empaquetados localmente (el hash no aporta seguridad)
+//     y el crossorigin puede romper la carga en WKWebView (custom scheme).
+const buildingForNative = process.env.CAPACITOR === 'true'
+
 export default defineConfig({
   plugins: [
     react(),
-    htmlSriPlugin(),
+    // Vite ignora plugins falsy: en build nativo omitimos el SRI (ver arriba).
+    buildingForNative ? undefined : htmlSriPlugin(),
     // PWA + offline-first (infra:I4, F2.8).
     //
     // generateSW (workbox) en lugar de injectManifest porque no necesitamos
@@ -73,6 +83,8 @@ export default defineConfig({
     // si falla retorna el error normal. Queue de operaciones offline es un
     // subsistema aparte (no MVP de este PR).
     VitePWA({
+      // En build nativo el SW se desactiva por completo (ver buildingForNative).
+      disable: buildingForNative,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
@@ -164,13 +176,18 @@ export default defineConfig({
     sourcemap: uploadSourcemaps ? 'hidden' : false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-charts': ['chart.js'],
-          'vendor-maps': ['leaflet'],
-          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
-          'vendor-xlsx': ['exceljs'],
-          'vendor-observability': ['@sentry/react', 'posthog-js'],
+        // vite 8 (rolldown) solo acepta manualChunks como FUNCIÓN — la forma
+        // objeto de rollup lanza "manualChunks is not a function". Mismo
+        // particionado de vendors que antes, expresado por id de módulo.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react-dom|react|scheduler)\//.test(id)) return 'vendor-react'
+          if (id.includes('node_modules/chart.js/')) return 'vendor-charts'
+          if (id.includes('node_modules/leaflet/')) return 'vendor-maps'
+          if (/node_modules\/(jspdf-autotable|jspdf)\//.test(id)) return 'vendor-pdf'
+          if (id.includes('node_modules/exceljs/')) return 'vendor-xlsx'
+          if (/node_modules\/(@sentry\/react|posthog-js)\//.test(id)) return 'vendor-observability'
+          return undefined
         },
       },
     },

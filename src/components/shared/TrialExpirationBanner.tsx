@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchActiveSubscription } from '../../domain/shared/queries'
-import { promptUpgrade } from './promptUpgrade'
+import { openBillingSection } from './promptUpgrade'
 
 // ============================================================================
 // TrialExpirationBanner — F4.3.3: warning persistente cuando el trial esta
@@ -79,11 +79,10 @@ export function TrialExpirationBanner({ companyId }: Props) {
     try { sessionStorage.setItem(DISMISS_KEY, '1') } catch { /* no-op */ }
   }
 
-  async function handleUpgrade() {
-    // promptUpgrade no aplica aqui directamente (no es limit-reached). Usamos
-    // su mismo CustomEvent para navegar al plan picker. Importamos solo por
-    // consistencia del CTA → mismo destino.
-    await promptUpgrade({ resource: 'project', current: 0, limit: 0 })
+  function handleUpgrade() {
+    // CTA de BILLING (configurar pago), no de límites: navega directo al plan
+    // picker de Perfil sin pasar por el confirm de promptUpgrade.
+    openBillingSection()
   }
 
   return (
@@ -113,7 +112,7 @@ export function TrialExpirationBanner({ companyId }: Props) {
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>
         <button
-          onClick={() => { void handleUpgrade() }}
+          onClick={handleUpgrade}
           style={{
             padding: '6px 14px',
             borderRadius: '8px',

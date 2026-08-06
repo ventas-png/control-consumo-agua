@@ -2,10 +2,11 @@ import { useState, useMemo, useCallback } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchGeneracionCuotasLogs } from '../../../domain/condominios/tabQueries'
-import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { CuotaCondominio, Unidad, GeneracionCuotasLog, RubroConfig, RubroDetalle } from '../../../types'
 import { RubrosBuilder } from '../RubrosBuilder'
+import { ROLES_RESPONSABLE_CUOTA } from './CuotasUi'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -81,6 +82,8 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
   const [concepto, setConcepto] = useState('Mantenimiento')
   const [conceptoCustom, setConceptoCustom] = useState('')
   const [fechaVenc, setFechaVenc] = useState('')
+  // Rol responsable estampado en cada cuota del lote ('' = sin diferenciar).
+  const [rolResponsable, setRolResponsable] = useState('')
   const [rubros, setRubros] = useState<RubroConfig[]>([
     { nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 },
   ])
@@ -205,23 +208,28 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
     const rows = [...seleccionadas].map(uid => {
       const calc = calculosMapa.get(uid)
-      const u = calc?.unidad
       return {
         company_id: companyId,
         project_id: proyectoId,
         unidad_id: uid,
-        unidad_nombre: u?.nombre ?? '',
         concepto: conceptoFinal,
         monto: calc?.total ?? 0,
         periodo,
         fecha_vencimiento: fechaVenc,
         estado: 'pendiente',
+        rol_responsable: rolResponsable || null,
         rubros_detalle: calc?.rubrosDetalle ?? null,
       }
     })
 
     // cond:C2 — batch insert con pre-validación Zod por fila.
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, rows)
+    // E1: la llave natural (unidad+período+concepto) rechazó el lote — otra
+    // generación concurrente ya creó estas cuotas. Nada se duplicó (batch atómico).
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas ya generadas', text: `Alguna unidad ya tiene cuota de ${conceptoFinal} en ${periodo} (generación simultánea). No se duplicó nada — actualizá la vista.` })
+      setGenerando(false); onRefresh(); return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setGenerando(false); return }
 
     // Log de auditoría con rubros
@@ -242,7 +250,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
     setResultado({ generadas: seleccionadas.size, total: totalSeleccionado })
     setPaso('resultado')
     onRefresh()
-  }, [seleccionadas, rubros, conceptoFinal, periodo, fechaVenc, totalSeleccionado, moneda, companyId, proyectoId, calculosMapa, onRefresh])
+  }, [seleccionadas, rubros, conceptoFinal, periodo, fechaVenc, rolResponsable, totalSeleccionado, moneda, companyId, proyectoId, calculosMapa, onRefresh])
 
   const cargarLogs = useCallback(async () => {
     setLoadingLogs(true)
@@ -328,10 +336,20 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   )}
                 </div>
 
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha de vencimiento *</label>
                   <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
                     style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Responsable</label>
+                  <select value={rolResponsable} onChange={e => setRolResponsable(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
+                    <option value="">Sin diferenciar</option>
+                    {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                  <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 4 }}>Se estampa en todas las cuotas de este lote.</div>
                 </div>
 
                 <div style={{ background: 'var(--at-primary-tint)', borderRadius: 8, padding: '10px 12px', fontSize: 12 }}>

@@ -11,7 +11,11 @@ const h = vi.hoisted(() => {
   return { state, builder, rpc }
 })
 
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => h.builder, rpc: h.rpc } }))
+// `db` es la MISMA instancia que `supabase` (cast tipado) — el mock replica eso.
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: () => h.builder, rpc: h.rpc }
+  return { supabase: client, db: client }
+})
 
 import { fetchActiveSubscription, fetchActiveBillingPlans, fetchMonthlyTotalBreakdown } from '../billing'
 

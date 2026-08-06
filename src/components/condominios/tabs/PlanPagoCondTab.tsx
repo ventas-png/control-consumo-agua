@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import {
@@ -29,7 +30,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
   cancelado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cancelado' },
 }
 
-const BLANK = { unidad_id: '', concepto: '', monto_total: '', num_cuotas: '3', fecha_inicio: new Date().toISOString().slice(0, 10), notas: '', aprobado_por: '' }
+const BLANK = { unidad_id: '', concepto: '', monto_total: '', num_cuotas: '3', fecha_inicio: hoyLocalISO(), notas: '', aprobado_por: '' }
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 function addMonths(dateStr: string, months: number): string {
@@ -104,7 +105,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
 
   async function marcarCuotaPagada(cuota: CuotaPlanPago) {
     const pagado = !cuota.pagado
-    const update: Record<string, unknown> = { pagado, fecha_pago: pagado ? new Date().toISOString().slice(0, 10) : null }
+    const update: Record<string, unknown> = { pagado, fecha_pago: pagado ? hoyLocalISO() : null }
     await updateCondominioRow('cuotas_plan_pago', cuota.id, update)
 
     // Check if plan is complete
@@ -117,7 +118,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     onRefresh()
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const filtered = filtroEstado === 'todos' ? planes : planes.filter(p => p.estado === filtroEstado)
   const montoCuotaPreview = form.monto_total && form.num_cuotas
     ? (parseFloat(form.monto_total) / parseInt(form.num_cuotas)).toFixed(2)

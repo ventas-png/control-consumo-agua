@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import {
+  fetchCondominiosPanelData,
   fetchCondominiosSectionData,
   fetchCondominiosRondasData,
   fetchVisitasControlRecent,
@@ -8,12 +9,14 @@ import {
   fetchClientesConCumple,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
-import { canViewCondominiosTabByPermission } from '../../lib/permissions'
+import { canViewCondominiosTabByPermission, canActInCondominiosTab } from '../../lib/permissions'
 import { SECTIONS, sectionForTab } from './sections'
 import { type CommandItem } from '../shared/CommandPalette'
 import { registerCommands } from '../../lib/commandRegistry'
 import { EmptyState } from '../shared/EmptyState'
+import { AccessDenied } from '../shared/AccessDenied'
 import { MediaScopeProvider } from '../shared/MediaScopeContext'
+import { TabStrip } from '../shared/TabStrip'
 import { ActiveCondominioProvider, useActiveCondominio } from './ActiveCondominioContext'
 import { CondominioContextBar } from './CondominioContextBar'
 import type {
@@ -47,7 +50,7 @@ import type {
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
   ControlPiscina, MantenimientoJardineria, IncidenciaElevador, MantenimientoCisterna,
   ControlGenerador, ControlSistemaIncendio, ControlCamaraSeguridad, LecturaMedidorGas,
-  ComentarioTicket, RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
+  RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
@@ -65,10 +68,6 @@ import type {
 // quitar tab no toca este archivo).
 import { useParams, useNavigate } from 'react-router-dom'
 import { TAB_REGISTRY, TAB_BY_ID, tabToPath, pathParamToTab, type CondominioTab, type CondominiosTabContext } from './tabRegistry'
-// Overlay: se renderiza encima del tab activo cuando hay un ticket seleccionado.
-// No es un tab del registry porque no aparece en la nav; vive aquí.
-const ComentariosTicketTab = lazy(() => import('./tabs/ComentariosTicketTab'))
-
 // Shown while a lazily-loaded tab chunk is fetched. Each tab is code-split, so
 // only the active tab's JS is downloaded instead of one ~2 MB bundle.
 function TabFallback() {
@@ -92,8 +91,6 @@ interface Props {
   proyectos: Proyecto[]
   unidades: Unidad[]
   currentUser: UserSession
-  canCreate: (section: string) => boolean
-  canEdit: (section: string) => boolean
 }
 
 /**
@@ -111,7 +108,20 @@ export function CondominiosSection(props: Props) {
   )
 }
 
-function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
+  // Permisos por tab (RBAC granular, migración 20260703000000): cada tab
+  // resuelve condominios.tab.<tab>.<action>, con fallback al permiso legado de
+  // módulo completo platform.condominios.<action>. Los tabs llaman con su
+  // propio id (ctx.canCreate('cuotas')), no con 'condominios'.
+  // 'cliente' (portal del residente) conserva el bypass que tenía en
+  // usePermissions (EXEMPT_ROLES incluye cliente; isExemptPlatformRole no).
+  const esCliente = currentUser.role === 'cliente'
+  const canCreate = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'create'), [currentUser, esCliente])
+  const canEdit = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'edit'), [currentUser, esCliente])
+  const canChangeStatus = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'change_status'), [currentUser, esCliente])
+  const canApprove = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'approve'), [currentUser, esCliente])
+  const canDelete = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'delete'), [currentUser, esCliente])
+
   const visibleSections = useMemo(() =>
     SECTIONS
       .map(sec => ({
@@ -285,8 +295,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   const [recordatorios, setRecordatorios] = useState<RecordatorioCondominio[]>([])
   const [plantillasCuota, setPlantillasCuota] = useState<PlantillaCuota[]>([])
   const [bitacoraAcciones, setBitacoraAcciones] = useState<BitacoraAccion[]>([])
-  const [comentariosTicket] = useState<ComentarioTicket[]>([])
-  const [ticketSeleccionado, setTicketSeleccionado] = useState<import('../../types').TicketMantenimiento | null>(null)
   // Fase 29
   const [recargosMora, setRecargosMora] = useState<RecargoMora[]>([])
   const [conveniosCuota, setConveniosCuota] = useState<ConvenioCuotaCond[]>([])
@@ -326,12 +334,58 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   // `proyectosActivos` y el id activo (con su default/persistencia) los provee
   // ActiveCondominioContext; ya no se derivan ni se inicializan aquí.
 
-  const cargarDatos = useCallback(async () => {
+  const restoCargadoRef = useRef(false)
+  const runSeqRef = useRef(0)
+
+  // P2 perf — carga por FASES: abrir Condominios dispara solo las 9 colecciones
+  // del tab Panel (fetchCondominiosPanelData); el resto (~132 queries en 5
+  // batches) se difiere al primer tab distinto de Panel. `restoCargadoRef` marca
+  // si el batch grande ya corrió (se resetea al cambiar de proyecto/empresa);
+  // `runSeqRef` descarta cargas viejas que resuelven tarde (cambio de proyecto o
+  // panel→todo en vuelo) para que no pisen datos ni apaguen el spinner ajeno.
+  const cargarDatos = useCallback(async (fase?: 'panel' | 'todo') => {
     if (!selectedProyectoId || !currentUser.company_id) return
+    // Sin fase explícita (onRefresh de los tabs, que puede llegar con un event
+    // como argumento): recargar lo ya cargado — 'todo' si el batch grande ya
+    // corrió, 'panel' si seguimos en la fase inicial.
+    const efectiva: 'panel' | 'todo' =
+      fase === 'panel' || fase === 'todo' ? fase : (restoCargadoRef.current ? 'todo' : 'panel')
+    const run = ++runSeqRef.current
     setLoading(true)
 
     const pid = selectedProyectoId
     const cid = currentUser.company_id
+
+    const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
+      data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
+
+    if (efectiva === 'panel') {
+      const [
+        cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes,
+        paquetesRes, polizasRes, inspeccionesRes, gastosRes,
+      ] = await fetchCondominiosPanelData(pid, cid)
+      if (runSeqRef.current !== run) return // una carga más nueva ya corre
+      // Mismos mapeos que el batch grande (mantener sincronizados).
+      setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
+      setVisitantes(mapUnidad<Visitante>(visitantesRes.data ?? []))
+      setAmenidades((amenidadesRes.data ?? []) as Amenidad[])
+      setReservas((reservasRes.data ?? []).map((r: Record<string, unknown>) => ({
+        ...r,
+        amenidad_nombre: (r.amenidades as { nombre: string } | null)?.nombre,
+        unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
+      } as ReservaAmenidad)))
+      setTickets(mapUnidad<TicketMantenimiento>(ticketsRes.data ?? []))
+      setPaquetes(mapUnidad<PaqueteRecibido>(paquetesRes.data ?? []))
+      setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
+      setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
+      setGastos((gastosRes.data ?? []) as GastoCondominio[])
+      setLoading(false)
+      return
+    }
+
+    // Optimista y SÍNCRONO (antes del primer await): dedupe del disparo por
+    // cambio de tab mientras este batch está en vuelo.
+    restoCargadoRef.current = true
 
     const [
       cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes, anunciosRes,
@@ -377,6 +431,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
       solicitudesRentaRes,
       solicitudesMudanzaRes,
     ] = await fetchCondominiosSectionData(pid, cid)
+    if (runSeqRef.current !== run) return // una carga más nueva ya corre
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
     const [areasRes, rutasRes, puntosControlRes, bloqueosAmenRes] = await fetchCondominiosRondasData(pid, cid)
@@ -442,8 +497,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
       setTareasBloque([]); setRevisionesTarea([])
     }
 
-    const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
-      data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
+    if (runSeqRef.current !== run) return
 
     setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
     setVisitantes(mapUnidad<Visitante>(visitantesRes.data ?? []))
@@ -598,10 +652,26 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
     setFondoReservaMovs((fondoReservaMovsRes.data ?? []) as FondoReservaMovimiento[])
     setConfigCondominio((configCondominioRes.data ?? null) as ConfigCondominio | null)
 
-    setLoading(false)
+    if (runSeqRef.current === run) setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
 
-  useEffect(() => { cargarDatos() }, [cargarDatos])
+  // Espejo de activeTab en un ref para que el efecto de carga inicial (que solo
+  // depende de cargarDatos) decida la fase sin re-dispararse en cada cambio de tab.
+  const activeTabRef = useRef(activeTab)
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+
+  // Carga inicial / cambio de proyecto-empresa: resetea la fase y carga según el
+  // tab actual (deep-link a un tab ≠ Panel necesita el batch completo).
+  useEffect(() => {
+    restoCargadoRef.current = false
+    void cargarDatos(activeTabRef.current === 'panel' ? 'panel' : 'todo')
+  }, [cargarDatos])
+
+  // Primer tab distinto de Panel → carga diferida del batch grande. El set
+  // optimista de restoCargadoRef dentro de cargarDatos deduplica disparos.
+  useEffect(() => {
+    if (activeTab !== 'panel' && !restoCargadoRef.current) void cargarDatos('todo')
+  }, [activeTab, cargarDatos])
 
   // Feature-usage analytics: which of the condominios tabs are actually used.
   useEffect(() => {
@@ -619,7 +689,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   // useMemo: estabiliza la referencia entre renders mientras los inputs no
   // cambien (tabs reciben el mismo objeto, pueden memorizar si lo necesitan).
   const tabCtx: CondominiosTabContext = useMemo(() => ({
-    canCreate, canEdit, onRefresh: cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, onRefresh: cargarDatos,
     proyectoId: selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
@@ -651,7 +721,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
     flujoAprobacion, ordenesCompra, asambleasDigital, proformas, conciliaciones,
     fondoReservaMovs, configCondominio,
   }), [
-    canCreate, canEdit, cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, cargarDatos,
     selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
@@ -685,16 +755,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
   ])
 
 
-  if (proyectosActivos.length === 0) {
-    return (
-      <EmptyState
-        icon="🏢"
-        title="No hay proyectos activos"
-        description='Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.'
-      />
-    )
-  }
-
   // F3.14: Command palette items — solo tabs visibles para el usuario.
   // Permite búsqueda y salto rápido a cualquiera de los 191 tabs via Cmd+K.
   const commandItems: CommandItem[] = useMemo(() => {
@@ -723,6 +783,21 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
     return registerCommands(commandItems)
   }, [commandItems])
 
+  // Early return DESPUÉS de todos los hooks: las Rules of Hooks exigen que el
+  // número y orden de hooks sea idéntico en cada render. Cuando este return
+  // estaba antes de los hooks de arriba (commandItems / registerCommands), pasar
+  // de "sin proyectos" a "con proyectos" cambiaba la cantidad de hooks → React
+  // error #310 ("Rendered more hooks than during the previous render").
+  if (proyectosActivos.length === 0) {
+    return (
+      <EmptyState
+        icon="🏢"
+        title="No hay proyectos activos"
+        description='Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.'
+      />
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header */}
@@ -736,32 +811,18 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
           <CondominioContextBar loading={loading} />
         </div>
 
-        {/* Barra de pestañas de la sección activa (nivel 2) — scroll horizontal */}
-        <div className="tab-strip-scrollable" style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }} role="tablist" aria-label="Pestañas de la sección activa">
-          {visibleSections.find(s => s.id === activeSection)?.tabs
-            .map(tid => TABS.find(t => t.id === tid))
-            .filter(Boolean)
-            .map(tab => {
-              if (!tab) return null
-              const activa = activeTab === tab.id
-              return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
-                  type="button" role="tab" aria-selected={activa} aria-current={activa ? 'page' : undefined}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                    fontSize: 12, fontWeight: activa ? 700 : 500,
-                    background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
-                    color: activa ? 'white' : 'var(--at-ink-3)',
-                    borderRadius: '6px 6px 0 0',
-                    borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
-                    marginBottom: -2,
-                  }}>
-                  <span aria-hidden="true">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              )
-            })}
+        {/* Barra de pestañas de la sección activa (nivel 2) — scroll horizontal.
+            El visual vive en <TabStrip>, compartido con el resto de módulos. */}
+        <div style={{ marginTop: 8 }}>
+          <TabStrip
+            ariaLabel="Pestañas de la sección activa"
+            value={activeTab}
+            onChange={(id) => setActiveTab(id as CondominioTab)}
+            items={(visibleSections.find(s => s.id === activeSection)?.tabs ?? [])
+              .map(tid => TABS.find(t => t.id === tid))
+              .filter((t): t is NonNullable<typeof t> => Boolean(t))
+              .map(t => ({ id: t.id as CondominioTab, label: t.label, icon: t.icon }))}
+          />
         </div>
 
       </div>
@@ -772,18 +833,12 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser, canCreate, 
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}
         <MediaScopeProvider projectId={selectedProyectoId}>
         <Suspense fallback={<TabFallback />}>
-        {TAB_BY_ID[activeTab]?.render(tabCtx)}
-        {ticketSeleccionado && (
-          <ComentariosTicketTab
-            ticket={ticketSeleccionado}
-            comentarios={comentariosTicket}
-            companyId={cid}
-            autorNombre={currentUser.name ?? ''}
-            canCreate={canCreate('condominios')}
-            onRefresh={cargarDatos}
-            onClose={() => setTicketSeleccionado(null)}
-          />
-        )}
+        {/* Gate de vista también en el render: la nav y el command palette ya
+            filtran por permiso, pero un deep-link (/condominios/:tab) llega
+            directo aquí sin pasar por ellos. */}
+        {TAB_BY_ID[activeTab] && !canViewCondominiosTabByPermission(currentUser, activeTab)
+          ? <AccessDenied />
+          : TAB_BY_ID[activeTab]?.render(tabCtx)}
         </Suspense>
         </MediaScopeProvider>
       </div>

@@ -23,7 +23,9 @@
 // fiscal-test-connection.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { encryptJson, decryptJson } from '../_shared/secretsCrypto.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -71,7 +73,7 @@ Deno.serve(async (req: Request) => {
     let callerIsSuperAdmin = false
     let internal = false
 
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)
@@ -148,8 +150,10 @@ Deno.serve(async (req: Request) => {
     const { data: existente, error: readErr } = await lookup.maybeSingle()
 
     let credActuales: Record<string, unknown> = {}
-    if (!readErr && existente && esObjeto((existente as { credenciales?: unknown }).credenciales)) {
-      credActuales = (existente as { credenciales: Record<string, unknown> }).credenciales
+    if (!readErr && existente) {
+      // P0 #7: descifrar el blob existente para el merge (dual-read: objeto legacy pasa igual).
+      const dec = await decryptJson((existente as { credenciales?: unknown }).credenciales)
+      if (esObjeto(dec)) credActuales = dec as Record<string, unknown>
     }
 
     const nuevasCredenciales: Record<string, unknown> = { ...credActuales }
@@ -164,7 +168,8 @@ Deno.serve(async (req: Request) => {
           company_id: companyId,
           project_id: projectId,
           proveedor,
-          credenciales: nuevasCredenciales,
+          // P0 #7: cifrar el blob en reposo (passthrough sin llave → objeto igual).
+          credenciales: await encryptJson(nuevasCredenciales),
           estado_conexion: 'desconocido',
           estado_mensaje: null,
           estado_probado_en: null,

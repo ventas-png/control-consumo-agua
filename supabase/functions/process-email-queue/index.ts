@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
 import { isRetriable } from '../_shared/emailRetryable.ts'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 
 // process-email-queue: worker que process el batch de emails pendientes.
 // Disparado por pg_cron cada 5 minutos. Toma hasta 50 rows pendientes,
@@ -67,7 +69,7 @@ async function refreshAccessToken(
   if (!data.access_token) return null
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase.from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -96,6 +98,9 @@ async function attemptSend(
   if (!cfgData) return { ok: false, error: 'sin Gmail config activa' }
 
   const config = cfgData as EmailConfig
+  // P0 #7: descifrar los tokens en reposo (dual-read: texto plano legacy pasa igual).
+  config.access_token = (await decryptSecret(config.access_token)) ?? ''
+  config.refresh_token = await decryptSecret(config.refresh_token)
   let accessToken = config.access_token
   const isExpired = config.token_expiry != null &&
     new Date(config.token_expiry).getTime() - Date.now() < 5 * 60 * 1000
@@ -149,8 +154,13 @@ Deno.serve(async (req: Request) => {
   }
 
   // Auth: solo el cron (con CRON_SECRET) puede invocar.
-  const auth = req.headers.get('x-cron-secret')
-  if (!CRON_SECRET || auth !== CRON_SECRET) {
+  // Comparación en tiempo constante (auditoría 2026-07-28, Bloque B · PR-11):
+  // un `!==` de strings sale en el primer byte distinto, así que su duración
+  // filtra cuántos bytes iniciales acertaste. Importa especialmente aquí porque
+  // este worker reenvía el MISMO CRON_SECRET a send-email como `x-internal-retry`
+  // (línea ~126), que es la ruta que se salta toda la autorización.
+  const auth = req.headers.get('x-cron-secret') ?? ''
+  if (!CRON_SECRET || !(await timingSafeEqualSecret(auth, CRON_SECRET))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { 'Content-Type': 'application/json' },
     })

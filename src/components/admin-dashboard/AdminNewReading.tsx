@@ -1,8 +1,9 @@
 import { useState, type ChangeEvent, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
+import { hoyLocalISO } from '../../lib/format'
 import type { Cliente, Contador, Tarifa } from '../../types'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularTotalPagar, calcularTotalPagarEscalonado, validarLectura } from '../../lib/business'
 
 interface Props {
   clientes: Cliente[]
@@ -19,6 +20,8 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
   const [tariffId, setTariffId] = useState('')
   const [canon, setCanon] = useState('20')
   const [notas, setNotas] = useState('')
+  // P1 (quick win): confirmación de reset del medidor para lectura↓ legítima.
+  const [resetContador, setResetContador] = useState(false)
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<{ image: File; preview: string } | null>(null)
 
@@ -28,12 +31,22 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
     : tarifas
   const selectedTariff = proyectoTarifas.find(t => t.id === tariffId)
 
-  // Calcular consumo y costo
-  const consumo = Math.max(0, parseFloat(lecturaActual) - parseFloat(lecturaAnterior) || 0)
+  // Calcular consumo y costo. validarLectura reemplaza el clamp silencioso a 0:
+  // una lectura que retrocede se BLOQUEA (salvo reset explícito), no se guarda 0.
+  const antNum = parseFloat(lecturaAnterior)
+  const actNum = parseFloat(lecturaActual)
+  const validacion = (!isNaN(antNum) && !isNaN(actNum))
+    ? validarLectura(antNum, actNum, { resetContador })
+    : null
+  const consumo = validacion?.valid ? (validacion.consumo ?? 0) : 0
   const tariffPrice = selectedTariff?.precio_m3 ?? 0
   const canolFixed = parseFloat(canon) || 0
+  // Tarifa escalonada → cobro por bloques (usa el canon manual como piso); si no,
+  // el modelo plano de siempre (comportamiento idéntico para tarifas planas).
   const calculation = consumo > 0
-    ? calcularTotalPagar(consumo, tariffPrice, canolFixed)
+    ? (selectedTariff?.tramos?.length
+        ? calcularTotalPagarEscalonado(consumo, selectedTariff.tramos, canolFixed, selectedTariff.consumo_minimo ?? 0)
+        : calcularTotalPagar(consumo, tariffPrice, canolFixed))
     : { total: 0, tipo_cobro: 'Sin datos' as const, desglose: {} }
 
   const handleSelectImage = (e: ChangeEvent<HTMLInputElement>) => {
@@ -62,6 +75,12 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       return
     }
 
+    // validarLectura: bloquea retroceso sin reset (antes se guardaba consumo 0).
+    if (!validacion || !validacion.valid) {
+      notify({ variant: 'error', title: 'Lectura inválida', text: validacion?.error ?? 'Datos de lectura inválidos' })
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -84,7 +103,10 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       const { error } = await createRegistro({
         cliente_id: selectedClienteId,
         cliente_nombre: selectedCliente?.nombre,
-        fecha: new Date().toISOString().split('T')[0],
+        // E4/D5: fecha LOCAL a mediodía (patrón de LecturasSection). Antes iba la
+        // fecha UTC date-only directa al timestamptz → medianoche UTC = 18:00 del
+        // día ANTERIOR en GT, y de noche caía al ciclo siguiente.
+        fecha: new Date(hoyLocalISO() + 'T12:00:00').toISOString(),
         lectura_anterior: parseFloat(lecturaAnterior),
         lectura_actual: parseFloat(lecturaActual),
         consumo,
@@ -113,6 +135,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
       setTariffId('')
       setCanon('20')
       setNotas('')
+      setResetContador(false)
       setPreview(null)
 
       onReadingAdded()
@@ -223,6 +246,24 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
             fontWeight: '600',
           }}>
             💧 Consumo: {consumo.toFixed(2)} m³
+          </div>
+        )}
+
+        {/* P1: validación de lectura (reset / anomalía) */}
+        {!isNaN(actNum) && !isNaN(antNum) && actNum < antNum && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--at-ink-2)', marginBottom: 20, cursor: 'pointer' }}>
+            <input type="checkbox" checked={resetContador} onChange={e => setResetContador(e.target.checked)} />
+            El medidor fue reemplazado/reseteado (la lectura bajó). Registrá el motivo en Notas.
+          </label>
+        )}
+        {validacion && !validacion.valid && (
+          <div role="alert" style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', color: 'var(--at-danger)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
+            {validacion.error}
+          </div>
+        )}
+        {validacion?.warning && (
+          <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
+            ⚠️ {validacion.warning}
           </div>
         )}
 

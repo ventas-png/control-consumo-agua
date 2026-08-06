@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { TicketMantenimiento } from '../../../types'
 
@@ -25,7 +26,7 @@ function diasDiff(desde: string, hasta: string): number {
 }
 
 export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroEstado, setFiltroEstado] = useState<string>('')
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('')
   const [verPor, setVerPor] = useState<'gantt' | 'stats'>('gantt')

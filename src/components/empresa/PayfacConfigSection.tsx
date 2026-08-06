@@ -30,6 +30,7 @@ import {
   camposCredencial,
   estadoConexionStyle,
 } from '../../lib/payfacCatalogo'
+import { MONEDAS_ISO } from '../../lib/monedas'
 
 interface Props {
   /** Locaciones del tenant para el override por proyecto. Vacío = solo empresa. */
@@ -63,9 +64,9 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
     esEmpresa ? undefined : ambitoProjectId,
   )
 
-  // Override CRUDO de la locación (projects.proveedor_pago) para distinguir
-  // "hereda" (NULL) de "propio" (con valor). A nivel empresa no aplica.
-  const { data: rawOverride } = useQuery<{ proveedorPago: string | null } | null>({
+  // Override CRUDO de la locación (projects.proveedor_pago/ambiente_pago) para
+  // distinguir "hereda" (NULL) de "propio" (con valor). A nivel empresa no aplica.
+  const { data: rawOverride } = useQuery<{ proveedorPago: string | null; ambientePago: string | null } | null>({
     queryKey: ['payfac', 'project-override-crudo', ambitoProjectId],
     enabled: !esEmpresa && !!ambitoProjectId,
     queryFn: () => fetchProjectProveedorPagoOverride(ambitoProjectId),
@@ -92,6 +93,28 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
       setProveedorForm(rawOverride?.proveedorPago ?? '')
     }
   }, [config, rawOverride, esEmpresa, ambitoProjectId])
+
+  // ── Moneda de cobro (companies.default_currency, solo a nivel empresa) ──
+  // Se siembra de la config efectiva (ISO mayúsculas) y se guarda en minúsculas.
+  const [monedaForm, setMonedaForm] = useState('')
+  useEffect(() => {
+    if (esEmpresa) setMonedaForm((config?.moneda ?? 'GTQ').toLowerCase())
+  }, [config, esEmpresa, ambitoProjectId])
+
+  // ── Ambiente de cobro (sandbox = pruebas, prod = cobros REALES) ──
+  // Mismo patrón que el payfac: EMPRESA se siembra del efectivo; LOCACIÓN del
+  // override crudo ('' = hereda de la empresa).
+  const [ambienteForm, setAmbienteForm] = useState('')
+  useEffect(() => {
+    if (esEmpresa) {
+      setAmbienteForm(config?.ambiente ?? 'sandbox')
+    } else {
+      setAmbienteForm(rawOverride?.ambientePago ?? '')
+    }
+  }, [config, rawOverride, esEmpresa, ambitoProjectId])
+
+  // Ambiente efectivo del control (en locación sin override, refleja el heredado).
+  const ambienteEfectivo = ambienteForm.trim() !== '' ? ambienteForm : config?.ambiente ?? 'sandbox'
 
   // Payfac efectivo del control (en locación sin override, refleja el heredado).
   const proveedorEfectivo = proveedorForm.trim() !== '' ? proveedorForm : config?.proveedorPago ?? 'sandbox'
@@ -131,8 +154,15 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
   async function onGuardarPayfac() {
     if (!canEdit) return
     try {
-      await guardarConfig.mutateAsync({ ambito, proveedorPago: proveedorForm })
-      notify({ variant: 'success', title: 'Payfac guardado', duration: 1600 })
+      await guardarConfig.mutateAsync({
+        ambito,
+        proveedorPago: proveedorForm,
+        // La moneda solo existe a nivel empresa (las locaciones la heredan).
+        monedaDefault: esEmpresa ? monedaForm : undefined,
+        // Ambiente de cobro: en locación '' = hereda (null).
+        ambientePago: ambienteForm,
+      })
+      notify({ variant: 'success', title: 'Configuración de cobros guardada', duration: 1600 })
     } catch (err) {
       notify({ variant: 'error', title: 'Error', text: (err as Error).message })
     }
@@ -266,13 +296,48 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
             {opcion?.nota && (
               <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>{opcion.nota}</p>
             )}
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
-              Moneda de cobro: <strong style={{ color: 'var(--at-ink)' }}>{config?.moneda ?? 'GTQ'}</strong> (de la empresa)
-            </p>
+            <div style={{ width: 420, maxWidth: '100%', marginTop: 14 }}>
+              <label style={lbl}>Ambiente de cobro{!esEmpresa && config ? ` (efectivo: ${config.ambiente === 'prod' ? 'producción' : 'pruebas'})` : ''}</label>
+              <select style={inp} value={ambienteForm} disabled={!canEdit} onChange={(e) => setAmbienteForm(e.target.value)}>
+                {!esEmpresa && <option value="">↳ Heredar de la empresa</option>}
+                <option value="sandbox">🧪 Pruebas (sandbox) — pagos simulados</option>
+                <option value="prod">🚀 Producción — cobros REALES</option>
+              </select>
+              {ambienteEfectivo === 'prod' ? (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--at-warning-strong)' }}>
+                  Los pagos en línea de este ámbito se procesarán con las credenciales de <strong>producción</strong> del
+                  payfac: son <strong>cobros reales</strong>. Verifica antes la conexión de producción.
+                </p>
+              ) : (
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
+                  En pruebas los pagos en línea se procesan contra el sandbox del payfac (no se cobra dinero real).
+                  Cambia a producción cuando las credenciales estén verificadas.
+                </p>
+              )}
+            </div>
+            {esEmpresa ? (
+              <div style={{ width: 420, maxWidth: '100%', marginTop: 14 }}>
+                <label style={lbl}>Moneda de cobro</label>
+                <select style={inp} value={monedaForm} disabled={!canEdit} onChange={(e) => setMonedaForm(e.target.value)}>
+                  {MONEDAS_ISO.map((m) => (
+                    <option key={m.code} value={m.code}>{m.label}</option>
+                  ))}
+                </select>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
+                  Se usa para los cobros a tus clientes y como moneda base de Contabilidad. Cambiarla{' '}
+                  <strong>no reconvierte montos históricos</strong>; si Stripe no soporta la moneda, los cobros con
+                  tarjeta se procesan en USD.
+                </p>
+              </div>
+            ) : (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--at-ink-3)' }}>
+                Moneda de cobro: <strong style={{ color: 'var(--at-ink)' }}>{config?.moneda ?? 'GTQ'}</strong> (heredada de la empresa)
+              </p>
+            )}
             {canEdit && (
               <div style={{ marginTop: 16 }}>
                 <button onClick={() => void onGuardarPayfac()} disabled={guardandoPayfac} style={btnPrimary(guardandoPayfac)}>
-                  {guardandoPayfac ? 'Guardando…' : 'Guardar payfac'}
+                  {guardandoPayfac ? 'Guardando…' : esEmpresa ? 'Guardar payfac y moneda' : 'Guardar payfac'}
                 </button>
               </div>
             )}
@@ -314,6 +379,10 @@ export function PayfacConfigSection({ proyectos = [] }: Props) {
           <button onClick={() => void onProbarConexion('sandbox')} disabled={probando}
             style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--at-primary)', background: 'transparent', color: 'var(--at-primary)', fontWeight: 600, fontSize: 14, cursor: probando ? 'not-allowed' : 'pointer' }}>
             {probando ? 'Probando…' : '🔌 Probar conexión (sandbox)'}
+          </button>
+          <button onClick={() => void onProbarConexion('prod')} disabled={probando}
+            style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--at-primary)', background: 'transparent', color: 'var(--at-primary)', fontWeight: 600, fontSize: 14, cursor: probando ? 'not-allowed' : 'pointer' }}>
+            {probando ? 'Probando…' : '🔌 Probar conexión (producción)'}
           </button>
         </div>
       </section>

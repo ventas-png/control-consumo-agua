@@ -28,6 +28,10 @@ import type {
   TipoDocumentoFiscal,
 } from '../types/fiscal'
 
+// PR-22 (auditoría 2026-07-28): el redondeo monetario vive en un solo sitio.
+// Había 8 copias del truco `(n + Number.EPSILON) * 100`, que fallaba el 4,58%
+// de los puntos medios y divergía de `numeric(12,2)` en todo negativo.
+import { redondear2 } from './business'
 // ════════════════════════════════════════════════════════════════════════════
 // 1. Máquina de estados del comprobante fiscal.
 // ════════════════════════════════════════════════════════════════════════════
@@ -263,11 +267,6 @@ export interface ConfigReceptor {
   nit?: string | null
   rfc?: string | null
   usoCfdi?: string | null
-}
-
-/** Redondeo a 2 decimales estable (evita errores de coma flotante). */
-function redondear2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
 /** Moneda por defecto según régimen (ISO 4217). */

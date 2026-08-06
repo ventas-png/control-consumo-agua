@@ -12,11 +12,19 @@ on:
         required: false
         default: 'false'
 
+# Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
+# `permissions` se heredan los del repositorio, que por defecto pueden ser de
+# escritura: un step comprometido (o una dependencia que ejecute código en
+# postinstall) podría entonces empujar commits o publicar releases. Ninguno de
+# estos workflows escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run migration via Supabase Management API
         run: |

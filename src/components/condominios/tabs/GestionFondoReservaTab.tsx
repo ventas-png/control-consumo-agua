@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -29,7 +30,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
     tipo: 'aportacion' as TipoMov,
     concepto: '',
     monto: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyLocalISO(),
     referencia: '',
     notas: '',
   })
@@ -79,11 +80,11 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ tipo: 'aportacion', concepto: '', monto: '', fecha: new Date().toISOString().slice(0, 10), referencia: '', notas: '' })
+    setForm({ tipo: 'aportacion', concepto: '', monto: '', fecha: hoyLocalISO(), referencia: '', notas: '' })
     onRefresh()
   }
 
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = mesLocalISO()
   const aportacionesMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'aportacion').reduce((s, m) => s + m.monto, 0)
   const retirosMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'retiro').reduce((s, m) => s + m.monto, 0)
 

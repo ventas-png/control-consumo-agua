@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
@@ -30,7 +31,7 @@ const ESTADO_CONFIG: Record<EstadoResiduo, { label: string; color: string; bg: s
 }
 
 const blank = (): Partial<RegistroResiduo> => ({
-  fecha: new Date().toISOString().slice(0, 10), tipo_residuo: 'general',
+  fecha: hoyLocalISO(), tipo_residuo: 'general',
   cantidad_kg: undefined, punto_acopio: '', empresa_recolectora: '',
   estado: 'pendiente', incidencia: false, descripcion_incidencia: '', notas: '',
 })

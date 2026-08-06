@@ -69,6 +69,14 @@ jobs:
   apply:
     needs: check-secrets
     runs-on: ubuntu-latest
+    # P0 #9 (auditoría 2026-07-10): gate de aprobación antes de escribir a prod.
+    # Este job aplica SQL a la base de PRODUCCIÓN; asociarlo a un Environment
+    # permite exigir aprobación humana (Settings → Environments → `production-db`
+    # → Required reviewers). Mientras el Environment no tenga reglas de protección,
+    # el job corre igual (no bloquea) — así este cambio es seguro de mergear y el
+    # gate se activa cuando el owner configure los reviewers. También permite
+    # restringir los secrets de Supabase a este Environment.
+    environment: production-db
     env:
       API_URL: https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query
       ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -76,8 +84,12 @@ jobs:
       INPUT_FILE: ${{ github.event.inputs.migration_file }}
       PUSH_BEFORE: ${{ github.event.before }}
       PUSH_AFTER: ${{ github.sha }}
+      # Tope duro de migraciones por corrida (ver el paso `list`). Mismo criterio
+      # que el MAX_DELETIONS de cleanup-preview-branches: acotar el daño de una
+      # selección disparatada en vez de ejecutarla entera contra producción.
+      MAX_APPLY: '10'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -90,12 +102,24 @@ jobs:
 
           remote_versions () {
             # Versiones ya registradas en el historial remoto (una por línea).
-            local resp
-            resp=$(curl -s -X POST "$API_URL" \
+            #
+            # Falla RUIDOSA a propósito. Antes acababa en `|| true`, así que una
+            # llamada fallida (token muerto, red) devolvía una lista VACÍA
+            # indistinguible de "no hay ninguna aplicada" — y el reconciliador de
+            # abajo habría intentado reaplicar TODAS las migraciones del repo desde
+            # cero contra producción. Mismo patrón que el bug del apply: no mirar
+            # el resultado de la llamada.
+            local code resp
+            code=$(curl -s -o /tmp/hist-resp.json -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d '{"query":"select version from supabase_migrations.schema_migrations order by version"}')
-            echo "$resp" | jq -r '.[].version' 2>/dev/null || true
+            resp=$(cat /tmp/hist-resp.json)
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ] || ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$resp"; then
+              echo "::error::No se pudo leer el historial remoto (HTTP $code): $(head -c 300 /tmp/hist-resp.json)" >&2
+              return 1
+            fi
+            jq -r '.[].version' <<<"$resp"
           }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${INPUT_FILE:-}" ]; then
@@ -106,13 +130,33 @@ jobs:
             files="$MIG_DIR/$INPUT_FILE"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # Reconciliar: locales cuya versión NO esté en el historial remoto.
-            applied=$(remote_versions)
+            # Sin historial fiable NO se reconcilia: ver remote_versions.
+            if ! applied=$(remote_versions); then
+              echo "::error::Abortado antes de tocar producción: sin el historial remoto no se puede saber qué falta, y asumir 'nada aplicado' reaplicaría todo."
+              exit 1
+            fi
             for f in $(ls "$MIG_DIR"/*.sql 2>/dev/null | sort); do
               base=$(basename "$f" .sql); ver=${base%%_*}
               if ! grep -qxF "$ver" <<<"$applied"; then files="$files $f"; fi
             done
           else
             # push a main: solo los .sql añadidos/modificados en este push.
+            #
+            # `--no-renames` NO es opcional. Git detecta un archivo renombrado
+            # como una sola entrada `R`, y `--diff-filter=AM` excluye la R: el
+            # archivo desaparece de la lista y el job reporta "Nothing to apply"
+            # en VERDE, sin aplicar ni registrar nada. Con --no-renames el
+            # renombre se descompone en D + A, y la A sí entra por el filtro.
+            #
+            # Pasó en el merge de #681: los dos renombres de migración
+            # (…100000 → …100001, …110000 → …110001) se saltaron en silencio.
+            # No rompió nada porque su DDL ya estaba aplicado, pero el registro
+            # quedó incompleto y el fallo fue INVISIBLE — el peor modo posible
+            # para un workflow que toca producción.
+            #
+            # Y el caso se va a repetir: la regla (d) de migrations-guard.mjs
+            # manda RENOMBRAR el archivo cuando hay timestamp duplicado. Sin
+            # esto, seguir esa instrucción mete la migración en este agujero.
             range=""
             if [ -n "${PUSH_BEFORE:-}" ] \
                && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
@@ -120,15 +164,57 @@ jobs:
               range="$PUSH_BEFORE $PUSH_AFTER"
             fi
             if [ -n "$range" ]; then
-              changed=$(git diff --name-only --diff-filter=AM $range -- "$MIG_DIR" | grep '\.sql$' || true)
+              changed=$(git diff --name-only --no-renames --diff-filter=AM $range -- "$MIG_DIR" | grep '\.sql$' || true)
             else
-              changed=$(git show --name-only --diff-filter=AM --pretty=format: "$PUSH_AFTER" -- "$MIG_DIR" | grep '\.sql$' || true)
+              changed=$(git show --name-only --no-renames --diff-filter=AM --pretty=format: "$PUSH_AFTER" -- "$MIG_DIR" | grep '\.sql$' || true)
             fi
             files="$changed"
           fi
 
           files=$(printf '%s\n' $files | sed '/^$/d' | sort -u | tr '\n' ' ')
           echo "Migraciones a aplicar: ${files:-(ninguna)}"
+
+          # ── Tope duro ─────────────────────────────────────────────────────
+          #
+          # Un despliegue sano nunca trae decenas de migraciones pendientes. Si
+          # la selección se dispara, NO es un despliegue grande: es que algo se
+          # descuadró, y lo correcto es parar y avisar en vez de reescribir
+          # producción a ciegas.
+          #
+          # El 2026-08-03 faltaba esto. `schema_migrations` estaba incompleto
+          # (solo registraba lo posterior al 2026-06-05), el reconciliador dio
+          # por pendientes 257 migraciones YA aplicadas y las reejecutó. Una de
+          # ellas, `20260320000000_fix_superadmin_app_users_uuid`, empieza con
+          # `DROP TABLE IF EXISTS public.app_users CASCADE`: se llevó por delante
+          # todos los perfiles, nadie pudo entrar y hubo que restaurar el backup
+          # de las 06:22 UTC perdiendo la mañana entera.
+          #
+          # cleanup-preview-branches ya tenía esta idea con MAX_DELETIONS, y su
+          # comentario la explica: "si algún día la API devolviera basura, el
+          # daño queda acotado y visible en vez de barrer el proyecto entero".
+          # Estaba en el workflow que borra ramas de preview y no en el que
+          # escribe en la base de producción.
+          #
+          # Si el tope salta de forma legítima (un backlog real tras semanas sin
+          # desplegar), se aplica por lotes con `migration_file`, revisando cada
+          # una. Nunca subir el número para "que pase".
+          count=$(printf '%s\n' $files | sed '/^$/d' | wc -l)
+          if [ "$count" -gt "$MAX_APPLY" ]; then
+            {
+              echo "### ⛔ Abortado: $count migraciones pendientes (tope: $MAX_APPLY)"
+              echo ""
+              echo "Un despliegue normal no trae tantas. Antes de tocar producción, revisar"
+              echo "si \`supabase_migrations.schema_migrations\` está completo — si le faltan"
+              echo "versiones ya aplicadas, esto reejecutaría migraciones antiguas contra la"
+              echo "base. Ver \`scripts/backfill-schema-migrations.sql\`."
+              echo ""
+              echo "Seleccionadas:"
+              printf '%s\n' $files | sed '/^$/d' | sed 's/^/- /'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$count migraciones pendientes supera el tope de $MAX_APPLY — abortado sin tocar producción. Revisar el historial en schema_migrations (scripts/backfill-schema-migrations.sql)."
+            exit 1
+          fi
+
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
       - name: Apply migrations via Management API
@@ -148,24 +234,55 @@ jobs:
             echo "::group::Aplicando $base"
             sql=$(cat "$f")
             payload=$(jq -Rs '{query: .}' <<<"$sql")
-            resp=$(curl -s -X POST "$API_URL" \
+            # El código HTTP se MIRA. Antes solo se buscaba `.error` en el cuerpo,
+            # y eso dejó pasar el fallo peor posible: el 2026-08-03 las tres
+            # migraciones de #698 respondieron `{"message":"Unauthorized"}` con el
+            # token caducado, `jq -e '.error'` dio falso porque la clave es
+            # `message` y no `error`, y el job imprimió "Todas las migraciones se
+            # aplicaron correctamente" EN VERDE sin haber ejecutado una sola línea
+            # de SQL contra producción. Un 403, un 404 o una página de error 500
+            # habrían pasado igual.
+            #
+            # El criterio ahora es positivo, no una lista de formas de error: una
+            # consulta que salió bien devuelve 2xx Y un array de filas (vacío para
+            # DDL). Cualquier otra cosa es un fallo, se llame como se llame.
+            code=$(curl -s -o /tmp/apply-resp.json -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$payload")
+            resp=$(cat /tmp/apply-resp.json)
+            echo "HTTP $code"
             echo "$resp"
-            if echo "$resp" | jq -e '.error' > /dev/null 2>&1; then
-              echo "::error::Falló $base"
-              echo "- ❌ \`$base\` — $(echo "$resp" | jq -c '.error' 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
+            motivo=""
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              motivo="HTTP $code"
+              [ "$code" = "401" ] && motivo="HTTP 401 — SUPABASE_ACCESS_TOKEN inválido, expirado o revocado"
+              [ "$code" = "403" ] && motivo="HTTP 403 — el token no tiene permiso sobre el proyecto"
+            elif ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$resp"; then
+              motivo="respuesta inesperada (se esperaba un array de filas)"
+            fi
+            if [ -n "$motivo" ]; then
+              echo "::error::Falló $base — $motivo: $(head -c 300 /tmp/apply-resp.json)"
+              echo "- ❌ \`$base\` — $motivo" >> "$GITHUB_STEP_SUMMARY"
               fail=1
               echo "::endgroup::"
               continue
             fi
-            # Registrar en el historial (best-effort; idempotente con ON CONFLICT).
+            # Registrar en el historial (idempotente con ON CONFLICT). Sigue siendo
+            # best-effort —el DDL ya se aplicó, no tiene sentido marcar la migración
+            # como fallida— pero AVISA: sin este registro, la reconciliación de un
+            # dispatch manual volvería a ver la migración como pendiente.
             hist="insert into supabase_migrations.schema_migrations (version, name) values ('$ver', '$name') on conflict (version) do nothing;"
-            curl -s -X POST "$API_URL" \
+            hist_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
-              -d "$(jq -Rs '{query: .}' <<<"$hist")" > /dev/null || true
+              -d "$(jq -Rs '{query: .}' <<<"$hist")")
+            if [ "$hist_code" -lt 200 ] || [ "$hist_code" -ge 300 ]; then
+              echo "::warning::$base se aplicó pero NO se pudo registrar en schema_migrations (HTTP $hist_code)."
+              echo "- ⚠️ \`$base\` — aplicada, sin registrar en el historial (HTTP $hist_code)" >> "$GITHUB_STEP_SUMMARY"
+              echo "::endgroup::"
+              continue
+            fi
             echo "- ✅ \`$base\`" >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
@@ -178,4 +295,14 @@ jobs:
 
       - name: Nothing to apply
         if: steps.list.outputs.files == ''
-        run: echo "No hay migraciones nuevas que aplicar en este evento."
+        run: |
+          # En `push` este workflow SOLO se dispara si cambió supabase/migrations/**
+          # (ver `paths`). Que la selección quede vacía significa entonces que un
+          # cambio de migración se coló sin aplicarse — exactamente el fallo mudo
+          # de #681. Un verde silencioso ahí no es "no había nada que hacer".
+          if [ "$EVENT_NAME" = "push" ]; then
+            echo "::warning::El push tocó supabase/migrations/** pero no se seleccionó ningún .sql."
+            echo "::warning::Revisá si fue un borrado puro; si no, la migración NO se aplicó."
+          else
+            echo "No hay migraciones nuevas que aplicar en este evento."
+          fi

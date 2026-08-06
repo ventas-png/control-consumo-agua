@@ -28,7 +28,7 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify required secrets are set
         run: |
@@ -40,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Upload generated types
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: database-types-${{ github.run_id }}
           path: generated/database.types.ts

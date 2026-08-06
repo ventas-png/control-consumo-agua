@@ -5,6 +5,7 @@
 // google-oauth-initiate y send-email (fetch + token de sesión). El armado de
 // vars/diálogos/toasts se queda en la UI; aquí sólo el I/O. Funciones planas
 // (imperativas) porque el componente maneja su propio estado de carga.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
@@ -43,7 +44,8 @@ export interface EmailSendLogRow {
 }
 
 async function getAccessToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession()
+  const { data, error } = await supabase.auth.getSession()
+  reportDegradedQuery('comunicacion.getAccessToken', error)
   return data.session?.access_token ?? ''
 }
 
@@ -64,9 +66,10 @@ export async function fetchEmailConfig(scope: EmailScope): Promise<EmailConfig |
   const base = supabase
     .from('company_email_configs')
     .select('id, email, is_active, updated_at, from_name, reply_to')
-  const { data } = await (
+  const { data, error } = await (
     scope.isSuperadmin ? base.eq('is_superadmin', true) : base.eq('company_id', scope.companyId!)
   ).maybeSingle()
+  reportDegradedQuery('comunicacion.fetchEmailConfig', error)
   return (data as EmailConfig | null) ?? null
 }
 
@@ -75,9 +78,10 @@ export async function fetchEmailTemplates(scope: EmailScope): Promise<EmailTempl
   const base = supabase
     .from('email_templates')
     .select('id, template_key, subject, html_body, is_active')
-  const { data } = await (
+  const { data, error } = await (
     scope.isSuperadmin ? base.eq('is_superadmin', true) : base.eq('company_id', scope.companyId!)
   )
+  reportDegradedQuery('comunicacion.fetchEmailTemplates', error)
   return (data as EmailTemplate[]) ?? []
 }
 
@@ -86,11 +90,12 @@ export async function fetchEmailSendLog(scope: EmailScope): Promise<EmailSendLog
   const base = supabase
     .from('email_send_log')
     .select('id, template_key, to_email, from_email, status, error_message, sent_at')
-  const { data } = await (
+  const { data, error } = await (
     scope.isSuperadmin ? base.eq('is_superadmin', true) : base.eq('company_id', scope.companyId!)
   )
     .order('sent_at', { ascending: false })
     .limit(20)
+  reportDegradedQuery('comunicacion.fetchEmailSendLog', error)
   return (data as EmailSendLogRow[]) ?? []
 }
 

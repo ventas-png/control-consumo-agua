@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { EntregaUnidad, Unidad } from '../../../types'
@@ -29,7 +30,7 @@ type FormData = {
 }
 
 const BLANK: FormData = {
-  unidad_id: '', tipo: 'entrega', fecha: new Date().toISOString().slice(0, 10),
+  unidad_id: '', tipo: 'entrega', fecha: hoyLocalISO(),
   condicion_general: 'bueno', inquilino: '', propietario: '',
   representante_admin: '', observaciones: '',
 }

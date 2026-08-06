@@ -66,6 +66,8 @@ export type AmbientePago = 'sandbox' | 'prod';
 export interface ConfigPagoEfectiva {
   proveedorPago: string;
   moneda: string;
+  /** Ambiente de cobro efectivo ('sandbox' default; 'prod' = cobros REALES). */
+  ambiente: AmbientePago;
   desdeLocacion: boolean;
 }
 
@@ -104,6 +106,16 @@ export interface PaymentRequest {
   updated_at: string;
 }
 
+/** Una cuota del calendario de pagos de un convenio (P1 · cobranza). */
+export interface ConvenioCuota {
+  /** Número de cuota (1-based). */
+  numero: number;
+  /** Fecha de vencimiento (YYYY-MM-DD). */
+  fecha_vencimiento: string;
+  /** Monto de la cuota (la última absorbe el residual de redondeo). */
+  monto: number;
+}
+
 export interface ConvenioPago {
   id: string;
   cliente_id: string;
@@ -114,6 +126,8 @@ export interface ConvenioPago {
   monto_total: number;
   monto_pagado: number;
   cuotas_pactadas?: number | null;
+  /** Calendario de cuotas (fechas + montos). null en convenios legacy sin calendario. */
+  cuotas?: ConvenioCuota[] | null;
   fecha_inicio: string;
   fecha_vencimiento?: string | null;
   estado: EstadoConvenio;
@@ -127,9 +141,9 @@ export interface ConvenioPago {
 
 export interface CostoCalculo {
   total: number;
-  tipo_cobro: 'Canon Fijo' | 'Consumo Normal' | 'Consumo con Exceso';
+  tipo_cobro: 'Canon Fijo' | 'Consumo Normal' | 'Consumo con Exceso' | 'Consumo Escalonado';
   desglose: {
-    tramo: 1 | 2 | 3;
+    tramo: 1 | 2 | 3 | 'escalonado';
     canon_fijo?: number;
     consumo_m3?: number;
     precio_m3?: number;
@@ -138,6 +152,8 @@ export interface CostoCalculo {
     precio_exceso?: number;
     monto_base?: number;
     monto_exceso?: number;
+    /** Detalle por bloque cuando la tarifa es escalonada. */
+    tramos?: Array<{ desde_m3: number; hasta_m3: number | null; precio_m3: number; m3: number; monto: number }>;
   };
 }
 

@@ -7,6 +7,7 @@ import {
   type PlanPriceIds,
   type SyncOp,
 } from '../_shared/billingSync.ts'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 
 // sync-stripe-quantities (F2.15d): worker que ajusta las quantities de cada
 // subscription_item a Stripe segun el uso real. Dispara pg_cron diario.
@@ -191,8 +192,12 @@ Deno.serve(async (req: Request) => {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  // Auth: solo el cron con CRON_SECRET puede invocar.
-  if (!CRON_SECRET || req.headers.get('x-cron-secret') !== CRON_SECRET) {
+  // Auth: solo el cron con CRON_SECRET puede invocar. Comparación en tiempo
+  // constante (auditoría 2026-07-28, Bloque B · PR-11): el `!==` filtraba por
+  // timing cuántos bytes iniciales del secreto coincidían, y CRON_SECRET está
+  // compartido con send-email / process-email-queue / notifications-dispatcher /
+  // backfill-tenant-secrets — filtrarlo aquí los abría todos.
+  if (!CRON_SECRET || !(await timingSafeEqualSecret(req.headers.get('x-cron-secret') ?? '', CRON_SECRET))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { 'Content-Type': 'application/json' },
     })

@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { exportData, type ExportFormat, type ExportColumn } from './exportData'
+import { REPORT_SOURCES, type ReportSourceMeta } from '../domain/empresa/reportes'
 
 // ============================================================================
 // sendReportByEmail — F4.5.1d: dispara la entrega de un saved report por
@@ -45,6 +46,10 @@ export async function sendReportByEmail<T>(opts: SendOptions<T>): Promise<SendRe
   const blob = await generateBlob(opts.format, opts.data, opts.columns, opts.templateName)
 
   // 2. Upload a storage
+  // NO es una fecha de negocio: es un sufijo único para el nombre del adjunto.
+  // Un instante UTC completo es justo lo que se quiere aquí (monotónico y sin
+  // ambigüedad de huso); no toca ninguna columna DATE ni ciclo de facturación.
+  // eslint-disable-next-line no-restricted-syntax
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const path = `${opts.companyId}/${opts.templateId}/${timestamp}.${opts.format}`
   const { error: uploadErr } = await supabase.storage
@@ -94,13 +99,10 @@ export async function sendReportByEmail<T>(opts: SendOptions<T>): Promise<SendRe
   return { success: true, enqueued: enqueueRows.length, attachmentPath: path }
 }
 
-const SOURCE_LABEL_MAP: Record<string, string> = {
-  cuotas_condominio:        'Cuotas de condominio',
-  pagos:                    'Pagos',
-  tickets_mantenimiento:    'Tickets de mantenimiento',
-  gastos_condominio:        'Gastos',
-  fondo_reserva_condominio: 'Fondo de reserva',
-}
+// C4: etiquetas desde la metadata central de reportes (domain/empresa/reportes).
+const SOURCE_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(REPORT_SOURCES as Record<string, ReportSourceMeta>).map(([k, v]) => [k, v.label]),
+)
 
 function mimeFor(format: ExportFormat): string {
   if (format === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

@@ -89,11 +89,11 @@ export function CookieConsent() {
   if (!visible) return null
 
   return (
-    <div className="cc-root" role="dialog" aria-label={t.aria} aria-live="polite">
-      <div className="cc-card">
-        <div className="cc-head">
-          <h2 className="cc-title">{t.title}</h2>
-          <p className="cc-body">
+    <div className="cookie-root" role="dialog" aria-label={t.aria} aria-live="polite">
+      <div className="cookie-card">
+        <div className="cookie-head">
+          <h2 className="cookie-title">{t.title}</h2>
+          <p className="cookie-body">
             {t.bodyA}
             <a href={cookiePolicyHref(lang)} target="_blank" rel="noopener noreferrer">{t.policy}</a>
             {t.bodyB}
@@ -101,24 +101,24 @@ export function CookieConsent() {
         </div>
 
         {panel && (
-          <div className="cc-options">
-            <div className="cc-option">
-              <div className="cc-option-text">
+          <div className="cookie-options">
+            <div className="cookie-option">
+              <div className="cookie-option-text">
                 <strong>{t.essential.name}</strong>
-                <span className="cc-tag">{t.essential.tag}</span>
+                <span className="cookie-tag">{t.essential.tag}</span>
                 <p>{t.essential.desc}</p>
               </div>
               <input type="checkbox" checked disabled aria-label={t.essential.name} />
             </div>
-            <label className="cc-option">
-              <div className="cc-option-text">
+            <label className="cookie-option">
+              <div className="cookie-option-text">
                 <strong>{t.analytics.name}</strong>
                 <p>{t.analytics.desc}</p>
               </div>
               <input type="checkbox" checked={analytics} onChange={e => setAnalytics(e.target.checked)} />
             </label>
-            <label className="cc-option">
-              <div className="cc-option-text">
+            <label className="cookie-option">
+              <div className="cookie-option-text">
                 <strong>{t.functional.name}</strong>
                 <p>{t.functional.desc}</p>
               </div>
@@ -127,20 +127,20 @@ export function CookieConsent() {
           </div>
         )}
 
-        <div className="cc-actions">
-          <button type="button" className="cc-btn cc-ghost" onClick={() => persist({ analytics: false, functional: false })}>
+        <div className="cookie-actions">
+          <button type="button" className="cookie-btn cookie-ghost" onClick={() => persist({ analytics: false, functional: false })}>
             {t.reject}
           </button>
           {panel ? (
-            <button type="button" className="cc-btn cc-ghost" onClick={() => persist({ analytics, functional })}>
+            <button type="button" className="cookie-btn cookie-ghost" onClick={() => persist({ analytics, functional })}>
               {t.save}
             </button>
           ) : (
-            <button type="button" className="cc-btn cc-ghost" onClick={() => setPanel(true)}>
+            <button type="button" className="cookie-btn cookie-ghost" onClick={() => setPanel(true)}>
               {t.configure}
             </button>
           )}
-          <button type="button" className="cc-btn cc-primary" onClick={() => persist({ analytics: true, functional: true })}>
+          <button type="button" className="cookie-btn cookie-primary" onClick={() => persist({ analytics: true, functional: true })}>
             {t.acceptAll}
           </button>
         </div>

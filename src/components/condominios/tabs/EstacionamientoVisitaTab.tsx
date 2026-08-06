@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
@@ -32,7 +33,7 @@ function duracion(entrada: string, salida?: string | null): string {
 export default function EstacionamientoVisitaTab({
   registros, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh,
 }: Props) {
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)

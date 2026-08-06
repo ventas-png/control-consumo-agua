@@ -529,6 +529,66 @@ button:focus:not(:focus-visible) {
  * en mobile bloqueando todo el viewport. Ahora se oculta off-canvas y se
  * activa via .open (controlado por sidebarOpen en App.tsx). */
 @media (max-width: 767px) {
+  /* ── El documento NUNCA debe poder arrastrarse de lado en un teléfono ────
+   *
+   * `.app-main` ya recorta su propio contenido (`overflow-x: hidden`, más
+   * abajo), pero eso solo cubre el área de contenido: la topbar, los
+   * breadcrumbs y los banners viven FUERA y cualquiera de ellos puede
+   * ensanchar el documento. Se reportó el panel de administrador arrastrándose
+   * de lado en un iPhone; en Chromium no reproduce a 402/360/320 ni forzando
+   * el ancho que WebKit da a los <input type="date">, así que el elemento
+   * concreto no se pudo aislar. Esta regla ataca el síntoma en la raíz
+   * correcta: el viewport.
+   *
+   * `clip` y NO `hidden`, a propósito y por dos motivos:
+   *   1. `overflow-x: hidden` con `overflow-y: visible` es inválido — el
+   *      segundo se convierte en `auto` y el elemento pasa a ser un contenedor
+   *      con scroll. En iOS eso vuelve a atrapar a los `position: fixed` de
+   *      los ~40 modales, que es exactamente la regresión de #692.
+   *      `clip` + `visible` sí es una combinación válida.
+   *   2. `clip` no crea scrollport, así que no altera de quién cuelga
+   *      `position: sticky` (la topbar) ni el bloque contenedor de los
+   *      `position: fixed` (drawer, backdrop, modales).
+   *
+   * Va en `#root` y NO en `html` ni en `body`. El overflow del elemento raíz se
+   * PROPAGA al viewport, y esa propagación solo contempla
+   * visible/hidden/scroll/auto: un `clip` ahí se queda sin efecto. Y como
+   * `html` es `visible`, lo mismo le pasa a `body` — su overflow también
+   * propaga. Medido: con la regla en `html` y luego en `body`, el documento
+   * seguía arrastrándose 198px. `#root` no propaga, así que el recorte se
+   * aplica de verdad.
+   *
+   * Soporte: Safari 16+ / Chrome 90+. En un navegador sin `clip` la regla se
+   * ignora y queda el comportamiento actual, no algo peor. */
+  #root { overflow-x: clip; }
+
+  /* Topbar pegada arriba — y el scroll SIGUE siendo el del documento.
+   *
+   * El problema a resolver era que al bajar, la topbar (con el botón de menú)
+   * se iba de pantalla y el contenido se metía bajo la barra de estado de iOS,
+   * transparente por `viewport-fit=cover`. `position: sticky` lo arregla: la
+   * barra queda anclada con su fondo opaco y su padding de safe-area.
+   *
+   * NO usar aquí `height: 100dvh` + `overflow: hidden` en el shell para que
+   * scrollee `.app-main`. Se probó y hubo que revertirlo: en iOS Safari un
+   * `position: fixed` dentro de un contenedor con scroll se posiciona respecto
+   * a ESE contenedor, no al viewport. Los ~40 overlays de modal de la app son
+   * `position: fixed` y viven dentro de `.app-main`, así que todos quedaban
+   * recortados a la caja del contenedor y sin poder scrollear (se vio en el
+   * detalle de visitante de Condominios). Mientras el scroll siga siendo el del
+   * documento, `.app-main` nunca llega a scrollear y los modales se posicionan
+   * contra el viewport, que es el comportamiento correcto.
+   *
+   * z-index 100: por encima del contenido y de la fila de pestañas de las
+   * secciones, por debajo del drawer (200) y de los modales (1000).
+   *
+   * `!important` en position porque Topbar.tsx lleva `position: relative`
+   * inline y un estilo en atributo gana a la hoja sin él. */
+  .app-topbar {
+    position: sticky !important;
+    top: 0;
+    z-index: 100;
+  }
   .app-sidebar {
     position: fixed !important;
     top: 0; left: 0; bottom: 0;
@@ -537,9 +597,12 @@ button:focus:not(:focus-visible) {
      * limitar a 85vw asegura que siempre quede un margen visible. */
     width: min(280px, 85vw) !important;
     min-width: min(280px, 85vw) !important;
+    /* OJO: el desplazamiento tiene que ser -100%, NUNCA un valor en px. El
+     * ancho es min(280px, 85vw), así que cualquier px fijo deja una franja del
+     * drawer dentro del viewport, tapando el borde izquierdo de TODAS las
+     * pantallas (con z-index 200) aunque nadie haya tocado el hamburguesa. */
     transform: translateX(-100%);
     z-index: 200;
-    box-shadow: 0 0 30px rgba(0,0,0,0.3);
     /* iOS safe-area: notch en iPhone X+ corta el contenido si no usamos
      * env(safe-area-inset-*) en padding. */
     padding-top: env(safe-area-inset-top, 0);
@@ -547,6 +610,10 @@ button:focus:not(:focus-visible) {
   }
   .app-sidebar.open {
     transform: translateX(0);
+    /* La sombra SOLO con el drawer abierto: `0 0 30px` no tiene desplazamiento,
+     * así que con el panel fuera de pantalla el halo se seguía dibujando sobre
+     * los primeros 30px del contenido. */
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
   }
   .app-backdrop {
     display: block !important;
@@ -554,6 +621,8 @@ button:focus:not(:focus-visible) {
   /* Main content takes full width when sidebar is off-canvas */
   .app-main {
     padding: 12px !important;
+    /* Home indicator: el último elemento no debe quedar bajo la barra táctil. */
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
     width: 100% !important;
   }
   /* iOS safe-area en topbar (notch) y main (home indicator). */
@@ -584,7 +653,28 @@ button:focus:not(:focus-visible) {
   input[type="url"], input[type="date"], input[type="month"],
   input[type="time"], textarea, select {
     min-height: 44px;
-    font-size: 16px;
+  }
+
+  /* ── Anti-autozoom de iOS: el font-size manda y va con !important ────────
+   *
+   * Safari amplía la página al enfocar un campo cuyo font-size computado sea
+   * MENOR de 16px, y al cerrar el formulario NO deshace el zoom: la página se
+   * queda ampliada y a partir de ahí se puede arrastrar de lado con el dedo.
+   * Es lo que se reportaba como "desborde" en varias pantallas — no había tal
+   * desborde, había zoom pegado.
+   *
+   * La regla ya existía sin `!important` y por eso nunca llegó a aplicarse:
+   * hay ~235 archivos con `style={{ fontSize: '13px' }}` en sus inputs, y un
+   * estilo en atributo gana siempre a la hoja. Con `!important` la hoja manda.
+   *
+   * El selector cubre además los que faltaban: `input` sin atributo `type`
+   * (equivale a text), `datetime-local` y `week`. Se excluyen los controles
+   * donde el tamaño de letra no aplica o estorba (casillas, radios, sliders,
+   * color, archivo y botones), que además no disparan el zoom. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

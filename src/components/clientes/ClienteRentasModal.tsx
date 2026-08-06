@@ -17,6 +17,9 @@ interface Props {
   unidades: Unidad[]
   companyId: string
   canEdit: boolean
+  // RBAC granular: permiso de eliminar (contratos/reservas). Opcional con
+  // default true para no romper usos existentes que no pasan el prop.
+  canDelete?: boolean
   onClose: () => void
 }
 
@@ -58,7 +61,7 @@ function calcNoches(entrada: string, salida: string) {
   return Math.max(0, Math.round((new Date(salida).getTime() - new Date(entrada).getTime()) / 86400000))
 }
 
-export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onClose }: Props) {
+export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canDelete = true, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('arrendamiento')
   const [contratos, setContratos] = useState<ContratoArrendamiento[]>([])
   const [reservas, setReservas] = useState<ReservaSTR[]>([])
@@ -595,20 +598,24 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                 </div>
                               )}
                             </div>
-                            {canEdit && (
+                            {(canEdit || canDelete) && (
                               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                <button
-                                  onClick={() => startEditContrato(c)}
-                                  style={{ padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => handleEliminarContrato(c)}
-                                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                                >
-                                  Eliminar
-                                </button>
+                                {canEdit && (
+                                  <button
+                                    onClick={() => startEditContrato(c)}
+                                    style={{ padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  >
+                                    Editar
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    onClick={() => handleEliminarContrato(c)}
+                                    style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  >
+                                    Eliminar
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -859,20 +866,24 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                 </div>
                               )}
                             </div>
-                            {canEdit && (
+                            {(canEdit || canDelete) && (
                               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                <button
-                                  onClick={() => startEditSTR(r)}
-                                  style={{ padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => handleEliminarSTR(r)}
-                                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                                >
-                                  Eliminar
-                                </button>
+                                {canEdit && (
+                                  <button
+                                    onClick={() => startEditSTR(r)}
+                                    style={{ padding: '5px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  >
+                                    Editar
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    onClick={() => handleEliminarSTR(r)}
+                                    style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  >
+                                    Eliminar
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>

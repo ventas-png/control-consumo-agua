@@ -1,8 +1,9 @@
+import { hoyLocalISO, formatDateShort } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { fetchConvCountsForProject, fetchConvRowsAllProjects } from '../../domain/admin-dashboard/queries'
 import { contarRegistrosEnPeriodo, periodoUltimaLectura, ultimaFechaLectura } from '../../domain/admin-dashboard/periodo'
-import { formatDateShort } from '../../lib/format'
+import { TabStrip } from '../shared/TabStrip'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
@@ -49,7 +50,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
   const [projectInitialized, setProjectInitialized] = useState(false)
 
   const defaultDesde = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) })()
-  const defaultHasta = new Date().toISOString().slice(0, 10)
+  const defaultHasta = hoyLocalISO()
   const [fechaDesde, setFechaDesde] = useState(defaultDesde)
   const [fechaHasta, setFechaHasta] = useState(defaultHasta)
   // true en cuanto el usuario fija fechas a mano (inputs o presets): a partir
@@ -212,13 +213,15 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
     <div>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '16px', color: 'var(--at-ink)' }}>
+        {/* clamp: 28px es demasiado para un teléfono — "Dashboard - Administrador
+            de Empresa" no cabía en el ancho útil y se cortaba a media palabra. */}
+        <h1 style={{ fontSize: 'clamp(20px, 5.5vw, 28px)', fontWeight: '700', marginBottom: '16px', color: 'var(--at-ink)' }}>
           Dashboard - Administrador de Empresa
         </h1>
 
         {/* Selector de Proyecto */}
         {data.proyectos.length > 0 && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
             <label style={{ fontSize: '14px', fontWeight: '600', color: 'var(--at-ink-2)' }}>Proyecto:</label>
             <select
               value={selectedProjectId}
@@ -231,7 +234,11 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                 fontWeight: '500',
                 background: 'var(--at-surface)',
                 cursor: 'pointer',
-                minWidth: '200px',
+                // `flex` en vez de `min-width: 200px` a secas: en un teléfono el
+                // ancho fijo no encogía y empujaba la fila fuera de pantalla.
+                flex: '1 1 200px',
+                minWidth: 0,
+                maxWidth: '100%',
               }}
             >
               <option value="">-- Todos los proyectos --</option>
@@ -248,18 +255,23 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
         {activeTab === 'dashboard' && (
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
           <label style={{ fontSize: '14px', fontWeight: '600', color: 'var(--at-ink-2)' }}>Período:</label>
+          {/* `flex: 1 1 130px` + `min-width: 0`: en iOS un <input type="date">
+              se dibuja con la fecha larga ("jul 4, 2026") y un ancho intrínseco
+              que no encoge, así que dos en la misma fila empujaban el layout
+              más allá de la pantalla. Ahora reparten el ancho disponible y, si
+              no caben, la fila envuelve. */}
           <input
             type="date"
             value={fechaDesde}
             onChange={e => { setFechasTouched(true); setFechaDesde(e.target.value) }}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 130px', minWidth: 0 }}
           />
           <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>—</span>
           <input
             type="date"
             value={fechaHasta}
             onChange={e => { setFechasTouched(true); setFechaHasta(e.target.value) }}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 130px', minWidth: 0 }}
           />
           {/* Quick presets */}
           {[
@@ -275,36 +287,13 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
         </div>
         )}
 
-        {/* Tabs de navegación */}
-        <div className="tab-strip-scrollable" style={{
-          display: 'flex',
-          gap: '12px',
-          borderBottom: '2px solid var(--at-line)',
-          overflowX: 'auto',
-          paddingBottom: '12px',
-        }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '10px 18px',
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span style={{ marginRight: '6px' }}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tabs de navegación — mismo <TabStrip> que el resto de módulos. */}
+        <TabStrip
+          ariaLabel="Secciones del panel"
+          items={tabs}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       {/* Contenido de pestañas */}

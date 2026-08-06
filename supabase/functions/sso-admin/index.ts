@@ -175,6 +175,7 @@ Deno.serve(async (req: Request) => {
         if (rowErr) return json({ error: rowErr.message }, 500)
         if (!row) return json({ error: 'Dominio no encontrado' }, 404)
         const domain = (row as { domain: string }).domain
+        const domainVerified = (row as { verified?: boolean }).verified === true
 
         // 1) Persistir SIEMPRE la metadata (aunque SSO esté parqueado).
         const { error: mdErr } = await admin
@@ -184,7 +185,41 @@ Deno.serve(async (req: Request) => {
           .eq('id', reqAction.id)
         if (mdErr) return json({ error: mdErr.message }, 500)
 
-        // 2) Intentar registrar/sincronizar el proveedor SAML en GoTrue.
+        // 2) Registrar/sincronizar el proveedor SAML en GoTrue — SOLO si el
+        //    dominio tiene la propiedad probada.
+        //
+        // PR-14 (auditoría 2026-07-28). Antes se hacía el POST a GoTrue sin mirar
+        // `row.verified`. La base de datos sí defiende —`company_sso_domains`
+        // tiene CHECK (NOT enforced OR verified) y `sso_lookup_domain` solo
+        // anuncia dominios verificados (20260606130000:79-80,185)— pero el mapeo
+        // dominio→IdP que vive en GoTrue es INDEPENDIENTE de esa tabla, así que
+        // esta ruta esquivaba los dos gates.
+        //
+        // Sin el chequeo, un company_owner podía reclamar un dominio que no le
+        // pertenece (cualquiera aún no registrado: el de un competidor, por
+        // ejemplo) y apuntarlo a su propio IdP. Quien luego entrara por SSO con
+        // una dirección de ese dominio acabaría autenticándose contra un IdP
+        // ajeno. Y `metadata_url` se lo pasa GoTrue a un fetch de servidor, así
+        // que además era un SSRF por delegación.
+        //
+        // Hoy nada marca `verified = true` (la verificación DNS está parqueada,
+        // ver `start_verification` más arriba), así que en la práctica esto deja
+        // el registro en GoTrue bloqueado hasta que se implemente. Es lo
+        // correcto: sin prueba de propiedad no debe existir el mapeo. La
+        // metadata sí se persiste (paso 1), así que no se pierde nada de lo que
+        // el admin configuró.
+        if (!domainVerified) {
+          return json({
+            ok: true,
+            provider_synced: false,
+            reason: 'domain_not_verified',
+            note:
+              'La metadata quedó guardada, pero el proveedor SAML NO se registró: ' +
+              'el dominio aún no tiene la propiedad verificada. Completá la verificación ' +
+              'DNS TXT para activar el SSO (gate anti-secuestro de dominio ajeno).',
+          })
+        }
+
         const body = buildGoTrueProviderBody(reqAction.metadata, [domain])
         let result
         try {

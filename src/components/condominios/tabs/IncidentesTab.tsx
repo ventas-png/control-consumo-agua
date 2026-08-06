@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -32,7 +33,7 @@ const ESTADO_FLOW: Record<string, { bg: string; color: string; label: string; ne
 }
 
 const BLANK = {
-  fecha: new Date().toISOString().slice(0, 10), hora: '',
+  fecha: hoyLocalISO(), hora: '',
   tipo: 'otro', descripcion: '', area: '',
   reportado_por: '', estado: 'reportado', involucrados: '', seguimiento: '',
 }
@@ -113,13 +114,13 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       proyectoNombre,
       headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado'],
       rows: filtered.map(i => [i.fecha, i.hora ?? '—', TIPO_STYLE[i.tipo]?.label ?? i.tipo, i.area ?? '—', i.descripcion, i.reportado_por ?? '—', ESTADO_FLOW[i.estado]?.label ?? i.estado]),
-      filename: `incidentes-${new Date().toISOString().slice(0, 10)}`,
+      filename: `incidentes-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`incidentes-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`incidentes-${hoyLocalISO()}`, [{
       name: 'Incidentes',
       headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado', 'Involucrados', 'Seguimiento'],
       rows: filtered.map(i => [i.fecha, i.hora ?? '', TIPO_STYLE[i.tipo]?.label ?? i.tipo, i.area ?? '', i.descripcion, i.reportado_por ?? '', ESTADO_FLOW[i.estado]?.label ?? i.estado, i.involucrados ?? '', i.seguimiento ?? '']),

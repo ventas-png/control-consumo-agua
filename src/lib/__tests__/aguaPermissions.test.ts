@@ -8,10 +8,10 @@ import { AGUA_MODULE_GROUPS } from '../aguaPermissions'
 // transición, las permission keys que se persisten por rol. Un drift aquí (key
 // mal formada, acción faltante, duplicado) se traduce en permisos que la UI
 // muestra pero el backend no reconoce — o viceversa. Estos tests fijan el
-// contrato estructural: 10 módulos × 4 acciones, keys únicas y bien formadas.
+// contrato estructural: 10 módulos × 6 acciones, keys únicas y bien formadas.
 // ════════════════════════════════════════════════════════════════════════════
 
-const EXPECTED_ACTIONS = ['view', 'create', 'edit', 'change_status']
+const EXPECTED_ACTIONS = ['view', 'create', 'edit', 'change_status', 'approve', 'delete']
 const EXPECTED_MODULES = [
   'dashboard',
   'lecturas',
@@ -44,7 +44,7 @@ describe('AGUA_MODULE_GROUPS — forma', () => {
 })
 
 describe('AGUA_MODULE_GROUPS — acciones por módulo', () => {
-  it('cada grupo expone exactamente las 4 acciones agua.<module>.<action>', () => {
+  it('cada grupo expone exactamente las 6 acciones agua.<module>.<action>', () => {
     for (const g of AGUA_MODULE_GROUPS) {
       const module = g.key.replace(/^agua_/, '')
       expect(g.tabs).toEqual(EXPECTED_ACTIONS.map((a) => `agua.${module}.${a}`))
@@ -71,7 +71,7 @@ describe('AGUA_MODULE_GROUPS — unicidad', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('todas las permission keys son únicas globalmente (40 = 10×4)', () => {
+  it('todas las permission keys son únicas globalmente (60 = 10×6)', () => {
     const allTabs = AGUA_MODULE_GROUPS.flatMap((g) => g.tabs)
     expect(allTabs).toHaveLength(EXPECTED_MODULES.length * EXPECTED_ACTIONS.length)
     expect(new Set(allTabs).size).toBe(allTabs.length)

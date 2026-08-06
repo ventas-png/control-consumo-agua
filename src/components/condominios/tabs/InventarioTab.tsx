@@ -1,9 +1,11 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ItemInventario, CategoriaInventario, EstadoInventario } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { ImportInventarioModal } from '../ImportInventarioModal'
 
 interface Props {
   inventario: ItemInventario[]
@@ -50,13 +52,14 @@ const blank = (): Partial<ItemInventario> => ({
 
 export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const { t } = useTranslation()
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoInventario | 'todos'>('todos')
   const [form, setForm] = useState<Partial<ItemInventario>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const stockBajo = inventario.filter(i => i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja')
   const porVencer = inventario.filter(i => i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
@@ -155,9 +158,14 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
           {valorTotal > 0 && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t('condominios.inventario.valor_activo')} <strong style={{ color: 'var(--at-primary)' }}>{moneda} {valorTotal.toFixed(2)}</strong></span>}
         </div>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            {t('condominios.inventario.new_button')}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              {t('condominios.inventario.import_button')}
+            </button>
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              {t('condominios.inventario.new_button')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -333,6 +341,15 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
           },
         ] satisfies DataTableColumn<ItemInventario>[]}
       />
+
+      {showImportModal && (
+        <ImportInventarioModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }

@@ -72,7 +72,7 @@ workflow indicadas por archivo.
 
 | Nombre | Tipo | Consumido por (workflow) | Para qué |
 |---|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migration.yml`, `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos). |
+| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migration.yml`, `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml`, `auth-hardening.yml`, `security-guard.yml`, `cleanup-preview-branches.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos, auditar catálogo, borrar previews). **Si expira o se revoca, los siete fallan a la vez** — el 2026-08-01 se cayó entre las 03:05 y las 08:09 UTC y salió a la luz por `cleanup-preview-branches` y `security-guard`, ambos con `401 Unauthorized`. |
 | `SUPABASE_PROJECT_ID` | Sensible (id) | mismos que arriba | Identifica el proyecto destino. No es un secreto fuerte, pero se trata como config protegida. |
 | `SUPABASE_DB_PASSWORD` | **Secreto** | `apply-migrations-prod.yml` (si aplica vía conexión directa) | Password de la base de producción. |
 | `VERCEL_TOKEN` | **Secreto** | `deploy-staging.yml`, `promote-production.yml` | Token de la API de Vercel (build/deploy/alias/promote/rollback). |
@@ -115,6 +115,7 @@ Configurados en **Supabase → Edge Functions → Secrets**. Detectados por
 | `STRIPE_PLATFORM_SECRET_KEY` | **Secreto** | `create-checkout-session`, `create-billing-portal-session`, `stripe-platform-webhook` | Secret key de la cuenta **plataforma** de Stripe (billing del SaaS). |
 | `STRIPE_PLATFORM_WEBHOOK_SECRET` | **Secreto** | `stripe-platform-webhook` | Verifica la firma HMAC del webhook de Stripe plataforma. |
 | `CRON_SECRET` | **Secreto** | funciones invocadas por `pg_cron` / triggers | Token compartido para autenticar invocaciones de cron sin JWT. |
+| `TENANT_SECRETS_ENC_KEY` | **Secreto crítico** | `_shared/secretsCrypto.ts` (cifrado en reposo de secretos por tenant, P0 #7) | Llave AES-256 (base64, 32 bytes) para cifrar/descifrar las tablas *deny-all* de categoría E. Vive **solo** aquí; jamás en la base. Si se omite, el cifrado queda en passthrough (texto plano). Rotación y provisión: `docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md`. |
 | `ALLOWED_ORIGINS` | Sensible (config) | helper CORS compartido | Allow-list de orígenes adicionales para CORS. |
 | `APP_URL` | Sensible (config) | varias (CORS/redirect) | URL pública usada como origen permitido de respaldo. |
 | `BILLING_SYNC_DRY_RUN` | Flag | sync de billing | Modo simulación; no es secreto. |
@@ -171,6 +172,13 @@ No son variables de entorno: son secretos **de cada tenant**, guardados en tabla
 El cliente **nunca** los lee; solo ve metadata/flags vía RPCs `SECURITY DEFINER`
 acotadas. Patrón establecido en `company_payment_secrets` y replicado en el resto.
 
+> **Cifrado en reposo (P0 #7).** Además del RLS, estos valores se cifran con
+> AES-256-GCM (`_shared/secretsCrypto.ts`, llave `TENANT_SECRETS_ENC_KEY` fuera de la
+> base). En curso por fases (expand→migrate→contract): la ruta de **pagos** ya está
+> cableada; fiscal/payfac/email siguen. Provisión de llave, orden de cableado y
+> backfill: `docs/RUNBOOK_TENANT_SECRETS_ENCRYPTION.md`. El cifrado es passthrough
+> (texto plano) hasta que se provisiona la llave, así que no altera el flujo actual.
+
 | Tabla | Contenido | Escrito por (edge) | Metadata expuesta (RPC) |
 |---|---|---|---|
 | `company_payment_secrets` | `stripe_secret_key`, `stripe_webhook_secret`, `paypal_client_secret` por empresa | `save-payment-config`, webhooks de Stripe | vista `companies_safe` (sin secretos) |
@@ -215,6 +223,21 @@ periódica programada.
 - [ ] **Revocar** el valor anterior en el sistema de origen.
 - [ ] **Auditar** logs por usos del valor viejo tras la revocación.
 - [ ] **Registrar** la rotación (fecha, secreto, motivo) en el canal de seguridad.
+
+### Registro de rotaciones
+
+El checklist pide registrar cada rotación. Se anota aquí, en el repo, para que
+quede junto al inventario y no solo en un canal de chat que nadie relee.
+
+| Fecha | Secreto | Motivo | Notas |
+| --- | --- | --- | --- |
+| 2026-08-03 | `SUPABASE_ACCESS_TOKEN` | Expiración o revocación **no planificada** | El token dejó de servir entre las 03:05 y las 08:09 UTC del 2026-08-01: a las 03:04 `apply-migrations-prod` aplicó la migración de #696 en verde y a las 03:05 `security-guard` leyó el catálogo sin problema; a las 08:09 `cleanup-preview-branches` ya daba `401 Unauthorized`. Sin cambios de código en esa ventana. Detectado por CI, no por una persona. Los siete workflows que comparten el token estuvieron caídos ~2 días, `apply-migrations-prod` entre ellos. |
+
+**Lección de esa caída:** este token no avisa antes de morir y se lleva por
+delante el despliegue de migraciones a producción. Si al generar el reemplazo
+Supabase ofrece fecha de expiración, **anotarla en la fila de arriba** y poner un
+recordatorio antes de que llegue. Un token sin fecha registrada es la misma
+trampa otra vez.
 
 ### Prioridad ante incidente (rotar primero lo más crítico)
 

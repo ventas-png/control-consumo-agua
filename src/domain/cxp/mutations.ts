@@ -4,6 +4,7 @@
 // aprobar, pagar y anular es de admin/owner (RLS UPDATE). Los asientos
 // contables y la actualización de saldos los hacen triggers de BD — aquí solo
 // se cambian estados.
+import { hoyLocalISO } from '../../lib/format'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
@@ -190,7 +191,7 @@ export function useMarcarOrdenPagadaMutation(companyId?: string) {
           .from('ordenes_pago')
           .update({
             estado: 'pagada',
-            fecha_pago: vars.fechaPago ?? new Date().toISOString().slice(0, 10),
+            fecha_pago: vars.fechaPago ?? hoyLocalISO(),
             pagada_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })

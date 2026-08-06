@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ProgramacionLimpieza } from '../../../types'
@@ -36,7 +37,7 @@ function addDays(date: string, days: number): string {
 
 function getAlerta(p: ProgramacionLimpieza): 'vencida' | 'proxima' | 'ok' | 'sin_fecha' {
   if (!p.proxima_ejecucion) return 'sin_fecha'
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   if (p.proxima_ejecucion < hoy) return 'vencida'
   const en3 = addDays(hoy, 3)
   if (p.proxima_ejecucion <= en3) return 'proxima'
@@ -91,7 +92,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
   }
 
   const marcarEjecutada = async (p: ProgramacionLimpieza) => {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const proxima = addDays(hoy, FRECUENCIA_DIAS[p.frecuencia])
     const { error } = await updateCondominioRow('programacion_limpieza', p.id, { ultima_ejecucion: hoy, proxima_ejecucion: proxima, estado: 'completado' })
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })

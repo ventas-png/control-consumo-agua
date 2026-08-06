@@ -1,6 +1,7 @@
 // T7/PR3 — Contrato del dominio shared: storage (condominios-media), suscripción
 // activa y create-checkout-session.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 
 const { upload, remove, maybeSingle, invoke } = vi.hoisted(() => ({
   upload: vi.fn(), remove: vi.fn(), maybeSingle: vi.fn(), invoke: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock('../../../lib/supabase', () => ({
 
 import { uploadCondominiosMedia, removeCondominiosMedia, uploadMudanzaDoc } from '../storage'
 import { fetchActiveSubscription } from '../queries'
-import { createCheckoutSession } from '../mutations'
+import { createCheckoutSession, createBillingPortalSession } from '../mutations'
 
 beforeEach(() => { upload.mockReset(); remove.mockReset(); maybeSingle.mockReset(); invoke.mockReset() })
 
@@ -57,16 +58,46 @@ describe('fetchActiveSubscription', () => {
 
 describe('createCheckoutSession', () => {
   const body = { plan_code: 'pro', billing_cycle: 'monthly', return_path: '/perfil' }
-  it('éxito → { url, error: null }', async () => {
+  it('éxito → { url, swapped: false, error: null }', async () => {
     invoke.mockResolvedValueOnce({ data: { url: 'https://checkout' }, error: null })
-    expect(await createCheckoutSession(body)).toEqual({ url: 'https://checkout', error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: 'https://checkout', swapped: false, error: null })
   })
-  it('error del edge → { url: null, error }', async () => {
+  it('cambio de plan in-place → { url: null, swapped: true, error: null }', async () => {
+    invoke.mockResolvedValueOnce({ data: { success: true, swapped: true }, error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: true, error: null })
+  })
+  it('error del edge → { url: null, swapped: false, error }', async () => {
     invoke.mockResolvedValueOnce({ data: null, error: { message: 'stripe down' } })
-    expect(await createCheckoutSession(body)).toEqual({ url: null, error: 'stripe down' })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: false, error: 'stripe down' })
   })
-  it('sin url en la respuesta → { url: null, error: null }', async () => {
+  it('sin url en la respuesta → { url: null, swapped: false, error: null }', async () => {
     invoke.mockResolvedValueOnce({ data: {}, error: null })
-    expect(await createCheckoutSession(body)).toEqual({ url: null, error: null })
+    expect(await createCheckoutSession(body)).toEqual({ url: null, swapped: false, error: null })
+  })
+  it('FunctionsHttpError → expone el mensaje del body del edge', async () => {
+    const ctx = new Response(JSON.stringify({ error: 'Stripe no configurado. Contacta a AdministraTodo.' }), { status: 503 })
+    invoke.mockResolvedValueOnce({ data: null, error: new FunctionsHttpError(ctx) })
+    expect(await createCheckoutSession(body))
+      .toEqual({ url: null, swapped: false, error: 'Stripe no configurado. Contacta a AdministraTodo.' })
+  })
+})
+
+describe('createBillingPortalSession', () => {
+  it('éxito → { url, error: null }', async () => {
+    invoke.mockResolvedValueOnce({ data: { url: 'https://portal' }, error: null })
+    expect(await createBillingPortalSession()).toEqual({ url: 'https://portal', error: null })
+  })
+  it('FunctionsHttpError → expone el mensaje del body del edge', async () => {
+    const ctx = new Response(JSON.stringify({ error: 'No hay informacion de pago registrada. Primero configura un plan.' }), { status: 404 })
+    invoke.mockResolvedValueOnce({ data: null, error: new FunctionsHttpError(ctx) })
+    expect(await createBillingPortalSession())
+      .toEqual({ url: null, error: 'No hay informacion de pago registrada. Primero configura un plan.' })
+  })
+  it('FunctionsHttpError con body no-JSON → cae al mensaje genérico', async () => {
+    const ctx = new Response('boom', { status: 500 })
+    invoke.mockResolvedValueOnce({ data: null, error: new FunctionsHttpError(ctx) })
+    const { url, error } = await createBillingPortalSession()
+    expect(url).toBeNull()
+    expect(error).toMatch(/non-2xx/)
   })
 })

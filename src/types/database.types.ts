@@ -1,9 +1,3 @@
-// AUTOGENERADO — NO EDITAR A MANO (auditoría P2 #7).
-// Tipos del esquema de la BD generados con Supabase desde producción
-// (supabase gen types typescript, 2026-06-11, hasta la migración
-// 20260611040000_eeff_fase5). Para regenerar: npm run gen:db-types
-// (requiere SUPABASE_ACCESS_TOKEN) o la herramienta MCP de Supabase.
-
 export type Json =
   | string
   | number
@@ -2157,6 +2151,80 @@ export type Database = {
           },
         ]
       }
+      cierre_ciclo_config: {
+        Row: {
+          activo: boolean
+          company_id: string
+          created_at: string
+          dia_cierre: number
+          id: string
+          modulo: string
+          notificar: boolean
+          project_id: string
+          ultimo_periodo_cerrado: string | null
+          ultimo_resultado: Json | null
+          ultimo_run_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          company_id: string
+          created_at?: string
+          dia_cierre?: number
+          id?: string
+          modulo: string
+          notificar?: boolean
+          project_id: string
+          ultimo_periodo_cerrado?: string | null
+          ultimo_resultado?: Json | null
+          ultimo_run_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          company_id?: string
+          created_at?: string
+          dia_cierre?: number
+          id?: string
+          modulo?: string
+          notificar?: boolean
+          project_id?: string
+          ultimo_periodo_cerrado?: string | null
+          ultimo_resultado?: Json | null
+          ultimo_run_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "cierre_ciclo_config_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cierres_anuales: {
         Row: {
           anio: number
@@ -2496,34 +2564,100 @@ export type Database = {
           },
         ]
       }
+      comentarios_mensaje_portal: {
+        Row: {
+          archivo_urls: Json
+          autor_nombre: string
+          company_id: string
+          contenido: string
+          created_at: string
+          creado_por: string | null
+          es_interno: boolean
+          foto_urls: Json
+          id: string
+          mensaje_id: string
+        }
+        Insert: {
+          archivo_urls?: Json
+          autor_nombre: string
+          company_id: string
+          contenido?: string
+          created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
+          foto_urls?: Json
+          id?: string
+          mensaje_id: string
+        }
+        Update: {
+          archivo_urls?: Json
+          autor_nombre?: string
+          company_id?: string
+          contenido?: string
+          created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
+          foto_urls?: Json
+          id?: string
+          mensaje_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comentarios_mensaje_portal_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comentarios_mensaje_portal_mensaje_id_fkey"
+            columns: ["mensaje_id"]
+            isOneToOne: false
+            referencedRelation: "mensajes_portal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comentarios_ticket: {
         Row: {
+          archivo_urls: Json
           autor_id: string | null
           autor_nombre: string
           company_id: string
           contenido: string
           created_at: string
+          creado_por: string | null
+          es_interno: boolean
           estado_nuevo: string | null
+          foto_urls: Json
           id: string
           ticket_id: string
         }
         Insert: {
+          archivo_urls?: Json
           autor_id?: string | null
           autor_nombre: string
           company_id: string
           contenido: string
           created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
           estado_nuevo?: string | null
+          foto_urls?: Json
           id?: string
           ticket_id: string
         }
         Update: {
+          archivo_urls?: Json
           autor_id?: string | null
           autor_nombre?: string
           company_id?: string
           contenido?: string
           created_at?: string
+          creado_por?: string | null
+          es_interno?: boolean
           estado_nuevo?: string | null
+          foto_urls?: Json
           id?: string
           ticket_id?: string
         }
@@ -2565,6 +2699,64 @@ export type Database = {
           },
         ]
       }
+      comision_config: {
+        Row: {
+          activo: boolean
+          canal: string
+          company_id: string
+          created_at: string
+          fijo: number
+          id: string
+          notas: string | null
+          pct: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          canal?: string
+          company_id: string
+          created_at?: string
+          fijo?: number
+          id?: string
+          notas?: string | null
+          pct?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          canal?: string
+          company_id?: string
+          created_at?: string
+          fijo?: number
+          id?: string
+          notas?: string | null
+          pct?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           activa: boolean
@@ -2572,6 +2764,7 @@ export type Database = {
           address_line1: string | null
           address_postal_code: string | null
           address_state: string | null
+          ambiente_pago: string
           center_lat: number | null
           center_lng: number | null
           country: string | null
@@ -2583,9 +2776,11 @@ export type Database = {
           logo_url: string | null
           max_projects: number
           max_units: number
+          mfa_required: boolean
           nit: string | null
           nombre: string
           nombre_fiscal: string | null
+          pago_sandbox_demo: boolean
           paypal_activo: boolean | null
           paypal_client_id: string | null
           paypal_configured: boolean | null
@@ -2605,6 +2800,7 @@ export type Database = {
           tax_id: string | null
           tax_id_type: string | null
           telefono: string | null
+          timezone: string
           zoom_default: number | null
         }
         Insert: {
@@ -2613,6 +2809,7 @@ export type Database = {
           address_line1?: string | null
           address_postal_code?: string | null
           address_state?: string | null
+          ambiente_pago?: string
           center_lat?: number | null
           center_lng?: number | null
           country?: string | null
@@ -2624,9 +2821,11 @@ export type Database = {
           logo_url?: string | null
           max_projects?: number
           max_units?: number
+          mfa_required?: boolean
           nit?: string | null
           nombre: string
           nombre_fiscal?: string | null
+          pago_sandbox_demo?: boolean
           paypal_activo?: boolean | null
           paypal_client_id?: string | null
           paypal_configured?: boolean | null
@@ -2646,6 +2845,7 @@ export type Database = {
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
+          timezone?: string
           zoom_default?: number | null
         }
         Update: {
@@ -2654,6 +2854,7 @@ export type Database = {
           address_line1?: string | null
           address_postal_code?: string | null
           address_state?: string | null
+          ambiente_pago?: string
           center_lat?: number | null
           center_lng?: number | null
           country?: string | null
@@ -2665,9 +2866,11 @@ export type Database = {
           logo_url?: string | null
           max_projects?: number
           max_units?: number
+          mfa_required?: boolean
           nit?: string | null
           nombre?: string
           nombre_fiscal?: string | null
+          pago_sandbox_demo?: boolean
           paypal_activo?: boolean | null
           paypal_client_id?: string | null
           paypal_configured?: boolean | null
@@ -2687,6 +2890,7 @@ export type Database = {
           tax_id?: string | null
           tax_id_type?: string | null
           telefono?: string | null
+          timezone?: string
           zoom_default?: number | null
         }
         Relationships: []
@@ -3586,6 +3790,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          project_id: string | null
         }
         Insert: {
           anio: number
@@ -3594,6 +3799,7 @@ export type Database = {
           company_id: string
           created_at?: string
           id?: string
+          project_id?: string | null
         }
         Update: {
           anio?: number
@@ -3602,6 +3808,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           id?: string
+          project_id?: string | null
         }
         Relationships: [
           {
@@ -3632,6 +3839,13 @@ export type Database = {
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
           },
+          {
+            foreignKeyName: "conta_cierres_anuales_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       conta_cuentas: {
@@ -3649,6 +3863,7 @@ export type Database = {
           nivel: number
           nombre: string
           padre_id: string | null
+          project_id: string | null
           tipo: string
           updated_at: string
         }
@@ -3666,6 +3881,7 @@ export type Database = {
           nivel?: number
           nombre: string
           padre_id?: string | null
+          project_id?: string | null
           tipo: string
           updated_at?: string
         }
@@ -3683,6 +3899,7 @@ export type Database = {
           nivel?: number
           nombre?: string
           padre_id?: string | null
+          project_id?: string | null
           tipo?: string
           updated_at?: string
         }
@@ -3715,42 +3932,62 @@ export type Database = {
             referencedRelation: "conta_cuentas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "conta_cuentas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       conta_folios: {
         Row: {
           company_id: string
+          id: string
+          project_id: string | null
           ultimo: number
         }
         Insert: {
           company_id: string
+          id?: string
+          project_id?: string | null
           ultimo?: number
         }
         Update: {
           company_id?: string
+          id?: string
+          project_id?: string | null
           ultimo?: number
         }
         Relationships: [
           {
             foreignKeyName: "conta_folios_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conta_folios_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "companies_safe"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conta_folios_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "conta_folios_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4799,6 +5036,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          cuotas: Json | null
           cuotas_pactadas: number | null
           descripcion: string | null
           estado: string
@@ -4818,6 +5056,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          cuotas?: Json | null
           cuotas_pactadas?: number | null
           descripcion?: string | null
           estado?: string
@@ -4837,6 +5076,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          cuotas?: Json | null
           cuotas_pactadas?: number | null
           descripcion?: string | null
           estado?: string
@@ -5184,6 +5424,7 @@ export type Database = {
           nombre: string
           notas: string | null
           numero_mascara: string | null
+          project_id: string | null
           updated_at: string
         }
         Insert: {
@@ -5197,6 +5438,7 @@ export type Database = {
           nombre: string
           notas?: string | null
           numero_mascara?: string | null
+          project_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -5210,6 +5452,7 @@ export type Database = {
           nombre?: string
           notas?: string | null
           numero_mascara?: string | null
+          project_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5241,6 +5484,48 @@ export type Database = {
             referencedRelation: "conta_cuentas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cuentas_bancarias_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cuota_recordatorios_log: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          cuota_id: string
+          hito: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          cuota_id: string
+          hito: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          cuota_id?: string
+          hito?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuota_recordatorios_log_cuota_id_fkey"
+            columns: ["cuota_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cuotas_condominio: {
@@ -5270,6 +5555,7 @@ export type Database = {
           project_id: string
           referencia_pago: string | null
           regla_mora_id: string | null
+          rol_responsable: string | null
           rubros_detalle: Json | null
           total_a_pagar: number | null
           unidad_id: string | null
@@ -5301,6 +5587,7 @@ export type Database = {
           project_id: string
           referencia_pago?: string | null
           regla_mora_id?: string | null
+          rol_responsable?: string | null
           rubros_detalle?: Json | null
           total_a_pagar?: number | null
           unidad_id?: string | null
@@ -5332,6 +5619,7 @@ export type Database = {
           project_id?: string
           referencia_pago?: string | null
           regla_mora_id?: string | null
+          rol_responsable?: string | null
           rubros_detalle?: Json | null
           total_a_pagar?: number | null
           unidad_id?: string | null
@@ -5401,6 +5689,7 @@ export type Database = {
           numero: number
           pagado: boolean
           plan_id: string
+          project_id: string
         }
         Insert: {
           company_id: string
@@ -5413,6 +5702,7 @@ export type Database = {
           numero: number
           pagado?: boolean
           plan_id: string
+          project_id: string
         }
         Update: {
           company_id?: string
@@ -5425,6 +5715,7 @@ export type Database = {
           numero?: number
           pagado?: boolean
           plan_id?: string
+          project_id?: string
         }
         Relationships: [
           {
@@ -5453,6 +5744,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "planes_pago_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuotas_plan_pago_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -5534,6 +5832,7 @@ export type Database = {
       documentos_fiscales: {
         Row: {
           company_id: string
+          costo_cents: number | null
           created_at: string
           error: string | null
           estado: string
@@ -5553,6 +5852,7 @@ export type Database = {
         }
         Insert: {
           company_id: string
+          costo_cents?: number | null
           created_at?: string
           error?: string | null
           estado?: string
@@ -5572,6 +5872,7 @@ export type Database = {
         }
         Update: {
           company_id?: string
+          costo_cents?: number | null
           created_at?: string
           error?: string | null
           estado?: string
@@ -9502,11 +9803,13 @@ export type Database = {
       }
       mensajes_portal: {
         Row: {
+          archivo_urls: Json
           asunto: string
           company_id: string
           created_at: string
           cuerpo: string
           estado: string
+          foto_urls: Json
           id: string
           project_id: string
           respondido_en: string | null
@@ -9515,11 +9818,13 @@ export type Database = {
           unidad_id: string
         }
         Insert: {
+          archivo_urls?: Json
           asunto: string
           company_id: string
           created_at?: string
           cuerpo: string
           estado?: string
+          foto_urls?: Json
           id?: string
           project_id: string
           respondido_en?: string | null
@@ -9528,11 +9833,13 @@ export type Database = {
           unidad_id: string
         }
         Update: {
+          archivo_urls?: Json
           asunto?: string
           company_id?: string
           created_at?: string
           cuerpo?: string
           estado?: string
+          foto_urls?: Json
           id?: string
           project_id?: string
           respondido_en?: string | null
@@ -9588,6 +9895,7 @@ export type Database = {
           fecha: string
           id: string
           monto: number
+          project_id: string
           registrado_por: string | null
           tipo: string
         }
@@ -9600,6 +9908,7 @@ export type Database = {
           fecha?: string
           id?: string
           monto: number
+          project_id: string
           registrado_por?: string | null
           tipo: string
         }
@@ -9612,6 +9921,7 @@ export type Database = {
           fecha?: string
           id?: string
           monto?: number
+          project_id?: string
           registrado_por?: string | null
           tipo?: string
         }
@@ -9644,6 +9954,13 @@ export type Database = {
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
           },
+          {
+            foreignKeyName: "movimientos_caja_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       movimientos_suministro: {
@@ -9656,6 +9973,7 @@ export type Database = {
           id: string
           motivo: string | null
           notas: string | null
+          project_id: string
           realizado_por: string | null
           suministro_id: string
           tipo: string
@@ -9669,6 +9987,7 @@ export type Database = {
           id?: string
           motivo?: string | null
           notas?: string | null
+          project_id: string
           realizado_por?: string | null
           suministro_id: string
           tipo?: string
@@ -9682,6 +10001,7 @@ export type Database = {
           id?: string
           motivo?: string | null
           notas?: string | null
+          project_id?: string
           realizado_por?: string | null
           suministro_id?: string
           tipo?: string
@@ -9713,6 +10033,13 @@ export type Database = {
             columns: ["suministro_id"]
             isOneToOne: false
             referencedRelation: "suministros_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_suministro_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -10645,6 +10972,7 @@ export type Database = {
           convenio_id: string | null
           created_at: string | null
           created_by: string | null
+          cuota_id: string | null
           deleted_at: string | null
           deleted_by: string | null
           estado: string
@@ -10674,6 +11002,7 @@ export type Database = {
           convenio_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          cuota_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           estado?: string
@@ -10703,6 +11032,7 @@ export type Database = {
           convenio_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          cuota_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           estado?: string
@@ -10737,6 +11067,13 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "convenios_pago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_cuota_id_fkey"
+            columns: ["cuota_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
             referencedColumns: ["id"]
           },
           {
@@ -11029,9 +11366,13 @@ export type Database = {
       }
       payment_requests: {
         Row: {
+          ambiente: string
           cliente_id: string
+          comision: number | null
+          comision_detalle: Json | null
           company_id: string
           created_at: string | null
+          cuota_id: string | null
           estado: string | null
           id: string
           monto: number
@@ -11046,9 +11387,13 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ambiente?: string
           cliente_id: string
+          comision?: number | null
+          comision_detalle?: Json | null
           company_id: string
           created_at?: string | null
+          cuota_id?: string | null
           estado?: string | null
           id?: string
           monto: number
@@ -11063,9 +11408,13 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ambiente?: string
           cliente_id?: string
+          comision?: number | null
+          comision_detalle?: Json | null
           company_id?: string
           created_at?: string | null
+          cuota_id?: string | null
           estado?: string | null
           id?: string
           monto?: number
@@ -11107,6 +11456,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "payment_requests_cuota_id_fkey"
+            columns: ["cuota_id"]
+            isOneToOne: false
+            referencedRelation: "cuotas_condominio"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "payment_requests_registro_id_fkey"
@@ -11593,6 +11949,7 @@ export type Database = {
           notas: string | null
           periodicidad: string
           project_id: string
+          rol_responsable: string | null
           rubros: Json | null
         }
         Insert: {
@@ -11609,6 +11966,7 @@ export type Database = {
           notas?: string | null
           periodicidad?: string
           project_id: string
+          rol_responsable?: string | null
           rubros?: Json | null
         }
         Update: {
@@ -11625,6 +11983,7 @@ export type Database = {
           notas?: string | null
           periodicidad?: string
           project_id?: string
+          rol_responsable?: string | null
           rubros?: Json | null
         }
         Relationships: [
@@ -11785,6 +12144,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_metrics_daily: {
+        Row: {
+          created_at: string
+          day: string
+          empresas_activas: number
+          mrr_cents: number
+          suscripciones_vigentes: number
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          empresas_activas?: number
+          mrr_cents?: number
+          suscripciones_vigentes?: number
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          empresas_activas?: number
+          mrr_cents?: number
+          suscripciones_vigentes?: number
+        }
+        Relationships: []
       }
       polizas_seguro: {
         Row: {
@@ -12490,6 +12873,7 @@ export type Database = {
       projects: {
         Row: {
           activo: boolean
+          ambiente_pago: string | null
           company_id: string
           created_at: string | null
           descripcion: string | null
@@ -12523,6 +12907,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          ambiente_pago?: string | null
           company_id: string
           created_at?: string | null
           descripcion?: string | null
@@ -12556,6 +12941,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          ambiente_pago?: string | null
           company_id?: string
           created_at?: string | null
           descripcion?: string | null
@@ -13438,6 +13824,7 @@ export type Database = {
           id: string
           nombre: string
           num_personas: number
+          project_id: string
           unidad_id: string
         }
         Insert: {
@@ -13449,6 +13836,7 @@ export type Database = {
           id?: string
           nombre: string
           num_personas?: number
+          project_id: string
           unidad_id: string
         }
         Update: {
@@ -13460,6 +13848,7 @@ export type Database = {
           id?: string
           nombre?: string
           num_personas?: number
+          project_id?: string
           unidad_id?: string
         }
         Relationships: [
@@ -13496,6 +13885,13 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_asistentes_evento_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -13595,6 +13991,9 @@ export type Database = {
           consumo: number | null
           contador_id: string | null
           created_at: string | null
+          creado_por: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           dias_servicio: number | null
           emitida_at: string | null
           estado: string | null
@@ -13634,6 +14033,9 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          creado_por?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null
@@ -13673,6 +14075,9 @@ export type Database = {
           consumo?: number | null
           contador_id?: string | null
           created_at?: string | null
+          creado_por?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dias_servicio?: number | null
           emitida_at?: string | null
           estado?: string | null
@@ -14280,6 +14685,7 @@ export type Database = {
           notas: string | null
           num_invitados: number
           observaciones_uso: string | null
+          project_id: string
           rechazada_motivo: string | null
           recordatorio_enviado: boolean
           recordatorio_enviado_at: string | null
@@ -14319,6 +14725,7 @@ export type Database = {
           notas?: string | null
           num_invitados?: number
           observaciones_uso?: string | null
+          project_id: string
           rechazada_motivo?: string | null
           recordatorio_enviado?: boolean
           recordatorio_enviado_at?: string | null
@@ -14358,6 +14765,7 @@ export type Database = {
           notas?: string | null
           num_invitados?: number
           observaciones_uso?: string | null
+          project_id?: string
           rechazada_motivo?: string | null
           recordatorio_enviado?: boolean
           recordatorio_enviado_at?: string | null
@@ -14420,6 +14828,13 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservas_amenidades_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -14716,6 +15131,7 @@ export type Database = {
       }
       roles: {
         Row: {
+          cloned_from_role_id: string | null
           color: string | null
           company_id: string | null
           created_at: string
@@ -14725,8 +15141,10 @@ export type Database = {
           name: string
           service: string | null
           updated_at: string
+          user_override_for: string | null
         }
         Insert: {
+          cloned_from_role_id?: string | null
           color?: string | null
           company_id?: string | null
           created_at?: string
@@ -14736,8 +15154,10 @@ export type Database = {
           name: string
           service?: string | null
           updated_at?: string
+          user_override_for?: string | null
         }
         Update: {
+          cloned_from_role_id?: string | null
           color?: string | null
           company_id?: string | null
           created_at?: string
@@ -14747,8 +15167,16 @@ export type Database = {
           name?: string
           service?: string | null
           updated_at?: string
+          user_override_for?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "roles_cloned_from_role_id_fkey"
+            columns: ["cloned_from_role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "roles_company_id_fkey"
             columns: ["company_id"]
@@ -14769,6 +15197,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "roles_user_override_for_fkey"
+            columns: ["user_override_for"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -15794,6 +16229,7 @@ export type Database = {
           current_period_end: string
           current_period_start: string
           id: string
+          past_due_since: string | null
           plan_id: string
           status: string
           stripe_customer_id: string | null
@@ -15810,6 +16246,7 @@ export type Database = {
           current_period_end: string
           current_period_start?: string
           id?: string
+          past_due_since?: string | null
           plan_id: string
           status: string
           stripe_customer_id?: string | null
@@ -15826,6 +16263,7 @@ export type Database = {
           current_period_end?: string
           current_period_start?: string
           id?: string
+          past_due_since?: string | null
           plan_id?: string
           status?: string
           stripe_customer_id?: string | null
@@ -16195,6 +16633,7 @@ export type Database = {
           precio_m3_exceso: number
           project_id: string
           tipo_agua: string
+          tramos: Json | null
           updated_at: string | null
           updated_by: string | null
           updated_by_name: string | null
@@ -16213,6 +16652,7 @@ export type Database = {
           precio_m3_exceso?: number
           project_id: string
           tipo_agua: string
+          tramos?: Json | null
           updated_at?: string | null
           updated_by?: string | null
           updated_by_name?: string | null
@@ -16231,6 +16671,7 @@ export type Database = {
           precio_m3_exceso?: number
           project_id?: string
           tipo_agua?: string
+          tramos?: Json | null
           updated_at?: string | null
           updated_by?: string | null
           updated_by_name?: string | null
@@ -16441,6 +16882,7 @@ export type Database = {
       }
       tickets_mantenimiento: {
         Row: {
+          archivo_urls: Json
           asignado_a: string | null
           cliente_id: string | null
           company_id: string
@@ -16465,6 +16907,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archivo_urls?: Json
           asignado_a?: string | null
           cliente_id?: string | null
           company_id: string
@@ -16489,6 +16932,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archivo_urls?: Json
           asignado_a?: string | null
           cliente_id?: string | null
           company_id?: string
@@ -16550,6 +16994,140 @@ export type Database = {
           },
           {
             foreignKeyName: "tickets_mantenimiento_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timbrado_config: {
+        Row: {
+          activo: boolean
+          company_id: string
+          created_at: string
+          id: string
+          notas: string | null
+          precio_dte_cents: number
+          timbres_incluidos: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          precio_dte_cents?: number
+          timbres_incluidos?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          precio_dte_cents?: number
+          timbres_incluidos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timbrado_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
+      unidad_residentes: {
+        Row: {
+          activo: boolean
+          cliente_id: string
+          company_id: string
+          created_at: string
+          id: string
+          project_id: string
+          tipo: string
+          unidad_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+          tipo?: string
+          unidad_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          tipo?: string
+          unidad_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidad_residentes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidad_residentes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidad_residentes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidad_residentes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "unidad_residentes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidad_residentes_unidad_id_fkey"
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
@@ -17671,19 +18249,58 @@ export type Database = {
     Views: {
       companies_safe: {
         Row: {
+          activa: boolean | null
           created_at: string | null
+          email: string | null
           id: string | null
+          logo_url: string | null
+          max_projects: number | null
+          max_units: number | null
+          nit: string | null
           nombre: string | null
+          paypal_activo: boolean | null
+          paypal_client_id: string | null
+          paypal_configured: boolean | null
+          stripe_activo: boolean | null
+          stripe_configured: boolean | null
+          stripe_public_key: string | null
+          telefono: string | null
         }
         Insert: {
+          activa?: boolean | null
           created_at?: string | null
+          email?: string | null
           id?: string | null
+          logo_url?: string | null
+          max_projects?: number | null
+          max_units?: number | null
+          nit?: string | null
           nombre?: string | null
+          paypal_activo?: boolean | null
+          paypal_client_id?: string | null
+          paypal_configured?: boolean | null
+          stripe_activo?: boolean | null
+          stripe_configured?: boolean | null
+          stripe_public_key?: string | null
+          telefono?: string | null
         }
         Update: {
+          activa?: boolean | null
           created_at?: string | null
+          email?: string | null
           id?: string | null
+          logo_url?: string | null
+          max_projects?: number | null
+          max_units?: number | null
+          nit?: string | null
           nombre?: string | null
+          paypal_activo?: boolean | null
+          paypal_client_id?: string | null
+          paypal_configured?: boolean | null
+          stripe_activo?: boolean | null
+          stripe_configured?: boolean | null
+          stripe_public_key?: string | null
+          telefono?: string | null
         }
         Relationships: []
       }
@@ -17730,6 +18347,39 @@ export type Database = {
       }
     }
     Functions: {
+      agua_anomalias_consumo: {
+        Args: { p_project_id?: string }
+        Returns: {
+          contador_id: string
+          cliente_id: string
+          cliente_nombre: string
+          project_id: string
+          ultima_fecha: string
+          ultimo_consumo: number
+          promedio: number
+          desviacion: number
+          z_score: number
+          ceros_consecutivos: number
+          n_lecturas: number
+          tipo_anomalia: string
+          severidad: string
+        }[]
+      }
+      agua_cerrar_ciclo: {
+        Args: { p_notificar?: boolean; p_periodo: string; p_project_id: string }
+        Returns: Json
+      }
+      agua_consumo_comunidad: {
+        Args: { p_project_id: string; p_meses?: number }
+        Returns: {
+          mes: string
+          n_residentes: number
+          mediana_m3: number
+          p25_m3: number
+          p75_m3: number
+          promedio_m3: number
+        }[]
+      }
       aplicar_mora_cuotas_vencidas: { Args: never; Returns: undefined }
       aplicar_mora_facturas_vencidas: { Args: never; Returns: undefined }
       banco_ajuste_conciliacion: {
@@ -17829,6 +18479,7 @@ export type Database = {
           candidato_id: string
           candidato_monto: number
           candidato_tipo: string
+          confianza: string
           movimiento_id: string
         }[]
       }
@@ -17887,8 +18538,17 @@ export type Database = {
         Args: { p_company_id: string; p_feature_code: string }
         Returns: boolean
       }
+      company_is_active: { Args: { p_company_id: string }; Returns: boolean }
       company_write_enabled: {
         Args: { p_company_id: string }
+        Returns: boolean
+      }
+      condominios_cerrar_ciclo: {
+        Args: { p_notificar?: boolean; p_periodo: string; p_project_id: string }
+        Returns: Json
+      }
+      conta_anio_cerrado: {
+        Args: { p_anio: number; p_company_id: string; p_project_id: string }
         Returns: boolean
       }
       conta_anular_asiento: {
@@ -17950,38 +18610,93 @@ export type Database = {
           tipo: string
         }[]
       }
-      conta_cierre_anual: {
-        Args: { p_anio: number }
+      conta_cierre_anual:
+        | {
+            Args: { p_anio: number }
+            Returns: {
+              anulado_por_id: string | null
+              company_id: string
+              concepto: string
+              created_at: string
+              created_by: string | null
+              estado: string
+              fecha: string
+              id: string
+              moneda_base: string
+              numero: number | null
+              origen: string
+              origen_evento: string | null
+              origen_id: string | null
+              origen_tabla: string | null
+              periodo: string | null
+              project_id: string | null
+              publicado_at: string | null
+              reversa_de_id: string | null
+              tipo: string
+              total_debe: number
+              total_haber: number
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conta_asientos"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { p_anio: number; p_project_id: string }
+            Returns: {
+              anulado_por_id: string | null
+              company_id: string
+              concepto: string
+              created_at: string
+              created_by: string | null
+              estado: string
+              fecha: string
+              id: string
+              moneda_base: string
+              numero: number | null
+              origen: string
+              origen_evento: string | null
+              origen_id: string | null
+              origen_tabla: string | null
+              periodo: string | null
+              project_id: string | null
+              publicado_at: string | null
+              reversa_de_id: string | null
+              tipo: string
+              total_debe: number
+              total_haber: number
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conta_asientos"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      conta_consolidado: {
+        Args: { p_company_id: string; p_desde: string; p_hasta: string }
         Returns: {
-          anulado_por_id: string | null
-          company_id: string
-          concepto: string
-          created_at: string
-          created_by: string | null
-          estado: string
-          fecha: string
-          id: string
-          moneda_base: string
-          numero: number | null
-          origen: string
-          origen_evento: string | null
-          origen_id: string | null
-          origen_tabla: string | null
-          periodo: string | null
-          project_id: string | null
-          publicado_at: string | null
-          reversa_de_id: string | null
-          tipo: string
-          total_debe: number
-          total_haber: number
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "conta_asientos"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+          activo: number
+          activo_origen: number
+          capital: number
+          capital_origen: number
+          gastos: number
+          gastos_origen: number
+          ingresos: number
+          ingresos_origen: number
+          ledger_nombre: string
+          ledger_project_id: string
+          moneda: string
+          pasivo: number
+          pasivo_origen: number
+          resultado: number
+          resultado_origen: number
+          tasa: number
+        }[]
       }
       conta_cuenta_para: {
         Args: { p_company_id: string; p_evento: string; p_project_id: string }
@@ -18043,7 +18758,12 @@ export type Database = {
           saldo: number
         }[]
       }
-      conta_moneda_base: { Args: { p_company_id: string }; Returns: string }
+      conta_moneda_base:
+        | { Args: { p_company_id: string }; Returns: string }
+        | {
+            Args: { p_company_id: string; p_project_id: string }
+            Returns: string
+          }
       conta_normalizar_moneda: { Args: { p_moneda: string }; Returns: string }
       conta_periodo_cerrado: {
         Args: { p_periodo: string; p_project_id: string }
@@ -18082,6 +18802,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      conta_revaluar_fx:
+        | {
+            Args: { p_aplicar?: boolean; p_fecha?: string }
+            Returns: {
+              ajuste: number
+              asiento_id: string
+              codigo: string
+              cuenta_id: string
+              moneda: string
+              nombre: string
+              resultado: string
+              saldo_libro: number
+              saldo_origen: number
+              saldo_revaluado: number
+              tasa: number
+            }[]
+          }
+        | {
+            Args: { p_aplicar: boolean; p_fecha: string; p_project_id: string }
+            Returns: {
+              ajuste: number
+              asiento_id: string
+              codigo: string
+              cuenta_id: string
+              moneda: string
+              nombre: string
+              resultado: string
+              saldo_libro: number
+              saldo_origen: number
+              saldo_revaluado: number
+              tasa: number
+            }[]
+          }
       conta_reversar_automatico: {
         Args: {
           p_company_id: string
@@ -18093,7 +18846,7 @@ export type Database = {
         Returns: string
       }
       conta_seed_catalogo: {
-        Args: { p_company_id: string }
+        Args: { p_company_id: string; p_project_id: string }
         Returns: undefined
       }
       conta_seed_cuenta: {
@@ -18105,11 +18858,26 @@ export type Database = {
           p_nivel: number
           p_nombre: string
           p_padre_codigo: string
+          p_project: string
           p_tipo: string
         }
         Returns: string
       }
-      conta_siguiente_folio: { Args: { p_company_id: string }; Returns: number }
+      conta_siguiente_folio:
+        | { Args: { p_company_id: string }; Returns: number }
+        | {
+            Args: { p_company_id: string; p_project_id: string }
+            Returns: number
+          }
+      conta_tasa_entre: {
+        Args: {
+          p_a: string
+          p_company_id: string
+          p_de: string
+          p_fecha: string
+        }
+        Returns: number
+      }
       conta_tasa_vigente: {
         Args: { p_company_id: string; p_fecha: string; p_moneda: string }
         Returns: number
@@ -18119,6 +18887,21 @@ export type Database = {
         Returns: undefined
       }
       current_user_role: { Args: never; Returns: string }
+      cartera_morosidad: {
+        Args: { p_project_id?: string }
+        Returns: {
+          unidad_id: string
+          bucket_0_30: number
+          bucket_31_60: number
+          bucket_61_90: number
+          bucket_90_plus: number
+          total_vencido: number
+          cuotas_vencidas: number
+          dias_atraso_max: number
+          periodos_morosos: number
+          score: number
+        }[]
+      }
       cxp_antiguedad_saldos: {
         Args: { p_company_id: string; p_project_id: string }
         Returns: {
@@ -18132,7 +18915,20 @@ export type Database = {
           total: number
         }[]
       }
-      cxp_seed_defaults: { Args: { p_company_id: string }; Returns: undefined }
+      cxp_proyeccion_pagos: {
+        Args: { p_company_id: string; p_project_id: string }
+        Returns: {
+          d0_7: number
+          d15_30: number
+          d31_mas: number
+          d8_14: number
+          proveedor: string
+          proveedor_id: string
+          sin_fecha: number
+          total: number
+          vencido: number
+        }[]
+      }
       deactivate_expired_tarifas: { Args: never; Returns: undefined }
       dispatch_scheduled_reports: {
         Args: { p_schedule_kind: string }
@@ -18159,6 +18955,8 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_recordatorios_cuotas: { Args: never; Returns: number }
+      export_company_data: { Args: { p_company_id: string }; Returns: Json }
       export_my_data: { Args: never; Returns: Json }
       fiscal_pac_estatus: {
         Args: { p_company_id: string }
@@ -18207,6 +19005,25 @@ export type Database = {
           version: string
         }[]
       }
+      get_kpis_tenant_mensual: {
+        Args: { p_desde: string; p_hasta: string; p_project_id?: string }
+        Returns: {
+          project_id: string
+          mes: string
+          cuotas_count: number
+          cuotas_morosas: number
+          unidades_con_deuda: number
+          cuotas_emitido: number
+          cuotas_cobrado: number
+          agua_recibos: number
+          agua_consumo_m3: number
+          agua_emitido: number
+          agua_cobrado: number
+          gastos_total: number
+          total_emitido: number
+          total_cobrado: number
+        }[]
+      }
       get_my_cliente_id: { Args: never; Returns: string }
       get_my_company_id: { Args: never; Returns: string }
       get_my_sessions: {
@@ -18224,10 +19041,6 @@ export type Database = {
         }[]
       }
       get_my_user_id: { Args: never; Returns: string }
-      export_company_data: {
-        Args: { p_company_id: string }
-        Returns: Json
-      }
       get_superadmin_empresas: {
         Args: {
           p_limit?: number
@@ -18268,21 +19081,16 @@ export type Database = {
           mrr_cents: number
         }[]
       }
-      get_superadmin_trends: {
-        Args: { p_months?: number }
-        Returns: {
-          altas: number
-          bajas: number
-          mes: string
-        }[]
-      }
       get_superadmin_plataforma_kpis: {
         Args: never
         Returns: {
           canceladas_30d: number
           empresas_activas: number
+          empresas_grandfathered: number
           empresas_inactivas: number
           mrr_cents: number
+          mrr_cobrable_cents: number
+          mrr_potencial_cents: number
           plan_distribution: Json
           refreshed_at: string
           suscripciones_activas: number
@@ -18292,6 +19100,14 @@ export type Database = {
           total_proyectos: number
           total_unidades: number
           total_usuarios: number
+        }[]
+      }
+      get_superadmin_trends: {
+        Args: { p_months?: number }
+        Returns: {
+          altas: number
+          bajas: number
+          mes: string
         }[]
       }
       get_user_permissions: {
@@ -18355,6 +19171,15 @@ export type Database = {
         Args: never
         Returns: Json
       }
+      mis_proyectos_ids: { Args: never; Returns: string[] }
+      mis_unidad_roles: {
+        Args: never
+        Returns: {
+          rol: string
+          unidad: string
+        }[]
+      }
+      mis_unidades_ids: { Args: never; Returns: string[] }
       notification_channel_enabled: {
         Args: { p_channel: string; p_user_id: string }
         Returns: boolean
@@ -18469,6 +19294,24 @@ export type Database = {
           updated_at: string
         }[]
       }
+      whatsapp_estatus: {
+        Args: { p_company_id: string }
+        Returns: {
+          company_id: string
+          created_at: string
+          estado_conexion: string
+          estado_mensaje: string
+          estado_probado_en: string
+          id: string
+          is_active: boolean
+          phone_number_id: string
+          provider: string
+          template_default: string
+          template_lang: string
+          tiene_token: boolean
+          updated_at: string
+        }[]
+      }
       pop_email_batch: {
         Args: { p_batch_size?: number }
         Returns: {
@@ -18479,6 +19322,31 @@ export type Database = {
           max_attempts: number
           payload: Json
           triggered_by: string
+        }[]
+      }
+      presupuesto_estado_partida: {
+        Args: { p_categoria: string; p_fecha: string; p_project_id: string }
+        Returns: {
+          cuenta_codigo: string
+          cuenta_id: string
+          cuenta_nombre: string
+          disponible: number
+          ejecutado: number
+          periodo: string
+          presupuestado: number
+        }[]
+      }
+      presupuesto_partida_estado: {
+        Args: {
+          p_company_id: string
+          p_cuenta_id: string
+          p_periodo: string
+          p_project_id: string
+        }
+        Returns: {
+          ejecutado: number
+          presupuestado: number
+          presupuesto_id: string
         }[]
       }
       presupuesto_vs_real: {
@@ -18540,12 +19408,38 @@ export type Database = {
       run_email_queue_worker: { Args: never; Returns: undefined }
       run_notifications_dispatcher: { Args: never; Returns: undefined }
       run_route_reminders: { Args: never; Returns: undefined }
+      snapshot_platform_metrics: { Args: never; Returns: undefined }
+      solicitar_ampliacion_limites: {
+        Args: { p_max_projects: number; p_max_units: number }
+        Returns: {
+          max_projects: number
+          max_units: number
+        }[]
+      }
       sso_lookup_domain: {
         Args: { p_domain: string }
         Returns: {
           enforced: boolean
           provider_id: string
           sso_available: boolean
+        }[]
+      }
+      superadmin_comisiones_resumen: {
+        Args: { p_company_id: string }
+        Returns: {
+          comision_total: number
+          mes: string
+          monto_total: number
+          pagos: number
+        }[]
+      }
+      superadmin_timbres_resumen: {
+        Args: { p_company_id: string }
+        Returns: {
+          con_costo: number
+          costo_total_cents: number
+          mes: string
+          timbres: number
         }[]
       }
       update_email_attempt: {

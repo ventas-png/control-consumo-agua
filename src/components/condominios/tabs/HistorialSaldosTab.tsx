@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { upsertCondominioRow } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -47,7 +48,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
           label: 'Período (YYYY-MM)',
           type: 'month',
           required: true,
-          initialValue: new Date().toISOString().slice(0, 7),
+          initialValue: mesLocalISO(),
           autoFocus: true,
         },
       ],

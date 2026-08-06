@@ -3,15 +3,20 @@ import {
   fetchPortalBootstrap,
   fetchPortalContadores,
   fetchPortalProjectsByCompanies,
+  fetchPortalFotoIds,
   fetchRegistrosByContadores,
   fetchRegistrosByProjects,
+  fetchConsumoComunidad,
 } from '../../domain/portal/queries'
 import { updateCliente } from '../../domain/clientes/mutations'
+import { confirmarPago } from '../../domain/portal/mutations'
+import { notify } from '../shared/Dialog'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
-import { useSignedUrl } from '../../lib/storageUrls'
-import { construirDashboardData, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
+import { resolveChartColor } from '../../lib/chartColors'
+import { PhotoLightbox } from '../shared/PhotoLightbox'
+import { construirDashboardData, type ComunidadMensual, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
 import type { PortalCtx } from './customer/ctx'
 import type { CompanyInfo, ProjectInfo, ClienteContacto } from './customer/ctx'
 import { DashboardTab } from './customer/DashboardTab'
@@ -27,38 +32,6 @@ interface Props {
 }
 
 
-
-
-
-// Lightbox que firma la URL bajo demanda con useSignedUrl. Se extrae como
-// sub-componente para que el hook pueda llamarse condicionalmente (solo
-// cuando hay un photoModal abierto).
-function PhotoLightbox({ modal, onClose }: { modal: { url: string; label: string }; onClose: () => void }) {
-  const signedUrl = useSignedUrl(modal.url, 'registro-fotos')
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 9999, cursor: 'pointer', flexDirection: 'column', gap: '14px', padding: '24px',
-      }}
-    >
-      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', textAlign: 'center', maxWidth: '80vw' }}>
-        {modal.label}
-      </div>
-      {signedUrl && (
-        <img
-          src={signedUrl}
-          alt={modal.label}
-          style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', objectFit: 'contain' }}
-        />
-      )}
-      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
-    </div>
-  )
-}
-
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
@@ -71,6 +44,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [contadores, setContadores] = useState<ContadorInfo[]>([])
   const [lecturas, setLecturas] = useState<LecturaInfo[]>([])
   const [registros, setRegistros] = useState<Registro[]>([])
+  const [fotoRegistroIds, setFotoRegistroIds] = useState<Set<string>>(new Set())
   const [contactoEdit, setContactoEdit] = useState<ClienteContacto>({
     email: null, telefono: null, whatsapp: null, telefono_alterno: null,
   })
@@ -78,7 +52,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [contactoMsg, setContactoMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [expandedContador, setExpandedContador] = useState<string | null>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [photoModal, setPhotoModal] = useState<{ url: string; label: string } | null>(null)
+  const [photoModal, setPhotoModal] = useState<{ registroId: string; label: string } | null>(null)
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
   const [chartMonthsBack, setChartMonthsBack] = useState(12)
@@ -88,6 +62,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [chartMetric, setChartMetric] = useState<'m3' | 'moneda'>('m3')
   const [selectedUnidadId, setSelectedUnidadId] = useState<string | null>(null)
   const [selectedTipoAgua, setSelectedTipoAgua] = useState<string | null>(null)
+  const [comunidad, setComunidad] = useState<ComunidadMensual[]>([])
 
   const clienteId = currentUser.cliente_id
 
@@ -113,37 +88,36 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const companiesList = Object.values(companyMap)
       setCompanyActivoMap(activoMap)
 
-      // Load active units first, then fetch contadores by their unidad_id
       const unidadesList = (uData as UnidadInfo[]) ?? []
       const unidadIds = unidadesList.map(u => u.id)
-      let cData: ContadorInfo[] = []
-      if (unidadIds.length > 0) {
-        const contData = await fetchPortalContadores(unidadIds)
-        cData = (contData as ContadorInfo[]) ?? []
-      }
+      const companyIds = companiesList.map(c => c.id)
+      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))] as string[]
+
+      // Contadores y proyectos no dependen entre sí (ambos salen del bootstrap):
+      // se piden en paralelo en vez de en cascada — quita un round-trip del arranque.
+      const [contData, pData] = await Promise.all([
+        unidadIds.length > 0 ? fetchPortalContadores(unidadIds) : Promise.resolve(null),
+        companyIds.length > 0 ? fetchPortalProjectsByCompanies(companyIds) : Promise.resolve(null),
+      ])
+      const cData = (contData as ContadorInfo[]) ?? []
+
       setCompanies(companiesList)
-
-      // Fetch projects for found companies
-      if (companiesList.length > 0) {
-        const pData = await fetchPortalProjectsByCompanies(companiesList.map(c => c.id))
-        setProjects((pData as ProjectInfo[]) ?? [])
-      } else {
-        setProjects([])
-      }
-
+      setProjects((pData as ProjectInfo[]) ?? [])
       setUnidades(unidadesList)
       setContadores(cData)
 
-      // Run both fallbacks in parallel (instead of sequentially) — saves ~400-1500ms on cold start.
+      // Fallbacks de lecturas + índice de fotos, todo en paralelo (ahorra round-trips):
       // Fallback 1: by contador_id — catches registros where cliente_id is wrong/null
       // Fallback 2: by project_id — catches registros where contador_id is also null
       //   (safe because RLS, migration 20260420000023, restricts clients to their own data)
+      // fotoIds: ids de lecturas con foto (sin bajar el base64; los bytes van bajo demanda)
       const contadorIds = cData.map(c => c.id)
-      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))] as string[]
-      const [byContadorData, byProjectData] = await Promise.all([
+      const [byContadorData, byProjectData, fotoIds] = await Promise.all([
         contadorIds.length > 0 ? fetchRegistrosByContadores(contadorIds) : Promise.resolve(null),
         unidadProjectIds.length > 0 && clienteId ? fetchRegistrosByProjects(unidadProjectIds) : Promise.resolve(null),
+        clienteId ? fetchPortalFotoIds(clienteId, contadorIds, unidadProjectIds) : Promise.resolve([] as string[]),
       ])
+      setFotoRegistroIds(new Set(fotoIds))
 
       const merged = new Map<string, LecturaInfo>()
       for (const row of (rData as LecturaInfo[] | null) ?? []) merged.set(row.id, row)
@@ -173,12 +147,67 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     cargarDatos()
   }, [cargarDatos])
 
+  // F2 pago en línea: retorno del checkout hospedado (?pago=ok|cancelado). En 'ok'
+  // confirma+concilia server-side el pago guardado antes de redirigir. Corre una
+  // sola vez al montar; limpia el query param para no re-disparar en refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pago = params.get('pago')
+    if (!pago) return
+    params.delete('pago')
+    window.history.replaceState({}, '', window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash)
+    if (pago === 'cancelado') {
+      notify({ variant: 'warning', title: 'Pago cancelado', text: 'No se completó el pago. Podés intentarlo de nuevo.' })
+      return
+    }
+    if (pago !== 'ok') return
+    let prId: string | null = null
+    try { prId = sessionStorage.getItem('pago_pr_id'); sessionStorage.removeItem('pago_pr_id') } catch { /* no-op */ }
+    if (!prId) return
+    void (async () => {
+      const conf = await confirmarPago(prId)
+      if (conf.error) { notify({ variant: 'error', title: 'Pago no confirmado', text: conf.error }); return }
+      if (conf.estado === 'aprobado') {
+        notify({
+          variant: 'success',
+          title: conf.liquidado ? 'Recibo pagado' : 'Abono registrado',
+          text: conf.liquidado ? 'Tu recibo quedó al día.' : `Saldo restante: Q ${(conf.saldoRestante ?? 0).toFixed(2)}`,
+        })
+        cargarDatos()
+      } else {
+        notify({ variant: 'info', title: 'Pago en proceso', text: 'Tu pago aún se está procesando; se reflejará en unos momentos.' })
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Referencia anónima de la comunidad para el proyecto activo (O5/V6). Con un
+  // solo proyecto propio se usa ese; con varios, solo cuando el residente elige
+  // uno en el filtro (evita mezclar comunidades). 24 meses cubre la ventana máx.
+  const comunidadProjectId = useMemo(() => {
+    if (selectedProjectId) return selectedProjectId
+    const propios = projects.filter(p =>
+      unidades.some(u => u.project_id === p.id) || contadores.some(c => c.project_id === p.id)
+    )
+    return propios.length === 1 ? propios[0].id : null
+  }, [selectedProjectId, projects, unidades, contadores])
+
+  useEffect(() => {
+    if (!comunidadProjectId) { setComunidad([]); return }
+    let cancelled = false
+    fetchConsumoComunidad(comunidadProjectId, 24)
+      .then(rows => { if (!cancelled) setComunidad(rows) })
+      .catch(() => { if (!cancelled) setComunidad([]) })
+    return () => { cancelled = true }
+  }, [comunidadProjectId])
+
   // ── Dashboard analytics (useMemo) ────────────────────────
   const dashboardData = useMemo(() => construirDashboardData({
-    lecturas, contadores, unidades,
+    lecturas, contadores, unidades, fotoRegistroIds,
     selectedProjectId, selectedUnidadId, selectedTipoAgua,
     chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric,
-  }), [lecturas, contadores, unidades, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric])
+    comunidad,
+  }), [lecturas, contadores, unidades, fotoRegistroIds, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric, comunidad])
 
   // ── Chart.js bar chart (per-counter, configurable range & metric) ──
   useEffect(() => {
@@ -186,12 +215,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const timeout = setTimeout(() => {
       if (!chartRef.current) return
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
-      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData } = dashboardData
+      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData, medianaComunidadData } = dashboardData
       const moneda = selectedProjectId
         ? (projects.find(p => p.id === selectedProjectId)?.moneda ?? projects[0]?.moneda ?? 'Q')
         : (projects[0]?.moneda ?? 'Q')
       const metricLabel = chartMetric === 'm3' ? 'm³' : moneda
       const hasTrend = trendData.some(v => v > 0)
+      // Mediana de la comunidad: solo en m³ (el RPC no expone importes ajenos) y
+      // solo si hay algún mes con dato dentro de la ventana visible.
+      const hasComunidad = chartMetric === 'm3' && medianaComunidadData.some(v => v != null)
       chartInstance.current = new Chart(chartRef.current, {
         type: 'bar',
         data: {
@@ -202,7 +234,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               label,
               data,
               backgroundColor: chartLabels.map((_, i) =>
-                i === chartCurrentMonthIdx ? colorSet.full : colorSet.soft
+                // V1: colorSet.full es un token var(--at-*); el canvas no lo
+                // resuelve, así que las barras del mes actual salían en negro.
+                i === chartCurrentMonthIdx ? resolveChartColor(colorSet.full) : colorSet.soft
               ),
               borderRadius: 6,
               borderSkipped: false,
@@ -211,7 +245,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               type: 'line' as const,
               label: 'Tendencia',
               data: trendData,
-              borderColor: 'var(--at-warning)',
+              borderColor: resolveChartColor('var(--at-warning)'),
               borderWidth: 2,
               borderDash: [6, 4],
               pointRadius: 0,
@@ -219,6 +253,20 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               tension: 0.4,
               backgroundColor: 'transparent',
               order: -1,
+            }] : []),
+            ...(hasComunidad ? [{
+              type: 'line' as const,
+              label: 'Mediana de la comunidad',
+              data: medianaComunidadData,
+              borderColor: resolveChartColor('var(--at-accent-2)'),
+              borderWidth: 2,
+              borderDash: [3, 3],
+              pointRadius: 0,
+              fill: false,
+              tension: 0.3,
+              backgroundColor: 'transparent',
+              spanGaps: true,
+              order: -2,
             }] : []),
           ],
         },
@@ -228,7 +276,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           animation: { duration: 400 },
           plugins: {
             legend: {
-              display: chartDatasets.length > 1 || hasTrend,
+              display: chartDatasets.length > 1 || hasTrend || hasComunidad,
               labels: {
                 font: { size: 11 }, color: 'var(--at-ink-2)', boxWidth: 12, padding: 14,
                 filter: item => item.text !== 'Tendencia' || hasTrend,
@@ -406,11 +454,16 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{
+        {/* Tabs — misma tira que el portal de Condominios: una sola línea con
+            scroll horizontal. Sin `overflow-x: auto` + `white-space: nowrap`
+            las 5 pestañas no caben en un teléfono: las etiquetas se partían en
+            dos líneas ("Mis / Servicios") y, aun así, la fila ensanchaba el
+            documento y TODO el portal se podía arrastrar de lado. Aquí no hay
+            red de seguridad de `.app-main`, que solo cubre el panel de admin. */}
+        <div className="tab-strip-scrollable" style={{
           maxWidth: '900px', margin: '0 auto',
           padding: '0 24px',
-          display: 'flex', gap: '4px',
+          display: 'flex', gap: '4px', overflowX: 'auto',
         }}>
           {([
             { key: 'dashboard', label: 'Dashboard', icon: '📈' },
@@ -424,14 +477,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               className={`portal-tab${tab === t.key ? ' active' : ''}`}
               onClick={() => setTab(t.key)}
               style={{
-                padding: '10px 18px',
+                padding: '10px 16px',
                 background: tab === t.key ? 'var(--at-surface)' : 'transparent',
                 color: tab === t.key ? 'var(--at-primary)' : 'rgba(255,255,255,0.85)',
                 border: 'none',
                 borderRadius: '10px 10px 0 0',
-                fontSize: '13.5px', fontWeight: 600,
+                fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.18s',
                 display: 'flex', alignItems: 'center', gap: '6px',
+                whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
               <span>{t.icon}</span> {t.label}
@@ -455,7 +509,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             registros={registros}
             clientes={[]}
             currentUser={currentUser}
+            companyId={companies[0]?.id}
             moneda={projects[0]?.moneda ?? 'Q'}
+            onDataChange={cargarDatos}
           />
         )}
 
@@ -478,7 +534,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       {/* ── Lightbox de fotos ── */}
       {photoModal && (
-        <PhotoLightbox modal={photoModal} onClose={() => setPhotoModal(null)} />
+        <PhotoLightbox registroId={photoModal.registroId} label={photoModal.label} onClose={() => setPhotoModal(null)} />
       )}
     </div>
   )

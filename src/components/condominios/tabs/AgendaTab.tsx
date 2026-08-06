@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AgendaItem, TipoAgenda, EstadoAgenda } from '../../../types'
@@ -32,7 +33,7 @@ const blank = (): Partial<AgendaItem> => ({
   titulo: '',
   descripcion: '',
   tipo: 'tarea',
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: hoyLocalISO(),
   hora_inicio: '',
   hora_fin: '',
   estado: 'pendiente',
@@ -41,7 +42,7 @@ const blank = (): Partial<AgendaItem> => ({
 })
 
 export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [vistaMode, setVistaMode] = useState<'proximos' | 'todos' | 'completados'>('proximos')
   const [filtroTipo, setFiltroTipo] = useState<TipoAgenda | 'todos'>('todos')
   const [form, setForm] = useState<Partial<AgendaItem>>(blank())

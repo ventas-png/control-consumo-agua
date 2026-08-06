@@ -23,7 +23,9 @@
 // validamos el token a mano (service_role O admin JWT), igual que timbrar-documento.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   getFiscalProvider,
   resolverConfigFiscalEfectiva,
@@ -124,7 +126,8 @@ async function cargarCredencialesPac(
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .maybeSingle()
-    const cred = (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales
+    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const cred = await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null
     if (cred && Object.keys(cred).length > 0) return cred
   }
   const { data } = await admin
@@ -133,7 +136,7 @@ async function cargarCredencialesPac(
     .eq('company_id', companyId)
     .is('project_id', null)
     .maybeSingle()
-  return (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales ?? null
+  return (await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null) ?? null
 }
 
 Deno.serve(async (req: Request) => {
@@ -157,7 +160,7 @@ Deno.serve(async (req: Request) => {
     let callerIsSuperAdmin = false
     let internal = false
 
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)

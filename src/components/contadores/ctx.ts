@@ -36,6 +36,7 @@ export interface ContadoresCtx {
   unidades: Unidad[]
   moneda: string
   canEdit: boolean
+  canDelete: boolean
 
   // ── Estado del modal ──
   form: ContadorForm

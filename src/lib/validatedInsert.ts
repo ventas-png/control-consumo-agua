@@ -50,6 +50,23 @@ export function isValidationError(
   )
 }
 
+/**
+ * E1: ¿el insert fue rechazado por una llave natural UNIQUE (Postgres 23505)?
+ * Los índices anti-duplicado (uq_registros_llave_natural,
+ * uq_cuotas_condominio_llave_natural) rechazan la fila repetida; el caller lo
+ * reporta como "ya existía" en vez de mostrar el error crudo de Postgres.
+ * (PostgREST no soporta índices PARCIALES como árbitro de ON CONFLICT, por eso
+ * el manejo es post-error y no upsert.)
+ */
+export function esDuplicadoLlaveNatural(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === '23505'
+  )
+}
+
 type SupabaseClientLike = typeof defaultClient
 
 export interface ValidatedInsertOptions {

@@ -36,4 +36,7 @@ export const aguaKeys = {
     [...aguaKeys.all, 'registros', 'consumo-mensual-por-proyecto', proyectoId] as const,
   medidoresAguaPorProyecto: (companyId: string, proyectoId: string) =>
     [...aguaKeys.all, 'medidores-agua', 'por-proyecto', companyId, proyectoId] as const,
+  // Anomalías de consumo (RPC agua_anomalias_consumo) por tenant/proyecto.
+  anomaliasConsumo: (companyId?: string, projectId?: string | null) =>
+    [...aguaKeys.all, 'anomalias-consumo', companyId ?? null, projectId ?? null] as const,
 } as const

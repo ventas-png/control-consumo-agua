@@ -1,12 +1,14 @@
 // Hooks de LECTURA del dominio Superadmin (plataforma).
 //
 // Consumen VISTAS MATERIALIZADAS vía RPC SECURITY DEFINER (migraciones
-// 20260605200000 + 20260612180100) en vez de agregar listas completas en el
-// cliente:
-//   · get_superadmin_plataforma_kpis() — KPIs globales del SaaS (1 fila).
-//   · get_superadmin_empresas()        — listado paginado/buscable/filtrable.
-//   · get_superadmin_trends()          — altas/bajas por mes (gráficas).
-//   · get_superadmin_mrr_trend()       — serie diaria de MRR (snapshot cron).
+// 20260605200000 + 20260612180100 + 20260717180000) en vez de agregar listas
+// completas en el cliente:
+//   · get_superadmin_plataforma_kpis()  — KPIs globales del SaaS (1 fila).
+//   · get_superadmin_empresas()         — listado paginado/buscable/filtrable.
+//   · get_superadmin_trends()           — altas/bajas por mes (gráficas).
+//   · get_superadmin_mrr_trend()        — serie diaria de MRR + desglose
+//     cobrable/potencial (snapshot cron).
+//   · get_superadmin_trial_cohortes()   — cohortes de trial por mes de alta.
 // Todas las RPC están acotadas a super_admin en la BD. Convención de
 // src/domain/README.md (queryFn con runQuery). El `.rpc(...)` se tipa laxo sin
 // los tipos generados de Supabase, así que se castea — igual que sesiones/agua.
@@ -31,6 +33,11 @@ export interface PlataformaKpis {
   total_proyectos: number
   total_unidades: number
   mrr_cents: number
+  /** F2 (C6): partición del MRR active por cobrabilidad (con/sin Stripe). */
+  mrr_cobrable_cents: number
+  mrr_potencial_cents: number
+  /** Pilotos con suscripción active SIN stripe_subscription_id (operan gratis). */
+  empresas_grandfathered: number
   suscripciones_activas: number
   suscripciones_trialing: number
   canceladas_30d: number
@@ -148,6 +155,7 @@ export function useSuperadminTrendsQuery(months = 12, enabled = true) {
         supabase.rpc('get_superadmin_trends', { p_months: months }).abortSignal(signal))) ??
         []) as unknown as SuperadminTrendPoint[],
     enabled,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -155,10 +163,16 @@ export function useSuperadminTrendsQuery(months = 12, enabled = true) {
 export interface MrrTrendPoint {
   day: string
   mrr_cents: number
+  /** Desglose cobrable/potencial (20260717180000). null = día sin desglose
+   *  registrado (filas previas a la migración) — jamás tratarlo como 0. */
+  mrr_cobrable_cents: number | null
+  mrr_potencial_cents: number | null
   empresas_activas: number
+  suscripciones_vigentes: number
+  suscripciones_trialing: number | null
 }
 
-/** Serie diaria de MRR/empresas activas (gráfica del dashboard). */
+/** Serie diaria de MRR (total + desglose) y conteos (gráficas del dashboard). */
 export function useMrrTrendQuery(days = 90, enabled = true) {
   return useQuery<MrrTrendPoint[]>({
     queryKey: superadminKeys.mrrTrend(days),
@@ -167,6 +181,88 @@ export function useMrrTrendQuery(days = 90, enabled = true) {
         supabase.rpc('get_superadmin_mrr_trend', { p_days: days }).abortSignal(signal))) ??
         []) as unknown as MrrTrendPoint[],
     enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Una cohorte mensual de trials clasificada por su estado ACTUAL. Los seis
+ *  buckets particionan la cohorte completa (suman = trials). */
+export interface TrialCohortePoint {
+  mes: string
+  trials: number
+  activas_cobrables: number
+  activas_sin_cobro: number
+  en_trial: number
+  trial_vencido: number
+  pago_vencido: number
+  canceladas: number
+}
+
+/**
+ * Cohortes de trial por mes de alta (RPC get_superadmin_trial_cohortes,
+ * acotada a super_admin). Reporta el estado actual de cada camada — no es
+ * conversión a ventana de 30 días.
+ */
+export function useTrialCohortesQuery(months = 12, enabled = true) {
+  return useQuery<TrialCohortePoint[]>({
+    queryKey: superadminKeys.trialCohortes(months),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase.rpc('get_superadmin_trial_cohortes', { p_months: months }).abortSignal(signal))) ??
+        []) as unknown as TrialCohortePoint[],
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Config del modelo de cobro del timbrado fiscal (timbrado_config) — F8. */
+export interface TimbradoConfigEmpresa {
+  activo: boolean
+  /** Precio por DTE en USD cents (unidad de billing_plans). */
+  precio_dte_cents: number
+  /** DTEs incluidos sin costo por mes calendario. */
+  timbres_incluidos: number
+}
+
+/**
+ * Modelo de cobro del timbrado de una empresa (fila única), o null si no se ha
+ * configurado. La RLS permite leerlo al superadmin y al propio tenant.
+ */
+export function useEmpresaTimbradoQuery(companyId: string | null, enabled = true) {
+  return useQuery<TimbradoConfigEmpresa | null>({
+    queryKey: superadminKeys.empresaTimbrado(companyId ?? ''),
+    queryFn: async () => {
+      const rows = ((await runQuery((signal) =>
+        supabase
+          .from('timbrado_config')
+          .select('activo, precio_dte_cents, timbres_incluidos')
+          .eq('company_id', companyId as string)
+          .limit(1)
+          .abortSignal(signal))) ?? []) as unknown as TimbradoConfigEmpresa[]
+      return rows[0] ?? null
+    },
+    enabled: enabled && !!companyId,
+  })
+}
+
+/** Un mes del contador de timbres (RPC superadmin_timbres_resumen). */
+export interface TimbresMesResumen {
+  mes: string
+  timbres: number
+  con_costo: number
+  costo_total_cents: number
+}
+
+/** Timbres certificados y costo sellado por mes (últimos 6 con actividad). */
+export function useEmpresaTimbresResumenQuery(companyId: string | null, enabled = true) {
+  return useQuery<TimbresMesResumen[]>({
+    queryKey: superadminKeys.empresaTimbresResumen(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .rpc('superadmin_timbres_resumen', { p_company_id: companyId as string })
+          .abortSignal(signal))) ?? []) as unknown as TimbresMesResumen[],
+    enabled: enabled && !!companyId,
   })
 }
 
@@ -195,6 +291,28 @@ export function useEmpresaUsuariosQuery(companyId: string | null, enabled = true
   })
 }
 
+/**
+ * Moneda de cobro de una empresa (companies.default_currency, ISO minúsculas).
+ * Query puntual para el drawer: el listado (RPC v2) no la incluye y así se
+ * evita recrear la firma de get_superadmin_empresas por un solo campo.
+ */
+export function useEmpresaMonedaQuery(companyId: string | null, enabled = true) {
+  return useQuery<string | null>({
+    queryKey: superadminKeys.empresaMoneda(companyId ?? ''),
+    queryFn: async () => {
+      const rows = ((await runQuery((signal) =>
+        supabase
+          .from('companies')
+          .select('default_currency')
+          .eq('id', companyId as string)
+          .limit(1)
+          .abortSignal(signal))) ?? []) as unknown as Array<{ default_currency: string | null }>
+      return rows[0]?.default_currency ?? null
+    },
+    enabled: enabled && !!companyId,
+  })
+}
+
 /** Desglose del total mensual de una empresa (RPC calculate_monthly_total_cents). */
 export interface EmpresaBillingBreakdown {
   total_cents: number
@@ -206,6 +324,56 @@ export interface EmpresaBillingBreakdown {
   primary_units_count: number
   extra_units_count: number
   primary_project_id: string | null
+}
+
+/** Fila de comisión transaccional configurada (comision_config) — F7. */
+export interface ComisionConfigFila {
+  canal: string
+  activo: boolean
+  /** Fracción (0.025 = 2.5%). */
+  pct: number
+  /** Monto fijo por pago, en la moneda de cobro del tenant. */
+  fijo: number
+}
+
+/**
+ * Config de comisión de plataforma de una empresa (todas sus filas por canal).
+ * La RLS permite leerla al superadmin y al propio tenant.
+ */
+export function useEmpresaComisionQuery(companyId: string | null, enabled = true) {
+  return useQuery<ComisionConfigFila[]>({
+    queryKey: superadminKeys.empresaComision(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .from('comision_config')
+          .select('canal, activo, pct, fijo')
+          .eq('company_id', companyId as string)
+          .order('canal', { ascending: true })
+          .abortSignal(signal))) ?? []) as unknown as ComisionConfigFila[],
+    enabled: enabled && !!companyId,
+  })
+}
+
+/** Un mes del resumen de comisiones selladas (RPC superadmin_comisiones_resumen). */
+export interface ComisionMesResumen {
+  mes: string
+  pagos: number
+  monto_total: number
+  comision_total: number
+}
+
+/** Comisiones de plataforma acumuladas por mes (pagos succeeded, últimos 6 meses). */
+export function useEmpresaComisionResumenQuery(companyId: string | null, enabled = true) {
+  return useQuery<ComisionMesResumen[]>({
+    queryKey: superadminKeys.empresaComisionResumen(companyId ?? ''),
+    queryFn: async () =>
+      ((await runQuery((signal) =>
+        supabase
+          .rpc('superadmin_comisiones_resumen', { p_company_id: companyId as string })
+          .abortSignal(signal))) ?? []) as unknown as ComisionMesResumen[],
+    enabled: enabled && !!companyId,
+  })
 }
 
 /**

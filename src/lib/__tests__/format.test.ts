@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   parseFecha,
+  dateLocalISO,
+  hoyLocalISO,
+  mesLocalISO,
+  datetimeLocalISO,
   formatDate,
   formatDateShort,
   formatDateTime,
@@ -33,6 +37,65 @@ describe('parseFecha', () => {
   it('pasa Date sin tocar', () => {
     const date = new Date(2026, 4, 16)
     expect(parseFecha(date)).toBe(date)
+  })
+})
+
+describe('dateLocalISO / hoyLocalISO (E4/D5)', () => {
+  it('usa los componentes LOCALES de la fecha (no la fecha UTC)', () => {
+    // 23:30 local: toISOString() daría la fecha UTC (posible "mañana");
+    // dateLocalISO debe conservar el día local.
+    const d = new Date(2026, 6, 31, 23, 30, 0) // 31 jul local, 23:30
+    expect(dateLocalISO(d)).toBe('2026-07-31')
+  })
+
+  it('con padding de mes y día', () => {
+    expect(dateLocalISO(new Date(2026, 0, 5, 8, 0, 0))).toBe('2026-01-05')
+  })
+
+  it('hoyLocalISO coincide con dateLocalISO(new Date())', () => {
+    expect(hoyLocalISO()).toBe(dateLocalISO(new Date()))
+  })
+
+  it('round-trip con parseFecha: conserva el mismo día local', () => {
+    const iso = dateLocalISO(new Date(2026, 11, 31, 22, 0, 0))
+    expect(parseFecha(iso).getDate()).toBe(31)
+    expect(parseFecha(iso).getMonth()).toBe(11)
+  })
+})
+
+// ── Helpers añadidos por el barrido de PR-24 (auditoría 2026-07-28) ─────────
+describe('mesLocalISO', () => {
+  it('usa el mes LOCAL, no el UTC', () => {
+    // La noche del último día del mes es donde se rompe: `toISOString()` de una
+    // fecha local tardía cae ya en el mes siguiente en husos negativos, así que
+    // un cierre contable o una emisión de cuotas lanzada a las 19:00 del 31 se
+    // etiquetaba con el período equivocado.
+    expect(mesLocalISO(new Date(2026, 6, 31, 23, 30, 0))).toBe('2026-07')
+    expect(mesLocalISO(new Date(2026, 0, 1, 0, 15, 0))).toBe('2026-01')
+  })
+
+  it('padea el mes a dos dígitos', () => {
+    expect(mesLocalISO(new Date(2026, 8, 15, 12, 0, 0))).toBe('2026-09')
+  })
+
+  it('sin argumento usa el instante actual', () => {
+    expect(mesLocalISO()).toBe(dateLocalISO(new Date()).slice(0, 7))
+  })
+})
+
+describe('datetimeLocalISO', () => {
+  it('devuelve el formato que espera <input type="datetime-local">', () => {
+    expect(datetimeLocalISO(new Date(2026, 6, 31, 9, 5, 0))).toBe('2026-07-31T09:05')
+  })
+
+  it('conserva la hora LOCAL (toISOString la habría desplazado)', () => {
+    // En GMT-6 el patrón anterior prellenaba el control seis horas en el futuro.
+    const d = new Date(2026, 6, 31, 23, 45, 0)
+    expect(datetimeLocalISO(d)).toBe('2026-07-31T23:45')
+  })
+
+  it('padea horas y minutos', () => {
+    expect(datetimeLocalISO(new Date(2026, 0, 2, 3, 7, 0))).toBe('2026-01-02T03:07')
   })
 })
 

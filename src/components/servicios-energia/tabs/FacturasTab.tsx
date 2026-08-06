@@ -14,6 +14,8 @@ interface FacturasTabProps {
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** RBAC granular: permiso de eliminar (default true para no romper usos existentes) */
+  canDelete?: boolean
 }
 
 export default function FacturasTab({
@@ -26,6 +28,7 @@ export default function FacturasTab({
   moneda,
   canCreate,
   canEdit,
+  canDelete = true,
 }: FacturasTabProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingFactura, setEditingFactura] = useState<FacturaEnergia | null>(null)
@@ -198,37 +201,37 @@ export default function FacturasTab({
                     </td>
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                       {canEdit && (
-                        <>
-                          <button
-                            onClick={() => handleEdit(f)}
-                            style={{
-                              marginRight: '0.5rem',
-                              padding: '0.25rem 0.75rem',
-                              backgroundColor: 'var(--at-primary)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDelete(f.id)}
-                            style={{
-                              padding: '0.25rem 0.75rem',
-                              backgroundColor: 'var(--at-danger)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                            }}
-                          >
-                            Eliminar
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleEdit(f)}
+                          style={{
+                            marginRight: '0.5rem',
+                            padding: '0.25rem 0.75rem',
+                            backgroundColor: 'var(--at-primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(f.id)}
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            backgroundColor: 'var(--at-danger)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          Eliminar
+                        </button>
                       )}
                     </td>
                   </tr>

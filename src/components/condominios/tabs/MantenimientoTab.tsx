@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -5,6 +6,8 @@ import { softDelete } from '../../../lib/softDelete'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { ImageGallery } from '../../shared/ImageGallery'
+import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
+import { TicketChatModal } from './TicketChatModal'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -13,6 +16,8 @@ interface Props {
   proyectoId: string
   companyId: string
   userId: string
+  /** Firma las respuestas del equipo en la conversación del ticket. */
+  autorNombre?: string
   proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
@@ -33,13 +38,15 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, autorNombre = '', proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<string>('activos')
   const [busqueda, setBusqueda] = useState('')
   const [fotoUrls, setFotoUrls] = useState<string[]>([])
+  const [archivoUrls, setArchivoUrls] = useState<string[]>([])
+  const [conversacion, setConversacion] = useState<TicketMantenimiento | null>(null)
   const [form, setForm] = useState({
     tipo: 'correctivo',
     titulo: '',
@@ -79,6 +86,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   function resetForm() {
     setForm({ tipo: 'correctivo', titulo: '', descripcion: '', prioridad: 'media', unidad_id: '', fecha_limite: '', costo_estimado: '' })
     setFotoUrls([])
+    setArchivoUrls([])
     setShowForm(false)
   }
 
@@ -99,13 +107,13 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         t.costo_real != null ? t.costo_real.toFixed(2) : '—',
       ]),
       rightAlignCols: [6, 7],
-      filename: `tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`,
+      filename: `tickets-mantenimiento-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`tickets-mantenimiento-${hoyLocalISO()}`, [{
       name: 'Tickets',
       headers: ['Título', 'Descripción', 'Tipo', 'Prioridad', 'Unidad', 'Estado', 'Fecha límite', 'Costo estimado', 'Costo real', 'Fecha creación', 'Fecha cierre'],
       rows: filtrados.map(t => [
@@ -134,6 +142,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       fecha_limite: form.fecha_limite || null,
       costo_estimado: form.costo_estimado ? Number(form.costo_estimado) : null,
       foto_urls: fotoUrls,
+      archivo_urls: archivoUrls,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -291,6 +300,9 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             <div style={{ gridColumn: '1 / -1' }}>
               <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiFileUploader values={archivoUrls} onChange={setArchivoUrls} folder="tickets" label="Documentos (cotización, garantía…)" maxFiles={6} />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -312,7 +324,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
           {filtrados.map(t => {
             const pColor = PRIORIDAD_COLORS[t.prioridad] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const eColor = ESTADO_COLORS[t.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
-            const vencido = t.fecha_limite && t.fecha_limite < new Date().toISOString().slice(0, 10) && t.estado !== 'cerrado'
+            const vencido = t.fecha_limite && t.fecha_limite < hoyLocalISO() && t.estado !== 'cerrado'
             return (
               <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -336,6 +348,11 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                         <ImageGallery urls={t.foto_urls} maxVisible={4} />
                       </div>
                     )}
+                    {t.archivo_urls?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <ListaAdjuntos paths={t.archivo_urls} />
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
                     {canEdit ? (
@@ -351,6 +368,12 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                         {t.estado.replace('_', ' ')}
                       </span>
                     )}
+                    {/* Mismo hilo que ve el residente en su portal (las notas
+                        internas quedan solo de este lado). */}
+                    <button onClick={() => setConversacion(t)} title="Conversación con el residente"
+                      style={{ padding: '4px 11px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                      💬 Conversación
+                    </button>
                     <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                   </div>
                 </div>
@@ -358,6 +381,19 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             )
           })}
         </div>
+      )}
+
+      {conversacion && (
+        <TicketChatModal
+          ticket={conversacion}
+          companyId={companyId}
+          autorNombre={autorNombre}
+          autorUserId={userId}
+          canWrite={canEdit}
+          esStaff
+          onClose={() => setConversacion(null)}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   )

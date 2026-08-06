@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo, useState } from 'react'
 import { Unidad, ContratoArrendamiento, Mascota, VehiculoResidente } from '../../../types'
 
@@ -87,7 +88,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `directorio_comunidad_${new Date().toISOString().slice(0, 10)}.csv`
+    a.href = url; a.download = `directorio_comunidad_${hoyLocalISO()}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 

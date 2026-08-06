@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -120,13 +121,13 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     if (!result) return
     const proxima = result.proxima || null
     const { error } = await updateCondominioRow('equipos_comunes', equipo.id, {
-      ultimo_mantenimiento: new Date().toISOString().split('T')[0],
+      ultimo_mantenimiento: hoyLocalISO(),
       proximo_mantenimiento: proxima,
       estado: 'operativo' as EstadoEquipo,
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     if (selected?.id === equipo.id) {
-      setSelected(prev => prev ? { ...prev, ultimo_mantenimiento: new Date().toISOString().split('T')[0], proximo_mantenimiento: proxima || undefined, estado: 'operativo' } : null)
+      setSelected(prev => prev ? { ...prev, ultimo_mantenimiento: hoyLocalISO(), proximo_mantenimiento: proxima || undefined, estado: 'operativo' } : null)
     }
     onRefresh()
   }

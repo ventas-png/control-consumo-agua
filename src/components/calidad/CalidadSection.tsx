@@ -1,3 +1,4 @@
+import { hoyLocalISO, datetimeLocalISO } from '../../lib/format'
 import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
@@ -5,6 +6,8 @@ import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { fetchFuentes, fetchRegistrosCalidad, getReporteCalidadSignedUrl } from '../../domain/calidad/queries'
 import { createFuente, updateFuente, setFuenteActiva, createRegistroCalidad, uploadReporteCalidad } from '../../domain/calidad/mutations'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
+import { scrollAppToTop } from '../../lib/scroll'
+import { TabStrip, type TabStripItem } from '../shared/TabStrip'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import { validarValorParametro, severidadParametro, SEVERIDAD_META } from '../../lib/calidadSeveridad'
 import { CalidadTendencia } from './CalidadTendencia'
@@ -13,6 +16,12 @@ import { ultimaMuestraPorFuente, estadoMuestreo, MUESTREO_META } from './muestre
 import type { Empresa } from '../../types'
 
 type SubTab = 'fuentes' | 'analisis' | 'historial'
+
+const SUB_TABS: TabStripItem<SubTab>[] = [
+  { id: 'fuentes', label: 'Fuentes de Agua', icon: '🗂️' },
+  { id: 'analisis', label: 'Nuevo Análisis', icon: '🧪' },
+  { id: 'historial', label: 'Historial Calidad', icon: '📋' },
+]
 
 interface Props {
   fuentesAgua: FuenteAgua[]
@@ -39,11 +48,11 @@ export function CalidadSection({
   const [savingFuente, setSavingFuente] = useState(false)
   // serv:S26 — última muestra por fuente (deriva el estado de muestreo en la lista).
   const ultimaMuestra = useMemo(() => ultimaMuestraPorFuente(registrosCalidad), [registrosCalidad])
-  const hoyISO = new Date().toISOString().slice(0, 10)
+  const hoyISO = hoyLocalISO()
 
   // Análisis form state
   const [analisisFuenteId, setAnalisisFuenteId] = useState('')
-  const [analisisFecha, setAnalisisFecha] = useState(new Date().toISOString().slice(0, 16))
+  const [analisisFecha, setAnalisisFecha] = useState(datetimeLocalISO())
   const [analisisObs, setAnalisisObs] = useState('')
   const [parametroValues, setParametroValues] = useState<Record<string, string>>({})
   // serv:S24 — archivo del reporte (se sube a Storage, no a base64).
@@ -101,7 +110,7 @@ export function CalidadSection({
     setEditandoId(f.id)
     setFuenteForm({ identificador: f.identificador, nombre: f.nombre, tipo_agua: f.tipo_agua, descripcion: f.descripcion ?? '', frecuencia_muestreo_dias: f.frecuencia_muestreo_dias != null ? String(f.frecuencia_muestreo_dias) : '' })
     setSubTab('fuentes')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollAppToTop()
   }
 
   async function toggleFuente(id: string, activo: boolean) {
@@ -188,7 +197,7 @@ export function CalidadSection({
       onRegistrosCalidadUpdated(await fetchRegistrosCalidad())
       // Reset form
       setAnalisisFuenteId('')
-      setAnalisisFecha(new Date().toISOString().slice(0, 16))
+      setAnalisisFecha(datetimeLocalISO())
       setAnalisisObs('')
       setParametroValues({})
       setReporteFile(null); setReporteNombre(null)
@@ -263,18 +272,16 @@ export function CalidadSection({
 
   return (
     <div>
-      {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {(['fuentes', 'analisis', 'historial'] as SubTab[]).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} style={{
-            padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600,
-            background: subTab === t ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-chip)',
-            color: subTab === t ? 'white' : 'var(--at-ink-2)',
-          }}>
-            {t === 'fuentes' ? '🗂️ Fuentes de Agua' : t === 'analisis' ? '🧪 Nuevo Análisis' : '📋 Historial Calidad'}
-          </button>
-        ))}
-      </div>
+      {/* Sub-menú: mismo <TabStrip> que Condominios, Contabilidad y Servicio
+          Energético. Con `flex-wrap` estas tres pestañas ocupaban dos líneas en
+          un teléfono antes de llegar al formulario. */}
+      <TabStrip
+        ariaLabel="Secciones de calidad de agua"
+        items={SUB_TABS}
+        value={subTab}
+        onChange={setSubTab}
+        marginBottom={20}
+      />
 
       {/* FUENTES */}
       {subTab === 'fuentes' && (
@@ -521,7 +528,7 @@ export function CalidadSection({
               const csv = registrosCalidadToCSV(historialFiltrado)
               const a = document.createElement('a')
               a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-              a.download = `historial_calidad_${new Date().toISOString().slice(0, 10)}.csv`
+              a.download = `historial_calidad_${hoyLocalISO()}.csv`
               a.click()
             }} disabled={historialFiltrado.length === 0} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: historialFiltrado.length === 0 ? 'not-allowed' : 'pointer', opacity: historialFiltrado.length === 0 ? 0.5 : 1 }}>
               📊 Exportar CSV

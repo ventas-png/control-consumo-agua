@@ -3,6 +3,7 @@
 // componentes los compartan; RoleCard gana variantes para el modelo de
 // plantillas (duplicar, heredado/convertir) y TemplateCard es la tarjeta de la
 // galería de plantillas (sin checkbox: usar / personalizar).
+import { hoyLocalISO } from '../../lib/format'
 import { useState } from 'react'
 import type { RoleDef } from '../../types'
 
@@ -165,7 +166,7 @@ export function RoleCard({
             type="date"
             value={expiresAt ?? ''}
             onChange={(e) => onExpirationChange(e.target.value || null)}
-            min={new Date().toISOString().slice(0, 10)}
+            min={hoyLocalISO()}
             style={{
               fontSize: '11px', padding: '3px 6px',
               border: '1px solid var(--at-line-strong)', borderRadius: '4px',

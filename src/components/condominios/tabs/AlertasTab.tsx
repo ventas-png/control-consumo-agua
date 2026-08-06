@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AlertaCondominio, TipoAlerta, PolizaSeguro, ContratoProveedor, InspeccionNormativa, LlaveCondominio } from '../../../types'
@@ -128,7 +129,7 @@ const BLANK: Omit<AlertaCondominio, 'id' | 'company_id' | 'project_id' | 'create
   tipo: 'aviso',
   titulo: '',
   descripcion: '',
-  fecha_alerta: new Date().toISOString().slice(0, 10),
+  fecha_alerta: hoyLocalISO(),
   estado: 'activa',
   referencia_tabla: undefined,
   referencia_id: undefined,

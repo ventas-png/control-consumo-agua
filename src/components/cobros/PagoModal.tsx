@@ -6,6 +6,7 @@ import { createPago } from '../../domain/cobros/mutations'
 import { updateRegistro } from '../../domain/agua/mutations'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
+import { hoyLocalISO } from '../../lib/format'
 import { FacturaEstadoBadge, FacturaDesglose } from './facturaUi'
 import { TimbradoEstadoBadge, TimbradoDatos } from './fiscalUi'
 import type { FacturaRow } from '../../domain/facturacion/queries'
@@ -85,7 +86,9 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
       const update: Record<string, unknown> = {
         monto_pagado: nuevoAbonado,
         estado: nuevoEstado,
-        fecha_pago: esPagoCompleto ? new Date().toISOString().split('T')[0] : null,
+        // E4/D5: fecha LOCAL (toISOString daba la fecha UTC — un pago nocturno
+        // quedaba fechado "mañana").
+        fecha_pago: esPagoCompleto ? hoyLocalISO() : null,
       }
       // T4 · agua:C4 — si el pago liquida una factura emitida/vencida, también
       // transiciona la máquina de estados de la Factura a 'pagada'. La validez de

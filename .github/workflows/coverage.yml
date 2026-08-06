@@ -17,16 +17,24 @@ concurrency:
   group: coverage-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
+# `permissions` se heredan los del repositorio, que por defecto pueden ser de
+# escritura: un step comprometido (o una dependencia que ejecute código en
+# postinstall) podría entonces empujar commits o publicar releases. Ninguno de
+# estos workflows escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   coverage-gate:
     name: Coverage gate (lógica de negocio crítica)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -73,12 +81,62 @@ jobs:
             --coverage.thresholds.functions=90 \
             --coverage.thresholds.branches=85
 
+      # ── Gate 2: lógica pura de src/domain/** (auditoría 2026-07-28, PR-31) ──
+      #
+      # El gate de arriba cubre 12 archivos de `src/lib/`. `src/domain/**` —toda
+      # la capa de queries/mutations/cálculo, incluida la contabilidad, los EEFF,
+      # el presupuesto y el aging de cartera— NO tenía ningún umbral.
+      #
+      # ALCANCE DELIBERADO: sólo los archivos de CÁLCULO Y VALIDACIÓN PUROS.
+      # Los `queries.ts` / `mutations.ts` / `billing.ts` / `paymentConfig.ts` de
+      # estos mismos dominios quedan FUERA a propósito, y la omisión no es un
+      # descuido: son cadenas del query builder de Supabase, así que cubrirlas
+      # sólo mide cuánto mock se escribió ("se llamó .eq() con esta columna"),
+      # no si el dinero se calcula bien. Meterlos bajaría el umbral alcanzable a
+      # ~68% y convertiría el gate en un número que nadie mira. El contrato de
+      # error de esa capa lo fija `src/domain/__tests__/queryFetch.test.ts`; que
+      # los call sites lo usen es trabajo aparte (PR-28), no de cobertura.
+      #
+      # Los 9 archivos de abajo están HOY al 100/100/100/100 (275 stmts, 151
+      # ramas). El umbral se deja 5 puntos por debajo —misma holgura que el gate
+      # de `src/lib/`, que corre al ~95% contra 90/85— para que falle ante una
+      # regresión real y no ante un refactor de una línea.
+      - name: Vitest + umbral de coverage (cálculo puro de src/domain/**)
+        run: |
+          npx vitest run \
+            src/domain/eeff/__tests__/calculos.test.ts \
+            src/domain/contabilidad/__tests__/arbol.test.ts \
+            src/domain/contabilidad/__tests__/schemas.test.ts \
+            src/domain/presupuesto/__tests__/proyeccion.test.ts \
+            src/domain/presupuesto/__tests__/schemas.test.ts \
+            src/domain/bancos/__tests__/schemas.test.ts \
+            src/domain/cxp/__tests__/schemas.test.ts \
+            src/domain/condominios/__tests__/schemas.test.ts \
+            src/domain/agua/__tests__/schemas.test.ts \
+            --coverage \
+            --coverage.reportsDirectory=coverage-domain \
+            --coverage.include='src/domain/eeff/calculos.ts' \
+            --coverage.include='src/domain/contabilidad/arbol.ts' \
+            --coverage.include='src/domain/contabilidad/schemas.ts' \
+            --coverage.include='src/domain/presupuesto/proyeccion.ts' \
+            --coverage.include='src/domain/presupuesto/schemas.ts' \
+            --coverage.include='src/domain/bancos/schemas.ts' \
+            --coverage.include='src/domain/cxp/schemas.ts' \
+            --coverage.include='src/domain/condominios/schemas.ts' \
+            --coverage.include='src/domain/agua/schemas.ts' \
+            --coverage.thresholds.lines=95 \
+            --coverage.thresholds.statements=95 \
+            --coverage.thresholds.functions=95 \
+            --coverage.thresholds.branches=90
+
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-critical-${{ github.run_id }}
-          path: coverage/
+          path: |
+            coverage/
+            coverage-domain/
           retention-days: 14
           if-no-files-found: warn
 
@@ -94,9 +152,12 @@ jobs:
       E2E_RESTRICTED_EMAIL: ${{ secrets.E2E_RESTRICTED_EMAIL }}
       E2E_RESTRICTED_PASSWORD: ${{ secrets.E2E_RESTRICTED_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde.
+      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde,
+      # pero VISIBLE: warning annotation + step summary, para que el "verde" no
+      # oculte que la suite Playwright no se ejecutó (auditoría 2026-07-10:
+      # "E2E/RLS verdes no-op").
       - name: Gate por E2E_BASE_URL
         id: gate
         run: |
@@ -104,13 +165,26 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "E2E_BASE_URL no configurado — E2E omitido (no-op verde). Ver e2e/README.md."
+            echo "::warning title=E2E omitido::E2E_BASE_URL no configurado — la suite Playwright NO se ejecutó (no-op verde). Configurá los secretos E2E_* del repo para activarla. Ver e2e/README.md."
+            {
+              echo "### ⚠️ E2E omitido — la suite Playwright no se ejecutó"
+              echo ""
+              echo "Este job quedó **verde sin correr** por falta del secreto \`E2E_BASE_URL\`."
+              echo "Para activar los E2E, configurá en *Settings → Secrets and variables → Actions*:"
+              echo ""
+              echo "- \`E2E_BASE_URL\` — URL del preview/staging contra el que correr"
+              echo "- \`E2E_LOGIN_EMAIL\` / \`E2E_LOGIN_PASSWORD\` — cuenta de prueba"
+              echo "- \`E2E_INVITE_TOKEN\` — flujo de aceptar invitación"
+              echo "- \`E2E_RESTRICTED_EMAIL\` / \`E2E_RESTRICTED_PASSWORD\` — flujo de rol restringido"
+              echo ""
+              echo "Referencia: \`e2e/README.md\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -135,7 +209,7 @@ jobs:
 
       - name: Upload Playwright report
         if: ${{ steps.gate.outputs.run == 'true' && always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: |
@@ -155,7 +229,7 @@ jobs:
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Gate por RLS_SUPABASE_URL
         id: gate
@@ -164,13 +238,31 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "RLS secrets no configurados — harness omitido (no-op verde). Ver src/test/rls/README.md."
+            # Igualado al gate de E2E: warning + step summary. Antes era un `echo`
+            # suelto que no dejaba rastro en la UI, así que el job aparecía como
+            # verde a secas y NADIE veía que las 22 aserciones de aislamiento
+            # multi-tenant no se habían ejecutado nunca. Un no-op invisible es
+            # peor que un fallo: se contabiliza como cobertura que no existe.
+            echo "::warning title=Harness RLS omitido::RLS_SUPABASE_URL no configurado — las aserciones de aislamiento multi-tenant NO se ejecutaron (no-op verde). Ver docs/ACTIVAR_HARNESS_RLS.md."
+            {
+              echo "### ⚠️ Harness RLS omitido — el aislamiento multi-tenant NO se verificó"
+              echo ""
+              echo "Este job quedó **verde sin correr** por falta del secreto \`RLS_SUPABASE_URL\`."
+              echo "Las aserciones que NO se ejecutaron incluyen la principal de la auditoría:"
+              echo "que dos usuarios de **empresas distintas** vean \`company_id\` **disjuntos**."
+              echo ""
+              echo "Para activarlo hay un script que crea el sandbox y lo verifica:"
+              echo "**\`docs/ACTIVAR_HARNESS_RLS.md\`** → \`scripts/seed-rls-sandbox.mjs\`."
+              echo ""
+              echo "Secretos: \`RLS_SUPABASE_URL\`, \`RLS_SUPABASE_ANON_KEY\`,"
+              echo "\`RLS_USER_A_EMAIL\`/\`RLS_USER_A_PASSWORD\`, \`RLS_USER_B_EMAIL\`/\`RLS_USER_B_PASSWORD\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -47,7 +48,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
   const [form, setForm] = useState({
     unidad_id: '', responsable: '', monto_adeudado: '',
     monto_pagado: '0', etapa: 'aviso_amistoso' as EtapaCobranza,
-    fecha_inicio: new Date().toISOString().split('T')[0], observaciones: '',
+    fecha_inicio: hoyLocalISO(), observaciones: '',
   })
 
   const [contactoForm, setContactoForm] = useState({
@@ -75,7 +76,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ unidad_id: '', responsable: '', monto_adeudado: '', monto_pagado: '0', etapa: 'aviso_amistoso', fecha_inicio: new Date().toISOString().split('T')[0], observaciones: '' })
+    setForm({ unidad_id: '', responsable: '', monto_adeudado: '', monto_pagado: '0', etapa: 'aviso_amistoso', fecha_inicio: hoyLocalISO(), observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }
@@ -95,17 +96,17 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     if (!res.isConfirmed) return
     const { error } = await updateCondominioRow('gestion_cobranza', c.id, {
       estado: 'resuelto' as EstadoCobranza, etapa: 'resuelto' as EtapaCobranza,
-      fecha_resolucion: new Date().toISOString().split('T')[0],
+      fecha_resolucion: hoyLocalISO(),
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado: 'resuelto', etapa: 'resuelto', fecha_resolucion: new Date().toISOString().split('T')[0] } : null)
+    if (selected?.id === c.id) setSelected(prev => prev ? { ...prev, estado: 'resuelto', etapa: 'resuelto', fecha_resolucion: hoyLocalISO() } : null)
     onRefresh()
   }
 
   async function registrarContacto(c: GestionCobranza) {
     if (!contactoForm.resultado.trim()) return
     const nuevo: ContactoCobranza = {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: hoyLocalISO(),
       tipo: contactoForm.tipo,
       resultado: contactoForm.resultado.trim(),
       siguiente_accion: contactoForm.siguiente_accion.trim() || undefined,
@@ -146,13 +147,13 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
         return [c.responsable, u?.nombre ?? '—', `${moneda} ${c.monto_adeudado.toLocaleString()}`, `${moneda} ${c.monto_pagado.toLocaleString()}`, `${moneda} ${(c.monto_adeudado - c.monto_pagado).toLocaleString()}`, ETAPAS.find(e => e.value === c.etapa)?.label ?? c.etapa, c.estado, c.fecha_inicio, c.contactos.length]
       }),
       rightAlignCols: [2, 3, 4, 8],
-      filename: `cobranza-${new Date().toISOString().slice(0, 10)}`,
+      filename: `cobranza-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`cobranza-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`cobranza-${hoyLocalISO()}`, [{
       name: 'Cobranza',
       headers: ['Responsable', 'Unidad', 'Adeudado', 'Pagado', 'Pendiente', 'Etapa', 'Estado', 'Inicio', 'Observaciones'],
       rows: cobranzas.map(c => {

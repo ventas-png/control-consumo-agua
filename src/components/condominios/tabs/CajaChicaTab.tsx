@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -17,7 +18,7 @@ interface Props {
 }
 
 const BLANK_CAJA = { responsable: '', monto_inicial: '', notas: '' }
-const BLANK_MOV = { tipo: 'egreso', concepto: '', monto: '', comprobante: '', fecha: new Date().toISOString().slice(0, 10) }
+const BLANK_MOV = { tipo: 'egreso', concepto: '', monto: '', comprobante: '', fecha: hoyLocalISO() }
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 
@@ -61,7 +62,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
     })
     if (!result?.cerrado_por) return
     const cerrado_por = result.cerrado_por
-    await updateCondominioRow('caja_chica', caja.id, { estado: 'cerrada', fecha_cierre: new Date().toISOString().slice(0, 10), cerrado_por })
+    await updateCondominioRow('caja_chica', caja.id, { estado: 'cerrada', fecha_cierre: hoyLocalISO(), cerrado_por })
     if (selected?.id === caja.id) setSelected(p => p ? { ...p, estado: 'cerrada' } : null)
     onRefresh()
   }

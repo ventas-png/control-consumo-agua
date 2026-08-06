@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -21,7 +22,7 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
 ]
 
 export default function PresenciaPersonalTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)

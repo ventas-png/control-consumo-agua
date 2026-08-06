@@ -15,9 +15,33 @@ name: Security guard (aislamiento multi-tenant)
 # el job es NO-OP VERDE (no falla CI en forks/sin wiring). Los mismos secretos que
 # apply-migration.yml / apply-migrations-prod.yml.
 
+# CARRERA CON EL APPLY DE MIGRACIONES — por qué los triggers son así.
+#
+# `apply-migrations-prod.yml` también corre en push a `main`, así que ambos
+# arrancan A LA VEZ y este guard puede leer el catálogo de producción ANTES de
+# que la migración de ese mismo push se haya aplicado. No es teórico: pasó dos
+# veces seguidas, y en direcciones opuestas.
+#
+#   #678 (18:59) → guard terminó a las :24, el apply escribió la función entre
+#                  :23 y :24. VERDE FALSO: no vio una violación que se estaba
+#                  introduciendo (set_project_id_desde_padre anon-ejecutable).
+#   #684 (23:12) → guard leyó a las :10, el apply escribió el REVOKE a las :14.
+#                  ROJO FALSO: reportó una violación que ya estaba arreglada.
+#
+# Un guard que miente en ambos sentidos es peor que no tenerlo, porque enseña a
+# ignorarlo. Arreglo: los pushes que TOCAN migraciones no disparan el guard por
+# `push` —lo haría antes de tiempo— sino por `workflow_run`, cuando el apply ha
+# terminado de verdad. Los pushes que no tocan migraciones no tienen carrera
+# posible y siguen por `push`, sin esperar a nada.
 on:
   push:
     branches: [main]
+    # Cubierto por el `workflow_run` de abajo, ya con la migración aplicada.
+    paths-ignore:
+      - 'supabase/migrations/**'
+  workflow_run:
+    workflows: ['Apply Migrations to Production']
+    types: [completed]
   schedule:
     # 07:00 UTC diario (~01:00 GT / 01:00 MX) — fuera de horas pico.
     - cron: '0 7 * * *'
@@ -38,7 +62,7 @@ jobs:
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Gate por secretos de Supabase
         id: gate
@@ -50,10 +74,10 @@ jobs:
             echo "SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN no configurados — guard omitido (no-op verde)."
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 20
+          node-version: 22
 
       # Sin dependencias: el script usa solo APIs nativas de Node 20 (fetch, fs).
       - name: Run security guard (solo lectura de catálogo)

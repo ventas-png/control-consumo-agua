@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { HistorialResidente, Unidad } from '../../../types'
@@ -32,7 +33,7 @@ const inputStyle: CSSProperties = {
 
 const BLANK = {
   unidad_id: '', nombre_completo: '', tipo: 'arrendatario',
-  fecha_desde: new Date().toISOString().slice(0, 10), fecha_hasta: '',
+  fecha_desde: hoyLocalISO(), fecha_hasta: '',
   email: '', telefono: '', estado: 'activo', notas: '',
 }
 
@@ -80,7 +81,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
   }
 
   const marcarAnterior = async (h: HistorialResidente) => {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     await updateCondominioRow('historial_residentes', h.id, { estado: 'anterior', fecha_hasta: h.fecha_hasta ?? hoy })
     onRefresh()
   }

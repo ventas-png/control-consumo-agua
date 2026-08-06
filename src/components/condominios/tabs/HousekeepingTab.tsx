@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ServicioHousekeeping, EstadoHousekeeping, TipoHousekeeping, Unidad } from '../../../types'
@@ -31,7 +32,7 @@ const TIPO_CONFIG: Record<TipoHousekeeping, { label: string; icon: string }> = {
 
 const blank = (): Partial<ServicioHousekeeping> => ({
   unidad_id: undefined, tipo: 'limpieza_estandar',
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: hoyLocalISO(),
   hora_inicio: '', hora_fin: '', responsable: '',
   estado: 'pendiente', costo: undefined, notas: '',
 })
@@ -43,7 +44,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const thisMonth = today.slice(0, 7)
 
   const filtered = servicios.filter(s => filtroEstado === 'todos' || s.estado === filtroEstado)

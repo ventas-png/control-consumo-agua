@@ -122,7 +122,7 @@ export interface ChannelRouting {
 }
 
 /**
- * Clasifica el canal: in_app/email son soportados; whatsapp/push son follow-ups
+ * Clasifica el canal: in_app/email/whatsapp son soportados; push es follow-up
  * (failed no-retriable); cualquier otro es "desconocido". Espejo del `switch` del
  * handler para fijar el contrato sin tocar el despacho real (que hace I/O).
  */
@@ -130,9 +130,8 @@ export function routeChannel(channel: string): ChannelRouting {
   switch (channel) {
     case 'in_app':
     case 'email':
-      return { supported: true }
     case 'whatsapp':
-      return { supported: false, error: 'canal whatsapp no implementado (follow-up)' }
+      return { supported: true }
     case 'push':
       return { supported: false, error: 'canal push no implementado (follow-up)' }
     default:
@@ -155,6 +154,16 @@ export function isTokenExpired(tokenExpiry: string | null, nowMs: number = Date.
  * la decisión inline de `sendViaGmail`.
  */
 export function isGmailStatusRetriable(status: number): boolean {
+  return status === 429 || status >= 500
+}
+
+/**
+ * Clasifica el status HTTP de la Meta WhatsApp Cloud API como retriable: 429
+ * (rate limit) o 5xx. Otros 4xx son terminales (token inválido/vencido, número
+ * no válido, plantilla inexistente o no aprobada). Espejo de isGmailStatusRetriable
+ * — misma política, nombre propio para que el contrato por canal sea explícito.
+ */
+export function isWhatsAppStatusRetriable(status: number): boolean {
   return status === 429 || status >= 500
 }
 

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { FirmaDigital, EstadoFirma, TipoDocumentoFirma, Unidad } from '../../../types'
@@ -36,7 +37,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
   const filtered = firmas.filter(f => filtroEstado === 'todos' || f.estado === filtroEstado)
   const pendientes = firmas.filter(f => f.estado === 'pendiente').length
   const firmados   = firmas.filter(f => f.estado === 'firmado').length

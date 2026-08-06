@@ -15,6 +15,8 @@ interface FuentesTabProps {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** RBAC granular: permiso de eliminar (default true para no romper usos existentes) */
+  canDelete?: boolean
 }
 
 export default function FuentesTab({
@@ -26,6 +28,7 @@ export default function FuentesTab({
   companyId,
   canCreate,
   canEdit,
+  canDelete = true,
 }: FuentesTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<Partial<FuenteEnergia>>({})
@@ -249,7 +252,7 @@ export default function FuentesTab({
               <th style={{ padding: '0.5rem', textAlign: 'left' }}>Medidor</th>
               <th style={{ padding: '0.5rem', textAlign: 'left' }}>Capacidad</th>
               <th style={{ padding: '0.5rem', textAlign: 'left' }}>Estado</th>
-              {canEdit && <th style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
+              {(canEdit || canDelete) && <th style={{ padding: '0.5rem', textAlign: 'center' }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -269,10 +272,14 @@ export default function FuentesTab({
                   <td style={{ padding: '0.5rem' }}>
                     <span style={{ color: f.activo ? 'var(--at-primary)' : 'var(--at-danger)' }}>{f.activo ? '● Activa' : '● Inactiva'}</span>
                   </td>
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                      <button onClick={() => handleStartEdit(f)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => handleDelete(f.id, f.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
+                      {canEdit && (
+                        <button onClick={() => handleStartEdit(f)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleDelete(f.id, f.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
+                      )}
                     </td>
                   )}
                 </tr>

@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent} from 'react'
+import { isNative } from '../../lib/platform'
 import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 import { SecureImage } from './SecureImage'
@@ -83,6 +84,15 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
     }
   }
 
+  // En nativo abrimos la cámara/galería del sistema (@capacitor/camera) y reusamos
+  // handleFile; en web seguimos con el <input type="file"> (que ya soporta captura).
+  async function openPicker() {
+    if (!isNative()) { inputRef.current?.click(); return }
+    const { takeNativePhoto } = await import('../../lib/nativeCamera')
+    const file = await takeNativePhoto(capture)
+    if (file) handleFile(file)
+  }
+
   function onDrop(e: DragEvent) {
     e.preventDefault(); setDragOver(false)
     const file = e.dataTransfer.files[0]
@@ -116,7 +126,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
           onDrop={onDrop}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
-          onClick={() => inputRef.current?.click()}
+          onClick={openPicker}
           style={{ width: '100%', paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 10, cursor: 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', transition: 'all 0.15s' }}>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             {uploading
@@ -194,6 +204,18 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
     onChange(values.filter(u => u !== url))
   }
 
+  // Nativo: una foto por toque desde la cámara/galería del sistema, envuelta en un
+  // FileList para reusar handleFiles sin duplicar validación/subida.
+  async function openPicker() {
+    if (!isNative()) { inputRef.current?.click(); return }
+    const { takeNativePhoto } = await import('../../lib/nativeCamera')
+    const file = await takeNativePhoto(capture)
+    if (!file) return
+    const dt = new DataTransfer()
+    dt.items.add(file)
+    handleFiles(dt.files)
+  }
+
   function onDrop(e: DragEvent) {
     e.preventDefault(); setDragOver(false)
     if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
@@ -222,7 +244,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
             onDrop={onDrop}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
-            onClick={() => inputRef.current?.click()}
+            onClick={openPicker}
             style={{ paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 8, cursor: 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)' }}>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               {uploading

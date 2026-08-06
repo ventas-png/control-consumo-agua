@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
@@ -37,13 +38,13 @@ const ESTADO_CONFIG: Record<EstadoPoliza, { label: string; color: string; bg: st
 const blank = (): Partial<PolizaSeguro> => ({
   numero_poliza: '', aseguradora: '', tipo: 'incendio', descripcion: '',
   suma_asegurada: undefined, prima_anual: undefined,
-  fecha_inicio: new Date().toISOString().slice(0, 10),
+  fecha_inicio: hoyLocalISO(),
   fecha_vencimiento: '', estado: 'vigente',
   agente_nombre: '', agente_telefono: '', agente_email: '', documento_url: '', notas: '',
 })
 
 export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [filtroEstado, setFiltroEstado] = useState<EstadoPoliza | 'todos'>('vigente')
   const [form, setForm] = useState<Partial<PolizaSeguro>>(blank())
   const [editId, setEditId] = useState<string | null>(null)
@@ -120,13 +121,13 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         return [p.numero_poliza, p.aseguradora, tipoInfo(p.tipo).label, p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—', p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—', p.fecha_inicio, p.fecha_vencimiento, `${ESTADO_CONFIG[p.estado].label}${dias !== null && p.estado === 'vigente' ? ` (${dias}d)` : ''}`]
       }),
       rightAlignCols: [3, 4],
-      filename: `polizas-${new Date().toISOString().slice(0, 10)}`,
+      filename: `polizas-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`polizas-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`polizas-${hoyLocalISO()}`, [{
       name: 'Pólizas',
       headers: ['Póliza', 'Aseguradora', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Inicio', 'Vencimiento', 'Estado', 'Agente', 'Teléfono Agente'],
       rows: polizas.map(p => [p.numero_poliza, p.aseguradora, tipoInfo(p.tipo).label, p.suma_asegurada ?? '', p.prima_anual ?? '', p.fecha_inicio, p.fecha_vencimiento, p.estado, p.agente_nombre ?? '', p.agente_telefono ?? '']),

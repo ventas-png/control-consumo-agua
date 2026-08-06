@@ -1,7 +1,7 @@
 // CxP — Hooks de LECTURA (TanStack Query + runQuery, patrón del repo).
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { runQuery } from '../queryFetch'
+import { runQuery, runQueryAll } from '../queryFetch'
 import { cxpKeys } from './keys'
 import type {
   ProyeccionPagosFila,
@@ -36,17 +36,21 @@ export function useFacturasProveedorQuery(companyId?: string, filtro: FacturasFi
   return useQuery({
     queryKey: cxpKeys.facturas(companyId, filtro.projectId, filtro.estado),
     enabled: !!companyId,
-    queryFn: async () => {
-      let q = supabase
-        .from('facturas_proveedor')
-        .select('*, proveedores(nombre)')
-        .eq('company_id', companyId!)
-        .order('fecha_emision', { ascending: false })
-        .limit(500)
-      if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
-      if (filtro.estado) q = q.eq('estado', filtro.estado)
-      return (await runQuery<FacturaProveedorConProveedor[]>((signal) => q.abortSignal(signal))) ?? []
-    },
+    // PR-25: el `.limit(500)` truncaba el listado de cuentas por pagar sin avisar.
+    // `.order('id')` da el orden total que `range()` necesita para no saltar filas
+    // con la misma `fecha_emision`.
+    queryFn: async () =>
+      await runQueryAll<FacturaProveedorConProveedor>((from, to, signal) => {
+        let q = supabase
+          .from('facturas_proveedor')
+          .select('*, proveedores(nombre)')
+          .eq('company_id', companyId!)
+          .order('fecha_emision', { ascending: false })
+          .order('id', { ascending: true })
+        if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
+        if (filtro.estado) q = q.eq('estado', filtro.estado)
+        return q.range(from, to).abortSignal(signal)
+      }),
   })
 }
 
@@ -54,17 +58,19 @@ export function useOrdenesPagoQuery(companyId?: string, filtro: FacturasFiltro =
   return useQuery({
     queryKey: cxpKeys.ordenes(companyId, filtro.projectId, filtro.estado),
     enabled: !!companyId,
-    queryFn: async () => {
-      let q = supabase
-        .from('ordenes_pago')
-        .select('*, proveedores(nombre), facturas_proveedor(numero_factura, concepto, monto_total, monto_pagado)')
-        .eq('company_id', companyId!)
-        .order('created_at', { ascending: false })
-        .limit(500)
-      if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
-      if (filtro.estado) q = q.eq('estado', filtro.estado)
-      return (await runQuery<OrdenPagoConRelaciones[]>((signal) => q.abortSignal(signal))) ?? []
-    },
+    // PR-25: idem — el listado de órdenes de pago se cortaba en 500.
+    queryFn: async () =>
+      await runQueryAll<OrdenPagoConRelaciones>((from, to, signal) => {
+        let q = supabase
+          .from('ordenes_pago')
+          .select('*, proveedores(nombre), facturas_proveedor(numero_factura, concepto, monto_total, monto_pagado)')
+          .eq('company_id', companyId!)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+        if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
+        if (filtro.estado) q = q.eq('estado', filtro.estado)
+        return q.range(from, to).abortSignal(signal)
+      }),
   })
 }
 

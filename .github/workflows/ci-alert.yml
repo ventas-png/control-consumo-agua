@@ -15,7 +15,20 @@ name: Alerta de fallo (CI/Deploy)
 
 on:
   workflow_run:
-    workflows: ["CI", "Deploy Supabase Edge Functions"]
+    # P0 #4 (auditoría 2026-07-10): antes solo escuchaba 2 de 12 workflows. Ahora
+    # cubre TODOS los que, si fallan en main, requieren atención humana inmediata:
+    # el gate de dinero/auth, las migraciones a prod (una migración a medias deja
+    # el schema parcial), el guard de aislamiento multi-tenant, el promote/rollback
+    # de producción, el deploy de edge functions/staging, y el probe de /health.
+    workflows:
+      - "CI"
+      - "Coverage gate & E2E"
+      - "Apply Migrations to Production"
+      - "Security guard (aislamiento multi-tenant)"
+      - "Promote / Rollback Production (Vercel)"
+      - "Deploy Staging (Vercel)"
+      - "Deploy Supabase Edge Functions"
+      - "Health check"
     types: [completed]
 
 permissions:

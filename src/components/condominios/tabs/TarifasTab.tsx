@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { TarifaCondominio } from '../../../types'
@@ -212,7 +213,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
           {filtered.map(t => {
             const per = PERIODICIDAD_LABEL[t.periodicidad]
-            const hoy = new Date().toISOString().slice(0, 10)
+            const hoy = hoyLocalISO()
             const vencida = t.vigente_hasta && t.vigente_hasta < hoy && t.activo
             return (
               <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '12px', padding: '16px', opacity: t.activo ? 1 : 0.6 }}>

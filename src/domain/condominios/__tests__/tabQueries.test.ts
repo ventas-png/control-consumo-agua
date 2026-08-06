@@ -17,11 +17,15 @@ const h = vi.hoisted(() => {
   return { state, from: (t: string) => makeBuilder(t) }
 })
 
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: h.from } }))
+// `db` es la misma instancia que `supabase` (retipada); el mock espeja eso.
+vi.mock('../../../lib/supabase', () => {
+  const client = { from: h.from }
+  return { supabase: client, db: client }
+})
 
 import {
   fetchDirectorioResidentes,
-  fetchProyectoResumen,
+  fetchProyectosResumen,
   fetchMensajesPortal,
   activarPortalUnidad,
   fetchFondoReservaAprobado,
@@ -60,23 +64,33 @@ describe('fetchDirectorioResidentes', () => {
   })
 })
 
-describe('fetchProyectoResumen', () => {
-  it('combina las 4 queries (filas + counts)', async () => {
-    h.state.byTable.cuotas_condominio = { data: [{ estado: 'pagado', monto: 100, fecha_vencimiento: null }], error: null }
-    h.state.byTable.tickets_mantenimiento = { data: [{ estado: 'abierto' }], error: null }
-    h.state.byTable.unidades = { data: null, count: 12, error: null }
-    h.state.byTable.visitantes = { data: null, count: 3, error: null }
-    const r = await fetchProyectoResumen('p1', 'co1', '2026-06-06')
-    expect(r).toEqual({
-      cuotas: [{ estado: 'pagado', monto: 100, fecha_vencimiento: null }],
-      tickets: [{ estado: 'abierto' }],
-      unidadesCount: 12,
-      visitantesCount: 3,
+describe('fetchProyectosResumen', () => {
+  it('agrupa por proyecto las 4 queries batched (filas etiquetadas + counts por conteo)', async () => {
+    h.state.byTable.cuotas_condominio = { data: [
+      { project_id: 'p1', estado: 'pagado', monto: 100, fecha_vencimiento: null },
+      { project_id: 'p2', estado: 'pendiente', monto: 50, fecha_vencimiento: '2026-01-01' },
+    ], error: null }
+    h.state.byTable.tickets_mantenimiento = { data: [{ project_id: 'p1', estado: 'abierto' }], error: null }
+    h.state.byTable.unidades = { data: [{ project_id: 'p1' }, { project_id: 'p1' }, { project_id: 'p2' }], error: null }
+    h.state.byTable.visitantes = { data: [{ project_id: 'p2' }], error: null }
+    const r = await fetchProyectosResumen(['p1', 'p2'], 'co1', '2026-06-06')
+    expect(r.p1).toEqual({
+      cuotas: [{ project_id: 'p1', estado: 'pagado', monto: 100, fecha_vencimiento: null }],
+      tickets: [{ project_id: 'p1', estado: 'abierto' }],
+      unidadesCount: 2,
+      visitantesCount: 0,
     })
+    expect(r.p2.cuotas).toHaveLength(1)
+    expect(r.p2.unidadesCount).toBe(1)
+    expect(r.p2.visitantesCount).toBe(1)
   })
-  it('degrada filas a [] y counts a 0', async () => {
-    const r = await fetchProyectoResumen('p1', 'co1', '2026-06-06')
-    expect(r).toEqual({ cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 })
+  it('filas de proyectos fuera de la lista se ignoran; sin data degrada a base vacía', async () => {
+    h.state.byTable.cuotas_condominio = { data: [{ project_id: 'ajeno', estado: 'pagado', monto: 1, fecha_vencimiento: null }], error: null }
+    const r = await fetchProyectosResumen(['p1'], 'co1', '2026-06-06')
+    expect(r).toEqual({ p1: { cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 } })
+  })
+  it('sin proyectos → {} sin disparar queries', async () => {
+    expect(await fetchProyectosResumen([], 'co1', '2026-06-06')).toEqual({})
   })
 })
 
@@ -96,15 +110,20 @@ describe('PortalResidenteTab helpers', () => {
 })
 
 describe('PortalTransparenciaTab reads', () => {
-  it('fetchFondoReservaAprobado degrada a []', async () => {
-    expect(await fetchFondoReservaAprobado('p1')).toEqual([])
+  // Regresión del fix de queries rotas: las tres funciones apuntaban a tablas/
+  // columnas inexistentes (fondo_reserva sin `estado`, fondo_reserva_movimientos
+  // y presupuestos_condominio no existen). Los mocks quedan keyed por las tablas
+  // REALES para fijar el contrato.
+  it('fetchFondoReservaAprobado lee de fondo_reserva_condominio', async () => {
+    h.state.byTable.fondo_reserva_condominio = { data: [{ concepto: 'reserva', estado: 'aprobado', monto: 900 }], error: null }
+    expect(await fetchFondoReservaAprobado('p1')).toEqual([{ concepto: 'reserva', estado: 'aprobado', monto: 900 }])
   })
-  it('fetchFondoReservaMovimientos devuelve filas', async () => {
-    h.state.byTable.fondo_reserva_movimientos = { data: [{ tipo: 'aportacion', monto: 50 }], error: null }
+  it('fetchFondoReservaMovimientos lee de fondo_reserva (ledger)', async () => {
+    h.state.byTable.fondo_reserva = { data: [{ tipo: 'aportacion', monto: 50 }], error: null }
     expect(await fetchFondoReservaMovimientos('p1')).toEqual([{ tipo: 'aportacion', monto: 50 }])
   })
-  it('fetchPresupuestosAnio devuelve filas', async () => {
-    h.state.byTable.presupuestos_condominio = { data: [{ categoria: 'agua', monto_presupuestado: 1000 }], error: null }
+  it('fetchPresupuestosAnio lee de presupuesto_condominio', async () => {
+    h.state.byTable.presupuesto_condominio = { data: [{ categoria: 'agua', monto_presupuestado: 1000 }], error: null }
     expect(await fetchPresupuestosAnio('p1', 2026)).toEqual([{ categoria: 'agua', monto_presupuestado: 1000 }])
   })
   it('fetchGastosAnioMontos degrada a []', async () => {

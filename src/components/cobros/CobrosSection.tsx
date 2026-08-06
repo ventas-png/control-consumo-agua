@@ -1,11 +1,15 @@
+import { hoyLocalISO, mesLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
+import { TabStrip } from '../shared/TabStrip'
 import { openPromptDialog } from '../shared/PromptDialog'
+import { configurarCierreAutomatico } from '../shared/cierreAutomaticoDialog'
 import { fetchPagosYConvenios } from '../../domain/cobros/queries'
 import { verifyPago, rejectPago, setConvenioEstado } from '../../domain/cobros/mutations'
 import { updateRegistro, marcarRegistrosMora } from '../../domain/agua/mutations'
-import type { Registro, Cliente, Pago, ConvenioPago, FormaPago } from '../../types'
+import type { Registro, Cliente, Pago, ConvenioPago, FormaPago, Proyecto } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { calcularTotalPagar, puedeTransicionarFactura } from '../../lib/business'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
@@ -22,6 +26,8 @@ import {
   useEmitirFacturaMutation,
   useAnularFacturaMutation,
   useIvaTasaDefaultQuery,
+  particionarEmitibles,
+  cerrarCicloAgua,
 } from '../../domain/facturacion/mutations'
 import { useDocumentosFiscalesQuery } from '../../domain/fiscal/queries'
 import { useTimbrarDocumentoMutation, puedeDispararTimbrado } from '../../domain/fiscal/mutations'
@@ -54,6 +60,8 @@ interface Props {
   registros: Registro[]
   clientes: Cliente[]
   moneda?: string
+  /** Proyectos del tenant — para el selector del cierre de ciclo por período. */
+  proyectos?: Proyecto[]
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
   onRegistroUpdated?: (id: string, partial: Partial<Registro>) => void
 }
@@ -71,7 +79,7 @@ const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   otro: '📎 Otro',
 }
 
-export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdated, onRegistroUpdated }: Props) {
+export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [], onEstadoUpdated, onRegistroUpdated }: Props) {
   const currentUser = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('pendientes')
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
@@ -84,6 +92,9 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const [verificando, setVerificando] = useState<string | null>(null)
 
   const canEdit = currentUser.role !== 'viewer'
+  // RBAC por acción: verificar/rechazar pagos es un flujo de aprobación
+  // (agua.cobros.approve), separado del edit/change_status genérico.
+  const canApprove = usePermissionsContext().canApprove('cobros')
   const companyId = currentUser.company_id
   const qc = useQueryClient()
 
@@ -104,6 +115,8 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
   const emitirMut = useEmitirFacturaMutation(companyId)
   const anularMut = useAnularFacturaMutation(companyId)
   const [accionFacturaId, setAccionFacturaId] = useState<string | null>(null)
+  const [emitiendoLote, setEmitiendoLote] = useState(false)
+  const [cerrandoCiclo, setCerrandoCiclo] = useState(false)
 
   // serv:S11 · estatus de timbrado. Documentos fiscales del tenant indexados por
   // registro_id; como la query ordena por created_at desc, el PRIMERO que veamos
@@ -264,7 +277,158 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
     setConvenioModal(bulk.selectedItems)
   }
 
+  // Facturación masiva "por ciclo": emite en lote las facturas seleccionadas que
+  // están pendientes de emisión (fija vencimiento + snapshot de IVA por fila,
+  // reusando la mutación de emisión ya testeada). El operador acota el ciclo con
+  // los filtros (búsqueda/estado) + selección; las no-emitibles se omiten.
+  async function emitirLoteSeleccion() {
+    if (!bulk.hasSelection || emitiendoLote) return
+    const conEstado = bulk.selectedItems.map(r => ({
+      r,
+      factura_estado: facturaById.get(r.id)?.factura_estado ?? r.estado,
+    }))
+    const { emitibles, omitidas } = particionarEmitibles(conEstado)
+    if (emitibles.length === 0) {
+      notify({ variant: 'warning', title: 'Nada para emitir', text: 'Ninguna de las facturas seleccionadas está pendiente de emisión.' })
+      return
+    }
+    const { isConfirmed } = await confirm({
+      title: `¿Emitir ${emitibles.length} factura(s)?`,
+      text: `Se fijará el vencimiento y el IVA de ${emitibles.length} factura(s).${omitidas.length ? ` ${omitidas.length} seleccionada(s) se omiten (ya emitidas o en estado terminal).` : ''}`,
+      icon: 'question',
+      confirmText: 'Sí, emitir',
+    })
+    if (!isConfirmed) return
+
+    setEmitiendoLote(true)
+    let ok = 0
+    const fallidas: string[] = []
+    // Secuencial: reusa la mutación por fila (validación server-side + snapshot)
+    // sin saturar la BD; la última invalidación refresca la tabla.
+    for (const { r, factura_estado } of emitibles) {
+      const factura = facturaById.get(r.id)
+      try {
+        await emitirMut.mutateAsync({
+          factura: {
+            id: r.id,
+            factura_estado,
+            monto_calculado: factura?.monto_calculado ?? r.monto_calculado,
+            mora_monto: factura?.mora_monto,
+          },
+          ivaTasa: factura?.iva_tasa ?? ivaTasaDefault,
+          diasVencimiento: diasVencimientoPara(r.project_id),
+        })
+        ok++
+      } catch {
+        fallidas.push(r.cliente_nombre ?? r.id)
+      }
+    }
+    setEmitiendoLote(false)
+    bulk.clear()
+    notify({
+      variant: fallidas.length ? 'warning' : 'success',
+      title: `📤 ${ok} factura(s) emitida(s)`,
+      text: fallidas.length
+        ? `${fallidas.length} no se pudieron emitir: ${fallidas.slice(0, 3).join(', ')}${fallidas.length > 3 ? '…' : ''}`
+        : 'Ciclo de facturación emitido correctamente.',
+      duration: 2600,
+    })
+  }
+
+  // Cierre de ciclo POR PERÍODO (espejo de condominios_cerrar_ciclo): emite en un
+  // solo RPC staff-gated TODOS los recibos pendientes de un proyecto+mes y avisa a
+  // cada cliente (campana + email). Complementa el lote por selección de arriba —
+  // aquí el operador no selecciona filas, elige proyecto y período.
+  async function cerrarCicloPeriodo() {
+    if (cerrandoCiclo) return
+    const opciones = (proyectos ?? []).map(p => ({ value: p.id, label: p.nombre }))
+    if (opciones.length === 0) {
+      notify({ variant: 'info', title: 'Sin proyectos', text: 'No hay proyectos para cerrar el ciclo de agua.' })
+      return
+    }
+    const datos = await openPromptDialog({
+      title: '📤 Emitir período (cerrar ciclo de agua)',
+      description: 'Emite todos los recibos de agua pendientes del proyecto y período elegidos, y avisa a cada cliente (campana + email si tiene correo).',
+      fields: [
+        { name: 'project_id', label: 'Proyecto', control: 'select', required: true, autoFocus: true, options: opciones },
+        { name: 'periodo', label: 'Período (YYYY-MM)', type: 'month', required: true, initialValue: mesLocalISO() },
+      ],
+      submitText: 'Continuar',
+    })
+    const projectId = datos?.project_id
+    const periodo = datos?.periodo
+    if (!projectId || !periodo) return
+    // Conteo local orientativo (el server es la verdad): registros del proyecto en
+    // ese mes cuya Factura admite 'emitir' — mismo predicado que el RPC.
+    const candidatas = facturas.filter(f =>
+      f.project_id === projectId &&
+      f.fecha.slice(0, 7) === periodo &&
+      puedeTransicionarFactura(f.factura_estado ?? f.estado, 'emitir').ok,
+    )
+    if (candidatas.length === 0) {
+      notify({ variant: 'info', title: 'Sin recibos por emitir', text: `No hay recibos de agua pendientes de emisión en ${periodo}.` })
+      return
+    }
+    const { isConfirmed } = await confirm({
+      title: `¿Emitir ${candidatas.length} recibo${candidatas.length > 1 ? 's' : ''} de ${periodo}?`,
+      text: 'Se fijará el vencimiento y el IVA de cada recibo y se avisará a los clientes (campana + email).',
+      icon: 'question',
+      confirmText: '📤 Emitir período',
+    })
+    if (!isConfirmed) return
+    setCerrandoCiclo(true)
+    const { data, error } = await cerrarCicloAgua(projectId, periodo)
+    setCerrandoCiclo(false)
+    if (error) { notify({ variant: 'error', title: 'No se pudo cerrar el ciclo', text: error.message }); return }
+    const n = data?.emitidas ?? 0
+    notify({
+      variant: 'success',
+      title: `📤 ${n} recibo${n !== 1 ? 's' : ''} emitido${n !== 1 ? 's' : ''}`,
+      text: `Avisos: ${data?.avisos ?? 0} en la campana, ${data?.emails ?? 0} por email.`,
+      duration: 2600,
+    })
+    void qc.invalidateQueries({ queryKey: facturacionKeys.all })
+  }
+
+  // F3: programación del cierre automático (cron server-side). Si hay más de un
+  // proyecto, se elige primero cuál configurar; el diálogo compartido hace el resto.
+  async function configurarCierreAutomaticoAgua() {
+    if (!companyId) return
+    const opciones = (proyectos ?? []).map(p => ({ value: p.id, label: p.nombre }))
+    if (opciones.length === 0) {
+      notify({ variant: 'info', title: 'Sin proyectos', text: 'No hay proyectos para programar el cierre de agua.' })
+      return
+    }
+    let seleccion = opciones[0]
+    if (opciones.length > 1) {
+      const datos = await openPromptDialog({
+        title: '🗓️ Cierre de ciclo automático',
+        description: 'Elige el proyecto cuya programación quieres ver o editar.',
+        fields: [
+          { name: 'project_id', label: 'Proyecto', control: 'select', required: true, autoFocus: true, options: opciones },
+        ],
+        submitText: 'Continuar',
+      })
+      const elegido = opciones.find(o => o.value === datos?.project_id)
+      if (!elegido) return
+      seleccion = elegido
+    }
+    await configurarCierreAutomatico({
+      companyId,
+      projectId: seleccion.value,
+      projectNombre: seleccion.label,
+      modulo: 'agua',
+    })
+  }
+
   const bulkActions: BulkAction[] = useMemo(() => [
+    {
+      id: 'emitir-facturas',
+      label: emitiendoLote ? 'Emitiendo…' : 'Emitir facturas',
+      icon: '📤',
+      variant: 'primary',
+      onClick: emitirLoteSeleccion,
+    },
     {
       id: 'marcar-mora',
       label: 'Marcar mora',
@@ -280,7 +444,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
       onClick: abrirConvenioGrupal,
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [bulk.selectedItems])
+  ], [bulk.selectedItems, emitiendoLote])
 
   async function handleVerificarPago(pagoId: string, aprobar: boolean) {
     setVerificando(pagoId)
@@ -390,7 +554,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
         {[
           { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', },
           { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,var(--at-danger),var(--at-danger))', },
-          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(new Date().toISOString().split('T')[0])).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
+          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(hoyLocalISO())).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
           { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', },
         ].map((s, i) => (
           <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}>
@@ -405,20 +569,14 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="tab-strip-scrollable" style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-            padding: '10px 20px', fontSize: '14px', fontWeight: activeTab === tab.id ? 700 : 500,
-            color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
-            background: 'transparent', border: 'none',
-            borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : '3px solid transparent',
-            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-          }}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — mismo <TabStrip> que el resto de módulos. */}
+      <TabStrip
+        ariaLabel="Secciones de cobros"
+        items={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        marginBottom={24}
+      />
 
       {/* ── TAB: Cargos Pendientes ── */}
       {activeTab === 'pendientes' && (
@@ -442,6 +600,35 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
               <option value="mora">En mora</option>
             </select>
 
+            {canEdit && (
+              <button
+                onClick={() => void cerrarCicloPeriodo()}
+                disabled={cerrandoCiclo}
+                title="Emitir todos los recibos pendientes de un proyecto y período, y avisar a los clientes (cerrar ciclo)"
+                style={{
+                  padding: '10px 16px', borderRadius: '8px', border: 'none',
+                  background: 'var(--at-primary)', color: 'white', fontSize: '14px', fontWeight: 700,
+                  cursor: cerrandoCiclo ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                  opacity: cerrandoCiclo ? 0.7 : 1,
+                }}
+              >
+                {cerrandoCiclo ? 'Emitiendo…' : '📤 Emitir período'}
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => void configurarCierreAutomaticoAgua()}
+                title="Programar el cierre de ciclo mensual automático (emite el período anterior a partir del día elegido)"
+                style={{
+                  padding: '10px 16px', borderRadius: '8px',
+                  border: '1.5px solid var(--at-line)', background: 'var(--at-surface)',
+                  color: 'var(--at-ink)', fontSize: '14px', fontWeight: 700,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                🗓️ Automático
+              </button>
+            )}
           </div>
 
           {/* Bulk actions toolbar (sticky) */}
@@ -717,6 +904,8 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                           )}
                         </div>
 
+                        {/* Autorizar/denegar el pago: solo con permiso de aprobación (RBAC). */}
+                        {canApprove && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
                           <button
                             onClick={() => void handleVerificarPago(pago.id, true)}
@@ -754,6 +943,7 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', onEstadoUpdat
                             ❌ Rechazar
                           </button>
                         </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -884,6 +1074,22 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                   {conv.fecha_vencimiento && <span>⏰ Vence: <strong>{new Date(conv.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>}
                   {conv.cuotas_pactadas && <span>📋 Cuotas: <strong>{conv.cuotas_pactadas}</strong></span>}
                 </div>
+                {conv.cuotas && conv.cuotas.length > 0 && (
+                  <details style={{ marginTop: '10px' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600 }}>
+                      📅 Ver calendario ({conv.cuotas.length} cuota{conv.cuotas.length !== 1 ? 's' : ''})
+                    </summary>
+                    <div style={{ marginTop: '8px', border: '1px solid var(--at-line)', borderRadius: '8px', overflow: 'hidden', maxWidth: '360px' }}>
+                      {conv.cuotas.map((c, i) => (
+                        <div key={c.numero} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', fontSize: '12.5px', borderTop: i === 0 ? 'none' : '1px solid var(--at-line)' }}>
+                          <span style={{ color: 'var(--at-ink-3)', minWidth: '54px' }}>Cuota {c.numero}</span>
+                          <span style={{ color: 'var(--at-ink-2)' }}>{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: est.bg, color: est.color }}>

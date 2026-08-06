@@ -1,3 +1,4 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, useMemo, type ReactElement} from 'react'
 import { CuotaCondominio, GastoCondominio, Unidad } from '../../../types'
 
@@ -25,7 +26,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
 
   // Cálculo de baseline
   const baseline = useMemo(() => {
-    const mesActual = new Date().toISOString().slice(0, 7)
+    const mesActual = mesLocalISO()
     const meses6: string[] = []
     for (let i = 5; i >= 0; i--) {
       const d = new Date()
@@ -56,7 +57,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
   const [mesesProyeccion, setMesesProyeccion] = useState<number>(12)
 
   const proyeccion = useMemo(() => {
-    const mesActual = new Date().toISOString().slice(0, 7)
+    const mesActual = mesLocalISO()
     return Array.from({ length: mesesProyeccion }, (_, i) => {
       const mes = addMes(mesActual, i + 1)
       const ingresos = cuotaMensual * totalUnidades * (pctCobro / 100)

@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { Registro } from '../../types'
-import { calcularTotalPagar } from '../../lib/business'
+import { resumenDashboardAgua } from '../../lib/dashboardAgua'
 import { Chart } from '../../lib/chartjs'
+import { resolveChartColor, chartFill } from '../../lib/chartColors'
+import { AlertasConsumoCard } from './AlertasConsumoCard'
 
 // El CSS de .dash-skeleton (shimmer) vive ahora en src/styles/runtime.css (I24).
 
@@ -9,54 +11,34 @@ interface Props {
   registros: Registro[]
   moneda?: string
   isLoading?: boolean
+  /** Tenant, para las alertas de anomalías de consumo (D3). */
+  companyId?: string
 }
 
-export function DashboardSection({ registros, moneda = 'Q', isLoading = false }: Props) {
+export function DashboardSection({ registros, moneda = 'Q', isLoading = false, companyId }: Props) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
 
-  const hoy = new Date()
-  const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
-  const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
-  const recaudoTotal = mesActual.reduce((acc, r) => {
-    const monto = r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
-    return acc + monto
-  }, 0)
-  const pendientes = registros.filter(r => r.estado === 'pendiente').length
+  // KPIs + serie en una sola pasada, con comparación año+mes y parse de fecha
+  // seguro ante date-only strings (auditoría 2026-07-16, D2).
+  const resumen = useMemo(() => resumenDashboardAgua(registros), [registros])
 
   useEffect(() => {
     if (!chartRef.current) return
-
-    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    const labels: string[] = []
-    const dataConsumo: number[] = []
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date()
-      d.setMonth(d.getMonth() - i)
-      const mes_idx = d.getMonth()
-      const anio = d.getFullYear()
-      labels.push(`${mesesNombres[mes_idx]} ${anio}`)
-      const suma = registros
-        .filter(r => {
-          const fr = new Date(r.fecha)
-          return fr.getMonth() === mes_idx && fr.getFullYear() === anio
-        })
-        .reduce((acc, curr) => acc + curr.consumo, 0)
-      dataConsumo.push(suma)
-    }
 
     if (chartInstance.current) chartInstance.current.destroy()
 
     chartInstance.current = new Chart(chartRef.current, {
       type: 'line',
       data: {
-        labels,
+        labels: resumen.serie.labels,
         datasets: [{
           label: 'Consumo (m³)',
-          data: dataConsumo,
-          borderColor: 'var(--at-primary)',
-          backgroundColor: 'rgba(27, 59, 54, 0.1)',
+          data: resumen.serie.consumo,
+          // V1: resolver el token a su valor computado (el canvas no entiende
+          // var(--at-*)); el relleno deriva del mismo color con alfa.
+          borderColor: resolveChartColor('var(--at-primary)'),
+          backgroundColor: chartFill('var(--at-primary)', 0.1),
           borderWidth: 3,
           fill: true,
           tension: 0.4,
@@ -71,12 +53,12 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
     })
 
     return () => { chartInstance.current?.destroy() }
-  }, [registros])
+  }, [resumen])
 
   const statCards = [
-    { label: 'Consumo Mes (m³)', value: consumoTotal.toFixed(2), bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)' },
-    { label: `Recaudo Estimado (${moneda})`, value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)' },
-    { label: 'Pendientes de Pago', value: String(pendientes), bg: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)' },
+    { label: 'Consumo Mes (m³)', value: resumen.consumoMes.toFixed(2), bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)' },
+    { label: `Recaudo Estimado (${moneda})`, value: resumen.recaudoMes.toFixed(2), bg: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)' },
+    { label: 'Pendientes de Pago', value: String(resumen.pendientes), bg: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)' },
   ]
 
   return (
@@ -95,6 +77,9 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
           </div>
         ))}
       </div>
+
+      {/* D3 — alertas de anomalías de consumo (se auto-oculta si no hay). */}
+      <AlertasConsumoCard companyId={companyId} />
 
       <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
         <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Tendencias de Consumo</div>

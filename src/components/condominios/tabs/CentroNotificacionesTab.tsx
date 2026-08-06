@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, ReservaAmenidad, PolizaSeguro,
@@ -42,7 +43,7 @@ const CAT_ICON: Record<CategoriaNotif, string> = {
   finanzas: '💰', mantenimiento: '🔧', normativa: '📋', comunidad: '🏘️', residentes: '🏠',
 }
 
-const hoy = new Date().toISOString().slice(0, 10)
+const hoy = hoyLocalISO()
 const mesActual = hoy.slice(0, 7)
 
 function diasHasta(fecha: string) {

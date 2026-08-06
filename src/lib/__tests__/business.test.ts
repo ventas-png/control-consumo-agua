@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   calcularTotalPagar,
+  calcularTotalPagarEscalonado,
+  calcularCostoTarifa,
+  validarTramos,
+  generarCalendarioConvenio,
   validarLectura,
   redondear2,
   calcularIVA,
@@ -93,6 +97,151 @@ describe('calcularTotalPagar', () => {
   })
 })
 
+describe('calcularTotalPagarEscalonado', () => {
+  it('consumo ≤ mínimo → solo canon fijo (piso)', () => {
+    const r = calcularTotalPagarEscalonado(3, [{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }], 40, 5)
+    expect(r.total).toBe(40)
+    expect(r.tipo_cobro).toBe('Canon Fijo')
+    expect(r.desglose.tramo).toBe(1)
+  })
+
+  it('bloque único (sin tope) cobra todo el consumo a un precio', () => {
+    const r = calcularTotalPagarEscalonado(15, [{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }], 0, 0)
+    expect(r.total).toBe(75) // 15 * 5
+    expect(r.tipo_cobro).toBe('Consumo Escalonado')
+    expect(r.desglose.tramo).toBe('escalonado')
+    expect(r.desglose.tramos).toHaveLength(1)
+  })
+
+  it('dos bloques: parte en el primero y parte en el segundo', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(90) // 10*5 + 5*8
+    expect(r.desglose.tramos).toEqual([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5, m3: 10, monto: 50 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8, m3: 5, monto: 40 },
+    ])
+  })
+
+  it('tres bloques: consumo cae en el bloque intermedio (último bloque no aplica)', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 4 },
+      { desde_m3: 10, hasta_m3: 20, precio_m3: 6 },
+      { desde_m3: 20, hasta_m3: null, precio_m3: 10 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(70) // 10*4 + 5*6
+    expect(r.desglose.tramos).toHaveLength(2) // el tercer bloque cubre 0 m³ → omitido
+  })
+
+  it('consumo exactamente en un límite de bloque', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 4 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 6 },
+    ]
+    const r = calcularTotalPagarEscalonado(10, tramos, 0, 0)
+    expect(r.total).toBe(40) // 10*4; el segundo bloque cubre 0 m³
+    expect(r.desglose.tramos).toHaveLength(1)
+  })
+
+  it('bloques desordenados se ordenan por desde_m3', () => {
+    const tramos = [
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+    ]
+    const r = calcularTotalPagarEscalonado(15, tramos, 0, 0)
+    expect(r.total).toBe(90)
+  })
+
+  it('precisión de coma flotante', () => {
+    const tramos = [
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 1.1 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 2.2 },
+    ]
+    const r = calcularTotalPagarEscalonado(10.1, tramos, 0, 0)
+    // 10*1.1 + 0.1*2.2 = 11 + 0.22 = 11.22
+    expect(r.total).toBeCloseTo(11.22, 6)
+  })
+})
+
+describe('calcularCostoTarifa (dispatcher plano vs escalonado)', () => {
+  it('sin tramos → modelo plano (idéntico a calcularTotalPagar)', () => {
+    const tarifa = { precio_m3: 5, precio_m3_exceso: 8, canon_fijo: 50, consumo_minimo: 10, tramos: null }
+    const dispatcher = calcularCostoTarifa(50, tarifa, 30)
+    const plano = calcularTotalPagar(50, 5, 50, 10, 8, 30)
+    expect(dispatcher).toEqual(plano)
+    expect(dispatcher.tipo_cobro).toBe('Consumo con Exceso')
+  })
+
+  it('tramos vacíos → modelo plano', () => {
+    const tarifa = { precio_m3: 5, precio_m3_exceso: 0, canon_fijo: 0, consumo_minimo: 0, tramos: [] }
+    expect(calcularCostoTarifa(20, tarifa).tipo_cobro).toBe('Consumo Normal')
+  })
+
+  it('con tramos → modelo escalonado', () => {
+    const tarifa = {
+      precio_m3: 5, precio_m3_exceso: 8, canon_fijo: 0, consumo_minimo: 0,
+      tramos: [
+        { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+        { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+      ],
+    }
+    const r = calcularCostoTarifa(15, tarifa, 30)
+    expect(r.tipo_cobro).toBe('Consumo Escalonado')
+    expect(r.total).toBe(90)
+  })
+})
+
+describe('validarTramos', () => {
+  it('bloques contiguos desde 0 con último sin tope → válido', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: 20, precio_m3: 8 },
+      { desde_m3: 20, hasta_m3: null, precio_m3: 12 },
+    ])).toBeNull()
+  })
+
+  it('un solo bloque sin tope → válido', () => {
+    expect(validarTramos([{ desde_m3: 0, hasta_m3: null, precio_m3: 5 }])).toBeNull()
+  })
+
+  it('vacío → error', () => {
+    expect(validarTramos([])).toMatch(/al menos un bloque/i)
+  })
+
+  it('no empieza en 0 → error de contigüidad', () => {
+    expect(validarTramos([{ desde_m3: 5, hasta_m3: null, precio_m3: 5 }])).toMatch(/contiguos/i)
+  })
+
+  it('hueco entre bloques → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 12, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/contiguos/i)
+  })
+
+  it('solape entre bloques → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: 10, precio_m3: 5 },
+      { desde_m3: 8, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/contiguos/i)
+  })
+
+  it('bloque intermedio sin tope → error', () => {
+    expect(validarTramos([
+      { desde_m3: 0, hasta_m3: null, precio_m3: 5 },
+      { desde_m3: 10, hasta_m3: null, precio_m3: 8 },
+    ])).toMatch(/último bloque/i)
+  })
+
+  it('precio negativo → error', () => {
+    expect(validarTramos([{ desde_m3: 0, hasta_m3: null, precio_m3: -1 }])).toMatch(/≥ 0/)
+  })
+})
+
 describe('validarLectura', () => {
   it('lectura actual mayor que anterior: válida, consumo positivo', () => {
     const r = validarLectura(100, 150)
@@ -179,6 +328,70 @@ describe('redondear2', () => {
   it('no finitos → 0', () => {
     expect(redondear2(NaN)).toBe(0)
     expect(redondear2(Infinity)).toBe(0)
+  })
+
+  // ── Regresión del defecto de la auditoría 2026-07-28 (Bloque D · PR-22) ────
+  // La implementación anterior sumaba `Number.EPSILON` antes de redondear. El
+  // test de arriba pasaba —1.005, 1.004 y 2.675 caen del lado bueno— pero el
+  // 4,58% de los puntos medios NO. Estos vectores son de los que fallaban.
+  it('acierta los puntos medios que el truco del epsilon perdía', () => {
+    expect(redondear2(2.135)).toBe(2.14)
+    expect(redondear2(4.015)).toBe(4.02)
+    expect(redondear2(8.165)).toBe(8.17)
+    expect(redondear2(10.075)).toBe(10.08)
+  })
+
+  // `Number.EPSILON` es el ulp EN 1.0: por encima de ~1000 sumarlo no cambia
+  // nada (`(1000.005 + Number.EPSILON) === 1000.005`), así que el redondeo
+  // quedaba a merced del error binario. Importa: son importes de factura reales.
+  it('sigue siendo correcto en magnitudes donde el epsilon era inoperante', () => {
+    expect(redondear2(1000.005)).toBe(1000.01)
+    expect(redondear2(12345.675)).toBe(12345.68)
+    expect(redondear2(999999.005)).toBe(999999.01)
+  })
+
+  // `Math.round` es half-UP, no half-away-from-zero: TODO punto medio negativo
+  // divergía de la columna `numeric(12,2)`. Afecta a notas de crédito, ajustes
+  // y reversos.
+  it('redondea los negativos alejándose del cero, como numeric', () => {
+    expect(redondear2(-1.005)).toBe(-1.01)
+    expect(redondear2(-2.135)).toBe(-2.14)
+    expect(redondear2(-10.045)).toBe(-10.05)
+    expect(redondear2(-0.005)).toBe(-0.01)
+  })
+
+  it('nunca devuelve -0 (distinto de 0 al serializar y al mostrarlo)', () => {
+    expect(Object.is(redondear2(-0.001), 0)).toBe(true)
+    expect(Object.is(redondear2(-0), 0)).toBe(true)
+  })
+
+  it('absorbe el error de coma flotante clásico', () => {
+    expect(redondear2(0.1 + 0.2)).toBe(0.3)
+    expect(redondear2(1.1 * 3)).toBe(3.3)
+  })
+
+  // Prueba de propiedad contra una referencia DECIMAL exacta (BigInt sobre
+  // centavos), que es lo que hace `numeric` en Postgres. Es la red que hubiera
+  // cazado el defecto original: barre magnitudes en vez de fiarse de 3 casos.
+  it('coincide con numeric(12,2) en 20.000 puntos medios de ambos signos', () => {
+    const referenciaDecimal = (x: number): number => {
+      const s = x.toFixed(10)
+      const negativo = s.startsWith('-')
+      const [entera, decimal] = s.replace('-', '').split('.')
+      const centavos = BigInt(entera) * 100n + BigInt(decimal.slice(0, 2))
+      const conRedondeo = centavos + (Number(decimal[2]) >= 5 ? 1n : 0n)
+      const valor = Number(conRedondeo) / 100
+      return negativo ? (valor === 0 ? 0 : -valor) : valor
+    }
+
+    const fallos: string[] = []
+    for (let i = 5; i <= 100005; i += 10) {
+      for (const n of [i / 1000, -i / 1000]) {
+        const esperado = referenciaDecimal(n)
+        if (redondear2(n) !== esperado) fallos.push(`${n}: ${redondear2(n)} ≠ ${esperado}`)
+      }
+    }
+    expect(fallos.slice(0, 5)).toEqual([])
   })
 })
 
@@ -465,5 +678,43 @@ describe('aplicarTransicionFactura', () => {
     const stamped = new Date(p.emitida_at as string).getTime()
     expect(stamped).toBeGreaterThanOrEqual(before)
     expect(stamped).toBeLessThanOrEqual(Date.now())
+  })
+})
+
+describe('generarCalendarioConvenio', () => {
+  it('divide en N cuotas iguales; la última absorbe el residual (suma exacta)', () => {
+    const cal = generarCalendarioConvenio(100, 3, '2026-01-15', 'mensual')
+    expect(cal.map(c => c.monto)).toEqual([33.33, 33.33, 33.34])
+    expect(cal.reduce((s, c) => s + c.monto, 0)).toBeCloseTo(100, 6)
+    expect(cal.map(c => c.numero)).toEqual([1, 2, 3])
+  })
+
+  it('agenda mensual con clamp de fin de mes (31 ene → 28 feb → 31 mar)', () => {
+    const cal = generarCalendarioConvenio(300, 3, '2026-01-31', 'mensual')
+    expect(cal.map(c => c.fecha_vencimiento)).toEqual(['2026-01-31', '2026-02-28', '2026-03-31'])
+  })
+
+  it('frecuencia quincenal y semanal suman días', () => {
+    expect(generarCalendarioConvenio(90, 3, '2026-01-01', 'quincenal').map(c => c.fecha_vencimiento))
+      .toEqual(['2026-01-01', '2026-01-16', '2026-01-31'])
+    expect(generarCalendarioConvenio(90, 3, '2026-01-01', 'semanal').map(c => c.fecha_vencimiento))
+      .toEqual(['2026-01-01', '2026-01-08', '2026-01-15'])
+  })
+
+  it('cruza el año en frecuencia mensual', () => {
+    const cal = generarCalendarioConvenio(200, 2, '2026-12-10', 'mensual')
+    expect(cal.map(c => c.fecha_vencimiento)).toEqual(['2026-12-10', '2027-01-10'])
+  })
+
+  it('una sola cuota = el total completo', () => {
+    expect(generarCalendarioConvenio(150.5, 1, '2026-03-01', 'mensual'))
+      .toEqual([{ numero: 1, fecha_vencimiento: '2026-03-01', monto: 150.5 }])
+  })
+
+  it('entradas inválidas → []', () => {
+    expect(generarCalendarioConvenio(100, 0, '2026-01-01')).toEqual([])
+    expect(generarCalendarioConvenio(0, 3, '2026-01-01')).toEqual([])
+    expect(generarCalendarioConvenio(100, 3, 'no-es-fecha')).toEqual([])
+    expect(generarCalendarioConvenio(-50, 3, '2026-01-01')).toEqual([])
   })
 })

@@ -1,5 +1,6 @@
 // domain/rutas/mutations.ts — Escrituras de rutas (agua/condominios). T7/PR3: el
 // acceso directo a la tabla `rutas` sale de RutasSection hacia la capa domain.
+import { hoyLocalISO } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import type { Ruta } from '../../types'
 
@@ -35,13 +36,18 @@ export async function markRutaCompletada(id: string): Promise<{ error: string | 
  * próxima pendiente. No-op si no hay ninguna. (Lógica movida de LecturasSection.)
  */
 export async function completeRelevantOcurrencia(rutaId: string): Promise<void> {
-  const hoyGT = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10)
+  // PR-29: antes `new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10)`,
+  // es decir un offset de −6 h CODIFICADO A MANO para fingir la hora de Guatemala.
+  // Falla para cualquier tenant fuera de GMT-6 —el producto ya factura en varias
+  // monedas LATAM (20260612203000_companies_currency_latam)— y en los cambios de
+  // horario. `hoyLocalISO()` usa la zona real del navegador.
+  const hoyLocal = hoyLocalISO()
   const enRango = await supabase
     .from('ruta_ocurrencias')
     .select('id')
     .eq('ruta_id', rutaId)
     .in('estado', ['pendiente', 'vencida'])
-    .lte('fecha', hoyGT)
+    .lte('fecha', hoyLocal)
     .order('fecha', { ascending: false })
     .limit(1)
   let occId = enRango.data?.[0]?.id as string | undefined
@@ -51,7 +57,7 @@ export async function completeRelevantOcurrencia(rutaId: string): Promise<void> 
       .select('id')
       .eq('ruta_id', rutaId)
       .in('estado', ['pendiente', 'vencida'])
-      .gte('fecha', hoyGT)
+      .gte('fecha', hoyLocal)
       .order('fecha', { ascending: true })
       .limit(1)
     occId = proxima.data?.[0]?.id as string | undefined

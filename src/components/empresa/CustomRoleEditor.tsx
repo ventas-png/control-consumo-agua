@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Fragment, useState, useEffect, useMemo, useCallback } from 'react'
 import {
   fetchPermissionsCatalog,
   fetchRoleById,
@@ -10,6 +10,63 @@ import {
   insertRolePermissions,
 } from '../../domain/empresa/roles'
 import type { PermissionDef, RoleDef } from '../../types'
+import { MODULE_ACTIONS, MODULE_ACTION_LABELS, type ModuleAction } from '../../lib/moduleConfig'
+
+// ── Matriz módulo × acción ───────────────────────────────────────────────────
+// El catálogo trae claves por acción (agua.<mod>.<action>,
+// platform.<mod>.<action>, condominios.tab.<tab>[.<action>] — la clave base de
+// tab es la visibilidad/Ver). En vez de una lista plana de 1000+ checkboxes,
+// se agrupa cada módulo/tab en una fila con una columna por acción.
+
+// Encabezados compactos por acción; el orden y la membresía vienen de
+// MODULE_ACTIONS (fuente única) para que una acción nueva gane columna sola.
+const SHORT_ACTION_LABELS: Record<ModuleAction, string> = {
+  view: 'Ver', create: 'Crear', edit: 'Editar',
+  change_status: 'Estado', approve: 'Autorizar', delete: 'Eliminar',
+}
+const ACTION_COLUMNS: { action: ModuleAction; short: string }[] =
+  MODULE_ACTIONS.map(action => ({ action, short: SHORT_ACTION_LABELS[action] }))
+
+const ACTION_SET = new Set<string>(MODULE_ACTIONS)
+
+interface MatrixRow {
+  /** Clave base del módulo/tab (p.ej. condominios.tab.cuotas, agua.cobros). */
+  id: string
+  label: string
+  cells: Partial<Record<ModuleAction, PermissionDef>>
+  perms: PermissionDef[]
+}
+
+/** Separa una clave del catálogo en (fila, acción). Claves sin sufijo de
+ * acción conocida (condominios.tab.<tab>) son la acción Ver de su fila. */
+function splitPermissionKey(key: string): { rowId: string; action: ModuleAction } {
+  const parts = key.split('.')
+  const last = parts[parts.length - 1]
+  if (parts.length > 2 && ACTION_SET.has(last)) {
+    return { rowId: parts.slice(0, -1).join('.'), action: last as ModuleAction }
+  }
+  return { rowId: key, action: 'view' }
+}
+
+/** Etiqueta de fila: la del permiso Ver sin el prefijo "Acción — ". */
+function rowLabel(row: MatrixRow): string {
+  const base = row.cells.view?.label ?? row.perms[0]?.label ?? row.id
+  return base.replace(/^[^—]+ — /, '')
+}
+
+/** Nombre legible de una categoría del catálogo (agua_cobros → Agua — Cobros). */
+function categoryLabel(category: string): string {
+  const FIXED: Record<string, string> = {
+    panel: 'Panel / Dashboard', finanzas: 'Finanzas', residentes: 'Residentes',
+    operaciones: 'Operaciones', instalaciones: 'Instalaciones', seguridad: 'Seguridad',
+    comunidad: 'Comunidad', administracion: 'Administración', especiales: 'Especiales',
+  }
+  if (FIXED[category]) return FIXED[category]
+  const pretty = (s: string) => s.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+  if (category.startsWith('agua_')) return `Agua — ${pretty(category.slice(5))}`
+  if (category.startsWith('platform_')) return `Plataforma — ${pretty(category.slice(9))}`
+  return pretty(category)
+}
 
 interface Props {
   companyId: string
@@ -90,33 +147,68 @@ export function CustomRoleEditor({
 
   useEffect(() => { void load() }, [load])
 
-  const grouped = useMemo(() => {
-    const filtered = search.trim().length === 0
-      ? permissions
-      : permissions.filter(p => p.label.toLowerCase().includes(search.toLowerCase()) || p.key.toLowerCase().includes(search.toLowerCase()))
-    const map = new Map<string, PermissionDef[]>()
-    for (const p of filtered) {
-      const arr = map.get(p.category) ?? []
-      arr.push(p)
-      map.set(p.category, arr)
+  // Matriz base por categoría (solo depende del catálogo, con filas ya
+  // ordenadas); la búsqueda filtra filas completas en un memo aparte para no
+  // reconstruir las ~1000 filas en cada tecla.
+  const baseMatrix = useMemo(() => {
+    const rowsById = new Map<string, MatrixRow>()
+    const byCategory = new Map<string, MatrixRow[]>()
+    for (const p of permissions) {
+      const { rowId, action } = splitPermissionKey(p.key)
+      let row = rowsById.get(rowId)
+      if (!row) {
+        row = { id: rowId, label: '', cells: {}, perms: [] }
+        rowsById.set(rowId, row)
+        const arr = byCategory.get(p.category) ?? []
+        arr.push(row)
+        byCategory.set(p.category, arr)
+      }
+      row.cells[action] = p
+      row.perms.push(p)
     }
-    return [...map.entries()]
-  }, [permissions, search])
+    for (const row of rowsById.values()) row.label = rowLabel(row)
+    for (const rows of byCategory.values()) rows.sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    return [...byCategory.entries()]
+  }, [permissions])
 
-  function togglePerm(key: string) {
+  const grouped = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (q.length === 0) return baseMatrix
+    const result: Array<[string, MatrixRow[]]> = []
+    for (const [category, rows] of baseMatrix) {
+      const visible = rows.filter(r =>
+        r.label.toLowerCase().includes(q) ||
+        r.id.toLowerCase().includes(q) ||
+        r.perms.some(p => p.label.toLowerCase().includes(q) || p.key.toLowerCase().includes(q)))
+      if (visible.length > 0) result.push([category, visible])
+    }
+    return result
+  }, [baseMatrix, search])
+
+  /** Alterna una acción respetando que Ver es prerequisito en runtime:
+   * otorgar una acción marca también Ver; quitar Ver desactiva toda la fila. */
+  function toggleAction(row: MatrixRow, perm: PermissionDef) {
     setSelectedKeys(prev => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key); else next.add(key)
+      const isView = row.cells.view?.key === perm.key
+      if (next.has(perm.key)) {
+        next.delete(perm.key)
+        if (isView) row.perms.forEach(p => next.delete(p.key))
+      } else {
+        next.add(perm.key)
+        if (!isView && row.cells.view) next.add(row.cells.view.key)
+      }
       return next
     })
   }
 
-  function toggleCategory(catPerms: PermissionDef[]) {
+  /** Alterna un conjunto de permisos: si están todos, los quita; si no, los pone. */
+  function toggleMany(perms: PermissionDef[]) {
     setSelectedKeys(prev => {
       const next = new Set(prev)
-      const allSelected = catPerms.every(p => next.has(p.key))
-      if (allSelected) catPerms.forEach(p => next.delete(p.key))
-      else catPerms.forEach(p => next.add(p.key))
+      const allSelected = perms.every(p => next.has(p.key))
+      if (allSelected) perms.forEach(p => next.delete(p.key))
+      else perms.forEach(p => next.add(p.key))
       return next
     })
   }
@@ -245,33 +337,69 @@ export function CustomRoleEditor({
           {loading ? (
             <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px' }}>Cargando…</div>
           ) : (
-            grouped.map(([category, perms]) => {
-              const allSelected = perms.every(p => selectedKeys.has(p.key))
+            grouped.map(([category, rows]) => {
+              const catPerms = rows.flatMap(r => r.perms)
+              const allSelected = catPerms.every(p => selectedKeys.has(p.key))
               return (
-                <div key={category} style={{ marginBottom: '14px' }}>
+                <div key={category} style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      {category}
+                      {categoryLabel(category)}
                     </div>
-                    <button onClick={() => toggleCategory(perms)} style={{
+                    <button onClick={() => toggleMany(catPerms)} style={{
                       fontSize: '11px', color: 'var(--at-primary-2)', background: 'transparent',
                       border: '1px solid var(--at-accent-2)', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
                     }}>{allSelected ? 'Deseleccionar' : 'Seleccionar todo'}</button>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-                    {perms.map(p => (
-                      <label key={p.key} style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                        fontSize: '12px', color: 'var(--at-ink-2)', padding: '3px 0',
-                      }}>
-                        <input
-                          type="checkbox" checked={selectedKeys.has(p.key)}
-                          onChange={() => togglePerm(p.key)}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <span>{p.label}</span>
-                      </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: `minmax(0, 1fr) repeat(${ACTION_COLUMNS.length}, 62px)`, alignItems: 'center' }}>
+                    {/* Encabezado de acciones (por categoría, para que siga visible al hacer scroll) */}
+                    <div />
+                    {ACTION_COLUMNS.map(c => (
+                      <div key={c.action} title={MODULE_ACTION_LABELS[c.action]} style={{
+                        fontSize: '10px', fontWeight: 700, color: 'var(--at-ink-3)', textAlign: 'center',
+                        textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 0',
+                      }}>{c.short}</div>
                     ))}
+                    {rows.map(row => {
+                      const rowAll = row.perms.every(p => selectedKeys.has(p.key))
+                      return (
+                        // Fila = módulo/tab. La etiqueta alterna toda la fila;
+                        // cada celda alterna una acción. Celda vacía = la
+                        // acción no existe en el catálogo para ese módulo.
+                        <Fragment key={row.id}>
+                          <button
+                            onClick={() => toggleMany(row.perms)}
+                            title={rowAll ? 'Quitar todas las acciones' : 'Otorgar todas las acciones'}
+                            style={{
+                              textAlign: 'left', fontSize: '12px', padding: '3px 4px', borderRadius: '4px',
+                              color: rowAll ? 'var(--at-primary-2)' : 'var(--at-ink-2)',
+                              fontWeight: rowAll ? 600 : 400,
+                              background: 'transparent', border: 'none', cursor: 'pointer',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}
+                          >{row.label}</button>
+                          {ACTION_COLUMNS.map(c => {
+                            const perm = row.cells[c.action]
+                            return (
+                              <div key={c.action} style={{ textAlign: 'center', padding: '2px 0' }}>
+                                {perm ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedKeys.has(perm.key)}
+                                    onChange={() => toggleAction(row, perm)}
+                                    aria-label={perm.label}
+                                    title={perm.label}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ) : (
+                                  <span style={{ color: 'var(--at-line)', fontSize: '11px' }}>—</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </Fragment>
+                      )
+                    })}
                   </div>
                 </div>
               )

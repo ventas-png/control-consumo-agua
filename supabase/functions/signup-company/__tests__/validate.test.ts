@@ -38,6 +38,14 @@ describe('signup-company/validatePayload', () => {
     expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: true })).toBeNull()
   })
 
+  it('valida la moneda de cobro cuando viene en el payload', () => {
+    expect(validatePayload({ ...ok, default_currency: 'gtq' })).toBeNull()
+    expect(validatePayload({ ...ok, default_currency: 'USD' })).toBeNull()
+    expect(validatePayload({ ...ok, default_currency: undefined })).toBeNull()
+    expect(validatePayload({ ...ok, default_currency: 'quetzal' })).toMatch(/Moneda de cobro/)
+    expect(validatePayload({ ...ok, default_currency: 'xxx' })).toMatch(/Moneda de cobro/)
+  })
+
   it('exige aceptar los documentos legales (click-wrap)', () => {
     expect(validatePayload({ ...ok, legal_accepted: undefined })).toMatch(/Términos de Servicio/)
     expect(validatePayload({ ...ok, legal_accepted: false })).toMatch(/Anexo DPA/)

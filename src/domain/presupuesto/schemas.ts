@@ -20,7 +20,10 @@ export const partidaSchema = z.object({
 
 export type PartidaInput = z.infer<typeof partidaSchema>
 
-const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+// PR-22 (auditoría 2026-07-28): esta era una de las 7 copias de un redondeo
+// monetario que fallaba el 4,58% de los puntos medios y divergía de
+// `numeric(12,2)` en todo negativo. Fuente única en src/lib/business.ts.
+import { redondear2 as r2 } from '../../lib/business'
 
 /**
  * Reparte un monto anual en 12 mensualidades a 2 decimales que SUMAN exacto:

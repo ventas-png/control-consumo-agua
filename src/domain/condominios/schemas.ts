@@ -33,10 +33,19 @@ const isoTimestamp = z
     'Timestamp inválido (ISO 8601 o Postgres)',
   )
 const optionalIsoTimestamp = z.union([isoTimestamp, z.null()]).optional()
+// Campos de vigencia que la UI llena con <input type="date"> (→ 'YYYY-MM-DD')
+// pero que en DB son timestamptz: Postgres coacciona la fecha a medianoche.
+// Aceptar SOLO timestamp rechazaba el payload de los formularios y el insert
+// nunca salía del navegador. Ver `valido_hasta` en visitanteInputSchema.
+const optionalYmdOrIsoTimestamp = z.union([ymd, isoTimestamp, z.null()]).optional()
 
 // ── CuotaCondominio ─────────────────────────────────────────────────────────
 const conceptoCuota = z.enum(['mantenimiento', 'extraordinaria', 'CAM', 'amenidad', 'otro'])
 const estadoCuota = z.enum(['pendiente', 'pagado', 'moroso'])
+// Rol responsable del cargo: mismo dominio que unidad_residentes.tipo. NULL =
+// sin diferenciar (responsabilidad de la unidad).
+const rolResponsable = z.enum(['propietario', 'arrendatario', 'familiar', 'otro'])
+const optionalRolResponsable = z.union([rolResponsable, z.null()]).optional()
 
 export const cuotaInputSchema = z
   .object({
@@ -48,6 +57,7 @@ export const cuotaInputSchema = z
     periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Periodo debe ser YYYY-MM'),
     fecha_vencimiento: optionalYmd,
     estado: estadoCuota,
+    rol_responsable: optionalRolResponsable,
     notas: optionalString,
   })
   // passthrough: preserva campos system-side (id, created_at, etc.) que no
@@ -82,7 +92,11 @@ export const visitanteInputSchema = z
     hora_entrada: isoTimestamp,
     hora_salida: optionalIsoTimestamp,
     notas: optionalString,
-    valido_hasta: optionalIsoTimestamp,
+    // Los DOS formularios que escriben este campo (portal del residente y pase
+    // QR del guardia) usan <input type="date"> → 'YYYY-MM-DD'. Exigir timestamp
+    // hacía que `validatedInsert` rechazara la fila antes de tocar la DB, con el
+    // botón aparentando "no hacer nada".
+    valido_hasta: optionalYmdOrIsoTimestamp,
     es_menor: z.boolean().optional(),
     fecha_nacimiento: optionalYmd,
   })

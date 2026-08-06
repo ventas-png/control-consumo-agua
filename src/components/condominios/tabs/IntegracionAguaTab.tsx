@@ -1,6 +1,7 @@
+import { mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { useMedidoresAguaPorProyectoQuery } from '../../../domain/agua/queries'
-import { validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { Unidad } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
@@ -51,7 +52,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
 
   // Generación de cuotas
   const [tarifa, setTarifa] = useState('')
-  const [periodo, setPeriodo] = useState(new Date().toISOString().slice(0, 7))
+  const [periodo, setPeriodo] = useState(mesLocalISO())
   const [fechaVenc, setFechaVenc] = useState('')
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [generando, setGenerando] = useState(false)
@@ -112,6 +113,11 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, inserts)
     setGenerando(false)
 
+    // E1: llave natural — estas cuotas de agua ya se generaron para el período.
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas ya generadas', text: `Alguna unidad ya tiene la cuota de agua de ${periodo}. No se duplicó nada — actualizá la vista.` })
+      onRefresh(); return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${items.length} cuotas de agua generadas`, text: `Total: ${moneda} ${total.toFixed(2)}`, duration: 2000 })
     setSeleccionadas(new Set())

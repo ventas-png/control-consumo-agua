@@ -1,6 +1,7 @@
 // domain/clientes/queries.ts — Lecturas del módulo clientes. T7/PR3: el acceso
 // directo a Supabase sale de los componentes (ClientesSection, ClienteRentasModal,
 // ImportClientesModal) hacia la capa domain. Lecturas imperativas (no-hook).
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import type { Cliente, ClienteLookupResult, ContratoArrendamiento, ReservaSTR } from '../../types'
 
@@ -15,10 +16,11 @@ export interface CompanyClienteActivo {
  * RLS acota el tenant; devolvemos solo los que matchean los ids dados.
  */
 export async function fetchClienteAccountMap(clienteIds: string[]): Promise<Record<string, boolean>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('app_users')
     .select('cliente_id')
     .in('cliente_id', clienteIds)
+  reportDegradedQuery('clientes.fetchClienteAccountMap', error)
   const map: Record<string, boolean> = {}
   data?.forEach((u: { cliente_id: string | null }) => {
     if (u.cliente_id) map[u.cliente_id] = true
@@ -34,11 +36,12 @@ export async function fetchCompanyClientesActivoMap(
   companyId: string,
   clienteIds: string[],
 ): Promise<Record<string, CompanyClienteActivo>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('company_clientes')
     .select('id, cliente_id, activo')
     .eq('company_id', companyId)
     .in('cliente_id', clienteIds)
+  reportDegradedQuery('clientes.fetchCompanyClientesActivoMap', error)
   const map: Record<string, CompanyClienteActivo> = {}
   data?.forEach((row: { id: string; cliente_id: string; activo: boolean | null }) => {
     map[row.cliente_id] = { ccId: row.id, activo: row.activo ?? true }
@@ -70,7 +73,8 @@ export async function buscarClienteParaOnboarding(
 
 /** Trae el registro completo de un cliente por id (o `null`). */
 export async function fetchClienteById(id: string): Promise<Cliente | null> {
-  const { data } = await supabase.from('clientes').select('*').eq('id', id).single()
+  const { data, error } = await supabase.from('clientes').select('*').eq('id', id).single()
+  reportDegradedQuery('clientes.fetchClienteById', error)
   return (data as Cliente) ?? null
 }
 
@@ -88,20 +92,22 @@ export async function fetchClientesForDedup(): Promise<{ data: Cliente[] | null;
 
 /** Contratos de arrendamiento de un conjunto de unidades (recientes primero). */
 export async function fetchContratosByUnidades(unidadIds: string[]): Promise<ContratoArrendamiento[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('contratos_arrendamiento')
     .select('*')
     .in('unidad_id', unidadIds)
     .order('created_at', { ascending: false })
+  reportDegradedQuery('clientes.fetchContratosByUnidades', error)
   return (data as ContratoArrendamiento[]) ?? []
 }
 
 /** Reservas STR de un conjunto de unidades (por fecha de entrada, recientes primero). */
 export async function fetchReservasByUnidades(unidadIds: string[]): Promise<ReservaSTR[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('reservas_str')
     .select('*')
     .in('unidad_id', unidadIds)
     .order('fecha_entrada', { ascending: false })
+  reportDegradedQuery('clientes.fetchReservasByUnidades', error)
   return (data as ReservaSTR[]) ?? []
 }

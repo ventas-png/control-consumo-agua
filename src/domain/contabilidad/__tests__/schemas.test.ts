@@ -4,6 +4,7 @@ import {
   asientoLineaFormSchema,
   convertirMontoBase,
   cuentaFormSchema,
+  normalizarMoneda,
   round2,
   tipoCambioFormSchema,
   totalesLineas,
@@ -128,5 +129,59 @@ describe('cuentaFormSchema', () => {
       descripcion: null,
     })
     expect(r.success).toBe(false)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// `normalizarMoneda` es un ESPEJO de la función SQL `conta_normalizar_moneda`
+// (migración 20260611000100_contabilidad_fase1_rpcs.sql:21-32), y hasta la
+// auditoría 2026-07-28 no tenía ningún test. Un espejo TS↔SQL sin test es la
+// misma forma del bug de PR-23 (mora del UI divergiendo del cron que cobra):
+// nada avisa cuando un lado cambia. Aquí importa de verdad porque la moneda
+// decide la conversión a moneda base — que la UI muestre 'US$' como una moneda
+// distinta de 'USD' parte el consolidado en dos ledgers.
+//
+// Cada caso está pareado con la rama del CASE de SQL que replica:
+//
+//   SELECT CASE upper(trim(COALESCE(p_moneda, '')))
+//     WHEN ''    THEN NULL     WHEN 'Q'   THEN 'GTQ'
+//     WHEN '$'   THEN 'USD'    WHEN 'US$' THEN 'USD'
+//     WHEN 'MX$' THEN 'MXN'    ELSE upper(trim(p_moneda))
+//   END
+// ════════════════════════════════════════════════════════════════════════════
+describe('normalizarMoneda (espejo de conta_normalizar_moneda)', () => {
+  it('mapea los símbolos legacy a ISO 4217', () => {
+    expect(normalizarMoneda('Q')).toBe('GTQ')
+    expect(normalizarMoneda('$')).toBe('USD')
+    expect(normalizarMoneda('US$')).toBe('USD')
+    expect(normalizarMoneda('MX$')).toBe('MXN')
+  })
+
+  it('normaliza caja y espacios ANTES de mapear (upper(trim(...)) en SQL)', () => {
+    // El SQL aplica upper+trim dentro del CASE, así que ' q ' entra por la rama
+    // 'Q'. Si el TS mapeara sobre el valor crudo, esto devolvería ' q '.
+    expect(normalizarMoneda(' q ')).toBe('GTQ')
+    expect(normalizarMoneda(' usd ')).toBe('USD')
+    expect(normalizarMoneda('gtq')).toBe('GTQ')
+  })
+
+  it('deja pasar cualquier otro código ya normalizado (rama ELSE)', () => {
+    expect(normalizarMoneda('USD')).toBe('USD')
+    expect(normalizarMoneda('EUR')).toBe('EUR')
+  })
+
+  it('vacío, blancos, null y undefined → null (rama WHEN ..)', () => {
+    // COALESCE(p_moneda,'') + trim: los cuatro colapsan al mismo caso en SQL.
+    expect(normalizarMoneda('')).toBeNull()
+    expect(normalizarMoneda('   ')).toBeNull()
+    expect(normalizarMoneda(null)).toBeNull()
+    expect(normalizarMoneda(undefined)).toBeNull()
+  })
+
+  it('es idempotente: normalizar dos veces no cambia el resultado', () => {
+    // Los valores ya normalizados vuelven a pasar por aquí al releer de la BD.
+    for (const m of ['Q', '$', 'US$', 'MX$', 'eur', ' q ']) {
+      expect(normalizarMoneda(normalizarMoneda(m))).toBe(normalizarMoneda(m))
+    }
   })
 })

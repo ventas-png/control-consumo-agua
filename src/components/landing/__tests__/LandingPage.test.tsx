@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+
+// LandingPage dispara el warm-up de Supabase al montar; el módulo real exige
+// las env vars VITE_SUPABASE_* que no existen en el entorno de test.
+vi.mock('../../../lib/supabase', () => ({
+  warmUpSupabase: vi.fn(),
+}))
+
 import { LandingPage } from '../LandingPage'
 import { checkA11y } from '../../../test/a11y'
 
@@ -10,7 +17,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/')
 })
 
-function setup(opts: { mfaChallenge?: { email: string } | null } = {}) {
+function setup(opts: { mfaChallenge?: { email: string } | null; initialAuthError?: string | null } = {}) {
   const onLogin = vi.fn(async () => null)
   const onLoginWithGoogle = vi.fn(async () => null)
   const onForgotPassword = vi.fn()
@@ -28,6 +35,7 @@ function setup(opts: { mfaChallenge?: { email: string } | null } = {}) {
       mfaChallenge={opts.mfaChallenge ?? null}
       onVerifyMfa={onVerifyMfa}
       onCancelMfa={onCancelMfa}
+      initialAuthError={opts.initialAuthError ?? null}
     />,
   )
   return { onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, onVerifyMfa, onCancelMfa, ...utils }
@@ -61,6 +69,16 @@ describe('LandingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     fireEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }))
     await waitFor(() => expect(onLoginWithGoogle).toHaveBeenCalledTimes(1))
+  })
+
+  it('auto-opens the login modal showing the OAuth callback error', async () => {
+    setup({ initialAuthError: 'No se pudo completar el inicio de sesión. Detalle: prueba' })
+    // El useEffect abre el modal al detectar el error del redirect OAuth y el
+    // LoginModal lo muestra como error inicial — antes el usuario volvía de
+    // Google a la landing sin ningún mensaje.
+    const heading = await screen.findByRole('heading', { name: 'Bienvenido de vuelta' })
+    expect(heading).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('No se pudo completar el inicio de sesión')
   })
 
   it('switches copy to English via the language toggle', () => {

@@ -463,7 +463,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 // ── Main tab ───────────────────────────────────────────────────────────────────
 
 export default function DifusionTab({ clientes, proyectos, unidades, canCreate }: Props) {
-  const { broadcasts, loading, loadBroadcasts } = useBroadcasts()
+  const { broadcasts, loading, error, loadBroadcasts } = useBroadcasts()
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => { loadBroadcasts() }, [loadBroadcasts])
@@ -503,7 +503,32 @@ export default function DifusionTab({ clientes, proyectos, unidades, canCreate }
         </div>
       )}
 
-      {!loading && broadcasts.length === 0 && (
+      {/* Un fallo de carga NO debe verse como "no hay comunicados": se distingue
+          el vacío real del error, y se ofrece reintentar. */}
+      {!loading && error && (
+        <div style={{
+          textAlign: 'center', padding: '40px 24px',
+          background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '16px',
+        }}>
+          <div style={{ fontSize: '34px', marginBottom: '10px' }}>⚠️</div>
+          <p style={{ margin: 0, color: 'var(--at-danger)', fontWeight: 700, fontSize: '14px' }}>
+            No se pudieron cargar los comunicados
+          </p>
+          <p style={{ margin: '6px 0 14px', color: 'var(--at-ink-3)', fontSize: '13px' }}>{error}</p>
+          <button
+            onClick={loadBroadcasts}
+            style={{
+              padding: '8px 18px', border: '1px solid var(--at-line-strong)', borderRadius: '9px',
+              background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 600,
+              fontSize: '13px', cursor: 'pointer',
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && broadcasts.length === 0 && (
         <div style={{
           textAlign: 'center', padding: '56px 24px',
           background: 'var(--at-surface)', border: '1px dashed var(--at-line)', borderRadius: '16px',
@@ -520,7 +545,7 @@ export default function DifusionTab({ clientes, proyectos, unidades, canCreate }
         </div>
       )}
 
-      {!loading && broadcasts.length > 0 && (
+      {!loading && !error && broadcasts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {broadcasts.map(b => <BroadcastCard key={b.id} broadcast={b} />)}
         </div>

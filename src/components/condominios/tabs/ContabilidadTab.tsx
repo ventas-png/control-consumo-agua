@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
@@ -36,7 +37,7 @@ const ESTADO_CONFIG: Record<EstadoGasto, { label: string; color: string; bg: str
 
 const blank = (): Partial<GastoCondominio> => ({
   concepto: '', categoria: 'otros', monto: undefined,
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: hoyLocalISO(),
   proveedor_nombre: '', estado: 'pagado', metodo_pago: 'transferencia',
   comprobante_num: '', notas: '',
 })
@@ -63,7 +64,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   const excedePartida = !!partida && partida.presupuestado > 0 &&
     (partida.ejecutado + (form.monto ?? 0)) > partida.presupuestado
 
-  const thisMonth = new Date().toISOString().slice(0, 7)
+  const thisMonth = mesLocalISO()
   const thisYear  = new Date().getFullYear().toString()
 
   const pagados   = gastos.filter(g => g.estado === 'pagado')
@@ -92,12 +93,12 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
       rows: filtered.map(g => [g.fecha, g.concepto, CAT_CONFIG[g.categoria].label, `${moneda} ${g.monto.toFixed(2)}`, ESTADO_CONFIG[g.estado].label, g.proveedor_nombre ?? '—']),
       totalesRow: ['', '', 'TOTAL PAGADOS', `${moneda} ${filtered.filter(g => g.estado === 'pagado').reduce((s, g) => s + g.monto, 0).toFixed(2)}`, '', ''],
       rightAlignCols: [3],
-      filename: `gastos-${new Date().toISOString().slice(0, 7)}`,
+      filename: `gastos-${mesLocalISO()}`,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`gastos-${new Date().toISOString().slice(0, 7)}`, [{
+    exportarExcel(`gastos-${mesLocalISO()}`, [{
       name: 'Gastos',
       headers: ['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', 'Proveedor', 'Método Pago', 'No. Comprobante', 'Notas'],
       rows: gastos.map(g => [g.fecha, g.concepto, CAT_CONFIG[g.categoria].label, g.monto, ESTADO_CONFIG[g.estado].label, g.proveedor_nombre ?? '', g.metodo_pago ?? '', g.comprobante_num ?? '', g.notas ?? '']),

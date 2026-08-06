@@ -1,3 +1,4 @@
+import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -47,7 +48,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   const activos = contratos.filter(c => c.estado === 'activo')
   const rentaTotal = activos.reduce((s, c) => s + c.monto_renta, 0)
 
-  const porVencer = contratos.filter(c => c.estado === 'activo' && c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
+  const porVencer = contratos.filter(c => c.estado === 'activo' && c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)))
 
   function resetForm() {
     setForm({ unidad_id: '', arrendatario_nombre: '', arrendatario_identificacion: '', arrendatario_telefono: '', arrendatario_email: '', monto_renta: '', dia_pago: '5', fecha_inicio: '', fecha_fin: '', deposito: '', notas: '' })
@@ -102,13 +103,13 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       rows: filtrados.map(c => [c.arrendatario_nombre, c.unidad_nombre ?? '—', `${moneda} ${c.monto_renta.toFixed(2)}`, c.deposito != null ? `${moneda} ${c.deposito.toFixed(2)}` : '—', `Día ${c.dia_pago}`, c.fecha_inicio, c.fecha_fin ?? '—', ESTADO_CONFIG[c.estado].label]),
       totalesRow: ['TOTAL ACTIVOS', '', `${moneda} ${rentaTotal.toFixed(2)}`, '', '', '', '', ''],
       rightAlignCols: [2, 3],
-      filename: `arrendamientos-${new Date().toISOString().slice(0, 10)}`,
+      filename: `arrendamientos-${hoyLocalISO()}`,
       landscape: true,
     })
   }
 
   function exportarXlsx() {
-    exportarExcel(`arrendamientos-${new Date().toISOString().slice(0, 10)}`, [{
+    exportarExcel(`arrendamientos-${hoyLocalISO()}`, [{
       name: 'Arrendamientos',
       headers: ['Arrendatario', 'DPI', 'Teléfono', 'Email', 'Unidad', 'Renta/mes', 'Depósito', 'Día pago', 'Inicio', 'Fin', 'Estado'],
       rows: contratos.map(c => [c.arrendatario_nombre, c.arrendatario_identificacion ?? '', c.arrendatario_telefono ?? '', c.arrendatario_email ?? '', c.unidad_nombre ?? '', c.monto_renta, c.deposito ?? '', c.dia_pago, c.fecha_inicio, c.fecha_fin ?? '', c.estado]),
@@ -266,7 +267,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</span> },
           { key: 'fecha_inicio', header: 'Período', sortable: true,
             render: (c) => {
-              const vence30 = c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) && c.estado === 'activo'
+              const vence30 = c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)) && c.estado === 'activo'
               return (
                 <span style={{ color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
                   {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
@@ -292,7 +293,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             } },
           { key: 'actions', header: '', align: 'right',
             render: (c) => {
-              const vence30 = c.fecha_fin && c.fecha_fin <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) && c.estado === 'activo'
+              const vence30 = c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)) && c.estado === 'activo'
               return (
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
                   {vence30 && (

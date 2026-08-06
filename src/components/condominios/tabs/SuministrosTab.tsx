@@ -1,12 +1,15 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
-import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum } from '../../../types'
+import { SuministroCondominio, MovimientoSuministro, CategoriaSupministro, UnidadMedidaSum, TipoMovimientoSum, ContratoProveedor } from '../../../types'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { ImportSuministrosModal } from '../ImportSuministrosModal'
 
 interface Props {
   suministros: SuministroCondominio[]
   movimientos: MovimientoSuministro[]
+  proveedores: ContratoProveedor[]
   proyectoId: string
   companyId: string
   moneda: string
@@ -32,12 +35,13 @@ const TIPOS_MOV: { value: TipoMovimientoSum; label: string; color: string }[] = 
   { value: 'ajuste',  label: 'Ajuste',  color: 'var(--at-warning)' },
 ]
 
-export default function SuministrosTab({ suministros, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function SuministrosTab({ suministros, movimientos, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<SuministroCondominio | null>(null)
   const [vista, setVista] = useState<'lista' | 'nuevo' | 'movimiento'>('lista')
   const [saving, setSaving] = useState(false)
   const [filtro, setFiltro] = useState<CategoriaSupministro | ''>('')
   const [soloAlertas, setSoloAlertas] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const [form, setForm] = useState({
     nombre: '', categoria: 'limpieza' as CategoriaSupministro,
@@ -47,7 +51,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
   const [movForm, setMovForm] = useState({
     tipo: 'salida' as TipoMovimientoSum, cantidad: '', motivo: '',
-    area_destino: '', realizado_por: '', fecha: new Date().toISOString().split('T')[0], notas: '',
+    area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '',
   })
 
   const lista = suministros.filter(s =>
@@ -57,6 +61,18 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
 
   const alertas = suministros.filter(s => s.activo && s.stock_actual <= s.stock_minimo)
   const movsDelSelected = selected ? movimientos.filter(m => m.suministro_id === selected.id) : []
+
+  // Proveedores autorizados/definidos (pestaña Proveedores) — únicas opciones
+  // válidas para el campo Proveedor del suministro. Nombres distintos, con los
+  // contratos activos primero.
+  const proveedoresDisponibles = Array.from(
+    new Set(
+      [...proveedores]
+        .sort((a, b) => (a.estado === 'activo' ? 0 : 1) - (b.estado === 'activo' ? 0 : 1))
+        .map(p => p.proveedor_nombre.trim())
+        .filter(Boolean)
+    )
+  )
 
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
@@ -104,7 +120,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     setSaving(false)
     if (errStock) { notify({ variant: 'error', title: 'Error', text: errStock.message }); return }
 
-    setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: new Date().toISOString().split('T')[0], notas: '' })
+    setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '' })
     setVista('lista')
     onRefresh()
   }
@@ -125,10 +141,16 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Suministros</span>
             {canCreate && (
-              <button onClick={() => { setVista('nuevo'); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nuevo
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+                  style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  ⬆ Masiva
+                </button>
+                <button onClick={() => { setVista('nuevo'); setSelected(null) }}
+                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  + Nuevo
+                </button>
+              </div>
             )}
           </div>
           <select style={{ ...inp, marginBottom: 6 }} value={filtro} onChange={e => setFiltro(e.target.value as CategoriaSupministro | '')}>
@@ -205,7 +227,17 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               </div>
               <div>
                 <label style={lbl}>Proveedor</label>
-                <input style={inp} value={form.proveedor} onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))} />
+                <select style={inp} value={form.proveedor}
+                  onChange={e => setForm(p => ({ ...p, proveedor: e.target.value }))}
+                  disabled={proveedoresDisponibles.length === 0}>
+                  <option value="">— Sin proveedor —</option>
+                  {proveedoresDisponibles.map(nombre => <option key={nombre} value={nombre}>{nombre}</option>)}
+                </select>
+                {proveedoresDisponibles.length === 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                    Define proveedores en la pestaña <strong>Proveedores</strong> para poder elegirlos aquí.
+                  </div>
+                )}
               </div>
               <div>
                 <label style={lbl}>Costo unitario ({moneda})</label>
@@ -362,6 +394,16 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           </div>
         )}
       </div>
+
+      {showImportModal && (
+        <ImportSuministrosModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          proveedoresValidos={proveedoresDisponibles}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }

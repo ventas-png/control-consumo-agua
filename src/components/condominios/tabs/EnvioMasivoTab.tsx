@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -31,7 +32,7 @@ const CANAL_CFG: Record<CanalPlantilla, { label: string; icon: string; color: st
 }
 
 function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondominio[], moneda: string, proyecto = ''): string {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const vencidas = cuotasU.filter(c => (c.estado === 'pendiente' || c.estado === 'moroso') && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
   const saldo = cuotasU.filter(c => c.estado !== 'pagado').reduce((s, c) => s + c.monto, 0)
   const ultimaVenc = vencidas.length > 0 ? vencidas[0].fecha_vencimiento ?? '' : ''
@@ -42,13 +43,13 @@ function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondomi
     .replace(/\{\{unidad\}\}/g, unidad.nombre)
     .replace(/\{\{monto\}\}/g, `${moneda} ${saldo.toFixed(2)}`)
     .replace(/\{\{fecha_vencimiento\}\}/g, ultimaVenc || hoy)
-    .replace(/\{\{periodo\}\}/g, new Date().toISOString().slice(0, 7))
+    .replace(/\{\{periodo\}\}/g, mesLocalISO())
     .replace(/\{\{dias_mora\}\}/g, String(diasMora))
     .replace(/\{\{proyecto\}\}/g, proyecto)
 }
 
 export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas, proyectoId, companyId, moneda, proyectoNombre, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [plantillaId, setPlantillaId] = useState('')
   const [segmento, setSegmento] = useState<SegmentoEnvio>('todos')
   const [previewUnidadId, setPreviewUnidadId] = useState('')

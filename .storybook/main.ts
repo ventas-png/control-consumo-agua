@@ -2,7 +2,8 @@ import type { StorybookConfig } from '@storybook/react-vite'
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
-  addons: ['@storybook/addon-essentials'],
+  // SB 9+: los addons "essentials" (controls, actions, backgrounds, viewport…)
+  // viven en el core — @storybook/addon-essentials ya no existe como paquete.
   framework: {
     name: '@storybook/react-vite',
     options: {},

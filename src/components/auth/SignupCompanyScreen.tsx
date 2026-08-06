@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { signupCompany } from '../../domain/auth/account'
 import { validatePasswordStrength } from '../../lib/validation'
+import { MONEDAS_ISO } from '../../lib/monedas'
 import { FUNNEL, trackFunnel } from '../../lib/analytics'
 import { BrandLogo } from '../shared/BrandLogo'
 
@@ -36,6 +37,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   // Step 2 — Datos de la empresa
   const [companyName, setCompanyName] = useState('')
   const [phone, setPhone] = useState('')
+  const [moneda, setMoneda] = useState('gtq')
   const [servicioAgua, setServicioAgua] = useState(false)
   const [servicioCondominios, setServicioCondominios] = useState(false)
   // Click-wrap obligatorio (RGPD/CCPA): desmarcado por defecto. Bloquea el envío.
@@ -82,6 +84,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
         full_name: fullName.trim(),
         company_name: companyName.trim(),
         phone: phone.trim() || undefined,
+        default_currency: moneda,
         servicio_agua: servicioAgua,
         servicio_condominios: servicioCondominios,
         // Evidencia click-wrap: el backend la valida y registra (versión + IP +
@@ -206,6 +209,14 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
             <label className="signup-field">
               <span>Teléfono (opcional)</span>
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+502 1234-5678" />
+            </label>
+            <label className="signup-field">
+              <span>Moneda de cobro</span>
+              <select value={moneda} onChange={e => setMoneda(e.target.value)}>
+                {MONEDAS_ISO.map(m => (
+                  <option key={m.code} value={m.code}>{m.label}</option>
+                ))}
+              </select>
             </label>
 
             <div className="signup-modules">

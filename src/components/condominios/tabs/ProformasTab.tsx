@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { confirm, notify } from '../../shared/Dialog'
@@ -212,7 +213,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
           {filtradas.map(p => {
             const cfg = ESTADO_CFG[p.estado]
             const exp = expandida === p.id
-            const vencida = p.fecha_validez && p.fecha_validez < new Date().toISOString().slice(0, 10) && p.estado !== 'convertida_oc' && p.estado !== 'rechazada'
+            const vencida = p.fecha_validez && p.fecha_validez < hoyLocalISO() && p.estado !== 'convertida_oc' && p.estado !== 'rechazada'
             return (
               <div key={p.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 12, overflow: 'hidden' }}>
                 <div onClick={() => setExpandida(exp ? null : p.id)}

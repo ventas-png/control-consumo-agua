@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useBalanzaQuery, useCuentasQuery } from '../../domain/contabilidad/queries'
 import { balanzaConRollups, type BalanzaNodo } from '../../domain/contabilidad/arbol'
 import { exportarExcel } from '../condominios/exportUtils'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, mesLocalISO } from '../../lib/format'
 import { EmptyState } from '../shared'
 import { btnSecundario, input } from './ui'
 import { RevaluacionFxModal } from './RevaluacionFxModal'
@@ -15,7 +15,7 @@ interface Props {
 }
 
 function periodoActual(): string {
-  return new Date().toISOString().slice(0, 7)
+  return mesLocalISO()
 }
 
 export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {

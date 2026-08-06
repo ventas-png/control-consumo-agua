@@ -79,6 +79,10 @@ export const FUNNEL = {
   companySignedUp: 'company_signed_up',
   /** Onboarding: un invitado aceptó la invitación y creó su cuenta (plat:P3). */
   invitationAccepted: 'invitation_accepted',
+  /** Billing plataforma: el usuario abrió el flujo de upgrade/checkout de plan. */
+  checkoutIniciado: 'checkout_iniciado',
+  /** Billing plataforma: cambio de plan aplicado in-place con prorrateo (swap). */
+  planActualizado: 'plan_actualizado',
   /** Billing: se emitió una factura (pendiente → emitida). */
   facturaEmitida: 'factura_emitida',
   /** Billing: se registró un pago/abono sobre una factura. */

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -99,7 +100,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
     await updateCondominioRow('reclamos_condominio', selected.id, {
       respuesta_admin: formResp.respuesta_admin.trim(),
       respondido_por: formResp.respondido_por || null,
-      fecha_respuesta: new Date().toISOString().slice(0, 10),
+      fecha_respuesta: hoyLocalISO(),
       estado: 'respondido',
     })
     setShowRespForm(false); setFormResp({ ...BLANK_RESP }); onRefresh()
@@ -223,7 +224,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
             const es = ESTADO_STYLE[r.estado] ?? ESTADO_STYLE.recibido
             const pr = PRIORIDAD_STYLE[r.prioridad] ?? PRIORIDAD_STYLE.normal
             const unidad = unidades.find(u => u.id === r.unidad_id)
-            const today = new Date().toISOString().slice(0, 10)
+            const today = hoyLocalISO()
             const vencido = (r.estado === 'recibido' || r.estado === 'en_revision') && r.plazo_respuesta && r.plazo_respuesta < today
             return (
               <div key={r.id} onClick={() => setSelected(selected?.id === r.id ? null : r)}

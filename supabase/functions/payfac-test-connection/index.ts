@@ -14,8 +14,11 @@
 // validamos el token a mano (service_role O admin/owner JWT).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
+  credencialesEfectivasDeAmbiente,
   getPaymentProvider,
   resolverConfigPagoEfectiva,
   type AmbientePago,
@@ -31,18 +34,6 @@ interface ReqBody {
   project_id?: string | null
   /** Ambiente a probar ('sandbox' | 'prod'). Default 'sandbox'. */
   ambiente?: string
-}
-
-/** Lee las credenciales del ambiente desde la fila de la bóveda (jsonb opaco). */
-function credsDeAmbiente(
-  credenciales: unknown,
-  ambiente: AmbientePago,
-): Record<string, unknown> | null {
-  if (typeof credenciales !== 'object' || credenciales === null) return null
-  const v = (credenciales as Record<string, unknown>)[ambiente]
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null
 }
 
 Deno.serve(async (req: Request) => {
@@ -66,7 +57,7 @@ Deno.serve(async (req: Request) => {
     let callerIsSuperAdmin = false
     let internal = false
 
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)
@@ -132,16 +123,21 @@ Deno.serve(async (req: Request) => {
     const config = resolverConfigPagoEfectiva(empresaConfig, locacionConfig)
 
     // ── 4) Cargar credenciales del ambiente desde la bóveda (NUNCA al cliente) ──
+    // Herencia locación→empresa (espeja create-charge): probar una locación que
+    // hereda el payfac usa las credenciales de la empresa (project_id NULL).
     let credLookup = admin
       .from('payfac_secrets')
-      .select('credenciales')
+      .select('project_id, credenciales')
       .eq('company_id', companyId)
     credLookup = projectId === null
       ? credLookup.is('project_id', null)
-      : credLookup.eq('project_id', projectId)
-    const { data: secretRow } = await credLookup.maybeSingle()
-    const credenciales = credsDeAmbiente(
-      (secretRow as { credenciales?: unknown } | null)?.credenciales,
+      : credLookup.or(`project_id.eq.${projectId},project_id.is.null`)
+    const { data: secretRows } = await credLookup
+    const filas = ((secretRows as { project_id: string | null; credenciales?: unknown }[] | null) ?? [])
+    // P0 #7: descifrar los blobs jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const credenciales = credencialesEfectivasDeAmbiente(
+      await decryptJson(filas.find((f) => f.project_id !== null)?.credenciales),
+      await decryptJson(filas.find((f) => f.project_id === null)?.credenciales),
       ambiente,
     )
 

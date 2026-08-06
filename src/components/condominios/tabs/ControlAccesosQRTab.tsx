@@ -1,7 +1,11 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { notify } from '../../shared/Dialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { validatedInsert } from '../../../lib/validatedInsert'
+import { generarToken } from '../../../lib/tokens'
+import { diaValidez } from '../../../lib/visitantesFiltros'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
 import { Visitante, Unidad } from '../../../types'
 
@@ -21,20 +25,14 @@ interface QRGenerado {
   unidadId: string
   unidadNombre: string
   validoHasta: string
-  qrUrl: string
 }
 
-function generarToken(): string {
-  return Math.random().toString(36).substring(2, 10).toUpperCase()
-}
-
-function qrUrl(token: string, nombre: string, unidad: string, hasta: string): string {
-  const data = encodeURIComponent(`VISITA:${token}|${nombre}|${unidad}|${hasta}`)
-  return `https://api.qrserver.com/v1/create-qr-code/?data=${data}&size=180x180&margin=8`
-}
+// P0 #8 (auditoría 2026-07-10): token CRIPTOGRÁFICO (antes Math.random, adivinable).
+// B5: el generador se extrajo a lib/tokens para compartirlo con paquetería
+// (12 chars × ~4.95 bits ≈ 59 bits — no adivinable en la ventana del pase).
 
 export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, companyId, canCreate: _canCreate, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [tab, setTab] = useState<'generar' | 'validar' | 'pendientes'>('generar')
   const [form, setForm] = useState({ nombre: '', motivo: '', unidadId: '', validoHasta: hoy, identificacion: '' })
   const [qrGenerado, setQrGenerado] = useState<QRGenerado | null>(null)
@@ -43,12 +41,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   const [registrando, setRegistrando] = useState(false)
 
   const preAutorizados = useMemo(() =>
-    visitantes.filter(v => v.qr_token && !v.hora_salida && v.valido_hasta && v.valido_hasta >= hoy),
+    visitantes.filter(v => v.qr_token && !v.hora_salida && v.valido_hasta && diaValidez(v.valido_hasta) >= hoy),
     [visitantes, hoy]
   )
 
   const vencidos = useMemo(() =>
-    visitantes.filter(v => v.qr_token && !v.hora_entrada && v.valido_hasta && v.valido_hasta < hoy),
+    visitantes.filter(v => v.qr_token && !v.hora_entrada && v.valido_hasta && diaValidez(v.valido_hasta) < hoy),
     [visitantes, hoy]
   )
 
@@ -65,7 +63,6 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       unidadId: form.unidadId,
       unidadNombre: u?.nombre ?? '',
       validoHasta: form.validoHasta,
-      qrUrl: qrUrl(token, form.nombre.trim(), u?.nombre ?? '', form.validoHasta),
     }
     setQrGenerado(qr)
   }
@@ -99,8 +96,8 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
     if (!v) {
       setResultadoValidacion({ ok: false, msg: 'Token no encontrado en el sistema.' }); return
     }
-    if (v.valido_hasta && v.valido_hasta < hoy) {
-      setResultadoValidacion({ ok: false, visitante: v, msg: `Token vencido el ${v.valido_hasta}.` }); return
+    if (v.valido_hasta && diaValidez(v.valido_hasta) < hoy) {
+      setResultadoValidacion({ ok: false, visitante: v, msg: `Token vencido el ${diaValidez(v.valido_hasta)}.` }); return
     }
     if (v.hora_entrada && !v.hora_salida) {
       setResultadoValidacion({ ok: true, visitante: v, msg: `Ya está dentro desde ${v.hora_entrada?.slice(11, 16)}.` }); return
@@ -200,8 +197,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 12 }}>
                   {qrGenerado.nombre} → {qrGenerado.unidadNombre} · válido hasta {qrGenerado.validoHasta}
                 </div>
-                <img src={qrGenerado.qrUrl} alt="QR" width={180} height={180}
-                  style={{ border: '2px solid var(--at-line)', borderRadius: 8, marginBottom: 12 }} />
+                {/* P0 #8: QR renderizado LOCALMENTE (antes iba a api.qrserver.com con
+                    los datos del visitante — fuga de PII a un tercero). Codifica solo
+                    el token opaco; el guardia lo escanea y valida contra qr_token. */}
+                <div style={{ background: '#fff', padding: 10, border: '2px solid var(--at-line)', borderRadius: 8, marginBottom: 12, lineHeight: 0 }}>
+                  <QRCodeSVG value={qrGenerado.token} size={180} level="M" marginSize={2} />
+                </div>
                 <div style={{ padding: '6px 12px', background: 'var(--at-chip)', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 2, marginBottom: 12, color: 'var(--at-ink)' }}>
                   Token: {qrGenerado.token}
                 </div>
@@ -250,7 +251,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                     <div><strong>{resultadoValidacion.visitante.nombre}</strong></div>
                     <div>Unidad: {resultadoValidacion.visitante.unidad_nombre}</div>
                     {resultadoValidacion.visitante.motivo && <div>Motivo: {resultadoValidacion.visitante.motivo}</div>}
-                    <div>Válido hasta: {resultadoValidacion.visitante.valido_hasta}</div>
+                    <div>Válido hasta: {resultadoValidacion.visitante.valido_hasta && diaValidez(resultadoValidacion.visitante.valido_hasta)}</div>
                   </div>
                 )}
                 {resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
@@ -289,7 +290,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                       {v.unidad_nombre} · Token: <code style={{ background: 'var(--at-chip)', padding: '1px 5px', borderRadius: 4 }}>{v.qr_token}</code>
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>
-                      Válido hasta {v.valido_hasta}
+                      Válido hasta {v.valido_hasta && diaValidez(v.valido_hasta)}
                       {v.hora_entrada && ` · Entró ${v.hora_entrada.slice(11, 16)}`}
                     </div>
                   </div>

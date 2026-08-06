@@ -10,9 +10,12 @@
 //
 // Las CREDENCIALES jamás se escriben/leen directo desde el cliente (solo vía edge).
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+// `db` = la misma instancia tipada (tablas/columnas chequeadas); `supabase` queda
+// para functions.invoke (edges) y storage, que no pasan por el esquema generado.
+import { db, supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { payfacKeys } from './keys'
+import type { TablesInsert, TablesUpdate } from '../../types/database.types'
 
 /** Ámbito de la config de pago: la empresa (companies) o una locación (projects). */
 export type AmbitoPago = { tipo: 'empresa' } | { tipo: 'locacion'; projectId: string }
@@ -29,19 +32,36 @@ function limpiar(v: string | null | undefined): string | null | undefined {
  * Construye el patch de columnas para companies/projects desde el proveedor
  * elegido. PURO/testeable. A nivel EMPRESA proveedor_pago es NOT NULL (no se
  * limpia a null: se cae a 'sandbox'); a nivel LOCACIÓN null = "hereda".
+ * `monedaDefault` (ISO 4217) solo aplica a nivel empresa: companies.default_currency
+ * — la BD la guarda en minúsculas; la locación no tiene moneda propia.
+ * `ambientePago` ('sandbox' | 'prod') sigue la MISMA regla que el proveedor:
+ * empresa NOT NULL (vacío cae a 'sandbox'), locación null = hereda.
  */
 export function buildConfigPagoPatch(
   ambito: AmbitoPago,
   proveedorPago: string | null | undefined,
+  monedaDefault?: string | null,
+  ambientePago?: string | null,
 ): Record<string, unknown> {
   const v = limpiar(proveedorPago)
-  if (v === undefined) return {}
-  // Empresa: la columna es NOT NULL → un vacío cae a 'sandbox' (default seguro).
-  if (ambito.tipo === 'empresa') {
-    return { proveedor_pago: v ?? 'sandbox' }
+  const patch: Record<string, unknown> = {}
+  if (v !== undefined) {
+    // Empresa: la columna es NOT NULL → un vacío cae a 'sandbox' (default seguro).
+    if (ambito.tipo === 'empresa') patch.proveedor_pago = v ?? 'sandbox'
+    // Locación: null = hereda de la empresa.
+    else patch.proveedor_pago = v
   }
-  // Locación: null = hereda de la empresa.
-  return { proveedor_pago: v }
+  const moneda = limpiar(monedaDefault)
+  if (ambito.tipo === 'empresa' && moneda != null) {
+    patch.default_currency = moneda.toLowerCase()
+  }
+  const amb = limpiar(ambientePago)
+  if (amb !== undefined) {
+    if (ambito.tipo === 'empresa') patch.ambiente_pago = amb === 'prod' ? 'prod' : 'sandbox'
+    // Locación: null = hereda; cualquier valor que no sea 'prod' explícito cae a sandbox.
+    else patch.ambiente_pago = amb == null ? null : amb === 'prod' ? 'prod' : 'sandbox'
+  }
+  return patch
 }
 
 /**
@@ -53,18 +73,25 @@ export function buildConfigPagoPatch(
 export function useGuardarConfigPagoMutation(companyId?: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (vars: { ambito: AmbitoPago; proveedorPago: string | null | undefined }) => {
-      const patch = buildConfigPagoPatch(vars.ambito, vars.proveedorPago)
+    mutationFn: async (vars: {
+      ambito: AmbitoPago
+      proveedorPago: string | null | undefined
+      monedaDefault?: string | null
+      ambientePago?: string | null
+    }) => {
+      const patch = buildConfigPagoPatch(vars.ambito, vars.proveedorPago, vars.monedaDefault, vars.ambientePago)
       if (Object.keys(patch).length === 0) return { ambito: vars.ambito }
       if (vars.ambito.tipo === 'empresa') {
         if (!companyId) throw new Error('Falta companyId para guardar la config de empresa.')
         await runQuery((signal) =>
-          supabase.from('companies').update(patch).eq('id', companyId).abortSignal(signal),
+          // El patch viene laxo (Record) del builder puro; solo emite columnas válidas.
+          db.from('companies').update(patch as TablesUpdate<'companies'>).eq('id', companyId).abortSignal(signal),
         )
       } else {
         const projectId = vars.ambito.projectId
         await runQuery((signal) =>
-          supabase.from('projects').update(patch).eq('id', projectId).abortSignal(signal),
+          // El patch viene laxo (Record) del builder puro; solo emite columnas válidas.
+          db.from('projects').update(patch as TablesUpdate<'projects'>).eq('id', projectId).abortSignal(signal),
         )
       }
       return { ambito: vars.ambito }
@@ -204,13 +231,14 @@ export function useProbarConexionPayfacMutation(companyId?: string) {
 
 /** Inserta un pago manual (payload ya armado por la UI). */
 export async function createPago(payload: Record<string, unknown>): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('pagos').insert(payload)
+  // Firma pública laxa (la UI arma el payload); la frontera lo castea al Insert generado.
+  const { error } = await db.from('pagos').insert(payload as TablesInsert<'pagos'>)
   return { error: error?.message ?? null }
 }
 
 /** Marca un pago como verificado (sella verification_status/estado + verified_by/at). */
 export async function verifyPago(pagoId: string, verifiedBy: string): Promise<{ error: string | null }> {
-  const { error } = await supabase
+  const { error } = await db
     .from('pagos')
     .update({
       verification_status: 'verificado',
@@ -228,7 +256,7 @@ export async function rejectPago(
   verifiedBy: string,
   notas: string,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
+  const { error } = await db
     .from('pagos')
     .update({
       verification_status: 'rechazado',
@@ -243,13 +271,14 @@ export async function rejectPago(
 
 /** Crea un convenio de pago (payload ya armado por la UI). */
 export async function createConvenio(payload: Record<string, unknown>): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('convenios_pago').insert(payload)
+  // Firma pública laxa (la UI arma el payload); la frontera lo castea al Insert generado.
+  const { error } = await db.from('convenios_pago').insert(payload as TablesInsert<'convenios_pago'>)
   return { error: error?.message ?? null }
 }
 
 /** Cambia el estado de un convenio (activo/completado/incumplido/cancelado). */
 export async function setConvenioEstado(id: string, estado: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('convenios_pago').update({ estado }).eq('id', id)
+  const { error } = await db.from('convenios_pago').update({ estado }).eq('id', id)
   return { error: error?.message ?? null }
 }
 

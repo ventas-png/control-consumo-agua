@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -23,7 +24,7 @@ const ESTADO_REV: Record<EstadoRevision, { label: string; icon: string; bg: stri
 }
 
 export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userId, canEdit, onRefresh }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const [selectedFecha, setSelectedFecha] = useState(hoy)
   const [selectedPersonalId, setSelectedPersonalId] = useState('todos')
   const [bloqueAbierto, setBloqueAbierto] = useState<string | null>(null)

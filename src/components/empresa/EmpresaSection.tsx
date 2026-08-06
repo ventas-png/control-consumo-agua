@@ -16,7 +16,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { UserSession } from '../../types'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { PayfacConfigSection } from './PayfacConfigSection'
+import { RecargoTarjetaConfig } from './RecargoTarjetaConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
+import { WhatsAppConfig } from './WhatsAppConfig'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { EmpresaHeaderCard } from './EmpresaHeaderCard'
 import { EmpresaProyectosSection } from './EmpresaProyectosSection'
@@ -113,6 +115,18 @@ export function EmpresaSection({ currentUser }: Props) {
         </div>
       )}
 
+      {/* Recargo por pago con tarjeta al cliente final (por canal). */}
+      {companyId && (
+        <div style={{
+          background: 'var(--at-surface)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid var(--at-line)',
+          marginTop: '24px',
+        }}>
+          <RecargoTarjetaConfig companyId={companyId} />
+        </div>
+      )}
+
       {/* Configuración de Correo Google */}
       {companyId && (
         <div style={{
@@ -123,6 +137,19 @@ export function EmpresaSection({ currentUser }: Props) {
           boxShadow: '0 2px 12px rgba(0,0,0,.04)',
         }}>
           <GoogleEmailConfig companyId={companyId} />
+        </div>
+      )}
+
+      {/* Configuración de WhatsApp Cloud API (com/B3) */}
+      {companyId && (
+        <div style={{
+          background: 'var(--at-surface)',
+          borderRadius: '16px', padding: '28px',
+          border: '1px solid var(--at-line)',
+          marginTop: '24px',
+          boxShadow: '0 2px 12px rgba(0,0,0,.04)',
+        }}>
+          <WhatsAppConfig companyId={companyId} />
         </div>
       )}
 

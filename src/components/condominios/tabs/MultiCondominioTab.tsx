@@ -1,5 +1,6 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, useEffect } from 'react'
-import { fetchProyectoResumen } from '../../../domain/condominios/tabQueries'
+import { fetchProyectosResumen } from '../../../domain/condominios/tabQueries'
 import { Proyecto } from '../../../types'
 
 interface Props {
@@ -26,15 +27,18 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
   const [loading, setLoading] = useState(true)
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   useEffect(() => {
     if (proyectosActivos.length === 0) { setLoading(false); return }
 
     async function cargar() {
       setLoading(true)
-      const resultado = await Promise.all(proyectosActivos.map(async p => {
-        const { cuotas, tickets, unidadesCount, visitantesCount } = await fetchProyectoResumen(p.id, companyId, hoy)
+      // P2 perf: 4 queries batched para TODOS los proyectos (antes 4 × N).
+      const porProyecto = await fetchProyectosResumen(proyectosActivos.map(p => p.id), companyId, hoy)
+      const resultado = proyectosActivos.map(p => {
+        const { cuotas, tickets, unidadesCount, visitantesCount } =
+          porProyecto[p.id] ?? { cuotas: [], tickets: [], unidadesCount: 0, visitantesCount: 0 }
         return {
           proyecto: p,
           cuotasTotales: cuotas.length,
@@ -47,7 +51,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
           unidades: unidadesCount,
           visitantesHoy: visitantesCount,
         } as ResumenProyecto
-      }))
+      })
       setResumenes(resultado)
       setLoading(false)
     }

@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -12,6 +13,10 @@ interface Props {
   autorNombre: string
   canCreate: boolean
   canEdit: boolean
+  /** Permiso para aprobar/rechazar solicitudes (default: canEdit, para no romper usos existentes) */
+  canApprove?: boolean
+  /** Permiso para eliminar solicitudes (default: true, para no romper usos existentes) */
+  canDelete?: boolean
   onRefresh: () => void
 }
 
@@ -31,7 +36,7 @@ const ESTADO_CFG: Record<EstadoFlujoAprobacion, { label: string; color: string; 
 
 const BLANK = { tipo: 'gasto_mayor' as TipoFlujoAprobacion, titulo: '', descripcion: '', monto: '' }
 
-export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, canApprove = canEdit, canDelete = true, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoFlujoAprobacion | ''>('pendiente')
   const [form, setForm] = useState({ ...BLANK })
   const [showForm, setShowForm] = useState(false)
@@ -55,7 +60,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
       monto: form.monto ? parseFloat(form.monto) : null,
       solicitado_por: autorNombre || null,
       estado: 'pendiente',
-      fecha_solicitud: new Date().toISOString().slice(0, 10),
+      fecha_solicitud: hoyLocalISO(),
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -82,7 +87,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
     const { error } = await updateCondominioRow('flujo_aprobacion_cond', flujo.id, {
       estado: nuevoEstado,
       aprobado_por: autorNombre || null,
-      fecha_resolucion: new Date().toISOString().slice(0, 10),
+      fecha_resolucion: hoyLocalISO(),
       comentario_resolucion: comentario || null,
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -205,7 +210,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
                       </div>
                     )}
                   </div>
-                  {canEdit && f.estado === 'pendiente' && (
+                  {canApprove && f.estado === 'pendiente' && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                       <button onClick={() => resolver(f, 'aprobado')}
                         style={{ padding: '5px 12px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
@@ -217,7 +222,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
                       </button>
                     </div>
                   )}
-                  {canEdit && f.estado !== 'pendiente' && (
+                  {canDelete && f.estado !== 'pendiente' && (
                     <button onClick={() => eliminar(f)}
                       style={{ padding: '4px 8px', border: '1px solid var(--at-danger-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: 11, flexShrink: 0, marginLeft: 10 }}>
                       🗑

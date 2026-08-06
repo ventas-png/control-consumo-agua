@@ -4,10 +4,11 @@
 // el evento PASSWORD_RECOVERY y el cierre del onboarding.
 import { useState, useEffect, useCallback } from 'react'
 import type { UserSession } from '../../types'
-import { supabase } from '../../lib/supabase'
+import { supabase, getOAuthCallbackError } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
 import { getStoredSession, storeSession } from '../../lib/authSession'
 import { buildSessionFromSupabase, refreshSessionFromSupabase, appUserProfileExists } from '../../domain/auth/session'
+import { describeOAuthCallbackError } from '../../domain/auth/oauthCallbackError'
 
 export interface PendingOAuthUser { id: string; email: string; full_name: string }
 
@@ -19,6 +20,7 @@ async function applyOAuthSession(
   setNeedsOnboarding: (v: boolean) => void,
   setPendingOAuthUser: (v: PendingOAuthUser | null) => void,
   setLoadingDone: () => void,
+  setOauthError: (msg: string) => void,
 ): Promise<void> {
   if (getStoredSession()) return
   try {
@@ -41,8 +43,21 @@ async function applyOAuthSession(
     storeSession(sessionData)
     setCurrentUser(sessionData)
     await logSecurityEvent('login_success', { email: user.email, provider }, user.id)
-  } catch {
-    // ignore
+  } catch (e) {
+    // Google ya autenticó al usuario: si aquí no se pudo armar la sesión de la
+    // app, dejarlo mudo lo devuelve a la landing sin pista alguna. Se muestra
+    // el motivo; para cuenta/empresa desactivada además se cierra la media
+    // sesión de Supabase para que un reload no reintente en silencio.
+    const msg = e instanceof Error ? e.message : ''
+    logSecurityEvent('oauth_session_build_failed', { email: user.email, error: msg }, user.id).catch(() => undefined)
+    if (msg.includes('desactivada')) {
+      await supabase.auth.signOut().catch(() => undefined)
+      setOauthError(msg)
+    } else if (msg.toLowerCase().includes('timeout')) {
+      setOauthError('La conexión con el servidor tardó demasiado al iniciar sesión. Intente de nuevo.')
+    } else {
+      setOauthError('No se pudo completar el inicio de sesión. Intente de nuevo.' + (msg ? ` Detalle: ${msg}` : ''))
+    }
   }
 }
 
@@ -51,6 +66,19 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [pendingOAuthUser, setPendingOAuthUser] = useState<PendingOAuthUser | null>(null)
+  // Error visible del flujo OAuth: callback fallido (capturado de la URL en
+  // lib/supabase) o fallo al construir la sesión tras un SIGNED_IN.
+  const [oauthError, setOauthError] = useState<string | null>(null)
+
+  // Superficie del error que GoTrue devolvió en el redirect (p.ej. "Unable to
+  // exchange external code" cuando el client secret de Google es inválido).
+  // Antes este error se perdía y el usuario volvía a la landing sin mensaje.
+  useEffect(() => {
+    const cbError = getOAuthCallbackError()
+    if (!cbError) return
+    setOauthError(describeOAuthCallbackError(cbError))
+    logSecurityEvent('oauth_callback_error', { code: cbError.code, error: cbError.description }).catch(() => undefined)
+  }, [])
 
   // On mount: restore session + handle OAuth redirect
   useEffect(() => {
@@ -84,7 +112,7 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeoutId)
       if (session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false))
+        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
       }
       setLoading(false)
     }).catch(() => {
@@ -98,7 +126,7 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false))
+        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false), setOauthError)
       }
       if (event === 'PASSWORD_RECOVERY') {
         // Supabase has processed the recovery token — show the reset form
@@ -125,5 +153,5 @@ export function useOAuthSession(setCurrentUser: (s: UserSession) => void) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding }
+  return { loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, oauthError }
 }

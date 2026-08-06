@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -71,7 +72,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
     onRefresh()
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hoyLocalISO()
 
   // Auto-flag vencidos (fecha_limite < today and still pendiente/en_proceso)
   const enriched = acuerdos.map(a => ({

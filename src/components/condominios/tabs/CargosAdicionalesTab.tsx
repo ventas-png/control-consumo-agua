@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -37,7 +38,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
 
   const [form, setForm] = useState({
     unidad_id: '', concepto: '', categoria: 'otro' as CategoriaCargoAdicional,
-    monto: '', fecha_cargo: new Date().toISOString().split('T')[0],
+    monto: '', fecha_cargo: hoyLocalISO(),
     fecha_vencimiento: '', referencia: '', observaciones: '',
   })
 
@@ -73,7 +74,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ unidad_id: '', concepto: '', categoria: 'otro', monto: '', fecha_cargo: new Date().toISOString().split('T')[0], fecha_vencimiento: '', referencia: '', observaciones: '' })
+    setForm({ unidad_id: '', concepto: '', categoria: 'otro', monto: '', fecha_cargo: hoyLocalISO(), fecha_vencimiento: '', referencia: '', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }

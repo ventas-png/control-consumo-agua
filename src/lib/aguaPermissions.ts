@@ -1,8 +1,9 @@
 import type { SectionGroup } from './condominiosRoles'
+import { MODULE_ACTIONS } from './moduleConfig'
 
 // Water service permission groups. Each "tab" entry is a permission key.
-// One group per water module; each module exposes 4 actions
-// (view / create / edit / change_status).
+// One group per water module; each module exposes 6 actions
+// (view / create / edit / change_status / approve / delete).
 export const AGUA_MODULE_GROUPS: SectionGroup[] = [
   { key: 'agua_dashboard',         label: 'Agua: Dashboard',          tabs: aguaActions('dashboard') },
   { key: 'agua_lecturas',          label: 'Agua: Lecturas',           tabs: aguaActions('lecturas') },
@@ -17,10 +18,5 @@ export const AGUA_MODULE_GROUPS: SectionGroup[] = [
 ]
 
 function aguaActions(module: string): string[] {
-  return [
-    `agua.${module}.view`,
-    `agua.${module}.create`,
-    `agua.${module}.edit`,
-    `agua.${module}.change_status`,
-  ]
+  return MODULE_ACTIONS.map(a => `agua.${module}.${a}`)
 }

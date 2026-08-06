@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
 import {
@@ -14,6 +15,8 @@ import {
   unenrollMfaFactor,
 } from '../../domain/auth/mfaActions'
 import { createCheckoutSession, createBillingPortalSession } from '../../domain/shared/mutations'
+import { estimarTotalMensualCents } from '../../lib/businessBilling'
+import { trackFunnel, FUNNEL } from '../../lib/analytics'
 import {
   fetchActiveSubscription,
   fetchActiveBillingPlans,
@@ -235,7 +238,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     for (const o of orphans) {
       await unenrollMfaFactor(o.id).catch(() => undefined)
     }
-    const { data, error } = await enrollTotpFactor(`Authenticator (${new Date().toISOString().slice(0, 10)})`)
+    const { data, error } = await enrollTotpFactor(`Authenticator (${hoyLocalISO()})`)
     if (error || !data) {
       setMfaFb({ type: 'error', msg: error ?? 'No fue posible iniciar el enrolamiento.' })
       setMfaLoading(false)
@@ -325,7 +328,19 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   }
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
   const [subLoading, setSubLoading] = useState(true)
-  const [availablePlans, setAvailablePlans] = useState<Array<{ code: string; name: string; price_monthly_cents: number; price_yearly_cents: number | null; description: string | null; features: string[] }>>([])
+  // F1 (C5): el plan trae también los componentes del precio POR USO y sus
+  // topes, para proyectar el total con el uso actual del tenant (el precio
+  // plano subestimaba la factura real — sorpresa en el primer cobro).
+  const [availablePlans, setAvailablePlans] = useState<Array<{
+    code: string; name: string; price_monthly_cents: number; price_yearly_cents: number | null
+    description: string | null; features: string[]
+    base_activation_cents: number; extra_project_cents: number
+    unit_primary_cents: number; unit_extra_cents: number
+    max_projects: number | null; max_units: number | null
+  }>>([])
+  // F1 (C7): sin prices YEARLY en Stripe, el botón "Anual" creaba un checkout
+  // roto. Gate en una constante: cuando existan los prices, esto se voltea.
+  const YEARLY_DISPONIBLE = false
   const [showPlanPicker, setShowPlanPicker] = useState(false)
   const [billingActionLoading, setBillingActionLoading] = useState(false)
   const [billingFb, setBillingFb] = useState<FeedbackState>(null)
@@ -405,10 +420,24 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   async function handleChangePlan(planCode: string, cycle: 'monthly' | 'yearly') {
     setBillingFb(null)
     setBillingActionLoading(true)
+    trackFunnel(FUNNEL.checkoutIniciado, { origen: 'perfil', plan_destino: planCode, ciclo: cycle })
     try {
-      const { url, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
+      const { url, swapped, error } = await createCheckoutSession({ plan_code: planCode, billing_cycle: cycle, return_path: '/perfil' })
       if (error) {
         setBillingFb({ type: 'error', msg: error ?? 'No se pudo crear la sesión de pago.' })
+        return
+      }
+      // P0 #1: la company ya tenía suscripción activa → el plan se cambió
+      // in-place (sin redirigir ni crear una segunda suscripción). Refrescamos
+      // la suscripción para reflejar el nuevo plan.
+      if (swapped) {
+        trackFunnel(FUNNEL.planActualizado, { origen: 'perfil', plan_destino: planCode })
+        setShowPlanPicker(false)
+        setBillingFb({ type: 'success', msg: 'Tu plan se actualizó. El ajuste se prorratea en tu próxima factura.' })
+        if (currentUser.company_id) {
+          const fresh = await fetchActiveSubscription<SubscriptionRow>(currentUser.company_id)
+          setSubscription(fresh)
+        }
         return
       }
       if (!url) {
@@ -863,6 +892,26 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                   <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {availablePlans.map(p => {
                       const isCurrent = p.code === subscription.plan?.code
+                      // F1 (C5): proyección del total mensual de ESTE plan con el
+                      // uso actual del tenant (misma aritmética que la BD). El
+                      // precio de lista es "desde" — la base sin proyectos/unidades
+                      // extra; lo que se cobra es base + uso.
+                      const proyectosActuales = (usageBreakdown?.extra_projects_count ?? 0) + 1
+                      const totalConUsoCents = usageBreakdown
+                        ? estimarTotalMensualCents(
+                            p,
+                            proyectosActuales,
+                            usageBreakdown.primary_units_count,
+                            usageBreakdown.extra_units_count,
+                          )
+                        : null
+                      // El plan no cubre el uso actual → el downgrade sorprendería
+                      // (topes por debajo de lo ya creado). Aviso + botón deshabilitado.
+                      const unidadesActuales = (usageBreakdown?.primary_units_count ?? 0) + (usageBreakdown?.extra_units_count ?? 0)
+                      const noCubreUso = usageBreakdown != null && (
+                        (p.max_projects != null && proyectosActuales > p.max_projects) ||
+                        (p.max_units != null && unidadesActuales > p.max_units)
+                      )
                       return (
                         <div key={p.code} style={{
                           padding: '14px 16px', borderRadius: '10px',
@@ -875,24 +924,35 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                                 {p.name} {isCurrent && <span style={{ fontSize: '11px', color: 'var(--at-primary)', fontWeight: 600 }}>(actual)</span>}
                               </div>
                               <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-                                ${(p.price_monthly_cents / 100).toFixed(2)}/mes
-                                {p.price_yearly_cents && ` · $${(p.price_yearly_cents / 100).toFixed(2)}/año`}
+                                desde ${(p.price_monthly_cents / 100).toFixed(2)}/mes
+                                {totalConUsoCents != null && totalConUsoCents !== p.price_monthly_cents && (
+                                  <span> · con tu uso actual: <strong style={{ color: 'var(--at-ink-2)' }}>${(totalConUsoCents / 100).toFixed(2)}/mes</strong></span>
+                                )}
                               </div>
+                              {noCubreUso && (
+                                <div style={{ fontSize: '11.5px', color: 'var(--at-warning-strong)', marginTop: '3px' }}>
+                                  No cubre tu uso actual ({proyectosActuales} proyecto{proyectosActuales !== 1 ? 's' : ''} · {unidadesActuales} unidades)
+                                </div>
+                              )}
                             </div>
                             {!isCurrent && (
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
                                   type="button"
                                   onClick={() => void handleChangePlan(p.code, 'monthly')}
-                                  disabled={billingActionLoading}
+                                  disabled={billingActionLoading || noCubreUso}
+                                  title={noCubreUso ? 'Este plan tiene topes por debajo de tu uso actual.' : undefined}
                                   style={{
                                     padding: '6px 12px', borderRadius: '6px',
-                                    background: 'var(--at-primary)', color: 'white', border: 'none',
+                                    background: (billingActionLoading || noCubreUso) ? 'var(--at-ink-3)' : 'var(--at-primary)',
+                                    color: 'white', border: 'none',
                                     fontSize: '12px', fontWeight: 600,
-                                    cursor: billingActionLoading ? 'not-allowed' : 'pointer',
+                                    cursor: (billingActionLoading || noCubreUso) ? 'not-allowed' : 'pointer',
                                   }}
                                 >Mensual</button>
-                                {p.price_yearly_cents && (
+                                {/* F1 (C7): "Anual" oculto hasta que existan los
+                                    prices yearly en Stripe (checkout roto). */}
+                                {YEARLY_DISPONIBLE && p.price_yearly_cents && (
                                   <button
                                     type="button"
                                     onClick={() => void handleChangePlan(p.code, 'yearly')}

@@ -120,10 +120,13 @@ describe('AdminClientDashboard — período vs. lecturas', () => {
     expect(await screen.findByText('45.00')).toBeTruthy()
     expect(getDateInputs(container).length).toBe(2)
 
-    fireEvent.click(screen.getByRole('button', { name: /Historial/ }))
+    // Las pestañas son <TabStrip> (role="tab", patrón Tab de WAI-ARIA), no
+    // botones sueltos: la tira se extrajo a un componente compartido después
+    // de abrirse este PR.
+    fireEvent.click(screen.getByRole('tab', { name: /Historial/ }))
     expect(getDateInputs(container).length).toBe(0)
 
-    fireEvent.click(screen.getByRole('button', { name: /Dashboard/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Dashboard/ }))
     expect(getDateInputs(container).length).toBe(2)
   })
 })

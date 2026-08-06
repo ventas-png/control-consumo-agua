@@ -1948,3 +1948,42 @@
 html:not([data-theme="light"]) .at-root {
   color-scheme: dark;
 }
+
+/* ─── Teléfonos: que nada del landing ensanche el documento ───────────────
+ * Medido con el landing real servido por `vite preview`, a 402/360/320px.
+ *
+ * CAUSA: las celdas de un grid traen `min-width: auto`, que resuelve a
+ * min-content. Si el contenido de una celda tiene un ancho intrínseco grande,
+ * la celda NO encoge por debajo de él y arrastra a las demás columnas:
+ *
+ *   .hero-visual  → min-content 476px (el mock animado del panel)
+ *   .modules-visual → min-content 350px
+ *
+ * En el hero eso empujaba a `.hero-copy` (min-content real: 194px) hasta 476px,
+ * y como `.hero` lleva `overflow: clip` el desborde no se veía como scroll sino
+ * como TEXTO CORTADO: el título y el párrafo salían mordidos por la derecha.
+ * En `.modules-stage` no hay clip, así que el documento entero se ensanchaba a
+ * 374px contra un viewport de 320/360 y la página se arrastraba de lado.
+ *
+ * `min-width: 0` en las celdas les devuelve la capacidad de encoger. */
+@media (max-width: 980px) {
+  .hero-inner > *,
+  .modules-stage > * { min-width: 0; }
+}
+
+@media (max-width: 640px) {
+  /* El mock del panel no baja de 476px por su propia estructura (barra
+   * lateral + panel + KPIs). Escalarlo lo dejaría ilegible y recortarlo se ve
+   * roto, así que en teléfono el hero se queda solo con el mensaje y los CTAs
+   * —igual que .hv-phone y .login-side, que ya se ocultan aquí—. */
+  .hero-visual { display: none; }
+
+  /* La maqueta de módulos sí encoge, pero su contenido interno tiene anchos
+   * propios: se recorta dentro de su caja en vez de empujar el documento. */
+  .modules-visual { overflow-x: hidden; }
+
+  /* iOS con viewport-fit=cover: la página arranca DEBAJO de la barra de
+   * estado, que es transparente. Sin esto el logo y el botón de "Iniciar
+   * sesión" quedaban tapados por la hora y la batería. */
+  .site-nav { padding-top: env(safe-area-inset-top, 0); }
+}

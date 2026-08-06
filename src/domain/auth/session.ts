@@ -4,6 +4,7 @@
 // I/O a Supabase + el parsing de RBAC (permisos, roles asignados, flags de
 // servicio) de la MÁQUINA DE ESTADO React del hook. Sin React aquí — funciones
 // puras de datos, testeables de forma aislada.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import { APP_CONFIG } from '../../lib/config'
 import { storeSession } from '../../lib/authSession'
@@ -62,19 +63,22 @@ export async function buildSessionFromSupabase(
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
   let empresaSuspendida = false
+  let mfa_required = false
   try {
     const batch2: Promise<void> = (async () => {
       if (companyId) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('companies')
-          .select('servicio_agua, servicio_condominios, activa')
+          .select('servicio_agua, servicio_condominios, activa, mfa_required')
           .eq('id', companyId)
           .single()
+        reportDegradedQuery('auth.buildSessionFromSupabase', error)
         if (data) {
-          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean }
+          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean; activa: boolean; mfa_required?: boolean }
           servicio_agua = flags.servicio_agua
           servicio_condominios = flags.servicio_condominios
           empresaSuspendida = flags.activa === false
+          mfa_required = flags.mfa_required === true
         }
       } else if (clienteId) {
         type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
@@ -121,6 +125,7 @@ export async function buildSessionFromSupabase(
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
     servicio_agua,
     servicio_condominios,
+    mfa_required,
     permissions: buildPermissionsSet(rbacPermsResult),
     assigned_role_ids: buildAssignedRoleIds(userRolesResult),
     assigned_roles: buildAssignedRoles(userRolesResult),
@@ -189,11 +194,19 @@ export function buildAssignedRoles(result: { data: unknown; error: unknown }): A
  * OAuth para decidir si el usuario nuevo (sin perfil) debe pasar por onboarding.
  */
 export async function appUserProfileExists(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('app_users')
     .select('id')
     .eq('id', userId)
     .maybeSingle()
+  reportDegradedQuery('auth.appUserProfileExists', error)
+  // Un fallo de la consulta NO significa "no tiene perfil": devolver false haría
+  // que un usuario existente cayera en el onboarding de cuenta nueva. Se propaga
+  // el error para que el caller lo trate como fallo recuperable y ofrezca
+  // reintentar. Importa sobre todo en la app móvil: como la sesión de app vive en
+  // sessionStorage (que el WebView borra al cerrar la app), este chequeo corre en
+  // CADA arranque en frío, y ahí las redes móviles fallan con frecuencia.
+  if (error) throw new Error(error.message)
   return !!data
 }
 

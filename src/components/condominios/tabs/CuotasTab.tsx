@@ -1,15 +1,19 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useRef, useMemo, useCallback, type ChangeEvent} from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { configurarCierreAutomatico } from '../../shared/cierreAutomaticoDialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { SelectionToolbar, type BulkAction } from '../../shared/SelectionToolbar'
 import { useBulkSelection } from '../../../hooks/useBulkSelection'
-import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas } from '../../../domain/condominios/tabMutations'
+import { useQueryClient } from '@tanstack/react-query'
+import { createCondominioRow, updateCondominioRowsByIds, marcarCuotasMorosas, cerrarCicloCuotas } from '../../../domain/condominios/tabMutations'
+import { condominiosKeys } from '../../../domain/condominios/keys'
 import { countRecibosByProyecto } from '../../../domain/condominios/tabQueries'
-import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
+import { validatedInsert, validatedInsertMany, esDuplicadoLlaveNatural } from '../../../lib/validatedInsert'
 import { cuotaInputSchema } from '../../../domain/condominios/schemas'
 import { softDelete } from '../../../lib/softDelete'
-import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
+import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle, TipoResidente } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
 // T4 · cond:C4 — capa de datos del agregado Cuota (estado/mora) + máquina de
 // estados. La tabla recibe `CuotaCondominio[]` (legacy, sin campos de
@@ -23,7 +27,7 @@ import {
   useAnularCuotaMutation,
 } from '../../../domain/condominios/mutations'
 import { puedeTransicionarCuota } from '../../../lib/businessCondominios'
-import { CuotaEstadoBadge } from './CuotasUi'
+import { CuotaEstadoBadge, ResponsableCuotaBadge, ROLES_RESPONSABLE_CUOTA, rolResponsableLabel } from './CuotasUi'
 
 interface CSVRow {
   rawUnidad: string
@@ -32,9 +36,11 @@ interface CSVRow {
   rawPeriodo: string
   rawVencimiento: string
   rawNotas: string
+  rawResponsable: string
   unidadId: string | null
   concepto: ConceptoCuota | null
   monto: number | null
+  rolResponsable: TipoResidente | null
   status: 'ok' | 'warn' | 'error'
   errores: string[]
 }
@@ -60,20 +66,23 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function CuotasTab({ cuotas, unidades, proyectos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [csvRows, setCsvRows] = useState<CSVRow[] | null>(null)
   const [importando, setImportando] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCuota | 'todos'>('todos')
+  // Filtro por rol responsable: 'todos' | 'sin' (no diferenciadas) | un rol.
+  const [filtroResponsable, setFiltroResponsable] = useState<TipoResidente | 'todos' | 'sin'>('todos')
   const [expandidasRubros, setExpandidasRubros] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     unidad_id: '',
     concepto: 'mantenimiento' as ConceptoCuota,
     monto: '',
-    periodo: new Date().toISOString().slice(0, 7),
+    periodo: mesLocalISO(),
     fecha_vencimiento: '',
+    rol_responsable: '',
     notas: '',
   })
 
@@ -107,6 +116,47 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   const pagarMut = usePagarCuotaMutation()
   const anularMut = useAnularCuotaMutation()
   const [accionCuotaId, setAccionCuotaId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  // Cierre de ciclo (P1 · facturación masiva): emite TODAS las cuotas pendientes
+  // de un período en un solo RPC staff-gated y avisa al residente responsable en
+  // su portal (outbox). El conteo local es orientativo; el server es la verdad.
+  async function cerrarCiclo() {
+    const emitibles = cuotas.filter(c => puedeTransicionarCuota(estadoCanonicoDe(c), 'emitir').ok)
+    const periodosEmitibles = emitibles.map(c => c.periodo).sort()
+    const periodoDefault = periodosEmitibles[periodosEmitibles.length - 1]
+      ?? mesLocalISO()
+    const datos = await openPromptDialog({
+      title: '📤 Emitir período (cerrar ciclo)',
+      description: 'Emite todas las cuotas pendientes del período y avisa a los residentes responsables en su portal.',
+      fields: [{ name: 'periodo', label: 'Período (YYYY-MM)', type: 'month', initialValue: periodoDefault, required: true, autoFocus: true }],
+      submitText: 'Continuar',
+    })
+    const periodo = datos?.periodo
+    if (!periodo) return
+    const candidatas = emitibles.filter(c => c.periodo === periodo)
+    if (candidatas.length === 0) {
+      notify({ variant: 'info', title: 'Sin cuotas por emitir', text: `No hay cuotas pendientes de emisión en ${periodo}.` })
+      return
+    }
+    const { isConfirmed } = await confirm({
+      title: `¿Emitir ${candidatas.length} cuota${candidatas.length > 1 ? 's' : ''} de ${periodo}?`,
+      text: `Se emitirán con vencimiento a ${diasVencimiento} días y se avisará a los residentes responsables en su portal.`,
+      icon: 'question',
+      confirmText: '📤 Emitir período',
+    })
+    if (!isConfirmed) return
+    const { data, error } = await cerrarCicloCuotas(proyectoId, periodo)
+    if (error) { notify({ variant: 'error', title: 'No se pudo cerrar el ciclo', text: error.message }); return }
+    notify({
+      variant: 'success',
+      title: `${data?.emitidas ?? 0} cuota${(data?.emitidas ?? 0) !== 1 ? 's' : ''} emitida${(data?.emitidas ?? 0) !== 1 ? 's' : ''}`,
+      text: `${data?.avisos ?? 0} aviso(s) al portal del residente.`,
+      duration: 2500,
+    })
+    void queryClient.invalidateQueries({ queryKey: condominiosKeys.all })
+    onRefresh()
+  }
 
   async function handleEmitir(cuota: CuotaCondominio) {
     setAccionCuotaId(cuota.id)
@@ -131,7 +181,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   async function handlePagar(cuota: CuotaCondominio) {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const datos = await openPromptDialog({
       title: 'Registrar pago',
       fields: [
@@ -194,9 +244,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }
   }
 
-  const cuotasFiltradas = filtroEstado === 'todos'
-    ? cuotas
-    : cuotas.filter(c => c.estado === filtroEstado)
+  const cuotasFiltradas = cuotas.filter(c => {
+    if (filtroEstado !== 'todos' && c.estado !== filtroEstado) return false
+    if (filtroResponsable === 'sin') return !c.rol_responsable
+    if (filtroResponsable !== 'todos' && c.rol_responsable !== filtroResponsable) return false
+    return true
+  })
 
   const cuotasPagables = cuotasFiltradas.filter(c => c.estado !== 'pagado')
 
@@ -218,7 +271,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     // skip header row
     return lineas.slice(1).map(linea => {
       const cols = linea.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-      const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = ''] = cols
+      const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = '', rawResponsable = ''] = cols
       const errores: string[] = []
 
       const unidadMatch = unidades.find(u => u.nombre.toLowerCase() === rawUnidad.toLowerCase())
@@ -236,15 +289,26 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       if (!rawPeriodo.match(/^\d{4}-\d{2}$/)) errores.push('Período debe ser AAAA-MM')
 
+      // Responsable (columna opcional al final): vacío → sin diferenciar; acepta el
+      // valor ('arrendatario') o la etiqueta ('Inquilino'), sin distinguir mayúsculas.
+      let rolResponsable: TipoResidente | null = null
+      if (rawResponsable.trim()) {
+        const t = rawResponsable.trim().toLowerCase()
+        const match = ROLES_RESPONSABLE_CUOTA.find(r => r.value === t || r.label.toLowerCase() === t)
+        if (match) rolResponsable = match.value
+        else errores.push(`Responsable "${rawResponsable}" inválido (propietario, inquilino, familiar, otro o vacío)`)
+      }
+
       const status: CSVRow['status'] = errores.length === 0 ? 'ok'
         : errores.some(e => e.includes('no encontrada')) ? 'warn'
         : 'error'
 
       return {
-        rawUnidad, rawConcepto, rawMonto, rawPeriodo, rawVencimiento, rawNotas,
+        rawUnidad, rawConcepto, rawMonto, rawPeriodo, rawVencimiento, rawNotas, rawResponsable,
         unidadId: unidadMatch?.id ?? null,
         concepto: errores.length === 0 || !errores.some(e => e.includes('Concepto')) ? concepto : null,
         monto: isNaN(monto) ? null : monto,
+        rolResponsable,
         status,
         errores,
       }
@@ -291,12 +355,18 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       monto: r.monto!,
       periodo: r.rawPeriodo,
       fecha_vencimiento: r.rawVencimiento || null,
+      rol_responsable: r.rolResponsable,
       notas: r.rawNotas || null,
       estado: 'pendiente' as EstadoCuota,
     }))
     // cond:C2 — batch insert (CSV import) con pre-validación Zod por fila.
     const { error } = await validatedInsertMany('cuotas_condominio', cuotaInputSchema, inserts)
     setImportando(false)
+    // E1: llave natural — el CSV trae cuotas que ya existen (unidad+período+concepto).
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuotas duplicadas en el CSV', text: 'Alguna fila ya existe (misma unidad, período y concepto). No se importó nada — depurá el archivo y reintentá.' })
+      return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: `${validas.length} cuotas importadas`, duration: 1800 })
     setCsvRows(null)
@@ -304,7 +374,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   function resetForm() {
-    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: new Date().toISOString().slice(0, 7), fecha_vencimiento: '', notas: '' })
+    setForm({ unidad_id: '', concepto: 'mantenimiento', monto: '', periodo: mesLocalISO(), fecha_vencimiento: '', rol_responsable: '', notas: '' })
     setShowForm(false)
   }
 
@@ -341,10 +411,16 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       monto: Number(form.monto),
       periodo: form.periodo,
       fecha_vencimiento: form.fecha_vencimiento || null,
+      rol_responsable: form.rol_responsable || null,
       notas: form.notas || null,
       estado: 'pendiente',
     })
     setSaving(false)
+    // E1: llave natural — la unidad ya tiene una cuota de este período/concepto.
+    if (esDuplicadoLlaveNatural(error)) {
+      notify({ variant: 'warning', title: 'Cuota ya existe', text: `La unidad ya tiene una cuota de "${form.concepto}" para ${form.periodo}. No se duplicó.` })
+      return
+    }
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: 'Cuota registrada', duration: 1500 })
     resetForm()
@@ -355,7 +431,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     const ids = [...seleccionadas]
     const items = cuotas.filter(c => ids.includes(c.id))
     const totalMonto = items.reduce((s, c) => s + c.monto, 0)
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
 
     const datos = await openPromptDialog({
       title: `Registrar pago para ${ids.length} cuota${ids.length > 1 ? 's' : ''}`,
@@ -403,7 +479,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   async function aplicarMoraMasiva() {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyLocalISO()
     const vencidas = cuotas.filter(c => c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
     if (vencidas.length === 0) {
       notify({ variant: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', duration: 2000 })
@@ -435,7 +511,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       numero_recibo: numero,
       monto: cuota.monto,
       concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
-      fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+      fecha_emision: cuota.fecha_pago ?? hoyLocalISO(),
       estado: 'generado',
     })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
@@ -451,7 +527,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         numero_recibo: numero,
         concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
         monto: cuota.monto,
-        fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+        fecha_emision: cuota.fecha_pago ?? hoyLocalISO(),
         unidadNombre: cuota.unidad_nombre,
         metodo_pago: cuota.metodo_pago,
         referencia_pago: cuota.referencia_pago,
@@ -471,14 +547,34 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
-            onClick={() => exportarExcel(`cuotas-${new Date().toISOString().slice(0,10)}`, [{
+            onClick={() => exportarExcel(`cuotas-${hoyLocalISO()}`, [{
               name: 'Cuotas',
-              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
-              rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
+              headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
+              rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
             }])}
             style={{ padding: '10px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
+          {canEdit && (
+            <button onClick={() => void cerrarCiclo()}
+              title="Emitir todas las cuotas pendientes de un período y avisar a los residentes (cerrar ciclo)"
+              style={{ padding: '10px 16px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              📤 Emitir período
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => void configurarCierreAutomatico({
+                companyId,
+                projectId: proyectoId,
+                projectNombre: proyectos.find(p => p.id === proyectoId)?.nombre,
+                modulo: 'condominios',
+              })}
+              title="Programar el cierre de ciclo mensual automático (emite el período anterior a partir del día elegido)"
+              style={{ padding: '10px 16px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              🗓️ Automático
+            </button>
+          )}
           {canEdit && (
             <button onClick={aplicarMoraMasiva}
               title="Marcar como morosas todas las cuotas pendientes con vencimiento pasado"
@@ -530,6 +626,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               <select value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota }))}
                 style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 {CONCEPTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Responsable</label>
+              <select value={form.rol_responsable} onChange={e => setForm(f => ({ ...f, rol_responsable: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+                <option value="">Sin diferenciar</option>
+                {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
@@ -589,7 +693,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
               <thead>
                 <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
-                  {['', 'Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
+                  {['', 'Unidad', 'Concepto', 'Responsable', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -602,6 +706,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     </td>
                     <td style={{ padding: '7px 12px', color: r.unidadId ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawUnidad || '—'}</td>
                     <td style={{ padding: '7px 12px', color: r.concepto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawConcepto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.rawResponsable && !r.rolResponsable ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{r.rolResponsable ? rolResponsableLabel(r.rolResponsable) : '—'}</td>
                     <td style={{ padding: '7px 12px', color: r.monto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawMonto || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawPeriodo || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawVencimiento || '—'}</td>
@@ -620,8 +725,21 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             </div>
           )}
           <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--at-primary-tint)', borderRadius: '8px', fontSize: '11.5px', color: 'var(--at-primary-hover)' }}>
-            Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,</code>
+            Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas,responsable</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,,inquilino</code>. La columna <code>responsable</code> es opcional (propietario / inquilino / familiar / otro; vacío = sin diferenciar).
           </div>
+        </div>
+      )}
+
+      {/* Filtro por responsable — visible solo cuando hay cuotas diferenciadas */}
+      {cuotas.some(c => c.rol_responsable) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <span style={{ color: 'var(--at-ink-3)', fontWeight: 600 }}>Responsable:</span>
+          <select value={filtroResponsable} onChange={e => { setFiltroResponsable(e.target.value as TipoResidente | 'todos' | 'sin'); bulk.clear() }}
+            style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13, background: 'var(--at-surface)' }}>
+            <option value="todos">Todos</option>
+            <option value="sin">Sin diferenciar</option>
+            {ROLES_RESPONSABLE_CUOTA.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
         </div>
       )}
 
@@ -695,6 +813,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             render: c => <span style={{ color: 'var(--at-ink-2)' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</span>,
           },
           {
+            key: 'responsable', header: 'Responsable', sortable: true,
+            accessor: c => c.rol_responsable ?? '',
+            render: c => c.rol_responsable
+              ? <ResponsableCuotaBadge rol={c.rol_responsable} />
+              : <span style={{ color: 'var(--at-ink-3)' }}>—</span>,
+            hideOnMobile: true,
+          },
+          {
             key: 'periodo', header: 'Período', sortable: true,
             accessor: c => c.periodo,
             render: c => <span style={{ color: 'var(--at-ink-2)' }}>{c.periodo}</span>,
@@ -734,7 +860,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             key: 'vencimiento', header: 'Vencimiento', sortable: true,
             accessor: c => c.fecha_vencimiento ?? '',
             render: c => {
-              const hoy = new Date().toISOString().slice(0, 10)
+              const hoy = hoyLocalISO()
               const vencida = c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado'
               return <span style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{c.fecha_vencimiento || '—'}</span>
             },
@@ -835,10 +961,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             id: 'exportar',
             label: 'Exportar',
             icon: '📊',
-            onClick: () => exportarExcel(`cuotas-seleccion-${new Date().toISOString().slice(0, 10)}`, [{
+            onClick: () => exportarExcel(`cuotas-seleccion-${hoyLocalISO()}`, [{
               name: 'Cuotas',
-              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado'],
-              rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
+              headers: ['Unidad', 'Concepto', 'Responsable', 'Período', 'Monto', 'Vencimiento', 'Estado'],
+              rows: bulk.selectedItems.map(c => [c.unidad_nombre ?? 'General', c.concepto, rolResponsableLabel(c.rol_responsable), c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
             }]),
           },
         ]}

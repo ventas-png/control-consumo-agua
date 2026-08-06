@@ -181,6 +181,18 @@ export function MapView({
     })
     mapInstance.current = map
     return () => {
+      // Fix Sentry: crash de Leaflet `undefined is not an object (t._leaflet_pos)`
+      // en `_onZoomTransitionEnd`. Si una animación de zoom/fly sigue en vuelo cuando
+      // se desmonta el mapa (p. ej. el usuario navega fuera mientras el fitBounds/zoom
+      // anima), su callback corre DESPUÉS de map.remove() —que ya borró `_mapPane`—
+      // y revienta. Antes de remover: cancelamos el fly pendiente y completamos el
+      // zoom en vuelo (con los panes aún vivos), de modo que el timeout/transitionend
+      // pendiente encuentre `_animatingZoom=false` y sea un no-op.
+      const anim = map as unknown as { _animatingZoom?: boolean; _flyToFrame?: number; _onZoomTransitionEnd?: () => void }
+      try {
+        if (anim._flyToFrame != null) cancelAnimationFrame(anim._flyToFrame)
+        if (anim._animatingZoom) anim._onZoomTransitionEnd?.()
+      } catch { /* noop */ }
       map.remove()
       mapInstance.current = null
       markersGroup.current = null

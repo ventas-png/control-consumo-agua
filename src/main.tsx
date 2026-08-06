@@ -19,6 +19,9 @@ import { FeatureFlagsProvider } from './lib/featureFlags'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 import { applyStoredConsent } from './lib/cookieConsent'
+import { isNative } from './lib/platform'
+import { initNativeApp } from './lib/nativeApp'
+import { initNativeAuthListener } from './lib/nativeAuth'
 
 // Error monitoring + product analytics. Both no-op without their env vars.
 // PostHog arranca OPTED-OUT (RGPD); aplicamos el consentimiento ya guardado para que
@@ -26,6 +29,29 @@ import { applyStoredConsent } from './lib/cookieConsent'
 initMonitoring()
 initAnalytics()
 applyStoredConsent()
+
+// Chunks viejos tras un deploy (Sentry PINK-RIBBON-1/-7): un tab abierto con el
+// index.html anterior intenta lazy-load un chunk hasheado que ya no existe y el
+// servidor responde index.html (MIME text/html) → pantalla rota. Recargar trae
+// el index nuevo con los hashes vigentes. El guard de sessionStorage evita un
+// loop de recargas si el fallo persiste (p. ej. sin conexión): en ese caso
+// dejamos que Vite lance el error y lo capture el ErrorBoundary.
+//
+// OJO al `preventDefault()`: el helper de Vite solo relanza si NADIE lo llamó,
+// así que al llamarlo aquí su `.catch()` deja de rechazar y RESUELVE la promesa
+// del chunk con `undefined`. React.lazy guardaría ese undefined como módulo y
+// rompería en el siguiente render (`_result.default`). Esa resolución vacía la
+// absorbe `lazySafe`/`lazyWithPreload` en lib/lazyWithPreload.ts — que es lo que
+// mantiene el spinner de Suspense hasta que esta recarga entra. Si algún día se
+// crean componentes con el `lazy` de react directamente, el crash vuelve.
+window.addEventListener('vite:preloadError', (event) => {
+  const KEY = 'at-chunk-reload-at'
+  const last = Number(sessionStorage.getItem(KEY) ?? 0)
+  if (Date.now() - last < 30_000) return
+  sessionStorage.setItem(KEY, String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
 
 // One-time migration: remove stale v1 cache key
 localStorage.removeItem('aquacontrol_data_v1')
@@ -49,7 +75,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <BrowserRouter>
                 <App />
               </BrowserRouter>
-              <PwaUpdatePrompt />
+              {/* El aviso de actualización de la PWA (service worker) solo aplica
+                  en web. En la app nativa el bundle se sirve localmente y se
+                  actualiza vía las tiendas, así que no se registra ningún SW. */}
+              {!isNative() && <PwaUpdatePrompt />}
               <PromptDialogRoot />
               <CookieConsent />
             </DialogProvider>
@@ -59,3 +88,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>
 )
+
+// Inicialización nativa (Capacitor). No-op en web: ajusta la barra de estado,
+// oculta el splash y registra el listener de deep links que completa el login
+// con Google (ver src/lib/nativeAuth.ts).
+initNativeApp()
+initNativeAuthListener()

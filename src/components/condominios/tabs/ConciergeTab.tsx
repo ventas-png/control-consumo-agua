@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { SolicitudConcierge, EstadoConcierge, TipoConcierge, Unidad } from '../../../types'
@@ -33,7 +34,7 @@ const TIPO_CONFIG: Record<TipoConcierge, { label: string; icon: string }> = {
 
 const blank = (): Partial<SolicitudConcierge> => ({
   unidad_id: undefined, tipo: 'otro', descripcion: '',
-  fecha_solicitud: new Date().toISOString().slice(0, 10),
+  fecha_solicitud: hoyLocalISO(),
   hora_solicitud: '', estado: 'pendiente', atendido_por: '', costo: undefined, notas_staff: '',
 })
 
@@ -44,7 +45,7 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const thisMonth = new Date().toISOString().slice(0, 7)
+  const thisMonth = mesLocalISO()
   const filtered = solicitudes.filter(s => filtroEstado === 'todos' || s.estado === filtroEstado)
   const pendientes  = solicitudes.filter(s => s.estado === 'pendiente').length
   const enProceso   = solicitudes.filter(s => s.estado === 'en_proceso').length

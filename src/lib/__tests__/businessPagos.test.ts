@@ -2,8 +2,12 @@
 // locación). Fuente de verdad Vite; su espejo Deno tiene un smoke test paralelo.
 import { describe, it, expect } from 'vitest'
 import {
+  calcularRecargoTarjeta,
+  type RecargoTarjetaRow,
   resolverConfigPagoEfectiva,
   normalizarMonedaISO,
+  normalizarAmbientePago,
+  AMBIENTE_PAGO_DEFAULT,
   MONEDA_PAGO_DEFAULT,
   PROVEEDOR_PAGO_DEFAULT,
 } from '../businessPagos'
@@ -50,6 +54,31 @@ describe('resolverConfigPagoEfectiva', () => {
     expect(c.proveedorPago).toBe('qpaypro')
     expect(c.moneda).toBe('GTQ')
   })
+
+  it('ambiente: default seguro sandbox cuando nadie lo eligió', () => {
+    expect(resolverConfigPagoEfectiva(null, null).ambiente).toBe(AMBIENTE_PAGO_DEFAULT)
+    expect(resolverConfigPagoEfectiva({ proveedorPago: 'qpaypro' }).ambiente).toBe('sandbox')
+  })
+
+  it('ambiente: hereda el de la empresa; el override de locación gana', () => {
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }).ambiente).toBe('prod')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, { ambientePago: null }).ambiente).toBe('prod')
+    // Piloto inverso: empresa en prod, una locación se queda en pruebas.
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'prod' }, { ambientePago: 'sandbox' }).ambiente).toBe('sandbox')
+    expect(resolverConfigPagoEfectiva({ ambientePago: 'sandbox' }, { ambientePago: 'prod' }).ambiente).toBe('prod')
+  })
+})
+
+describe('normalizarAmbientePago', () => {
+  it("solo 'prod' exacto (case/trim-insensible) cobra real; el resto cae a sandbox", () => {
+    expect(normalizarAmbientePago('prod')).toBe('prod')
+    expect(normalizarAmbientePago(' PROD ')).toBe('prod')
+    expect(normalizarAmbientePago('sandbox')).toBe('sandbox')
+    expect(normalizarAmbientePago('produccion')).toBe('sandbox')
+    expect(normalizarAmbientePago('')).toBe('sandbox')
+    expect(normalizarAmbientePago(null)).toBe('sandbox')
+    expect(normalizarAmbientePago(undefined)).toBe('sandbox')
+  })
 })
 
 describe('normalizarMonedaISO', () => {
@@ -76,5 +105,28 @@ describe('normalizarMonedaISO', () => {
     expect(normalizarMonedaISO(null)).toBe('GTQ')
     expect(normalizarMonedaISO(undefined)).toBe('GTQ')
     expect(normalizarMonedaISO('€')).toBe('GTQ')
+  })
+})
+
+describe('calcularRecargoTarjeta (espejo Vite del edge recargo.ts)', () => {
+  const fila = (over: Partial<RecargoTarjetaRow> = {}): RecargoTarjetaRow =>
+    ({ canal: 'default', activo: true, pct: 0.05, fijo: 0, ...over })
+
+  it('sin filas o monto inválido → null', () => {
+    expect(calcularRecargoTarjeta(100, 'qpaypro', [])).toBeNull()
+    expect(calcularRecargoTarjeta(100, 'qpaypro', null)).toBeNull()
+    expect(calcularRecargoTarjeta(0, 'qpaypro', [fila()])).toBeNull()
+  })
+
+  it('la fila del canal gana sobre la default', () => {
+    const rows = [fila({ canal: 'default', pct: 0.05 }), fila({ canal: 'qpaypro', pct: 0.06, fijo: 2 })]
+    expect(calcularRecargoTarjeta(100, 'qpaypro', rows)).toBe(8)
+    expect(calcularRecargoTarjeta(100, 'stripe', rows)).toBe(5)
+  })
+
+  it('fila inactiva o en cero → null; redondeo a 2 decimales', () => {
+    expect(calcularRecargoTarjeta(100, 'stripe', [fila({ activo: false })])).toBeNull()
+    expect(calcularRecargoTarjeta(100, 'stripe', [fila({ pct: 0, fijo: 0 })])).toBeNull()
+    expect(calcularRecargoTarjeta(33.33, 'stripe', [fila({ pct: 0.05 })])).toBe(1.67)
   })
 })

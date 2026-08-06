@@ -1,24 +1,29 @@
 // domain/shared/queries.ts — Lecturas para componentes compartidos
 // transversales (banner de trial, etc.). T7/PR3.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 
 /** Suscripción "vigente" (status no terminal) de una empresa. */
 export interface ActiveSubscription {
   status: string
   trial_end: string | null
+  // P0 #2: momento del primer pago fallido (NULL salvo en past_due). Lo usa
+  // PastDueBanner para calcular los días de gracia restantes.
+  past_due_since?: string | null
 }
 
 /**
  * Suscripción vigente del tenant (status en trialing/active/past_due/incomplete),
- * para el banner de expiración de trial. `null` si no hay ninguna.
+ * para los banners de expiración de trial y de pago fallido. `null` si no hay ninguna.
  */
 export async function fetchActiveSubscription(companyId: string): Promise<ActiveSubscription | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('subscriptions')
-    .select('status, trial_end')
+    .select('status, trial_end, past_due_since')
     .eq('company_id', companyId)
     .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
     .maybeSingle()
+  reportDegradedQuery('shared.fetchActiveSubscription', error)
   return (data as ActiveSubscription) ?? null
 }
 
@@ -33,10 +38,11 @@ export interface CompanySuspension {
  * leer la propia empresa). `null` si la fila no es visible/no existe.
  */
 export async function fetchCompanySuspension(companyId: string): Promise<CompanySuspension | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('companies')
     .select('activa, suspended_reason')
     .eq('id', companyId)
     .maybeSingle()
+  reportDegradedQuery('shared.fetchCompanySuspension', error)
   return (data as CompanySuspension) ?? null
 }

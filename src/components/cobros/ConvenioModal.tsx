@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
@@ -5,7 +6,7 @@ import { Button } from '../shared/Button'
 import { createConvenio } from '../../domain/cobros/mutations'
 import { marcarRegistrosMora } from '../../domain/agua/mutations'
 import type { Registro, Cliente } from '../../types'
-import { calcularTotalPagar } from '../../lib/business'
+import { calcularTotalPagar, generarCalendarioConvenio, type FrecuenciaConvenio } from '../../lib/business'
 
 interface Props {
   registros: Registro[]
@@ -31,9 +32,17 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   const [numeroConvenio, setNumeroConvenio] = useState(`CONV-${Date.now().toString().slice(-6)}`)
   const [descripcion, setDescripcion] = useState('')
   const [cuotasPactadas, setCuotasPactadas] = useState('')
-  const [fechaVencimiento, setFechaVencimiento] = useState('')
+  const [fechaPrimeraCuota, setFechaPrimeraCuota] = useState(hoyLocalISO())
+  const [frecuencia, setFrecuencia] = useState<FrecuenciaConvenio>('mensual')
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Calendario de cuotas (P1): se genera al vuelo desde total + nº cuotas + fecha +
+  // frecuencia. La última cuota absorbe el residual de redondeo (suma exacta).
+  const numCuotas = parseInt(cuotasPactadas) || 0
+  const calendario = numCuotas > 0
+    ? generarCalendarioConvenio(totalCargos, numCuotas, fechaPrimeraCuota, frecuencia)
+    : []
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -47,9 +56,13 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         descripcion: descripcion || null,
         monto_total: totalCargos,
         monto_pagado: 0,
-        cuotas_pactadas: cuotasPactadas ? parseInt(cuotasPactadas) : null,
-        fecha_inicio: new Date().toISOString().split('T')[0],
-        fecha_vencimiento: fechaVencimiento || null,
+        cuotas_pactadas: numCuotas || null,
+        // Calendario (P1): fecha_inicio = primera cuota; vencimiento = última cuota.
+        cuotas: calendario.length ? calendario : null,
+        fecha_inicio: fechaPrimeraCuota || hoyLocalISO(),
+        fecha_vencimiento: calendario.length
+          ? calendario[calendario.length - 1].fecha_vencimiento
+          : (fechaPrimeraCuota || null),
         estado: 'activo',
         registro_ids: registros.map(r => r.id),
         notas: notas || null,
@@ -137,7 +150,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
           <div>
             <label htmlFor="conv-cuotas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-              Cuotas Pactadas
+              Número de cuotas
             </label>
             <input
               id="conv-cuotas"
@@ -147,16 +160,48 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
             />
           </div>
           <div>
-            <label htmlFor="conv-vencimiento" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
-              Fecha de Vencimiento
+            <label htmlFor="conv-frecuencia" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+              Frecuencia
             </label>
-            <input
-              id="conv-vencimiento"
-              type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)}
+            <select
+              id="conv-frecuencia"
+              value={frecuencia} onChange={e => setFrecuencia(e.target.value as FrecuenciaConvenio)}
               style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-            />
+            >
+              <option value="mensual">Mensual</option>
+              <option value="quincenal">Quincenal</option>
+              <option value="semanal">Semanal</option>
+            </select>
           </div>
         </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label htmlFor="conv-primera" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
+            Fecha de la primera cuota
+          </label>
+          <input
+            id="conv-primera"
+            type="date" value={fechaPrimeraCuota} onChange={e => setFechaPrimeraCuota(e.target.value)}
+            style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {calendario.length > 0 && (
+          <div style={{ marginBottom: '16px', border: '1px solid var(--at-line)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', background: 'var(--at-surface-2)', fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>
+              📅 Calendario de pago — {calendario.length} cuota{calendario.length !== 1 ? 's' : ''}
+            </div>
+            <div style={{ maxHeight: '168px', overflowY: 'auto' }}>
+              {calendario.map(c => (
+                <div key={c.numero} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 12px', fontSize: '13px', borderTop: '1px solid var(--at-line)' }}>
+                  <span style={{ color: 'var(--at-ink-3)', minWidth: '58px' }}>Cuota {c.numero}</span>
+                  <span style={{ color: 'var(--at-ink-2)' }}>{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <label htmlFor="conv-notas" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>

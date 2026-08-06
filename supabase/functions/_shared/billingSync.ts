@@ -98,3 +98,84 @@ export function planSyncOps(
 
   return ops
 }
+
+// ── Cambio de plan (P0 #1) ──────────────────────────────────────────────────
+// Item para `stripe.subscriptions.update({ items: [...] })`. A diferencia de
+// planSyncOps (mismo plan, solo ajusta cantidades), aquí los price_id CAMBIAN:
+// hay que mover la subscription del set de precios viejo al nuevo en una sola
+// llamada atómica, SIN dejar items huérfanos del plan anterior (que seguirían
+// cobrándose → doble cobro, justo el bug que arreglamos).
+export type SwapItem =
+  // Reutilizar un item existente: fijar price (nuevo) + quantity.
+  | { id: string; price: string; quantity: number }
+  // Eliminar un item que ya no aplica (precio viejo, huérfano o duplicado).
+  | { id: string; deleted: true }
+  // Agregar un componente que la subscription aún no tiene.
+  | { price: string; quantity: number }
+
+// Construye el array `items` para subscriptions.update que deja la subscription
+// EXACTAMENTE con los precios del nuevo plan a las cantidades esperadas.
+//
+// Solo depende de `newPriceIds` (no del plan viejo) → robusto ante:
+//   - drift del plan viejo en BD,
+//   - reintentos (si el swap ya se aplicó parcialmente, converge sin duplicar),
+//   - planes que comparten un precio en algún componente (no genera churn).
+//
+// Estrategia: todo item que ya esté en un precio del nuevo plan se conserva (y
+// se le ajusta la cantidad); cualquier otro item se elimina; los componentes
+// del nuevo plan sin item se agregan.
+//
+// Precondición del modelo de pricing: los 4 precios de un plan son distintos
+// entre sí y cada price_id representa un único componente. activation y
+// unit_primary siempre quedan con quantity>=1 (computeExpectedQuantities), así
+// que la subscription nunca queda sin items tras el swap.
+export function planSwapItems(
+  items: StripeSubItem[],
+  expected: ExpectedQuantities,
+  newPriceIds: PlanPriceIds,
+): SwapItem[] {
+  const ops: SwapItem[] = []
+  const roles: Array<keyof ExpectedQuantities & keyof PlanPriceIds> = [
+    'activation', 'unit_primary', 'extra_project', 'unit_extra',
+  ]
+
+  // 1. Para cada componente, el primer item que YA está en el precio nuevo se
+  //    conserva ("survivor"): evita churn cuando dos planes comparten precio o
+  //    ante un reintento donde el swap ya se había aplicado.
+  const survivorByRole = new Map<string, StripeSubItem>()
+  const survivorIds = new Set<string>()
+  for (const role of roles) {
+    const np = newPriceIds[role]
+    const hit = items.find(it => it.price.id === np && !survivorIds.has(it.id))
+    if (hit) {
+      survivorByRole.set(role, hit)
+      survivorIds.add(hit.id)
+    }
+  }
+
+  // 2. Cualquier item que no sea survivor (precio del plan viejo, huérfano o
+  //    duplicado del mismo precio) se elimina.
+  for (const it of items) {
+    if (!survivorIds.has(it.id)) ops.push({ id: it.id, deleted: true })
+  }
+
+  // 3. Ajustar cada componente a la cantidad esperada del nuevo plan.
+  for (const role of roles) {
+    const qty = expected[role]
+    const np = newPriceIds[role]
+    const survivor = survivorByRole.get(role)
+    if (qty > 0) {
+      if (survivor) {
+        // Ya está en el precio nuevo; solo corrige la cantidad si difiere.
+        if (survivor.quantity !== qty) ops.push({ id: survivor.id, price: np, quantity: qty })
+      } else {
+        ops.push({ price: np, quantity: qty })
+      }
+    } else if (survivor) {
+      // El componente no aplica pero había un item en el precio nuevo → quitarlo.
+      ops.push({ id: survivor.id, deleted: true })
+    }
+  }
+
+  return ops
+}

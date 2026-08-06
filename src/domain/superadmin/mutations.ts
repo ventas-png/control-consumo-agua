@@ -16,12 +16,63 @@ export async function updateEmpresaCampo(
   return { error: error?.message ?? null }
 }
 
+/**
+ * Crea o actualiza la comisión transaccional de una empresa para un canal (F7).
+ * Upsert por la llave natural (company_id, canal); la RLS restringe la
+ * escritura a super_admin. pct es fracción (0.025 = 2.5%); fijo va en la
+ * moneda de cobro del tenant. Los cobros ya sellados no cambian.
+ */
+export async function guardarComisionConfig(
+  companyId: string,
+  canal: string,
+  cfg: { activo: boolean; pct: number; fijo: number },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('comision_config')
+    .upsert(
+      {
+        company_id: companyId,
+        canal,
+        activo: cfg.activo,
+        pct: cfg.pct,
+        fijo: cfg.fijo,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id,canal' },
+    )
+  return { error: error?.message ?? null }
+}
+
 /** Crea una empresa (payload ya armado por la UI). Devuelve la fila creada. */
 export async function createEmpresa(
   payload: Record<string, unknown>,
 ): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
   const { data, error } = await supabase.from('companies').insert(payload).select().single()
   return { data: (data as Record<string, unknown>) ?? null, error: error?.message ?? null }
+}
+
+/**
+ * Crea o actualiza el modelo de cobro del timbrado fiscal de una empresa (F8).
+ * Upsert por company_id (fila única); la RLS restringe la escritura a
+ * super_admin. Los DTEs ya sellados no cambian de costo.
+ */
+export async function guardarTimbradoConfig(
+  companyId: string,
+  cfg: { activo: boolean; precio_dte_cents: number; timbres_incluidos: number },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('timbrado_config')
+    .upsert(
+      {
+        company_id: companyId,
+        activo: cfg.activo,
+        precio_dte_cents: cfg.precio_dte_cents,
+        timbres_incluidos: cfg.timbres_incluidos,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'company_id' },
+    )
+  return { error: error?.message ?? null }
 }
 
 /**

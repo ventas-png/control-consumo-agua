@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
 import { promptUpgrade } from '../shared/promptUpgrade'
 import type { Unidad, TipoUnidad, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { useSession } from '../shared/SessionContext'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 import { resolveUnidadProjectCompany, checkUnidadesLimit } from '../../domain/unidades/queries'
 import { createUnidad, updateUnidad, setUnidadActiva, deleteUnidad, assignContadoresToUnidad, unlinkContadores } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
@@ -12,6 +14,7 @@ import { EMPTY_FORM, type FormState, type UnidadesCtx } from './ctx'
 import { TIPOS_UNIDAD, TIPO_COLORES, inputStyle } from './ui'
 import { UnidadFormModal } from './UnidadFormModal'
 import { UnidadCard, pageBtnStyle } from './UnidadCard'
+import { UnidadResidentesModal } from './UnidadResidentesModal'
 
 const ImportUnidadesModal = lazy(() => import('./ImportUnidadesModal').then(m => ({ default: m.ImportUnidadesModal })))
 
@@ -39,6 +42,7 @@ export function UnidadesSection({
   onContadorUpdated,
 }: Props) {
   const currentUser = useSession()
+  const perms = usePermissionsContext()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -48,6 +52,8 @@ export function UnidadesSection({
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
   const [filterProyecto, setFilterProyecto] = useState<string>('')
   const [showImportModal, setShowImportModal] = useState(false)
+  // Portal propietario/inquilino (fase 3): unidad cuyos residentes se gestionan.
+  const [residentesModal, setResidentesModal] = useState<Unidad | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const PAGE_SIZE = 24  // cards grandes, 24 ≈ 4 filas × 6 columnas en pantalla XL
 
@@ -92,6 +98,9 @@ export function UnidadesSection({
   }, [filterProyecto, proyectos, maxUnidadesPorTipo])
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
+  // RBAC granular: eliminar unidad requiere el permiso delete del módulo
+  // (además de la condición de rol existente). Crear/editar no cambian.
+  const canDelete = canEdit && perms.canDelete('unidades')
 
   function startCreate() {
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
@@ -489,9 +498,11 @@ export function UnidadesSection({
                 proyectoNombre={proyectos.length > 1 ? proyectos.find(p => p.id === u.project_id)?.nombre : undefined}
                 clienteAsignado={u.cliente_id ? clientes.find(c => c.id === u.cliente_id) : undefined}
                 canEdit={canEdit}
+                canDelete={canDelete}
                 onEdit={() => startEdit(u)}
                 onToggleActivo={() => handleToggleActivo(u)}
                 onEliminar={() => handleEliminar(u)}
+                onResidentes={() => setResidentesModal(u)}
               />
             ))}
           </div>
@@ -524,6 +535,14 @@ export function UnidadesSection({
         {search || filterTipo ? 'encontradas' : 'registradas'} ·{' '}
         {unidades.filter(u => u.activo).length} activa{unidades.filter(u => u.activo).length !== 1 ? 's' : ''}
       </div>
+
+      {residentesModal && (
+        <UnidadResidentesModal
+          unidad={residentesModal}
+          clientes={clientes}
+          onClose={() => setResidentesModal(null)}
+        />
+      )}
 
       {showImportModal && (
         <Suspense fallback={null}>

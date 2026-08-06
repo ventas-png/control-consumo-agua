@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../lib/format'
 import { useState, type ReactNode } from 'react'
 import { EditModal } from '../shared/EditModal'
 import { StatusBadge } from '../shared/StatusBadge'
@@ -13,8 +14,17 @@ import {
 import {
   useEmpresaUsuariosQuery,
   useEmpresaBillingQuery,
+  useEmpresaMonedaQuery,
+  useEmpresaComisionQuery,
+  useEmpresaComisionResumenQuery,
+  useEmpresaTimbradoQuery,
+  useEmpresaTimbresResumenQuery,
   type EmpresaSuperadminRow,
 } from '../../domain/superadmin/queries'
+import { guardarComisionConfig, guardarTimbradoConfig } from '../../domain/superadmin/mutations'
+import { superadminKeys } from '../../domain/superadmin/keys'
+import { useQueryClient } from '@tanstack/react-query'
+import { MONEDAS_ISO, monedaLabel } from '../../lib/monedas'
 import { ToggleSwitch } from './ToggleSwitch'
 import { subscriptionBadge } from './EmpresasTable'
 import {
@@ -51,6 +61,15 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 
   const { data: usuarios = [], isLoading: usuariosLoading } = useEmpresaUsuariosQuery(emp.id)
   const { data: billing } = useEmpresaBillingQuery(emp.id)
+  const { data: moneda } = useEmpresaMonedaQuery(emp.id)
+  // F7: take-rate de plataforma (config + acumulado mensual). No confundir con
+  // el recargo de tarjeta al cliente final (recargo_tarjeta_config, del tenant).
+  const { data: comisionRows = [] } = useEmpresaComisionQuery(emp.id)
+  const { data: comisionResumen = [] } = useEmpresaComisionResumenQuery(emp.id)
+  // F8: modelo de cobro del timbrado fiscal (config + contador mensual).
+  const { data: timbrado } = useEmpresaTimbradoQuery(emp.id)
+  const { data: timbresResumen = [] } = useEmpresaTimbresResumenQuery(emp.id)
+  const qc = useQueryClient()
 
   const patch = (changes: Partial<EmpresaSuperadminRow>) => setEmp(prev => ({ ...prev, ...changes }))
 
@@ -62,6 +81,14 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
         { name: 'nit', label: 'NIT', initialValue: emp.nit ?? '' },
         { name: 'email', label: 'Email de contacto', type: 'email', initialValue: emp.email ?? '' },
         { name: 'telefono', label: 'Teléfono', type: 'tel', initialValue: emp.telefono ?? '' },
+        {
+          name: 'moneda',
+          label: 'Moneda de cobro',
+          control: 'select',
+          options: MONEDAS_ISO.map(m => ({ value: m.code, label: m.label })),
+          initialValue: moneda ?? 'usd',
+          helpText: 'Cobros del tenant y moneda base contable. Cambiarla no reconvierte montos históricos.',
+        },
       ],
       submitText: 'Guardar',
       validate: (data) => data.nombre?.trim() ? null : 'El nombre es obligatorio',
@@ -72,15 +99,136 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       nit: result.nit?.trim() || null,
       email: result.email?.trim() || null,
       telefono: result.telefono?.trim() || null,
+      default_currency: result.moneda,
     }
     const { error } = await updateEmpresaCampo(emp.id, values)
     if (error) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
     } else {
       notify({ variant: 'success', title: 'Actualizado', duration: 1200 })
-      patch(values)
+      patch({ nombre: values.nombre, nit: values.nit, email: values.email, telefono: values.telefono })
       onChanged()
     }
+  }
+
+  // F7: configurar el take-rate de plataforma de un canal. Dos pasos (igual que
+  // el cierre automático): elegir canal → editar valores prefijados con la fila
+  // vigente. pct se captura en % y se guarda como fracción.
+  async function configurarComision() {
+    const paso1 = await openPromptDialog({
+      title: '💸 Take-rate de plataforma',
+      description:
+        'Comisión de la plataforma sobre cada pago en línea del tenant, facturable al tenant '
+        + '(solo pagos de ambiente prod). NO es el recargo por pago con tarjeta — ese lo '
+        + 'configura el tenant y lo paga su cliente final. '
+        + 'Se sella al crear cada cobro: cambiarla no afecta pagos ya creados. '
+        + 'La fila «Todos los canales» aplica a cualquier proveedor sin fila propia.',
+      fields: [
+        {
+          name: 'canal', label: 'Canal', control: 'select', autoFocus: true,
+          initialValue: 'default',
+          options: CANALES_COMISION.map(c => ({ value: c.value, label: c.label })),
+        },
+      ],
+      submitText: 'Continuar',
+    })
+    const canal = paso1?.canal
+    if (!canal) return
+    const actual = comisionRows.find(c => c.canal === canal)
+    const datos = await openPromptDialog({
+      title: `💸 Take-rate — ${canalComisionLabel(canal)}`,
+      description: actual
+        ? `Config vigente: ${(actual.pct * 100).toFixed(2)}% + ${actual.fijo.toFixed(2)} fijo${actual.activo ? '' : ' (inactiva)'}.`
+        : 'Este canal aún no tiene comisión configurada.',
+      fields: [
+        {
+          name: 'pct', label: 'Porcentaje del monto (%)', type: 'number',
+          initialValue: actual ? String(actual.pct * 100) : '0',
+          helpText: 'Ej. 2.5 = 2.5% de cada pago. Máximo 20.',
+        },
+        {
+          name: 'fijo', label: 'Monto fijo por pago', type: 'number',
+          initialValue: actual ? String(actual.fijo) : '0',
+          helpText: 'En la moneda de cobro del tenant. 0 = sin componente fijo.',
+        },
+        {
+          name: 'activo', label: 'Comisión activa', control: 'checkbox',
+          initialValue: actual == null || actual.activo ? 'true' : '',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (d) => {
+        const pct = Number(d.pct)
+        const fijo = Number(d.fijo)
+        if (!Number.isFinite(pct) || pct < 0 || pct > 20) return 'El porcentaje debe estar entre 0 y 20.'
+        if (!Number.isFinite(fijo) || fijo < 0) return 'El monto fijo no puede ser negativo.'
+        return null
+      },
+    })
+    if (!datos) return
+    const { error } = await guardarComisionConfig(emp.id, canal, {
+      activo: datos.activo === 'true',
+      pct: Number(datos.pct) / 100,
+      fijo: Number(datos.fijo),
+    })
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo guardar la comisión', text: error })
+      return
+    }
+    notify({ variant: 'success', title: '💸 Take-rate guardado', duration: 1400 })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaComision(emp.id) })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaComisionResumen(emp.id) })
+  }
+
+  // F8: configurar el modelo de cobro del timbrado (precio por DTE + cuota
+  // incluida). El costo se sella POR DTE al certificar: cambiar la config no
+  // toca timbres ya sellados.
+  async function configurarTimbrado() {
+    const datos = await openPromptDialog({
+      title: '🧾 Cobro del timbrado (DTE)',
+      description:
+        (timbrado
+          ? `Vigente: $${(timbrado.precio_dte_cents / 100).toFixed(2)} por DTE, ${timbrado.timbres_incluidos} incluido${timbrado.timbres_incluidos !== 1 ? 's' : ''}/mes${timbrado.activo ? '' : ' (inactivo)'}. `
+          : 'Esta empresa aún no tiene modelo de cobro de timbrado. ')
+        + 'El costo se sella por DTE al certificar; los primeros N del mes calendario salen sin costo.',
+      fields: [
+        {
+          name: 'precio', label: 'Precio por DTE (USD)', type: 'number', autoFocus: true,
+          initialValue: timbrado ? String(timbrado.precio_dte_cents / 100) : '0',
+          helpText: 'Ej. 0.50 = 50¢ por DTE timbrado. 0 = sin costo.',
+        },
+        {
+          name: 'incluidos', label: 'DTEs incluidos por mes', type: 'number',
+          initialValue: String(timbrado?.timbres_incluidos ?? 0),
+          helpText: '0 = todos los DTEs se cobran al precio configurado.',
+        },
+        {
+          name: 'activo', label: 'Modelo de cobro activo', control: 'checkbox',
+          initialValue: timbrado == null || timbrado.activo ? 'true' : '',
+        },
+      ],
+      submitText: 'Guardar',
+      validate: (d) => {
+        const precio = Number(d.precio)
+        const incluidos = Number(d.incluidos)
+        if (!Number.isFinite(precio) || precio < 0) return 'El precio no puede ser negativo.'
+        if (!Number.isInteger(incluidos) || incluidos < 0) return 'Los DTEs incluidos deben ser un entero ≥ 0.'
+        return null
+      },
+    })
+    if (!datos) return
+    const { error } = await guardarTimbradoConfig(emp.id, {
+      activo: datos.activo === 'true',
+      precio_dte_cents: Math.round(Number(datos.precio) * 100),
+      timbres_incluidos: Number(datos.incluidos),
+    })
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo guardar el modelo de cobro', text: error })
+      return
+    }
+    notify({ variant: 'success', title: '🧾 Modelo de cobro guardado', duration: 1400 })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaTimbrado(emp.id) })
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaTimbresResumen(emp.id) })
   }
 
   async function guardarLimites() {
@@ -171,7 +319,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `export-${slug}-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `export-${slug}-${hoyLocalISO()}.json`
     a.click()
     URL.revokeObjectURL(url)
     notify({ variant: 'success', title: 'Export descargado', duration: 1500 })
@@ -228,6 +376,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
             ['Email', emp.email ?? '—'],
             ['Teléfono', emp.telefono ?? '—'],
             ['NIT', emp.nit ?? '—'],
+            ['Moneda de cobro', monedaLabel(moneda)],
             ['Creada', emp.created_at ? new Date(emp.created_at).toLocaleDateString('es-GT') : '—'],
           ]} />
         </Section>
@@ -267,8 +416,55 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
           )}
         </Section>
 
+        {/* ── Take-rate de plataforma (F7) ── */}
+        <Section
+          title="Take-rate de plataforma (opcional)"
+          action={<button onClick={() => void configurarComision()} style={secondaryBtnStyle}>Configurar</button>}
+        >
+          <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+            Comisión de la plataforma sobre los pagos en línea del tenant, facturable al
+            tenant (ledger). NO es el recargo por pago con tarjeta: ese lo configura el
+            tenant en Mi Empresa y lo paga su cliente final.
+          </p>
+          {comisionRows.length === 0 ? (
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
+              Sin take-rate configurado — los pagos en línea de esta empresa no generan
+              comisión de plataforma.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {comisionRows.map(c => (
+                <div key={c.canal} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                  <span style={{ fontWeight: 600, minWidth: '110px' }}>{canalComisionLabel(c.canal)}</span>
+                  <span style={{ fontFamily: 'var(--at-font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatPctComision(c.pct)}{c.fijo > 0 ? ` + ${c.fijo.toFixed(2)} fijo` : ''}
+                  </span>
+                  {!c.activo && <StatusBadge tone="warning">Inactiva</StatusBadge>}
+                </div>
+              ))}
+            </div>
+          )}
+          {comisionResumen.length > 0 && (
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginTop: '12px' }}>
+              <tbody>
+                {comisionResumen.map(m => (
+                  <BreakdownRow
+                    key={m.mes}
+                    label={`${m.mes} · ${m.pagos} pago${m.pagos !== 1 ? 's' : ''} cobrado${m.pagos !== 1 ? 's' : ''}`}
+                    value={m.comision_total.toFixed(2)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
+
         {/* ── Límites del tenant ── */}
         <Section title="Límites">
+          <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+            Estos límites son los que ve y aplica la empresa. El dueño puede ampliarlos
+            self-service hasta el tope de su plan (el cobro es por uso).
+          </p>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <LimitInput
               label={`Proyectos (en uso: ${emp.project_count})`}
@@ -303,6 +499,41 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
               onLabelColor="var(--at-accent)"
             />
           </div>
+        </Section>
+
+        {/* ── Timbrado fiscal (F8) ── */}
+        <Section
+          title="Timbrado fiscal (DTE)"
+          action={<button onClick={() => void configurarTimbrado()} style={secondaryBtnStyle}>Configurar</button>}
+        >
+          {timbrado ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--at-font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                ${(timbrado.precio_dte_cents / 100).toFixed(2)} / DTE
+              </span>
+              <span style={{ color: 'var(--at-ink-3)' }}>
+                · {timbrado.timbres_incluidos} incluido{timbrado.timbres_incluidos !== 1 ? 's' : ''}/mes
+              </span>
+              {!timbrado.activo && <StatusBadge tone="warning">Inactivo</StatusBadge>}
+            </div>
+          ) : (
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
+              Sin modelo de cobro — los DTEs de esta empresa no generan costo de timbrado.
+            </div>
+          )}
+          {timbresResumen.length > 0 && (
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', marginTop: '12px' }}>
+              <tbody>
+                {timbresResumen.map(m => (
+                  <BreakdownRow
+                    key={m.mes}
+                    label={`${m.mes} · ${m.timbres} timbre${m.timbres !== 1 ? 's' : ''} (${m.con_costo} con costo)`}
+                    value={formatUsdCents(m.costo_total_cents)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
         </Section>
 
         {/* ── Usuarios ── */}
@@ -381,6 +612,23 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 }
 
 // ── Piezas locales ──────────────────────────────────────────────────────────
+
+// F7: canales de comisión (deben casar con el CHECK de comision_config).
+const CANALES_COMISION = [
+  { value: 'default', label: 'Todos los canales (default)' },
+  { value: 'qpaypro', label: 'QPayPro' },
+  { value: 'stripe', label: 'Stripe' },
+  { value: 'paypal', label: 'PayPal' },
+] as const
+
+function canalComisionLabel(canal: string): string {
+  return CANALES_COMISION.find(c => c.value === canal)?.label ?? canal
+}
+
+function formatPctComision(pct: number): string {
+  // 0.025 → "2.5%" (sin ceros colgantes).
+  return `${parseFloat((pct * 100).toFixed(2))}%`
+}
 
 function Section({ title, action, danger = false, children }: {
   title: string

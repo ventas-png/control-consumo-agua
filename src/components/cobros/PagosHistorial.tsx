@@ -1,3 +1,4 @@
+import { hoyLocalISO, dateLocalISO } from '../../lib/format'
 import { useState, useMemo } from 'react'
 import type { Pago, Cliente, Registro, FormaPago } from '../../types'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -16,9 +17,13 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
   const [filtroMetodo, setFiltroMetodo] = useState<string>('todos')
   const [filtroFecha, setFiltroFecha] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('todos')
 
-  const hoy = new Date().toISOString().split('T')[0]
-  const inicioSemana = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  const hoy = hoyLocalISO()
+  const inicioSemana = dateLocalISO(new Date(Date.now() - 7 * 86400000))
+  // PR-24: `new Date(y, m, 1)` construye la medianoche LOCAL del día 1; pasarla
+  // por `toISOString()` la reexpresa en UTC y en GMT-6 devuelve el ÚLTIMO DÍA DEL
+  // MES ANTERIOR. El filtro "este mes" del historial de pagos arrastraba entonces
+  // un día que no le toca, y perdía el día 1 según la hora de consulta.
+  const inicioMes = dateLocalISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
   const pagosFiltrados = useMemo(() => {
     return pagos.filter(p => {

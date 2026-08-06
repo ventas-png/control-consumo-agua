@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode} from 'react'
-import { formatCurrency } from '../../../lib/format'
+import { formatCurrency, dateLocalISO } from '../../../lib/format'
 import type {
   CuotaCondominio, GastoCondominio, TicketMantenimiento, PresupuestoCondominio,
   Visitante, NovedadSeguridad, RondaSeguridad, AnuncioComunidad,
@@ -62,7 +62,7 @@ export function ReporteConsolidadoTab({
 
   const periodo = useMemo(() => {
     const desde = `${anio}-${String(mes + 1).padStart(2, '0')}-01`
-    const hasta  = new Date(anio, mes + 1, 0).toISOString().slice(0, 10)
+    const hasta  = dateLocalISO(new Date(anio, mes + 1, 0))
     return { desde, hasta, label: `${MESES[mes]} ${anio}` }
   }, [mes, anio])
 

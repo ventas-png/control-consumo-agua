@@ -1,6 +1,7 @@
 // domain/mapa/queries.ts — Acceso a datos del centro/zoom del mapa por tenant
 // (serv:S16). Extraído de MapaSection (T7/PR3): los componentes no importan
 // `supabase` directo; el acceso a `companies` para el mapa vive en la capa domain.
+import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
 import { parseMapCenter, type MapCenterConfig } from './schemas'
 
@@ -10,11 +11,12 @@ import { parseMapCenter, type MapCenterConfig } from './schemas'
  * existen. No lanza: ante error devuelve `null`.
  */
 export async function fetchMapCenter(companyId: string): Promise<MapCenterConfig | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('companies')
     .select('center_lat, center_lng, zoom_default')
     .eq('id', companyId)
     .single()
+  reportDegradedQuery('mapa.fetchMapCenter', error)
   return parseMapCenter(data)
 }
 

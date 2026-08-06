@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import { CuotaCondominio, InfraccionCondominio, SancionCondominio, Unidad } from '../../../types'
 
@@ -79,7 +80,7 @@ const GRADO_CFG = {
 }
 
 export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, unidades, moneda }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
 
   const scores = useMemo(() =>
     unidades

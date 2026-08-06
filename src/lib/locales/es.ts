@@ -516,6 +516,7 @@ export const es: Translations = {
     inventario: {
       title: 'Inventario',
       new_button: '+ Agregar Item',
+      import_button: '⬆ Carga masiva',
       valor_activo: 'Valor en inventario activo:',
       alerta_stock: '{{count}} item(s) con stock bajo o agotado',
       alerta_vencer: '{{count}} item(s) por vencer en menos de 30 días',

@@ -3,14 +3,16 @@
 // de alta y la grilla de tarjetas con edición / cambio de estado / logo. Posee
 // sus mutaciones de proyecto y refresca vía `onReload`. El gating por límite de
 // plan usa `effectiveMaxProjects`, calculado en el contenedor.
+import { useState, useEffect } from 'react'
 import { notify } from '../shared/Dialog'
 import { openTextPrompt, openPromptDialog } from '../shared/PromptDialog'
 import { createProyecto, updateProyecto, uploadProyectoLogo } from '../../domain/empresa/mutations'
 import type { Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { SecureImage } from '../shared/SecureImage'
-import { promptUpgrade } from '../shared/promptUpgrade'
+import { OPEN_AMPLIAR_FLAG } from '../shared/promptUpgrade'
 import { PlanUsageCard } from './PlanUsageCard'
+import { AmpliarPlanModal } from './AmpliarPlanModal'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -38,6 +40,21 @@ interface Props {
 }
 
 export function EmpresaProyectosSection({ empresa, proyectos, companyId, effectiveMaxProjects, onReload }: Props) {
+  const [showAmpliar, setShowAmpliar] = useState(false)
+  // Remonta PlanUsageCard tras una ampliación (su usePlanLimits es interno).
+  const [usageKey, setUsageKey] = useState(0)
+
+  // promptUpgrade (crear proyecto/unidad en límite) navega aquí y deja este
+  // flag para abrir el modal de ampliación al montar.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(OPEN_AMPLIAR_FLAG) === '1') {
+        sessionStorage.removeItem(OPEN_AMPLIAR_FLAG)
+        setShowAmpliar(true)
+      }
+    } catch { /* sessionStorage bloqueado: sin auto-apertura */ }
+  }, [])
+
   async function editarProyecto(proyecto: Proyecto) {
     const monedaOptions = MONEDAS.map(m => ({ value: m.simbolo, label: `${m.simbolo} — ${m.nombre}` }))
 
@@ -163,13 +180,9 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
   async function crearProyecto() {
     if (!empresa) return
     if (proyectos.length >= effectiveMaxProjects) {
-      // F4.1.2: en lugar de un notify informativo, modal con CTA "Ver planes"
-      // que navega a Perfil → Mi plan con auto-scroll y plan picker abierto.
-      await promptUpgrade({
-        resource: 'project',
-        current: proyectos.length,
-        limit: effectiveMaxProjects,
-      })
+      // Límite alcanzado: ya estamos en la sección Empresa, así que se abre el
+      // modal de ampliación self-service directamente (sin navegación).
+      setShowAmpliar(true)
       return
     }
 
@@ -203,8 +216,16 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
     <>
       {/* F4.2.2: card de uso del plan con barras de proyectos y unidades */}
       <div style={{ marginBottom: '24px' }}>
-        <PlanUsageCard companyId={companyId ?? null} />
+        <PlanUsageCard key={usageKey} companyId={companyId ?? null} onAmpliar={() => setShowAmpliar(true)} />
       </div>
+
+      {showAmpliar && companyId && (
+        <AmpliarPlanModal
+          companyId={companyId}
+          onClose={() => setShowAmpliar(false)}
+          onSuccess={() => { setUsageKey(k => k + 1); onReload() }}
+        />
+      )}
 
       {/* Proyectos */}
       <div style={{ marginBottom: '28px' }}>

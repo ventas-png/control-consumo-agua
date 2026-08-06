@@ -30,6 +30,14 @@ env:
   # Vercel). Default: un subdominio *.vercel.app del proyecto.
   STAGING_ALIAS: ${{ vars.STAGING_ALIAS || 'staging-control-consumo-agua.vercel.app' }}
 
+# Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
+# `permissions` se heredan los del repositorio, que por defecto pueden ser de
+# escritura: un step comprometido (o una dependencia que ejecute código en
+# postinstall) podría entonces empujar commits o publicar releases. Ninguno de
+# estos workflows escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   check-secrets:
     runs-on: ubuntu-latest
@@ -51,11 +59,11 @@ jobs:
     needs: check-secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Vercel CLI

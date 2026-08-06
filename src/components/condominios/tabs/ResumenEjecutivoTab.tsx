@@ -1,3 +1,4 @@
+import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, GastoCondominio, PresupuestoCondominio,
@@ -31,9 +32,9 @@ export default function ResumenEjecutivoTab({
   polizas, contratosProveedores, inspecciones, vencimientosExtra,
   sugerencias, moneda, proyectoNombre,
 }: Props) {
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocalISO()
   const mes = hoy.slice(0, 7)
-  const en30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+  const en30 = dateLocalISO(new Date(Date.now() + 30 * 86400000))
   const fechaLarga = new Date().toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
 
   const financiero = useMemo(() => {

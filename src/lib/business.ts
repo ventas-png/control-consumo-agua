@@ -1,4 +1,4 @@
-import type { CostoCalculo } from '../types'
+import type { CostoCalculo, TarifaTramo, ConvenioCuota } from '../types'
 
 export function calcularTotalPagar(
   consumo: number,
@@ -39,6 +39,104 @@ export function calcularTotalPagar(
     tipo_cobro: 'Consumo Normal',
     desglose: { tramo: 2, consumo_m3: consumo, precio_m3: t },
   }
+}
+
+/**
+ * Cobro por tarifa ESCALONADA (increasing-block tariff). Debajo del mínimo cobra
+ * solo el canon fijo (mismo piso que el modelo plano); por encima suma bloque a
+ * bloque sobre el consumo completo desde 0. Cada m³ dentro de `(desde_m3, hasta_m3]`
+ * se cobra a `precio_m3`; el último bloque tiene `hasta_m3 = null` (∞). Bloques con
+ * 0 m³ cubiertos se omiten del desglose. La contigüidad la garantiza la UI (ver
+ * `validarTramos`), pero el cálculo es robusto ante huecos/solapes (cobra el
+ * volumen recortado de cada bloque, sin doble conteo dentro de un mismo bloque).
+ */
+export function calcularTotalPagarEscalonado(
+  consumo: number,
+  tramos: TarifaTramo[],
+  canon = 0,
+  consumoMinimo = 0,
+): CostoCalculo {
+  const canonVal = parseFloat(String(canon || 0))
+  // Tramo 1: consumo ≤ mínimo → solo canon fijo (piso mínimo, igual al modelo plano).
+  if (consumo >= 0 && consumo <= consumoMinimo) {
+    return { total: canonVal, tipo_cobro: 'Canon Fijo', desglose: { tramo: 1, canon_fijo: canonVal } }
+  }
+  const ordenados = [...tramos].sort((a, b) => (Number(a.desde_m3) || 0) - (Number(b.desde_m3) || 0))
+  let total = 0
+  const detalle: NonNullable<CostoCalculo['desglose']['tramos']> = []
+  for (const tr of ordenados) {
+    const desde = Number(tr.desde_m3) || 0
+    const hasta = tr.hasta_m3 == null ? Infinity : Number(tr.hasta_m3)
+    const precio = parseFloat(String(tr.precio_m3 || 0))
+    const m3 = Math.max(0, Math.min(consumo, hasta) - desde)
+    if (m3 <= 0) continue
+    const monto = m3 * precio
+    total += monto
+    detalle.push({ desde_m3: desde, hasta_m3: tr.hasta_m3 ?? null, precio_m3: precio, m3, monto })
+  }
+  return { total, tipo_cobro: 'Consumo Escalonado', desglose: { tramo: 'escalonado', tramos: detalle } }
+}
+
+/** Entrada mínima de tarifa para resolver el cobro (la satisface `Tarifa`). */
+export interface EntradaCostoTarifa {
+  precio_m3: number
+  precio_m3_exceso?: number | null
+  canon_fijo: number
+  consumo_minimo?: number | null
+  tramos?: TarifaTramo[] | null
+}
+
+/**
+ * Punto ÚNICO de decisión del cobro de una lectura: si la tarifa tiene bloques
+ * (`tramos`), usa el modelo ESCALONADO; si no, el plano de 3 tramos
+ * (`calcularTotalPagar`). Lo consume la captura de lecturas.
+ */
+export function calcularCostoTarifa(
+  consumo: number,
+  tarifa: EntradaCostoTarifa,
+  derechoServicioM3: number | null = null,
+): CostoCalculo {
+  if (Array.isArray(tarifa.tramos) && tarifa.tramos.length > 0) {
+    return calcularTotalPagarEscalonado(consumo, tarifa.tramos, tarifa.canon_fijo, tarifa.consumo_minimo ?? 0)
+  }
+  return calcularTotalPagar(
+    consumo,
+    tarifa.precio_m3,
+    tarifa.canon_fijo,
+    tarifa.consumo_minimo ?? 0,
+    tarifa.precio_m3_exceso ?? 0,
+    derechoServicioM3,
+  )
+}
+
+/**
+ * Valida un set de bloques escalonados para guardar la tarifa: ≥1 bloque,
+ * contiguos desde 0 (sin huecos ni solapes), cada `hasta_m3 > desde_m3`, precios
+ * ≥ 0, y solo el ÚLTIMO bloque sin tope (`hasta_m3 = null`). Devuelve el mensaje de
+ * error o `null` si es válido.
+ */
+export function validarTramos(tramos: TarifaTramo[]): string | null {
+  if (!Array.isArray(tramos) || tramos.length === 0) return 'Agregá al menos un bloque.'
+  const ord = [...tramos].sort((a, b) => (Number(a.desde_m3) || 0) - (Number(b.desde_m3) || 0))
+  let esperadoDesde = 0
+  for (let i = 0; i < ord.length; i++) {
+    const t = ord[i]
+    const esUltimo = i === ord.length - 1
+    const desde = Number(t.desde_m3)
+    const precio = Number(t.precio_m3)
+    if (!Number.isFinite(desde) || desde < 0) return 'Los límites deben ser números ≥ 0.'
+    if (Math.abs(desde - esperadoDesde) > 1e-9) return 'Los bloques deben ser contiguos desde 0 (sin huecos ni solapes).'
+    if (!Number.isFinite(precio) || precio < 0) return 'Los precios por m³ deben ser ≥ 0.'
+    if (esUltimo) {
+      if (t.hasta_m3 != null && Number(t.hasta_m3) <= desde) return 'El límite superior del último bloque debe ser mayor a su inicio (o vacío = ∞).'
+    } else {
+      if (t.hasta_m3 == null) return 'Solo el último bloque puede quedar sin tope.'
+      const hasta = Number(t.hasta_m3)
+      if (!Number.isFinite(hasta) || hasta <= desde) return 'Cada bloque debe terminar por encima de su inicio.'
+      esperadoDesde = hasta
+    }
+  }
+  return null
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -158,9 +256,32 @@ export function validarLectura(
 // drift de centavos entre el cálculo en TS y la columna persistida.
 export function redondear2(n: number): number {
   if (!Number.isFinite(n)) return 0
-  // Epsilon para neutralizar el error de coma flotante (0.1+0.2) antes de
-  // redondear: 1.005 debe dar 1.01, no 1.00.
-  return Math.round((n + Number.EPSILON) * 100) / 100
+
+  // El truco de `Math.round((n + Number.EPSILON) * 100) / 100` NO cumple lo que
+  // promete el comentario de arriba, por dos motivos distintos (auditoría
+  // 2026-07-28, Bloque D · PR-22):
+  //
+  //  1. `Number.EPSILON` es el ulp EN 1.0 (~2.22e-16), un empujón ABSOLUTO
+  //     contra un error que ESCALA con la magnitud. Medido por fuerza bruta
+  //     sobre los 200.001 puntos medios de 0,005 a 200,005: 9.158 (el 4,58%)
+  //     redondeaban hacia abajo — 2.135→2.13, 4.015→4.01, 10.075→10.07. Y por
+  //     encima de ~1000 el epsilon es literalmente inoperante:
+  //     `(1000.005 + Number.EPSILON) === 1000.005` es `true`.
+  //
+  //  2. `Math.round` es "half UP", no "half away from zero": para negativos
+  //     rompe la equivalencia con `numeric` de Postgres que el comentario
+  //     promete. `Math.round(-1.005 * 100) / 100` da -1.00; Postgres da -1.01.
+  //     Afecta a notas de crédito, ajustes y reversos. Además producía `-0`.
+  //
+  // La corrección: escalar y recuperar la intención DECIMAL con `toFixed` antes
+  // de redondear —`2.135 * 100` es `213.49999999999997` en binario, y
+  // `Math.round` de eso da 213— y aplicar el signo por fuera para que el
+  // redondeo sea siempre alejándose del cero, como hace `numeric`.
+  const signo = n < 0 ? -1 : 1
+  const escalado = Number((Math.abs(n) * 100).toFixed(6))
+  const resultado = (signo * Math.round(escalado)) / 100
+  // `-0` es un valor distinto de `0` al serializar a JSON y al mostrarlo.
+  return resultado === 0 ? 0 : resultado
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -337,6 +458,74 @@ export function calcularTotalFactura(
     mora_monto: mora,
     total_a_pagar: redondear2(iva.total + mora),
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Calendario de cuotas de un convenio de pago (P1 · cobranza).
+// ────────────────────────────────────────────────────────────────────────────
+
+export type FrecuenciaConvenio = 'semanal' | 'quincenal' | 'mensual'
+
+/** Días entre cuotas por frecuencia (semanal/quincenal). Mensual se maneja aparte. */
+const DIAS_FRECUENCIA: Record<'semanal' | 'quincenal', number> = { semanal: 7, quincenal: 15 }
+
+/**
+ * Suma `i` periodos a una fecha YYYY-MM-DD según la frecuencia. Puro y determinista.
+ * Mensual usa aritmética de meses con CLAMP de día (31 ene + 1 mes → 28/29 feb, no
+ * se desborda a marzo). UTC para no depender de la zona horaria del navegador.
+ */
+function sumarPeriodo(fechaISO: string, i: number, frecuencia: FrecuenciaConvenio): string {
+  const [y, m, d] = fechaISO.split('-').map(Number)
+  if (frecuencia === 'mensual') {
+    const totalMes = (m - 1) + i
+    const ty = y + Math.floor(totalMes / 12)
+    const tm = ((totalMes % 12) + 12) % 12 // 0..11
+    const ultimoDia = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate()
+    // UTC DELIBERADO: la fecha se construye con Date.UTC() y se reexpresa con
+    // toISOString(), así que el round-trip es exacto y la función queda
+    // independiente de la zona del navegador (ver el docstring). Usar
+    // dateLocalISO aquí introduciría justo el desplazamiento que esta función
+    // existe para evitar.
+    // eslint-disable-next-line no-restricted-syntax
+    return new Date(Date.UTC(ty, tm, Math.min(d, ultimoDia))).toISOString().slice(0, 10)
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + i * DIAS_FRECUENCIA[frecuencia])
+  // UTC deliberado, igual que arriba. Aquí NO hace falta la supresión de
+  // `no-restricted-syntax`: el selector de la regla exige que el receptor sea un
+  // `new Date(...)` INLINE (`new Date(…).toISOString()`), y esto va por variable.
+  // Es decir, la regla tiene un punto ciego con la forma
+  // `const d = new Date(); d.toISOString()` — se deja anotado en vez de ampliar
+  // el selector, porque cualquier `x.toISOString()` legítimamente UTC pasaría a
+  // dar falsos positivos.
+  return dt.toISOString().slice(0, 10)
+}
+
+/**
+ * Genera el calendario de cuotas de un convenio: divide `montoTotal` en `numCuotas`
+ * cuotas iguales (la ÚLTIMA absorbe el residual de redondeo para casar el total al
+ * centavo) y las agenda desde `fechaPrimera` según la frecuencia. Puro y testeable.
+ * Devuelve `[]` ante entradas inválidas (numCuotas < 1, monto ≤ 0, fecha mal formada).
+ */
+export function generarCalendarioConvenio(
+  montoTotal: number,
+  numCuotas: number,
+  fechaPrimera: string,
+  frecuencia: FrecuenciaConvenio = 'mensual',
+): ConvenioCuota[] {
+  const n = Math.floor(numCuotas)
+  const total = redondear2(montoTotal)
+  if (!Number.isFinite(n) || n < 1 || !(total > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(fechaPrimera)) return []
+  const base = redondear2(total / n)
+  const cuotas: ConvenioCuota[] = []
+  let acumulado = 0
+  for (let i = 0; i < n; i++) {
+    const esUltima = i === n - 1
+    const monto = esUltima ? redondear2(total - acumulado) : base
+    acumulado = redondear2(acumulado + monto)
+    cuotas.push({ numero: i + 1, fecha_vencimiento: sumarPeriodo(fechaPrimera, i, frecuencia), monto })
+  }
+  return cuotas
 }
 
 // ────────────────────────────────────────────────────────────────────────────

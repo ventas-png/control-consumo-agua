@@ -15,7 +15,10 @@
 //   email    → Gmail via company_email_configs (mismo enfoque que send-email /
 //              route-reminders). Resuelve plantilla: notification_templates del
 //              tenant → global → email_templates → render minimo del payload.
-//   whatsapp → no implementado todavia (follow-up); se marca failed no-retriable.
+//   whatsapp → Meta Cloud API via company_whatsapp_configs (bóveda por tenant,
+//              token cifrado). Meta exige PLANTILLA aprobada para mensajes
+//              iniciados por el negocio: payload.template_name ?? template_default
+//              de la config; sin plantilla o sin config → failed no-retriable.
 //   push     → no implementado todavia (follow-up); se marca failed no-retriable.
 //
 // Auth (interno, mismo espiritu que route-reminders / process-email-queue):
@@ -26,6 +29,9 @@
 // migracion 20260604100000_notifications_outbox.sql).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { encryptSecret, decryptSecret } from '../_shared/secretsCrypto.ts'
+import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 // Helpers puros de render/plantillas/routing extraídos a ./render.ts para poder
 // testearlos en vitest sin I/O (infra:I22). El handler sigue haciendo las queries.
 import {
@@ -36,6 +42,7 @@ import {
   formatFromHeader,
   isGmailStatusRetriable,
   isTokenExpired,
+  isWhatsAppStatusRetriable,
   resolveEmailContent,
   routeChannel,
   type EmailTemplate,
@@ -133,7 +140,7 @@ async function refreshAccessToken(refreshToken: string, supabase: Client, config
   if (!data.access_token) return null
   const newExpiry = new Date(Date.now() + 3600 * 1000).toISOString()
   await supabase.from('company_email_configs')
-    .update({ access_token: data.access_token, token_expiry: newExpiry })
+    .update({ access_token: await encryptSecret(data.access_token), token_expiry: newExpiry })
     .eq('id', configId)
   return data.access_token
 }
@@ -142,11 +149,17 @@ function buildRawMessage(
   fromEmail: string, fromName: string | null, replyTo: string | null,
   to: string, subject: string, htmlBody: string,
 ): string {
+  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
+  // única cabecera de este mensaje que no va codificada en base64, así que es la
+  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
+  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
+  const safeTo = assertEmailAddress('To', to)
+  const safeReplyTo = replyTo ? assertEmailAddress('Reply-To', replyTo) : null
   const boundary = `----=_Part_${Date.now()}`
   const lines = [
     `From: ${formatFromHeader(fromEmail, fromName)}`,
-    `To: ${to}`,
-    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
+    `To: ${safeTo}`,
+    ...(safeReplyTo ? [`Reply-To: ${safeReplyTo}`] : []),
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -272,6 +285,12 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
     .eq('company_id', row.company_id).eq('is_active', true)
     .maybeSingle()
   if (!cfg) return { ok: false, error: 'sin Gmail configurado para la empresa', retriable: false }
+  // P0 #7: descifrar los tokens en reposo (dual-read).
+  {
+    const cs = cfg as { access_token?: string | null; refresh_token?: string | null }
+    cs.access_token = (await decryptSecret(cs.access_token)) ?? ''
+    cs.refresh_token = await decryptSecret(cs.refresh_token)
+  }
 
   // Resolucion de plantilla en cascada (I/O aquí; la decisión en resolveEmailContent):
   //   1) notification_templates (tenant → global) por template_key.
@@ -303,6 +322,127 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
 
   try {
     await sendViaGmail(cfg as unknown as EmailConfig, toEmail, content.subject, content.htmlBody, admin)
+    return { ok: true }
+  } catch (err) {
+    const retriable = (err as { retriable?: boolean })?.retriable ?? true
+    return { ok: false, error: err instanceof Error ? err.message : String(err), retriable }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp (Meta Cloud API) — bóveda por tenant company_whatsapp_configs
+// ---------------------------------------------------------------------------
+
+// Misma versión de Graph API que notify-package (el sender global legacy).
+const META_GRAPH_VERSION = 'v19.0'
+
+interface WhatsAppTenantConfig {
+  id: string
+  provider: string
+  phone_number_id: string
+  access_token: string
+  template_default: string | null
+  template_lang: string | null
+}
+
+/** Solo dígitos: Meta acepta `to` sin `+` (mismo criterio que formatPhoneForWa). */
+function soloDigitos(telefono: string): string {
+  return telefono.replace(/\D+/g, '')
+}
+
+/**
+ * Envía una PLANTILLA aprobada vía Meta WhatsApp Cloud API. Meta exige plantilla
+ * para mensajes iniciados por el negocio (fuera de la ventana de 24 h), así que
+ * este canal no manda texto libre. `params` mapea a los {{n}} del body.
+ * Lanza Error con `.retriable` clasificado (429/5xx sí; otros 4xx terminales).
+ */
+async function sendViaMetaWhatsApp(
+  config: WhatsAppTenantConfig,
+  to: string,
+  templateName: string,
+  lang: string,
+  params: string[],
+): Promise<void> {
+  const body = {
+    messaging_product: 'whatsapp',
+    to: soloDigitos(to),
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: lang },
+      ...(params.length > 0
+        ? { components: [{ type: 'body', parameters: params.map((p) => ({ type: 'text', text: p })) }] }
+        : {}),
+    },
+  }
+  const res = await fetch(
+    `https://graph.facebook.com/${META_GRAPH_VERSION}/${config.phone_number_id}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!res.ok) {
+    const status = res.status
+    const err = await res.json().catch(() => ({}))
+    const retriable = isWhatsAppStatusRetriable(status)
+    const e = new Error(`Meta WhatsApp API ${status}: ${JSON.stringify(err)}`) as Error & { retriable: boolean }
+    e.retriable = retriable
+    throw e
+  }
+}
+
+/**
+ * Despacho del canal 'whatsapp'. INERTE sin config del tenant: si la empresa no
+ * tiene fila activa en company_whatsapp_configs, la fila se marca failed
+ * no-retriable ("sin WhatsApp configurado") sin afectar al resto del lote —
+ * mismo contrato que el canal email sin Gmail. La supresión por preferencia
+ * (payload.user_id → notification_channel_enabled) ya ocurre ANTES, en el loop.
+ *
+ * Contrato del productor: recipient = teléfono (o payload.to_phone);
+ * payload.template_name/template_lang/template_params sobreescriben la plantilla
+ * por defecto de la config. Sin plantilla resoluble → failed no-retriable (Meta
+ * exige plantilla aprobada para mensajes iniciados por el negocio).
+ */
+async function dispatchWhatsApp(admin: Client, row: OutboxRow): Promise<DispatchResult> {
+  const p = row.payload ?? {}
+  const toPhone = row.recipient || asString(p.to_phone)
+  if (!toPhone || soloDigitos(toPhone) === '') {
+    return { ok: false, error: 'whatsapp sin recipient (teléfono)', retriable: false }
+  }
+  if (!row.company_id) {
+    return { ok: false, error: 'whatsapp sin company_id no soportado', retriable: false }
+  }
+
+  const { data: cfg } = await admin.from('company_whatsapp_configs')
+    .select('id, provider, phone_number_id, access_token, template_default, template_lang')
+    .eq('company_id', row.company_id).eq('is_active', true)
+    .maybeSingle()
+  if (!cfg) return { ok: false, error: 'sin WhatsApp configurado para la empresa', retriable: false }
+
+  const config = cfg as unknown as WhatsAppTenantConfig
+  // P0 #7: descifrar el token en reposo (dual-read: passthrough si aún no hay llave).
+  config.access_token = (await decryptSecret(config.access_token)) ?? ''
+  if (!config.access_token) {
+    return { ok: false, error: 'config de WhatsApp sin access_token utilizable', retriable: false }
+  }
+
+  const templateName = asString(p.template_name) || config.template_default || ''
+  if (!templateName) {
+    return {
+      ok: false,
+      error: 'whatsapp sin plantilla (payload.template_name o template_default de la config); Meta exige plantilla aprobada',
+      retriable: false,
+    }
+  }
+  const lang = asString(p.template_lang) || config.template_lang || 'es'
+  const params = Array.isArray(p.template_params)
+    ? (p.template_params as unknown[]).map((v) => asString(v))
+    : []
+
+  try {
+    await sendViaMetaWhatsApp(config, toPhone, templateName, lang, params)
     return { ok: true }
   } catch (err) {
     const retriable = (err as { retriable?: boolean })?.retriable ?? true
@@ -349,7 +489,8 @@ async function isChannelSuppressed(admin: Client, row: OutboxRow): Promise<boole
 async function dispatchRow(admin: Client, row: OutboxRow): Promise<DispatchResult> {
   if (row.channel === 'in_app') return await dispatchInApp(admin, row)
   if (row.channel === 'email') return await dispatchEmail(admin, row)
-  // whatsapp/push (follow-ups) y canales desconocidos: failed no-retriable.
+  if (row.channel === 'whatsapp') return await dispatchWhatsApp(admin, row)
+  // push (follow-up) y canales desconocidos: failed no-retriable.
   const routing = routeChannel(row.channel)
   return { ok: false, error: routing.error ?? `canal desconocido: ${row.channel}`, retriable: false }
 }
@@ -371,8 +512,8 @@ Deno.serve(async (req: Request) => {
   const cronSecret = req.headers.get('x-cron-secret') ?? ''
   const bearer = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
   const authorized =
-    (CRON_SECRET !== '' && cronSecret === CRON_SECRET) ||
-    (SERVICE_ROLE_KEY !== '' && bearer === SERVICE_ROLE_KEY)
+    (CRON_SECRET !== '' && (await timingSafeEqualSecret(cronSecret, CRON_SECRET))) ||
+    (SERVICE_ROLE_KEY !== '' && (await timingSafeEqualSecret(bearer, SERVICE_ROLE_KEY)))
   if (!authorized) return json({ error: 'Unauthorized' }, 401)
 
   try {

@@ -1,56 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret } from '../_shared/secretsCrypto.ts'
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 // CORS utilities for Edge Functions
-function getAllowedOrigins(): string[] {
-  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
-  const origins = new Set<string>([
-    'https://administratodo.com',
-    'https://www.administratodo.com',
-    'https://administratodo.app',
-    'https://www.administratodo.app',
-  ])
-
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    for (const origin of envOrigins.split(',')) {
-      const trimmed = origin.trim()
-      if (trimmed) origins.add(trimmed)
-    }
-  } else {
-    origins.add('http://localhost:5173')
-    origins.add('http://localhost:3000')
-    origins.add('http://127.0.0.1:5173')
-    origins.add('http://127.0.0.1:3000')
-  }
-
-  const appUrl = Deno.env.get('APP_URL')
-  if (appUrl) {
-    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
-  }
-
-  return [...origins]
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = getAllowedOrigins()
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  }
-}
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowedOrigins = getAllowedOrigins()
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed', origin }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -141,6 +93,11 @@ Deno.serve(async (req) => {
     let companyUpdate: Record<string, unknown>
     let secretsUpdate: Record<string, unknown>
 
+    // P0 #7: cifrar el secreto en reposo antes de guardarlo. Sin
+    // TENANT_SECRETS_ENC_KEY configurada, encryptSecret devuelve el texto plano
+    // (passthrough) → cero cambio de comportamiento hasta provisionar la llave.
+    const encryptedSecret = await encryptSecret(secretKey)
+
     if (provider === 'stripe') {
       companyUpdate = {
         stripe_public_key: publicKey,
@@ -149,7 +106,7 @@ Deno.serve(async (req) => {
       }
       secretsUpdate = {
         company_id: companyId,
-        stripe_secret_key: secretKey,
+        stripe_secret_key: encryptedSecret,
         updated_at: new Date().toISOString(),
       }
     } else {
@@ -160,7 +117,7 @@ Deno.serve(async (req) => {
       }
       secretsUpdate = {
         company_id: companyId,
-        paypal_client_secret: secretKey,
+        paypal_client_secret: encryptedSecret,
         updated_at: new Date().toISOString(),
       }
     }

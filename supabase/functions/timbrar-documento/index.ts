@@ -17,8 +17,11 @@
 // route-reminders / invite-user), aceptando service_role O un admin JWT.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
+import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
   getFiscalProvider,
   aplicarTransicionFiscal,
@@ -26,6 +29,7 @@ import {
   type AmbientePac,
   type CredencialesPacPorAmbiente,
 } from '../_shared/fiscal/index.ts'
+import { calcularCostoTimbre, type TimbradoConfigRow } from '../_shared/fiscal/costoTimbre.ts'
 import {
   armarDteDesdeFilas,
   type ClienteRow,
@@ -71,7 +75,8 @@ async function cargarCredencialesPac(
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .maybeSingle()
-    const cred = (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales
+    // P0 #7: descifrar el blob jsonb en reposo (dual-read: objeto legacy pasa igual).
+    const cred = await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null
     if (cred && Object.keys(cred).length > 0) return cred
   }
   const { data } = await admin
@@ -80,7 +85,7 @@ async function cargarCredencialesPac(
     .eq('company_id', companyId)
     .is('project_id', null)
     .maybeSingle()
-  return (data as { credenciales?: CredencialesPacPorAmbiente } | null)?.credenciales ?? null
+  return (await decryptJson((data as { credenciales?: unknown } | null)?.credenciales) as CredencialesPacPorAmbiente | null) ?? null
 }
 
 Deno.serve(async (req: Request) => {
@@ -102,13 +107,15 @@ Deno.serve(async (req: Request) => {
     // ── Auth: service_role (interno) o JWT de admin/owner/super_admin ──
     let callerCompanyId: string | null = null
     let callerIsSuperAdmin = false
+    let callerUserId: string | null = null
     let internal = false
 
-    if (token && token === SERVICE_ROLE_KEY) {
+    if (token && (await timingSafeEqualSecret(token, SERVICE_ROLE_KEY))) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
+      callerUserId = user.id
       const { data: au } = await admin
         .from('app_users')
         .select('company_id, role')
@@ -124,6 +131,19 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       return json({ error: 'Unauthorized' }, 401)
+    }
+
+    // Rate limit por usuario (auditoría S6): timbrar llama al PAC (costo por
+    // DTE). 120/h cubre el timbrado manual intensivo; interno (cierre de ciclo
+    // masivo via service_role) exento; fail-open si el contador falla.
+    if (!internal && callerUserId) {
+      const rl = await enforceRateLimit(admin, {
+        subject: callerUserId,
+        action: 'timbrar_documento',
+        max: 120,
+        message: 'Demasiados timbrados en poco tiempo. Espera unos minutos e intenta de nuevo.',
+      }, corsHeaders)
+      if (rl) return rl
     }
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
@@ -244,6 +264,31 @@ Deno.serve(async (req: Request) => {
 
     const ahora = new Date().toISOString()
     if (resultado.ok) {
+      // F8: costo del timbre según el modelo de cobro del tenant
+      // (timbrado_config), sellado en el documento. Los primeros
+      // `timbres_incluidos` del mes calendario salen a 0; el resto al precio
+      // vigente. Sin config/inactiva → NULL (no se cobra el timbrado).
+      let costoCents: number | null = null
+      {
+        const { data: tcRow } = await admin
+          .from('timbrado_config')
+          .select('activo, precio_dte_cents, timbres_incluidos')
+          .eq('company_id', companyId)
+          .maybeSingle()
+        if (tcRow) {
+          const inicioMes = new Date()
+          inicioMes.setUTCDate(1)
+          inicioMes.setUTCHours(0, 0, 0, 0)
+          const { count } = await admin
+            .from('documentos_fiscales')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+            .eq('estado', 'timbrado')
+            .gte('fecha_certificacion', inicioMes.toISOString())
+          costoCents = calcularCostoTimbre(tcRow as TimbradoConfigRow, count ?? 0)
+        }
+      }
+
       const parche = aplicarTransicionFiscal('por_timbrar', 'timbrar', ahora)
       const { error: updErr } = await admin
         .from('documentos_fiscales')
@@ -255,6 +300,7 @@ Deno.serve(async (req: Request) => {
           numero_autorizacion: resultado.numeroAutorizacion ?? null,
           fecha_certificacion: resultado.fechaCertificacion ?? parche.fecha_certificacion ?? ahora,
           response_payload: resultado.raw ?? null,
+          costo_cents: costoCents,
         })
         .eq('id', docId)
       if (updErr) return json({ error: updErr.message, documento_id: docId }, 500)

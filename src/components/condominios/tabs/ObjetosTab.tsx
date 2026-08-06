@@ -1,3 +1,4 @@
+import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ObjetoPerdido, EstadoObjeto } from '../../../types'
@@ -31,7 +32,7 @@ const ESTADO_LABEL_KEY: Record<EstadoObjeto, TranslationKey> = {
 const blank = (): Partial<ObjetoPerdido> => ({
   descripcion: '',
   lugar_encontrado: '',
-  fecha_encontrado: new Date().toISOString().slice(0, 10),
+  fecha_encontrado: hoyLocalISO(),
   estado: 'en_custodia',
   notas: '',
 })
@@ -74,7 +75,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       project_id: proyectoId,
       descripcion: form.descripcion!.trim(),
       lugar_encontrado: form.lugar_encontrado || null,
-      fecha_encontrado: form.fecha_encontrado ?? new Date().toISOString().slice(0, 10),
+      fecha_encontrado: form.fecha_encontrado ?? hoyLocalISO(),
       estado: form.estado ?? 'en_custodia',
       notas: form.notas || null,
       registrado_por: userId || null,
@@ -115,7 +116,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
     const { error } = await updateCondominioRow('objetos_perdidos', reclamoId, {
       estado: 'reclamado',
       reclamado_por: reclamadoPor || null,
-      fecha_reclamo: new Date().toISOString().slice(0, 10),
+      fecha_reclamo: hoyLocalISO(),
     })
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
     setReclamoId(null)

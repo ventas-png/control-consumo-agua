@@ -224,6 +224,72 @@ describe('EditModal — comportamiento controlable', () => {
   })
 })
 
+describe('EditModal — foco de entrada y salida', () => {
+  it('al abrir mueve el foco al diálogo (sin esto el focus trap nunca corre)', () => {
+    render(
+      <EditModal title="Con foco" onClose={() => {}}>
+        <input aria-label="campo" />
+      </EditModal>,
+    )
+    expect(screen.getByRole('dialog')).toBe(document.activeElement)
+  })
+
+  it('respeta el foco que el consumidor ya movió adentro (autoFocus)', () => {
+    render(
+      <EditModal title="Con autoFocus" onClose={() => {}}>
+        <input aria-label="campo" autoFocus />
+      </EditModal>,
+    )
+    expect(screen.getByLabelText('campo')).toBe(document.activeElement)
+  })
+
+  it('al cerrar devuelve el foco al elemento que lo abrió', () => {
+    const disparador = document.createElement('button')
+    document.body.appendChild(disparador)
+    disparador.focus()
+    expect(disparador).toBe(document.activeElement)
+
+    const { unmount } = render(<EditModal title="Vuelve" onClose={() => {}}><p>x</p></EditModal>)
+    expect(disparador).not.toBe(document.activeElement)
+
+    unmount()
+    expect(disparador).toBe(document.activeElement)
+    disparador.remove()
+  })
+
+  it('no explota si el disparador ya no está en el DOM al cerrar', () => {
+    const disparador = document.createElement('button')
+    document.body.appendChild(disparador)
+    disparador.focus()
+    const { unmount } = render(<EditModal title="Huérfano" onClose={() => {}}><p>x</p></EditModal>)
+    disparador.remove()
+    expect(() => unmount()).not.toThrow()
+  })
+})
+
+describe('EditModal — scroll lock del body', () => {
+  it('bloquea el scroll del fondo mientras está abierto y lo restaura al cerrar', () => {
+    expect(document.body.style.overflow).not.toBe('hidden')
+    const { unmount } = render(<EditModal title="Lock" onClose={() => {}}><p>x</p></EditModal>)
+    expect(document.body.style.overflow).toBe('hidden')
+    unmount()
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('con modales anidados solo desbloquea cuando se cierra el último', () => {
+    const externo = render(<EditModal title="Externo" onClose={() => {}}><p>a</p></EditModal>)
+    const interno = render(<EditModal title="Interno" onClose={() => {}}><p>b</p></EditModal>)
+    expect(document.body.style.overflow).toBe('hidden')
+
+    interno.unmount()
+    // El externo sigue abierto: el fondo NO debe volver a scrollear.
+    expect(document.body.style.overflow).toBe('hidden')
+
+    externo.unmount()
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+})
+
 describe('EditModal — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
     const { container } = render(

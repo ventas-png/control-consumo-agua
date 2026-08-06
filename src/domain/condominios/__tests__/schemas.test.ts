@@ -64,6 +64,22 @@ describe('cuotaInputSchema', () => {
     expect(cuotaInputSchema.safeParse({ ...base, fecha_vencimiento: '2026-06-30' }).success).toBe(true)
     expect(cuotaInputSchema.safeParse({ ...base, fecha_vencimiento: '30/06/2026' }).success).toBe(false)
   })
+
+  it('rol_responsable es opcional (omitido o null = sin diferenciar)', () => {
+    expect(cuotaInputSchema.safeParse(base).success).toBe(true)
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: null }).success).toBe(true)
+  })
+
+  it('rol_responsable acepta el dominio de unidad_residentes.tipo', () => {
+    for (const rol of ['propietario', 'arrendatario', 'familiar', 'otro'] as const) {
+      expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: rol }).success).toBe(true)
+    }
+  })
+
+  it('rechaza rol_responsable fuera del enum', () => {
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: 'inquilino' }).success).toBe(false)
+    expect(cuotaInputSchema.safeParse({ ...base, rol_responsable: '' }).success).toBe(false)
+  })
 })
 
 describe('visitanteInputSchema', () => {
@@ -119,6 +135,50 @@ describe('visitanteInputSchema', () => {
       fecha_nacimiento: '2015-03-20',
     })
     expect(ok.success).toBe(true)
+  })
+
+  // Regresión: `valido_hasta` exigía timestamp ISO, pero los DOS formularios que
+  // lo escriben (portal del residente y pase QR del guardia) usan
+  // <input type="date"> → 'YYYY-MM-DD'. `validatedInsert` rechazaba la fila antes
+  // de tocar la DB y el botón "Pre-autorizar visita" parecía no hacer nada.
+  it('acepta valido_hasta como fecha de <input type="date">', () => {
+    const r = visitanteInputSchema.safeParse({ ...base, valido_hasta: '2026-07-28' })
+    expect(r.success ? 'OK' : JSON.stringify(r.error.flatten().fieldErrors)).toBe('OK')
+  })
+
+  it('acepta valido_hasta como timestamp (columna timestamptz leída de vuelta)', () => {
+    expect(
+      visitanteInputSchema.safeParse({ ...base, valido_hasta: '2026-07-28T00:00:00+00:00' }).success,
+    ).toBe(true)
+  })
+
+  it('acepta valido_hasta nulo o ausente (visita de hoy únicamente)', () => {
+    expect(visitanteInputSchema.safeParse({ ...base, valido_hasta: null }).success).toBe(true)
+    expect(visitanteInputSchema.safeParse(base).success).toBe(true)
+  })
+
+  it('sigue rechazando un valido_hasta que no es fecha ni timestamp', () => {
+    expect(visitanteInputSchema.safeParse({ ...base, valido_hasta: '28/07/2026' }).success).toBe(false)
+    expect(visitanteInputSchema.safeParse({ ...base, valido_hasta: 'mañana' }).success).toBe(false)
+  })
+
+  // El payload exacto que arma PortalVisitantesTab.preAutorizar() para el caso
+  // reportado: menor de edad, foto de vehículo y autorización con fecha.
+  it('acepta el payload completo del portal del residente', () => {
+    const r = visitanteInputSchema.safeParse({
+      ...base,
+      identificacion: null,
+      placa_vehiculo: null,
+      motivo: 'test',
+      notas: 'test',
+      foto_url: null,
+      foto_documento_url: null,
+      foto_vehiculo_url: 'https://ejemplo/foto.jpg',
+      valido_hasta: '2026-07-28',
+      es_menor: true,
+      fecha_nacimiento: '2015-07-14',
+    })
+    expect(r.success ? 'OK' : JSON.stringify(r.error.flatten().fieldErrors)).toBe('OK')
   })
 
   it('acepta timestamp en formato Postgres "YYYY-MM-DD HH:MM:SS"', () => {

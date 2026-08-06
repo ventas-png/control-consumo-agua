@@ -1,3 +1,4 @@
+import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
 import { useState, useMemo } from 'react'
 import {
   CuotaCondominio, RecargoMora, ReservaAmenidad,
@@ -51,7 +52,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
 
   const reservasUnidad = useMemo(() =>
     reservas
-      .filter(r => r.unidad_id === unidadId && r.fecha >= new Date().toISOString().slice(0, 10))
+      .filter(r => r.unidad_id === unidadId && r.fecha >= hoyLocalISO())
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
       .slice(0, 5)
   , [reservas, unidadId])
@@ -68,7 +69,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
   const saldoPendiente = pendientes.reduce((s, c) => s + c.monto, 0)
   const saldoRecargos = recargosUnidad.reduce((s, r) => s + r.monto_calculado, 0)
 
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = mesLocalISO()
   const cuotaMes = cuotasUnidad.find(c => c.periodo === mesActual)
 
   function imprimir() {

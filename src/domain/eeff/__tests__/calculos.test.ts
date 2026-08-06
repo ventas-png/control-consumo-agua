@@ -122,4 +122,19 @@ describe('resumirConsolidado', () => {
     expect(r.totalIngresos).toBe(0)
     expect(r.sinTasa).toHaveLength(1)
   })
+
+  it('una fila CON tasa pero con componentes null suma 0, nunca NaN', () => {
+    // `tasa !== null` es lo que mete la fila en el total, pero cada componente
+    // convertido se tipa aparte como `number | null`. Si alguno llega null (la
+    // RPC no lo calculó), `reduce` sin el `?? 0` propagaría NaN a TODO el total
+    // consolidado — y el reporte financiero renderiza "NaN" en vez de fallar.
+    const rota = { ...fila('P3', 7.95, 795), activo: null, pasivo: null }
+    const r = resumirConsolidado([fila('Empresa', 1, 100), rota])
+    expect(r.convertidas).toHaveLength(2)
+    expect(r.totalActivo).toBe(500)   // 500 de Empresa + 0 por la fila rota
+    expect(r.totalPasivo).toBe(200)
+    expect(Number.isNaN(r.totalActivo)).toBe(false)
+    // Los componentes sanos de la fila rota sí se suman.
+    expect(r.totalIngresos).toBe(895)
+  })
 })

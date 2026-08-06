@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '../shared/SessionContext'
+import { TabStrip } from '../shared/TabStrip'
 import { useProyectosQuery } from '../../domain/agua/queries'
 import { useMonedaBaseQuery } from '../../domain/contabilidad/queries'
 import { CatalogoCuentasTab } from './CatalogoCuentasTab'
@@ -14,16 +15,16 @@ import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
 type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
 
-const TABS: { id: SubTab; label: string }[] = [
-  { id: 'polizas', label: 'Pólizas' },
-  { id: 'balanza', label: 'Balanza' },
-  { id: 'eeff', label: 'Estados financieros' },
-  { id: 'bancos', label: 'Bancos' },
-  { id: 'cxp', label: 'Cuentas por pagar' },
-  { id: 'proveedores', label: 'Proveedores' },
-  { id: 'presupuesto', label: 'Presupuesto' },
-  { id: 'catalogo', label: 'Catálogo de cuentas' },
-  { id: 'configuracion', label: 'Configuración' },
+const TABS: { id: SubTab; label: string; icon: string }[] = [
+  { id: 'polizas', label: 'Pólizas', icon: '📒' },
+  { id: 'balanza', label: 'Balanza', icon: '⚖️' },
+  { id: 'eeff', label: 'Estados financieros', icon: '📊' },
+  { id: 'bancos', label: 'Bancos', icon: '🏦' },
+  { id: 'cxp', label: 'Cuentas por pagar', icon: '🧾' },
+  { id: 'proveedores', label: 'Proveedores', icon: '🚚' },
+  { id: 'presupuesto', label: 'Presupuesto', icon: '🎯' },
+  { id: 'catalogo', label: 'Catálogo de cuentas', icon: '📚' },
+  { id: 'configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
 /**
@@ -100,28 +101,15 @@ export function ContabilidadSection() {
         </label>
       </div>
 
-      <div role="tablist" aria-label="Secciones de contabilidad" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--at-line)', flexWrap: 'wrap' }}>
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              padding: '8px 14px',
-              border: 'none',
-              borderBottom: tab === t.id ? '2px solid var(--at-accent)' : '2px solid transparent',
-              background: 'transparent',
-              color: tab === t.id ? 'var(--at-ink)' : 'var(--at-ink-soft)',
-              fontWeight: tab === t.id ? 700 : 500,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Sub-menú con el mismo patrón que Condominios: una sola fila con scroll
+          horizontal. Con `flex-wrap` estas 9 pestañas ocupaban cuatro líneas en
+          un teléfono antes de llegar al contenido. */}
+      <TabStrip
+        ariaLabel="Secciones de contabilidad"
+        items={TABS}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === 'polizas' && (
         <AsientosTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

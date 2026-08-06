@@ -13,6 +13,7 @@ import {
   validatedInsertMany,
   validatedUpdate,
   isValidationError,
+  esDuplicadoLlaveNatural,
   VALIDATION_FAILED_CODE,
   type ValidatedInsertOptions,
 } from '../validatedInsert'
@@ -220,5 +221,16 @@ describe('validatedUpdate', () => {
     )
     expect(isValidationError(error)).toBe(true)
     expect(mock.updateFn).not.toHaveBeenCalled()
+  })
+})
+
+describe('esDuplicadoLlaveNatural (E1)', () => {
+  it('true solo para PostgrestError con code 23505', () => {
+    expect(esDuplicadoLlaveNatural({ code: '23505', message: 'duplicate key' })).toBe(true)
+    expect(esDuplicadoLlaveNatural({ code: '42703', message: 'columna no existe' })).toBe(false)
+    expect(esDuplicadoLlaveNatural({ code: 'VALIDATION_FAILED', message: 'zod' })).toBe(false)
+    expect(esDuplicadoLlaveNatural(null)).toBe(false)
+    expect(esDuplicadoLlaveNatural(undefined)).toBe(false)
+    expect(esDuplicadoLlaveNatural('23505')).toBe(false)
   })
 })

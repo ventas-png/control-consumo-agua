@@ -4,8 +4,12 @@
 // Invocada desde pg_cron (vía dispatch_scheduled_reports + pg_net.http_post)
 // con body { template_id }. Procesa el template:
 //
-//   1. SELECT data del source_table con filtros aplicados
-//   2. Serializa CSV (server-side, sin libs externas)
+//   1. SELECT data del source_table con filtros aplicados — POR CHUNKS (sin el
+//      tope silencioso de ~1000 filas de PostgREST) y con el scoping correcto
+//      por tabla (company_id directo o project_id ∈ proyectos del tenant; ver
+//      SOURCE_META en logic.ts — pagos/registros no tienen company_id).
+//   2. Serializa CSV o XLSX (ambos server-side, sin libs externas; el XLSX es
+//      un ZIP STORE + SpreadsheetML mínimo — ver logic.ts). PDF cae a CSV.
 //   3. Upload a Storage bucket 'report-attachments'
 //   4. Crea signed URL (24h)
 //   5. INSERT N rows en email_send_queue con template_key='saved_report_delivery'
@@ -14,14 +18,14 @@
 //
 // Auth: requiere Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY> (verificado
 // contra env var). Los cron jobs pasan el service role para bypass RLS y poder
-// leer/escribir cross-tenant.
-//
-// Formato: solo CSV en MVP server-side. XLSX/PDF requieren libs Deno pesadas
-// que disparan cold start y complican el deploy; el usuario puede usar el
-// "Send by email" del frontend para esos formatos cuando lo necesite.
+// leer/escribir cross-tenant — por eso el scoping explícito del paso 1 es la
+// ÚNICA barrera de aislamiento aquí y debe ser correcto por tabla.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { SOURCE_META, fetchAllChunks, serializeCsv, buildXlsx } from './logic.ts'
+import type { ChunkResult } from './logic.ts'
 
 interface RequestBody {
   template_id: string
@@ -37,14 +41,6 @@ interface ReportTemplate {
   filters: Record<string, string | number | null>
   recipients: string[]
   default_format: 'xlsx' | 'csv' | 'pdf'
-}
-
-const SOURCE_LABEL_MAP: Record<string, string> = {
-  cuotas_condominio:        'Cuotas de condominio',
-  pagos:                    'Pagos',
-  tickets_mantenimiento:    'Tickets de mantenimiento',
-  gastos_condominio:        'Gastos',
-  fondo_reserva_condominio: 'Fondo de reserva',
 }
 
 Deno.serve(async (req: Request) => {
@@ -64,7 +60,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'env_misconfigured' }, 500, cors)
   }
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
-  if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+  const bearerTok = (authHeader ?? '').replace('Bearer ', '').trim()
+  if (!(await timingSafeEqualSecret(bearerTok, serviceKey))) {
     return jsonResponse({ error: 'unauthorized' }, 401, cors)
   }
 
@@ -98,33 +95,69 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'no_recipients' }, 422, cors)
   }
 
-  // ── 2. SELECT data del source_table con filters + soft-delete filter ──
-  // El whitelist en CHECK constraint de report_templates ya bloquea source_table
-  // arbitrario, asi que es seguro pasarlo directo.
-  let q = admin.from(template.source_table).select('*').eq('company_id', template.company_id)
-  q = q.is('deleted_at', null)
-  for (const [k, v] of Object.entries(template.filters)) {
-    if (v !== null && v !== '' && v !== undefined) {
-      q = q.eq(k, v)
-    }
+  // El CHECK constraint de report_templates ya bloquea source_table arbitrario;
+  // SOURCE_META es la defensa en profundidad + la config de scoping por tabla.
+  const meta = SOURCE_META[template.source_table]
+  if (!meta) {
+    await logRun(admin, template, 0, 'failed', `unsupported source_table: ${template.source_table}`)
+    return jsonResponse({ error: 'unsupported_source_table' }, 422, cors)
   }
-  const { data: rows, error: rowsErr } = await q
-  if (rowsErr) {
-    await logRun(admin, template, 0, 'failed', rowsErr.message)
-    return jsonResponse({ error: 'query_failed', detail: rowsErr.message }, 500, cors)
-  }
-  const dataRows = (rows ?? []) as Array<Record<string, unknown>>
 
-  // ── 3. Serializa CSV ──
-  const csv = serializeCsv(template.columns, dataRows)
-  const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  // ── 2. SELECT data por chunks con scoping por tabla ──
+  // scope 'project': la tabla no tiene company_id (pagos, registros) — se aísla
+  // por project_id ∈ proyectos del tenant.
+  let projectIds: string[] = []
+  if (meta.scope === 'project') {
+    const { data: projs, error: projErr } = await admin
+      .from('projects').select('id').eq('company_id', template.company_id)
+    if (projErr) {
+      await logRun(admin, template, 0, 'failed', `projects: ${projErr.message}`)
+      return jsonResponse({ error: 'query_failed', detail: projErr.message }, 500, cors)
+    }
+    projectIds = ((projs ?? []) as Array<{ id: string }>).map(p => p.id)
+  }
+
+  let dataRows: Array<Record<string, unknown>> = []
+  if (meta.scope === 'company' || projectIds.length > 0) {
+    const { rows, error: rowsErr } = await fetchAllChunks((from, to) => {
+      let q = admin.from(template.source_table).select(meta.cols)
+      q = meta.scope === 'company'
+        ? q.eq('company_id', template.company_id)
+        : q.in('project_id', projectIds)
+      if (meta.softDelete) q = q.is('deleted_at', null)
+      for (const [k, v] of Object.entries(template.filters)) {
+        if (v !== null && v !== '' && v !== undefined) {
+          q = q.eq(k, v)
+        }
+      }
+      // Orden ESTABLE por id: sin orden total, range() puede saltar/duplicar filas.
+      return q.order('id', { ascending: true }).range(from, to) as unknown as PromiseLike<ChunkResult>
+    })
+    if (rowsErr) {
+      await logRun(admin, template, 0, 'failed', rowsErr)
+      return jsonResponse({ error: 'query_failed', detail: rowsErr }, 500, cors)
+    }
+    dataRows = rows
+  }
+
+  // ── 3. Serializa CSV o XLSX (pdf cae a CSV: PDF server-side sigue parqueado) ──
+  const format: 'csv' | 'xlsx' = template.default_format === 'xlsx' ? 'xlsx' : 'csv'
+  let fileBlob: Blob
+  if (format === 'xlsx') {
+    const bytes = buildXlsx(template.columns, dataRows)
+    fileBlob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  } else {
+    // Bare `text/csv` (sin charset): espejo de sendReportEmail — el BOM en los
+    // bytes ya le indica UTF-8 a Excel.
+    fileBlob = new Blob([serializeCsv(template.columns, dataRows)], { type: 'text/csv' })
+  }
 
   // ── 4. Upload a Storage ──
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const path = `${template.company_id}/${template.id}/${timestamp}.csv`
+  const path = `${template.company_id}/${template.id}/${timestamp}.${format}`
   const { error: uploadErr } = await admin.storage
     .from('report-attachments')
-    .upload(path, csvBlob, { contentType: 'text/csv;charset=utf-8' })
+    .upload(path, fileBlob, { contentType: fileBlob.type })
   if (uploadErr) {
     await logRun(admin, template, dataRows.length, 'failed', `upload: ${uploadErr.message}`)
     return jsonResponse({ error: 'upload_failed', detail: uploadErr.message }, 500, cors)
@@ -140,12 +173,11 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── 6. INSERT en email_send_queue por cada recipient ──
-  const sourceLabel = SOURCE_LABEL_MAP[template.source_table] ?? template.source_table
   const vars = {
     report_name:    template.name,
     rows_count:     String(dataRows.length),
-    format:         'CSV',
-    source_table:   sourceLabel,
+    format:         format.toUpperCase(),
+    source_table:   meta.label,
     attachment_url: signed.signedUrl,
     generated_at:   new Date().toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short' }),
   }
@@ -167,12 +199,13 @@ Deno.serve(async (req: Request) => {
 
   // ── 7. UPDATE last_run_at + INSERT report_runs ──
   await admin.from('report_templates').update({ last_run_at: new Date().toISOString() }).eq('id', template.id)
-  await logRun(admin, template, dataRows.length, 'success', null)
+  await logRun(admin, template, dataRows.length, 'success', null, format)
 
   return jsonResponse({
     success: true,
     template_id: template.id,
     rows_count: dataRows.length,
+    format,
     enqueued: enqueueRows.length,
     attachment_path: path,
   }, 200, cors)
@@ -187,43 +220,20 @@ function jsonResponse(body: unknown, status: number, cors: HeadersInit): Respons
   })
 }
 
-function serializeCsv(
-  columns: Array<{ header: string; accessor: string }>,
-  rows: Array<Record<string, unknown>>,
-): string {
-  const headerLine = columns.map(c => escapeCsv(c.header)).join(',')
-  const dataLines = rows.map(row =>
-    columns.map(c => {
-      const v = row[c.accessor]
-      if (v === null || v === undefined) return ''
-      if (typeof v === 'object') return escapeCsv(JSON.stringify(v))
-      return escapeCsv(String(v))
-    }).join(',')
-  )
-  // BOM UTF-8 para que Excel detecte encoding con acentos.
-  return '﻿' + [headerLine, ...dataLines].join('\n')
-}
-
-function escapeCsv(s: string): string {
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-    return `"${s.replace(/"/g, '""')}"`
-  }
-  return s
-}
-
 async function logRun(
   admin: ReturnType<typeof createClient>,
   template: ReportTemplate,
   rowsCount: number,
   status: 'success' | 'failed',
   errorMsg: string | null,
+  format: 'csv' | 'xlsx' = 'csv',
 ): Promise<void> {
   await admin.from('report_runs').insert({
     template_id:  template.id,
     company_id:   template.company_id,
     triggered_by: 'scheduled',
     rows_count:   rowsCount,
-    format:       'csv',
+    format,
     status,
     error_msg:    errorMsg,
     actor_id:     null,
