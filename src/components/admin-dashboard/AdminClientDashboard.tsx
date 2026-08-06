@@ -1,7 +1,8 @@
-import { hoyLocalISO } from '../../lib/format'
+import { hoyLocalISO, formatDateShort } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { fetchConvCountsForProject, fetchConvRowsAllProjects } from '../../domain/admin-dashboard/queries'
+import { contarRegistrosEnPeriodo, periodoUltimaLectura, ultimaFechaLectura } from '../../domain/admin-dashboard/periodo'
 import { TabStrip } from '../shared/TabStrip'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
@@ -52,6 +53,9 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
   const defaultHasta = hoyLocalISO()
   const [fechaDesde, setFechaDesde] = useState(defaultDesde)
   const [fechaHasta, setFechaHasta] = useState(defaultHasta)
+  // true en cuanto el usuario fija fechas a mano (inputs o presets): a partir
+  // de ahí el período es suyo y el auto-encuadre deja de moverlo.
+  const [fechasTouched, setFechasTouched] = useState(false)
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
   const [perProjectStats, setPerProjectStats] = useState<Record<string, ConvStats>>({})
 
@@ -165,6 +169,33 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
       : (data.tarifas || [])
   ), [selectedProjectId, data.tarifas])
 
+  // Lecturas del scope actual que caen dentro del período: es lo que computan
+  // los KPI cards. Si es 0 pero sí hay histórico, el período está "vacío" y los
+  // ceros del dashboard no significan falta de datos sino ventana mal ubicada.
+  const registrosEnPeriodo = useMemo(
+    () => contarRegistrosEnPeriodo(registrosFiltrados, fechaDesde, fechaHasta),
+    [registrosFiltrados, fechaDesde, fechaHasta],
+  )
+  const periodoVacio = registrosFiltrados.length > 0 && registrosEnPeriodo === 0
+
+  const ajustarPeriodoADatos = useCallback(() => {
+    const rango = periodoUltimaLectura(registrosFiltrados)
+    if (rango) {
+      setFechaDesde(rango.desde)
+      setFechaHasta(rango.hasta)
+    }
+  }, [registrosFiltrados])
+
+  // Auto-encuadre del período: mientras el usuario no haya tocado las fechas,
+  // si la ventana actual no contiene ninguna lectura (típico con histórico
+  // cargado meses atrás, o al cambiar de proyecto) se corre al ciclo de
+  // lecturas más reciente. Cuando las fechas ya son manuales, el ajuste solo
+  // se ofrece vía el aviso del tab Dashboard.
+  useEffect(() => {
+    if (fechasTouched || !periodoVacio) return
+    ajustarPeriodoADatos()
+  }, [fechasTouched, periodoVacio, ajustarPeriodoADatos])
+
   const handleReadingAdded = async () => {
     await onDataRefresh()
     setActiveTab('historial')
@@ -218,7 +249,10 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
           </div>
         )}
 
-        {/* Selector de Rango de Fechas */}
+        {/* Selector de Rango de Fechas — solo afecta los KPIs del tab Dashboard
+            (Historial/Clientes muestran el histórico completo), así que solo se
+            muestra ahí para no sugerir un filtro que las otras pestañas ignoran. */}
+        {activeTab === 'dashboard' && (
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
           <label style={{ fontSize: '14px', fontWeight: '600', color: 'var(--at-ink-2)' }}>Período:</label>
           {/* `flex: 1 1 130px` + `min-width: 0`: en iOS un <input type="date">
@@ -229,14 +263,14 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
           <input
             type="date"
             value={fechaDesde}
-            onChange={e => setFechaDesde(e.target.value)}
+            onChange={e => { setFechasTouched(true); setFechaDesde(e.target.value) }}
             style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 130px', minWidth: 0 }}
           />
           <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>—</span>
           <input
             type="date"
             value={fechaHasta}
-            onChange={e => setFechaHasta(e.target.value)}
+            onChange={e => { setFechasTouched(true); setFechaHasta(e.target.value) }}
             style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 130px', minWidth: 0 }}
           />
           {/* Quick presets */}
@@ -246,11 +280,12 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
             { label: 'Mes anterior', onClick: () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y = d.getFullYear(); const m = d.getMonth(); const last = new Date(y, m+1, 0); setFechaDesde(`${y}-${String(m+1).padStart(2,'0')}-01`); setFechaHasta(last.toISOString().slice(0,10)) } },
             { label: 'Últ. 3 meses', onClick: () => { const d = new Date(); const d90 = new Date(); d90.setDate(d.getDate() - 90); setFechaDesde(d90.toISOString().slice(0, 10)); setFechaHasta(d.toISOString().slice(0, 10)) } },
           ].map(p => (
-            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--at-line)', background: 'var(--at-surface)', fontSize: '12px', fontWeight: 500, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+            <button key={p.label} onClick={() => { setFechasTouched(true); p.onClick() }} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--at-line)', background: 'var(--at-surface)', fontSize: '12px', fontWeight: 500, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
               {p.label}
             </button>
           ))}
         </div>
+        )}
 
         {/* Tabs de navegación — mismo <TabStrip> que el resto de módulos. */}
         <TabStrip
@@ -265,6 +300,50 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
       <div style={{ minHeight: 'calc(100vh - 300px)' }}>
         {activeTab === 'dashboard' && (
           <div>
+            {/* Aviso de período vacío: hay lecturas pero ninguna dentro del rango
+                elegido a mano (con fechas sin tocar, el auto-encuadre lo resuelve
+                solo). Sin esto, los KPIs en 0 parecen un error de cómputo. */}
+            {periodoVacio && fechasTouched && (
+              <div
+                role="status"
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  padding: '14px 18px',
+                  marginBottom: '20px',
+                  background: 'var(--at-warning-tint)',
+                  border: '1px solid var(--at-warning)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  color: 'var(--at-ink-2)',
+                }}
+              >
+                <span>
+                  📭 Ninguna de las <strong>{registrosFiltrados.length}</strong> lecturas registradas cae
+                  dentro del período seleccionado. Última lectura:{' '}
+                  <strong>{formatDateShort(ultimaFechaLectura(registrosFiltrados))}</strong>.
+                </span>
+                <button
+                  onClick={ajustarPeriodoADatos}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--at-primary)',
+                    color: 'white',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Ver período con lecturas
+                </button>
+              </div>
+            )}
             <AdminDashboardStats
               registros={registrosFiltrados}
               moneda={moneda}
