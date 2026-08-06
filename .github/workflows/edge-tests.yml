@@ -45,7 +45,7 @@ jobs:
     name: vitest — supabase/functions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
@@ -93,7 +93,7 @@ jobs:
     # lado Deno (`supabase gen types` + un import_map); hasta entonces, el gate
     # honesto es este, sobre lógica pura.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: denoland/setup-deno@v2
         with:

@@ -89,7 +89,7 @@ jobs:
       # selección disparatada en vez de ejecutarla entera contra producción.
       MAX_APPLY: '10'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

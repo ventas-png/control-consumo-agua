@@ -30,7 +30,7 @@ jobs:
     name: Coverage gate (lógica de negocio crítica)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
@@ -152,7 +152,7 @@ jobs:
       E2E_RESTRICTED_EMAIL: ${{ secrets.E2E_RESTRICTED_EMAIL }}
       E2E_RESTRICTED_PASSWORD: ${{ secrets.E2E_RESTRICTED_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde,
       # pero VISIBLE: warning annotation + step summary, para que el "verde" no
@@ -229,7 +229,7 @@ jobs:
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Gate por RLS_SUPABASE_URL
         id: gate
