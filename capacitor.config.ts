@@ -14,6 +14,17 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
   },
   plugins: {
+    // La barra de estado NO se superpone al WebView: en iOS el plugin baja el
+    // `webView.frame` por debajo de ella y pinta la franja con backgroundColor.
+    // Es lo que reserva el hueco de verdad — `env(safe-area-inset-top)` resuelve
+    // a 0 en este WebView, así que el `calc()` del CSS no reservaba nada y el
+    // conmutador Condominios/Agua quedaba bajo el reloj. Ver src/lib/nativeApp.ts.
+    // En Android (targetSdk 36) el sistema impone edge-to-edge y esto no aplica.
+    StatusBar: {
+      overlaysWebView: false,
+      style: 'DARK',
+      backgroundColor: '#1B3B36',
+    },
     SplashScreen: {
       // La app oculta el splash manualmente al terminar el arranque (ver
       // src/lib/nativeApp.ts). launchShowDuration 0 evita el flash inicial.

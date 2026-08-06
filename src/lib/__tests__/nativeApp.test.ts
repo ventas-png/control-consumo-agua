@@ -3,12 +3,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // isNative se mockea por test: initNativeApp tiene que ser un no-op en web.
 vi.mock('../platform', () => ({ isNative: vi.fn(), getPlatform: vi.fn() }))
 
+const statusBar = {
+  setOverlaysWebView: vi.fn().mockResolvedValue(undefined),
+  setStyle: vi.fn().mockResolvedValue(undefined),
+  setBackgroundColor: vi.fn().mockResolvedValue(undefined),
+}
+vi.mock('@capacitor/status-bar', () => ({
+  StatusBar: statusBar,
+  Style: { Dark: 'DARK', Light: 'LIGHT', Default: 'DEFAULT' },
+}))
+
 import {
   aplicarViewportNativo,
-  asegurarSafeAreaTop,
-  medirSafeAreaTop,
+  configurarBarraDeEstado,
   VIEWPORT_NATIVO,
-  VIEWPORT_NATIVO_SIN_COVER,
   initNativeApp,
 } from '../nativeApp'
 import { isNative } from '../platform'
@@ -24,7 +32,12 @@ function montarMetaViewport(content = VIEWPORT_WEB) {
   return meta
 }
 
-beforeEach(() => { vi.mocked(isNative).mockReset() })
+beforeEach(() => {
+  vi.mocked(isNative).mockReset()
+  statusBar.setOverlaysWebView.mockClear().mockResolvedValue(undefined)
+  statusBar.setStyle.mockClear().mockResolvedValue(undefined)
+  statusBar.setBackgroundColor.mockClear().mockResolvedValue(undefined)
+})
 afterEach(() => { document.head.innerHTML = '' })
 
 describe('aplicarViewportNativo', () => {
@@ -50,42 +63,26 @@ describe('aplicarViewportNativo', () => {
   })
 })
 
-describe('asegurarSafeAreaTop', () => {
-  it('no toca el viewport cuando el WebView sí popula el inset', () => {
-    const meta = montarMetaViewport(VIEWPORT_NATIVO)
-    asegurarSafeAreaTop(() => 59)
-    expect(meta.getAttribute('content')).toBe(VIEWPORT_NATIVO)
+describe('configurarBarraDeEstado', () => {
+  // El arreglo de verdad: `env(safe-area-inset-top)` resuelve a 0 en este
+  // WebView, así que el hueco de la barra de estado NO puede depender del CSS.
+  // Con overlay:false el plugin baja el webView.frame por el lado nativo.
+  it('pide que la barra de estado no se superponga al WebView', async () => {
+    await configurarBarraDeEstado()
+    expect(statusBar.setOverlaysWebView).toHaveBeenCalledWith({ overlay: false })
   })
 
-  // Sin inset, `calc(8px + env(...))` se queda en 8px y los chips
-  // Condominios/Agua acaban bajo el reloj, donde no se pueden tocar. Quitar
-  // `cover` hace que el motor encaje el viewport dentro del área segura.
-  it('quita viewport-fit=cover cuando el inset resuelve a 0', () => {
-    const meta = montarMetaViewport(VIEWPORT_NATIVO)
-    asegurarSafeAreaTop(() => 0)
-    expect(meta.getAttribute('content')).toBe(VIEWPORT_NATIVO_SIN_COVER)
-    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('viewport-fit=contain')
+  // Sin overlay, la franja la pinta el plugin: si no se le da color, queda
+  // blanca — y con Style.Dark (íconos claros) el reloj sería ilegible.
+  it('deja la franja en el verde de marca con íconos claros', async () => {
+    await configurarBarraDeEstado()
+    expect(statusBar.setStyle).toHaveBeenCalledWith({ style: 'DARK' })
+    expect(statusBar.setBackgroundColor).toHaveBeenCalledWith({ color: '#1B3B36' })
   })
 
-  // La alternativa no puede reintroducir el auto-zoom que arregló el viewport nativo.
-  it('la alternativa conserva el bloqueo de zoom', () => {
-    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('maximum-scale=1.0')
-    expect(VIEWPORT_NATIVO_SIN_COVER).toContain('user-scalable=no')
-  })
-
-  it('no revienta si no hay meta viewport', () => {
-    document.head.innerHTML = ''
-    expect(() => asegurarSafeAreaTop(() => 0)).not.toThrow()
-  })
-})
-
-describe('medirSafeAreaTop', () => {
-  // La sonda es un efecto secundario sobre el DOM: si se quedara puesta,
-  // acumularía un <div> por arranque.
-  it('retira la sonda del DOM', () => {
-    const antes = document.body.childElementCount
-    medirSafeAreaTop()
-    expect(document.body.childElementCount).toBe(antes)
+  it('no propaga el fallo si un método del plugin rechaza', async () => {
+    statusBar.setOverlaysWebView.mockRejectedValueOnce(new Error('sin plugin'))
+    await expect(configurarBarraDeEstado()).resolves.toBeUndefined()
   })
 })
 
