@@ -422,7 +422,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         padding: '0',
         boxShadow: '0 2px 12px rgba(27, 59, 54,0.3)',
       }}>
-        <div style={{
+        <div className="portal-header" style={{
           maxWidth: '900px', margin: '0 auto',
           padding: '16px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
