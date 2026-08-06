@@ -15,15 +15,31 @@
 
 ## 1. Pipeline — fallo de CI/Deploy → Slack
 
-`ci-alert.yml` escucha el resultado de los workflows **CI** y **Deploy Supabase
-Edge Functions** (vía `workflow_run`, solo en `main`) y, si fallaron, postea a
-Slack.
+`ci-alert.yml` escucha el resultado de los workflows críticos (CI, Coverage gate,
+migraciones a producción, security guard, promote/rollback, deploy staging,
+deploy de edge functions y Health check) vía `workflow_run`, solo en `main`, y si
+fallaron postea a Slack.
 
 **Activación:** crea un [Incoming Webhook de Slack](https://api.slack.com/messaging/webhooks)
 y guárdalo como secret `SLACK_WEBHOOK_URL` (Settings → Secrets and variables →
 Actions). **Sin** el secret, el workflow hace no-op con un aviso (no falla).
 
 El mensaje incluye workflow, branch, commit corto, autor y link al run.
+
+### Falsos positivos: el run rojo que nunca llegó a ejecutarse
+
+Cuando GitHub no asigna runner, el job se queda en cola, acaba `cancelled` **sin
+logs y sin steps**, y el run entero se marca `failure`. En la pestaña Actions se
+ve idéntico a un fallo real, pero no hay nada que arreglar en el repo.
+
+Para distinguirlo: abre el job y mira si tiene logs. Sin logs y sin runner
+asignado ⇒ es infraestructura de Actions; re-lanza el run cuando la cola se
+normalice. `ci-alert.yml` hace ese triage por sí solo (consulta los jobs del run
+y solo alerta si alguno terminó en `failure`, o si el run ni siquiera arrancó por
+YAML inválido), así que estos casos ya no llegan a Slack.
+
+El probe de `/health` reintenta 3 veces (~40 s) antes de darse por caído, de modo
+que un 5xx puntual o un cold start del edge runtime tampoco despiertan a nadie.
 
 ## 2. Runtime — errores de producción → Sentry
 
