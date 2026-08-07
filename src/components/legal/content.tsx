@@ -37,7 +37,7 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
       metaTitle: 'Política de Privacidad | AdministraTodo',
       metaDescription:
         'Política de Privacidad de administratodo.com: cómo recopilamos, tratamos y protegemos tus datos personales conforme al RGPD, la CCPA/CPRA y las normativas de protección de datos de América Latina.',
-      updated: 'Última actualización: 5 de junio de 2026',
+      updated: 'Última actualización: 7 de agosto de 2026',
     },
     tos: {
       title: 'Términos de Servicio',
@@ -51,7 +51,7 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
       metaTitle: 'Anexo DPA y Política de Cookies | AdministraTodo',
       metaDescription:
         'Anexo de Procesamiento de Datos (DPA) y Política de Cookies de administratodo.com: roles de responsable y encargado del tratamiento, subprocesadores, medidas de seguridad y gestión de cookies conforme al RGPD.',
-      updated: 'Última actualización: 4 de junio de 2026',
+      updated: 'Última actualización: 7 de agosto de 2026',
     },
   },
   en: {
@@ -60,7 +60,7 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
       metaTitle: 'Privacy Policy | AdministraTodo',
       metaDescription:
         'administratodo.com Privacy Policy: how we collect, process and protect your personal data in line with the GDPR, the CCPA/CPRA and Latin American data-protection laws.',
-      updated: 'Last updated: June 5, 2026',
+      updated: 'Last updated: August 7, 2026',
     },
     tos: {
       title: 'Terms of Service',
@@ -74,7 +74,7 @@ export const LEGAL_META: Record<Lang, Record<LegalDocType, LegalDocMeta>> = {
       metaTitle: 'DPA & Cookie Policy | AdministraTodo',
       metaDescription:
         'administratodo.com Data Processing Addendum (DPA) and Cookie Policy: controller/processor roles, sub-processors, security measures and cookie management under the GDPR.',
-      updated: 'Last updated: June 4, 2026',
+      updated: 'Last updated: August 7, 2026',
     },
   },
 }
@@ -139,6 +139,7 @@ function PrivacyBodyEs(): ReactElement {
         <li><strong>Datos de conexión y dispositivo:</strong> dirección IP, tipo de navegador, sistema operativo, identificadores únicos de dispositivos de acceso, configuración de idioma y zona horaria.</li>
         <li><strong>Datos de uso de la infraestructura:</strong> páginas y módulos visitados dentro de la Plataforma, tiempo de permanencia, clics, flujos de navegación e interacciones entre empresas y proyectos.</li>
         <li><strong>Cookies y tecnologías de rastreo:</strong> datos recopilados mediante cookies esenciales, analíticas y funcionales de conformidad con nuestra <a href={LEGAL_PATHS.dpa}>Política de Cookies</a>.</li>
+        <li><strong>Métricas de entrega y apertura de correos:</strong> cuando la Plataforma envía correos transaccionales o de difusión en nombre de una empresa administradora, registramos si el mensaje fue entregado, si fue abierto y la fecha y hora de esa apertura. La detección de apertura se realiza mediante una imagen de seguimiento de 1×1 píxel incluida en el cuerpo del mensaje; al cargarla, el cliente de correo del destinatario transmite su dirección IP y los datos técnicos de la petición. Estas métricas se asocian al destinatario del envío. La apertura es una estimación por exceso: algunos proveedores de correo precargan las imágenes automáticamente, lo que puede registrar aperturas que el destinatario no realizó. Si el destinatario configura su cliente de correo para no cargar imágenes, no se registra apertura alguna y la entrega del mensaje no se ve afectada.</li>
       </ul>
 
       <h2>3. Finalidades y base legal del tratamiento de datos</h2>
@@ -390,7 +391,7 @@ function DpaBodyEs(): ReactElement {
       <p>A la terminación de los Servicios SaaS, y conforme a los plazos previstos en los Términos de Servicio, la Plataforma conservará los datos por un periodo máximo de treinta (30) días calendario para permitir su portabilidad y exportación. Transcurrido dicho plazo, administratodo.com procederá a la eliminación segura y definitiva de toda la información de sus servidores activos, salvo por aquellos registros cuya retención sea exigida por legislaciones fiscales o contables locales aplicables en Latinoamérica.</p>
 
       <h2 className="legal-divider">Política de Cookies</h2>
-      <p className="legal-subtle">Última actualización: 4 de junio de 2026</p>
+      <p className="legal-subtle">Última actualización: 7 de agosto de 2026</p>
       <p>En administratodo.com utilizamos cookies y tecnologías similares de seguimiento para mejorar el rendimiento de la plataforma, optimizar la experiencia multiempresa del usuario y garantizar la seguridad transaccional en nuestros procesamientos de pago.</p>
 
       <h3>1. ¿Qué es una cookie?</h3>
@@ -405,9 +406,15 @@ function DpaBodyEs(): ReactElement {
             <tr><td>Esenciales o técnicas</td><td>Obligatorias para el correcto funcionamiento de la interfaz, mantenimiento de sesiones abiertas y prevención de fraudes.</td><td>Propias de la plataforma, Stripe, PayPal.</td></tr>
             <tr><td>De rendimiento y analítica</td><td>Recopilan datos anónimos y agregados sobre los patrones de navegación y uso multiproyecto del software para optimizar la infraestructura.</td><td>Google Analytics.</td></tr>
             <tr><td>Funcionales y preferencias</td><td>Permiten recordar selecciones del usuario, tales como la moneda de facturación local o la segregación visual de empresas en el panel.</td><td>Propias de la plataforma, Google Maps API.</td></tr>
+            <tr><td>Seguimiento en correos electrónicos</td><td>Imagen de 1×1 píxel incluida en los correos que la Plataforma envía, que registra si el mensaje fue abierto y cuándo. No es una cookie ni se almacena en el dispositivo: se activa al cargar la imagen desde el cliente de correo del destinatario.</td><td>Propias de la plataforma.</td></tr>
           </tbody>
         </table>
       </div>
+
+      <h3>3. Alcance: seguimiento fuera del navegador</h3>
+      <p>Las cookies descritas arriba operan dentro del navegador cuando el usuario visita la Plataforma. El seguimiento de apertura de correos, en cambio, se produce <strong>fuera del navegador</strong>: se activa en el cliente de correo del destinatario al cargar las imágenes del mensaje, sin que medie una visita a la Plataforma y, por tanto, sin que el panel de configuración de cookies descrito en el apartado siguiente llegue a mostrarse.</p>
+      <p>Esta distinción es relevante porque los destinatarios de estos correos <strong>no son necesariamente usuarios registrados</strong> de la Plataforma: pueden ser residentes, clientes o terceros a quienes una empresa administradora dirige una comunicación. En esos casos, la empresa administradora que ordena el envío actúa como responsable del tratamiento y administratodo.com como encargado, en los términos del Acuerdo de Tratamiento de Datos anterior.</p>
+      <p>El destinatario puede impedir este seguimiento en cualquier momento configurando su cliente de correo para no cargar imágenes automáticamente —opción disponible en Gmail, Outlook, Apple Mail y la mayoría de clientes—. Hacerlo no afecta a la entrega ni al contenido del mensaje.</p>
 
       <h3>3. Gestión y revocación del consentimiento</h3>
       <p>De conformidad con las directrices del RGPD y los estándares internacionales de privacidad, el usuario puede modificar sus preferencias o revocar su consentimiento en cualquier momento a través del Panel de Configuración de Cookies integrado en nuestro banner informativo, o ajustando directamente la configuración de privacidad de su navegador web.</p>
@@ -451,6 +458,7 @@ function PrivacyBodyEn(): ReactElement {
         <li><strong>Connection and device data:</strong> IP address, browser type, operating system, unique identifiers of access devices, language settings and time zone.</li>
         <li><strong>Infrastructure usage data:</strong> pages and modules visited within the Platform, dwell time, clicks, navigation flows and interactions across companies and projects.</li>
         <li><strong>Cookies and tracking technologies:</strong> data collected through essential, analytics and functional cookies in accordance with our <a href={legalHref('dpa', 'en')}>Cookie Policy</a>.</li>
+        <li><strong>Email delivery and open metrics:</strong> when the Platform sends transactional or broadcast emails on behalf of a managing company, we record whether the message was delivered, whether it was opened, and the date and time of that opening. Open detection uses a 1×1 pixel tracking image embedded in the message body; on loading it, the recipient's email client transmits its IP address and the technical data of the request. These metrics are associated with the recipient of the message. Opens are an upper-bound estimate: some email providers preload images automatically, which may record opens the recipient did not perform. If the recipient configures their email client not to load images, no open is recorded and message delivery is unaffected.</li>
       </ul>
 
       <h2>3. Purposes and legal basis for processing</h2>
@@ -653,7 +661,7 @@ function DpaBodyEn(): ReactElement {
       <p>Upon termination of the SaaS Services, and in accordance with the periods set out in the Terms of Service, the Platform will retain the data for a maximum period of thirty (30) calendar days to allow its portability and export. After that period, administratodo.com will proceed with the secure and definitive deletion of all information from its active servers, except for those records whose retention is required by applicable local tax or accounting legislation in Latin America.</p>
 
       <h2 className="legal-divider">Cookie Policy</h2>
-      <p className="legal-subtle">Last updated: June 4, 2026</p>
+      <p className="legal-subtle">Last updated: August 7, 2026</p>
       <p>At administratodo.com we use cookies and similar tracking technologies to improve the platform's performance, optimize the user's multi-company experience and ensure transactional security in our payment processing.</p>
 
       <h3>1. What is a cookie?</h3>
@@ -668,9 +676,15 @@ function DpaBodyEn(): ReactElement {
             <tr><td>Essential or technical</td><td>Mandatory for the correct functioning of the interface, maintenance of open sessions and fraud prevention.</td><td>First-party, Stripe, PayPal.</td></tr>
             <tr><td>Performance and analytics</td><td>Collect anonymous, aggregated data on navigation patterns and multi-project usage of the software to optimize the infrastructure.</td><td>Google Analytics.</td></tr>
             <tr><td>Functional and preferences</td><td>Allow remembering user selections, such as the local billing currency or the visual segregation of companies in the panel.</td><td>First-party, Google Maps API.</td></tr>
+            <tr><td>Email tracking</td><td>1×1 pixel image embedded in the emails the Platform sends, which records whether the message was opened and when. It is not a cookie and is not stored on the device: it is triggered when the image loads in the recipient's email client.</td><td>First-party.</td></tr>
           </tbody>
         </table>
       </div>
+
+      <h3>3. Scope: tracking outside the browser</h3>
+      <p>The cookies described above operate within the browser when the user visits the Platform. Email open tracking, by contrast, occurs <strong>outside the browser</strong>: it is triggered in the recipient's email client when the message images load, without any visit to the Platform and therefore without the cookie settings panel described in the following section ever being shown.</p>
+      <p>This distinction matters because the recipients of these emails <strong>are not necessarily registered users</strong> of the Platform: they may be residents, customers or third parties to whom a managing company addresses a communication. In those cases, the managing company ordering the send acts as data controller and administratodo.com as processor, under the terms of the Data Processing Agreement above.</p>
+      <p>Recipients may prevent this tracking at any time by configuring their email client not to load images automatically — an option available in Gmail, Outlook, Apple Mail and most clients. Doing so affects neither the delivery nor the content of the message.</p>
 
       <h3>3. Consent management and withdrawal</h3>
       <p>In accordance with GDPR guidelines and international privacy standards, the user may modify their preferences or withdraw their consent at any time through the Cookie Settings panel integrated into our information banner, or by adjusting the privacy settings of their web browser directly.</p>
