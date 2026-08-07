@@ -24,6 +24,8 @@ import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { validarCreateChargeBody } from './validate.ts'
+// Mapeo puro estado del provider → payment_requests, extraído para vitest (infra:I22).
+import { estadoPaymentRequest } from './logic.ts'
 import { captureEdgeException } from '../_shared/sentry.ts'
 import { decryptJson } from '../_shared/secretsCrypto.ts'
 import {
@@ -36,7 +38,6 @@ import {
   type CobroCanonico,
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
-  type EstadoCobroProveedor,
 } from '../_shared/payments/index.ts'
 import { residentePuedePagarCuota } from '../_shared/payments/reconcile.ts'
 import { calcularComision, type ComisionConfigRow } from '../_shared/payments/comision.ts'
@@ -61,20 +62,6 @@ interface ReqBody {
   descripcion?: string
   url_retorno?: string
   url_cancelacion?: string
-}
-
-/** Mapea el estado normalizado del provider al estado de payment_requests. */
-function estadoPaymentRequest(estado: EstadoCobroProveedor): string {
-  switch (estado) {
-    case 'aprobado':
-      return 'succeeded'
-    case 'rechazado':
-    case 'error':
-      return 'failed'
-    default:
-      // 'pendiente' | 'requiere_accion' → esperando confirmación/retorno.
-      return 'pending'
-  }
 }
 
 Deno.serve(async (req: Request) => {
