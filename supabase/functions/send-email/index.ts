@@ -5,6 +5,14 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
+import {
+  applyVars,
+  buildRawMessage,
+  isTokenExpired,
+  renderTemplate,
+  resolveEmailScope,
+  sanitizeVars,
+} from './logic.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -69,56 +77,6 @@ async function refreshAccessToken(
 }
 
 // ---------------------------------------------------------------------------
-// Build RFC 2822 message base64url-encoded for Gmail API
-// ---------------------------------------------------------------------------
-
-// Construye un From con display name si fromName esta presente:
-// `"AdministraTodo" <noreply@admin.com>`. RFC 5322 + encoding UTF-8 del
-// display name por si trae acentos.
-function formatFromHeader(fromEmail: string, fromName: string | null): string {
-  if (!fromName) return fromEmail
-  const encoded = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(fromName)))}?=`
-  return `"${encoded}" <${fromEmail}>`
-}
-
-function buildRawMessage(
-  fromEmail: string,
-  fromName: string | null,
-  replyTo: string | null,
-  to: string,
-  subject: string,
-  htmlBody: string,
-): string {
-  // PR-15: el destinatario se VALIDA antes de entrar en la cabecera. `To` es la
-  // única cabecera de este mensaje que no va codificada en base64, así que es la
-  // única por la que se puede inyectar (`\r\nBcc: ...`). Lanza en vez de sanear:
-  // recortar los CRLF en silencio enviaría a un destinatario distinto del pedido.
-  const safeTo = assertEmailAddress('To', to)
-  const safeReplyTo = replyTo ? assertEmailAddress('Reply-To', replyTo) : null
-  const boundary = `----=_Part_${Date.now()}`
-  const lines = [
-    `From: ${formatFromHeader(fromEmail, fromName)}`,
-    `To: ${safeTo}`,
-    ...(safeReplyTo ? [`Reply-To: ${safeReplyTo}`] : []),
-    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    '',
-    btoa(unescape(encodeURIComponent(htmlBody))),
-    '',
-    `--${boundary}--`,
-  ]
-  return btoa(unescape(encodeURIComponent(lines.join('\r\n'))))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-// ---------------------------------------------------------------------------
 // Gmail API send
 // ---------------------------------------------------------------------------
 
@@ -128,11 +86,9 @@ async function sendViaGmail(
   subject: string,
   htmlBody: string,
   supabase: ReturnType<typeof createClient>
-): Promise<void> {
+): Promise<string | null> {
   let accessToken = config.access_token
-  const isExpired =
-    config.token_expiry != null &&
-    new Date(config.token_expiry).getTime() - Date.now() < 5 * 60 * 1000
+  const isExpired = isTokenExpired(config.token_expiry)
   if (isExpired && config.refresh_token) {
     const newToken = await refreshAccessToken(config.refresh_token, supabase, config.id)
     if (newToken) accessToken = newToken
@@ -147,237 +103,10 @@ async function sendViaGmail(
     const err = await res.json()
     throw new Error(`Gmail API: ${JSON.stringify(err)}`)
   }
-}
-
-// ---------------------------------------------------------------------------
-// HTML Templates
-// ---------------------------------------------------------------------------
-
-function baseLayout(content: string, empresa: string, logoUrl = ''): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>${empresa}</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:600px;">
-      <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0d9488);padding:28px 32px;text-align:center;">
-        ${logoUrl ? `<img src="${logoUrl}" alt="${empresa}" style="height:48px;margin-bottom:8px;border-radius:8px;"/><br/>` : ''}
-        <span style="color:#ffffff;font-size:22px;font-weight:700;">${empresa}</span>
-      </td></tr>
-      <tr><td style="padding:32px;">${content}</td></tr>
-      <tr><td style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:12px;color:#94a3b8;">Este correo fue enviado automáticamente por ${empresa}. Por favor no responda directamente.</p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table></body></html>`
-}
-
-function renderTemplate(key: string, vars: Record<string, string>): { subject: string; html: string } | null {
-  const empresa = vars.empresa_nombre ?? 'Control de Consumo de Agua'
-  const logo = vars.empresa_logo ?? ''
-
-  if (key === 'recibo') {
-    return {
-      subject: `Recibo de Consumo${vars.mes ? ' — ' + vars.mes : ''} | ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">Recibo de Consumo</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Estimado/a <strong>${vars.nombre_cliente ?? 'Cliente'}</strong>, su recibo está listo.</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
-          <tr style="background:#0ea5e9;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLE DE CONSUMO</td></tr>
-          ${vars.mes ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Período</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.mes}</td></tr>` : ''}
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Lectura Anterior</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.lectura_anterior ?? '—'} m³</td></tr>
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Lectura Actual</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.lectura_actual ?? '—'} m³</td></tr>
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Consumo</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.consumo ?? '—'} m³</td></tr>
-          ${vars.tipo_cobro ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Tipo</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.tipo_cobro}</td></tr>` : ''}
-          <tr style="background:#f0fdf4;"><td style="padding:14px 18px;font-size:15px;color:#166534;font-weight:700;">TOTAL A PAGAR</td><td style="padding:14px 18px;font-size:18px;color:#16a34a;font-weight:800;text-align:right;">${vars.moneda ?? ''}${vars.total_pagar ?? '0.00'}</td></tr>
-        </table>
-        <p style="margin:0 0 8px;font-size:13px;color:#64748b;">Fecha de emisión: <strong>${vars.fecha ?? new Date().toLocaleDateString('es-GT')}</strong></p>
-        ${vars.fecha_vencimiento ? `<p style="margin:0 0 16px;font-size:13px;color:#dc2626;font-weight:600;">Fecha límite de pago: ${vars.fecha_vencimiento}</p>` : ''}
-        <p style="margin:24px 0 0;font-size:13px;color:#64748b;">Si tiene preguntas, comuníquese con ${empresa}.</p>
-      `, empresa, logo),
-    }
-  }
-
-  if (key === 'ruta_asignada') {
-    return {
-      subject: `Nueva Ruta Asignada: ${vars.ruta_nombre ?? 'Ruta'} | ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">Nueva Ruta Asignada</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${vars.to_name ?? 'Operador'}</strong>, se te ha asignado una nueva ruta.</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
-          <tr style="background:#0d9488;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLES DE LA RUTA</td></tr>
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Nombre</td><td style="padding:10px 18px;font-size:14px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.ruta_nombre ?? '—'}</td></tr>
-          ${vars.ruta_descripcion ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Descripción</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.ruta_descripcion}</td></tr>` : ''}
-          ${vars.fecha_programada ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Fecha Programada</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.fecha_programada}</td></tr>` : ''}
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Clientes</td><td style="padding:10px 18px;font-size:14px;color:#0d9488;font-weight:700;text-align:right;">${vars.total_clientes ?? '0'} clientes</td></tr>
-        </table>
-        <p style="margin:0;font-size:13px;color:#64748b;">Ingresa al sistema para ver los detalles completos y comenzar la toma de lecturas.</p>
-      `, empresa, logo),
-    }
-  }
-
-  if (key === 'difusion') {
-    return {
-      subject: vars.subject ?? `Comunicado de ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">${vars.subject ?? 'Comunicado'}</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Estimado/a <strong>${vars.to_name ?? 'Cliente'}</strong>,</p>
-        <div style="background:#f8fafc;border-radius:12px;border-left:4px solid #0ea5e9;padding:20px 24px;margin-bottom:24px;">
-          <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${vars.message ?? ''}</p>
-        </div>
-        ${vars.from_name ? `<p style="margin:0;font-size:13px;color:#64748b;">Atentamente,<br/><strong style="color:#0f172a;">${vars.from_name}</strong><br/>${empresa}</p>` : ''}
-      `, empresa, logo),
-    }
-  }
-
-  // Anuncio del tablón del condominio (trigger fn_notificar_anuncio_comunidad).
-  // Mismo esqueleto que 'difusion' pero con el encabezado del condominio y sin
-  // firma de remitente: un anuncio lo publica la administración, no una persona.
-  if (key === 'anuncio_condominio') {
-    return {
-      subject: vars.subject ?? `Nuevo anuncio | ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">${vars.subject ?? 'Nuevo anuncio'}</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${vars.to_name ?? 'residente'}</strong>, la administración publicó un anuncio en el tablón del condominio.</p>
-        <div style="background:#f8fafc;border-radius:12px;border-left:4px solid #0d9488;padding:20px 24px;margin-bottom:24px;">
-          <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${vars.message ?? ''}</p>
-        </div>
-        <p style="margin:0;font-size:13px;color:#64748b;">Podés verlo también en tu portal de residente, en la sección <strong>Anuncios</strong>.</p>
-      `, empresa, logo),
-    }
-  }
-
-  if (key === 'password_reset') {
-    return {
-      subject: `Restablecer contraseña | ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">Restablecer Contraseña</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>${empresa}</strong>.</p>
-        <div style="text-align:center;margin:32px 0;">
-          <a href="${vars.reset_link ?? '#'}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;">Restablecer Contraseña</a>
-        </div>
-        <p style="margin:0 0 8px;font-size:13px;color:#64748b;">O copia este enlace:</p>
-        <p style="margin:0 0 24px;font-size:12px;color:#0ea5e9;word-break:break-all;">${vars.reset_link ?? ''}</p>
-        <div style="background:#fef3c7;border-radius:8px;border:1px solid #fcd34d;padding:12px 16px;">
-          <p style="margin:0;font-size:12px;color:#92400e;font-weight:600;">⚠️ Este enlace expira en ${vars.hora_expiracion ?? '1 hora'}. Si no solicitaste este cambio, ignora este correo.</p>
-        </div>
-      `, empresa, logo),
-    }
-  }
-
-  if (key === 'pago_confirmado') {
-    return {
-      subject: `Pago confirmado${vars.referencia ? ' — ' + vars.referencia : ''} | ${empresa}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">Pago Confirmado</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Estimado/a <strong>${vars.nombre_cliente ?? 'Cliente'}</strong>, tu pago fue procesado correctamente.</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;overflow:hidden;margin-bottom:24px;">
-          <tr style="background:#16a34a;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">✅ PAGO PROCESADO</td></tr>
-          ${vars.referencia ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #bbf7d0;">Referencia</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #bbf7d0;">${vars.referencia}</td></tr>` : ''}
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #bbf7d0;">Monto</td><td style="padding:10px 18px;font-size:17px;color:#16a34a;font-weight:800;text-align:right;border-bottom:1px solid #bbf7d0;">${vars.moneda ?? ''}${vars.monto ?? '0.00'}</td></tr>
-          ${vars.metodo ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #bbf7d0;">Método</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #bbf7d0;">${vars.metodo}</td></tr>` : ''}
-          <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Fecha</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${vars.fecha ?? new Date().toLocaleDateString('es-GT')}</td></tr>
-        </table>
-        <p style="margin:0;font-size:13px;color:#64748b;">Conserva este correo como comprobante. Gracias por tu puntualidad.</p>
-      `, empresa, logo),
-    }
-  }
-
-  if (key === 'bienvenida_empresa') {
-    const platform = vars.platform_name ?? 'AquaControl'
-    return {
-      subject: `¡Bienvenido a ${platform}! | ${vars.empresa_nombre ?? 'Nueva Empresa'}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">¡Bienvenido/a, <span style="color:#0ea5e9;">${vars.empresa_nombre ?? 'Nueva Empresa'}</span>!</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Tu cuenta en <strong>${platform}</strong> ha sido creada exitosamente.</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
-          <tr style="background:linear-gradient(135deg,#0ea5e9,#0d9488);"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DATOS DE ACCESO</td></tr>
-          ${vars.login_email ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Correo</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.login_email}</td></tr>` : ''}
-          ${vars.plan ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Plan</td><td style="padding:10px 18px;font-size:13px;color:#0ea5e9;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${vars.plan}</td></tr>` : ''}
-          ${vars.max_projects ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Proyectos máximos</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${vars.max_projects}</td></tr>` : ''}
-        </table>
-        <div style="text-align:center;margin:28px 0;">
-          <a href="${vars.app_url ?? '#'}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:700;">Iniciar Sesión</a>
-        </div>
-        ${vars.mensaje_adicional ? `<p style="font-size:13px;color:#64748b;line-height:1.7;">${vars.mensaje_adicional}</p>` : ''}
-      `, platform, logo),
-    }
-  }
-
-  if (key === 'dunning_pago') {
-    // P0 #2: aviso de pago fallido de la suscripción SaaS (plataforma → tenant).
-    const platform = vars.platform_name ?? 'AdministraTodo'
-    const dias = vars.dias_gracia ?? '14'
-    return {
-      subject: `Pago rechazado — acción requerida | ${vars.empresa_nombre ?? platform}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">No pudimos procesar tu pago</h2>
-        <p style="margin:0 0 20px;color:#64748b;font-size:14px;">Estimado equipo de <strong>${vars.empresa_nombre ?? 'su empresa'}</strong>, el cobro de tu suscripción fue rechazado.</p>
-        <div style="background:#fef2f2;border-radius:12px;border-left:4px solid #dc2626;padding:18px 22px;margin-bottom:24px;">
-          <p style="margin:0;font-size:14px;color:#991b1b;line-height:1.7;">Tienes <strong>${dias} días</strong> para actualizar tu método de pago. Pasado ese plazo, la cuenta pasará a <strong>modo solo lectura</strong> hasta regularizar el pago. Reintentaremos el cobro automáticamente mientras tanto.</p>
-        </div>
-        ${vars.cta_url && vars.cta_texto ? `<div style="text-align:center;margin:24px 0;"><a href="${vars.cta_url}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;">${vars.cta_texto}</a></div>` : ''}
-        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">Si ya actualizaste tu método de pago, puedes ignorar este correo.<br/>Atentamente,<br/><strong>${platform}</strong></p>
-      `, platform, logo),
-    }
-  }
-
-  if (key === 'notificacion_empresa') {
-    const platform = vars.platform_name ?? 'AquaControl'
-    return {
-      subject: vars.subject ?? `Notificación de ${platform}`,
-      html: baseLayout(`
-        <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">${vars.titulo ?? 'Notificación de Plataforma'}</h2>
-        <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Estimado equipo de <strong>${vars.empresa_nombre ?? 'su empresa'}</strong>,</p>
-        <div style="background:#f8fafc;border-radius:12px;border-left:4px solid #8b5cf6;padding:20px 24px;margin-bottom:24px;">
-          <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${vars.message ?? ''}</p>
-        </div>
-        ${vars.cta_url && vars.cta_texto ? `<div style="text-align:center;margin:24px 0;"><a href="${vars.cta_url}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;">${vars.cta_texto}</a></div>` : ''}
-        <p style="margin:16px 0 0;font-size:13px;color:#64748b;">Atentamente,<br/><strong>${platform}</strong> — Administración</p>
-      `, platform, logo),
-    }
-  }
-
-  return null
-}
-
-function applyVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '')
-}
-
-// ---------------------------------------------------------------------------
-// HTML-safe variable rendering (anti HTML/link injection in the email body)
-// ---------------------------------------------------------------------------
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-// Solo se permiten esquemas http(s) y mailto en vars de URL; cualquier otra
-// cosa (javascript:, data:, etc.) se neutraliza a '#'.
-function sanitizeUrl(s: string): string {
-  const t = s.trim()
-  return /^(https?:\/\/|mailto:)/i.test(t) ? t : '#'
-}
-
-// Escapa cada var para interpolarla en el CUERPO HTML. Las claves que son URLs
-// (terminan en _link/_url, o logo) además se validan por esquema.
-function sanitizeVars(vars: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const [k, v] of Object.entries(vars ?? {})) {
-    const val = v == null ? '' : String(v)
-    const isUrl = /(_link|_url)$/.test(k) || k === 'empresa_logo' || k === 'logo'
-    out[k] = escapeHtml(isUrl ? sanitizeUrl(val) : val)
-  }
-  return out
+  // messages.send devuelve { id, threadId, ... }: el id correlaciona el envío
+  // con futuros eventos de entrega/bounce (com:N4). Best-effort si no parsea.
+  const data = await res.json().catch(() => ({})) as { id?: string }
+  return data.id ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -480,47 +209,19 @@ Deno.serve(async (req: Request) => {
         .from('app_users').select('role, company_id').eq('id', userId).maybeSingle()
       const role = (prof as { role?: string } | null)?.role ?? ''
       const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
-      const isSuper = role === 'super_admin' || role === 'superadmin'
 
-      if (effIsSuperadmin) {
-        if (!isSuper) {
-          return new Response(
-            JSON.stringify({ error: 'Solo un super administrador puede enviar correo de plataforma' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-      } else if (!isSuper) {
-        // Staff de tenant: solo roles que envían correo, y SIEMPRE acotado a su
-        // propia empresa (se ignora cualquier company_id del body).
-        if (!['admin', 'company_owner', 'operator', 'operador'].includes(role) || !callerCompany) {
-          return new Response(
-            JSON.stringify({ error: 'No autorizado para enviar correo' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-        effCompanyId = callerCompany
+      // Decisión pura en logic.ts (testeable): misma cascada de siempre.
+      const scope = resolveEmailScope(
+        { isSuperadmin: effIsSuperadmin, companyId: effCompanyId },
+        { role, companyId: callerCompany },
+      )
+      if (!scope.ok) {
+        return new Response(
+          JSON.stringify({ error: scope.error }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-      // Un super_admin con is_superadmin=false puede enviar a nombre del company_id pedido.
-
-      // ── Rate limit (auditoría 2026-07-28, Bloque C · PR-16) ───────────────
-      // Esta función no tenía NINGÚN límite, siendo la única del repo que envía
-      // correo arbitrario desde la identidad Gmail VERIFICADA del tenant. Todas
-      // las demás escrituras sensibles sí lo tienen (create-user 30/h,
-      // invite-user 30/h, create-charge 30/h, timbrar-documento 120/h).
-      //
-      // Sin él, un `operator` podía mandar phishing ilimitado con el dominio del
-      // cliente pasando SPF/DKIM — y de paso quemar la reputación de envío de la
-      // empresa, que es un daño que no se revierte borrando filas.
-      //
-      // Doble dimensión para que ni un usuario rotando IPs ni una IP rotando
-      // usuarios evada el tope. fail-OPEN (default): el caller ya pasó el
-      // control de rol de arriba, así que ante un fallo del contador es peor
-      // bloquear correo transaccional legítimo (recibos, avisos de corte).
-      const rlSend = await enforceRateLimits(supabase, [
-        { subject: userId, action: 'send_email', max: 120 },
-        { subject: `ip:${getClientIp(req)}`, action: 'send_email:ip', max: 240 },
-      ], corsHeaders)
-      if (rlSend) return rlSend
+      effCompanyId = scope.companyId
     }
 
     // Fetch Gmail config — Supabase query builder is immutable so we apply the
@@ -600,8 +301,19 @@ Deno.serve(async (req: Request) => {
     // El payload re-encolado para reintentos usa el scope EFECTIVO ya validado,
     // no el del body original (que pudo venir manipulado).
     const scopedPayload = { ...payload, company_id: effIsSuperadmin ? null : effCompanyId, is_superadmin: effIsSuperadmin }
+
+    // Píxel de apertura (com:N4): tracking_id efímero firmado con CRON_SECRET;
+    // track-email-open lo verifica y marca opened_at. Sin secreto configurado
+    // no se inyecta nada (degradación graceful, el correo sale igual).
+    let trackingId: string | null = null
+    if (cronSecret) {
+      trackingId = crypto.randomUUID()
+      const token = await buildTrackingToken('t', trackingId, cronSecret)
+      htmlBody = appendTrackingPixel(htmlBody, buildPixelUrl(SUPABASE_URL, token))
+    }
+
     try {
-      await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
+      const gmailMessageId = await sendViaGmail(typedConfig, to_email, subject, htmlBody, supabase)
       supabase.from('email_send_log').insert({
         company_id: effIsSuperadmin ? null : effCompanyId,
         is_superadmin: effIsSuperadmin,
@@ -610,6 +322,8 @@ Deno.serve(async (req: Request) => {
         from_email: typedConfig.email,
         status: 'sent',
         triggered_by: userId,
+        gmail_message_id: gmailMessageId,
+        tracking_id: trackingId,
       }).then(({ error }) => { if (error) console.error('[email_send_log] insert failed:', error.message) })
 
       return new Response(

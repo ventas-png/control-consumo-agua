@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encryptSecret } from '../_shared/secretsCrypto.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
+import { buildEmailConfigRecord, canConnectEmailScope, validateOAuthState } from './logic.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
@@ -22,13 +23,6 @@ interface TokenResponse {
 interface GoogleUserInfo {
   email: string
   name: string
-}
-
-interface StatePayload {
-  t: string
-  company_id: string | null
-  is_superadmin: boolean
-  ts: number
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,31 +55,15 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Decode and validate state
-    let stateData: StatePayload
-    try {
-      stateData = JSON.parse(atob(state)) as StatePayload
-    } catch {
+    // Decode and validate state (decisión pura en logic.ts — mismos 3 rechazos 400)
+    const stateCheck = validateOAuthState(state)
+    if (!stateCheck.ok) {
       return new Response(
-        JSON.stringify({ error: 'Invalid state parameter' }),
+        JSON.stringify({ error: stateCheck.error }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    if (stateData.t !== 'gmail_connect') {
-      return new Response(
-        JSON.stringify({ error: 'Invalid OAuth flow type' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Reject stale states (15-minute window)
-    if (Date.now() - stateData.ts > 15 * 60 * 1000) {
-      return new Response(
-        JSON.stringify({ error: 'OAuth state expired. Please try again.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const stateData = stateCheck.state
 
     // Authorization: re-validamos el scope contra el rol/empresa REAL del caller
     // (no contra el state, que va sin firmar). Aunque alguien fabrique un state
@@ -97,10 +75,10 @@ Deno.serve(async (req: Request) => {
         .from('app_users').select('role, company_id').eq('id', user.id).maybeSingle()
       const role = (prof as { role?: string } | null)?.role ?? ''
       const callerCompany = (prof as { company_id?: string | null } | null)?.company_id ?? null
-      const isSuper = role === 'super_admin' || role === 'superadmin'
-      const authorized = stateData.is_superadmin
-        ? isSuper
-        : isSuper || (['admin', 'company_owner'].includes(role) && callerCompany === stateData.company_id)
+      const authorized = canConnectEmailScope(
+        { companyId: stateData.company_id, isSuperadmin: stateData.is_superadmin },
+        { role, companyId: callerCompany },
+      )
       if (!authorized) {
         return new Response(
           JSON.stringify({ error: 'No autorizado para conectar el correo de este scope' }),
@@ -153,21 +131,16 @@ Deno.serve(async (req: Request) => {
     })
     const userInfo = await userInfoRes.json() as GoogleUserInfo
 
-    const tokenExpiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-
-    const record = {
-      provider: 'google',
-      email: userInfo.email,
-      // P0 #7: cifrar los tokens OAuth en reposo (passthrough sin llave).
-      access_token: await encryptSecret(tokens.access_token),
-      refresh_token: tokens.refresh_token ? await encryptSecret(tokens.refresh_token) : null,
-      token_expiry: tokenExpiry,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-      ...(stateData.is_superadmin
-        ? { company_id: null, is_superadmin: true }
-        : { company_id: stateData.company_id, is_superadmin: false }),
-    }
+    // P0 #7: cifrar los tokens OAuth en reposo (passthrough sin llave). Se
+    // cifran AQUÍ y se le pasan ya cifrados al helper, que es puro.
+    const record = buildEmailConfigRecord(
+      tokens,
+      userInfo.email,
+      stateData,
+      Date.now(),
+      await encryptSecret(tokens.access_token),
+      tokens.refresh_token ? await encryptSecret(tokens.refresh_token) : null,
+    )
 
     if (stateData.is_superadmin) {
       await supabase.from('company_email_configs').delete().eq('is_superadmin', true)
