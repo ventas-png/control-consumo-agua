@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularPosicion } from '../NotificationBell'
+import { calcularPosicion } from '../notificationBellPos'
 
 // La campana vive en la cabecera del portal, no pegada al borde derecho.
 function ancla(right: number, bottom = 100): DOMRect {
