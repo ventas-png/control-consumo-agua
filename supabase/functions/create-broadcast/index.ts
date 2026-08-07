@@ -20,20 +20,11 @@ import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 import {
   resolveBroadcastClienteIds,
   chunk,
-  type BroadcastTargetType,
   type UnidadRef,
 } from '../_shared/broadcastAudience.ts'
+import { canCreateBroadcast, parseBroadcastRequest, type BroadcastRequestBody } from './validate.ts'
 
-const VALID_TARGETS: BroadcastTargetType[] = ['todos', 'proyecto', 'unidades', 'clientes']
 const RECIPIENT_BATCH = 1000
-
-interface RequestBody {
-  title?: string
-  body?: string
-  target_type?: BroadcastTargetType
-  target_ids?: string[]
-  send_email?: boolean
-}
 
 function json(payload: unknown, status: number, corsHeaders: HeadersInit) {
   return new Response(JSON.stringify(payload), {
@@ -69,27 +60,18 @@ Deno.serve(async (req) => {
     const callerCompanyId = (profile as { company_id?: string } | null)?.company_id ?? null
     const callerName = (profile as { full_name?: string } | null)?.full_name ?? 'Administrador'
 
-    const allowed = ['super_admin', 'superadmin', 'company_owner', 'admin']
-    if (!allowed.includes(callerRole)) {
+    if (!canCreateBroadcast(callerRole)) {
       return json({ error: 'No tienes permisos para enviar comunicados.' }, 403, corsHeaders)
     }
     if (!callerCompanyId) {
       return json({ error: 'Tu usuario no está asociado a una empresa.' }, 403, corsHeaders)
     }
 
-    // 2. Parse + validación de entrada.
-    const body = (await req.json().catch(() => ({}))) as RequestBody
-    const title = (body.title ?? '').trim()
-    const message = (body.body ?? '').trim()
-    const targetType = body.target_type as BroadcastTargetType
-    const targetIds = Array.isArray(body.target_ids) ? body.target_ids : []
-    const sendEmail = body.send_email === true
-
-    if (!title) return json({ error: 'El título es obligatorio.' }, 400, corsHeaders)
-    if (!message) return json({ error: 'El mensaje es obligatorio.' }, 400, corsHeaders)
-    if (!VALID_TARGETS.includes(targetType)) {
-      return json({ error: 'Tipo de audiencia inválido.' }, 400, corsHeaders)
-    }
+    // 2. Parse + validación de entrada (decisión pura en validate.ts).
+    const body = (await req.json().catch(() => ({}))) as BroadcastRequestBody
+    const parsed = parseBroadcastRequest(body)
+    if (!parsed.ok) return json({ error: parsed.error }, 400, corsHeaders)
+    const { title, message, targetType, targetIds, sendEmail } = parsed
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
