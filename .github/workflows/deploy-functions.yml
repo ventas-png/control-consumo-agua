@@ -242,3 +242,6 @@ jobs:
 
       - name: Deploy sync-stripe-quantities (no JWT — worker de pg_cron; auth por CRON_SECRET en tiempo constante)
         run: bash .github/scripts/deploy-fn.sh sync-stripe-quantities --no-verify-jwt
+
+      - name: Deploy track-email-open (no JWT — píxel público; autoriza el token HMAC firmado con CRON_SECRET)
+        run: bash .github/scripts/deploy-fn.sh track-email-open --no-verify-jwt

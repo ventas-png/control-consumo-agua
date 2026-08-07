@@ -5,6 +5,13 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
 import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 import { enforceRateLimits, getClientIp } from '../_shared/rateLimit.ts'
+// Tracking de apertura (com:N4): píxel firmado que track-email-open verifica
+// para marcar opened_at en email_send_log (correlación por tracking_id).
+import {
+  appendTrackingPixel,
+  buildPixelUrl,
+  buildTrackingToken,
+} from '../_shared/deliveryTracking.ts'
 import {
   applyVars,
   buildRawMessage,
