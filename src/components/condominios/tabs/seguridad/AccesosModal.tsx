@@ -6,6 +6,7 @@ import { ImageUploader } from '../../../shared/ImageUploader'
 import type { SeguridadCtx } from './ctx'
 import { filtrarReservasSTRAcceso, nochesReserva } from '../../../../lib/seguridadReglas'
 import { PLATAFORMA_COLOR, PLATAFORMA_LABEL } from './ui'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
   const {
@@ -20,6 +21,7 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
   } = ctx
 
   return (
+    <ModalPortal>
     <div onClick={resetAccesos}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()}
@@ -319,5 +321,6 @@ export function AccesosModal({ ctx }: { ctx: SeguridadCtx }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

@@ -87,7 +87,7 @@ describe('ImportModal — cierre', () => {
 
   it('cierra al click fuera del modal', () => {
     const onClose = vi.fn()
-    const { container } = render(
+    render(
       <ImportModal
         entityLabel="contacto"
         columns={columns}
@@ -97,8 +97,10 @@ describe('ImportModal — cierre', () => {
         onImportado={() => {}}
       />
     )
-    // Click en el overlay (primer child del root)
-    fireEvent.click(container.firstChild as Element)
+    // El overlay ya no cuelga del contenedor de render: va por portal al body
+    // (ver ModalPortal), así que se busca ahí.
+    const overlay = document.body.querySelector('[data-testid="import-modal-overlay"]')
+    fireEvent.click(overlay as Element)
     expect(onClose).toHaveBeenCalled()
   })
 })

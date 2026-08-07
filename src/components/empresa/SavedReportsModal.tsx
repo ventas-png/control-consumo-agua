@@ -16,6 +16,7 @@ import { openPromptDialog } from '../shared/PromptDialog'
 import { exportData, type ExportColumn } from '../../lib/exportData'
 import { sendReportByEmail } from '../../lib/sendReportEmail'
 import { nextRunFor, formatNextRun } from '../../lib/scheduleHelpers'
+import { ModalPortal } from '../shared/ModalPortal'
 
 // ============================================================================
 // SavedReportsModal — F4.5.1 MVP: Reportes guardados con ejecucion manual.
@@ -309,6 +310,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
   }
 
   return (
+    <ModalPortal>
     <div
       style={overlayStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -480,6 +482,7 @@ export function SavedReportsModal({ onClose, companyId }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

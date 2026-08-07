@@ -3,6 +3,7 @@ import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad } from '
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { fetchBroadcastEmailStats, type BroadcastEmailStats } from '../../domain/comunicacion/broadcasts'
 import { confirm, notify } from '../shared/Dialog'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface Props {
   clientes: Cliente[]
@@ -164,6 +165,7 @@ function NuevoComunicadoModal({
   })
 
   return (
+    <ModalPortal>
     <div
       role="dialog"
       aria-modal="true"
@@ -365,6 +367,7 @@ function NuevoComunicadoModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

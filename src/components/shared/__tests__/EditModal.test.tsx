@@ -17,12 +17,12 @@ describe('EditModal — render básico', () => {
   })
 
   it('marca role=dialog con aria-modal y aria-label', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="Mi modal" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const dialog = container.querySelector('[role="dialog"]')
+    const dialog = baseElement.querySelector('[role="dialog"]')
     expect(dialog).not.toBeNull()
     expect(dialog?.getAttribute('aria-modal')).toBe('true')
     expect(dialog?.getAttribute('aria-label')).toBe('Mi modal')
@@ -51,13 +51,13 @@ describe('EditModal — subtitle', () => {
   })
 
   it('no renderiza subtitle si no se pasa', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
     // Solo h2 dentro del header (sin subtitle)
-    const headerDiv = container.querySelector('h2')?.parentElement
+    const headerDiv = baseElement.querySelector('h2')?.parentElement
     expect(headerDiv?.children).toHaveLength(1)
   })
 })
@@ -98,79 +98,79 @@ describe('EditModal — footer', () => {
   })
 
   it('no renderiza footer si no se pasa', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
     // Sin footer, el contenedor del modal tiene 2 hijos (header + body)
-    const modalCard = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const modalCard = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     expect(modalCard.children).toHaveLength(2)
   })
 })
 
 describe('EditModal — size variants', () => {
   it('aplica width "md" (760px) por default para retro-compat', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     expect(card.style.maxWidth).toContain('760px')
   })
 
   it('aplica width "sm" cuando size="sm"', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" size="sm" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     expect(card.style.maxWidth).toContain('480px')
   })
 
   it('aplica width "xl" cuando size="xl"', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" size="xl" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     expect(card.style.maxWidth).toContain('1100px')
   })
 
   it('maxWidth manual tiene prioridad sobre size', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" size="sm" maxWidth="900px" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     expect(card.style.maxWidth).toContain('900px')
   })
 })
 
 describe('EditModal — noPadding', () => {
   it('body sin padding cuando noPadding=true', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" noPadding onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
     // El body es el segundo hijo del card
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     const body = card.children[1] as HTMLElement
     expect(body.style.padding).toBe('0px')
   })
 
   it('body con padding default cuando noPadding no se pasa', () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" onClose={() => {}}>
         <p>x</p>
       </EditModal>,
     )
-    const card = container.querySelector('[role="dialog"]')?.firstChild as HTMLElement
+    const card = baseElement.querySelector('[role="dialog"]')?.firstChild as HTMLElement
     const body = card.children[1] as HTMLElement
     expect(body.style.padding).toBe('20px')
   })
@@ -179,24 +179,24 @@ describe('EditModal — noPadding', () => {
 describe('EditModal — comportamiento controlable', () => {
   it('cierra al click en backdrop por default', () => {
     const onClose = vi.fn()
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" onClose={onClose}>
         <p>x</p>
       </EditModal>,
     )
-    const backdrop = container.querySelector('[role="dialog"]') as HTMLElement
+    const backdrop = baseElement.querySelector('[role="dialog"]') as HTMLElement
     fireEvent.click(backdrop)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('NO cierra al click en backdrop cuando closeOnBackdropClick=false', () => {
     const onClose = vi.fn()
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal title="x" closeOnBackdropClick={false} onClose={onClose}>
         <p>x</p>
       </EditModal>,
     )
-    const backdrop = container.querySelector('[role="dialog"]') as HTMLElement
+    const backdrop = baseElement.querySelector('[role="dialog"]') as HTMLElement
     fireEvent.click(backdrop)
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -292,7 +292,7 @@ describe('EditModal — scroll lock del body', () => {
 
 describe('EditModal — a11y baseline', () => {
   it('renderiza sin violaciones de accesibilidad', async () => {
-    const { container } = render(
+    const { baseElement } = render(
       <EditModal
         title="Editar usuario"
         subtitle="Juan Pérez"
@@ -310,6 +310,29 @@ describe('EditModal — a11y baseline', () => {
         </form>
       </EditModal>,
     )
-    await checkA11y(container)
+    await checkA11y(baseElement)
+  })
+})
+
+// El motivo de sacarlo del árbol: en iOS un `position: fixed` dentro de un
+// contenedor que scrollea se posiciona respecto a ese contenedor y no respecto
+// al viewport. Pasó en #691 (shell con `overflow: hidden`) y dejó los ~40
+// modales recortados e inmóviles. Chromium no reproduce el fallo, así que esta
+// prueba estructural es la única red que queda.
+describe('EditModal — portal a document.body', () => {
+  it('NO se renderiza dentro del árbol de quien lo abre', () => {
+    const { container, baseElement } = render(
+      <div data-testid="anfitrion">
+        <EditModal title="Editar" onClose={() => {}}>contenido</EditModal>
+      </div>,
+    )
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(baseElement.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+
+  it('cuelga directamente del body, sin ancestros que puedan scrollear', () => {
+    const { baseElement } = render(<EditModal title="Editar" onClose={() => {}}>contenido</EditModal>)
+    const dialog = baseElement.querySelector('[role="dialog"]')
+    expect(dialog?.parentElement).toBe(document.body)
   })
 })

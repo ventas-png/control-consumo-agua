@@ -13,6 +13,7 @@ import { notify, confirm } from '../../shared/Dialog'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface HuespedSTRForm {
   id?: string
@@ -307,6 +308,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       </div>
 
       {showForm && (
+        <ModalPortal>
         <div onClick={e => { if (e.target === e.currentTarget) cancelForm() }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
@@ -543,6 +545,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
           </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Filtros */}

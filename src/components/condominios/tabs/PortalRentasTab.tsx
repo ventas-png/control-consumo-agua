@@ -19,6 +19,7 @@ import type {
   EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
   SolicitudRentaUnidad, TipoRenta, HuespedSTR,
 } from '../../../types'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface HuespedSTRForm {
   id?: string
@@ -606,6 +607,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           })}
 
           {showCA && (
+            <ModalPortal>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
               <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -670,6 +672,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                 </div>
               </div>
             </div>
+            </ModalPortal>
           )}
         </>
       ) : (
@@ -730,6 +733,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           })}
 
           {showSTR && (
+            <ModalPortal>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
               <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -954,6 +958,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                 </div>
               </div>
             </div>
+            </ModalPortal>
           )}
         </>
       )}

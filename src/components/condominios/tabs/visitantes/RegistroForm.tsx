@@ -2,10 +2,12 @@
 import type { VisitantesCtx } from './ctx'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import { defaultAcompForm } from './ctx'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
   const { unidades, saving, fotoUrl, setFotoUrl, fotoDocumentoUrl, setFotoDocumentoUrl, fotoVehiculoUrl, setFotoVehiculoUrl, fotosExpiradas, strCtx, mudanzaCtx, form, setForm, formEsMenor, setFormEsMenor, formFechaNacimiento, setFormFechaNacimiento, acompanantes, showAcompForm, setShowAcompForm, acompForm, setAcompForm, sugerencias, acompSugerencias, resetForm, autocompletar, autocompletarAcompanante, agregarAcompanante, quitarAcompanante, handleRegistrar } = ctx
   return (
+        <ModalPortal>
         <div
           onClick={e => { if (e.target === e.currentTarget) resetForm() }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
@@ -264,5 +266,6 @@ export function RegistroForm({ ctx }: { ctx: VisitantesCtx }) {
             </div>
           </div>
         </div>
+        </ModalPortal>
   )
 }

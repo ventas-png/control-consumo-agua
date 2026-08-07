@@ -1,12 +1,14 @@
 // Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
 import type { PrioridadNovedad, TipoNovedad, VisitantesCtx } from './ctx'
 import { MultiImageUploader } from '../../../shared/ImageUploader'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function SalidaPanel({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, salidaPendiente, modoSalida, setModoSalida, guardandoSalida, novedadForm, setNovedadForm, fotosNovedad, setFotosNovedad, salidaConAcomp, setSalidaConAcomp, cancelarSalida, confirmarSalida } = ctx
   if (!salidaPendiente) return null
         const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
         return (
+          <ModalPortal>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
               <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--at-chip)' }}>
@@ -119,5 +121,6 @@ export function SalidaPanel({ ctx }: { ctx: VisitantesCtx }) {
               </div>
             </div>
           </div>
+          </ModalPortal>
         )
 }

@@ -4,6 +4,7 @@ import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../lib/businessPagos'
 import { iniciarPagoRegistro, confirmarPago } from '../../domain/portal/mutations'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface Props {
   registro: Registro
@@ -90,6 +91,7 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
   }
 
   return (
+    <ModalPortal>
     <div
       role="dialog"
       aria-modal="true"
@@ -218,5 +220,6 @@ export function PagoEnLineaModal({ registro, moneda, recargoRows, canalPago, onC
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

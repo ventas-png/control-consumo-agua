@@ -1,10 +1,12 @@
 // Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
 import type { VisitantesCtx } from './ctx'
 import { TIPO_MUDANZA_LABEL } from './ui'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function MudanzaModal({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, setShowMudanzaModal, mudanzaSearch, setMudanzaSearch, hoy, mudanzasElegibles, abrirRegistroMudanza } = ctx
   return (
+        <ModalPortal>
         <div onClick={e => { if (e.target === e.currentTarget) { setShowMudanzaModal(false); setMudanzaSearch('') } }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
@@ -101,5 +103,6 @@ export function MudanzaModal({ ctx }: { ctx: VisitantesCtx }) {
             </div>
           </div>
         </div>
+        </ModalPortal>
   )
 }

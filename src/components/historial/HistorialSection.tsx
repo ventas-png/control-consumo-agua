@@ -13,6 +13,7 @@ import {
   unidadesDelProyecto,
   type HistorialFiltros,
 } from '../../lib/historialFiltros'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface Props {
   registros: Registro[]
@@ -525,6 +526,7 @@ export function HistorialSection({
 
       {/* Edit Status Modal */}
       {editModal && (
+        <ModalPortal>
         <div
           style={{
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -574,6 +576,7 @@ export function HistorialSection({
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Lightbox de la foto de la lectura — baja la imagen bajo demanda por id */}

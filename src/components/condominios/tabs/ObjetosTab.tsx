@@ -5,6 +5,7 @@ import type { ObjetoPerdido, EstadoObjeto } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface Props {
   objetos: ObjetoPerdido[]
@@ -183,6 +184,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
 
       {/* Reclamo modal */}
       {reclamoId && (
+        <ModalPortal>
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--at-surface)', borderRadius: '12px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700 }}>{t('condominios.objetos.reclamo_title')}</h3>
@@ -194,6 +196,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* List — cond:B2: migrado a <DataTable> shared */}

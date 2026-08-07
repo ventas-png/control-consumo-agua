@@ -6,6 +6,7 @@ import { fetchSolicitudesMudanzaByUnidad, fetchTerminosMudanzaPorProyecto } from
 import { uploadMudanzaDoc } from '../../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza } from '../../../types'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface Props {
   unidadId: string
@@ -171,6 +172,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
       {/* New request form */}
       {showForm && (
+        <ModalPortal>
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -321,6 +323,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* List */}

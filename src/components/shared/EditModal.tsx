@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { ModalPortal } from './ModalPortal'
 
 export type EditModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
 
@@ -129,6 +130,7 @@ export function EditModal({
   const resolvedMaxWidth = maxWidth ?? SIZE_WIDTHS[size]
 
   return (
+    <ModalPortal>
     <div
       ref={dialogRef}
       role="dialog"
@@ -242,5 +244,6 @@ export function EditModal({
         )}
       </div>
     </div>
+    </ModalPortal>
   )
 }

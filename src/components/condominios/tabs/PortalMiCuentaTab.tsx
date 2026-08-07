@@ -5,6 +5,7 @@ import { notify } from '../../shared/Dialog'
 import { iniciarPagoCuota, confirmarPagoCuota } from '../../../domain/portal/mutations'
 import { calcularRecargoTarjeta, type RecargoTarjetaRow } from '../../../lib/businessPagos'
 import { ResponsableCuotaBadge } from './CuotasUi'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -162,6 +163,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
 
       {/* Modal de pago en línea (F1) */}
       {pagando && (
+        <ModalPortal>
         <div
           role="dialog"
           aria-modal="true"
@@ -209,6 +211,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )

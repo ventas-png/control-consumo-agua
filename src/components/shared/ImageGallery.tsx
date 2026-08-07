@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent} from 'react'
 import { SecureImage } from './SecureImage'
+import { ModalPortal } from './ModalPortal'
 
 interface Props {
   urls: string[]
@@ -43,6 +44,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
       </div>
 
       {lightbox !== null && (
+        <ModalPortal>
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setLightbox(null)}
@@ -88,6 +90,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
             {lightbox + 1} / {urls.length}
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   )

@@ -40,6 +40,7 @@ import {
 } from '../../lib/effectivePermissions'
 import { Banner, CollapsibleSection, RoleCard, SectionHeader, TemplateCard } from './rolesUi'
 import { PermissionMatrixPanel, type MatrixSectionBlock } from './PermissionMatrixPanel'
+import { ModalPortal } from '../shared/ModalPortal'
 
 /** Petición de apertura del editor de roles desde este modal. */
 export interface CustomEditorRequest {
@@ -406,6 +407,7 @@ export function RolPermisosModal({
   const exemptTier = isExemptPlatformRole(usuarioTier)
 
   return (
+    <ModalPortal>
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9000,
@@ -604,5 +606,6 @@ export function RolPermisosModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

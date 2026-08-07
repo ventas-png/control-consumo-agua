@@ -11,6 +11,7 @@ import {
 } from '../../domain/empresa/roles'
 import type { PermissionDef, RoleDef } from '../../types'
 import { MODULE_ACTIONS, MODULE_ACTION_LABELS, type ModuleAction } from '../../lib/moduleConfig'
+import { ModalPortal } from '../shared/ModalPortal'
 
 // ── Matriz módulo × acción ───────────────────────────────────────────────────
 // El catálogo trae claves por acción (agua.<mod>.<action>,
@@ -261,6 +262,7 @@ export function CustomRoleEditor({
   }
 
   return (
+    <ModalPortal>
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9100,
@@ -422,6 +424,7 @@ export function CustomRoleEditor({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
