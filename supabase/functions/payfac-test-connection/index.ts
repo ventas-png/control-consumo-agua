@@ -25,6 +25,15 @@ import {
   type ConfigPagoEmpresa,
   type ConfigPagoLocacion,
 } from '../_shared/payments/index.ts'
+// Lógica pura (parseo de ambiente, credenciales de la bóveda, resolución de
+// tenant y gate multi-tenant) extraída a ./logic.ts para poder testearla en
+// vitest (infra:I22).
+import {
+  autorizadoParaTenant,
+  credsDeAmbiente,
+  parseAmbiente,
+  resolverCompanyId,
+} from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -81,7 +90,7 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
     const projectId = body.project_id ?? null
-    const ambiente: AmbientePago = body.ambiente === 'prod' ? 'prod' : 'sandbox'
+    const ambiente: AmbientePago = parseAmbiente(body.ambiente)
 
     // ── 1) Resolver el tenant ──
     let projectRow: { company_id?: string | null; proveedor_pago?: string | null } | null = null
@@ -96,10 +105,10 @@ Deno.serve(async (req: Request) => {
       projectRow = proj as typeof projectRow
     }
 
-    const companyId = (projectRow?.company_id ?? null) ?? body.company_id ?? callerCompanyId ?? null
+    const companyId = resolverCompanyId(projectRow?.company_id ?? null, body.company_id, callerCompanyId)
     if (!companyId) return json({ error: 'Falta company_id' }, 400)
 
-    if (!internal && !callerIsSuperAdmin && callerCompanyId !== companyId) {
+    if (!autorizadoParaTenant(internal, callerIsSuperAdmin, callerCompanyId, companyId)) {
       return json({ error: 'No autorizado para probar la conexión de otro tenant' }, 403)
     }
 
