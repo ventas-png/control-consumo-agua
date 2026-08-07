@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
 import type { AppSection, UserNotification } from '../../types'
 import { useNotifications } from '../../hooks/useNotifications'
+import { calcularPosicion } from './notificationBellPos'
 
 interface Props {
   userId?: string
@@ -21,6 +22,24 @@ function tiempoRelativo(iso: string): string {
 export function NotificationBell({ userId, onNavigate }: Props) {
   const { items, unread, marcarLeida, marcarTodas } = useNotifications(userId)
   const [open, setOpen] = useState(false)
+  const botonRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState<ReturnType<typeof calcularPosicion> | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    const colocar = () => {
+      const el = botonRef.current
+      if (el) setPos(calcularPosicion(el.getBoundingClientRect(), window.innerWidth, window.innerHeight))
+    }
+    colocar()
+    window.addEventListener('resize', colocar)
+    // `true` para capturar también el scroll de cualquier contenedor intermedio.
+    window.addEventListener('scroll', colocar, true)
+    return () => {
+      window.removeEventListener('resize', colocar)
+      window.removeEventListener('scroll', colocar, true)
+    }
+  }, [open])
 
   function onItemClick(n: UserNotification) {
     if (!n.leido) void marcarLeida(n.id)
@@ -31,6 +50,7 @@ export function NotificationBell({ userId, onNavigate }: Props) {
   return (
     <div style={{ position: 'relative' }}>
       <button
+        ref={botonRef}
         onClick={() => setOpen(o => !o)}
         aria-label="Notificaciones"
         title="Notificaciones"
@@ -57,15 +77,16 @@ export function NotificationBell({ userId, onNavigate }: Props) {
         )}
       </button>
 
-      {open && (
+      {open && pos && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{
-            position: 'absolute', right: 0, top: '42px', width: '340px', maxWidth: '90vw',
+            position: 'fixed', top: pos.top, left: pos.left, width: pos.width,
+            maxHeight: pos.maxHeight, display: 'flex', flexDirection: 'column',
             background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '12px',
             boxShadow: '0 12px 40px rgba(0,0,0,0.18)', zIndex: 61, overflow: 'hidden',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--at-line)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--at-line)', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>Notificaciones</span>
               {unread > 0 && (
                 <button onClick={() => void marcarTodas()} style={{ border: 'none', background: 'transparent', color: 'var(--at-primary)', fontWeight: 600, fontSize: '12px', cursor: 'pointer' }}>
@@ -73,7 +94,7 @@ export function NotificationBell({ userId, onNavigate }: Props) {
                 </button>
               )}
             </div>
-            <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+            <div style={{ maxHeight: '380px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
               {items.length === 0 && (
                 <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13px' }}>
                   No tienes notificaciones
