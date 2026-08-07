@@ -309,13 +309,18 @@ Deno.serve(async (req: Request) => {
     // no el del body original (que pudo venir manipulado).
     const scopedPayload = { ...payload, company_id: effIsSuperadmin ? null : effCompanyId, is_superadmin: effIsSuperadmin }
 
-    // Píxel de apertura (com:N4): tracking_id efímero firmado con CRON_SECRET;
+    // Píxel de apertura (com:N4): tracking_id efímero firmado con la llave
+    // PROPIA del tracking. Separada de CRON_SECRET a propósito — ese secreto
+    // autoriza rutas privilegiadas (incluida la interna de aquí arriba) y lo
+    // comparten 6 funciones, mientras que estos tokens salen al mundo en cada
+    // correo. Fallback transitorio al viejo mientras se provisiona la variable.
     // track-email-open lo verifica y marca opened_at. Sin secreto configurado
     // no se inyecta nada (degradación graceful, el correo sale igual).
     let trackingId: string | null = null
-    if (cronSecret) {
+    const trackingSecret = Deno.env.get('EMAIL_TRACKING_SECRET') || cronSecret || ''
+    if (trackingSecret) {
       trackingId = crypto.randomUUID()
-      const token = await buildTrackingToken('t', trackingId, cronSecret)
+      const token = await buildTrackingToken('t', trackingId, trackingSecret)
       htmlBody = appendTrackingPixel(htmlBody, buildPixelUrl(SUPABASE_URL, token))
     }
 

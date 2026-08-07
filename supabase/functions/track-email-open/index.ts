@@ -22,7 +22,17 @@ import { onePixelGifBytes, verifyTrackingToken } from '../_shared/deliveryTracki
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
+// Llave de firma del píxel de apertura. Se separa de CRON_SECRET a propósito:
+// ese secreto lo comparten 6 funciones y autoriza rutas privilegiadas —
+// send-email ya documenta el problema en su bloque de auth interno—, mientras
+// que los tokens del píxel salen al MUNDO en cada correo. Son dominios de
+// confianza distintos y no deben compartir llave.
+//
+// Fallback transitorio a CRON_SECRET para no romper los correos ya enviados,
+// cuyos tokens están firmados con el secreto viejo, ni el despliegue antes de
+// provisionar la variable. Retirar el fallback cuando EMAIL_TRACKING_SECRET
+// esté puesta y los correos en circulación hayan caducado.
+const TRACKING_SECRET = Deno.env.get('EMAIL_TRACKING_SECRET') || Deno.env.get('CRON_SECRET') || ''
 
 const GIF_HEADERS = {
   'Content-Type': 'image/gif',
@@ -43,7 +53,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const token = new URL(req.url).searchParams.get('t')
-    const parsed = await verifyTrackingToken(token, CRON_SECRET)
+    const parsed = await verifyTrackingToken(token, TRACKING_SECRET)
     if (!parsed) return gif() // inválido/forjado → mismo GIF, sin efectos
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
