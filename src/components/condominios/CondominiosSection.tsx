@@ -6,6 +6,7 @@ import {
   fetchVisitasControlRecent,
   fetchCondominiosTareasData,
   fetchTareasBloqueData,
+  fetchCondominiosLimpiezaData,
   fetchClientesConCumple,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
@@ -43,7 +44,7 @@ import type {
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
-  ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
@@ -259,6 +260,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   // Fase 19
   const [checklistAreas, setChecklistAreas] = useState<ChecklistArea[]>([])
   const [progLimpieza, setProgLimpieza] = useState<ProgramacionLimpieza[]>([])
+  const [ejecLimpieza, setEjecLimpieza] = useState<EjecucionLimpieza[]>([])
   const [consumoEnergia, setConsumoEnergia] = useState<ConsumoEnergiaArea[]>([])
   const [historialRes, setHistorialRes] = useState<HistorialResidente[]>([])
   // Fase 20
@@ -497,6 +499,18 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       setTareasBloque([]); setRevisionesTarea([])
     }
 
+    // Rutas de limpieza (20260807130000). Va aparte del Promise.all grande
+    // porque la tabla es nueva: si el entorno todavía no tiene la migración
+    // aplicada, el error se queda aquí (lista vacía) en vez de tumbar la carga
+    // de las otras ~140 colecciones del panel.
+    const ejecLimpiezaRes = await fetchCondominiosLimpiezaData(pid, cid)
+    setEjecLimpieza(
+      (ejecLimpiezaRes.data ?? []).map((e: Record<string, unknown>) => ({
+        ...e,
+        foto_urls: (e.foto_urls as string[] | null) ?? [],
+      })) as EjecucionLimpieza[]
+    )
+
     if (runSeqRef.current !== run) return
 
     setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
@@ -707,7 +721,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,
     entregas, avisosCobro, bitacoraRegistros, evaluacionesProv, reclamos,
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
-    progLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
+    progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
@@ -739,7 +753,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,
     entregas, avisosCobro, bitacoraRegistros, evaluacionesProv, reclamos,
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
-    progLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
+    progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
