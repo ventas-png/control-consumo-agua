@@ -30,11 +30,20 @@ import {
   getFiscalProvider,
   resolverConfigFiscalEfectiva,
   regimenRealDeConfig,
-  type AmbientePac,
-  type ConfigFiscalEmpresa,
-  type ConfigFiscalLocacion,
   type CredencialesPacPorAmbiente,
 } from '../_shared/fiscal/index.ts'
+// Lógica pura (normalización de ambiente, mapeo row→config, resolución de
+// tenant, gate de autorización, override de credenciales) extraída a ./logic.ts
+// para testearla con vitest (infra:I22 · Track T8/T5). Aquí queda solo el I/O.
+import {
+  type CompanyRow,
+  type ProjectRow,
+  autorizadoParaTenant,
+  empresaConfigDeRow,
+  locacionConfigDeRow,
+  normalizarAmbiente,
+  resolverCompanyId,
+} from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -45,32 +54,6 @@ const COMPANY_COLS =
 const PROJECT_COLS =
   'id,company_id,nombre,nombre_fiscal,nit,rfc,regimen_fiscal,proveedor_timbrado,establecimiento,lugar_expedicion,serie_fiscal'
 
-interface CompanyRow {
-  id: string
-  nombre?: string | null
-  nombre_fiscal?: string | null
-  nit?: string | null
-  tax_id?: string | null
-  rfc?: string | null
-  regimen_fiscal?: string | null
-  proveedor_timbrado?: string | null
-  address_postal_code?: string | null
-}
-
-interface ProjectRow {
-  id: string
-  company_id?: string | null
-  nombre?: string | null
-  nombre_fiscal?: string | null
-  nit?: string | null
-  rfc?: string | null
-  regimen_fiscal?: string | null
-  proveedor_timbrado?: string | null
-  establecimiento?: string | null
-  lugar_expedicion?: string | null
-  serie_fiscal?: string | null
-}
-
 interface ReqBody {
   /** Tenant a probar. Opcional para admin/owner (se infiere de su JWT). */
   company_id?: string
@@ -78,33 +61,6 @@ interface ReqBody {
   project_id?: string | null
   /** Ambiente a reportar en el estatus ('sandbox' | 'prod'). Default 'sandbox'. */
   ambiente?: string
-}
-
-function empresaConfigDeRow(c: CompanyRow): ConfigFiscalEmpresa {
-  return {
-    regimenFiscal: (c.regimen_fiscal as ConfigFiscalEmpresa['regimenFiscal']) ?? null,
-    nombre: c.nombre ?? null,
-    nombreFiscal: c.nombre_fiscal ?? null,
-    nit: c.nit ?? null,
-    taxId: c.tax_id ?? null,
-    rfc: c.rfc ?? null,
-    proveedorTimbrado: c.proveedor_timbrado ?? null,
-    codigoPostal: c.address_postal_code ?? null,
-  }
-}
-
-function locacionConfigDeRow(p: ProjectRow): ConfigFiscalLocacion {
-  return {
-    regimenFiscal: (p.regimen_fiscal as ConfigFiscalLocacion['regimenFiscal']) ?? null,
-    nombre: p.nombre ?? null,
-    nombreFiscal: p.nombre_fiscal ?? null,
-    nit: p.nit ?? null,
-    rfc: p.rfc ?? null,
-    proveedorTimbrado: p.proveedor_timbrado ?? null,
-    establecimiento: p.establecimiento ?? null,
-    lugarExpedicion: p.lugar_expedicion ?? null,
-    serieFiscal: p.serie_fiscal ?? null,
-  }
 }
 
 /**
@@ -184,7 +140,7 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json().catch(() => ({}))) as ReqBody
     const projectId = body.project_id ?? null
-    const ambiente = body.ambiente === 'prod' ? 'prod' : 'sandbox'
+    const ambiente = normalizarAmbiente(body.ambiente)
 
     // ── 1) Resolver el tenant a probar ──
     // Si viene project_id, el tenant lo dicta el proyecto (autoritativo). Si no,
@@ -201,15 +157,11 @@ Deno.serve(async (req: Request) => {
       project = proj as ProjectRow
     }
 
-    const companyId =
-      (project?.company_id ?? null) ??
-      body.company_id ??
-      callerCompanyId ??
-      null
+    const companyId = resolverCompanyId(project?.company_id, body.company_id, callerCompanyId)
     if (!companyId) return json({ error: 'Falta company_id' }, 400)
 
     // Autorización por tenant: admin/owner solo prueba su propia empresa.
-    if (!internal && !callerIsSuperAdmin && callerCompanyId !== companyId) {
+    if (!autorizadoParaTenant({ internal, callerIsSuperAdmin, callerCompanyId }, companyId)) {
       return json({ error: 'No autorizado para probar la conexión de otro tenant' }, 403)
     }
 
@@ -301,7 +253,7 @@ Deno.serve(async (req: Request) => {
       companyId,
       proveedor: config.proveedorTimbrado,
       regimen,
-      ambiente: ambiente as AmbientePac,
+      ambiente,
       credenciales,
     })
 

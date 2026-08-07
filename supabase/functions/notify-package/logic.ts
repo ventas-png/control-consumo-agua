@@ -1,0 +1,193 @@
+// Lógica pura de notify-package, extraída del handler para poder testearla en
+// aislamiento (infra:I22 · Track T8). Sin Deno ni supabase-js → corre directo en
+// vitest. El handler (index.ts) importa estos símbolos: el comportamiento no
+// cambia, solo se mueve la definición a un archivo importable desde los tests.
+//
+// Aquí vive SOLO la decisión pura: sanitización HTML, etiqueta de tipo de envío,
+// plantilla del correo, filas in-app, payloads de WhatsApp (Meta/Twilio) y la
+// selección de proveedor. El I/O (Gmail, WhatsApp APIs, queries) queda en index.ts.
+
+// deno-lint-ignore no-explicit-any
+export type Row = Record<string, any>
+
+/** Sustituye {{var}} con vars; variable desconocida → '' (mismo motor que send-email). */
+export function applyVars(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? '')
+}
+
+/** Escapa & < > " ' para interpolar texto del usuario dentro del HTML del correo. */
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ))
+}
+
+// Etiqueta legible del tipo de envío (es). Desconocido → 'Envío'.
+export const TIPO_LABEL: Record<string, string> = {
+  paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío',
+}
+
+/** Etiqueta del tipo de paquete; cae a 'Envío' si el tipo no está mapeado. */
+export function tipoLabel(tipo: string): string {
+  return TIPO_LABEL[tipo] ?? 'Envío'
+}
+
+// ---------------------------------------------------------------------------
+// Autorización por empresa (camino con JWT)
+// ---------------------------------------------------------------------------
+
+/**
+ * Gate de tenant: interno (service key) y super_admin pasan siempre; un usuario
+ * de empresa solo puede notificar paquetes de SU empresa.
+ */
+export function autorizadoParaEmpresa(
+  auth: { internal: boolean; callerIsSuperAdmin: boolean; callerCompanyId: string | null },
+  pkgCompanyId: string | null,
+): boolean {
+  return auth.internal || auth.callerIsSuperAdmin || pkgCompanyId === auth.callerCompanyId
+}
+
+// ---------------------------------------------------------------------------
+// Plantilla del correo
+// ---------------------------------------------------------------------------
+
+export function baseLayout(content: string, empresa: string): string {
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(empresa)}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;"><tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:600px;">
+    <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0d9488);padding:28px 32px;text-align:center;">
+      <span style="color:#fff;font-size:22px;font-weight:700;">${escapeHtml(empresa)}</span></td></tr>
+    <tr><td style="padding:32px;">${content}</td></tr>
+    <tr><td style="background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">Aviso automático de ${escapeHtml(empresa)}. Por favor no responda directamente.</p></td></tr>
+  </table>
+</td></tr></table></body></html>`
+}
+
+/**
+ * Render por defecto del aviso de paquete (cuando el tenant no tiene
+ * email_template custom). `fallbackAppUrl` sustituye al APP_URL de módulo del
+ * handler: el CTA usa `vars.app_url` y cae a este fallback si viene vacío.
+ */
+export function renderPaquete(
+  vars: Record<string, string>,
+  fallbackAppUrl = '',
+): { subject: string; html: string } {
+  const empresa = vars.empresa_nombre || 'AdministraTodo'
+  const content = `
+    <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">📦 ${escapeHtml(vars.tipo_label)} en portería</h2>
+    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${escapeHtml(vars.to_name || '')}</strong>, recibimos un envío para tu unidad y está disponible para que lo retires.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
+      <tr style="background:#0d9488;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLE DEL ENVÍO</td></tr>
+      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Unidad</td><td style="padding:10px 18px;font-size:14px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.unidad || '—')}</td></tr>
+      <tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Descripción</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.descripcion || '—')}</td></tr>
+      ${vars.remitente ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Remitente</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.remitente)}</td></tr>` : ''}
+      ${vars.empresa_mensajeria ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Mensajería</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(vars.empresa_mensajeria)}</td></tr>` : ''}
+    </table>
+    <div style="text-align:center;margin:28px 0;"><a href="${vars.app_url || fallbackAppUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#fff;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:700;">Ver y firmar recepción</a></div>
+    <p style="margin:0;font-size:13px;color:#64748b;">Al retirarlo podrás firmar la recepción desde tu portal.</p>`
+  return {
+    subject: `📦 ${vars.tipo_label} disponible en portería · ${vars.unidad || ''}`.trim(),
+    html: baseLayout(content, empresa),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rows in-app (user_notifications)
+// ---------------------------------------------------------------------------
+
+/**
+ * Construye las filas de user_notifications para los usuarios de app vinculados
+ * al residente (el INSERT lo hace el handler). Usa vars.tipo_label / descripcion /
+ * remitente / unidad, que el handler arma desde el paquete.
+ */
+export function buildPaqueteInAppRows(
+  userIds: string[],
+  vars: Record<string, string>,
+  ctx: { companyId: string | null; paqueteId: string },
+): Row[] {
+  return userIds.map(userId => ({
+    user_id: userId,
+    company_id: ctx.companyId,
+    tipo: 'paquete_pendiente',
+    titulo: `📦 ${vars.tipo_label} en portería`,
+    cuerpo: `${vars.descripcion}${vars.remitente ? ` · De: ${vars.remitente}` : ''} para ${vars.unidad}. Pasa a recogerlo cuando gustes.`,
+    seccion: 'paquetes',
+    paquete_id: ctx.paqueteId,
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp (payloads puros + selección de proveedor)
+// ---------------------------------------------------------------------------
+
+/** Deja solo dígitos del teléfono (formato E.164 sin '+' para las APIs). */
+export function digits(phone: string): string { return phone.replace(/[^\d]/g, '') }
+
+/** Config de entorno de WhatsApp (los env vars, ya leídos por el handler). */
+export interface WhatsAppEnv {
+  provider: string
+  metaToken: string
+  metaPhoneId: string
+  metaTemplate: string
+  twilioSid: string
+  twilioToken: string
+  twilioFrom: string
+}
+
+/**
+ * Decide qué proveedor de WhatsApp usar: 'meta' o 'twilio' SOLO si el proveedor
+ * elegido tiene TODAS sus credenciales; si no, null (canal omitido en silencio,
+ * el handler responde 'not_configured'). Nunca cae de un proveedor al otro.
+ */
+export function resolveWhatsAppProvider(env: WhatsAppEnv): 'meta' | 'twilio' | null {
+  if (env.provider === 'meta' && env.metaToken && env.metaPhoneId && env.metaTemplate) return 'meta'
+  if (env.provider === 'twilio' && env.twilioSid && env.twilioToken && env.twilioFrom) return 'twilio'
+  return null
+}
+
+/**
+ * Payload de la WhatsApp Cloud API (Meta). Mensaje iniciado por la empresa ⇒
+ * requiere plantilla aprobada; los parámetros del body son unidad y descripción
+ * EN ESE ORDEN (contrato con la plantilla registrada en Meta).
+ */
+export function buildMetaWaPayload(
+  to: string,
+  vars: Record<string, string>,
+  template: string,
+  lang: string,
+): Row {
+  return {
+    messaging_product: 'whatsapp',
+    to: digits(to),
+    type: 'template',
+    template: {
+      name: template,
+      language: { code: lang },
+      components: [{
+        type: 'body',
+        parameters: [
+          { type: 'text', text: vars.unidad },
+          { type: 'text', text: vars.descripcion },
+        ],
+      }],
+    },
+  }
+}
+
+/**
+ * Parámetros del mensaje de Twilio: To en formato `whatsapp:+<dígitos>` y el
+ * texto libre del aviso (Twilio sí permite mensajes sin plantilla en sandbox).
+ */
+export function buildTwilioWaParams(
+  to: string,
+  vars: Record<string, string>,
+  from: string,
+): Record<string, string> {
+  return {
+    From: from,
+    To: `whatsapp:+${digits(to)}`,
+    Body: `📦 Tienes ${vars.tipo_label} en portería para ${vars.unidad}: ${vars.descripcion}. Pasa a recogerlo cuando gustes.`,
+  }
+}
