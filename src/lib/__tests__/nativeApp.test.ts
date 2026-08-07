@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // isNative se mockea por test: initNativeApp tiene que ser un no-op en web.
 vi.mock('../platform', () => ({ isNative: vi.fn(), getPlatform: vi.fn() }))
 
+const INFO_BASE = { visible: true, style: 'DARK', color: '#1B3B36', overlays: true, height: 54 }
 const statusBar = {
   setOverlaysWebView: vi.fn().mockResolvedValue(undefined),
   setStyle: vi.fn().mockResolvedValue(undefined),
   setBackgroundColor: vi.fn().mockResolvedValue(undefined),
+  getInfo: vi.fn().mockResolvedValue(INFO_BASE),
 }
 vi.mock('@capacitor/status-bar', () => ({
   StatusBar: statusBar,
@@ -16,6 +18,8 @@ vi.mock('@capacitor/status-bar', () => ({
 import {
   aplicarViewportNativo,
   configurarBarraDeEstado,
+  publicarAltoBarraDeEstado,
+  VAR_SAFE_TOP,
   VIEWPORT_NATIVO,
   initNativeApp,
 } from '../nativeApp'
@@ -37,6 +41,8 @@ beforeEach(() => {
   statusBar.setOverlaysWebView.mockClear().mockResolvedValue(undefined)
   statusBar.setStyle.mockClear().mockResolvedValue(undefined)
   statusBar.setBackgroundColor.mockClear().mockResolvedValue(undefined)
+  statusBar.getInfo.mockClear().mockResolvedValue(INFO_BASE)
+  document.documentElement.style.removeProperty(VAR_SAFE_TOP)
 })
 afterEach(() => { document.head.innerHTML = '' })
 
@@ -83,6 +89,37 @@ describe('configurarBarraDeEstado', () => {
   it('no propaga el fallo si un método del plugin rechaza', async () => {
     statusBar.setOverlaysWebView.mockRejectedValueOnce(new Error('sin plugin'))
     await expect(configurarBarraDeEstado()).resolves.toBeUndefined()
+  })
+})
+
+describe('publicarAltoBarraDeEstado', () => {
+  const leer = () => document.documentElement.style.getPropertyValue(VAR_SAFE_TOP)
+
+  // El caso del reporte: env(safe-area-inset-top) es 0 en este WebView, así que
+  // el hueco tiene que venir del alto que mide el plugin.
+  it('publica el alto real de la barra cuando se superpone', async () => {
+    await publicarAltoBarraDeEstado()
+    expect(leer()).toBe('54px')
+  })
+
+  // Si overlaysWebView ya bajó el webView.frame, sumar padding duplicaría el hueco.
+  it('publica 0 cuando la barra ya no se superpone', async () => {
+    statusBar.getInfo.mockResolvedValueOnce({ ...INFO_BASE, overlays: false })
+    await publicarAltoBarraDeEstado()
+    expect(leer()).toBe('0px')
+  })
+
+  it('publica 0 con la barra de estado oculta', async () => {
+    statusBar.getInfo.mockResolvedValueOnce({ ...INFO_BASE, visible: false })
+    await publicarAltoBarraDeEstado()
+    expect(leer()).toBe('0px')
+  })
+
+  // Sin variable, el CSS cae en el env() — que es lo correcto en la web.
+  it('deja la variable sin definir si el plugin falla', async () => {
+    statusBar.getInfo.mockRejectedValueOnce(new Error('sin plugin'))
+    await expect(publicarAltoBarraDeEstado()).resolves.toBeUndefined()
+    expect(leer()).toBe('')
   })
 })
 

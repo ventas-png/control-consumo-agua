@@ -10,8 +10,42 @@ import { isNative } from './platform'
 export function initNativeApp(): void {
   if (!isNative()) return
   aplicarViewportNativo()
-  void configurarBarraDeEstado()
+  void configurarBarraDeEstado().then(publicarAltoBarraDeEstado)
   void ocultarSplash()
+}
+
+/** Variable CSS con el hueco a reservar arriba. La lee el bloque ≤767px de index.css. */
+export const VAR_SAFE_TOP = '--at-safe-top'
+
+/**
+ * Publica en CSS el alto REAL de la barra de estado, medido por el lado nativo.
+ *
+ * POR QUÉ HACE FALTA. El CSS reserva el hueco con `env(safe-area-inset-top)`, y
+ * en este WebView ese valor es 0: se comprobó sobre capturas del aparato, donde
+ * los chips Condominios/Agua arrancan exactamente a los 8px del padding inline.
+ * Confirmado además que el bundle nativo SÍ está corriendo (el zoom por pellizco
+ * está bloqueado, cosa que solo hace `aplicarViewportNativo`), así que no es un
+ * problema de entrega: el WebView simplemente no expone el inset.
+ *
+ * `StatusBar.getInfo()` sí lo sabe — devuelve `height` en px — y no pasa por CSS.
+ * Las reglas usan `max(env(...), var(--at-safe-top))`, así que en la web, donde
+ * la variable no existe, sigue mandando `env()` sin cambiar nada.
+ *
+ * `overlays` evita sumar el hueco dos veces: si `overlaysWebView: false` ya bajó
+ * el `webView.frame` por debajo de la barra, no queda nada que reservar y la
+ * variable va a 0. Con eso los dos mecanismos son excluyentes por construcción,
+ * funcione el que funcione.
+ */
+export async function publicarAltoBarraDeEstado(): Promise<void> {
+  try {
+    const { StatusBar } = await import('@capacitor/status-bar')
+    const info = await StatusBar.getInfo()
+    const reservar = info.visible !== false && info.overlays
+    const alto = reservar ? Math.max(0, Math.round(info.height ?? 0)) : 0
+    document.documentElement.style.setProperty(VAR_SAFE_TOP, `${alto}px`)
+  } catch {
+    // Sin plugin: la variable queda sin definir y manda el env() del CSS.
+  }
 }
 
 /** Verde de marca: fondo de la barra de estado e íconos claros encima. */

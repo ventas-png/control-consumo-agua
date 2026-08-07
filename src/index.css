@@ -605,8 +605,8 @@ button:focus:not(:focus-visible) {
     z-index: 200;
     /* iOS safe-area: notch en iPhone X+ corta el contenido si no usamos
      * env(safe-area-inset-*) en padding. */
-    padding-top: env(safe-area-inset-top, 0);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-top: max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .app-sidebar.open {
     transform: translateX(0);
@@ -629,7 +629,7 @@ button:focus:not(:focus-visible) {
   .app-topbar {
     flex-wrap: wrap;
     gap: 8px;
-    padding-top: env(safe-area-inset-top, 0);
+    padding-top: max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px));
   }
   /* Tablas: scroll horizontal con indicador */
   .table-scroll-wrapper {
@@ -662,6 +662,12 @@ button:focus:not(:focus-visible) {
    * ese hueco o su contenido acaba bajo el reloj y la batería — y ahí no se
    * puede tocar, que es como se reportó el conmutador Condominios/Agua.
    *
+   * `var(--at-safe-top)` NO es redundante: en el WebView de la app nativa
+   * `env(safe-area-inset-top)` resuelve a 0, así que el `calc()` no reservaba
+   * nada. La variable la publica `publicarAltoBarraDeEstado()` con el alto real
+   * que reporta el plugin de Capacitor. En la web no está definida y manda el
+   * `env()`, que ahí sí funciona.
+   *
    * El `!important` es necesario porque el padding va inline en el componente.
    *
    * Los dos casos son excluyentes: cuando el cliente tiene los dos servicios
@@ -670,10 +676,10 @@ button:focus:not(:focus-visible) {
    * de la cabecera cuando el conmutador ya lo reservó, para no sumarlo dos
    * veces. */
   .portal-service-switch {
-    padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(8px + max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px))) !important;
   }
   .portal-header {
-    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(16px + max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px))) !important;
   }
   .portal-service-switch ~ * .portal-header {
     padding-top: 16px !important;
