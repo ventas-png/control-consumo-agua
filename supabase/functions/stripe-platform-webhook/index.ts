@@ -1,6 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { captureEdgeException } from '../_shared/sentry.ts'
+// Lógica pura (mapeos de status, construcción de rows, decisión del update de
+// customer.updated) extraída a ./logic.ts para testearla en vitest (infra:I22).
+import {
+  buildCustomerUpdate,
+  buildInvoiceRow,
+  buildSubscriptionRow,
+  isUniqueViolation,
+  mapStripeStatus,
+  stripeRefId,
+} from './logic.ts'
 
 // ============================================================================
 // stripe-platform-webhook — receptor de eventos Stripe (plat:P1, F2.12)
@@ -33,18 +43,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const STRIPE_PLATFORM_SECRET_KEY = Deno.env.get('STRIPE_PLATFORM_SECRET_KEY') ?? ''
 const STRIPE_PLATFORM_WEBHOOK_SECRET = Deno.env.get('STRIPE_PLATFORM_WEBHOOK_SECRET') ?? ''
 
-function mapStripeStatus(s: string): string {
-  // Stripe puede devolver 'paused' o 'trialing' que ya cubrimos. Cualquier
-  // status no presente en el CHECK de subscriptions cae a 'incomplete'.
-  const valid = ['trialing', 'active', 'past_due', 'canceled', 'incomplete', 'incomplete_expired', 'unpaid']
-  return valid.includes(s) ? s : 'incomplete'
-}
-
-function mapInvoiceStatus(s: string | null | undefined): string {
-  const valid = ['draft', 'open', 'paid', 'void', 'uncollectible']
-  return s && valid.includes(s) ? s : 'open'
-}
-
 async function upsertSubscriptionFromStripe(
   supabase: ReturnType<typeof createClient>,
   stripeSub: Stripe.Subscription,
@@ -69,7 +67,6 @@ async function upsertSubscriptionFromStripe(
   }
 
   const planCode = stripeSub.metadata?.plan_code
-  const billingCycle = stripeSub.metadata?.billing_cycle === 'yearly' ? 'yearly' : 'monthly'
 
   // Resolver plan_id desde plan_code (o desde price_id si planCode falta)
   let planId: string | null = null
@@ -97,15 +94,6 @@ async function upsertSubscriptionFromStripe(
     return
   }
 
-  const periodStart = stripeSub.current_period_start
-    ? new Date(stripeSub.current_period_start * 1000).toISOString()
-    : new Date().toISOString()
-  const periodEnd = stripeSub.current_period_end
-    ? new Date(stripeSub.current_period_end * 1000).toISOString()
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-  const trialEnd = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null
-  const canceledAt = stripeSub.canceled_at ? new Date(stripeSub.canceled_at * 1000).toISOString() : null
-
   // Upsert: si ya hay una sub activa para esta company, la actualizamos por
   // company_id; si no, INSERT. Stripe_subscription_id es el ancla unica del
   // lado Stripe.
@@ -129,20 +117,7 @@ async function upsertSubscriptionFromStripe(
       : new Date().toISOString()
   }
 
-  const row = {
-    company_id: companyId,
-    plan_id: planId,
-    status,
-    billing_cycle: billingCycle,
-    current_period_start: periodStart,
-    current_period_end: periodEnd,
-    trial_end: trialEnd,
-    canceled_at: canceledAt,
-    cancel_at_period_end: !!stripeSub.cancel_at_period_end,
-    stripe_subscription_id: stripeSub.id,
-    stripe_customer_id: typeof stripeSub.customer === 'string' ? stripeSub.customer : stripeSub.customer.id,
-    past_due_since: pastDueSince,
-  }
+  const row = buildSubscriptionRow(stripeSub, companyId, planId, Date.now(), pastDueSince)
 
   if (existing) {
     await supabase
@@ -170,9 +145,7 @@ async function upsertInvoiceFromStripe(
 ): Promise<void> {
   // Encuentra la subscription correspondiente (necesitamos su id local +
   // company_id)
-  const stripeSubId = typeof stripeInvoice.subscription === 'string'
-    ? stripeInvoice.subscription
-    : stripeInvoice.subscription?.id
+  const stripeSubId = stripeRefId(stripeInvoice.subscription)
   if (!stripeSubId) {
     console.warn('[webhook] invoice sin subscription, skipeando:', stripeInvoice.id)
     return
@@ -188,42 +161,11 @@ async function upsertInvoiceFromStripe(
     return
   }
 
-  // F4.3.4: extraer tax desde Stripe Invoice. Cuando automatic_tax esta
-  // habilitado, total_tax_amounts contiene el desglose; usamos el total.
-  const taxAmount = Array.isArray(stripeInvoice.total_tax_amounts)
-    ? stripeInvoice.total_tax_amounts.reduce((s, t) => s + (t.amount ?? 0), 0)
-    : 0
-  // customer_tax_ids: array de { type, value } del customer al momento del
-  // cobro. Snapshot del primero (típicamente solo hay uno).
-  const taxIdEntry = Array.isArray(stripeInvoice.customer_tax_ids)
-    ? stripeInvoice.customer_tax_ids[0]
-    : null
-  const countryBilled = stripeInvoice.customer_address?.country ?? null
-
-  const row = {
-    subscription_id: (sub as { id: string }).id,
-    company_id: (sub as { company_id: string }).company_id,
-    amount_cents: stripeInvoice.amount_paid > 0 ? stripeInvoice.amount_paid : stripeInvoice.amount_due,
-    subtotal_cents: stripeInvoice.subtotal ?? null,
-    tax_amount_cents: taxAmount,
-    tax_id: taxIdEntry?.value ?? null,
-    tax_id_type: taxIdEntry?.type ?? null,
-    country_billed: countryBilled,
-    currency: stripeInvoice.currency,
-    status: mapInvoiceStatus(stripeInvoice.status),
-    period_start: stripeInvoice.period_start
-      ? new Date(stripeInvoice.period_start * 1000).toISOString()
-      : new Date().toISOString(),
-    period_end: stripeInvoice.period_end
-      ? new Date(stripeInvoice.period_end * 1000).toISOString()
-      : new Date().toISOString(),
-    due_date: stripeInvoice.due_date ? new Date(stripeInvoice.due_date * 1000).toISOString() : null,
-    paid_at: stripeInvoice.status_transitions?.paid_at
-      ? new Date(stripeInvoice.status_transitions.paid_at * 1000).toISOString()
-      : null,
-    stripe_invoice_id: stripeInvoice.id,
-    pdf_url: stripeInvoice.invoice_pdf,
-  }
+  const row = buildInvoiceRow(
+    stripeInvoice,
+    (sub as { id: string }).id,
+    (sub as { company_id: string }).company_id,
+  )
 
   // Upsert por stripe_invoice_id (UNIQUE)
   const { data: existing } = await supabase
@@ -330,7 +272,7 @@ Deno.serve(async (req: Request) => {
       payload: event as unknown as Record<string, unknown>,
     })
   if (insertErr) {
-    if (insertErr.code === '23505') {
+    if (isUniqueViolation(insertErr.code)) {
       // Duplicate key — ya procesado, return 200 silenciosamente
       return new Response('OK (already processed)', { status: 200 })
     }
@@ -404,17 +346,7 @@ Deno.serve(async (req: Request) => {
         } catch (taxErr) {
           console.warn('[webhook] no se pudo listar tax_ids:', taxErr instanceof Error ? taxErr.message : String(taxErr))
         }
-        const addr = customer.address
-        const update: Record<string, string | null> = {}
-        if (addr?.country) update.country = addr.country
-        if (addr?.line1) update.address_line1 = addr.line1
-        if (addr?.city) update.address_city = addr.city
-        if (addr?.state) update.address_state = addr.state
-        if (addr?.postal_code) update.address_postal_code = addr.postal_code
-        if (taxIdEntry?.value) {
-          update.tax_id = taxIdEntry.value
-          update.tax_id_type = taxIdEntry.type
-        }
+        const update = buildCustomerUpdate(customer.address, taxIdEntry)
         if (Object.keys(update).length > 0) {
           await supabase.from('companies').update(update).eq('id', companyId)
         }

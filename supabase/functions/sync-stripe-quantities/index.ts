@@ -8,6 +8,9 @@ import {
   type SyncOp,
 } from '../_shared/billingSync.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
+// Lógica pura propia de esta función (normalización de items, etiquetas del
+// audit log, formato de changes) extraída a ./logic.ts para vitest (infra:I22).
+import { describeSyncOp, nameForPrice, toStripeSubItems } from './logic.ts'
 
 // sync-stripe-quantities (F2.15d): worker que ajusta las quantities de cada
 // subscription_item a Stripe segun el uso real. Dispara pg_cron diario.
@@ -121,11 +124,7 @@ async function syncOne(
     return { ...base, outcome: 'error', last_error: `stripe.retrieve fallo: ${(e as Error).message}` }
   }
 
-  const items: StripeSubItem[] = stripeSub.items.data.map(it => ({
-    id: it.id,
-    price: { id: typeof it.price === 'string' ? it.price : it.price.id },
-    quantity: it.quantity ?? 0,
-  }))
+  const items: StripeSubItem[] = toStripeSubItems(stripeSub.items.data)
 
   const ops = planSyncOps(items, expected, priceIds)
   if (ops.length === 0) {
@@ -140,11 +139,7 @@ async function syncOne(
     const key = nameForPrice(op.price, priceIds)
     if (DRY_RUN) {
       // Solo registra lo que haria.
-      changes[key] = op.kind === 'add'
-        ? { kind: op.kind, price: op.price, to: op.to }
-        : op.kind === 'remove'
-          ? { kind: op.kind, price: op.price, from: op.from }
-          : { kind: op.kind, price: op.price, from: op.from, to: op.to }
+      changes[key] = describeSyncOp(op)
       continue
     }
 
@@ -154,10 +149,10 @@ async function syncOne(
           quantity: op.to,
           proration_behavior: 'create_prorations',
         })
-        changes[key] = { kind: 'update', price: op.price, from: op.from, to: op.to }
+        changes[key] = describeSyncOp(op)
       } else if (op.kind === 'remove') {
         await stripe.subscriptionItems.del(op.itemId, { proration_behavior: 'create_prorations' })
-        changes[key] = { kind: 'remove', price: op.price, from: op.from }
+        changes[key] = describeSyncOp(op)
       } else if (op.kind === 'add') {
         await stripe.subscriptionItems.create({
           subscription: sub.stripe_subscription_id,
@@ -165,7 +160,7 @@ async function syncOne(
           quantity: op.to,
           proration_behavior: 'create_prorations',
         })
-        changes[key] = { kind: 'add', price: op.price, to: op.to }
+        changes[key] = describeSyncOp(op)
       }
     } catch (e) {
       applyError = `${op.kind} ${key} fallo: ${(e as Error).message}`
@@ -177,14 +172,6 @@ async function syncOne(
     return { ...base, outcome: 'error', changes, last_error: applyError }
   }
   return { ...base, outcome: 'updated', changes }
-}
-
-function nameForPrice(priceId: string, ids: PlanPriceIds): string {
-  if (priceId === ids.activation)    return 'activation'
-  if (priceId === ids.unit_primary)  return 'unit_primary'
-  if (priceId === ids.extra_project) return 'extra_project'
-  if (priceId === ids.unit_extra)    return 'unit_extra'
-  return priceId
 }
 
 Deno.serve(async (req: Request) => {
