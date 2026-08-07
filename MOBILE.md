@@ -152,6 +152,57 @@ en segundo plano (`scene(_:openURLContexts:)`) y con la app **cerrada del todo**
 Cuando Capacitor adopte escenas upstream, conviene volver a su plantilla y borrar
 esta adaptación.
 
+### iOS: ruido normal en la consola de Xcode al arrancar
+
+Un arranque **sano** de la app en dispositivo imprime esto, y ninguna de las
+líneas marcadas como ruido indica un fallo:
+
+```
+Reading from public effective user settings.                                  ← ruido
+Could not create a sandbox extension for '/var/containers/…/App.app'          ← ruido
+Loading network plugin
+⚡️  Loading app at capacitor://localhost...
+Reachable via WiFi
+⚡️  JS Eval error A JavaScript exception occurred                             ← ruido
+WebContent[…] Unable to hide query parameters from script (missing data)      ← ruido
+⚡️  WebView loaded
+⚡️  To Native ->  StatusBar setOverlaysWebView …
+```
+
+**`JS Eval error` es el único que asusta, y es del framework, no nuestro.** Sale
+**antes** de `WebView loaded`, y ese orden es la prueba: el puente intenta
+evaluar JS cuando el WebView todavía no tiene documento. El emisor es
+`CapacitorBridge.setupCordovaCompatibility()`, que se suscribe a
+`UIScene.willEnterForegroundNotification` y dispara
+`triggerDocumentJSEvent("resume")`; en un arranque en frío la escena pasa a
+primer plano mientras `webView.load(...)` sigue en vuelo, así que
+`window.Capacitor.triggerEvent(...)` se evalúa sobre una página vacía y
+WKWebView devuelve *A JavaScript exception occurred*. Es el único `eval` que el
+puente puede emitir en ese instante: `notifyListeners` sale antes de evaluar
+nada cuando no hay oyentes registrados (`CAPPlugin.m`), y `toJsError`/`logToJs`
+necesitan una llamada previa desde JS.
+
+No hay nada que arreglar y no se pierde funcionalidad: ese primer `resume` no es
+un "volver a primer plano" real —la app está naciendo— y **nadie escucha los
+eventos `resume`/`pause` de documento en este código**. Si algún día hiciera
+falta reaccionar a foreground/background, lo correcto es
+`App.addListener('appStateChange', …)` de `@capacitor/app`, que se registra
+desde JS y por tanto nunca llega antes de que exista el documento.
+
+Las otras tres líneas son del sistema (CFPreferences y WebKit), salen en
+cualquier app con WKWebView y no dependen de nuestro código.
+
+Nada de esto aparece en producción: `loggingBehavior` de Capacitor vale `debug`
+por defecto, es decir, los logs se emiten en builds Debug y **no** en Release.
+Ponerlo a `'none'` en `capacitor.config.ts` silenciaría también esta línea, pero
+se lleva por delante el reenvío de `console.log`/`console.error` de la SPA a
+Xcode, que es justo lo que se quiere durante el desarrollo. **No lo cambies solo
+por esconder este mensaje.**
+
+Corolario práctico: si la app se ve mal o se queda en blanco, **este mensaje no
+es la pista** — busca en el inspector web (Safari → Desarrollo → dispositivo),
+donde sí aparecen los errores reales de la SPA.
+
 ---
 
 ## 4. Layout en teléfono (shell responsive)
