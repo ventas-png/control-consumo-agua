@@ -479,9 +479,21 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
                       <td style={{ padding: '8px 12px', color: 'var(--at-ink)' }}>{row.template_key}</td>
                       <td style={{ padding: '8px 12px', color: 'var(--at-ink)', wordBreak: 'break-all' }}>{row.to_email}</td>
                       <td style={{ padding: '8px 12px' }}>
-                        {row.status === 'sent' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', fontSize: '11px', fontWeight: 600 }}>
-                            ✓ Enviado
+                        {/* Tracking com:N4: rebote duro gana; luego enviado (+abierto vía píxel); luego fallo. */}
+                        {row.bounced_at ? (
+                          <span title={row.bounce_reason ?? ''} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: '11px', fontWeight: 600, cursor: 'help' }}>
+                            ↩ Rebotado
+                          </span>
+                        ) : row.status === 'sent' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', fontSize: '11px', fontWeight: 600 }}>
+                              ✓ Enviado
+                            </span>
+                            {row.opened_at && (
+                              <span title={new Date(row.opened_at).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', fontSize: '11px', fontWeight: 600, cursor: 'help' }}>
+                                👁 Abierto
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <span title={row.error_message ?? ''} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: '11px', fontWeight: 600, cursor: 'help' }}>

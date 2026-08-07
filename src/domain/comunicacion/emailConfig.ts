@@ -41,6 +41,10 @@ export interface EmailSendLogRow {
   status: 'sent' | 'failed'
   error_message: string | null
   sent_at: string
+  /** Tracking de apertura/bounce (com:N4) — sellos idempotentes del pipeline. */
+  opened_at: string | null
+  bounced_at: string | null
+  bounce_reason: string | null
 }
 
 async function getAccessToken(): Promise<string> {
@@ -89,7 +93,7 @@ export async function fetchEmailTemplates(scope: EmailScope): Promise<EmailTempl
 export async function fetchEmailSendLog(scope: EmailScope): Promise<EmailSendLogRow[]> {
   const base = supabase
     .from('email_send_log')
-    .select('id, template_key, to_email, from_email, status, error_message, sent_at')
+    .select('id, template_key, to_email, from_email, status, error_message, sent_at, opened_at, bounced_at, bounce_reason')
   const { data, error } = await (
     scope.isSuperadmin ? base.eq('is_superadmin', true) : base.eq('company_id', scope.companyId!)
   )

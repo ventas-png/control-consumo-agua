@@ -55,6 +55,13 @@ import {
   resolvePreferenceUserId,
   SUPPRESSION_REASON_CHANNEL_DISABLED,
 } from '../_shared/notificationPrefs.ts'
+// Tracking de entrega/lectura (com:N4): token HMAC + píxel de apertura. El
+// endpoint público track-email-open verifica el token y marca 'read'.
+import {
+  appendTrackingPixel,
+  buildPixelUrl,
+  buildTrackingToken,
+} from '../_shared/deliveryTracking.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -109,6 +116,10 @@ interface DispatchResult {
   ok: boolean
   error?: string
   retriable?: boolean
+  // Referencia del mensaje en el canal (com:N4): Gmail message id para email,
+  // user_notifications.id para in_app. Se persiste en provider_message_id para
+  // correlacionar entregas/lecturas/bounces con este envío.
+  providerMessageId?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +187,7 @@ function buildRawMessage(
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-async function sendViaGmail(config: EmailConfig, to: string, subject: string, htmlBody: string, supabase: Client): Promise<void> {
+async function sendViaGmail(config: EmailConfig, to: string, subject: string, htmlBody: string, supabase: Client): Promise<string | null> {
   let accessToken = config.access_token
   const isExpired = isTokenExpired(config.token_expiry)
   if (isExpired && config.refresh_token) {
@@ -198,6 +209,11 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
     e.retriable = retriable
     throw e
   }
+  // messages.send devuelve { id, threadId, ... }: el id correlaciona este envío
+  // con futuros eventos de entrega/bounce (com:N4). Best-effort: si el body no
+  // parsea, el envío igual fue aceptado.
+  const data = await res.json().catch(() => ({})) as { id?: string }
+  return data.id ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +264,7 @@ async function dispatchInApp(admin: Client, row: OutboxRow): Promise<DispatchRes
   }
   if (!titulo) titulo = asString(p.titulo) || 'Notificación'
 
-  const { error } = await admin.from('user_notifications').insert({
+  const { data: inserted, error } = await admin.from('user_notifications').insert({
     user_id: userId,
     company_id: row.company_id,
     tipo: asString(p.tipo) || 'notificacion',
@@ -257,9 +273,11 @@ async function dispatchInApp(admin: Client, row: OutboxRow): Promise<DispatchRes
     seccion: asString(p.seccion) || null,
     ruta_id: (p.ruta_id as string) ?? null,
     ocurrencia_id: (p.ocurrencia_id as string) ?? null,
-  })
+  }).select('id').single()
   if (error) return { ok: false, error: `user_notifications insert: ${error.message}`, retriable: true }
-  return { ok: true }
+  // El id de la campana correlaciona la lectura (trigger sobre leido) con esta
+  // fila del outbox (com:N4).
+  return { ok: true, providerMessageId: (inserted as { id: string } | null)?.id ?? null }
 }
 
 async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchResult> {
@@ -320,9 +338,18 @@ async function dispatchEmail(admin: Client, row: OutboxRow): Promise<DispatchRes
   })
   if (!content.ok) return { ok: false, error: content.error, retriable: false }
 
+  // Píxel de apertura (com:N4): token HMAC firmado con CRON_SECRET que
+  // track-email-open verifica para marcar 'read'. Sin secreto configurado no
+  // se inyecta nada (degradación graceful, el correo sale igual).
+  let htmlToSend = content.htmlBody
+  if (CRON_SECRET) {
+    const token = await buildTrackingToken('o', row.id, CRON_SECRET)
+    htmlToSend = appendTrackingPixel(htmlToSend, buildPixelUrl(SUPABASE_URL, token))
+  }
+
   try {
-    await sendViaGmail(cfg as unknown as EmailConfig, toEmail, content.subject, content.htmlBody, admin)
-    return { ok: true }
+    const gmailMessageId = await sendViaGmail(cfg as unknown as EmailConfig, toEmail, content.subject, htmlToSend, admin)
+    return { ok: true, providerMessageId: gmailMessageId }
   } catch (err) {
     const retriable = (err as { retriable?: boolean })?.retriable ?? true
     return { ok: false, error: err instanceof Error ? err.message : String(err), retriable }
@@ -565,6 +592,16 @@ Deno.serve(async (req: Request) => {
         p_retriable: result.retriable ?? true,
       })
       if (markErr) console.error('[notifications-dispatcher] mark_notification_result failed', row.id, markErr.message)
+
+      // Correlación (com:N4): persistir la referencia del mensaje en el canal
+      // (Gmail message id / user_notifications.id). Best-effort, aparte del
+      // mark_* para no cambiar la firma del RPC existente.
+      if (result.ok && result.providerMessageId) {
+        const { error: refErr } = await admin.from('notifications_outbox')
+          .update({ provider_message_id: result.providerMessageId })
+          .eq('id', row.id)
+        if (refErr) console.error('[notifications-dispatcher] provider_message_id update failed', row.id, refErr.message)
+      }
 
       // Audit trail: una fila por intento (append-only). 'sent' o 'failed' con el
       // detalle del proveedor; `terminal` distingue el fallo definitivo del que

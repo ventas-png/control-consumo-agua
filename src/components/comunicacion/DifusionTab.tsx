@@ -1,6 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
+import { fetchBroadcastEmailStats, type BroadcastEmailStats } from '../../domain/comunicacion/broadcasts'
 import { confirm, notify } from '../shared/Dialog'
 
 interface Props {
@@ -369,7 +370,7 @@ function NuevoComunicadoModal({
 
 // ── Broadcast card ─────────────────────────────────────────────────────────────
 
-function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
+function BroadcastCard({ broadcast, emailStats }: { broadcast: Broadcast; emailStats?: BroadcastEmailStats }) {
   const [expanded, setExpanded] = useState(false)
 
   const targetLabel = {
@@ -430,10 +431,19 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
               <strong style={{ color: 'var(--at-success-strong)' }}>{broadcast.read_count ?? 0}</strong> leídos ({pct}%)
             </span>
             {broadcast.send_email && (
-              <span style={{
-                padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)',
-              }}>📧 Email</span>
+              <span
+                title={emailStats ? `${emailStats.pendientes} en cola · ${emailStats.fallidos} fallidos` : undefined}
+                style={{
+                  padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                  background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)',
+                }}
+              >
+                {/* Tracking de entrega (com:N4): enviados = aceptados por Gmail;
+                    abiertos = píxel (cota superior); rebotados = bounce duro. */}
+                {emailStats
+                  ? `📧 ${emailStats.enviados} enviados · ${emailStats.abiertos} abiertos${emailStats.rebotados > 0 ? ` · ${emailStats.rebotados} rebotados` : ''}`
+                  : '📧 Email'}
+              </span>
             )}
           </div>
         </div>
@@ -465,8 +475,19 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 export default function DifusionTab({ clientes, proyectos, unidades, canCreate }: Props) {
   const { broadcasts, loading, error, loadBroadcasts } = useBroadcasts()
   const [showModal, setShowModal] = useState(false)
+  const [emailStats, setEmailStats] = useState<Record<string, BroadcastEmailStats>>({})
 
   useEffect(() => { loadBroadcasts() }, [loadBroadcasts])
+
+  // Stats de entrega de los emails (com:N4): una sola query al outbox por lote
+  // de comunicados con email. Degrada a {} (sin stats) si la RLS no aplica al rol.
+  useEffect(() => {
+    const ids = broadcasts.filter(b => b.send_email).map(b => b.id)
+    if (ids.length === 0) { setEmailStats({}); return }
+    let cancelled = false
+    fetchBroadcastEmailStats(ids).then(stats => { if (!cancelled) setEmailStats(stats) })
+    return () => { cancelled = true }
+  }, [broadcasts])
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4px 0 24px' }}>
@@ -547,7 +568,7 @@ export default function DifusionTab({ clientes, proyectos, unidades, canCreate }
 
       {!loading && !error && broadcasts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {broadcasts.map(b => <BroadcastCard key={b.id} broadcast={b} />)}
+          {broadcasts.map(b => <BroadcastCard key={b.id} broadcast={b} emailStats={emailStats[b.id]} />)}
         </div>
       )}
 
