@@ -32,7 +32,7 @@ import type {
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
-  ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
@@ -213,6 +213,7 @@ export interface CondominiosTabContext {
   incidentes: IncidenteSeguridad[]
   checklistAreas: ChecklistArea[]
   progLimpieza: ProgramacionLimpieza[]
+  ejecLimpieza: EjecucionLimpieza[]
   consumoEnergia: ConsumoEnergiaArea[]
   historialRes: HistorialResidente[]
   estacVisita: EstacionamientoVisita[]
@@ -643,7 +644,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'checklist_areas', label: 'Checklist', icon: '🗒️', render: (ctx) =>
     <ChecklistAreasTab checklists={ctx.checklistAreas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} onRefresh={ctx.onRefresh} /> },
   { id: 'prog_limpieza', label: 'Limpieza', icon: '🧹', render: (ctx) =>
-    <ProgramacionLimpiezaTab programaciones={ctx.progLimpieza} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} onRefresh={ctx.onRefresh} /> },
+    <ProgramacionLimpiezaTab programaciones={ctx.progLimpieza} ejecuciones={ctx.ejecLimpieza} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} onRefresh={ctx.onRefresh} /> },
   { id: 'consumo_energia', label: 'Consumo Energía', icon: '⚡', render: (ctx) =>
     <ConsumoEnergiaAreasTab consumos={ctx.consumoEnergia} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('consumo_energia')} canEdit={ctx.canEdit('consumo_energia')} onRefresh={ctx.onRefresh} /> },
   { id: 'historial_res', label: 'Historial Res.', icon: '👥', render: (ctx) =>

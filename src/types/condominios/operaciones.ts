@@ -284,12 +284,51 @@ export interface ProgramacionLimpieza {
   project_id: string
   area: string
   frecuencia: FrecuenciaLimpieza
+  /** Texto libre: sirve para terceros (empresa de limpieza) que no están en `personal_condominio`. */
   responsable?: string | null
   ultima_ejecucion?: string | null
   proxima_ejecucion?: string | null
   estado: EstadoLimpieza
   activo: boolean
   notas?: string | null
+  created_at: string
+  // ── Asignación (20260807130000) ──────────────────────────────────────────
+  // Opcionales porque las filas creadas antes de la migración no las traen.
+  /** Empleado asignado. NULL = la cubre quien encaje con `turno`/`cargo`. */
+  personal_id?: string | null
+  /** NULL = cualquier turno. */
+  turno?: TurnoPersonal | null
+  /** NULL = cualquier cargo. */
+  cargo?: CargoPersonal | null
+  /** Orden del área dentro de la ruta (menor primero). */
+  orden?: number
+  /** Si es true, la ejecución del día no se cierra sin al menos una foto. */
+  requiere_foto?: boolean
+}
+
+// ── Ejecución diaria de limpieza (rutas) — 20260807130000 ────────────────────
+
+export type EstadoEjecucionLimpieza = 'pendiente' | 'completada' | 'con_novedad' | 'omitida'
+export type PrioridadNovedadLimpieza = 'baja' | 'media' | 'alta'
+
+/** Una fila por (área, día): lo que le toca hoy a un empleado y cómo quedó. */
+export interface EjecucionLimpieza {
+  id: string
+  company_id: string
+  project_id: string
+  programacion_id: string
+  personal_id?: string | null
+  fecha: string
+  turno?: TurnoPersonal | null
+  orden: number
+  estado: EstadoEjecucionLimpieza
+  completada_en?: string | null
+  /** Paths bare de `condominios-media`; se firman al render (SecureImage). */
+  foto_urls: string[]
+  observacion?: string | null
+  novedad?: string | null
+  requiere_mantenimiento: boolean
+  prioridad?: PrioridadNovedadLimpieza | null
   created_at: string
 }
 
