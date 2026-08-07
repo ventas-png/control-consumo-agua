@@ -27,6 +27,7 @@ begin
   for r in
     with fk as (
       select
+        t.oid      as tbl_oid,
         t.relname  as tbl,
         a.attname  as col,
         cf.relname as ref_tbl,
@@ -42,7 +43,7 @@ begin
         and n.nspname = 'public'
         and array_length(c.conkey, 1) = 1
     )
-    select fk.tbl, fk.col
+    select fk.tbl_oid, fk.tbl, fk.col
     from fk
     where fk.col not in ('company_id', 'project_id', 'unidad_id', 'cliente_id')
       and not (fk.ref_schema = 'auth'   and fk.ref_tbl = 'users')
@@ -50,11 +51,19 @@ begin
       and not exists (
         select 1
         from pg_index i
-        where i.indrelid = ('public.' || fk.tbl)::regclass
+        -- Se usa el OID que ya trae el CTE en vez de reconstruir el nombre y
+        -- castearlo a regclass. Ese cast era un bug latente: Postgres inlinea
+        -- los CTE no recursivos y NO garantiza el orden de evaluación entre el
+        -- filtro `n.nspname = 'public'` y este subquery, así que el plan podía
+        -- evaluar ('public.' || tbl)::regclass sobre filas de OTROS esquemas.
+        -- `auth.identities` (única FK de 1 columna llamada así en el catálogo)
+        -- producía 'public.identities'::regclass → 42P01 y la migración moría.
+        -- Con el OID no hay nombre que construir ni cast que pueda fallar.
+        where i.indrelid = fk.tbl_oid
           and i.indkey[0] = (
             select a2.attnum
             from pg_attribute a2
-            where a2.attrelid = ('public.' || fk.tbl)::regclass
+            where a2.attrelid = fk.tbl_oid
               and a2.attname = fk.col
           )
       )
