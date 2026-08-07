@@ -4,6 +4,7 @@ import { SecureFileLink } from '../../../shared/SecureFileLink'
 import type { SeguridadCtx } from './ctx'
 import { separarDescripcionNovedad } from '../../../../lib/seguridadReglas'
 import { accentPrioridad, PRIORIDAD_CONFIG, TIPO_NOVEDAD_CONFIG } from './ui'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
   const { rondas, canEdit, novedadDetalle, setNovedadDetalle, eliminarNovedad } = ctx
@@ -15,6 +16,7 @@ export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
   const rondaVinculada = novedadDetalle.ronda_id ? rondas.find(r => r.id === novedadDetalle.ronda_id) : null
   const accentColor = accentPrioridad(novedadDetalle.prioridad)
   return (
+    <ModalPortal>
     <div onClick={() => setNovedadDetalle(null)}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
       <div onClick={e => e.stopPropagation()}
@@ -135,5 +137,6 @@ export function NovedadDetalleModal({ ctx }: { ctx: SeguridadCtx }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

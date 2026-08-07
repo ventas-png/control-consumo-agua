@@ -3,6 +3,7 @@ import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } f
 import { notify } from '../shared/Dialog'
 import { calcularFacturaEnergia, validarFacturaEnergia } from '../../lib/businessEnergia'
 import { sanitizeInput } from '../../lib/validation'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface FacturaEnergiaModalProps {
   factura: Partial<FacturaEnergia> | null
@@ -125,6 +126,7 @@ export default function FacturaEnergiaModal({
   }
 
   return (
+    <ModalPortal>
     <div
       style={{
         position: 'fixed',
@@ -398,5 +400,6 @@ export default function FacturaEnergiaModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   )
 }

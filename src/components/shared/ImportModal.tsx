@@ -1,6 +1,7 @@
 import { useState, useRef, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
 import { notify } from '../shared/Dialog'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
+import { ModalPortal } from './ModalPortal'
 
 // ── Tipos públicos ────────────────────────────────────────────────────────
 
@@ -210,7 +211,8 @@ export function ImportModal<T>({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
+    <ModalPortal>
+    <div data-testid="import-modal-overlay" style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={modalStyle}>
         <div style={headerStyle}>
           <div>
@@ -288,6 +290,7 @@ export function ImportModal<T>({
         />
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

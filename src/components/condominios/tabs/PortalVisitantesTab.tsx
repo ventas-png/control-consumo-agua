@@ -6,6 +6,7 @@ import { toast } from '../../../lib/toast'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { diaValidez } from '../../../lib/visitantesFiltros'
 import type { Visitante } from '../../../types'
+import { ModalPortal } from '../../shared/ModalPortal'
 
 interface Props {
   visitantes: Visitante[]
@@ -169,6 +170,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
       </div>
 
       {showForm && (
+        <ModalPortal>
         <div
           onClick={e => { if (e.target === e.currentTarget) resetForm() }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
@@ -376,6 +378,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {visitantes.length === 0 ? (

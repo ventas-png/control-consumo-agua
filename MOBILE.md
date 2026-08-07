@@ -168,6 +168,7 @@ drawer, hazlo en `index.css`.
 | El drawer se esconde con `translateX(-100%)`, nunca con píxeles | Su ancho es `min(280px, 85vw)`. Un desplazamiento fijo de `-256px` dejaba **24px del menú dentro de la pantalla** en cualquier teléfono de ≥330px: como va con `z-index: 200`, tapaba el borde izquierdo de todas las vistas (títulos y breadcrumbs cortados) sin que nadie hubiera tocado el hamburguesa. |
 | La sombra del drawer solo con `.open` | `box-shadow: 0 0 30px` no tiene desplazamiento, así que con el panel fuera de pantalla el halo se seguía dibujando sobre los primeros 30px del contenido. |
 | La topbar es `position: sticky` y **el scroll sigue siendo el del documento** | Antes la topbar (con el botón de menú) se iba de pantalla al bajar y el contenido se metía bajo la barra de estado de iOS, transparente por `viewport-fit=cover`. `sticky` lo arregla sin cambiar quién scrollea. Lleva `!important` porque `Topbar.tsx` trae `position: relative` inline. |
+| Todo overlay de modal va envuelto en `<ModalPortal>` | `src/components/shared/ModalPortal.tsx` lo cuelga de `document.body` con `createPortal`. Elimina de raíz la trampa de la fila siguiente: sin ancestros, ninguno puede scrollear. Cubre `EditModal` (y con él sus 30 usos) más 29 overlays propios en 28 archivos. **No** cambia el apilamiento — `#root` no crea contexto (sin `position`, `isolation`, `transform` ni `contain`), así que los z-index ya competían en el contexto raíz. Fuera quedan `LoginScreen` (es la pantalla entera), `PwaUpdatePrompt` (toast ya colgado de la raíz), el backdrop del drawer y el popover de la campana — estos dos necesitan su sitio en el árbol para apilarse. `Dialog.tsx` y `KeyboardShortcutsHelp` ya portan vía Radix. Al probar un modal, consúltalo con `baseElement`/`screen`, no con `container`. |
 | **NO** dar altura fija al shell para que scrollee `.app-main` | Se probó (`height: 100dvh` + `overflow: hidden`) y hubo que revertirlo: en iOS Safari un `position: fixed` dentro de un contenedor con scroll se posiciona respecto a **ese contenedor**, no al viewport. Los ~40 overlays de modal de la app son `position: fixed` y viven dentro de `.app-main`, así que **todos** quedaban recortados y sin poder scrollear. Mientras scrollee el documento, `.app-main` nunca llega a scrollear y los modales se posicionan contra el viewport. |
 | `scrollAppToTop()` (`src/lib/scroll.ts`) en vez de `window.scrollTo` | Elige el contenedor que realmente tiene scroll, así sigue funcionando si algún día una vista sí monta su propio scroller. |
 | En la app NATIVA el zoom se desactiva por viewport (`src/lib/nativeApp.ts`) | Complemento del anterior, no sustituto. **Safari ignora `maximum-scale` y `user-scalable` desde iOS 10** por accesibilidad, así que en la web el único freno es el font-size. **WKWebView sí los respeta**, de modo que el arreglo del font-size no bastaba dentro de la app: había que cortarlo también por viewport. Solo corre bajo `isNative()`, así que el navegador conserva el pinch-zoom. Se mantiene `viewport-fit=cover`, del que dependen los `env(safe-area-inset-*)`. |
@@ -187,7 +188,9 @@ teléfono:
 4. **Ningún ancestro de un modal es un contenedor que scrollee de verdad**
    (`overflow: auto/scroll` con `scrollHeight > clientHeight`). Es lo que en
    iOS Safari atrapa a los `position: fixed`, y no se reproduce en Chromium —
-   hay que razonarlo o probarlo en un dispositivo.
+   hay que razonarlo o probarlo en un dispositivo. **Desde que los overlays van
+   por `<ModalPortal>` esta invariante se cumple por construcción** (ver abajo),
+   pero sigue anotada: vale para cualquier `fixed` nuevo que no use el portal.
 
 El guard contra el arrastre lateral vive en `#root { overflow-x: clip }`, y esa
 elección tiene dos trampas detrás:

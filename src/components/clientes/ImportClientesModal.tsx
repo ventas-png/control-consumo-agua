@@ -8,6 +8,7 @@ import { validatedInsertMany } from '../../lib/validatedInsert'
 import { clienteInputSchema } from '../../domain/agua/schemas'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
+import { ModalPortal } from '../shared/ModalPortal'
 
 function normalizeDate(raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -427,6 +428,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   }
 
   return (
+    <ModalPortal>
     <div style={overlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={modalStyle}>
         {/* Header */}
@@ -750,5 +752,6 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

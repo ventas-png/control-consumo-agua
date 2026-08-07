@@ -3,6 +3,7 @@ import { notify } from '../shared/Dialog'
 import { createPago, uploadComprobantePago } from '../../domain/cobros/mutations'
 import type { Registro, UserSession, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface Props {
   registro: Registro
@@ -114,6 +115,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
   }
 
   return (
+    <ModalPortal>
     <div
       style={{
         position: 'fixed',
@@ -340,5 +342,6 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

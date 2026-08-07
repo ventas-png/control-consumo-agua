@@ -1,10 +1,12 @@
 // Bloque extraído de VisitantesTab (fase B): JSX idéntico al original.
 import type { VisitantesCtx } from './ctx'
 import { PLATAFORMA_LABEL, PLATAFORMA_COLOR } from './ui'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, reservasSTR, setShowStrModal, strSearch, setStrSearch, strHuespedes, hoy, abrirRegistroSTR } = ctx
   return (
+        <ModalPortal>
         <div onClick={e => { if (e.target === e.currentTarget) { setShowStrModal(false); setStrSearch('') } }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
@@ -169,5 +171,6 @@ export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
             </div>
           </div>
         </div>
+        </ModalPortal>
   )
 }

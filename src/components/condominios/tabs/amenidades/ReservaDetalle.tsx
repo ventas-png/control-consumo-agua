@@ -6,6 +6,7 @@ import { btnAction } from './ui'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import { SecureImage } from '../../../shared/SecureImage'
 import { CheckoutForm } from './comunes'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
   const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
@@ -115,6 +116,7 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
         }
         const accent = r.estado === 'confirmada' ? 'var(--at-accent-2)' : r.estado === 'pendiente' ? 'var(--at-warning)' : 'var(--at-ink-3)'
         return (
+          <ModalPortal>
           <div onClick={() => setReservaDetalle(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'fadeIn 0.15s ease' }}>
             <div onClick={e => e.stopPropagation()}
@@ -190,5 +192,6 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
               </div>
             </div>
           </div>
+          </ModalPortal>
         )
 }

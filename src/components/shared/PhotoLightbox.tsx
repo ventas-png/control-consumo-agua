@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react'
 import { fetchRegistroFoto } from '../../domain/agua/queries'
 import { useSignedUrl } from '../../lib/storageUrls'
+import { ModalPortal } from './ModalPortal'
 
 export function PhotoLightbox({ registroId, label, onClose }: {
   registroId: string; label: string; onClose: () => void
@@ -40,6 +41,7 @@ export function PhotoLightbox({ registroId, label, onClose }: {
   const signedUrl = useSignedUrl(fotoValue, 'registro-fotos', 3600, { width: 1400, quality: 80 })
 
   return (
+    <ModalPortal>
     <div
       onClick={onClose}
       role="dialog"
@@ -72,5 +74,6 @@ export function PhotoLightbox({ registroId, label, onClose }: {
       )}
       <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
     </div>
+    </ModalPortal>
   )
 }

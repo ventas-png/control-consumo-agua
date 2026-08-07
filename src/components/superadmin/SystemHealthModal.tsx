@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
+import { ModalPortal } from '../shared/ModalPortal'
 
 // ============================================================================
 // SystemHealthModal — F4.4.3: dashboard de salud del sistema para superadmin.
@@ -106,6 +107,7 @@ export function SystemHealthModal({ onClose }: Props) {
     error ? 'error' : health?.status === 'ok' ? 'ok' : 'degraded'
 
   return (
+    <ModalPortal>
     <div
       style={overlayStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -210,6 +212,7 @@ export function SystemHealthModal({ onClose }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

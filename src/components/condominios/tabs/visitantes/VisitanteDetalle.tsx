@@ -2,11 +2,13 @@
 import type { VisitantesCtx } from './ctx'
 import { SecureImage } from '../../../shared/SecureImage'
 import { SecureFileLink } from '../../../shared/SecureFileLink'
+import { ModalPortal } from '../../../shared/ModalPortal'
 
 export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, visitanteDetalle, setVisitanteDetalle, hoy, iniciarSalida } = ctx
   if (!visitanteDetalle) return null
   return (
+        <ModalPortal>
         <div onClick={() => setVisitanteDetalle(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
@@ -105,5 +107,6 @@ export function VisitanteDetalle({ ctx }: { ctx: VisitantesCtx }) {
             </div>
           </div>
         </div>
+        </ModalPortal>
   )
 }

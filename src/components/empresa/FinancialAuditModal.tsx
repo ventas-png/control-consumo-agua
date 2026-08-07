@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Fragment, type ReactNode, type CSSProperties } from 'react'
 import { fetchFinancialAuditLog } from '../../domain/empresa/auditoria'
 import { fetchAppUserNamesByIds } from '../../domain/usuarios/queries'
+import { ModalPortal } from '../shared/ModalPortal'
 
 // ============================================================================
 // FinancialAuditModal — F4.2.1: UI sobre audit_log generico de F2.7.
@@ -111,6 +112,7 @@ export function FinancialAuditModal({ onClose }: Props) {
   const hasMore = rows.length === pageSize
 
   return (
+    <ModalPortal>
     <div
       style={overlayStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -247,6 +249,7 @@ export function FinancialAuditModal({ onClose }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
