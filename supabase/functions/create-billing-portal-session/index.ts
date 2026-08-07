@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@17.4.0?target=deno'
 import { getCorsHeaders } from '../_shared/cors.ts'
+// Gate de rol extraído a ./logic.ts para testearlo en vitest (infra:I22).
+// El CORS lo sirve _shared/cors.ts, ya centralizado en main.
+import { canManageBilling } from './logic.ts'
 
 // ============================================================================
 // create-billing-portal-session — Stripe Billing Portal (plat:P1, F2.12)
@@ -58,7 +61,7 @@ Deno.serve(async (req: Request) => {
       .select('role, company_id')
       .eq('id', user.id)
       .single()
-    if (!appUser || !['company_owner', 'admin'].includes((appUser as { role: string }).role)) {
+    if (!appUser || !canManageBilling((appUser as { role: string }).role)) {
       return new Response(JSON.stringify({ error: 'Solo company_owner o admin' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
