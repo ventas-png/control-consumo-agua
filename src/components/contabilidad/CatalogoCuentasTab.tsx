@@ -8,6 +8,8 @@ import { useActualizarCuentaMutation, useCrearCuentaMutation } from '../../domai
 import { buildArbolCuentas, flattenArbol, type CuentaNode } from '../../domain/contabilidad/arbol'
 import { cuentaFormSchema } from '../../domain/contabilidad/schemas'
 import { NATURALEZA_POR_TIPO, TIPO_CUENTA_LABELS, type CuentaContable, type TipoCuenta } from '../../types/contabilidad'
+import type { Proyecto } from '../../types/plataforma'
+import { ImportCuentasModal } from './ImportCuentasModal'
 import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
 interface Props {
@@ -15,6 +17,8 @@ interface Props {
   /** Ledger activo: null = contabilidad de la empresa. */
   projectId: string | null
   monedaBase: string
+  /** Proyectos de la empresa: destinos posibles de la carga masiva. */
+  proyectos: Proyecto[]
 }
 
 interface FormState {
@@ -34,13 +38,14 @@ const FORM_VACIO: FormState = {
   padre_id: '', es_detalle: true, moneda: '', descripcion: '',
 }
 
-export function CatalogoCuentasTab({ companyId, projectId, monedaBase }: Props) {
+export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos }: Props) {
   const { data: cuentas = [], isLoading } = useCuentasQuery(companyId, projectId)
   const crear = useCrearCuentaMutation(companyId, projectId)
   const actualizar = useActualizarCuentaMutation(companyId, projectId)
 
   const [form, setForm] = useState<FormState | null>(null)
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
+  const [importando, setImportando] = useState(false)
 
   const filas = useMemo(() => {
     const visibles = mostrarInactivas ? cuentas : cuentas.filter((c) => c.activa)
@@ -180,6 +185,7 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase }: Props) 
               />
               Ver inactivas
             </label>
+            <button onClick={() => setImportando(true)} style={btnSecundario}>📥 Carga masiva</button>
             <button onClick={abrirNueva} style={btnPrimario}>+ Nueva cuenta</button>
           </div>
         }
@@ -188,6 +194,19 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase }: Props) 
           description: 'El catálogo se crea automáticamente al activar la contabilidad. Si no aparece, contacta al administrador.',
         }}
       />
+
+      {importando && (
+        <ImportCuentasModal
+          companyId={companyId}
+          projectId={projectId}
+          proyectos={proyectos}
+          onClose={() => setImportando(false)}
+          // El listado se refresca solo (la mutación invalida el catálogo del
+          // ledger); el modal se queda en su pantalla de resumen hasta que el
+          // usuario la cierre.
+          onImportado={() => undefined}
+        />
+      )}
 
       {form && (
         <EditModal title={form.id ? 'Editar cuenta' : 'Nueva cuenta'} onClose={() => setForm(null)} size="sm"

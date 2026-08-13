@@ -66,6 +66,17 @@ export interface ImportModalProps<T> {
    * Si no se pasa, se muestra "fila X — errores: ...".
    */
   renderErrorRow?: (row: Record<string, unknown>, errors: string[]) => ReactNode
+
+  /**
+   * Panel de configuración de la importación (destino, modo, etc.). Se muestra
+   * en los pasos de subida y de preview, porque la decisión sigue siendo
+   * editable hasta el momento de importar.
+   */
+  optionsPanel?: ReactNode
+  /** Bloquea el botón "Importar" (p. ej. falta elegir destino). */
+  importDisabled?: boolean
+  /** Motivo mostrado junto al botón cuando `importDisabled`. */
+  importDisabledReason?: string
 }
 
 // ── Estado interno ────────────────────────────────────────────────────────
@@ -94,6 +105,9 @@ export function ImportModal<T>({
   onClose,
   onImportado,
   renderErrorRow,
+  optionsPanel,
+  importDisabled = false,
+  importDisabledReason,
 }: ImportModalProps<T>) {
   const plural = entityLabelPlural ?? `${entityLabel}s`
   const sheetN = sheetName ?? plural.charAt(0).toUpperCase() + plural.slice(1)
@@ -230,6 +244,10 @@ export function ImportModal<T>({
         </div>
 
         <div style={bodyStyle}>
+          {optionsPanel && (step === 'upload' || step === 'preview') && (
+            <div style={{ marginBottom: '20px' }}>{optionsPanel}</div>
+          )}
+
           {step === 'upload' && (
             <UploadStep
               onPlantilla={descargarPlantilla}
@@ -268,8 +286,17 @@ export function ImportModal<T>({
         </div>
 
         <div style={footerStyle}>
+          {step === 'preview' && validCount > 0 && importDisabled && importDisabledReason && (
+            <span style={{ fontSize: '12px', color: 'var(--at-danger-strong)', alignSelf: 'center', marginRight: 'auto' }}>
+              {importDisabledReason}
+            </span>
+          )}
           {step === 'preview' && validCount > 0 && (
-            <button onClick={() => void handleImportar()} style={btnPrimary}>
+            <button
+              onClick={() => void handleImportar()}
+              disabled={importDisabled}
+              style={importDisabled ? { ...btnPrimary, opacity: 0.5, cursor: 'not-allowed' } : btnPrimary}
+            >
               Importar {validCount} {validCount === 1 ? entityLabel : plural}
             </button>
           )}
