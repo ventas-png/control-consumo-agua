@@ -17,7 +17,7 @@ export interface CuentaContable {
   tipo: TipoCuenta
   naturaleza: NaturalezaCuenta
   padre_id: string | null
-  /** 1=clase · 2=grupo · 3=mayor · 4=sub-cuenta · 5=auxiliar */
+  /** 1=clase · 2=grupo · 3=mayor · 4=sub-cuenta · 5..8=auxiliares */
   nivel: number
   es_detalle: boolean
   activa: boolean

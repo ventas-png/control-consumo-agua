@@ -10,22 +10,39 @@ import { ImportModal, type ImportColumn } from '../shared'
 import { StatusBadge } from '../shared/StatusBadge'
 import { notify } from '../shared/Dialog'
 import { useImportarCuentasMutation } from '../../domain/contabilidad/mutations'
-import { validarFilaCuenta, type CuentaImportFila } from '../../domain/contabilidad/importCuentas'
+import { NIVEL_MAXIMO, validarFilaCuenta, type CuentaImportFila } from '../../domain/contabilidad/importCuentas'
 import type { Proyecto } from '../../types/plataforma'
 import { btnSecundario } from './ui'
 
 /** Clave del ledger en la UI: '' = empresa, uuid = proyecto. */
 const EMPRESA = ''
 
+// La jerarquía va en columnas por nivel (n_1…n_8) y no en un código con
+// guiones: Excel convierte "1102-03" en una fecha en cuanto se toca la celda.
+// Con números por nivel no hay nada que autoformatear y el padre no se escribe
+// a mano — se deduce de la propia numeración.
+//
+// Las filas de ejemplo son la documentación real del formato: el nivel 1
+// declara el tipo, los hijos lo heredan, y la naturaleza solo se escribe donde
+// va contra-natura (la depreciación acumulada es un activo acreedor).
 const COLUMNS: ImportColumn[] = [
-  { key: 'codigo',       width: 14, exampleValues: ['1102-03', '5201', '5201-01'] },
-  { key: 'nombre',       width: 30, exampleValues: ['Banco Promerica USD', 'Servicios básicos', 'Energía eléctrica'] },
-  { key: 'tipo',         width: 12, exampleValues: ['activo', 'gasto', 'gasto'] },
-  { key: 'naturaleza',   width: 12, exampleValues: ['deudora', '', ''] },
-  { key: 'padre_codigo', width: 14, exampleValues: ['1102', '52', '5201'] },
-  { key: 'es_detalle',   width: 12, exampleValues: ['sí', 'no', 'sí'] },
-  { key: 'moneda',       width: 10, exampleValues: ['USD', '', ''] },
-  { key: 'descripcion',  width: 34, exampleValues: ['Cuenta monetaria en dólares', '', ''] },
+  { key: 'n_1',         width: 6,  exampleValues: [1, 1, 1, 1, 1, 1] },
+  { key: 'n_2',         width: 6,  exampleValues: [0, 1, 1, 1, 1, 1] },
+  { key: 'n_3',         width: 6,  exampleValues: [0, 0, 1, 1, 1, 1] },
+  { key: 'n_4',         width: 6,  exampleValues: [0, 0, 0, 1, 1, 2] },
+  { key: 'n_5',         width: 6,  exampleValues: [0, 0, 0, 0, 1, 0] },
+  { key: 'n_6',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
+  { key: 'n_7',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
+  { key: 'n_8',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
+  { key: 'nombre',      width: 38, exampleValues: [
+    'ACTIVO', 'NO CORRIENTE', 'PROPIEDAD PLANTA Y EQUIPO',
+    'Vehículos', 'Pick-up Toyota 2020', 'Depreciación acumulada vehículos',
+  ] },
+  { key: 'tipo',        width: 12, exampleValues: ['activo', '', '', '', '', ''] },
+  { key: 'naturaleza',  width: 12, exampleValues: ['', '', '', '', '', 'acreedora'] },
+  { key: 'es_detalle',  width: 12, exampleValues: ['', '', '', '', '', ''] },
+  { key: 'moneda',      width: 10, exampleValues: ['', '', '', '', '', ''] },
+  { key: 'descripcion', width: 34, exampleValues: ['', '', '', '', 'Placa P-123ABC', ''] },
 ]
 
 interface Props {
@@ -113,13 +130,25 @@ export function ImportCuentasModal({ companyId, projectId, proyectos, onClose, o
         </span>
       </label>
 
-      <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
-        La cuenta padre se indica por <strong>código</strong> en la columna
-        <code> padre_codigo</code>. Si la dejas vacía se deduce del propio código
-        (1102-01 → 1102, 1102 → 11) y, si ese código no existe, la cuenta se crea
-        en la raíz. Las cuentas con hijos quedan como agrupadoras (no reciben
-        movimientos) y el árbol admite hasta 5 niveles.
-      </p>
+      <div style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--at-ink-3)', lineHeight: 1.6 }}>
+        <strong>Cómo se llena la plantilla:</strong> una columna por nivel
+        (<code>n_1</code>…<code>n_{NIVEL_MAXIMO}</code>), con <strong>0</strong> en
+        los niveles que la cuenta no usa. La jerarquía sale de esos números — no
+        se escribe ningún código con guiones ni se indica la cuenta padre.
+        <div style={{ marginTop: 6, fontFamily: 'var(--at-mono, monospace)', whiteSpace: 'pre', overflowX: 'auto' }}>
+          {'1 0 0 0 0  ACTIVO            → nivel 1\n'}
+          {'1 1 0 0 0  NO CORRIENTE      → nivel 2, hija de la anterior\n'}
+          {'1 1 1 0 0  PROPIEDAD, PLANTA → nivel 3\n'}
+          {'1 1 1 1 0  Vehículos         → nivel 4'}
+        </div>
+        <div style={{ marginTop: 6 }}>
+          El <strong>tipo</strong> se escribe solo en el nivel 1 y lo heredan sus
+          cuentas hijas; la <strong>naturaleza</strong> únicamente donde va
+          contra-natura (depreciación acumulada). Las cuentas con hijas quedan
+          como agrupadoras y las de la punta reciben movimientos, así que
+          <code> es_detalle</code> solo hace falta para excepciones.
+        </div>
+      </div>
     </fieldset>
   )
 

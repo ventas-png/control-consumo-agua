@@ -37,7 +37,7 @@ export const cuentaFormSchema = z.object({
   tipo: z.enum(['activo', 'pasivo', 'capital', 'ingreso', 'gasto']),
   naturaleza: z.enum(['deudora', 'acreedora']),
   padre_id: z.string().uuid().nullable(),
-  nivel: z.number().int().min(1).max(5),
+  nivel: z.number().int().min(1).max(8),
   es_detalle: z.boolean(),
   moneda: z.string().trim().toUpperCase().length(3, 'Código ISO de 3 letras (ej. USD)').nullable(),
   descripcion: z.string().trim().max(500).nullable(),
