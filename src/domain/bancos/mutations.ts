@@ -10,7 +10,7 @@ import { runQuery } from '../queryFetch'
 import { bancosKeys } from './keys'
 import { contabilidadKeys } from '../contabilidad/keys'
 import type { BancoMovimiento, CuentaBancaria } from '../../types/bancos'
-import type { CuentaBancariaFormInput, MovimientoImportado } from './schemas'
+import { construirLoteExtracto, type CuentaBancariaFormInput, type MovimientoImportado } from './schemas'
 
 function useInvalidarBancos() {
   const qc = useQueryClient()
@@ -51,31 +51,38 @@ export function useGuardarCuentaBancariaMutation(companyId?: string, projectId?:
 }
 
 /**
- * Inserta un lote del extracto. upsert con ignoreDuplicates: las filas que ya
- * existen (mismo banco+fecha+monto+referencia) se omiten silenciosamente.
+ * Inserta un lote del extracto EN LA CONTABILIDAD DE LA CUENTA BANCARIA
+ * (empresa o proyecto): `construirLoteExtracto` rechaza una cuenta que no sea
+ * del ledger activo y la BD vuelve a sellar company_id/project_id desde la
+ * cuenta, así que un extracto no puede aterrizar en la contabilidad de otro.
+ *
+ * upsert con ignoreDuplicates: las filas que ya existen (mismo banco+fecha+
+ * monto+referencia) se omiten. El árbitro es `uq_banco_mov_dedup`, que debe ser
+ * un índice COMPLETO: PostgREST manda `ON CONFLICT (<columnas>)` sin predicado,
+ * y mientras el índice fue PARCIAL (WHERE referencia IS NOT NULL) Postgres no
+ * podía inferirlo y rechazaba el lote entero con "there is no unique or
+ * exclusion constraint matching the ON CONFLICT specification".
  * Devuelve cuántas filas se insertaron de verdad.
  */
-export function useImportarMovimientosMutation(companyId?: string) {
+export function useImportarMovimientosMutation(companyId?: string, projectId?: string | null) {
   const invalidar = useInvalidarBancos()
   return useMutation({
-    mutationFn: async (vars: { cuentaBancariaId: string; movimientos: MovimientoImportado[] }) => {
+    mutationFn: async (vars: { cuenta: CuentaBancaria; movimientos: MovimientoImportado[] }) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const loteId = crypto.randomUUID()
+      const filas = construirLoteExtracto({
+        cuenta: vars.cuenta,
+        companyId,
+        projectId: projectId ?? null,
+        movimientos: vars.movimientos,
+        loteId: crypto.randomUUID(),
+      })
       const rows = await runQuery<{ id: string }[]>((signal) =>
         supabase
           .from('banco_movimientos')
-          .upsert(
-            vars.movimientos.map((m) => ({
-              company_id: companyId,
-              cuenta_bancaria_id: vars.cuentaBancariaId,
-              fecha: m.fecha,
-              descripcion: m.descripcion,
-              referencia: m.referencia,
-              monto: m.monto,
-              lote_id: loteId,
-            })),
-            { onConflict: 'cuenta_bancaria_id,fecha,monto,referencia', ignoreDuplicates: true },
-          )
+          .upsert(filas, {
+            onConflict: 'cuenta_bancaria_id,fecha,monto,referencia',
+            ignoreDuplicates: true,
+          })
           .select('id')
           .abortSignal(signal),
       )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '../shared/SessionContext'
 import { TabStrip } from '../shared/TabStrip'
 import { useProyectosQuery } from '../../domain/agua/queries'
@@ -35,32 +35,57 @@ const TABS: { id: SubTab; label: string; icon: string }[] = [
  * propios); los asientos automáticos nacen de los triggers de BD en el
  * ledger del documento.
  */
+/** Contabilidad recordada de una empresa (null = la de la empresa). */
+function leerLedgerGuardado(companyId?: string | null): string | null {
+  if (!companyId) return null
+  return localStorage.getItem(`conta-ledger:${companyId}`) || null
+}
+
 export function ContabilidadSection() {
   const session = useSession()
   const companyId = session.company_id
   const [tab, setTab] = useState<SubTab>('polizas')
 
-  const { data: proyectos = [] } = useProyectosQuery(companyId)
+  const { data: proyectos = [], isSuccess: proyectosCargados } = useProyectosQuery(companyId)
 
   // Ledger activo: null = contabilidad de la EMPRESA; uuid = la del proyecto.
-  // Persistido por empresa para volver donde el admin trabajaba.
-  const ledgerKey = `conta-ledger:${companyId ?? ''}`
-  const [ledgerProjectId, setLedgerProjectId] = useState<string | null>(() => {
-    const stored = localStorage.getItem(`conta-ledger:${companyId ?? ''}`)
-    return stored || null
-  })
+  // Persistido por empresa para volver donde el admin trabajaba. El estado
+  // guarda TAMBIÉN la empresa dueña de la selección: sin eso, el proyecto de
+  // una empresa se arrastraba (y se re-persistía) bajo la llave de otra cuando
+  // la sesión cambiaba de empresa o cuando aún no había resuelto al montar.
+  const [ledger, setLedger] = useState<{ empresa: string | null; proyecto: string | null }>(() => ({
+    empresa: companyId ?? null,
+    proyecto: leerLedgerGuardado(companyId),
+  }))
+  const ledgerProjectId = ledger.empresa === (companyId ?? null) ? ledger.proyecto : null
+  const elegirLedger = useCallback(
+    (proyecto: string | null) => setLedger({ empresa: companyId ?? null, proyecto }),
+    [companyId],
+  )
+  // Cambió la empresa: la contabilidad activa se relee de ESA empresa.
   useEffect(() => {
-    if (ledgerProjectId) localStorage.setItem(ledgerKey, ledgerProjectId)
-    else localStorage.removeItem(ledgerKey)
-  }, [ledgerKey, ledgerProjectId])
-  // Si el proyecto persistido ya no existe/accesible, volver a la empresa.
+    if (ledger.empresa === (companyId ?? null)) return
+    setLedger({ empresa: companyId ?? null, proyecto: leerLedgerGuardado(companyId) })
+  }, [companyId, ledger.empresa])
   useEffect(() => {
-    if (ledgerProjectId && proyectos.length > 0 && !proyectos.some((p) => p.id === ledgerProjectId)) {
-      setLedgerProjectId(null)
+    if (!companyId || ledger.empresa !== companyId) return
+    const key = `conta-ledger:${companyId}`
+    if (ledger.proyecto) localStorage.setItem(key, ledger.proyecto)
+    else localStorage.removeItem(key)
+  }, [companyId, ledger])
+  // Si el proyecto persistido no es de esta empresa (o ya no existe/accesible),
+  // volver a la empresa. La guarda corre en cuanto la lista resuelve, incluso
+  // vacía: una empresa SIN proyectos conservaba el proyecto de la anterior.
+  useEffect(() => {
+    if (proyectosCargados && ledgerProjectId && !proyectos.some((p) => p.id === ledgerProjectId)) {
+      elegirLedger(null)
     }
-  }, [ledgerProjectId, proyectos])
+  }, [ledgerProjectId, proyectos, proyectosCargados, elegirLedger])
 
   const { data: monedaBase = 'GTQ' } = useMonedaBaseQuery(companyId, ledgerProjectId)
+  // Identidad de la contabilidad activa (empresa + proyecto) para remontar las
+  // pestañas al cambiarla.
+  const ledgerKeyUI = `${companyId ?? ''}:${ledgerProjectId ?? 'empresa'}`
   const ledgerNombre = ledgerProjectId
     ? proyectos.find((p) => p.id === ledgerProjectId)?.nombre ?? 'Proyecto'
     : 'Empresa'
@@ -89,7 +114,7 @@ export function ContabilidadSection() {
           Contabilidad
           <select
             value={ledgerProjectId ?? ''}
-            onChange={(e) => setLedgerProjectId(e.target.value || null)}
+            onChange={(e) => elegirLedger(e.target.value || null)}
             aria-label="Seleccionar contabilidad"
             style={{ padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13, fontWeight: 600, minWidth: 220, background: 'var(--at-surface)' }}
           >
@@ -111,32 +136,36 @@ export function ContabilidadSection() {
         onChange={setTab}
       />
 
+      {/* `key` por ledger: cambiar de contabilidad REMONTA la pestaña, así el
+          estado local de cada una (cuenta bancaria elegida, filtros, periodo,
+          formularios a medio llenar) nunca se arrastra de una contabilidad a
+          otra ni se aplica sobre la que no le toca. */}
       {tab === 'polizas' && (
-        <AsientosTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <AsientosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'balanza' && (
-        <BalanzaTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'eeff' && (
-        <EstadosFinancierosTab companyId={companyId} projectId={ledgerProjectId} ledgerNombre={ledgerNombre} monedaBase={monedaBase} />
+        <EstadosFinancierosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} ledgerNombre={ledgerNombre} monedaBase={monedaBase} />
       )}
       {tab === 'bancos' && (
-        <BancosTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <BancosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'cxp' && (
-        <CuentasPorPagarTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <CuentasPorPagarTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'proveedores' && (
-        <ProveedoresTab companyId={companyId} />
+        <ProveedoresTab key={companyId} companyId={companyId} />
       )}
       {tab === 'presupuesto' && (
-        <PresupuestoTab companyId={companyId} projectId={ledgerProjectId} proyectos={proyectos} monedaBase={monedaBase} />
+        <PresupuestoTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} proyectos={proyectos} monedaBase={monedaBase} />
       )}
       {tab === 'catalogo' && (
-        <CatalogoCuentasTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <CatalogoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'configuracion' && (
-        <MapeoCuentasTab companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <MapeoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
     </div>
   )

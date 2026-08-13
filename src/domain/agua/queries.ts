@@ -62,19 +62,30 @@ export async function fetchRegistroFoto(registroId: string): Promise<string | nu
   return data?.foto ?? null
 }
 
-// `projects` (proyectos del tenant). RLS los scopea por empresa; orden por nombre
-// igual que useData. Es la ÚLTIMA colección que vivía en useData → cierra
-// `agua:A4`. El hook devuelve el set CRUDO que RLS permite; el filtrado fino por
-// asignación de proyecto (filterProyectosByAssignment) y la derivación de
-// moneda/maxUnidades (deriveProyectoConfig) se aplican en el consumidor (App),
-// igual que rutas usa filterRutasByProjectAccess.
+// `projects` (proyectos del tenant), acotados a la empresa de la sesión. Orden
+// por nombre igual que useData. Es la ÚLTIMA colección que vivía en useData →
+// cierra `agua:A4`. El hook devuelve el set CRUDO de esa empresa; el filtrado
+// fino por asignación de proyecto (filterProyectosByAssignment) y la derivación
+// de moneda/maxUnidades (deriveProyectoConfig) se aplican en el consumidor
+// (App), igual que rutas usa filterRutasByProjectAccess.
+//
+// El `.eq('company_id', …)` NO es redundante con la RLS: la policy projects_select
+// deja pasar TODOS los proyectos de TODAS las empresas a un super_admin
+// (`is_super_admin() OR …`), así que sin el filtro el selector de proyecto —y con
+// él la contabilidad por proyecto— mezclaba proyectos de otras empresas. Para el
+// resto de roles la RLS ya acota a su empresa y el filtro no cambia nada.
 export function useProyectosQuery(companyId?: string) {
   return useQuery({
     queryKey: aguaKeys.proyectos(companyId),
     queryFn: async () => {
       const rows =
         (await runQuery((signal) =>
-          db.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal),
+          db
+            .from('projects')
+            .select('*')
+            .eq('company_id', companyId!)
+            .order('nombre', { ascending: true })
+            .abortSignal(signal),
         )) ?? []
       // La columna generada `estado` es string; el dominio la acota a EstadoProyecto (CHECK en BD).
       return rows.map((r): Proyecto => ({ ...r, estado: r.estado as Proyecto['estado'] }))
