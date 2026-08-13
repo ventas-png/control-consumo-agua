@@ -24,7 +24,7 @@ import type {
   FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
   GastoCondominio, PresupuestoCondominio, AlertaCondominio,
   EventoCalendario, ConfiguracionCondominio,
-  SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
+  SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
   CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
@@ -66,7 +66,7 @@ export type CondominioTab =
   | 'firmas' | 'concierge' | 'llaves' | 'encuestas'
   | 'contabilidad' | 'presupuesto' | 'alertas' | 'reportes'
   | 'estadocuenta' | 'calendario' | 'directorio' | 'configuracion'
-  | 'solicitudes' | 'solicitudes_renta' | 'solicitudes_mudanza' | 'junta' | 'prestamos' | 'comunicados'
+  | 'solicitudes' | 'solicitudes_renta' | 'solicitudes_mudanza' | 'mensajes_portal' | 'junta' | 'prestamos' | 'comunicados'
   | 'actas' | 'cierres' | 'notificaciones' | 'medidores_unidad'
   | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
   | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
@@ -180,6 +180,7 @@ export interface CondominiosTabContext {
   solicitudes: SolicitudResidente[]
   solicitudesRenta: SolicitudRentaUnidad[]
   solicitudesMudanza: SolicitudMudanzaUnidad[]
+  mensajesPortal: MensajePortal[]
   junta: MiembroJunta[]
   prestamos: PrestamoEquipo[]
   comunicados: ComunicadoCondominio[]
@@ -331,6 +332,7 @@ const ConfiguracionTab = lazy(() => import('./tabs/ConfiguracionTab').then(m => 
 const SolicitudesTab = lazy(() => import('./tabs/SolicitudesTab').then(m => ({ default: m.SolicitudesTab })))
 const SolicitudesRentaTab = lazy(() => import('./tabs/SolicitudesRentaTab').then(m => ({ default: m.SolicitudesRentaTab })))
 const SolicitudesMudanzaTab = lazy(() => import('./tabs/SolicitudesMudanzaTab').then(m => ({ default: m.SolicitudesMudanzaTab })))
+const MensajesPortalTab = lazy(() => import('./tabs/MensajesPortalTab').then(m => ({ default: m.MensajesPortalTab })))
 const JuntaTab = lazy(() => import('./tabs/JuntaTab').then(m => ({ default: m.JuntaTab })))
 const PrestamoEquiposTab = lazy(() => import('./tabs/PrestamoEquiposTab').then(m => ({ default: m.PrestamoEquiposTab })))
 const ComunicadosTab = lazy(() => import('./tabs/ComunicadosTab').then(m => ({ default: m.ComunicadosTab })))
@@ -577,6 +579,8 @@ export const TAB_REGISTRY: TabDef[] = [
     <SolicitudesRentaTab solicitudes={ctx.solicitudesRenta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} autorNombre={ctx.currentUser.name ?? ''} canEdit={ctx.canEdit('solicitudes_renta')} onRefresh={ctx.onRefresh} /> },
   { id: 'solicitudes_mudanza', label: 'Autorizac. Mudanza', icon: '🚛', render: (ctx) =>
     <SolicitudesMudanzaTab solicitudes={ctx.solicitudesMudanza} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} autorNombre={ctx.currentUser.name ?? ''} canEdit={ctx.canEdit('solicitudes_mudanza')} onRefresh={ctx.onRefresh} /> },
+  { id: 'mensajes_portal', label: 'Mensajes Portal', icon: '📨', render: (ctx) =>
+    <MensajesPortalTab mensajes={ctx.mensajesPortal} unidades={ctx.unidadesProyecto} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} canEdit={ctx.canEdit('mensajes_portal')} onRefresh={ctx.onRefresh} /> },
   { id: 'junta', label: 'Junta Directiva', icon: '👑', render: (ctx) =>
     <JuntaTab junta={ctx.junta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('junta')} canEdit={ctx.canEdit('junta')} onRefresh={ctx.onRefresh} /> },
   { id: 'prestamos', label: 'Préstamo Equip.', icon: '🪑', render: (ctx) =>

@@ -227,6 +227,12 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
     db.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
     db.from('solicitud_mudanza_unidad').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
+    // Mensajes que los residentes envían desde su portal ("Mensajes a la
+    // administración"). Los escribe PortalMiUnidadTab y hasta ahora el único
+    // lector del lado admin era ese mismo tab dentro de "Portal Resid.", que
+    // exige elegir la unidad de antemano — nadie los veía llegar. Este select
+    // alimenta la bandeja del proyecto (MensajesPortalTab).
+    db.from('mensajes_portal').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
   ])
 }
 
