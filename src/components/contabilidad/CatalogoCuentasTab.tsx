@@ -9,6 +9,7 @@ import { buildArbolCuentas, flattenArbol, type CuentaNode } from '../../domain/c
 import { cuentaFormSchema } from '../../domain/contabilidad/schemas'
 import { NATURALEZA_POR_TIPO, TIPO_CUENTA_LABELS, type CuentaContable, type TipoCuenta } from '../../types/contabilidad'
 import type { Proyecto } from '../../types/plataforma'
+import { NIVEL_MAXIMO } from '../../domain/contabilidad/importCuentas'
 import { ImportCuentasModal } from './ImportCuentasModal'
 import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
 
@@ -79,7 +80,7 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
       tipo: form.tipo,
       naturaleza: form.naturaleza,
       padre_id: form.padre_id || null,
-      nivel: padre ? Math.min(padre.nivel + 1, 5) : 1,
+      nivel: padre ? Math.min(padre.nivel + 1, NIVEL_MAXIMO) : 1,
       es_detalle: form.es_detalle,
       moneda: form.moneda.trim() === '' ? null : form.moneda,
       descripcion: form.descripcion.trim() === '' ? null : form.descripcion,
@@ -240,7 +241,7 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
                 style={input}
               >
                 <option value="">(raíz)</option>
-                {cuentas.filter((c) => c.activa && c.nivel < 5 && c.id !== form.id).map((c) => (
+                {cuentas.filter((c) => c.activa && c.nivel < NIVEL_MAXIMO && c.id !== form.id).map((c) => (
                   <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
                 ))}
               </select>

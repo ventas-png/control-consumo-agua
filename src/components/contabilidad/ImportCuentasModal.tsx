@@ -10,14 +10,14 @@ import { ImportModal, type ImportColumn } from '../shared'
 import { StatusBadge } from '../shared/StatusBadge'
 import { notify } from '../shared/Dialog'
 import { useImportarCuentasMutation } from '../../domain/contabilidad/mutations'
-import { validarFilaCuenta, type CuentaImportFila } from '../../domain/contabilidad/importCuentas'
+import { NIVEL_MAXIMO, validarFilaCuenta, type CuentaImportFila } from '../../domain/contabilidad/importCuentas'
 import type { Proyecto } from '../../types/plataforma'
 import { btnSecundario } from './ui'
 
 /** Clave del ledger en la UI: '' = empresa, uuid = proyecto. */
 const EMPRESA = ''
 
-// La jerarquía va en columnas por nivel (n_1…n_5) y no en un código con
+// La jerarquía va en columnas por nivel (n_1…n_8) y no en un código con
 // guiones: Excel convierte "1102-03" en una fecha en cuanto se toca la celda.
 // Con números por nivel no hay nada que autoformatear y el padre no se escribe
 // a mano — se deduce de la propia numeración.
@@ -31,6 +31,9 @@ const COLUMNS: ImportColumn[] = [
   { key: 'n_3',         width: 6,  exampleValues: [0, 0, 1, 1, 1, 1] },
   { key: 'n_4',         width: 6,  exampleValues: [0, 0, 0, 1, 1, 2] },
   { key: 'n_5',         width: 6,  exampleValues: [0, 0, 0, 0, 1, 0] },
+  { key: 'n_6',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
+  { key: 'n_7',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
+  { key: 'n_8',         width: 6,  exampleValues: [0, 0, 0, 0, 0, 0] },
   { key: 'nombre',      width: 38, exampleValues: [
     'ACTIVO', 'NO CORRIENTE', 'PROPIEDAD PLANTA Y EQUIPO',
     'Vehículos', 'Pick-up Toyota 2020', 'Depreciación acumulada vehículos',
@@ -129,9 +132,9 @@ export function ImportCuentasModal({ companyId, projectId, proyectos, onClose, o
 
       <div style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--at-ink-3)', lineHeight: 1.6 }}>
         <strong>Cómo se llena la plantilla:</strong> una columna por nivel
-        (<code>n_1</code>…<code>n_5</code>), con <strong>0</strong> en los niveles
-        que la cuenta no usa. La jerarquía sale de esos números — no se escribe
-        ningún código con guiones ni se indica la cuenta padre.
+        (<code>n_1</code>…<code>n_{NIVEL_MAXIMO}</code>), con <strong>0</strong> en
+        los niveles que la cuenta no usa. La jerarquía sale de esos números — no
+        se escribe ningún código con guiones ni se indica la cuenta padre.
         <div style={{ marginTop: 6, fontFamily: 'var(--at-mono, monospace)', whiteSpace: 'pre', overflowX: 'auto' }}>
           {'1 0 0 0 0  ACTIVO            → nivel 1\n'}
           {'1 1 0 0 0  NO CORRIENTE      → nivel 2, hija de la anterior\n'}

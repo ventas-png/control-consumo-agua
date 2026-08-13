@@ -293,18 +293,19 @@ describe('planificarCatalogo', () => {
     expect(plan.omitidas.every((o) => /circular/.test(o.motivo))).toBe(true)
   })
 
-  it('rechaza pasar del nivel 5', () => {
+  it('admite una rama hasta el nivel 8 y rechaza el 9', () => {
+    // '1' ya existe en el ledger (nivel 1) → la rama del archivo va del 2 al 9.
+    const rama = ['1.1', '1.1.1', '1.1.1.1', '1.1.1.1.1', '1.1.1.1.1.1', '1.1.1.1.1.1.1', '1.1.1.1.1.1.1.1']
     const plan = planificarCatalogo(
       [
-        fila({ codigo: '1102-01-01', nombre: 'Nivel 5', padre_codigo: '1102-01' }),
-        fila({ codigo: '1102-01', nombre: 'Nivel 4', padre_codigo: '1102' }),
-        fila({ codigo: '1102-01-01-01', nombre: 'Nivel 6', padre_codigo: '1102-01-01' }),
+        ...rama.map((codigo, i) => heredada(codigo, i === 0 ? '1' : rama[i - 1], { nombre: `Nivel ${i + 2}` })),
+        heredada('1.1.1.1.1.1.1.1.1', '1.1.1.1.1.1.1.1', { nombre: 'Nivel 9' }),
       ],
       existentes,
     )
-    expect(plan.crear.map((c) => c.cuenta.codigo)).toEqual(['1102-01', '1102-01-01'])
+    expect(plan.crear.map((c) => c.nivel)).toEqual([2, 3, 4, 5, 6, 7, 8])
     expect(plan.omitidas).toHaveLength(1)
-    expect(plan.omitidas[0].motivo).toMatch(/nivel máximo/i)
+    expect(plan.omitidas[0].motivo).toMatch(/nivel máximo \(8\)/i)
   })
 
   it('descarta duplicados dentro del archivo y conserva la primera fila', () => {

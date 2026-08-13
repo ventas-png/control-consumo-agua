@@ -1,15 +1,17 @@
 // Contabilidad — CARGA MASIVA del catálogo de cuentas (lógica pura, testeable).
 //
-// FORMATO DEL ARCHIVO (el de la plantilla): una COLUMNA POR NIVEL, `n_1`..`n_5`,
+// FORMATO DEL ARCHIVO (el de la plantilla): una COLUMNA POR NIVEL, `n_1`..`n_8`,
 // con 0 en los niveles que la cuenta no usa. La jerarquía se lee sola y el
 // código de la cuenta sale de unir los niveles con punto:
 //
-//   n_1 n_2 n_3 n_4 n_5   nombre                       → código   nivel  padre
-//    1   0   0   0   0    ACTIVO                         1          1     —
-//    1   1   0   0   0    NO CORRIENTE                   1.1        2     1
-//    1   1   1   0   0    PROPIEDAD PLANTA Y EQUIPO      1.1.1      3     1.1
-//    1   1   1   1   0    Vehículos                      1.1.1.1    4     1.1.1
-//    1   1   1   1   1    Pick-up Toyota 2020            1.1.1.1.1  5     1.1.1.1
+//   n_1 n_2 n_3 n_4 n_5 …  nombre                     → código   nivel  padre
+//    1   0   0   0   0      ACTIVO                       1          1     —
+//    1   1   0   0   0      NO CORRIENTE                 1.1        2     1
+//    1   1   1   0   0      PROPIEDAD PLANTA Y EQUIPO    1.1.1      3     1.1
+//    1   1   1   1   0      Vehículos                    1.1.1.1    4     1.1.1
+//    1   1   1   1   1      Pick-up Toyota 2020          1.1.1.1.1  5     1.1.1.1
+//
+// El árbol llega hasta `n_8`; las columnas que sobran se dejan en 0.
 //
 // Por qué así y no una columna `codigo` con guiones: Excel convierte `1102-03`
 // en una FECHA en cuanto la celda se toca, y el catálogo entraba corrupto sin
@@ -37,11 +39,11 @@
 import { NATURALEZA_POR_TIPO, type NaturalezaCuenta, type TipoCuenta } from '../../types/contabilidad'
 import { normalizarMoneda } from './schemas'
 
-/** Nivel máximo del catálogo (CHECK nivel BETWEEN 1 AND 5 en BD). */
-export const NIVEL_MAXIMO = 5
+/** Nivel máximo del catálogo (CHECK nivel BETWEEN 1 AND 8 en BD). */
+export const NIVEL_MAXIMO = 8
 
 /** Cabeceras de las columnas por nivel, en orden. */
-export const COLUMNAS_NIVEL = ['n_1', 'n_2', 'n_3', 'n_4', 'n_5'] as const
+export const COLUMNAS_NIVEL = ['n_1', 'n_2', 'n_3', 'n_4', 'n_5', 'n_6', 'n_7', 'n_8'] as const
 
 /** Une los niveles del código: 1 · 1 · 3 → "1.1.3". */
 export const SEPARADOR_NIVEL = '.'
@@ -87,7 +89,7 @@ export interface CuentaResuelta {
 
 export interface CuentaPlanCrear {
   cuenta: CuentaResuelta
-  /** Nivel calculado (1..5) a partir de la cadena de padres. */
+  /** Nivel calculado (1..8) a partir de la cadena de padres. */
   nivel: number
   /** Código del padre ya resuelto (null = cuenta raíz). */
   padre_codigo: string | null
@@ -199,7 +201,7 @@ interface Jerarquia {
 }
 
 /**
- * Lee `n_1`..`n_5` y arma código, padre y nivel. El 0 (o la celda vacía) marca
+ * Lee `n_1`..`n_8` y arma código, padre y nivel. El 0 (o la celda vacía) marca
  * "esta cuenta no llega a este nivel", y una vez que aparece ya no puede volver
  * a haber número: 1·0·2 no describe ninguna cuenta.
  */
@@ -248,7 +250,7 @@ export function jerarquiaDesdeNiveles(
 
 /**
  * Valida y normaliza una fila cruda del archivo. Acepta los dos formatos:
- * columnas por nivel (`n_1`..`n_5`, el de la plantilla) o el viejo `codigo` +
+ * columnas por nivel (`n_1`..`n_8`, el de la plantilla) o el viejo `codigo` +
  * `padre_codigo`. Si la fila trae ambos, mandan las columnas por nivel.
  */
 export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResultado {
@@ -273,7 +275,7 @@ export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResul
   } else {
     codigo = texto(row['codigo'])
     const padre = texto(row['padre_codigo'])
-    if (!codigo) errors.push('indica el nivel en las columnas n_1…n_5 (o un codigo)')
+    if (!codigo) errors.push('indica el nivel en las columnas n_1…n_8 (o un codigo)')
     else if (codigo.length > 20) errors.push('codigo no puede exceder 20 caracteres')
     else if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(codigo))
       errors.push(`codigo inválido: "${codigo}" — use letras, números, punto o guion (ej. 1102-01)`)
