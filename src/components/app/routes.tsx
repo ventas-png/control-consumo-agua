@@ -305,7 +305,11 @@ export const APP_ROUTES: AppRouteDef[] = [
     render: () => <SuperAdminSection />,
   },
   {
-    path: '/comunicacion', sectionName: 'comunicacion',
+    // Mismo desalineo que tenía /contabilidad, en el sentido inverso: el
+    // sidebar ya ocultaba Comunicación a quien no tiene
+    // platform.comunicacion.view, pero la ruta no comprobaba nada y el
+    // deep-link montaba la sección y disparaba sus queries.
+    path: '/comunicacion', sectionName: 'comunicacion', module: 'comunicacion',
     render: ({ currentUser, agua, canCreate, canEdit }) => (
       <ComunicacionSection
         currentUser={currentUser}

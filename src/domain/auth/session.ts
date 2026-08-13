@@ -6,6 +6,7 @@
 // puras de datos, testeables de forma aislada.
 import { reportDegradedQuery } from '../queryFetch'
 import { supabase } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 import { APP_CONFIG } from '../../lib/config'
 import { storeSession } from '../../lib/authSession'
 import type { UserSession, UserRole, AssignedRoleInfo } from '../../types'
@@ -26,7 +27,16 @@ export async function buildSessionFromSupabase(
     .eq('id', userId)
     .single()
 
-  const rbacPermsQuery = supabase.rpc('get_user_permissions', { target_user_id: userId })
+  // Paginada: un rol de acceso amplio ("Finanzas / Contador") pasa de las 1100
+  // claves y la RPC devuelve SETOF text, sujeto al mismo tope de filas que
+  // cualquier tabla. Truncada, la sesión se queda con un subconjunto ARBITRARIO
+  // — el módulo aparecía o no según el login. La RPC ordena por clave
+  // (20260818000100) para que `.range()` no salte ni duplique filas.
+  const rbacPermsQuery = fetchAllRows<{ get_user_permissions?: string } | string>(
+    (from, to) => supabase
+      .rpc('get_user_permissions', { target_user_id: userId })
+      .range(from, to),
+  ).then(r => ({ data: r.error ? null : r.data, error: r.error ? { message: r.error } : null }))
 
   const userRolesQuery = supabase
     .from('user_roles')
@@ -57,6 +67,10 @@ export async function buildSessionFromSupabase(
   else if (dbRole === 'collector') uiRole = 'collector'
 
   const displayName = prof?.full_name ?? email
+
+  // Hasta ahora un fallo de la RPC de permisos era MUDO: la sesión se construía
+  // sin permisos y el usuario perdía todos sus módulos sin dejar rastro.
+  reportDegradedQuery('auth.get_user_permissions', rbacPermsResult.error)
 
   // Batch 2: company flags (needs companyId from batch 1) — wrapped in 4s timeout
   // to prevent login from hanging if Supabase is slow or the nested join stalls
@@ -225,6 +239,15 @@ export async function refreshSessionFromSupabase(
       current.email,
       expiresAt,
     )
+    // `permissions: undefined` NO significa "sin permisos": buildPermissionsSet
+    // solo devuelve undefined cuando la RPC falló (un usuario sin permisos
+    // devuelve un Set vacío). Degradarlo a [] hacía que un fallo transitorio se
+    // leyera como "le quitaron todo" y se PERSISTIERA una sesión sin permisos:
+    // el sidebar se vaciaba —Contabilidad incluida— hasta el siguiente refresh
+    // con suerte. Ante ese caso conservamos los permisos que ya teníamos.
+    if (!fresh.permissions && current.permissions) {
+      fresh.permissions = current.permissions
+    }
     const freshPerms = fresh.permissions ? [...fresh.permissions].sort() : []
     const currentPerms = current.permissions ? [...current.permissions].sort() : []
     const permissionsChanged = JSON.stringify(freshPerms) !== JSON.stringify(currentPerms)

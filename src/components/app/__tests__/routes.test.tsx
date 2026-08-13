@@ -76,6 +76,7 @@ describe('APP_ROUTES', () => {
     expect(byPath['/perfil'].allowedRoles).toBeUndefined()
     expect(byPath['/perfil'].module).toBeUndefined()
     expect(byPath['/comunicacion'].allowedRoles).toBeUndefined()
+    expect(byPath['/comunicacion'].module).toBe('comunicacion')
   })
 
   // Regresión: el sidebar muestra los módulos configurables por permiso
