@@ -144,18 +144,6 @@ export async function fetchRolePermissionKeys(
   return { data: (data as Array<{ permission_key: string }>) ?? null, error: error?.message ?? null }
 }
 
-/** Todas las claves de permiso de un rol (sin filtrar por effect) — para el
- * diff de guardado, que compara contra TODO lo persistido. */
-export async function fetchAllRolePermissionKeys(
-  roleId: string,
-): Promise<{ data: Array<{ permission_key: string }> | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('permission_key')
-    .eq('role_id', roleId)
-  return { data: (data as Array<{ permission_key: string }>) ?? null, error: error?.message ?? null }
-}
-
 /** Actualiza un rol personalizado (patch ya armado por la UI). */
 export async function updateRole(
   roleId: string,
@@ -173,17 +161,50 @@ export async function createRole(
   return { data: (data as { id: string }) ?? null, error: error?.message ?? null }
 }
 
-/** Quita permisos de un rol (diff de la UI). */
+/**
+ * Deja el rol EXACTAMENTE con estos permisos (quita sobrantes, agrega
+ * faltantes). Una sola llamada, atómica, con la lista en el CUERPO.
+ *
+ * Sustituye al diff cliente (delete + insert) para el editor de roles: aquel
+ * mandaba las claves a borrar dentro de la query string, y con un rol grande
+ * —1 080 claves al recortar el catálogo completo a 90 permisos— la URL pasaba
+ * de 50 KB y la pasarela devolvía un «Bad Request» de texto plano. Ver la
+ * migración 20260817000000.
+ */
+export async function setRolePermissions(
+  roleId: string,
+  permissionKeys: string[],
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('set_role_permissions', {
+    p_role_id: roleId,
+    p_keys: permissionKeys,
+  })
+  return { error: error?.message ?? null }
+}
+
+// Tamaño de lote del borrado por claves. Cada clave ocupa ~45 caracteres una
+// vez URL-encodeada (comillas y comas incluidas), así que 40 por petición deja
+// la query string bien por debajo del límite habitual de 4 KB de las pasarelas.
+const DELETE_KEYS_CHUNK = 40
+
+/**
+ * Quita permisos de un rol (diff de la UI). Trocea la lista: las claves viajan
+ * en la URL, así que una lista larga en una sola petición la rechaza la
+ * pasarela antes de llegar a PostgREST. Corta en el primer error.
+ */
 export async function deleteRolePermissions(
   roleId: string,
   permissionKeys: string[],
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('role_permissions')
-    .delete()
-    .eq('role_id', roleId)
-    .in('permission_key', permissionKeys)
-  return { error: error?.message ?? null }
+  for (let i = 0; i < permissionKeys.length; i += DELETE_KEYS_CHUNK) {
+    const { error } = await supabase
+      .from('role_permissions')
+      .delete()
+      .eq('role_id', roleId)
+      .in('permission_key', permissionKeys.slice(i, i + DELETE_KEYS_CHUNK))
+    if (error) return { error: error.message }
+  }
+  return { error: null }
 }
 
 /** Agrega permisos a un rol (filas ya armadas por la UI). */
