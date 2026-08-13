@@ -13,7 +13,6 @@ import type { AppSection, Ruta } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { sectionForPath, type SectionKey } from './components/condominios/sections'
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
-import { isProjectExempt } from './lib/proyectosAccess'
 import { useAuth } from './hooks/useAuth'
 import { useAguaData } from './hooks/useAguaData'
 import { getResetToken, detectGmailOAuthCallback, handleGmailOAuthCallback } from './lib/gmailOAuth'
@@ -240,10 +239,8 @@ function AppShell() {
   // El badge cuenta lo mismo que el usuario puede abrir: para un rol no exento,
   // solo las conversaciones de sus proyectos (`agua.proyectos` ya viene acotado).
   const comunicacionProjectIds = useMemo(
-    () => isProjectExempt(currentUser?.role, currentUser?.assigned_role_ids)
-      ? undefined
-      : agua.proyectos.map(p => p.id),
-    [currentUser?.role, currentUser?.assigned_role_ids, agua.proyectos],
+    () => agua.projectScope.exempt ? undefined : agua.proyectos.map(p => p.id),
+    [agua.projectScope, agua.proyectos],
   )
 
   const fetchUnreadComunicacion = useCallback(async () => {
@@ -446,9 +443,12 @@ function AppShell() {
   // F3.11 (P1 quick win): onboarding. Un company_owner/admin cuya empresa aún no
   // tiene proyectos ve el SetupWizard (crea el primero). Se evalúa SOLO tras
   // cargar los datos → nunca parpadea; empresas ya configuradas jamás lo ven.
+  // Solo aplica a quien ve la empresa entera: para un admin acotado a sus
+  // proyectos asignados, "no veo ninguno" no significa "la empresa no tiene".
   const necesitaOnboarding =
     !agua.dataLoading &&
     (currentUser.role === 'company_owner' || currentUser.role === 'admin') &&
+    agua.projectScope.exempt &&
     !!currentUser.company_id &&
     agua.proyectos.length === 0
 

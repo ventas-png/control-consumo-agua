@@ -231,8 +231,15 @@ async function main() {
     //
     // Lo que SÍ se caza: un cuerpo que use el id que le pasa el cliente sin
     // referirse jamás a quién es el caller.
+    //
+    // Por eso la lista incluye también los helpers de identidad POR PROYECTO
+    // (user_has_project_access / user_is_project_exempt): resuelven `auth.uid()`
+    // y responden "¿este caller puede ver ESTE proyecto?", que es exactamente la
+    // pregunta que la regla exige. Sin ellos, `can_access_project` —el helper de
+    // alcance por proyecto que evalúan las policies de agua— salía como
+    // vulnerable pese a no mirar más que al caller.
     const guarded =
-      /assert_company_scope|get_my_company_id|get_my_cliente_id|get_my_user_id|is_super_admin/i.test(
+      /assert_company_scope|get_my_company_id|get_my_cliente_id|get_my_user_id|is_super_admin|user_has_project_access|user_is_project_exempt/i.test(
         fn.body,
       )
     if (!guarded) missingScope.push({ name, file: fn.file })

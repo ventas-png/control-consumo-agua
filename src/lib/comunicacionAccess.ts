@@ -8,9 +8,10 @@
 // que `filterRutasByProjectAccess` cerró para rutas, que es el patrón que este
 // módulo espeja.
 //
-// Los `clientes` no llevan `project_id` propio: su proyecto se deriva de las
-// unidades que ocupan y de las lecturas registradas a su nombre (igual que en
-// rutasAccess). Por eso el índice cliente→proyectos es la pieza central.
+// Las primitivas comunes (índice cliente→proyectos, `ProjectScope`, filtros de
+// unidades y clientes) viven en `lib/projectScope.ts` desde que el módulo de
+// agua necesitó las mismas; aquí se re-exportan para no tocar a los
+// consumidores, y solo quedan los filtros propios de comunicación.
 //
 // Regla de ambigüedad (consistente con rutasAccess): cuando una fila NO se puede
 // mapear a ningún proyecto (cliente sin unidad ni lectura visible, conversación
@@ -18,62 +19,16 @@
 // escondería trabajo legítimo; el cierre fino llega porque las conversaciones
 // nuevas sí sellan `project_id` (ver domain/comunicacion/conversations.ts) y la
 // migración 20260814000000 rellena las viejas.
-import type { Broadcast, Cliente, Conversation, Registro, Unidad } from '../types'
+import type { Broadcast, Conversation, Unidad } from '../types'
+import { clienteProjectIds, intersects, type ProjectScope } from './projectScope'
 
-/** cliente_id → proyectos en los que ese cliente tiene presencia. */
-export type ClienteProjectIndex = Map<string, Set<string>>
-
-export interface BuildClienteProjectIndexParams {
-  /** Unidades de la empresa (`unidades.cliente_id` → `unidades.project_id`). */
-  unidades: Unidad[]
-  /** Lecturas de la empresa; aportan el proyecto de clientes sin unidad propia. */
-  registros?: Registro[]
-}
-
-/** Construye el índice cliente→proyectos a partir de unidades y lecturas. */
-export function buildClienteProjectIndex({
-  unidades,
-  registros = [],
-}: BuildClienteProjectIndexParams): ClienteProjectIndex {
-  const index: ClienteProjectIndex = new Map()
-  const link = (clienteId?: string | null, projectId?: string | null) => {
-    if (!clienteId || !projectId) return
-    let set = index.get(clienteId)
-    if (!set) { set = new Set(); index.set(clienteId, set) }
-    set.add(projectId)
-  }
-  for (const u of unidades) link(u.cliente_id, u.project_id)
-  for (const r of registros) link(r.cliente_id, r.project_id)
-  return index
-}
-
-/** Contexto de acceso del usuario actual, compartido por todos los filtros. */
-export interface ProjectScope {
-  /** Proyectos que el usuario puede ver (ya filtrados por asignación). */
-  accessibleProjectIds: Set<string>
-  /**
-   * `true` si el rol salta el filtrado por proyecto (ver `isProjectExempt`):
-   * super_admin / company_owner / admin sin rol de condominios restringido.
-   */
-  exempt: boolean
-  /** Índice cliente→proyectos (de `buildClienteProjectIndex`). */
-  clienteProjects: ClienteProjectIndex
-}
-
-function intersects(ids: Iterable<string>, accessible: Set<string>): boolean {
-  for (const id of ids) if (accessible.has(id)) return true
-  return false
-}
-
-/**
- * Proyectos de un cliente según el índice. `null` = no resolvible (el cliente no
- * tiene unidad ni lectura visible) — caso ambiguo, no "sin acceso".
- */
-export function clienteProjectIds(clienteId: string | null | undefined, index: ClienteProjectIndex): Set<string> | null {
-  if (!clienteId) return null
-  const set = index.get(clienteId)
-  return set && set.size > 0 ? set : null
-}
+export {
+  buildClienteProjectIndex,
+  clienteProjectIds,
+  filterClientesByProjectAccess,
+  filterUnidadesByProjectAccess,
+} from './projectScope'
+export type { BuildClienteProjectIndexParams, ClienteProjectIndex, ProjectScope } from './projectScope'
 
 export interface FilterConversationsParams {
   conversations: Conversation[]
@@ -169,27 +124,6 @@ export function filterBroadcastsByProjectAccess({
       default:
         return true
     }
-  })
-}
-
-/** Unidades de los proyectos accesibles (audiencia del composer de difusión). */
-export function filterUnidadesByProjectAccess(unidades: Unidad[], scope: ProjectScope): Unidad[] {
-  if (scope.exempt) return unidades
-  return unidades.filter(u => scope.accessibleProjectIds.has(u.project_id))
-}
-
-/**
- * Clientes alcanzables desde los proyectos accesibles. Los clientes que no se
- * pueden mapear (aún sin unidad ni lectura) se conservan: son el alta reciente
- * que todavía no opera en ningún proyecto, y ocultarlos rompería darles de alta
- * con un comunicado o abrirles una conversación.
- */
-export function filterClientesByProjectAccess(clientes: Cliente[], scope: ProjectScope): Cliente[] {
-  if (scope.exempt) return clientes
-  return clientes.filter(c => {
-    const projects = clienteProjectIds(c.id, scope.clienteProjects)
-    if (!projects) return true
-    return intersects(projects, scope.accessibleProjectIds)
   })
 }
 
