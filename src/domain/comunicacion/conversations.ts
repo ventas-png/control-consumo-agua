@@ -21,13 +21,25 @@ import type {
  * Conteo de conversaciones abiertas de la empresa (badge de la topbar). Usa el
  * estimado `planned` (barato; evita COUNT(*) cada 60s sobre toda la tabla).
  * Degrada a 0 si no hay dato.
+ *
+ * `projectIds` acota el conteo a los proyectos del usuario (mismo criterio que
+ * la lista: las conversaciones sin `project_id` cuentan porque son ambiguas, no
+ * ajenas). Se omite para roles exentos, que ven la empresa entera.
  */
-export async function fetchOpenConversationsCount(companyId: string): Promise<number> {
-  const { count } = await supabase
+export async function fetchOpenConversationsCount(companyId: string, projectIds?: string[]): Promise<number> {
+  let query = supabase
     .from('conversations')
     .select('id', { count: 'planned', head: true })
     .eq('company_id', companyId)
     .eq('status', 'abierta')
+
+  if (projectIds) {
+    query = projectIds.length > 0
+      ? query.or(`project_id.is.null,project_id.in.(${projectIds.join(',')})`)
+      : query.is('project_id', null)
+  }
+
+  const { count } = await query
   return count ?? 0
 }
 
@@ -147,6 +159,12 @@ export interface CreateInternalConversationInput {
   firstMessage: string
   senderName: string
   companyId: string
+  /**
+   * Proyecto del equipo al que va dirigida. Sellarlo es lo que permite que la
+   * discusión solo la vea quien tiene ese proyecto asignado; sin él la discusión
+   * es general (visible a toda la empresa).
+   */
+  projectId?: string
 }
 
 /** Crea una conversación interna (equipo) + su primer mensaje. Devuelve la fila. */
@@ -158,6 +176,7 @@ export async function createInternalConversation(
     .from('conversations')
     .insert({
       company_id: params.companyId,
+      project_id: params.projectId ?? null,
       cliente_id: null,
       cliente_nombre: null,
       subject: params.subject,

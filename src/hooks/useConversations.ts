@@ -94,6 +94,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     firstMessage: string
     senderName: string
     companyId: string
+    projectId?: string
   }): Promise<Conversation | null> => {
     setSending(true)
     try {

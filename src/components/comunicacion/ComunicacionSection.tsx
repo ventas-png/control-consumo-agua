@@ -1,8 +1,17 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { notify } from '../shared/Dialog'
 import { useConversations } from '../../hooks/useConversations'
 import { useTeamUsersQuery } from '../../domain/comunicacion/queries'
 import { sanitizeInput } from '../../lib/validation'
+import { isProjectExempt } from '../../lib/proyectosAccess'
+import {
+  buildClienteProjectIndex,
+  filterClientesByProjectAccess,
+  filterConversationsByProjectAccess,
+  filterUnidadesByProjectAccess,
+  resolveConversationProjectId,
+  type ProjectScope,
+} from '../../lib/comunicacionAccess'
 import DifusionTab from './DifusionTab'
 import { NuevaConversacionModal } from './NuevaConversacionModal'
 import { NuevaDiscusionInternaModal } from './NuevaDiscusionInternaModal'
@@ -16,6 +25,7 @@ import type {
   UserSession,
   Cliente,
   Proyecto,
+  Registro,
   Unidad,
   Conversation,
   ConversationCategory,
@@ -27,8 +37,15 @@ import type {
 interface Props {
   currentUser: UserSession
   clientes: Cliente[]
+  /** Proyectos que el usuario puede ver (ya filtrados por asignación). */
   proyectos: Proyecto[]
   unidades: Unidad[]
+  /**
+   * Lecturas de la empresa. Solo se usan para resolver el proyecto de los
+   * clientes que no ocupan ninguna unidad (ver lib/comunicacionAccess). Opcional:
+   * el registry de condominios no las tiene y ahí las unidades bastan.
+   */
+  registros?: Registro[]
   canCreate: boolean
   canEdit: boolean
   serviceType?: ConversationServiceType
@@ -61,10 +78,14 @@ const TAB_LABELS: Record<MainTab, string> = {
   preferencias: 'Notificaciones',
 }
 
+// Default estable para `registros`: un `= []` en la firma crearía un array nuevo
+// en cada render y recalcularía el scope (y con él toda la lista) sin motivo.
+const SIN_REGISTROS: Registro[] = []
+
 // ── Componente principal (orquestador; sub-componentes en com:N6) ────────────
-export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, canCreate, canEdit, serviceType = 'agua' }: Props) {
+export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, registros = SIN_REGISTROS, canCreate, canEdit, serviceType = 'agua' }: Props) {
   const {
-    conversations,
+    conversations: allConversations,
     messages,
     accessRules,
     assignments,
@@ -89,6 +110,40 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     isCliente: false,
     serviceType,
   })
+
+  // ── Scope por proyecto ────────────────────────────────────────────────────
+  // `conversations` y `broadcasts` solo se acotan por empresa (RLS + la query),
+  // así que un usuario asignado a un subconjunto de proyectos veía la
+  // comunicación de TODOS. `proyectos` ya llega filtrado por asignación
+  // (useAguaData → filterProyectosByAssignment), así que sus ids son el conjunto
+  // accesible; el resto del scope se deriva igual que en rutas.
+  const scope: ProjectScope = useMemo(() => ({
+    accessibleProjectIds: new Set(proyectos.map(p => p.id)),
+    exempt: isProjectExempt(currentUser.role, currentUser.assigned_role_ids),
+    clienteProjects: buildClienteProjectIndex({ unidades, registros }),
+  }), [proyectos, unidades, registros, currentUser.role, currentUser.assigned_role_ids])
+
+  // Las conversaciones asignadas al usuario nunca se ocultan (espeja la RLS de
+  // agentes): si alguien te asignó un caso, lo ves aunque sea de otro proyecto.
+  const assignedConversationIds = useMemo(
+    () => new Set(assignments.filter(a => a.user_id === currentUser.user_id).map(a => a.conversation_id)),
+    [assignments, currentUser.user_id],
+  )
+
+  const conversations = useMemo(
+    () => filterConversationsByProjectAccess({
+      conversations: allConversations,
+      scope,
+      userId: currentUser.user_id,
+      assignedConversationIds,
+    }),
+    [allConversations, scope, currentUser.user_id, assignedConversationIds],
+  )
+
+  // Audiencia seleccionable (nueva conversación / comunicado): también acotada,
+  // para no poder escribirle a clientes de proyectos ajenos desde esta pantalla.
+  const clientesVisibles = useMemo(() => filterClientesByProjectAccess(clientes, scope), [clientes, scope])
+  const unidadesVisibles = useMemo(() => filterUnidadesByProjectAccess(unidades, scope), [unidades, scope])
 
   const [mainTab, setMainTab] = useState<MainTab>('conversaciones')
   const [view, setView] = useState<'list' | 'detail' | 'config'>('list')
@@ -143,6 +198,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       const conv = await createConversation({
         ...data,
         companyId: currentUser.company_id!,
+        // Sella el proyecto del cliente cuando es inequívoco: es lo que permite
+        // filtrar esta conversación por proyecto sin re-derivarla cada vez.
+        projectId: resolveConversationProjectId(data.clienteId, scope) ?? undefined,
         senderName: currentUser.name,
       })
       setShowNuevaModal(false)
@@ -155,7 +213,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     }
   }
 
-  async function handleCrearDiscusionInterna(data: { subject: string; category: ConversationCategory; firstMessage: string }) {
+  async function handleCrearDiscusionInterna(data: { subject: string; category: ConversationCategory; firstMessage: string; projectId?: string }) {
     try {
       const conv = await createInternalConversation({
         ...data,
@@ -349,9 +407,11 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {/* ── Difusión tab ── */}
       {mainTab === 'difusion' && (
         <DifusionTab
-          clientes={clientes}
+          clientes={clientesVisibles}
           proyectos={proyectos}
-          unidades={unidades}
+          unidades={unidadesVisibles}
+          todasLasUnidades={unidades}
+          scope={scope}
           canCreate={canCreate}
         />
       )}
@@ -494,7 +554,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {/* ── Modal Nueva Conversación (cliente) ── */}
       {showNuevaModal && (
         <NuevaConversacionModal
-          clientes={clientes}
+          clientes={clientesVisibles}
           sending={sending}
           onClose={() => setShowNuevaModal(false)}
           onConfirm={handleCrearConversacion}
@@ -506,6 +566,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {showNuevaInternaModal && (
         <NuevaDiscusionInternaModal
           sending={sending}
+          proyectos={proyectos}
           onClose={() => setShowNuevaInternaModal(false)}
           onConfirm={handleCrearDiscusionInterna}
           serviceType={serviceType}
