@@ -1,5 +1,6 @@
 // Estilos y micro-componentes compartidos del módulo Contabilidad.
 import type { CSSProperties, ReactNode } from 'react'
+import { usePermissionsContext } from '../shared/PermissionsContext'
 
 export function Campo({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -55,4 +56,24 @@ export const btnPeligro: CSSProperties = {
   ...btnSecundario,
   color: 'var(--at-danger)',
   borderColor: 'var(--at-danger)',
+}
+
+/**
+ * Permisos de acción del módulo Contabilidad para el usuario actual.
+ *
+ * El módulo se gatea con la clave `contabilidad` (platform.contabilidad.<accion>).
+ * Las acciones espejan las que exige la BD tras 20260818000000: crear / editar /
+ * cambiar estado (publicar, anular, conciliar, activar) / autorizar (aprobar
+ * factura u orden) / eliminar. Sin esto, un rol con solo `view` vería botones
+ * que la RLS rechaza.
+ */
+export function usePermisosContabilidad() {
+  const perms = usePermissionsContext()
+  return {
+    puedeCrear: perms.canCreate('contabilidad'),
+    puedeEditar: perms.canEdit('contabilidad'),
+    puedeCambiarEstado: perms.canChangeStatus('contabilidad'),
+    puedeAutorizar: perms.canApprove('contabilidad'),
+    puedeEliminar: perms.canDelete('contabilidad'),
+  }
 }

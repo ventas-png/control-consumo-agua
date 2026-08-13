@@ -7,7 +7,17 @@
 // los componentes; aquí sólo el I/O a Supabase. Las lecturas devuelven
 // `{ data, error }` para que la UI conserve su manejo de errores (throw → catch).
 import { supabase } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 import type { PermissionDef, RoleDef } from '../../types'
+
+// Las lecturas del catálogo RBAC PAGINAN con fetchAllRows: el catálogo ronda
+// las 1 170 claves y un rol de acceso amplio (p. ej. "Finanzas / Contador")
+// arrastra más de 1 100 filas él solo, así que estas consultas viven por
+// encima del tope silencioso de PostgREST (~1 000 filas). Truncadas, el panel
+// de permisos efectivos muestra menos de lo que el rol tiene —y, peor, el
+// editor hace read-modify-write: guardar un rol precargado a medias BORRA los
+// permisos que no llegaron. `.range()` exige un orden total, de ahí los
+// `.order()` por clave primaria en cada una.
 
 /** Roles del sistema (plantillas) + los personalizados de la company (para el
  * selector RBAC). Excluye los roles de ajustes individuales por usuario
@@ -30,13 +40,16 @@ export async function fetchAllRolePermissions(): Promise<{
   data: Array<{ role_id: string; permission_key: string; effect: string }> | null
   error: string | null
 }> {
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('role_id, permission_key, effect')
-  return {
-    data: (data as Array<{ role_id: string; permission_key: string; effect: string }>) ?? null,
-    error: error?.message ?? null,
-  }
+  const { data, error } = await fetchAllRows<{ role_id: string; permission_key: string; effect: string }>(
+    (from, to) => supabase
+      .from('role_permissions')
+      .select('role_id, permission_key, effect')
+      .order('role_id')
+      .order('permission_key')
+      .order('effect')
+      .range(from, to),
+  )
+  return { data: error ? null : data, error }
 }
 
 /** Roles asignados a un usuario, con su expiración (para el modal de roles). */
@@ -112,12 +125,16 @@ export async function fetchPermissionsCatalog(): Promise<{
   data: PermissionDef[] | null
   error: string | null
 }> {
-  const { data, error } = await supabase
-    .from('permissions')
-    .select('key, category, label, description')
-    .order('category')
-    .order('label')
-  return { data: (data as PermissionDef[]) ?? null, error: error?.message ?? null }
+  const { data, error } = await fetchAllRows<PermissionDef>(
+    (from, to) => supabase
+      .from('permissions')
+      .select('key, category, label, description')
+      .order('category')
+      .order('label')
+      .order('key')
+      .range(from, to),
+  )
+  return { data: error ? null : data, error }
 }
 
 /** Un rol por id (para precargar el editor en modo edición o clonado). */
@@ -136,12 +153,16 @@ export async function fetchRoleById(
 export async function fetchRolePermissionKeys(
   roleId: string,
 ): Promise<{ data: Array<{ permission_key: string }> | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('permission_key')
-    .eq('role_id', roleId)
-    .eq('effect', 'allow')
-  return { data: (data as Array<{ permission_key: string }>) ?? null, error: error?.message ?? null }
+  const { data, error } = await fetchAllRows<{ permission_key: string }>(
+    (from, to) => supabase
+      .from('role_permissions')
+      .select('permission_key')
+      .eq('role_id', roleId)
+      .eq('effect', 'allow')
+      .order('permission_key')
+      .range(from, to),
+  )
+  return { data: error ? null : data, error }
 }
 
 /** Actualiza un rol personalizado (patch ya armado por la UI). */
@@ -222,14 +243,16 @@ export async function insertRolePermissions(
 export async function fetchRolePermissionsWithEffect(
   roleId: string,
 ): Promise<{ data: Array<{ permission_key: string; effect: string }> | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('permission_key, effect')
-    .eq('role_id', roleId)
-  return {
-    data: (data as Array<{ permission_key: string; effect: string }>) ?? null,
-    error: error?.message ?? null,
-  }
+  const { data, error } = await fetchAllRows<{ permission_key: string; effect: string }>(
+    (from, to) => supabase
+      .from('role_permissions')
+      .select('permission_key, effect')
+      .eq('role_id', roleId)
+      .order('permission_key')
+      .order('effect')
+      .range(from, to),
+  )
+  return { data: error ? null : data, error }
 }
 
 /**

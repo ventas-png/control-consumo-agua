@@ -22,7 +22,7 @@ import {
   type PresupuestoConPartidas,
 } from '../../types/presupuesto'
 import type { Proyecto } from '../../types'
-import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
+import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -37,6 +37,7 @@ type Vista = 'presupuestos' | 'comparativo'
 const TONO_ESTADO = { borrador: 'info', propuesto: 'warning', aprobado: 'success', archivado: 'neutral' } as const
 
 export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: Props) {
+  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('presupuestos')
   const [nuevo, setNuevo] = useState(false)
   const [editorId, setEditorId] = useState<string | null>(null)
@@ -91,15 +92,15 @@ export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: 
       header: '',
       render: (p) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {(p.estado === 'borrador' || p.estado === 'propuesto') && (
+          {(p.estado === 'borrador' || p.estado === 'propuesto') && puedeEditar && (
             <button onClick={(e) => { e.stopPropagation(); setEditorId(p.id) }} style={btnLink}>Partidas</button>
           )}
-          {p.estado === 'borrador' && (
+          {p.estado === 'borrador' && puedeCambiarEstado && (
             <button onClick={(e) => { e.stopPropagation(); void accion(() => cambiarEstado.mutateAsync({ presupuestoId: p.id, estado: 'propuesto' }), 'Presupuesto propuesto para aprobación.') }} style={btnLink}>
               Proponer
             </button>
           )}
-          {p.estado === 'propuesto' && (
+          {p.estado === 'propuesto' && puedeAutorizar && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -146,7 +147,9 @@ export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: 
           isLoading={isLoading}
           searchableKeys={['nombre']}
           defaultSort={{ key: 'anio', direction: 'desc' }}
-          toolbar={<button onClick={() => setNuevo(true)} style={btnPrimario}>+ Nuevo presupuesto</button>}
+          toolbar={puedeCrear
+            ? <button onClick={() => setNuevo(true)} style={btnPrimario}>+ Nuevo presupuesto</button>
+            : undefined}
           emptyState={{
             title: 'Sin presupuestos',
             description: 'Crea el presupuesto anual con partidas mensuales ligadas a cuentas contables; el comparativo contra lo real sale de la contabilidad.',

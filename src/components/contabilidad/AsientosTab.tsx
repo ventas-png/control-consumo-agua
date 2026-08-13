@@ -8,7 +8,7 @@ import { TIPO_ASIENTO_LABELS, type AsientoContable } from '../../types/contabili
 import { AsientoFormModal } from './AsientoFormModal'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
 import { AperturaSaldosModal } from './AperturaSaldosModal'
-import { btnPrimario, btnSecundario, input } from './ui'
+import { btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -26,6 +26,7 @@ function periodoActual(): string {
 const TONO_ESTADO = { borrador: 'warning', publicado: 'success', anulado: 'neutral' } as const
 
 export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
+  const { puedeCrear } = usePermisosContabilidad()
   const [periodo, setPeriodo] = useState(periodoActual())
   const [estado, setEstado] = useState<FiltroEstado>('todos')
   const [nuevo, setNuevo] = useState(false)
@@ -126,12 +127,14 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
         onRowClick={(a) => setDetalleId(a.id)}
         toolbar={
           <div style={{ display: 'flex', gap: 8 }}>
-            {!hayApertura && (
+            {!hayApertura && puedeCrear && (
               <button onClick={() => setApertura(true)} style={btnSecundario}>
                 Saldos iniciales
               </button>
             )}
-            <button onClick={() => setNuevo(true)} style={btnPrimario}>+ Nueva póliza</button>
+            {puedeCrear && (
+              <button onClick={() => setNuevo(true)} style={btnPrimario}>+ Nueva póliza</button>
+            )}
           </div>
         }
         emptyState={{

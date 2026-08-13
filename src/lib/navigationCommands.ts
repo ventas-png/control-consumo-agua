@@ -19,10 +19,16 @@ export interface NavCommandDef {
   category: string
   /** Atajo vim-style (ej: 'g c') — solo para los mas frecuentes. */
   shortcut?: string
-  /** Roles que pueden ver (alguno del array). Vacio = todos. */
+  /**
+   * Roles que pueden ver (alguno del array). Vacio = todos. Reservado a las
+   * secciones NO configurables por RBAC; un modulo configurable se gatea con
+   * `module` para no divergir del sidebar y de APP_ROUTES.
+   */
   roles?: UserSession['role'][]
   /** Modulo para chequeo via canViewModule. */
   module?: string
+  /** Roles base que pasan el gate de modulo sin el permiso RBAC (legacy). */
+  moduleRoleBypass?: UserSession['role'][]
 }
 
 export const NAV_COMMANDS: NavCommandDef[] = [
@@ -30,7 +36,7 @@ export const NAV_COMMANDS: NavCommandDef[] = [
   { id: 'clientes',         label: 'Clientes',           icon: '👥', category: 'Agua',         shortcut: 'g c', module: 'clientes' },
   { id: 'lecturas',         label: 'Lecturas',           icon: '📊', category: 'Agua',         shortcut: 'g l', module: 'lecturas' },
   { id: 'tabla',            label: 'Historial',          icon: '📋', category: 'Agua',         shortcut: 'g h', module: 'tabla' },
-  { id: 'cobros',           label: 'Cobros',             icon: '💰', category: 'Agua',         shortcut: 'g b', roles: ['collector', 'admin', 'super_admin', 'company_owner'] },
+  { id: 'cobros',           label: 'Cobros',             icon: '💰', category: 'Agua',         shortcut: 'g b', module: 'cobros', moduleRoleBypass: ['collector'] },
   { id: 'mapa',             label: 'Mapa',               icon: '🗺',  category: 'Agua',         shortcut: 'g m', module: 'mapa' },
   { id: 'rutas',            label: 'Rutas',              icon: '🛣',  category: 'Agua',         shortcut: 'g r', module: 'rutas' },
   { id: 'calidad',          label: 'Calidad del agua',   icon: '💧', category: 'Agua',                          module: 'calidad' },
@@ -49,7 +55,8 @@ export const NAV_COMMANDS: NavCommandDef[] = [
 
   // ── Cuenta ──
   { id: 'empresa_proyectos',label: 'Mis Proyectos',      icon: '📁', category: 'Cuenta',       shortcut: 'g p', roles: ['company_owner'] },
-  { id: 'configuracion',    label: 'Configuración',      icon: '⚙️',  category: 'Cuenta',       shortcut: 'g s', roles: ['admin', 'super_admin', 'company_owner'] },
+  { id: 'configuracion',    label: 'Configuración',      icon: '⚙️',  category: 'Cuenta',       shortcut: 'g s', module: 'configuracion' },
+  { id: 'contabilidad',     label: 'Contabilidad',       icon: '📒', category: 'Cuenta',                        module: 'contabilidad' },
   { id: 'perfil',           label: 'Mi cuenta',          icon: '👤', category: 'Cuenta',       shortcut: 'g u' },
   { id: 'superadmin_empresas', label: 'Empresas (admin)', icon: '🏛',  category: 'Cuenta',                       roles: ['super_admin'] },
 ]
@@ -68,7 +75,9 @@ export function buildNavCommands(
   const out: CommandItem[] = []
   for (const def of NAV_COMMANDS) {
     if (def.roles && def.roles.length > 0 && !def.roles.includes(currentUser.role)) continue
-    if (def.module && !canViewModule(def.module)) continue
+    if (def.module
+        && !canViewModule(def.module)
+        && !(def.moduleRoleBypass?.includes(currentUser.role) ?? false)) continue
     out.push({
       id: `nav:${def.id}`,
       label: def.label,

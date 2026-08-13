@@ -13,7 +13,7 @@ import { compararPyG, rangoAnterior, resumirBalance, resumirConsolidado, resumir
 import { exportarExcel } from '../condominios/exportUtils'
 import { generarReporteAsamblea } from './reporteAsamblea'
 import { formatCurrency, mesLocalISO } from '../../lib/format'
-import { btnPrimario, btnSecundario, input } from './ui'
+import { btnPrimario, btnSecundario, input , usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -31,6 +31,7 @@ function periodoActual(): string {
 }
 
 export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, monedaBase }: Props) {
+  const { puedeCambiarEstado } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('pyg')
   const [periodo, setPeriodo] = useState(periodoActual())
   const [desde, setDesde] = useState(`${new Date().getFullYear()}-01`)
@@ -199,7 +200,7 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
           📄 Informe asamblea
         </button>
         <button onClick={exportar} style={btnSecundario}>Exportar Excel</button>
-        {!anioCerrado && (
+        {!anioCerrado && puedeCambiarEstado && (
           <button onClick={() => void onCierreAnual()} disabled={cierre.isPending} style={btnPrimario}>
             Cerrar ejercicio {anioCerrable}
           </button>
