@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   inferirPadreCodigo,
+  jerarquiaDesdeNiveles,
   parseBooleano,
   planificarCatalogo,
   validarFilaCuenta,
@@ -21,16 +22,89 @@ function fila(over: Partial<CuentaImportFila> = {}): CuentaImportFila {
   }
 }
 
-describe('validarFilaCuenta', () => {
-  it('normaliza una fila mínima y deriva la naturaleza del tipo', () => {
+/** Fila cruda en el formato de la plantilla (columnas por nivel). */
+function niveles(ns: number[], resto: Record<string, unknown> = {}): Record<string, unknown> {
+  const row: Record<string, unknown> = { nombre: 'Cuenta', ...resto }
+  ns.forEach((n, i) => { row[`n_${i + 1}`] = n })
+  return row
+}
+
+describe('jerarquiaDesdeNiveles', () => {
+  it('arma código, padre y nivel desde las columnas', () => {
+    const r = jerarquiaDesdeNiveles(niveles([1, 1, 1, 3, 2]))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.data).toEqual({ codigo: '1.1.1.3.2', padre_codigo: '1.1.1.3', nivel: 5 })
+  })
+
+  it('el nivel 1 no tiene padre', () => {
+    const r = jerarquiaDesdeNiveles(niveles([1, 0, 0, 0, 0]))
+    expect(r.ok && r.data).toEqual({ codigo: '1', padre_codigo: null, nivel: 1 })
+  })
+
+  it('trata la celda vacía como 0', () => {
+    const r = jerarquiaDesdeNiveles({ n_1: 2, n_2: 3, n_3: '', n_4: '', n_5: '' })
+    expect(r.ok && r.data.codigo).toBe('2.3')
+  })
+
+  it('rechaza un hueco entre niveles', () => {
+    const r = jerarquiaDesdeNiveles(niveles([1, 0, 2, 0, 0]))
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.errors[0]).toMatch(/nivel en 0 entre dos/i)
+  })
+
+  it('acepta las cabeceras alternativas nivel_1 y n1', () => {
+    expect(jerarquiaDesdeNiveles({ nivel_1: 4, nivel_2: 2 })).toMatchObject({ ok: true, data: { codigo: '4.2' } })
+    expect(jerarquiaDesdeNiveles({ n1: 5 })).toMatchObject({ ok: true, data: { codigo: '5' } })
+  })
+
+  it('rechaza la fila sin ningún nivel y los valores no enteros', () => {
+    expect(jerarquiaDesdeNiveles(niveles([0, 0, 0, 0, 0])).ok).toBe(false)
+    expect(jerarquiaDesdeNiveles({ n_1: 'uno' }).ok).toBe(false)
+    expect(jerarquiaDesdeNiveles({ n_1: 1.5 }).ok).toBe(false)
+  })
+})
+
+describe('validarFilaCuenta — formato de la plantilla (columnas por nivel)', () => {
+  it('lee la jerarquía de las columnas sin pedir código ni padre', () => {
+    const r = validarFilaCuenta(niveles([1, 1, 1, 1, 0], { nombre: 'Vehículos' }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.data.codigo).toBe('1.1.1.1')
+    expect(r.data.padre_codigo).toBe('1.1.1')
+  })
+
+  it('deja tipo y naturaleza vacíos para que se hereden del padre', () => {
+    const r = validarFilaCuenta(niveles([1, 1, 0, 0, 0], { nombre: 'NO CORRIENTE' }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.data.tipo).toBeNull()
+    expect(r.data.naturaleza).toBeNull()
+  })
+
+  it('exige el tipo en el nivel 1, que no tiene de quién heredarlo', () => {
+    const r = validarFilaCuenta(niveles([1, 0, 0, 0, 0], { nombre: 'ACTIVO' }))
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.errors[0]).toMatch(/tipo es obligatorio en el nivel 1/i)
+  })
+
+  it('acepta el nivel 1 con su tipo', () => {
+    const r = validarFilaCuenta(niveles([1, 0, 0, 0, 0], { nombre: 'ACTIVO', tipo: 'activo' }))
+    expect(r.ok && r.data.tipo).toBe('activo')
+  })
+})
+
+describe('validarFilaCuenta — formato viejo (codigo + padre_codigo)', () => {
+  it('sigue aceptando los archivos ya armados', () => {
     const r = validarFilaCuenta({ codigo: ' 5201 ', nombre: ' Energía ', tipo: 'GASTO' })
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.data.codigo).toBe('5201')
     expect(r.data.nombre).toBe('Energía')
-    expect(r.data.naturaleza).toBe('deudora')
+    expect(r.data.tipo).toBe('gasto')
     expect(r.data.es_detalle).toBe(true)
-    expect(r.data.moneda).toBeNull()
   })
 
   it('acepta sinónimos de tipo y naturaleza', () => {
@@ -38,13 +112,6 @@ describe('validarFilaCuenta', () => {
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.data.tipo).toBe('ingreso')
-    expect(r.data.naturaleza).toBe('acreedora')
-  })
-
-  it('permite naturaleza contra-natura (depreciación acumulada)', () => {
-    const r = validarFilaCuenta({ codigo: '1205', nombre: 'Depreciación acumulada', tipo: 'activo', naturaleza: 'acreedora' })
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
     expect(r.data.naturaleza).toBe('acreedora')
   })
 
@@ -92,6 +159,10 @@ describe('inferirPadreCodigo', () => {
     expect(inferirPadreCodigo('1102-01-03')).toBe('1102-01')
   })
 
+  it('entiende también los códigos por nivel', () => {
+    expect(inferirPadreCodigo('1.1.1.3')).toBe('1.1.1')
+  })
+
   it('no infiere padre para códigos alfabéticos', () => {
     expect(inferirPadreCodigo('CAJA')).toBeNull()
   })
@@ -99,10 +170,15 @@ describe('inferirPadreCodigo', () => {
 
 describe('planificarCatalogo', () => {
   const existentes = [
-    { id: 'id-1', codigo: '1', nivel: 1 },
-    { id: 'id-11', codigo: '11', nivel: 2 },
-    { id: 'id-1102', codigo: '1102', nivel: 3 },
+    { id: 'id-1', codigo: '1', nivel: 1, tipo: 'activo' as const, naturaleza: 'deudora' as const },
+    { id: 'id-11', codigo: '11', nivel: 2, tipo: 'activo' as const, naturaleza: 'deudora' as const },
+    { id: 'id-1102', codigo: '1102', nivel: 3, tipo: 'activo' as const, naturaleza: 'deudora' as const },
   ]
+
+  /** Fila del formato nuevo: sin tipo, se hereda del padre. */
+  function heredada(codigo: string, padre: string | null, over: Partial<CuentaImportFila> = {}) {
+    return fila({ codigo, padre_codigo: padre, tipo: null, naturaleza: null, ...over })
+  }
 
   it('cuelga cuentas nuevas de una cuenta ya existente del ledger', () => {
     const plan = planificarCatalogo([fila({ codigo: '1102-02', nombre: 'Banco USD', tipo: 'activo' })], existentes)
@@ -114,14 +190,53 @@ describe('planificarCatalogo', () => {
   it('ordena padres antes que hijos aunque el archivo venga al revés', () => {
     const plan = planificarCatalogo(
       [
-        fila({ codigo: '52-01-01', nombre: 'Agua potable', padre_codigo: '52-01' }),
-        fila({ codigo: '52-01', nombre: 'Servicios', padre_codigo: '52' }),
-        fila({ codigo: '52', nombre: 'Gastos de operación', padre_codigo: null }),
+        heredada('1.1.1', '1.1', { nombre: 'Propiedad, planta y equipo' }),
+        heredada('1.1', '1', { nombre: 'No corriente' }),
+        fila({ codigo: '1', nombre: 'ACTIVO', tipo: 'activo', padre_codigo: null }),
       ],
       [],
     )
-    expect(plan.crear.map((c) => c.fila.codigo)).toEqual(['52', '52-01', '52-01-01'])
+    expect(plan.crear.map((c) => c.cuenta.codigo)).toEqual(['1', '1.1', '1.1.1'])
     expect(plan.crear.map((c) => c.nivel)).toEqual([1, 2, 3])
+  })
+
+  it('hereda el tipo del nivel 1 por toda la rama', () => {
+    const plan = planificarCatalogo(
+      [
+        fila({ codigo: '1', nombre: 'ACTIVO', tipo: 'activo', padre_codigo: null }),
+        heredada('1.1', '1', { nombre: 'No corriente' }),
+        heredada('1.1.1', '1.1', { nombre: 'Vehículos' }),
+      ],
+      [],
+    )
+    expect(plan.crear.map((c) => c.cuenta.tipo)).toEqual(['activo', 'activo', 'activo'])
+    expect(plan.crear.map((c) => c.cuenta.naturaleza)).toEqual(['deudora', 'deudora', 'deudora'])
+  })
+
+  it('las hijas de una cuenta contra-natura heredan su naturaleza', () => {
+    const plan = planificarCatalogo(
+      [
+        fila({ codigo: '1', nombre: 'ACTIVO', tipo: 'activo', padre_codigo: null }),
+        heredada('1.2', '1', { nombre: 'Depreciación acumulada', naturaleza: 'acreedora' }),
+        heredada('1.2.1', '1.2', { nombre: 'Depreciación vehículos' }),
+      ],
+      [],
+    )
+    const porCodigo = Object.fromEntries(plan.crear.map((c) => [c.cuenta.codigo, c.cuenta]))
+    expect(porCodigo['1.2'].naturaleza).toBe('acreedora')
+    expect(porCodigo['1.2.1'].naturaleza).toBe('acreedora')  // hereda, no re-deriva del tipo
+    expect(porCodigo['1.2.1'].tipo).toBe('activo')
+  })
+
+  it('hereda el tipo de la cuenta ya existente cuando la rama arranca en el catálogo', () => {
+    const plan = planificarCatalogo([heredada('1102.01', '1102', { nombre: 'Banco Promerica' })], existentes)
+    expect(plan.crear[0].cuenta).toMatchObject({ tipo: 'activo', naturaleza: 'deudora' })
+  })
+
+  it('omite la fila sin tipo cuya rama tampoco lo define', () => {
+    const plan = planificarCatalogo([heredada('9', null, { nombre: 'Huérfana' })], existentes)
+    expect(plan.crear).toEqual([])
+    expect(plan.omitidas[0].motivo).toMatch(/falta el tipo/i)
   })
 
   it('marca como agrupadora a la cuenta que tiene hijos en el archivo', () => {
@@ -132,8 +247,8 @@ describe('planificarCatalogo', () => {
       ],
       [],
     )
-    expect(plan.crear.find((c) => c.fila.codigo === '52')!.fila.es_detalle).toBe(false)
-    expect(plan.crear.find((c) => c.fila.codigo === '52-01')!.fila.es_detalle).toBe(true)
+    expect(plan.crear.find((c) => c.cuenta.codigo === '52')!.cuenta.es_detalle).toBe(false)
+    expect(plan.crear.find((c) => c.cuenta.codigo === '52-01')!.cuenta.es_detalle).toBe(true)
   })
 
   it('sin padre_codigo y sin padre inferible, la cuenta nace como raíz', () => {
@@ -187,7 +302,7 @@ describe('planificarCatalogo', () => {
       ],
       existentes,
     )
-    expect(plan.crear.map((c) => c.fila.codigo)).toEqual(['1102-01', '1102-01-01'])
+    expect(plan.crear.map((c) => c.cuenta.codigo)).toEqual(['1102-01', '1102-01-01'])
     expect(plan.omitidas).toHaveLength(1)
     expect(plan.omitidas[0].motivo).toMatch(/nivel máximo/i)
   })
@@ -201,7 +316,7 @@ describe('planificarCatalogo', () => {
       existentes,
     )
     expect(plan.crear).toHaveLength(1)
-    expect(plan.crear[0].fila.nombre).toBe('Primera')
+    expect(plan.crear[0].cuenta.nombre).toBe('Primera')
     expect(plan.omitidas[0].motivo).toMatch(/repetido/i)
   })
 
@@ -221,7 +336,17 @@ describe('planificarCatalogo', () => {
     expect(plan.crear).toEqual([])
     expect(plan.actualizar).toHaveLength(1)
     expect(plan.actualizar[0]).toMatchObject({ id: 'id-1102', nivel: 3 })
+    expect(plan.actualizar[0].cuenta.nombre).toBe('Bancos renombrado')
     expect(plan.omitidas).toEqual([])
+  })
+
+  it('al actualizar sin tipo conserva el de la cuenta existente', () => {
+    const plan = planificarCatalogo(
+      [heredada('1102', null, { nombre: 'Bancos' })],
+      existentes,
+      { actualizarExistentes: true },
+    )
+    expect(plan.actualizar[0].cuenta).toMatchObject({ tipo: 'activo', naturaleza: 'deudora' })
   })
 
   it('el mismo archivo se replica en un ledger vacío (proyecto recién creado)', () => {

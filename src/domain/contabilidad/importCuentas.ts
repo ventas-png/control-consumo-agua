@@ -1,18 +1,38 @@
 // Contabilidad — CARGA MASIVA del catálogo de cuentas (lógica pura, testeable).
 //
-// El archivo que sube el usuario trae una fila por cuenta y referencia al padre
-// por CÓDIGO (no por uuid, que el usuario no conoce). Este módulo hace dos
-// cosas, ambas sin tocar la red:
+// FORMATO DEL ARCHIVO (el de la plantilla): una COLUMNA POR NIVEL, `n_1`..`n_5`,
+// con 0 en los niveles que la cuenta no usa. La jerarquía se lee sola y el
+// código de la cuenta sale de unir los niveles con punto:
 //
+//   n_1 n_2 n_3 n_4 n_5   nombre                       → código   nivel  padre
+//    1   0   0   0   0    ACTIVO                         1          1     —
+//    1   1   0   0   0    NO CORRIENTE                   1.1        2     1
+//    1   1   1   0   0    PROPIEDAD PLANTA Y EQUIPO      1.1.1      3     1.1
+//    1   1   1   1   0    Vehículos                      1.1.1.1    4     1.1.1
+//    1   1   1   1   1    Pick-up Toyota 2020            1.1.1.1.1  5     1.1.1.1
+//
+// Por qué así y no una columna `codigo` con guiones: Excel convierte `1102-03`
+// en una FECHA en cuanto la celda se toca, y el catálogo entraba corrupto sin
+// que nadie lo notara. Con columnas numéricas no hay nada que autoformatear, y
+// de paso el padre deja de escribirse a mano (era la otra fuente de errores).
+//
+// `tipo` y `naturaleza` se HEREDAN del padre cuando la celda va vacía: en un
+// catálogo real solo el nivel 1 declara el tipo, y la naturaleza únicamente se
+// escribe donde va contra-natura (depreciación acumulada y sus hijas).
+//
+// Se sigue aceptando el formato viejo (`codigo` + `padre_codigo`) para los
+// archivos ya armados; ver `validarFilaCuenta`.
+//
+// Este módulo no toca la red. Hace dos cosas:
 //   1. `validarFilaCuenta` — normaliza y valida UNA fila del XLSX/CSV.
-//   2. `planificarCatalogo` — cruza las filas válidas contra el catálogo que ya
-//      existe en el ledger destino y devuelve el PLAN: qué crear (en orden
-//      padres→hijos, con su nivel ya calculado), qué actualizar y qué se omite
-//      y por qué.
+//   2. `planificarCatalogo` — cruza las filas con el catálogo que ya existe en
+//      el ledger destino y devuelve el PLAN: qué crear (en orden padres→hijos,
+//      con nivel, tipo y naturaleza ya resueltos), qué actualizar, y qué se
+//      omite y por qué.
 //
 // El plan se calcula UNA VEZ POR LEDGER: el mismo archivo se puede aplicar a la
-// contabilidad de la empresa y a la de cada proyecto, y en cada una el código
-// padre resuelve contra las cuentas de ESE ledger (unicidad de código es por
+// contabilidad de la empresa y a la de cada proyecto, y en cada una los códigos
+// resuelven contra las cuentas de ESE ledger (la unicidad de código es por
 // ledger — ver uq_conta_cuentas_ledger_codigo).
 import { NATURALEZA_POR_TIPO, type NaturalezaCuenta, type TipoCuenta } from '../../types/contabilidad'
 import { normalizarMoneda } from './schemas'
@@ -20,13 +40,21 @@ import { normalizarMoneda } from './schemas'
 /** Nivel máximo del catálogo (CHECK nivel BETWEEN 1 AND 5 en BD). */
 export const NIVEL_MAXIMO = 5
 
+/** Cabeceras de las columnas por nivel, en orden. */
+export const COLUMNAS_NIVEL = ['n_1', 'n_2', 'n_3', 'n_4', 'n_5'] as const
+
+/** Une los niveles del código: 1 · 1 · 3 → "1.1.3". */
+export const SEPARADOR_NIVEL = '.'
+
 /** Fila del archivo ya normalizada (aún sin ubicar en el árbol). */
 export interface CuentaImportFila {
   codigo: string
   nombre: string
-  tipo: TipoCuenta
-  naturaleza: NaturalezaCuenta
-  /** Código del padre tal como vino en el archivo; null = inferir/raíz. */
+  /** null = se hereda de la cuenta padre (o de la cuenta ya existente). */
+  tipo: TipoCuenta | null
+  /** null = se hereda del padre; sin padre, se deriva del tipo. */
+  naturaleza: NaturalezaCuenta | null
+  /** Código del padre; null = raíz o (formato viejo) inferir del código. */
   padre_codigo: string | null
   es_detalle: boolean
   moneda: string | null
@@ -42,10 +70,23 @@ export interface CuentaExistenteRef {
   id: string
   codigo: string
   nivel: number
+  tipo: TipoCuenta
+  naturaleza: NaturalezaCuenta
+}
+
+/** Cuenta lista para escribir: sin nada pendiente de heredar. */
+export interface CuentaResuelta {
+  codigo: string
+  nombre: string
+  tipo: TipoCuenta
+  naturaleza: NaturalezaCuenta
+  es_detalle: boolean
+  moneda: string | null
+  descripcion: string | null
 }
 
 export interface CuentaPlanCrear {
-  fila: CuentaImportFila
+  cuenta: CuentaResuelta
   /** Nivel calculado (1..5) a partir de la cadena de padres. */
   nivel: number
   /** Código del padre ya resuelto (null = cuenta raíz). */
@@ -54,7 +95,7 @@ export interface CuentaPlanCrear {
 
 export interface CuentaPlanActualizar {
   id: string
-  fila: CuentaImportFila
+  cuenta: CuentaResuelta
   /** Nivel actual en BD: una cuenta existente NO se mueve de rama. */
   nivel: number
 }
@@ -111,8 +152,8 @@ export function parseBooleano(raw: unknown, porDefecto: boolean): boolean | null
 }
 
 /**
- * Padre implícito según la convención de códigos del catálogo semilla
- * ('1' → '11' → '1102' → '1102-01'). Solo se usa cuando la fila NO trae
+ * Padre implícito del FORMATO VIEJO, según la convención del catálogo semilla
+ * ('1' → '11' → '1102' → '1102-01'). Solo se usa cuando la fila no trae
  * `padre_codigo` Y el código inferido existe: si no existe, la cuenta se crea
  * como raíz (un `padre_codigo` escrito a mano que no resuelve SÍ es error, ahí
  * la intención del usuario es explícita).
@@ -123,36 +164,144 @@ export function inferirPadreCodigo(codigo: string): string | null {
     const padre = c.slice(0, c.lastIndexOf('-'))
     return padre || null
   }
-  // Sin guion la convención es posicional y solo aplica a códigos numéricos;
+  if (c.includes(SEPARADOR_NIVEL)) {
+    const padre = c.slice(0, c.lastIndexOf(SEPARADOR_NIVEL))
+    return padre || null
+  }
+  // Sin separador la convención es posicional y solo aplica a códigos numéricos;
   // un código alfabético ('CAJA') se toma como raíz salvo padre_codigo explícito.
   if (!/^\d+$/.test(c) || c.length <= 1) return null
   if (c.length === 2) return c.slice(0, 1)
   return c.slice(0, 2)
 }
 
-/** Valida y normaliza una fila cruda del archivo. */
+/**
+ * Celda del nivel `i` (1-based). Se aceptan las tres cabeceras que aparecen en
+ * los catálogos que ya circulan por la empresa: `n_1`, `nivel_1` y `n1`.
+ */
+function celdaNivel(row: Record<string, unknown>, i: number): string {
+  for (const clave of [`n_${i}`, `nivel_${i}`, `n${i}`]) {
+    const v = texto(row[clave])
+    if (v !== '') return v
+  }
+  return ''
+}
+
+/** ¿La fila trae la jerarquía en columnas por nivel? */
+function usaColumnasNivel(row: Record<string, unknown>): boolean {
+  return COLUMNAS_NIVEL.some((_, i) => celdaNivel(row, i + 1) !== '')
+}
+
+interface Jerarquia {
+  codigo: string
+  padre_codigo: string | null
+  nivel: number
+}
+
+/**
+ * Lee `n_1`..`n_5` y arma código, padre y nivel. El 0 (o la celda vacía) marca
+ * "esta cuenta no llega a este nivel", y una vez que aparece ya no puede volver
+ * a haber número: 1·0·2 no describe ninguna cuenta.
+ */
+export function jerarquiaDesdeNiveles(
+  row: Record<string, unknown>,
+): { ok: true; data: Jerarquia } | { ok: false; errors: string[] } {
+  const segmentos: number[] = []
+  for (let i = 1; i <= COLUMNAS_NIVEL.length; i++) {
+    const crudo = celdaNivel(row, i)
+    if (crudo === '') {
+      segmentos.push(0)
+      continue
+    }
+    const n = Number(crudo)
+    if (!Number.isInteger(n) || n < 0) {
+      return { ok: false, errors: [`n_${i} debe ser un número entero ≥ 0 (0 = nivel no usado)`] }
+    }
+    segmentos.push(n)
+  }
+
+  const ultimo = segmentos.reduce((acc, n, i) => (n !== 0 ? i : acc), -1)
+  if (ultimo < 0) {
+    return { ok: false, errors: ['indica al menos el nivel 1 (columna n_1)'] }
+  }
+  if (segmentos.slice(0, ultimo).some((n) => n === 0)) {
+    return {
+      ok: false,
+      errors: ['no puede quedar un nivel en 0 entre dos niveles con número (ej. 1 · 0 · 2)'],
+    }
+  }
+
+  const partes = segmentos.slice(0, ultimo + 1).map(String)
+  const codigo = partes.join(SEPARADOR_NIVEL)
+  if (codigo.length > 20) {
+    return { ok: false, errors: [`el código "${codigo}" excede los 20 caracteres`] }
+  }
+  return {
+    ok: true,
+    data: {
+      codigo,
+      padre_codigo: ultimo > 0 ? partes.slice(0, ultimo).join(SEPARADOR_NIVEL) : null,
+      nivel: ultimo + 1,
+    },
+  }
+}
+
+/**
+ * Valida y normaliza una fila cruda del archivo. Acepta los dos formatos:
+ * columnas por nivel (`n_1`..`n_5`, el de la plantilla) o el viejo `codigo` +
+ * `padre_codigo`. Si la fila trae ambos, mandan las columnas por nivel.
+ */
 export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResultado {
   const errors: string[] = []
+  const porNivel = usaColumnasNivel(row)
 
-  const codigo = texto(row['codigo'])
-  if (!codigo) errors.push('codigo es obligatorio')
-  else if (codigo.length > 20) errors.push('codigo no puede exceder 20 caracteres')
-  else if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(codigo))
-    errors.push(`codigo inválido: "${codigo}" — use letras, números, punto o guion (ej. 1102-01)`)
+  let codigo = ''
+  let padreCodigo: string | null = null
+  let nivelDeclarado: number | null = null
+
+  if (porNivel) {
+    const jerarquia = jerarquiaDesdeNiveles(row)
+    if (!jerarquia.ok) errors.push(...jerarquia.errors)
+    else {
+      codigo = jerarquia.data.codigo
+      padreCodigo = jerarquia.data.padre_codigo
+      nivelDeclarado = jerarquia.data.nivel
+      if (nivelDeclarado > NIVEL_MAXIMO) {
+        errors.push(`el catálogo admite hasta ${NIVEL_MAXIMO} niveles`)
+      }
+    }
+  } else {
+    codigo = texto(row['codigo'])
+    const padre = texto(row['padre_codigo'])
+    if (!codigo) errors.push('indica el nivel en las columnas n_1…n_5 (o un codigo)')
+    else if (codigo.length > 20) errors.push('codigo no puede exceder 20 caracteres')
+    else if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(codigo))
+      errors.push(`codigo inválido: "${codigo}" — use letras, números, punto o guion (ej. 1102-01)`)
+    if (padre && padre === codigo) errors.push('padre_codigo no puede ser la misma cuenta')
+    if (padre.length > 20) errors.push('padre_codigo no puede exceder 20 caracteres')
+    padreCodigo = padre || null
+  }
 
   const nombre = texto(row['nombre'])
   if (nombre.length < 2) errors.push('nombre es obligatorio (mín. 2 caracteres)')
   else if (nombre.length > 120) errors.push('nombre no puede exceder 120 caracteres')
 
+  // Vacío = se hereda del padre. Una cuenta RAÍZ no tiene de quién heredar, así
+  // que ahí el tipo sí es obligatorio y se avisa en el archivo de errores.
   const tipoRaw = sinAcentos(texto(row['tipo'])).toLowerCase()
-  const tipo = (TIPOS_VALIDOS as string[]).includes(tipoRaw)
-    ? (tipoRaw as TipoCuenta)
-    : TIPO_SINONIMOS[tipoRaw]
-  if (!tipo) errors.push(`tipo inválido: "${texto(row['tipo'])}" — use: ${TIPOS_VALIDOS.join(', ')}`)
+  let tipo: TipoCuenta | null = null
+  if (tipoRaw !== '') {
+    tipo = (TIPOS_VALIDOS as string[]).includes(tipoRaw)
+      ? (tipoRaw as TipoCuenta)
+      : TIPO_SINONIMOS[tipoRaw] ?? null
+    if (!tipo) errors.push(`tipo inválido: "${texto(row['tipo'])}" — use: ${TIPOS_VALIDOS.join(', ')}`)
+  } else if (padreCodigo === null && nivelDeclarado !== null) {
+    errors.push(`tipo es obligatorio en el nivel 1 — use: ${TIPOS_VALIDOS.join(', ')}`)
+  }
 
   const naturalezaRaw = sinAcentos(texto(row['naturaleza'])).toLowerCase()
-  let naturaleza: NaturalezaCuenta | undefined
-  if (naturalezaRaw === '') naturaleza = tipo ? NATURALEZA_POR_TIPO[tipo] : undefined
+  let naturaleza: NaturalezaCuenta | null = null
+  if (naturalezaRaw === '') naturaleza = null
   else if (['deudora', 'deudor', 'debito', 'debe'].includes(naturalezaRaw)) naturaleza = 'deudora'
   else if (['acreedora', 'acreedor', 'credito', 'haber'].includes(naturalezaRaw)) naturaleza = 'acreedora'
   else errors.push(`naturaleza inválida: "${texto(row['naturaleza'])}" — use deudora o acreedora`)
@@ -169,11 +318,7 @@ export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResul
   const descripcion = texto(row['descripcion'])
   if (descripcion.length > 500) errors.push('descripcion no puede exceder 500 caracteres')
 
-  const padreCodigo = texto(row['padre_codigo'])
-  if (padreCodigo && padreCodigo === codigo) errors.push('padre_codigo no puede ser la misma cuenta')
-  if (padreCodigo.length > 20) errors.push('padre_codigo no puede exceder 20 caracteres')
-
-  if (errors.length > 0 || !tipo || !naturaleza || esDetalle === null) {
+  if (errors.length > 0 || esDetalle === null) {
     return { ok: false, errors: errors.length > 0 ? errors : ['Fila inválida'] }
   }
 
@@ -184,7 +329,7 @@ export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResul
       nombre,
       tipo,
       naturaleza,
-      padre_codigo: padreCodigo || null,
+      padre_codigo: padreCodigo,
       es_detalle: esDetalle,
       moneda,
       descripcion: descripcion || null,
@@ -194,7 +339,9 @@ export function validarFilaCuenta(row: Record<string, unknown>): FilaCuentaResul
 
 // ── Planificación contra el catálogo del ledger ─────────────────────────────
 
-type ResolucionNivel = { ok: true; nivel: number } | { ok: false; motivo: string }
+type Resolucion =
+  | { ok: true; nivel: number; tipo: TipoCuenta; naturaleza: NaturalezaCuenta }
+  | { ok: false; motivo: string }
 
 export interface OpcionesPlan {
   /**
@@ -228,10 +375,11 @@ export function planificarCatalogo(
     porCodigo.set(fila.codigo, fila)
   }
 
-  // Padre efectivo de cada fila. El declarado manda siempre (si no resuelve es
-  // un error, no una cuenta raíz por accidente). El inferido por convención de
-  // código solo se usa cuando EXISTE: así el archivo que arranca en '52' sin
-  // traer la clase '5' crea '52' como raíz en vez de fallar.
+  // Padre efectivo de cada fila. Con columnas por nivel siempre viene explícito;
+  // en el formato viejo el declarado manda (si no resuelve es error, no una
+  // cuenta raíz por accidente) y el inferido por convención de código solo se
+  // usa cuando EXISTE: así un archivo que arranca en '52' sin traer la clase
+  // '5' crea '52' como raíz en vez de fallar.
   const padreResuelto = new Map<string, string | null>()
   for (const fila of porCodigo.values()) {
     const explicito = fila.padre_codigo?.trim()
@@ -253,9 +401,10 @@ export function planificarCatalogo(
     if (padre && porCodigo.has(padre)) conHijos.add(padre)
   }
 
-  const cache = new Map<string, ResolucionNivel>()
+  const cache = new Map<string, Resolucion>()
 
-  function resolverNivel(codigo: string, enCurso: Set<string>): ResolucionNivel {
+  /** Nivel + tipo + naturaleza de un código, heredando por la cadena de padres. */
+  function resolver(codigo: string, enCurso: Set<string>): Resolucion {
     const cacheado = cache.get(codigo)
     if (cacheado) return cacheado
     if (enCurso.has(codigo)) {
@@ -266,10 +415,15 @@ export function planificarCatalogo(
     const fila = porCodigo.get(codigo)
     const existente = existentesPorCodigo.get(codigo)
 
-    let resultado: ResolucionNivel
+    let resultado: Resolucion
     if (existente) {
-      // Ya está en el árbol del ledger: conserva su nivel.
-      resultado = { ok: true, nivel: existente.nivel }
+      // Ya está en el árbol del ledger: conserva nivel, tipo y naturaleza.
+      resultado = {
+        ok: true,
+        nivel: existente.nivel,
+        tipo: fila?.tipo ?? existente.tipo,
+        naturaleza: fila?.naturaleza ?? existente.naturaleza,
+      }
     } else if (!fila) {
       resultado = {
         ok: false,
@@ -277,21 +431,28 @@ export function planificarCatalogo(
       }
     } else {
       const padre = padreResuelto.get(codigo) ?? null
-      if (!padre) {
-        resultado = { ok: true, nivel: 1 }
+      const rp = padre ? conCurso(codigo, padre, enCurso) : null
+      if (rp && !rp.ok) {
+        resultado = rp
+      } else if (rp && rp.nivel >= NIVEL_MAXIMO) {
+        resultado = {
+          ok: false,
+          motivo: `excede el nivel máximo (${NIVEL_MAXIMO}): su padre "${padre}" ya está en el nivel ${rp.nivel}`,
+        }
       } else {
-        enCurso.add(codigo)
-        const rp = resolverNivel(padre, enCurso)
-        enCurso.delete(codigo)
-        if (!rp.ok) {
-          resultado = { ok: false, motivo: rp.motivo }
-        } else if (rp.nivel >= NIVEL_MAXIMO) {
-          resultado = {
-            ok: false,
-            motivo: `excede el nivel máximo (${NIVEL_MAXIMO}): su padre "${padre}" ya está en el nivel ${rp.nivel}`,
-          }
+        const tipo = fila.tipo ?? rp?.tipo ?? null
+        if (!tipo) {
+          resultado = { ok: false, motivo: 'falta el tipo (activo, pasivo, capital, ingreso o gasto)' }
         } else {
-          resultado = { ok: true, nivel: rp.nivel + 1 }
+          resultado = {
+            ok: true,
+            nivel: rp ? rp.nivel + 1 : 1,
+            tipo,
+            // Sin naturaleza propia hereda la del padre — así las hijas de una
+            // cuenta contra-natura (depreciación acumulada) siguen siendo
+            // acreedoras — y si no hay padre, sale del tipo.
+            naturaleza: fila.naturaleza ?? rp?.naturaleza ?? NATURALEZA_POR_TIPO[tipo],
+          }
         }
       }
     }
@@ -300,36 +461,50 @@ export function planificarCatalogo(
     return resultado
   }
 
+  function conCurso(codigo: string, padre: string, enCurso: Set<string>): Resolucion {
+    enCurso.add(codigo)
+    const r = resolver(padre, enCurso)
+    enCurso.delete(codigo)
+    return r
+  }
+
   const crear: CuentaPlanCrear[] = []
   const actualizar: CuentaPlanActualizar[] = []
 
   for (const fila of porCodigo.values()) {
     const existente = existentesPorCodigo.get(fila.codigo)
-    const normalizada: CuentaImportFila = conHijos.has(fila.codigo)
-      ? { ...fila, es_detalle: false }
-      : fila
+    const resuelta = resolver(fila.codigo, new Set())
+    if (!resuelta.ok) {
+      omitidas.push({ codigo: fila.codigo, motivo: resuelta.motivo })
+      continue
+    }
+
+    const cuenta: CuentaResuelta = {
+      codigo: fila.codigo,
+      nombre: fila.nombre,
+      tipo: resuelta.tipo,
+      naturaleza: resuelta.naturaleza,
+      es_detalle: conHijos.has(fila.codigo) ? false : fila.es_detalle,
+      moneda: fila.moneda,
+      descripcion: fila.descripcion,
+    }
 
     if (existente) {
       if (opciones.actualizarExistentes) {
-        actualizar.push({ id: existente.id, fila: normalizada, nivel: existente.nivel })
+        actualizar.push({ id: existente.id, cuenta, nivel: existente.nivel })
       } else {
         omitidas.push({ codigo: fila.codigo, motivo: 'ya existe en esta contabilidad' })
       }
       continue
     }
 
-    const nivel = resolverNivel(fila.codigo, new Set())
-    if (!nivel.ok) {
-      omitidas.push({ codigo: fila.codigo, motivo: nivel.motivo })
-      continue
-    }
-    crear.push({ fila: normalizada, nivel: nivel.nivel, padre_codigo: padreResuelto.get(fila.codigo) ?? null })
+    crear.push({ cuenta, nivel: resuelta.nivel, padre_codigo: padreResuelto.get(fila.codigo) ?? null })
   }
 
   // Padres primero: el insert por niveles ascendentes garantiza que el
   // padre_id ya está disponible cuando toca insertar a los hijos.
-  crear.sort((a, b) => a.nivel - b.nivel || a.fila.codigo.localeCompare(b.fila.codigo, 'es'))
-  actualizar.sort((a, b) => a.fila.codigo.localeCompare(b.fila.codigo, 'es'))
+  crear.sort((a, b) => a.nivel - b.nivel || a.cuenta.codigo.localeCompare(b.cuenta.codigo, 'es'))
+  actualizar.sort((a, b) => a.cuenta.codigo.localeCompare(b.cuenta.codigo, 'es'))
 
   return { crear, actualizar, omitidas }
 }

@@ -109,7 +109,7 @@ async function cargarCatalogoEnLedger(
 
   try {
     // 1. Catálogo actual del ledger (el código es único POR LEDGER).
-    let q = supabase.from('conta_cuentas').select('id,codigo,nivel').eq('company_id', companyId)
+    let q = supabase.from('conta_cuentas').select('id,codigo,nivel,tipo,naturaleza').eq('company_id', companyId)
     q = ledger ? q.eq('project_id', ledger) : q.is('project_id', null)
     const existentes = (await runQuery<CuentaExistenteRef[]>((signal) => q.abortSignal(signal))) ?? []
 
@@ -126,7 +126,7 @@ async function cargarCatalogoEnLedger(
         const padreId = item.padre_codigo ? idPorCodigo.get(item.padre_codigo) ?? null : null
         if (item.padre_codigo && !padreId) {
           omitidas.push({
-            codigo: item.fila.codigo,
+            codigo: item.cuenta.codigo,
             motivo: `no se creó su cuenta padre "${item.padre_codigo}"`,
           })
           continue
@@ -134,15 +134,15 @@ async function cargarCatalogoEnLedger(
         payload.push({
           company_id: companyId,
           project_id: ledger,
-          codigo: item.fila.codigo,
-          nombre: item.fila.nombre,
-          tipo: item.fila.tipo,
-          naturaleza: item.fila.naturaleza,
+          codigo: item.cuenta.codigo,
+          nombre: item.cuenta.nombre,
+          tipo: item.cuenta.tipo,
+          naturaleza: item.cuenta.naturaleza,
           padre_id: padreId,
           nivel: item.nivel,
-          es_detalle: item.fila.es_detalle,
-          moneda: item.fila.moneda,
-          descripcion: item.fila.descripcion,
+          es_detalle: item.cuenta.es_detalle,
+          moneda: item.cuenta.moneda,
+          descripcion: item.cuenta.descripcion,
         })
       }
       for (const lote of trocear(payload, LOTE_INSERT)) {
@@ -163,12 +163,12 @@ async function cargarCatalogoEnLedger(
             supabase
               .from('conta_cuentas')
               .update({
-                nombre: item.fila.nombre,
-                tipo: item.fila.tipo,
-                naturaleza: item.fila.naturaleza,
-                es_detalle: item.fila.es_detalle,
-                moneda: item.fila.moneda,
-                descripcion: item.fila.descripcion,
+                nombre: item.cuenta.nombre,
+                tipo: item.cuenta.tipo,
+                naturaleza: item.cuenta.naturaleza,
+                es_detalle: item.cuenta.es_detalle,
+                moneda: item.cuenta.moneda,
+                descripcion: item.cuenta.descripcion,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', item.id)
