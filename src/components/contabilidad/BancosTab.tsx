@@ -64,7 +64,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
   const { data: sugerencias = [] } = useSugerenciasQuery(cuentaActivaId)
   const { data: estado } = useEstadoConciliacionQuery(cuentaActivaId, periodo)
 
-  const importar = useImportarMovimientosMutation(companyId)
+  const importar = useImportarMovimientosMutation(companyId, projectId)
   const conciliar = useConciliarMutation()
   const desconciliar = useDesconciliarMutation()
   const ajuste = useAjusteConciliacionMutation()
@@ -283,7 +283,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
           validateRow={(row): RowValidationResult<MovimientoImportado> => validarFilaExtracto(row)}
           onInsertBatch={async (batch) => {
             try {
-              const ok = await importar.mutateAsync({ cuentaBancariaId: cuentaActiva.id, movimientos: batch })
+              const ok = await importar.mutateAsync({ cuenta: cuentaActiva, movimientos: batch })
               return { ok }
             } catch (e) {
               return { ok: 0, error: e instanceof Error ? e.message : 'Error al insertar.' }

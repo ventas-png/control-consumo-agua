@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  construirLoteExtracto,
   cuentaBancariaFormSchema,
   parseFechaExtracto,
   parseMontoExtracto,
@@ -99,6 +100,57 @@ describe('validarFilaExtracto', () => {
       expect(r.data.descripcion).toBeNull()
       expect(r.data.referencia).toBeNull()
     }
+  })
+})
+
+describe('construirLoteExtracto', () => {
+  const cuentaProyecto = { id: 'cb1', company_id: 'emp1', project_id: 'proy1' }
+  const movimientos = [
+    { fecha: '2026-06-10', descripcion: 'DEPOSITO', referencia: 'TRF-1', monto: 350 },
+    { fecha: '2026-06-11', descripcion: 'COMISION', referencia: null, monto: -15 },
+  ]
+
+  it('sella cada fila con la contabilidad de la CUENTA, no con la del selector', () => {
+    const filas = construirLoteExtracto({
+      cuenta: cuentaProyecto, companyId: 'emp1', projectId: 'proy1', movimientos, loteId: 'lote-1',
+    })
+    expect(filas).toHaveLength(2)
+    expect(filas[0]).toEqual({
+      company_id: 'emp1', project_id: 'proy1', cuenta_bancaria_id: 'cb1',
+      fecha: '2026-06-10', descripcion: 'DEPOSITO', referencia: 'TRF-1', monto: 350, lote_id: 'lote-1',
+    })
+    // Todo el lote comparte lote_id: es lo que agrupa una importación.
+    expect(new Set(filas.map((f) => f.lote_id)).size).toBe(1)
+  })
+
+  it('ledger EMPRESA (project_id null) es un ledger válido, no "sin proyecto"', () => {
+    const filas = construirLoteExtracto({
+      cuenta: { id: 'cb2', company_id: 'emp1', project_id: null },
+      companyId: 'emp1', projectId: null, movimientos, loteId: 'lote-2',
+    })
+    expect(filas.every((f) => f.project_id === null)).toBe(true)
+  })
+
+  // El extracto de una contabilidad no puede aterrizar en otra: es la mezcla
+  // que se colaba cuando la cuenta seleccionada quedaba de un ledger anterior.
+  it('rechaza el lote si la cuenta es de OTRO proyecto', () => {
+    expect(() => construirLoteExtracto({
+      cuenta: cuentaProyecto, companyId: 'emp1', projectId: 'proy2', movimientos, loteId: 'l',
+    })).toThrow(/contabilidad activa/)
+  })
+
+  it('rechaza el lote si la cuenta es de la EMPRESA y el ledger activo es un proyecto', () => {
+    expect(() => construirLoteExtracto({
+      cuenta: { id: 'cb2', company_id: 'emp1', project_id: null },
+      companyId: 'emp1', projectId: 'proy1', movimientos, loteId: 'l',
+    })).toThrow(/contabilidad activa/)
+  })
+
+  it('rechaza el lote si la cuenta es de OTRA empresa', () => {
+    expect(() => construirLoteExtracto({
+      cuenta: { id: 'cb3', company_id: 'emp2', project_id: 'proy1' },
+      companyId: 'emp1', projectId: 'proy1', movimientos, loteId: 'l',
+    })).toThrow(/contabilidad activa/)
   })
 })
 

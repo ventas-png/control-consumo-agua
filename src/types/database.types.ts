@@ -1033,6 +1033,7 @@ export type Database = {
           match_id: string | null
           match_tipo: string | null
           monto: number
+          project_id: string | null
           referencia: string | null
         }
         Insert: {
@@ -1049,6 +1050,7 @@ export type Database = {
           match_id?: string | null
           match_tipo?: string | null
           monto: number
+          project_id?: string | null
           referencia?: string | null
         }
         Update: {
@@ -1065,6 +1067,7 @@ export type Database = {
           match_id?: string | null
           match_tipo?: string | null
           monto?: number
+          project_id?: string | null
           referencia?: string | null
         }
         Relationships: [
@@ -1095,6 +1098,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cuentas_bancarias"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banco_movimientos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_banco_mov_cuenta_empresa"
+            columns: ["cuenta_bancaria_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
+            referencedColumns: ["id", "company_id"]
           },
         ]
       }

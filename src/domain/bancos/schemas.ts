@@ -2,6 +2,7 @@
 // La validación autoritativa (dedup, doble conciliación, asientos de ajuste)
 // vive en la BD; estos helpers normalizan lo que viene del CSV/XLSX bancario.
 import { z } from 'zod'
+import type { CuentaBancaria } from '../../types/bancos'
 
 export const cuentaBancariaFormSchema = z.object({
   nombre: z.string().trim().min(2, 'El alias es obligatorio').max(80),
@@ -71,6 +72,51 @@ export function parseFechaExtracto(raw: unknown): string | null {
     return `${y}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
   }
   return null
+}
+
+/** Fila lista para insertar en `banco_movimientos`. */
+export interface MovimientoInsert {
+  company_id: string
+  project_id: string | null
+  cuenta_bancaria_id: string
+  fecha: string
+  descripcion: string | null
+  referencia: string | null
+  monto: number
+  lote_id: string
+}
+
+/**
+ * Filas del lote a insertar. La contabilidad (empresa + proyecto) sale de la
+ * CUENTA BANCARIA, nunca del selector de la pantalla: si el ledger activo no es
+ * el de la cuenta —selección vieja tras cambiar de contabilidad o de empresa—
+ * el lote no se manda, en vez de sellarlo con una empresa que no es la suya y
+ * mezclar extractos entre contabilidades. (La BD lo vuelve a sellar por su
+ * cuenta con banco_tg_movimiento_ledger; esto es el aviso temprano y legible.)
+ */
+export function construirLoteExtracto(args: {
+  cuenta: Pick<CuentaBancaria, 'id' | 'company_id' | 'project_id'>
+  companyId: string
+  projectId: string | null
+  movimientos: MovimientoImportado[]
+  loteId: string
+}): MovimientoInsert[] {
+  const { cuenta, companyId, projectId, movimientos, loteId } = args
+  if (cuenta.company_id !== companyId || (cuenta.project_id ?? null) !== (projectId ?? null)) {
+    throw new Error(
+      'La cuenta bancaria no pertenece a la contabilidad activa. Vuelve a seleccionarla antes de importar.',
+    )
+  }
+  return movimientos.map((m) => ({
+    company_id: cuenta.company_id,
+    project_id: cuenta.project_id,
+    cuenta_bancaria_id: cuenta.id,
+    fecha: m.fecha,
+    descripcion: m.descripcion,
+    referencia: m.referencia,
+    monto: m.monto,
+    lote_id: loteId,
+  }))
 }
 
 /** Valida una fila parseada del extracto (para ImportModal.validateRow). */

@@ -25,6 +25,11 @@ export interface CuentaBancaria {
 export interface BancoMovimiento {
   id: string
   company_id: string
+  /**
+   * Contabilidad dueña del movimiento, derivada de su cuenta bancaria
+   * (null = ledger de la empresa). La sella la BD, no el cliente.
+   */
+  project_id: string | null
   cuenta_bancaria_id: string
   fecha: string
   descripcion: string | null
