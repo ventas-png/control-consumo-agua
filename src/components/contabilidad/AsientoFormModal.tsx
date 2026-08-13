@@ -33,7 +33,11 @@ interface LineaForm {
 const LINEA_VACIA: LineaForm = { cuenta_id: '', descripcion: '', lado: 'debe', monto: '', tipo_cambio: '' }
 
 export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: Props) {
-  const { data: cuentas = [] } = useCuentasQuery(companyId)
+  // El catálogo es el DEL LEDGER activo. Sin `projectId` la query cae al de la
+  // empresa (`project_id IS NULL`), así que una póliza del proyecto se armaba
+  // con cuentas de la empresa y moría al publicar ("cuentas de otra
+  // contabilidad"), dejando el borrador cruzado atrás.
+  const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 

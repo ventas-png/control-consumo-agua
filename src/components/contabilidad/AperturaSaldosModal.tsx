@@ -23,7 +23,10 @@ interface Props {
  * publicada por empresa+proyecto (índice único en BD).
  */
 export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose }: Props) {
-  const { data: cuentas = [] } = useCuentasQuery(companyId)
+  // El catálogo es el DEL LEDGER activo. Sin `projectId` la query cae al de la
+  // empresa (`project_id IS NULL`), así que la apertura de un proyecto listaba
+  // las cuentas de la empresa y armaba el asiento contra ellas.
+  const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
   const crear = useCrearAsientoBorradorMutation(companyId)
   const publicar = usePublicarAsientoMutation()
 
