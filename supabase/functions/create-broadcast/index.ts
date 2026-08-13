@@ -6,9 +6,10 @@
 // los emails uno a uno llamando a send-email. Aquí, con service_role:
 //   1. Autenticamos y autorizamos al caller (admin/owner del tenant).
 //   2. Rate-limit por caller (reusa _shared/rateLimit).
-//   3. Resolvemos la audiencia contra la BD (clientes de la empresa + unidades).
-//   4. Insertamos el broadcast y sus broadcast_recipients en lotes.
-//   5. Si send_email: ENCOLAMOS un email por destinatario en notifications_outbox
+//   3. Acotamos el alcance a los proyectos del caller si su rol no es exento.
+//   4. Resolvemos la audiencia contra la BD (clientes de la empresa + unidades).
+//   5. Insertamos el broadcast y sus broadcast_recipients en lotes.
+//   6. Si send_email: ENCOLAMOS un email por destinatario en notifications_outbox
 //      vía enqueue_notification (consume el orquestador #378; el dispatcher los
 //      envía async y, en el follow-up, respetará notification_preferences).
 //
@@ -19,6 +20,8 @@ import { enforceRateLimit } from '../_shared/rateLimit.ts'
 import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 import {
   resolveBroadcastClienteIds,
+  restrictClienteIdsToProjects,
+  isProjectExemptSender,
   chunk,
   type UnidadRef,
 } from '../_shared/broadcastAudience.ts'
@@ -89,8 +92,42 @@ Deno.serve(async (req) => {
     }, corsHeaders)
     if (rl) return rl
 
-    // 4. Resolución de audiencia en el servidor.
-    //    4a. Clientes vinculados a la empresa (company_clientes).
+    // 4. Alcance por proyecto del emisor. `target_ids` viaja desde el navegador:
+    //    sin este recorte, un usuario acotado a un proyecto podía difundir a los
+    //    clientes de TODA la empresa mandando ids arbitrarios. Los roles exentos
+    //    (owner/admin sin rol de condominios restringido) siguen sin recorte.
+    const { data: roleRows } = await adminClient
+      .from('user_roles')
+      .select('role_id, role:roles(cloned_from_role_id)')
+      .eq('user_id', caller.id)
+    const assignedRoleIds = (roleRows ?? []).flatMap(
+      (r: { role_id: string; role?: { cloned_from_role_id?: string | null } | null }) =>
+        // Linaje: las copias de empresa heredan el gate de su plantilla de origen.
+        [r.role_id, r.role?.cloned_from_role_id].filter((v): v is string => !!v),
+    )
+    const exempt = isProjectExemptSender(callerRole, assignedRoleIds)
+
+    let allowedProjectIds: string[] = []
+    if (!exempt) {
+      const { data: upaRows, error: upaError } = await adminClient
+        .from('user_project_assignments')
+        .select('project_id')
+        .eq('user_id', caller.id)
+      if (upaError) return json({ error: upaError.message }, 500, corsHeaders)
+      allowedProjectIds = (upaRows ?? []).map((r: { project_id: string }) => r.project_id)
+
+      // Difundir "por proyecto" a uno que no tienes asignado es un error de
+      // autorización, no una audiencia vacía: se rechaza explícitamente.
+      if (targetType === 'proyecto') {
+        const allowed = new Set(allowedProjectIds)
+        if (targetIds.some((id) => !allowed.has(id))) {
+          return json({ error: 'No puedes enviar comunicados a proyectos que no tienes asignados.' }, 403, corsHeaders)
+        }
+      }
+    }
+
+    // 5. Resolución de audiencia en el servidor.
+    //    5a. Clientes vinculados a la empresa (company_clientes).
     const { data: ccRows, error: ccError } = await adminClient
       .from('company_clientes')
       .select('cliente_id')
@@ -98,9 +135,10 @@ Deno.serve(async (req) => {
     if (ccError) return json({ error: ccError.message }, 500, corsHeaders)
     const companyClienteIds = (ccRows ?? []).map((r: { cliente_id: string }) => r.cliente_id)
 
-    //    4b. Unidades (solo si la audiencia depende de ellas).
+    //    5b. Unidades: necesarias para resolver 'proyecto'/'unidades' y, para un
+    //        emisor acotado, también para recortar la audiencia a sus proyectos.
     let unidades: UnidadRef[] = []
-    if (targetType === 'proyecto' || targetType === 'unidades') {
+    if (targetType === 'proyecto' || targetType === 'unidades' || !exempt) {
       const { data: uRows, error: uError } = await adminClient
         .from('unidades')
         .select('id, project_id, cliente_id')
@@ -109,18 +147,22 @@ Deno.serve(async (req) => {
       unidades = (uRows ?? []) as UnidadRef[]
     }
 
-    const clienteIds = resolveBroadcastClienteIds({
+    const resolvedClienteIds = resolveBroadcastClienteIds({
       targetType,
       targetIds,
       companyClienteIds,
       unidades,
     })
 
+    const clienteIds = exempt
+      ? resolvedClienteIds
+      : restrictClienteIdsToProjects({ clienteIds: resolvedClienteIds, allowedProjectIds, unidades })
+
     if (clienteIds.length === 0) {
       return json({ error: 'No hay destinatarios para los criterios seleccionados.' }, 400, corsHeaders)
     }
 
-    // 5. INSERT del broadcast.
+    // 6. INSERT del broadcast.
     const { data: broadcast, error: bError } = await adminClient
       .from('broadcasts')
       .insert({
@@ -141,7 +183,7 @@ Deno.serve(async (req) => {
     }
     const broadcastId = (broadcast as { id: string }).id
 
-    // 6. INSERT de destinatarios en lotes (server-side, sin enviar el padrón al
+    // 7. INSERT de destinatarios en lotes (server-side, sin enviar el padrón al
     //    cliente). Si falla, removemos el broadcast para no dejar uno huérfano.
     for (const part of chunk(clienteIds, RECIPIENT_BATCH)) {
       const rows = part.map((cid) => ({
@@ -156,7 +198,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7. Email opcional → encolar en notifications_outbox (orquestador #378).
+    // 8. Email opcional → encolar en notifications_outbox (orquestador #378).
     let emailsQueued = 0
     if (sendEmail) {
       // Nombre de la empresa para las variables de la plantilla.

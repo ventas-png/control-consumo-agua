@@ -5,19 +5,30 @@ import { Button } from '../shared/Button'
 import { sanitizeInput } from '../../lib/validation'
 import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 import { CATEGORY_LABELS } from './conversationConstants'
-import type { ConversationCategory, ConversationServiceType } from '../../types'
+import type { ConversationCategory, ConversationServiceType, Proyecto } from '../../types'
 
 interface Props {
   onClose: () => void
-  onConfirm: (data: { subject: string; category: ConversationCategory; firstMessage: string }) => Promise<void>
+  onConfirm: (data: {
+    subject: string
+    category: ConversationCategory
+    firstMessage: string
+    projectId?: string
+  }) => Promise<void>
   sending: boolean
+  /** Proyectos accesibles: acotan a qué equipo se dirige la discusión. */
+  proyectos?: Proyecto[]
   serviceType?: ConversationServiceType
 }
 
-export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, serviceType = 'agua' }: Props) {
+export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, proyectos = [], serviceType = 'agua' }: Props) {
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState<ConversationCategory>('general')
   const [firstMessage, setFirstMessage] = useState('')
+  // Una discusión interna se sella con el proyecto de su equipo: así solo la ve
+  // quien tiene ese proyecto asignado. Con un único proyecto accesible no hay
+  // nada que preguntar; sin proyectos queda general (visible a toda la empresa).
+  const [projectId, setProjectId] = useState<string>(proyectos.length === 1 ? proyectos[0].id : '')
 
   async function handleSubmit() {
     if (!subject.trim() || !firstMessage.trim()) {
@@ -28,6 +39,7 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
       subject: sanitizeInput(subject.trim()),
       category,
       firstMessage: sanitizeInput(firstMessage.trim()),
+      projectId: projectId || undefined,
     })
   }
 
@@ -71,6 +83,21 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
             ))}
           </select>
         </div>
+        {proyectos.length > 1 && (
+          <div>
+            <label htmlFor="discusion-proyecto" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Proyecto</label>
+            <select id="discusion-proyecto" value={projectId} onChange={e => setProjectId(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+              <option value="">General (todos los proyectos)</option>
+              {proyectos.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+            <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
+              Solo el equipo asignado a ese proyecto verá la discusión.
+            </p>
+          </div>
+        )}
         <div>
           <label htmlFor="discusion-mensaje" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Mensaje inicial *</label>
           <textarea id="discusion-mensaje" value={firstMessage} onChange={e => setFirstMessage(e.target.value)}

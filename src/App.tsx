@@ -1,5 +1,5 @@
 import { hoyLocalISO } from './lib/format'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { lazySafe as lazy } from './lib/lazyWithPreload'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { OPEN_BILLING_EVENT, OPEN_AMPLIAR_EVENT } from './components/shared/promptUpgrade'
@@ -13,6 +13,7 @@ import type { AppSection, Ruta } from './types'
 import { sectionToPath, pathToSection } from './lib/routes'
 import { sectionForPath, type SectionKey } from './components/condominios/sections'
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
+import { isProjectExempt } from './lib/proyectosAccess'
 import { useAuth } from './hooks/useAuth'
 import { useAguaData } from './hooks/useAguaData'
 import { getResetToken, detectGmailOAuthCallback, handleGmailOAuthCallback } from './lib/gmailOAuth'
@@ -236,10 +237,19 @@ function AppShell() {
 
   const clearRutaActiva = useCallback(() => setRutaActivaParaLecturas(null), [])
 
+  // El badge cuenta lo mismo que el usuario puede abrir: para un rol no exento,
+  // solo las conversaciones de sus proyectos (`agua.proyectos` ya viene acotado).
+  const comunicacionProjectIds = useMemo(
+    () => isProjectExempt(currentUser?.role, currentUser?.assigned_role_ids)
+      ? undefined
+      : agua.proyectos.map(p => p.id),
+    [currentUser?.role, currentUser?.assigned_role_ids, agua.proyectos],
+  )
+
   const fetchUnreadComunicacion = useCallback(async () => {
     if (!currentUser?.company_id) return
-    setUnreadComunicacion(await fetchOpenConversationsCount(currentUser.company_id))
-  }, [currentUser?.company_id])
+    setUnreadComunicacion(await fetchOpenConversationsCount(currentUser.company_id, comunicacionProjectIds))
+  }, [currentUser?.company_id, comunicacionProjectIds])
 
   useEffect(() => {
     fetchUnreadComunicacion()

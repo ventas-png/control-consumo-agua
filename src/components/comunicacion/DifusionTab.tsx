@@ -1,14 +1,26 @@
-import { useState, useEffect, type CSSProperties} from 'react'
+import { useState, useEffect, useMemo, type CSSProperties} from 'react'
 import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { fetchBroadcastEmailStats, type BroadcastEmailStats } from '../../domain/comunicacion/broadcasts'
+import { filterBroadcastsByProjectAccess, type ProjectScope } from '../../lib/comunicacionAccess'
 import { confirm, notify } from '../shared/Dialog'
 import { ModalPortal } from '../shared/ModalPortal'
 
 interface Props {
+  /** Padrón seleccionable como audiencia (ya acotado a los proyectos accesibles). */
   clientes: Cliente[]
   proyectos: Proyecto[]
+  /** Unidades seleccionables como audiencia (acotadas). */
   unidades: Unidad[]
+  /**
+   * Unidades de la empresa SIN acotar: se usan solo para resolver a qué proyecto
+   * apuntaba un comunicado ya enviado (`target_type='unidades'`). Sin ellas, un
+   * comunicado dirigido a unidades de otro proyecto quedaría "no resoluble" y se
+   * mostraría por la regla de ambigüedad.
+   */
+  todasLasUnidades?: Unidad[]
+  /** Scope por proyecto del usuario (ver lib/comunicacionAccess). */
+  scope: ProjectScope
   canCreate: boolean
 }
 
@@ -475,12 +487,25 @@ function BroadcastCard({ broadcast, emailStats }: { broadcast: Broadcast; emailS
 
 // ── Main tab ───────────────────────────────────────────────────────────────────
 
-export default function DifusionTab({ clientes, proyectos, unidades, canCreate }: Props) {
-  const { broadcasts, loading, error, loadBroadcasts } = useBroadcasts()
+export default function DifusionTab({ clientes, proyectos, unidades, todasLasUnidades, scope, canCreate }: Props) {
+  const { broadcasts: allBroadcasts, loading, error, loadBroadcasts } = useBroadcasts()
   const [showModal, setShowModal] = useState(false)
   const [emailStats, setEmailStats] = useState<Record<string, BroadcastEmailStats>>({})
 
   useEffect(() => { loadBroadcasts() }, [loadBroadcasts])
+
+  // `broadcasts` solo se acota por empresa (RLS staff_broadcasts_all), así que el
+  // histórico llegaba completo. Aquí se reconstruye la audiencia de cada
+  // comunicado (proyecto / unidades / clientes) y se deja solo lo que toca a los
+  // proyectos del usuario.
+  const broadcasts = useMemo(
+    () => filterBroadcastsByProjectAccess({
+      broadcasts: allBroadcasts,
+      scope,
+      unidades: todasLasUnidades ?? unidades,
+    }),
+    [allBroadcasts, scope, todasLasUnidades, unidades],
+  )
 
   // Stats de entrega de los emails (com:N4): una sola query al outbox por lote
   // de comunicados con email. Degrada a {} (sin stats) si la RLS no aplica al rol.

@@ -293,6 +293,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         clientes={agua.clientes}
         proyectos={agua.proyectos}
         unidades={agua.unidades}
+        registros={agua.registros}
         canCreate={canCreate('comunicacion')}
         canEdit={canEdit('comunicacion')}
       />
