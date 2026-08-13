@@ -7,18 +7,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => {
   // `queue`: resultados consumidos en orden para funciones multi-query
   // (ensureCompanyRoleFromTemplate); vacía → siempre `result`.
-  const state: { result: unknown; queue: unknown[] } = { result: { data: null, error: null }, queue: [] }
+  // `inCalls`/`rpcCalls`: para afirmar el troceado del delete y el payload de
+  // la RPC de permisos.
+  const state: { result: unknown; queue: unknown[]; inCalls: string[][]; rpcCalls: Array<[string, unknown]> } =
+    { result: { data: null, error: null }, queue: [], inCalls: [], rpcCalls: [] }
   const builder: Record<string, unknown> = {}
-  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'or', 'is', 'order', 'limit', 'single', 'maybeSingle']) {
+  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'or', 'is', 'order', 'limit', 'single', 'maybeSingle']) {
     builder[m] = () => builder
   }
+  builder.in = (_col: string, values: string[]) => { state.inCalls.push(values); return builder }
   builder.then = (resolve: (v: unknown) => void) =>
     resolve(state.queue.length > 0 ? state.queue.shift() : state.result)
-  return { state, builder }
+  const rpc = (fn: string, args: unknown) => {
+    state.rpcCalls.push([fn, args])
+    return { then: (resolve: (v: unknown) => void) => resolve(state.queue.length > 0 ? state.queue.shift() : state.result) }
+  }
+  return { state, builder, rpc }
 })
 
 vi.mock('../../../lib/supabase', () => ({
-  supabase: { from: () => h.builder },
+  supabase: { from: () => h.builder, rpc: h.rpc },
 }))
 
 import {
@@ -33,18 +41,23 @@ import {
   fetchPermissionsCatalog,
   fetchRoleById,
   fetchRolePermissionKeys,
-  fetchAllRolePermissionKeys,
   updateRole,
   createRole,
   deleteRolePermissions,
   insertRolePermissions,
+  setRolePermissions,
   fetchRolePermissionsWithEffect,
   fetchUserOverrideRole,
   createOverrideRole,
   ensureCompanyRoleFromTemplate,
 } from '../roles'
 
-beforeEach(() => { h.state.result = { data: null, error: null }; h.state.queue = [] })
+beforeEach(() => {
+  h.state.result = { data: null, error: null }
+  h.state.queue = []
+  h.state.inCalls = []
+  h.state.rpcCalls = []
+})
 function setResult(r: unknown) { h.state.result = r }
 function setQueue(...rs: unknown[]) { h.state.queue = rs }
 
@@ -91,10 +104,6 @@ describe('lecturas RBAC', () => {
     expect(await fetchRolePermissionKeys('r1')).toEqual({ data: [{ permission_key: 'k' }], error: null })
   })
 
-  it('fetchAllRolePermissionKeys éxito (sin filtro effect)', async () => {
-    setResult({ data: [{ permission_key: 'k' }], error: null })
-    expect(await fetchAllRolePermissionKeys('r1')).toEqual({ data: [{ permission_key: 'k' }], error: null })
-  })
 })
 
 describe('mutaciones RBAC', () => {
@@ -131,6 +140,46 @@ describe('mutaciones RBAC', () => {
   it('deleteRolePermissions éxito', async () => {
     setResult({ error: null })
     expect(await deleteRolePermissions('r1', ['k'])).toEqual({ error: null })
+  })
+
+  // Las claves viajan en la URL: en una sola petición, una lista larga la
+  // rechaza la pasarela con un «Bad Request» de texto plano antes de llegar a
+  // PostgREST (bug del editor de roles).
+  it('deleteRolePermissions trocea las claves en lotes de 40', async () => {
+    setResult({ error: null })
+    const keys = Array.from({ length: 95 }, (_, i) => `k${i}`)
+    expect(await deleteRolePermissions('r1', keys)).toEqual({ error: null })
+    expect(h.state.inCalls.map(c => c.length)).toEqual([40, 40, 15])
+    expect(h.state.inCalls.flat()).toEqual(keys)
+  })
+
+  it('deleteRolePermissions corta en el primer lote que falla', async () => {
+    setQueue({ error: null }, { error: { message: 'rls' } })
+    const keys = Array.from({ length: 95 }, (_, i) => `k${i}`)
+    expect(await deleteRolePermissions('r1', keys)).toEqual({ error: 'rls' })
+    expect(h.state.inCalls).toHaveLength(2)
+  })
+
+  it('deleteRolePermissions con lista vacía no llama a la BD', async () => {
+    expect(await deleteRolePermissions('r1', [])).toEqual({ error: null })
+    expect(h.state.inCalls).toHaveLength(0)
+  })
+
+  it('setRolePermissions manda el conjunto entero en el cuerpo de la RPC', async () => {
+    setResult({ data: 3, error: null })
+    expect(await setRolePermissions('r1', ['a', 'b', 'c'])).toEqual({ error: null })
+    expect(h.state.rpcCalls).toEqual([['set_role_permissions', { p_role_id: 'r1', p_keys: ['a', 'b', 'c'] }]])
+  })
+
+  it('setRolePermissions con lista vacía llama igual (vaciar el rol es válido)', async () => {
+    setResult({ data: 0, error: null })
+    expect(await setRolePermissions('r1', [])).toEqual({ error: null })
+    expect(h.state.rpcCalls).toEqual([['set_role_permissions', { p_role_id: 'r1', p_keys: [] }]])
+  })
+
+  it('setRolePermissions error → mensaje legible', async () => {
+    setResult({ data: null, error: { message: 'rls' } })
+    expect(await setRolePermissions('r1', ['a'])).toEqual({ error: 'rls' })
   })
 
   it('insertRolePermissions error → mensaje legible', async () => {

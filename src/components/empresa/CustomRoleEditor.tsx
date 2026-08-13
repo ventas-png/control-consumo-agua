@@ -3,11 +3,9 @@ import {
   fetchPermissionsCatalog,
   fetchRoleById,
   fetchRolePermissionKeys,
-  fetchAllRolePermissionKeys,
   updateRole,
   createRole,
-  deleteRolePermissions,
-  insertRolePermissions,
+  setRolePermissions,
 } from '../../domain/empresa/roles'
 import type { PermissionDef, RoleDef } from '../../types'
 import { MODULE_ACTIONS, MODULE_ACTION_LABELS, type ModuleAction } from '../../lib/moduleConfig'
@@ -236,21 +234,14 @@ export function CustomRoleEditor({
         savedRoleId = insData!.id
       }
 
-      const { data: existingPerms } = await fetchAllRolePermissionKeys(savedRoleId)
-      const existing = new Set((existingPerms ?? []).map(r => r.permission_key))
-
-      const toAdd = [...selectedKeys].filter(k => !existing.has(k))
-      const toRemove = [...existing].filter(k => !selectedKeys.has(k))
-
-      if (toRemove.length > 0) {
-        const { error: delErr } = await deleteRolePermissions(savedRoleId, toRemove)
-        if (delErr) throw new Error(delErr)
-      }
-      if (toAdd.length > 0) {
-        const rows = toAdd.map(permission_key => ({ role_id: savedRoleId, permission_key, effect: 'allow' }))
-        const { error: insErr } = await insertRolePermissions(rows)
-        if (insErr) throw new Error(insErr)
-      }
+      // El conjunto deseado se manda ENTERO y el diff lo hace la BD (RPC
+      // set_role_permissions). Antes se diffeaba aquí y se borraba con las
+      // claves en la query string: al recortar un rol con el catálogo completo
+      // (1 170 permisos) la URL superaba los 50 KB y la pasarela respondía un
+      // «Bad Request» de texto plano. Además ahora es atómico: ya no hay estado
+      // a medias si algo falla entre el borrado y la inserción.
+      const { error: permsErr } = await setRolePermissions(savedRoleId, [...selectedKeys])
+      if (permsErr) throw new Error(permsErr)
 
       onSaved(savedRoleId)
       onClose()
