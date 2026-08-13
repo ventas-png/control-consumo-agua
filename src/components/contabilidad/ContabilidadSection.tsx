@@ -162,7 +162,7 @@ export function ContabilidadSection() {
         <PresupuestoTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} proyectos={proyectos} monedaBase={monedaBase} />
       )}
       {tab === 'catalogo' && (
-        <CatalogoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <CatalogoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} proyectos={proyectos} />
       )}
       {tab === 'configuracion' && (
         <MapeoCuentasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
