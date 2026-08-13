@@ -46,6 +46,14 @@ interface Props {
    * el registry de condominios no las tiene y ahí las unidades bastan.
    */
   registros?: Registro[]
+  /**
+   * Alcance por proyecto ya calculado (useAguaData lo construye con las listas
+   * CRUDAS de la empresa). Cuando llega, se usa tal cual: derivarlo aquí a
+   * partir de unas `unidades`/`registros` ya acotados dejaría a los clientes de
+   * otros proyectos como "no resolubles" y la regla de ambigüedad los
+   * conservaría. Sin él (registry de condominios) se deriva de los props.
+   */
+  scope?: ProjectScope
   canCreate: boolean
   canEdit: boolean
   serviceType?: ConversationServiceType
@@ -83,7 +91,7 @@ const TAB_LABELS: Record<MainTab, string> = {
 const SIN_REGISTROS: Registro[] = []
 
 // ── Componente principal (orquestador; sub-componentes en com:N6) ────────────
-export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, registros = SIN_REGISTROS, canCreate, canEdit, serviceType = 'agua' }: Props) {
+export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, registros = SIN_REGISTROS, scope: scopeProp, canCreate, canEdit, serviceType = 'agua' }: Props) {
   const {
     conversations: allConversations,
     messages,
@@ -117,11 +125,12 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   // comunicación de TODOS. `proyectos` ya llega filtrado por asignación
   // (useAguaData → filterProyectosByAssignment), así que sus ids son el conjunto
   // accesible; el resto del scope se deriva igual que en rutas.
-  const scope: ProjectScope = useMemo(() => ({
+  const scopeDerivado: ProjectScope = useMemo(() => ({
     accessibleProjectIds: new Set(proyectos.map(p => p.id)),
     exempt: isProjectExempt(currentUser.role, currentUser.assigned_role_ids),
     clienteProjects: buildClienteProjectIndex({ unidades, registros }),
   }), [proyectos, unidades, registros, currentUser.role, currentUser.assigned_role_ids])
+  const scope = scopeProp ?? scopeDerivado
 
   // Las conversaciones asignadas al usuario nunca se ocultan (espeja la RLS de
   // agentes): si alguien te asignó un caso, lo ves aunque sea de otro proyecto.

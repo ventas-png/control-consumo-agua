@@ -14,7 +14,7 @@ import type { Cliente, Registro, Ruta, Contador, Tarifa, Unidad, ProveedorEnergi
 // `db` = cliente TIPADO (P2 tipos). `supabase` (sin tipar) queda SOLO para los
 // call sites cuyas columnas no existen en el esquema generado (ver comentarios).
 import { db } from '../../lib/supabase'
-import { isProjectExempt } from '../../lib/proyectosAccess'
+import { isCompanyWideRole } from '../../lib/proyectosAccess'
 import { runQuery, runQueryAll } from '../queryFetch'
 import { aguaKeys } from './keys'
 
@@ -95,18 +95,21 @@ export function useProyectosQuery(companyId?: string) {
 }
 
 // `user_project_assignments` del usuario → ids de proyecto a los que tiene acceso.
-// Solo se consulta para roles NO exentos: los exentos ven todos los proyectos, así
-// que el fetch sería inútil (espeja el guard de filterDataByAssignment, que ni
-// llamaba a Supabase para ellos). Mientras carga, filterProyectosByAssignment hace
-// fail-closed (ningún proyecto) para usuarios restringidos.
-export function useProyectoAssignmentsQuery(userId?: string, role?: string, assignedRoleIds?: string[]) {
+// No se consulta para los roles de alcance de empresa (super_admin /
+// company_owner): ven todos los proyectos pase lo que pase, así que el fetch
+// sería inútil. Para el resto SÍ se pide siempre —incluido `admin`, que es
+// exento solo mientras no tenga asignaciones—, porque la propia lista es la que
+// decide si hay que acotarlo (ver isProjectExempt). Mientras carga,
+// filterProyectosByAssignment hace fail-closed (ningún proyecto) para usuarios
+// restringidos.
+export function useProyectoAssignmentsQuery(userId?: string, role?: string) {
   return useQuery({
     queryKey: aguaKeys.proyectoAssignments(userId),
     queryFn: async () =>
       (await runQuery<{ project_id: string }[]>((signal) =>
         db.from('user_project_assignments').select('project_id').eq('user_id', userId!).abortSignal(signal),
       ))?.map((a) => a.project_id) ?? [],
-    enabled: !!userId && !isProjectExempt(role, assignedRoleIds),
+    enabled: !!userId && !isCompanyWideRole(role),
   })
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isProjectExempt,
+  isCompanyWideRole,
   filterProyectosByAssignment,
   deriveProyectoConfig,
 } from '../proyectosAccess'
@@ -53,6 +54,31 @@ describe('isProjectExempt', () => {
   it('administrador_general no restringe: el rol exento sigue siéndolo', () => {
     expect(isProjectExempt('company_owner', [COND_ADMIN_GENERAL])).toBe(true)
   })
+
+  it('un admin CON proyecto asignado deja de ser exento (ve solo lo suyo)', () => {
+    expect(isProjectExempt('admin', undefined, [P1])).toBe(false)
+  })
+
+  it('un admin sin asignaciones sigue viendo toda la empresa', () => {
+    expect(isProjectExempt('admin', undefined, [])).toBe(true)
+    expect(isProjectExempt('admin', undefined, null)).toBe(true)
+    expect(isProjectExempt('admin', undefined, undefined)).toBe(true)
+  })
+
+  it('los roles de alcance de empresa no se acotan ni con asignaciones', () => {
+    expect(isProjectExempt('super_admin', undefined, [P1])).toBe(true)
+    expect(isProjectExempt('company_owner', undefined, [P1])).toBe(true)
+  })
+})
+
+describe('isCompanyWideRole', () => {
+  it('solo super_admin y company_owner tienen alcance de empresa garantizado', () => {
+    expect(isCompanyWideRole('super_admin')).toBe(true)
+    expect(isCompanyWideRole('company_owner')).toBe(true)
+    expect(isCompanyWideRole('admin')).toBe(false)
+    expect(isCompanyWideRole('operator')).toBe(false)
+    expect(isCompanyWideRole(undefined)).toBe(false)
+  })
 })
 
 describe('filterProyectosByAssignment', () => {
@@ -103,6 +129,20 @@ describe('filterProyectosByAssignment', () => {
   it('sin role no filtra', () => {
     const out = filterProyectosByAssignment({
       proyectos, userId: ME, role: undefined, assignments: [],
+    })
+    expect(out.map((p) => p.id)).toEqual([P1, P2])
+  })
+
+  it('un admin con proyecto asignado solo ve ese proyecto', () => {
+    const out = filterProyectosByAssignment({
+      proyectos, userId: ME, role: 'admin', assignments: [P2],
+    })
+    expect(out.map((p) => p.id)).toEqual([P2])
+  })
+
+  it('un admin sin asignaciones sigue viendo todos los proyectos de la empresa', () => {
+    const out = filterProyectosByAssignment({
+      proyectos, userId: ME, role: 'admin', assignments: [],
     })
     expect(out.map((p) => p.id)).toEqual([P1, P2])
   })

@@ -16,7 +16,14 @@ import {
 } from '../domain/agua/queries'
 import { aguaKeys } from '../domain/agua/keys'
 import { filterRutasByProjectAccess } from '../lib/rutasAccess'
-import { filterProyectosByAssignment, deriveProyectoConfig } from '../lib/proyectosAccess'
+import { filterProyectosByAssignment, deriveProyectoConfig, isProjectExempt } from '../lib/proyectosAccess'
+import {
+  buildClienteProjectIndex, filterClientesByProjectAccess, filterUnidadesByProjectAccess,
+  type ProjectScope,
+} from '../lib/projectScope'
+import {
+  filterContadoresByProjectAccess, filterRegistrosByProjectAccess, filterTarifasByProjectAccess,
+} from '../lib/aguaAccess'
 
 export type AguaData = ReturnType<typeof useAguaData>
 
@@ -29,10 +36,14 @@ export function useAguaData(currentUser: UserSession | null) {
   // y la derivación de moneda/maxUnidades se aplican aquí, igual que rutas usa
   // filterRutasByProjectAccess. Va ANTES del useMemo de rutas porque ese filtro usa
   // `proyectos` accesibles para construir su accessibleProjectIds.
-  const { data: proyectosRaw = [], isLoading: dataLoading } = useProyectosQuery(dataCompanyId)
-  const { data: projectAssignments } = useProyectoAssignmentsQuery(
-    currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids,
-  )
+  const { data: proyectosRaw = [], isLoading: proyectosLoading } = useProyectosQuery(dataCompanyId)
+  const { data: projectAssignments, isLoading: assignmentsLoading } =
+    useProyectoAssignmentsQuery(currentUser?.user_id, currentUser?.role)
+  // Las asignaciones cuentan como carga: hasta que se sepan, el alcance por
+  // proyecto es fail-closed (ningún proyecto) y las secciones enseñarían "sin
+  // datos" en vez de su skeleton. La query está deshabilitada para los roles de
+  // alcance de empresa, y una query deshabilitada no reporta isLoading.
+  const dataLoading = proyectosLoading || assignmentsLoading
   const { proyectos, moneda, maxUnidadesPorTipo } = useMemo(() => {
     const accesibles = filterProyectosByAssignment({
       proyectos: proyectosRaw,
@@ -52,7 +63,7 @@ export function useAguaData(currentUser: UserSession | null) {
   )
   // T7: `contadores` migran a la capa de datos (scope company). Va ANTES del
   // useMemo de rutas porque ese filtro usa `contadores` como entrada.
-  const { data: contadores = [] } = useContadoresQuery(dataCompanyId)
+  const { data: contadoresRaw = [] } = useContadoresQuery(dataCompanyId)
   const addContador = useCallback((contador: Contador) => {
     dataQueryClient.setQueryData<Contador[]>(aguaKeys.contadores(dataCompanyId), (old = []) => [contador, ...old])
   }, [dataQueryClient, dataCompanyId])
@@ -65,7 +76,7 @@ export function useAguaData(currentUser: UserSession | null) {
   // T7: `unidades` migran a la capa de datos (scope company, orden por nombre).
   // También va ANTES del useMemo de rutas (es entrada del filtro). addUnidad
   // reordena por nombre al insertar, igual que el setData del antiguo useData.
-  const { data: unidades = [] } = useUnidadesQuery(dataCompanyId)
+  const { data: unidadesRaw = [] } = useUnidadesQuery(dataCompanyId)
   const addUnidad = useCallback((unidad: Unidad) => {
     dataQueryClient.setQueryData<Unidad[]>(aguaKeys.unidades(dataCompanyId), (old = []) => [...old, unidad].sort((a, b) => a.nombre.localeCompare(b.nombre)))
   }, [dataQueryClient, dataCompanyId])
@@ -78,7 +89,7 @@ export function useAguaData(currentUser: UserSession | null) {
   // T7: `registros` (core de datos) migran a la capa de datos. Va ANTES del useMemo
   // de rutas (es entrada del filtro). addRegistro APENDE; updateRegistroEstado solo
   // toca `estado`; deleteRegistro filtra. Optimista vía setQueryData.
-  const { data: registros = [] } = useRegistrosQuery(dataCompanyId)
+  const { data: registrosRaw = [] } = useRegistrosQuery(dataCompanyId)
   const addRegistro = useCallback((registro: Registro) => {
     dataQueryClient.setQueryData<Registro[]>(aguaKeys.registros(dataCompanyId), (old = []) => [...old, registro])
   }, [dataQueryClient, dataCompanyId])
@@ -88,17 +99,48 @@ export function useAguaData(currentUser: UserSession | null) {
   const deleteRegistro = useCallback((id: string) => {
     dataQueryClient.setQueryData<Registro[]>(aguaKeys.registros(dataCompanyId), (old = []) => old.filter(r => r.id !== id))
   }, [dataQueryClient, dataCompanyId])
+  // ── Alcance por proyecto de TODO el módulo ────────────────────────────────
+  // Las colecciones de arriba se piden por EMPRESA, así que un usuario asignado
+  // a un proyecto veía los medidores, unidades, lecturas, tarifas y clientes de
+  // toda la empresa (y con ellos el dashboard, los cobros y el histórico). El
+  // scope se construye con las listas CRUDAS —el índice cliente→proyectos tiene
+  // que ver las unidades/lecturas ajenas para poder descartar a sus clientes— y
+  // se aplica una sola vez aquí, de modo que todas las secciones que consumen
+  // `agua.*` quedan acotadas sin tocarlas una por una. La RLS (migración
+  // 20260815000000) es la defensa autoritativa.
+  const projectScope: ProjectScope = useMemo(() => ({
+    accessibleProjectIds: new Set(proyectos.map(p => p.id)),
+    exempt: isProjectExempt(currentUser?.role, currentUser?.assigned_role_ids, projectAssignments),
+    clienteProjects: buildClienteProjectIndex({ unidades: unidadesRaw, registros: registrosRaw }),
+  }), [proyectos, unidadesRaw, registrosRaw, projectAssignments, currentUser?.role, currentUser?.assigned_role_ids])
+
+  const contadores = useMemo(
+    () => filterContadoresByProjectAccess(contadoresRaw, projectScope),
+    [contadoresRaw, projectScope],
+  )
+  const unidades = useMemo(
+    () => filterUnidadesByProjectAccess(unidadesRaw, projectScope),
+    [unidadesRaw, projectScope],
+  )
+  const registros = useMemo(
+    () => filterRegistrosByProjectAccess({ registros: registrosRaw, contadores: contadoresRaw, scope: projectScope }),
+    [registrosRaw, contadoresRaw, projectScope],
+  )
+
   const { data: rutasRaw = [] } = useRutasQuery(dataCompanyId)
+  // El filtro de rutas recibe las listas CRUDAS a propósito: deriva el proyecto
+  // de una ruta legada desde sus items, y con las listas ya filtradas una ruta
+  // ajena quedaría irresoluble → "ambigua" → conservada.
   const rutas = useMemo(
     () => filterRutasByProjectAccess({
       rutas: rutasRaw,
-      contadores,
-      unidades,
-      registros,
-      accessibleProjectIds: new Set(proyectos.map(p => p.id)),
+      contadores: contadoresRaw,
+      unidades: unidadesRaw,
+      registros: registrosRaw,
+      accessibleProjectIds: projectScope.accessibleProjectIds,
       userId: currentUser?.user_id ?? '',
     }),
-    [rutasRaw, contadores, unidades, registros, proyectos, currentUser?.user_id],
+    [rutasRaw, contadoresRaw, unidadesRaw, registrosRaw, projectScope, currentUser?.user_id],
   )
   // Mutaciones optimistas sobre el caché de rutas (espejan addRuta/updateRuta/
   // deleteRuta del antiguo useData). RutasSection sigue haciendo el INSERT/
@@ -113,10 +155,14 @@ export function useAguaData(currentUser: UserSession | null) {
     dataQueryClient.setQueryData<Ruta[]>(aguaKeys.rutas(dataCompanyId), (old = []) => old.filter(r => r.id !== id))
   }, [dataQueryClient, dataCompanyId])
 
-  // T7: `tarifas` también migran a la capa de datos (scope company, sin filtro
-  // por proyecto). Se conservan los nombres para no tocar TarifasSection ni el
-  // resto de consumidores.
-  const { data: tarifas = [] } = useTarifasQuery(dataCompanyId)
+  // T7: `tarifas` también migran a la capa de datos (scope company). Se acotan
+  // por proyecto igual que el resto (`tarifas.project_id` es NOT NULL); los
+  // nombres se conservan para no tocar TarifasSection ni el resto de consumidores.
+  const { data: tarifasRaw = [] } = useTarifasQuery(dataCompanyId)
+  const tarifas = useMemo(
+    () => filterTarifasByProjectAccess(tarifasRaw, projectScope),
+    [tarifasRaw, projectScope],
+  )
   const addTarifa = useCallback((tarifa: Tarifa) => {
     dataQueryClient.setQueryData<Tarifa[]>(aguaKeys.tarifas(dataCompanyId), (old = []) => [tarifa, ...old])
   }, [dataQueryClient, dataCompanyId])
@@ -146,8 +192,14 @@ export function useAguaData(currentUser: UserSession | null) {
   const { data: empresa = {} as Empresa } = useEmpresaQuery(dataCompanyId)
   // T7: `clientes` migran a la capa de datos (RLS por junction company_clientes;
   // su PII ya NO se persiste en localStorage). addCliente APENDE (no prepend) para
-  // conservar el orden original de useData.
-  const { data: clientes = [] } = useClientesQuery(dataCompanyId)
+  // conservar el orden original de useData. El acotado por proyecto se deriva del
+  // índice (los clientes no llevan `project_id`): los que aún no se pueden mapear
+  // se conservan, ver lib/projectScope.
+  const { data: clientesRaw = [] } = useClientesQuery(dataCompanyId)
+  const clientes = useMemo(
+    () => filterClientesByProjectAccess(clientesRaw, projectScope),
+    [clientesRaw, projectScope],
+  )
   const addCliente = useCallback((cliente: Cliente) => {
     dataQueryClient.setQueryData<Cliente[]>(aguaKeys.clientes(dataCompanyId), (old = []) => [...old, cliente])
   }, [dataQueryClient, dataCompanyId])
@@ -160,7 +212,7 @@ export function useAguaData(currentUser: UserSession | null) {
 
   return {
     dataLoading, refrescarDatos,
-    proyectos, moneda, maxUnidadesPorTipo,
+    proyectos, moneda, maxUnidadesPorTipo, projectScope,
     contadores, addContador, updateContador, deleteContador,
     unidades, addUnidad, updateUnidad, deleteUnidad,
     registros, addRegistro, updateRegistroEstado, deleteRegistro,
