@@ -36,7 +36,7 @@ import type {
   FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
   GastoCondominio, PresupuestoCondominio, AlertaCondominio,
   EventoCalendario, ConfiguracionCondominio,
-  SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
+  SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
   CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
@@ -219,6 +219,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [solicitudes, setSolicitudes] = useState<SolicitudResidente[]>([])
   const [solicitudesRenta, setSolicitudesRenta] = useState<SolicitudRentaUnidad[]>([])
   const [solicitudesMudanza, setSolicitudesMudanza] = useState<SolicitudMudanzaUnidad[]>([])
+  const [mensajesPortal, setMensajesPortal] = useState<MensajePortal[]>([])
   const [junta, setJunta] = useState<MiembroJunta[]>([])
   const [prestamos, setPrestamos] = useState<PrestamoEquipo[]>([])
   const [comunicados, setComunicados] = useState<ComunicadoCondominio[]>([])
@@ -432,6 +433,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       configCondominioRes,
       solicitudesRentaRes,
       solicitudesMudanzaRes,
+      mensajesPortalRes,
     ] = await fetchCondominiosSectionData(pid, cid)
     if (runSeqRef.current !== run) return // una carga más nueva ya corre
 
@@ -576,6 +578,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setSolicitudes(mapUnidad<SolicitudResidente>(solicitudesRes.data ?? []))
     setSolicitudesRenta((solicitudesRentaRes.data ?? []) as SolicitudRentaUnidad[])
     setSolicitudesMudanza(mapUnidad<SolicitudMudanzaUnidad>(solicitudesMudanzaRes.data ?? []))
+    setMensajesPortal(mapUnidad<MensajePortal>(mensajesPortalRes.data ?? []))
     setJunta(mapUnidad<MiembroJunta>(juntaRes.data ?? []))
     setPrestamos(mapUnidad<PrestamoEquipo>(prestamosRes.data ?? []))
     setComunicados(mapUnidad<ComunicadoCondominio>(comunicadosRes.data ?? []))
@@ -715,7 +718,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     memorias, reservasSTR, locales, serviciosHK, firmas, solicitudesConcierge,
     llaves, encuestas, respuestasEncuesta, gastos, presupuestos, alertasCondominio,
     eventosCalendario, configuracion, solicitudes, solicitudesRenta,
-    solicitudesMudanza, junta, prestamos, comunicados, actas, cierres, reglas,
+    solicitudesMudanza, mensajesPortal, junta, prestamos, comunicados, actas, cierres, reglas,
     medidores, votaciones, sanciones, planesMantenimiento, correspondencia,
     libroNovedades, acuerdos, vehiculos, eventosComunidad, asistentesEvento,
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,
@@ -747,7 +750,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     memorias, reservasSTR, locales, serviciosHK, firmas, solicitudesConcierge,
     llaves, encuestas, respuestasEncuesta, gastos, presupuestos, alertasCondominio,
     eventosCalendario, configuracion, solicitudes, solicitudesRenta,
-    solicitudesMudanza, junta, prestamos, comunicados, actas, cierres, reglas,
+    solicitudesMudanza, mensajesPortal, junta, prestamos, comunicados, actas, cierres, reglas,
     medidores, votaciones, sanciones, planesMantenimiento, correspondencia,
     libroNovedades, acuerdos, vehiculos, eventosComunidad, asistentesEvento,
     cajasChicas, movimientosCaja, obras, planesPage, accesosRes, garantias,

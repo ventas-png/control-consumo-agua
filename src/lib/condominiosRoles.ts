@@ -86,7 +86,7 @@ const TODAS_FINANZAS = [
 
 const TODAS_RESIDENTES = [
   'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
-  'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'vehiculos', 'mascotas',
+  'entrega_unidad', 'portal', 'mensajes_portal', 'resumen_residente', 'solicitudes', 'vehiculos', 'mascotas',
   'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades', 'scoring_unidades',
 ]
 
@@ -182,7 +182,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     'incidentes', 'bitacora_guardia', 'panel_turno', 'emergencias', 'reclamos',
     // Residentes: directorio y accesos
     'directorio', 'directorio_comunidad', 'vehiculos', 'mascotas', 'solicitudes',
-    'accesos_res', 'control_accesos_qr', 'certificados', 'portal',
+    'accesos_res', 'control_accesos_qr', 'certificados', 'portal', 'mensajes_portal',
     // Instalaciones: amenidades y parking
     'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'llaves',
     // Comunidad: comunicaciones
