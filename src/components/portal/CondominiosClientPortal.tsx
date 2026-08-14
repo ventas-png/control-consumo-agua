@@ -377,23 +377,40 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       {/* Main content */}
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 24px' }}>
 
-        {/* KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+        {/* KPI Cards — tarjeta compacta: valor arriba y el icono junto a la
+         * etiqueta en una sola línea abajo. Antes el icono iba en su propio
+         * renglón y con `minmax` de 185px las cuatro tarjetas caían a ancho
+         * completo en móvil: ~113px de alto cada una, casi 500px antes de que
+         * empezara el contenido del tab. Con esta caja (~65px) entran dos por
+         * fila desde 360px y el bloque baja a ~141px, en la misma línea visual
+         * que las tarjetas de resumen del portal de agua.
+         *
+         * El icono va en el renglón de la etiqueta —y no en un chip a la
+         * izquierda como en agua— porque ahí el valor se queda sin ancho: en
+         * una tarjeta de 150px un importe tipo "Q 1250.00" parte en dos
+         * renglones. Con el valor a lo ancho de la tarjeta no envuelve.
+         * Los gradientes de marca no cambian. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
           {kpiCards.map(card => (
             <div key={card.label} style={{
-              background: card.bg, borderRadius: '16px', padding: '20px',
-              color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+              background: card.bg, borderRadius: '14px', padding: '12px 14px',
+              color: 'white', boxShadow: '0 4px 14px rgba(0,0,0,0.10)',
             }}>
-              <div style={{ fontSize: '22px', marginBottom: '8px', opacity: loading ? 0.4 : 1 }}>{card.icon}</div>
               {loading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className="condo-skeleton" style={{ height: '22px', width: '65%' }} />
-                  <div className="condo-skeleton" style={{ height: '11px', width: '50%' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', padding: '2px 0' }}>
+                  <div className="condo-skeleton" style={{ height: '18px', width: '62%' }} />
+                  <div className="condo-skeleton" style={{ height: '11px', width: '80%' }} />
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: '22px', fontWeight: 700, lineHeight: 1, marginBottom: '4px' }}>{card.value}</div>
-                  <div style={{ fontSize: '11.5px', opacity: 0.88 }}>{card.label}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, lineHeight: 1.15 }}>{card.value}</div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px',
+                    fontSize: '11.5px', opacity: 0.9, lineHeight: 1.3,
+                  }}>
+                    <span style={{ fontSize: '13px', flexShrink: 0 }}>{card.icon}</span>
+                    <span>{card.label}</span>
+                  </div>
                 </>
               )}
             </div>
