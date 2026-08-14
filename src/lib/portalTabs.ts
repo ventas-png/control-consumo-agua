@@ -22,11 +22,12 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
 
 // Tabs OPERATIVOS: lo que un residente no-propietario puede hacer en la unidad.
 // En 'cuenta' el RLS ya acota las cuotas al rol responsable (arrendatario/NULL),
-// así que el tab es seguro para el inquilino. Lo que queda fuera es del dueño:
-// rentas (autorización/contratos/STR), mudanza, asambleas (voto por unidad) y
-// transparencia financiera.
+// y 'mudanza' es relevante para el inquilino (entrada/salida de la unidad; su
+// RLS ya lo cubre vía mis_unidades_ids — decisión de producto en 20260713080000).
+// Lo que queda fuera es del dueño: rentas (autorización/contratos/STR),
+// asambleas (voto por unidad) y transparencia financiera.
 const TABS_NO_PROPIETARIO: readonly PortalTab[] = [
-  'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios',
+  'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios', 'mudanza',
 ]
 
 /**

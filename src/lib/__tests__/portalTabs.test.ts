@@ -16,15 +16,15 @@ describe('tabsForRol', () => {
     expect(tabsForRol('')).toEqual(todos)
   })
 
-  it('arrendatario ve solo los tabs operativos', () => {
+  it('arrendatario ve solo los tabs operativos (mudanza incluida)', () => {
     expect(tabsForRol('arrendatario')).toEqual([
-      'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios',
+      'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios', 'mudanza',
     ])
   })
 
-  it('arrendatario NO ve rentas, mudanza, asambleas ni transparencia', () => {
+  it('arrendatario NO ve rentas, asambleas ni transparencia', () => {
     const visibles = tabsForRol('arrendatario')
-    for (const oculto of ['rentas', 'mudanza', 'asambleas', 'transparencia']) {
+    for (const oculto of ['rentas', 'asambleas', 'transparencia']) {
       expect(visibles, `${oculto} es del propietario`).not.toContain(oculto)
     }
   })
