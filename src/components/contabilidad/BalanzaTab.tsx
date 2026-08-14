@@ -4,7 +4,7 @@ import { balanzaConRollups, type BalanzaNodo } from '../../domain/contabilidad/a
 import { exportarExcel } from '../condominios/exportUtils'
 import { formatCurrency, mesLocalISO } from '../../lib/format'
 import { EmptyState } from '../shared'
-import { btnSecundario, input } from './ui'
+import { btnSecundario, input , usePermisosContabilidad } from './ui'
 import { RevaluacionFxModal } from './RevaluacionFxModal'
 
 interface Props {
@@ -19,6 +19,7 @@ function periodoActual(): string {
 }
 
 export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
+  const { puedeCrear } = usePermisosContabilidad()
   const [periodo, setPeriodo] = useState(periodoActual())
   const [showRevaluacion, setShowRevaluacion] = useState(false)
 
@@ -67,9 +68,11 @@ export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 150 }} aria-label="Periodo" />
         <span style={{ flex: 1 }} />
-        <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra 3301">
-          💱 Revaluar FX
-        </button>
+        {puedeCrear && (
+          <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra 3301">
+            💱 Revaluar FX
+          </button>
+        )}
         <button onClick={exportar} disabled={nodos.length === 0} style={btnSecundario}>Exportar Excel</button>
       </div>
 

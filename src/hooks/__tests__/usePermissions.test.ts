@@ -115,6 +115,20 @@ describe('módulos de plataforma → clave platform.<modulo>.<accion>', () => {
     expect(api(session('viewer', ['platform.configuracion.view'])).canViewModule('configuracion')).toBe(true)
     expect(api(session('operator', ['agua.clientes.view'])).canViewModule('clientes')).toBe(false) // prefijo equivocado
   })
+
+  // Contabilidad no está en WATER_MODULE_KEYS, así que resuelve al prefijo
+  // platform. De esa clave depende todo el gating nuevo del módulo (ruta,
+  // sidebar, ⌘K y los botones de cada tab): si el prefijo cambiara, el rol
+  // "Finanzas / Contador" volvería a quedarse fuera en silencio.
+  it('contabilidad usa platform.contabilidad.<accion>', () => {
+    const conta = api(session('operator', [
+      'platform.contabilidad.view', 'platform.contabilidad.create',
+    ]))
+    expect(conta.canViewModule('contabilidad')).toBe(true)
+    expect(conta.canCreate('contabilidad')).toBe(true)
+    expect(conta.canDelete('contabilidad')).toBe(false)
+    expect(api(session('operator', ['agua.contabilidad.view'])).canViewModule('contabilidad')).toBe(false)
+  })
 })
 
 describe('atajos de condominios en el sidebar', () => {

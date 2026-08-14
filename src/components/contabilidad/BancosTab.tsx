@@ -28,7 +28,7 @@ import {
   type CuentaBancaria,
   type SugerenciaConciliacion,
 } from '../../types/bancos'
-import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
+import { Campo, btnLink, btnPrimario, btnSecundario, input , usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -46,6 +46,7 @@ function periodoActual(): string {
 }
 
 export function BancosTab({ companyId, projectId, monedaBase }: Props) {
+  const { puedeCrear, puedeEditar, puedeCambiarEstado } = usePermisosContabilidad()
   const { data: cuentasBancarias = [], isLoading: cargandoCuentas } = useCuentasBancariasQuery(companyId, projectId)
   const [cuentaId, setCuentaId] = useState('')
   const [filtro, setFiltro] = useState<FiltroEstado>('pendiente')
@@ -125,7 +126,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
         const sugs = sugerenciasPorMovimiento.get(m.id) ?? []
         return (
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {m.estado === 'pendiente' && sugs.slice(0, 1).map((s) => (
+            {m.estado === 'pendiente' && puedeCambiarEstado && sugs.slice(0, 1).map((s) => (
               <button
                 key={s.candidato_id}
                 onClick={() => void accion(
@@ -138,7 +139,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
                 {s.confianza === 'exacta' ? '✓' : '≈'} Conciliar con {MATCH_TIPO_LABELS[s.candidato_tipo].toLowerCase()}
               </button>
             ))}
-            {m.estado === 'pendiente' && (
+            {m.estado === 'pendiente' && puedeCambiarEstado && (
               <>
                 <button
                   onClick={() => {
@@ -160,12 +161,12 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
                 </button>
               </>
             )}
-            {m.estado === 'conciliado' && m.match_tipo !== 'ajuste' && (
+            {m.estado === 'conciliado' && m.match_tipo !== 'ajuste' && puedeCambiarEstado && (
               <button onClick={() => void accion(() => desconciliar.mutateAsync(m.id), 'Conciliación revertida.')} style={{ ...btnLink, color: 'var(--at-warning)' }}>
                 Desconciliar
               </button>
             )}
-            {m.estado === 'descartado' && (
+            {m.estado === 'descartado' && puedeCambiarEstado && (
               <button onClick={() => void accion(() => descartar.mutateAsync({ movimientoId: m.id, descartar: false }), 'Movimiento restaurado.')} style={btnLink}>
                 Restaurar
               </button>
@@ -200,11 +201,17 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
         <span style={{ flex: 1 }} />
         {cuentaActiva && (
           <>
-            <button onClick={() => setImportando(true)} style={btnSecundario}>Importar extracto</button>
-            <button onClick={() => setFormCuenta(cuentaActiva)} style={btnSecundario}>Editar cuenta</button>
+            {puedeCrear && (
+              <button onClick={() => setImportando(true)} style={btnSecundario}>Importar extracto</button>
+            )}
+            {puedeEditar && (
+              <button onClick={() => setFormCuenta(cuentaActiva)} style={btnSecundario}>Editar cuenta</button>
+            )}
           </>
         )}
-        <button onClick={() => setFormCuenta('nueva')} style={btnPrimario}>+ Cuenta bancaria</button>
+        {puedeCrear && (
+          <button onClick={() => setFormCuenta('nueva')} style={btnPrimario}>+ Cuenta bancaria</button>
+        )}
       </div>
 
       {cuentaActiva && estado && (

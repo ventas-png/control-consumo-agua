@@ -42,18 +42,33 @@ export interface AppRouteDef {
   path: string
   /** Nombre de sección para el ErrorBoundary (sin él, la ruta no se envuelve). */
   sectionName?: string
-  /** Guard de rol: envuelve en <RoleGuard allowedRoles>. */
+  /**
+   * Guard de rol DURO: envuelve en <RoleGuard allowedRoles>. Reservado a los
+   * módulos NO configurables (NON_CONFIGURABLE_MODULES) y a las secciones que
+   * se controlan solo por rol: /superadmin, /empresa, /admin-dashboard.
+   * NO usarlo en módulos configurables: el sidebar los muestra por permiso RBAC
+   * (Sidebar.isTabVisible → canViewModule) y un RoleGuard encima haría que un
+   * rol con el permiso otorgado viera el tab y recibiera "Acceso Denegado".
+   */
   allowedRoles?: UserRole[]
   /** Guard de módulo: si canViewModule(module) es falso renderiza <AccessDenied>. */
   module?: string
+  /**
+   * Roles base que pasan el guard de módulo aunque no tengan el permiso RBAC.
+   * Compatibilidad con roles legacy cuyo acceso nunca se modeló como permiso
+   * (p. ej. 'collector' en /cobros). Los roles exentos ya pasan por
+   * canViewModule, no hace falta listarlos.
+   */
+  moduleRoleBypass?: UserRole[]
   render: (ctx: AppRoutesCtx) => ReactNode
 }
 
 /** Compone los guards declarados sobre el render de la ruta. */
 export function renderAppRoute(def: AppRouteDef, ctx: AppRoutesCtx): ReactNode {
-  let element: ReactNode = (def.module && !ctx.canViewModule(def.module))
-    ? <AccessDenied />
-    : def.render(ctx)
+  const moduleOk = !def.module
+    || ctx.canViewModule(def.module)
+    || (def.moduleRoleBypass?.includes(ctx.currentUser.role) ?? false)
+  let element: ReactNode = moduleOk ? def.render(ctx) : <AccessDenied />
   if (def.allowedRoles) element = <RoleGuard allowedRoles={def.allowedRoles}>{element}</RoleGuard>
   if (def.sectionName) element = <ErrorBoundary sectionName={def.sectionName}>{element}</ErrorBoundary>
   return element
@@ -121,8 +136,10 @@ export const APP_ROUTES: AppRouteDef[] = [
     ),
   },
   {
+    // 'collector' conserva su acceso legacy por rol; el resto entra por
+    // agua.cobros.view, que es lo que el sidebar ya evalúa.
     path: '/cobros', sectionName: 'cobros',
-    allowedRoles: ['collector', 'admin', 'super_admin', 'company_owner'],
+    module: 'cobros', moduleRoleBypass: ['collector'],
     render: ({ agua }) => (
       <CobrosSection
         registros={agua.registros}
@@ -145,8 +162,11 @@ export const APP_ROUTES: AppRouteDef[] = [
     ),
   },
   {
-    path: '/contabilidad', sectionName: 'contabilidad',
-    allowedRoles: ['admin', 'super_admin', 'company_owner'], module: 'contabilidad',
+    // Solo guard de módulo: los roles exentos (admin / super_admin /
+    // company_owner) ya pasan por canViewModule, y un rol RBAC con
+    // platform.contabilidad.view entra — antes el RoleGuard lo negaba pese a
+    // que el sidebar sí le mostraba el tab.
+    path: '/contabilidad', sectionName: 'contabilidad', module: 'contabilidad',
     render: () => <ContabilidadSection />,
   },
   {
@@ -221,8 +241,7 @@ export const APP_ROUTES: AppRouteDef[] = [
     ),
   },
   {
-    path: '/configuracion', sectionName: 'configuracion',
-    allowedRoles: ['admin', 'super_admin', 'company_owner'],
+    path: '/configuracion', sectionName: 'configuracion', module: 'configuracion',
     render: ({ handleLogout }) => <ConfiguracionSection onLogout={handleLogout} />,
   },
   {
@@ -286,7 +305,11 @@ export const APP_ROUTES: AppRouteDef[] = [
     render: () => <SuperAdminSection />,
   },
   {
-    path: '/comunicacion', sectionName: 'comunicacion',
+    // Mismo desalineo que tenía /contabilidad, en el sentido inverso: el
+    // sidebar ya ocultaba Comunicación a quien no tiene
+    // platform.comunicacion.view, pero la ruta no comprobaba nada y el
+    // deep-link montaba la sección y disparaba sus queries.
+    path: '/comunicacion', sectionName: 'comunicacion', module: 'comunicacion',
     render: ({ currentUser, agua, canCreate, canEdit }) => (
       <ComunicacionSection
         currentUser={currentUser}

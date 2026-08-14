@@ -18,13 +18,20 @@ import { hasBaseUrl, hasRestrictedCreds, RESTRICTED, reasons } from './fixtures/
 
 // Rutas vetadas para CUALQUIER rol no-admin/no-owner (guards declarados en
 // APP_ROUTES): superadmin (solo super_admin), empresa y admin-dashboard
-// (company_owner), configuración y contabilidad (admin+).
+// (company_owner). Son las únicas que siguen siendo invariantes de ROL.
+//
+// /configuracion y /contabilidad SALIERON de esta lista: son módulos
+// configurables por RBAC, así que su acceso ya no depende del rol base sino de
+// platform.<modulo>.view. Un usuario restringido las alcanza si su empresa se
+// lo otorgó, de modo que como invariante de rol serían un test flaky que
+// depende del seed de permisos del tenant de pruebas. La cobertura de esas dos
+// vive en los tests unitarios de renderAppRoute
+// (src/components/app/__tests__/routes.test.tsx), donde los permisos se
+// controlan explícitamente.
 const ADMIN_ONLY_ROUTES = [
   '/superadmin',
   '/empresa',
   '/admin-dashboard',
-  '/configuracion',
-  '/contabilidad',
 ] as const
 
 test.describe('AUTH · rol restringido no alcanza secciones de administración', () => {

@@ -11,7 +11,7 @@ import { NATURALEZA_POR_TIPO, TIPO_CUENTA_LABELS, type CuentaContable, type Tipo
 import type { Proyecto } from '../../types/plataforma'
 import { NIVEL_MAXIMO } from '../../domain/contabilidad/importCuentas'
 import { ImportCuentasModal } from './ImportCuentasModal'
-import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
+import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -40,6 +40,7 @@ const FORM_VACIO: FormState = {
 }
 
 export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos }: Props) {
+  const { puedeCrear, puedeEditar, puedeCambiarEstado } = usePermisosContabilidad()
   const { data: cuentas = [], isLoading } = useCuentasQuery(companyId, projectId)
   const crear = useCrearCuentaMutation(companyId, projectId)
   const actualizar = useActualizarCuentaMutation(companyId, projectId)
@@ -154,8 +155,10 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
       header: '',
       render: (c) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          <button onClick={(e) => { e.stopPropagation(); abrirEdicion(c) }} style={btnLink}>Editar</button>
-          {!c.es_sistema && (
+          {puedeEditar && (
+            <button onClick={(e) => { e.stopPropagation(); abrirEdicion(c) }} style={btnLink}>Editar</button>
+          )}
+          {!c.es_sistema && puedeCambiarEstado && (
             <button onClick={(e) => { e.stopPropagation(); void toggleActiva(c) }} style={btnLink}>
               {c.activa ? 'Desactivar' : 'Activar'}
             </button>
@@ -186,8 +189,12 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
               />
               Ver inactivas
             </label>
-            <button onClick={() => setImportando(true)} style={btnSecundario}>📥 Carga masiva</button>
-            <button onClick={abrirNueva} style={btnPrimario}>+ Nueva cuenta</button>
+            {puedeCrear && (
+              <>
+                <button onClick={() => setImportando(true)} style={btnSecundario}>📥 Carga masiva</button>
+                <button onClick={abrirNueva} style={btnPrimario}>+ Nueva cuenta</button>
+              </>
+            )}
           </div>
         }
         emptyState={{

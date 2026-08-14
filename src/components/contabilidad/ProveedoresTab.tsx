@@ -7,7 +7,7 @@ import { useProveedoresQuery } from '../../domain/cxp/queries'
 import { useGuardarProveedorMutation, useToggleProveedorActivoMutation } from '../../domain/cxp/mutations'
 import { proveedorFormSchema } from '../../domain/cxp/schemas'
 import { CATEGORIAS_GASTO_CXP, type Proveedor } from '../../types/cxp'
-import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
+import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -33,6 +33,7 @@ const FORM_VACIO: FormState = {
 }
 
 export function ProveedoresTab({ companyId }: Props) {
+  const { puedeCrear, puedeEditar } = usePermisosContabilidad()
   const { data: proveedores = [], isLoading } = useProveedoresQuery(companyId)
   const guardar = useGuardarProveedorMutation(companyId)
   const toggle = useToggleProveedorActivoMutation(companyId)
@@ -99,7 +100,9 @@ export function ProveedoresTab({ companyId }: Props) {
       header: '',
       render: (p) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          <button onClick={(e) => { e.stopPropagation(); abrirEdicion(p) }} style={btnLink}>Editar</button>
+          {puedeEditar && (
+            <button onClick={(e) => { e.stopPropagation(); abrirEdicion(p) }} style={btnLink}>Editar</button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); void toggle.mutateAsync({ id: p.id, activo: !p.activo }) }}
             style={btnLink}
@@ -121,7 +124,9 @@ export function ProveedoresTab({ companyId }: Props) {
         isLoading={isLoading}
         searchableKeys={['nombre', (p) => p.nit ?? '', (p) => p.rfc ?? '']}
         searchPlaceholder="Buscar proveedor…"
-        toolbar={<button onClick={() => setForm({ ...FORM_VACIO })} style={btnPrimario}>+ Nuevo proveedor</button>}
+        toolbar={puedeCrear
+          ? <button onClick={() => setForm({ ...FORM_VACIO })} style={btnPrimario}>+ Nuevo proveedor</button>
+          : undefined}
         emptyState={{
           title: 'Sin proveedores',
           description: 'Los nombres de proveedor usados en gastos anteriores se migraron automáticamente; registra aquí los datos completos (NIT/RFC, contacto, días de crédito).',

@@ -9,13 +9,18 @@ const h = vi.hoisted(() => {
   // (ensureCompanyRoleFromTemplate); vacía → siempre `result`.
   // `inCalls`/`rpcCalls`: para afirmar el troceado del delete y el payload de
   // la RPC de permisos.
-  const state: { result: unknown; queue: unknown[]; inCalls: string[][]; rpcCalls: Array<[string, unknown]> } =
-    { result: { data: null, error: null }, queue: [], inCalls: [], rpcCalls: [] }
+  // `rangeCalls`: ventanas pedidas por las lecturas paginadas con fetchAllRows
+  // (el catálogo RBAC pasa de 1 000 filas y sin paginar PostgREST lo trunca).
+  const state: {
+    result: unknown; queue: unknown[]; inCalls: string[][]
+    rpcCalls: Array<[string, unknown]>; rangeCalls: Array<[number, number]>
+  } = { result: { data: null, error: null }, queue: [], inCalls: [], rpcCalls: [], rangeCalls: [] }
   const builder: Record<string, unknown> = {}
   for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'or', 'is', 'order', 'limit', 'single', 'maybeSingle']) {
     builder[m] = () => builder
   }
   builder.in = (_col: string, values: string[]) => { state.inCalls.push(values); return builder }
+  builder.range = (from: number, to: number) => { state.rangeCalls.push([from, to]); return builder }
   builder.then = (resolve: (v: unknown) => void) =>
     resolve(state.queue.length > 0 ? state.queue.shift() : state.result)
   const rpc = (fn: string, args: unknown) => {
@@ -51,12 +56,14 @@ import {
   createOverrideRole,
   ensureCompanyRoleFromTemplate,
 } from '../roles'
+import { CHUNK_SIZE } from '../../../lib/fetchAllRows'
 
 beforeEach(() => {
   h.state.result = { data: null, error: null }
   h.state.queue = []
   h.state.inCalls = []
   h.state.rpcCalls = []
+  h.state.rangeCalls = []
 })
 function setResult(r: unknown) { h.state.result = r }
 function setQueue(...rs: unknown[]) { h.state.queue = rs }
@@ -77,6 +84,35 @@ describe('lecturas RBAC', () => {
     expect(await fetchAllRolePermissions()).toEqual({
       data: [{ role_id: 'r1', permission_key: 'k', effect: 'allow' }], error: null,
     })
+    expect(h.state.rangeCalls[0]).toEqual([0, CHUNK_SIZE - 1])
+  })
+
+  // Regresión: el catálogo RBAC ronda las 1 170 claves y un rol de acceso
+  // amplio ("Finanzas / Contador") arrastra >1 100 filas él solo. Sin paginar,
+  // PostgREST corta en ~1 000 en silencio: el panel de permisos efectivos
+  // mostraba de menos y el editor, que hace read-modify-write, guardaba el rol
+  // sin los permisos que nunca llegaron.
+  it('las lecturas del catálogo RBAC paginan hasta agotar', async () => {
+    const pagina = (n: number, desde: number) =>
+      Array.from({ length: n }, (_, i) => ({ role_id: 'r1', permission_key: `k${desde + i}`, effect: 'allow' }))
+    setQueue(
+      { data: pagina(CHUNK_SIZE, 0), error: null },   // página llena → hay más
+      { data: pagina(163, CHUNK_SIZE), error: null }, // página corta → última
+    )
+    const { data, error } = await fetchAllRolePermissions()
+    expect(error).toBeNull()
+    expect(data).toHaveLength(CHUNK_SIZE + 163)
+    expect(h.state.rangeCalls).toEqual([[0, CHUNK_SIZE - 1], [CHUNK_SIZE, CHUNK_SIZE * 2 - 1]])
+  })
+
+  it('fetchRolePermissionKeys pagina: un rol con >1000 claves no se precarga a medias', async () => {
+    setQueue(
+      { data: Array.from({ length: CHUNK_SIZE }, (_, i) => ({ permission_key: `a${i}` })), error: null },
+      { data: [{ permission_key: 'z' }], error: null },
+    )
+    const { data } = await fetchRolePermissionKeys('rol-finanzas')
+    expect(data).toHaveLength(CHUNK_SIZE + 1)
+    expect(h.state.rangeCalls).toHaveLength(2)
   })
 
   it('fetchUserRoleAssignments éxito', async () => {

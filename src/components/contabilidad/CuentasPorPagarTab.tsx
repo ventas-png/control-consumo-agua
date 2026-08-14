@@ -31,7 +31,7 @@ import {
   type MetodoPagoCxP,
   type OrdenPagoConRelaciones,
 } from '../../types/cxp'
-import { Campo, btnLink, btnPrimario, btnSecundario, input } from './ui'
+import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -48,6 +48,7 @@ const TONO_FACTURA = {
 const TONO_ORDEN = { borrador: 'info', aprobada: 'warning', pagada: 'success', anulada: 'neutral' } as const
 
 export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) {
+  const { puedeCrear, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
@@ -106,7 +107,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (f) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {f.estado === 'registrada' && (
+          {f.estado === 'registrada' && puedeAutorizar && (
             <button
               onClick={(e) => { e.stopPropagation(); void accion(() => aprobarFactura.mutateAsync(f.id), 'Factura aprobada: el gasto quedó devengado contra CxP.') }}
               style={btnLink}
@@ -114,10 +115,10 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
               Aprobar
             </button>
           )}
-          {(f.estado === 'aprobada' || f.estado === 'pagada_parcial') && (
+          {(f.estado === 'aprobada' || f.estado === 'pagada_parcial') && puedeCrear && (
             <button onClick={(e) => { e.stopPropagation(); setOrdenPara(f) }} style={btnLink}>Pagar</button>
           )}
-          {f.estado !== 'anulada' && f.monto_pagado === 0 && (
+          {f.estado !== 'anulada' && f.monto_pagado === 0 && puedeCambiarEstado && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -166,15 +167,15 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (o) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {o.estado === 'borrador' && (
+          {o.estado === 'borrador' && puedeAutorizar && (
             <button onClick={() => void accion(() => aprobarOrden.mutateAsync(o.id), 'Orden aprobada.')} style={btnLink}>Aprobar</button>
           )}
-          {o.estado === 'aprobada' && (
+          {o.estado === 'aprobada' && puedeCambiarEstado && (
             <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
               Marcar pagada
             </button>
           )}
-          {o.estado !== 'anulada' && (
+          {o.estado !== 'anulada' && puedeCambiarEstado && (
             <button
               onClick={() => {
                 void (async () => {
@@ -223,7 +224,9 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           searchableKeys={[(f) => f.proveedores?.nombre ?? '', 'concepto', (f) => f.numero_factura ?? '']}
           searchPlaceholder="Buscar factura…"
           defaultSort={{ key: 'vence', direction: 'asc' }}
-          toolbar={<button onClick={() => setNuevaFactura(true)} style={btnPrimario}>+ Registrar factura</button>}
+          toolbar={puedeCrear
+            ? <button onClick={() => setNuevaFactura(true)} style={btnPrimario}>+ Registrar factura</button>
+            : undefined}
           emptyState={{
             title: 'Sin facturas de proveedor',
             description: 'Registra las facturas por pagar; al aprobarlas se devengan en contabilidad (gasto contra Proveedores por pagar) y se liquidan con órdenes de pago.',

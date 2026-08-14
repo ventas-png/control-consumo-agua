@@ -5,7 +5,7 @@ import { useGuardarMapeoMutation, useGuardarTipoCambioMutation } from '../../dom
 import { tipoCambioFormSchema } from '../../domain/contabilidad/schemas'
 import { formatDateShort, formatNumber, hoyLocalISO } from '../../lib/format'
 import { EVENTOS_MAPEO } from '../../types/contabilidad'
-import { Campo, btnPrimario, input } from './ui'
+import { Campo, btnPrimario, input , usePermisosContabilidad } from './ui'
 
 interface Props {
   companyId: string
@@ -21,6 +21,7 @@ interface Props {
  * manuales para las monedas distintas a la base.
  */
 export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
+  const { puedeCrear } = usePermisosContabilidad()
   const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
   const { data: mapeos = [] } = useMapeoQuery(companyId, projectId)
   const { data: tiposCambio = [] } = useTiposCambioQuery(companyId)
@@ -132,7 +133,7 @@ export function MapeoCuentasTab({ companyId, projectId, monedaBase }: Props) {
           <Campo label={`Tasa (${monedaBase})`}>
             <input type="number" min="0" step="0.000001" value={tcForm.tasa} onChange={(e) => setTcForm({ ...tcForm, tasa: e.target.value })} style={{ ...input, textAlign: 'right' }} placeholder="7.85" />
           </Campo>
-          <button onClick={() => void onGuardarTC()} disabled={guardarTC.isPending} style={btnPrimario}>Agregar</button>
+          <button onClick={() => void onGuardarTC()} disabled={guardarTC.isPending || !puedeCrear} style={btnPrimario}>Agregar</button>
         </div>
         {tiposCambio.length === 0 ? (
           <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>Sin tasas registradas.</p>
