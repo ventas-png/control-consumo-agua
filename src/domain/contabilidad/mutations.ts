@@ -58,6 +58,59 @@ export function useActualizarCuentaMutation(companyId?: string, projectId?: stri
   })
 }
 
+// ── Borrado de cuentas ──────────────────────────────────────────────────────
+
+/** Fila de `conta_cuentas_en_uso`: quién referencia a la cuenta. */
+export interface CuentaEnUso {
+  cuenta_id: string
+  /** Tabla que la referencia (nombre crudo; la UI lo traduce). */
+  referencia: string
+  usos: number
+}
+
+/**
+ * Pregunta al servidor qué cuentas están referenciadas ANTES de borrar.
+ *
+ * Sin esto, el borrado de una selección es todo-o-nada: una sola cuenta con
+ * movimientos aborta la transacción y no se borra ninguna, con un error de FK
+ * ilegible. Con esto la UI borra las que sí puede y explica las que no.
+ */
+export async function fetchCuentasEnUso(ids: string[]): Promise<CuentaEnUso[]> {
+  if (ids.length === 0) return []
+  return (
+    (await runQuery<CuentaEnUso[]>((signal) =>
+      supabase.rpc('conta_cuentas_en_uso', { p_ids: ids }).abortSignal(signal),
+    )) ?? []
+  )
+}
+
+/**
+ * Borra cuentas del catálogo del ledger. El caller ya filtró las referenciadas
+ * (`fetchCuentasEnUso`); la BD sigue siendo la autoridad — FK RESTRICT para las
+ * referencias y el trigger conta_cuenta_proteger_borrado para las del seed.
+ */
+export function useEliminarCuentasMutation(companyId?: string, projectId?: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      if (ids.length === 0) return 0
+      await runQuery((signal) =>
+        supabase
+          .from('conta_cuentas')
+          .delete()
+          .in('id', ids)
+          .eq('company_id', companyId)
+          .abortSignal(signal),
+      )
+      return ids.length
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.cuentas(companyId, projectId) })
+    },
+  })
+}
+
 // ── Carga masiva del catálogo ───────────────────────────────────────────────
 
 export interface ImportarCuentasVars {
