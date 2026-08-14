@@ -9,6 +9,7 @@ import { usePartidasQuery, usePresupuestosQuery, usePresupuestoVsRealQuery } fro
 import {
   useCambiarEstadoPresupuestoMutation,
   useCrearPresupuestoMutation,
+  useEliminarPresupuestoMutation,
   useGuardarPartidasMutation,
 } from '../../domain/presupuesto/mutations'
 import { distribuirAnual, presupuestoFormSchema, totalFila, type PartidaInput } from '../../domain/presupuesto/schemas'
@@ -39,7 +40,7 @@ type Vista = 'presupuestos' | 'comparativo'
 const TONO_ESTADO = { borrador: 'info', propuesto: 'warning', aprobado: 'success', archivado: 'neutral' } as const
 
 export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: Props) {
-  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar } = usePermisosContabilidad()
+  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeAutorizar, puedeEliminar } = usePermisosContabilidad()
   const [vista, setVista] = useState<Vista>('presupuestos')
   const [nuevo, setNuevo] = useState(false)
   const [editorId, setEditorId] = useState<string | null>(null)
@@ -51,6 +52,7 @@ export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: 
     [todosPresupuestos, projectId],
   )
   const cambiarEstado = useCambiarEstadoPresupuestoMutation(companyId)
+  const eliminar = useEliminarPresupuestoMutation(companyId)
 
   const editor = presupuestos.find((p) => p.id === editorId) ?? null
 
@@ -122,6 +124,28 @@ export function PresupuestoTab({ companyId, projectId, proyectos, monedaBase }: 
           )}
           {p.estado === 'aprobado' && (
             <button onClick={(e) => { e.stopPropagation(); setVista('comparativo') }} style={btnLink}>Comparativo</button>
+          )}
+          {(p.estado === 'borrador' || p.estado === 'propuesto') && puedeEliminar && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                void (async () => {
+                  const partidas = p.presupuesto_partidas.length
+                  const { isConfirmed } = await confirm({
+                    title: `¿Eliminar "${p.nombre}"?`,
+                    text: partidas > 0
+                      ? `Se borran también sus ${partidas} partida${partidas === 1 ? '' : 's'} mensuales. Esta acción no se puede deshacer.`
+                      : 'Esta acción no se puede deshacer.',
+                    confirmText: 'Eliminar',
+                    variant: 'danger',
+                  })
+                  if (isConfirmed) void accion(() => eliminar.mutateAsync(p.id), 'Presupuesto eliminado.')
+                })()
+              }}
+              style={{ ...btnLink, color: 'var(--at-danger)' }}
+            >
+              Eliminar
+            </button>
           )}
         </div>
       ),

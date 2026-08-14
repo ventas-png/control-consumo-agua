@@ -74,6 +74,32 @@ export function useGuardarPartidasMutation(companyId?: string) {
   })
 }
 
+/**
+ * Borra un presupuesto y sus partidas (CASCADE). Solo borrador/propuesto: la BD
+ * rechaza los aprobados y archivados (trigger presupuesto_proteger_borrado),
+ * porque el comparativo vs real y las alertas de partida excedida se apoyan en
+ * ellos — una corrección es una versión nueva, no un borrado.
+ */
+export function useEliminarPresupuestoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (presupuestoId: string) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      await runQuery((signal) =>
+        supabase
+          .from('presupuestos')
+          .delete()
+          .eq('id', presupuestoId)
+          .eq('company_id', companyId)
+          .abortSignal(signal),
+      )
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: presupuestoKeys.all })
+    },
+  })
+}
+
 export function useCambiarEstadoPresupuestoMutation(companyId?: string) {
   const qc = useQueryClient()
   return useMutation({
