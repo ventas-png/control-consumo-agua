@@ -54,21 +54,13 @@ export function useGuardarProveedorMutation(companyId?: string) {
   })
 }
 
-export function useToggleProveedorActivoMutation(companyId?: string) {
-  const invalidar = useInvalidarCxP(companyId)
-  return useMutation({
-    mutationFn: async (vars: { id: string; activo: boolean }) => {
-      await runQuery((signal) =>
-        supabase
-          .from('proveedores')
-          .update({ activo: vars.activo, updated_at: new Date().toISOString() })
-          .eq('id', vars.id)
-          .abortSignal(signal),
-      )
-    },
-    onSuccess: () => invalidar(),
-  })
-}
+// El toggle de `activo` se eliminó en la Fase 6: `proveedores.activo` pasó a ser
+// una PROYECCIÓN de `estado` (un trigger los mantiene sincronizados), así que
+// escribirlo a mano ya no dice lo que parece —apagar el interruptor sobre un
+// proveedor autorizado lo SUSPENDE, y sobre uno vetado no hace nada—. Autorizar
+// y suspender se hacen con useCambiarEstadoProveedorMutation
+// (src/domain/compras/mutations.ts), que además exige el motivo y deja la firma
+// de quién autorizó.
 
 // ── Facturas de proveedor ───────────────────────────────────────────────────
 

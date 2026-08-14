@@ -76,15 +76,43 @@ Límites declarados de la Fase 1 (se resuelven en fases posteriores): sin backfi
 
 La contabilidad pasó de "una por empresa" a una ENTIDAD CONTABLE por (empresa, proyecto): la empresa lleva sus libros y **cada proyecto lleva los suyos, en su moneda predominante** (la ya configurada del proyecto), con **catálogo, mapeos, folios, apertura, cierre anual y revaluación FX propios**. Decisiones: contabilidades aisladas con **vista consolidada como reporte de solo lectura ✅ (2026-06-12)** — RPC `conta_consolidado` y vista "Consolidado" en EEFF: una fila por entidad (empresa + proyectos) con P&L del rango y balance al corte convertidos a la moneda de la empresa con la tasa de cierre del periodo; entidades sin tasa se muestran en su moneda, fuera del total y con advertencia —, tipos de cambio compartidos por empresa con conversión cruzada vía pivote (`conta_tasa_entre`), bancos asignables a un ledger, y los asientos pre-ledger migrados a los libros de la empresa con nota `[pre-ledger]`. La UI tiene un **selector de contabilidad** (Empresa | proyecto) que fija el ledger activo para los 9 tabs. Migraciones `20260612*`.
 
+## Fase 6 — Ciclo de compras (proveedor autorizado → pago) ✅
+
+El riel que faltaba: **proveedor AUTORIZADO → orden de compra → recepción → factura → contraseña de pago → cancelación**, con todo documento llevando `company_id` + `project_id` (NULL = empresa), así que funciona igual para la contabilidad de la empresa y para la de cada proyecto. Migraciones `20260821*`.
+
+Antes de esto la cadena existía a medias y partida en dos módulos: `proveedores` solo tenía `activo` (sin autorización), `ordenes_compra` vivía en condominios con el proveedor en **texto libre sin FK**, sin líneas, sin contabilidad y con RLS que no miraba el rol; no había recepción (solo un `estado='recibida'` que alguien marcaba), no existía registro de activos fijos ni sus cuentas, la factura no se cuadraba contra nada, y la contraseña de pago no existía.
+
+- **Proveedor autorizado**: `proveedores.estado` (borrador → en_revision → autorizado → suspendido/vetado) con quién autorizó, cuándo y **hasta cuándo** (`autorizacion_vence`: vencida deja de habilitar sin que nadie tenga que acordarse). `proveedor_documentos` guarda la papelería (RTU, patentes, constancias) con su vencimiento. `activo` se conserva como proyección sincronizada por trigger, para no romper la UI que lo lee.
+- **Orden de compra contable**: se EVOLUCIONÓ `ordenes_compra` (no una tabla paralela) — `proveedor_id` con backfill por nombre, `project_id` nullable para que **la empresa también compre**, correlativo por contabilidad, totales, y `orden_compra_lineas` con `destino_tipo` (`inventario` | `activo_fijo` | `servicio` | `gasto`), que es la bisagra de toda la fase. **El candado**: aprobar o emitir exige proveedor autorizado y vigente. RLS realineada con `conta_puede_escribir`. La orden **no genera asiento** (es un compromiso); para verlo está la RPC `compras_compromisos`.
+- **Recepción con asiento GR/IR**: `recepciones` + `recepcion_lineas`. Al registrar: Dr Inventario/Activo/Gasto contra **Cr 2105 «Bienes y servicios por facturar»**, se mueven existencias y se dan de alta los activos. Cuentas nuevas retro-sembradas en todos los ledgers: `1106`, `14`+`1401..1404`, `1409` Depreciación acumulada (contra-natura), `2105` y `5107`.
+- **Inventario**: la recepción alimenta `suministros_condominio` vía `movimientos_suministro`, y de paso se corrigió un bug real — el stock lo recalculaba **el navegador** con dos escrituras no atómicas. Ahora lo hace un trigger, con costo promedio ponderado, y la BD ignora los UPDATE directos a `stock_actual`.
+- **Activos fijos**: `activos_fijos` (no existía nada), alta automática desde la recepción, con vida útil y las tres cuentas ya guardadas.
+- **Cuadre de 3 vías**: `facturas_proveedor.orden_compra_id` + `factura_proveedor_lineas`, RPC `compras_validar_match` (pedido vs recibido vs facturado, en cantidad y precio) y tolerancias en `compras_config`. Fuera de tolerancia **no se aprueba** salvo que alguien con permiso lo autorice dejando la justificación por escrito. El devengo aprende la ruta GR/IR: con orden y recepción, el debe va contra 2105 (no contra el gasto, que ya se registró al recibir) y la 2105 cierra en cero.
+- **Contraseña de pago**: `contrasenas_pago` + `contrasena_pago_facturas` (M:N) — el acuse con correlativo y fecha programada que se le devuelve al proveedor, agrupando **varias facturas suyas**. `ordenes_pago` gana `contrasena_pago_id` con `factura_id` ya opcional y un CHECK de exactamente uno, y **una sola orden cancela todas las facturas de la contraseña**: eso entrega de paso el «órdenes multi-factura» que la Fase 2 dejó diferido. La contraseña no genera asiento (es un acuse, no un hecho económico).
+- **Verificación**: `supabase/tests/compras_flujo/run.sh` — 59 invariantes ejecutables contra un PostgreSQL desechable (candado, asiento cuadrado, kardex, activos, tolerancias, reversos simétricos, aislamiento entre contabilidades) y las 5 migraciones aplicadas dos veces para probar idempotencia.
+
+### Límites declarados de la Fase 6
+
+- **Depreciación mensual**: no entra. Se sembraron las cuentas (`1409`, `5107`) y los campos del activo (vida útil, valor residual, las tres cuentas) para que después sea un RPC y un trigger, no un rediseño.
+- **`gastos_condominio` ↔ `facturas_proveedor` sin unificar**: las dos rutas siguen posteando al mismo ledger sin conocerse, así que el mismo desembolso capturado por ambas se cuenta dos veces y nada lo detecta. Esta fase deja `facturas_proveedor` como canónica del riel de compras; unificarlas es trabajo aparte.
+- **Variación de precio de compra**: se reconoce como **gasto del periodo**, no se capitaliza. Es a propósito: el kardex y el registro de activos se valúan al precio de la ORDEN, y capitalizar la diferencia dejaría el mayor por encima del auxiliar de forma permanente.
+- **`proformas_condominio` → orden de compra**: sigue sin enlace (`convertida_oc` es solo un estado).
+- **El alta de un proveedor ya no autoriza por sí sola**: es lo pedido, pero cambia el flujo — un proveedor nuevo nace en `borrador` y no aparece en los selectores hasta que se le autoriza.
+
 ## Dependencias y orden
 
 ```
 Fase 1 (contabilidad) ──► Fase 2 (CxP)      ──► Fase 4 (bancos/conciliación)
-        │                                          │
+        │                     │                    │
+        │                     ▼                    │
+        │              Fase 6 (compras)            │
+        │                     │                    │
         └──────────► Fase 3 (presupuesto) ◄────────┘
                               │
                               ▼
                      Fase 5 (EEFF + cierre)
 ```
+
+Fase 6 depende de la 2 (proveedores y facturas) y de la 1 (catálogo y asientos automáticos); alimenta a la 3 avisando cuando una orden compromete más de lo presupuestado.
 
 Fase 3 puede arrancar en paralelo con Fase 2 (solo depende del catálogo de cuentas). Fase 5 requiere 1–4 para que los estados financieros estén completos, aunque P&L/balance básicos funcionan desde Fase 1.

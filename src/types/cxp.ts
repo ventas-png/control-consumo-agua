@@ -59,6 +59,12 @@ export interface FacturaProveedor {
   created_by: string | null
   created_at: string
   updated_at: string
+  // ── Fase 6 (compras) ──────────────────────────────────────────────────────
+  /** Orden que origina la factura. Con orden + recepción el devengo va a 2105. */
+  orden_compra_id?: string | null
+  /** Quién autorizó aprobarla pese a no cuadrar con la orden. */
+  match_forzado_por?: string | null
+  match_justificacion?: string | null
 }
 
 export interface FacturaProveedorConProveedor extends FacturaProveedor {
@@ -70,7 +76,12 @@ export interface OrdenPago {
   company_id: string
   project_id: string | null
   proveedor_id: string
-  factura_id: string
+  /**
+   * Fase 6: una orden liquida UNA factura o UNA contraseña de pago (que a su
+   * vez cubre varias facturas), nunca las dos cosas — lo garantiza un CHECK.
+   */
+  factura_id: string | null
+  contrasena_pago_id?: string | null
   monto: number
   fecha_pago: string | null
   metodo_pago: MetodoPagoCxP

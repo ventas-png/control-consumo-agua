@@ -546,12 +546,26 @@ export interface GeneracionCuotasLog {
 }
 
 // ── Fase 37 ───────────────────────────────────────────────────────────────────
-export type EstadoOrdenCompra = 'borrador' | 'aprobada' | 'emitida' | 'recibida' | 'cancelada'
+// La Fase 6 del ERP (compras) amplió el ciclo con la recepción parcial y el
+// cierre, y ató la orden al catálogo de proveedores. Los estados nuevos los
+// pone la contabilidad (recepciones y facturas), no esta pantalla, pero
+// aparecen aquí porque es la misma tabla `ordenes_compra`.
+export type EstadoOrdenCompra =
+  | 'borrador'
+  | 'aprobada'
+  | 'emitida'
+  | 'recibida_parcial'
+  | 'recibida'
+  | 'cerrada'
+  | 'cancelada'
 export interface OrdenCompra {
   id: string
   company_id: string
-  project_id: string
+  /** NULL = orden de la EMPRESA (contabilidad propia), no de un proyecto. */
+  project_id: string | null
   correlativo: number
+  /** FK al catálogo de Contabilidad; NULL solo en órdenes previas al backfill. */
+  proveedor_id?: string | null
   proveedor_nombre: string
   concepto: string
   descripcion?: string | null

@@ -21,6 +21,12 @@ import {
   useMarcarOrdenPagadaMutation,
 } from '../../domain/cxp/mutations'
 import { facturaProveedorFormSchema, ordenPagoFormSchema, saldoFactura } from '../../domain/cxp/schemas'
+import { useCuadreQuery } from '../../domain/compras/queries'
+import {
+  useAprobarFacturaConCuadreMutation,
+  useCrearContrasenaMutation,
+} from '../../domain/compras/mutations'
+import { contrasenaFormSchema } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO } from '../../lib/format'
 import {
   CATEGORIAS_GASTO_CXP,
@@ -52,9 +58,16 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
   const [vista, setVista] = useState<Vista>('facturas')
   const [nuevaFactura, setNuevaFactura] = useState(false)
   const [ordenPara, setOrdenPara] = useState<FacturaProveedorConProveedor | null>(null)
+  const [cuadreDe, setCuadreDe] = useState<FacturaProveedorConProveedor | null>(null)
+  const [emitirContrasena, setEmitirContrasena] = useState(false)
 
-  const { data: facturas = [], isLoading: cargandoFacturas } = useFacturasProveedorQuery(companyId)
-  const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesPagoQuery(companyId)
+  // `projectId` es la IDENTIDAD de la contabilidad activa, no un filtro opcional:
+  // sin pasarlo, estas dos listas traían las facturas y órdenes de TODAS las
+  // contabilidades de la empresa y las mostraban dentro de cualquiera de ellas
+  // —mientras la antigüedad y la proyección, que sí lo pasan, mostraban otra
+  // cosa en la misma pantalla—.
+  const { data: facturas = [], isLoading: cargandoFacturas } = useFacturasProveedorQuery(companyId, { projectId })
+  const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesPagoQuery(companyId, { projectId })
   const { data: aging = [] } = useAgingQuery(companyId, projectId)
   const { data: proyeccion = [] } = useProyeccionPagosQuery(vista === 'proyeccion' ? companyId : undefined, projectId)
   const totalProyectado = proyeccion.reduce((s, f) => s + f.total, 0)
@@ -107,7 +120,13 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       header: '',
       render: (f) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-          {f.estado === 'registrada' && puedeAutorizar && (
+          {/* Con orden de compra detrás, aprobar pasa por el cuadre de 3 vías:
+              lo pedido, lo recibido y lo facturado tienen que coincidir. Sin
+              orden (gasto directo, caja chica) se aprueba como siempre. */}
+          {f.estado === 'registrada' && puedeAutorizar && f.orden_compra_id && (
+            <button onClick={(e) => { e.stopPropagation(); setCuadreDe(f) }} style={btnLink}>Revisar y aprobar</button>
+          )}
+          {f.estado === 'registrada' && puedeAutorizar && !f.orden_compra_id && (
             <button
               onClick={(e) => { e.stopPropagation(); void accion(() => aprobarFactura.mutateAsync(f.id), 'Factura aprobada: el gasto quedó devengado contra CxP.') }}
               style={btnLink}
@@ -225,7 +244,12 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
           searchPlaceholder="Buscar factura…"
           defaultSort={{ key: 'vence', direction: 'asc' }}
           toolbar={puedeCrear
-            ? <button onClick={() => setNuevaFactura(true)} style={btnPrimario}>+ Registrar factura</button>
+            ? (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => setNuevaFactura(true)} style={btnPrimario}>+ Registrar factura</button>
+                <button onClick={() => setEmitirContrasena(true)} style={btnSecundario}>Emitir contraseña de pago</button>
+              </div>
+            )
             : undefined}
           emptyState={{
             title: 'Sin facturas de proveedor',
@@ -347,7 +371,265 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
       {ordenPara && (
         <OrdenFormModal companyId={companyId} factura={ordenPara} monedaBase={monedaBase} onClose={() => setOrdenPara(null)} />
       )}
+      {cuadreDe && (
+        <CuadreModal factura={cuadreDe} monedaBase={monedaBase} onClose={() => setCuadreDe(null)} />
+      )}
+      {emitirContrasena && (
+        <ContrasenaFormModal
+          companyId={companyId}
+          projectId={projectId}
+          monedaBase={monedaBase}
+          facturas={facturas.filter((f) => f.estado === 'aprobada' || f.estado === 'pagada_parcial')}
+          onClose={() => setEmitirContrasena(false)}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Modal: cuadre de 3 vías antes de aprobar ────────────────────────────────
+// Es el punto donde se paga de más: un precio distinto al cotizado, una
+// cantidad que nunca entró, o la misma factura capturada dos veces. La BD
+// bloquea la aprobación si algo no cuadra; aquí se muestra QUÉ no cuadra para
+// que la decisión de forzarla sea informada y quede escrita.
+
+function CuadreModal({ factura, monedaBase, onClose }: {
+  factura: FacturaProveedorConProveedor
+  monedaBase: string
+  onClose: () => void
+}) {
+  const { data: filas = [], isLoading } = useCuadreQuery(factura.id)
+  const aprobar = useAprobarFacturaConCuadreMutation()
+  const [justificacion, setJustificacion] = useState('')
+
+  const problemas = filas.filter((f) => !f.dentro_tolerancia)
+  const cuadra = !isLoading && problemas.length === 0
+
+  async function confirmar() {
+    if (!cuadra && justificacion.trim().length < 5) {
+      notify({
+        variant: 'warning', title: 'Falta la justificación',
+        text: 'Para aprobar una factura que no cuadra hay que dejar escrito por qué.',
+      })
+      return
+    }
+    try {
+      await aprobar.mutateAsync({
+        facturaId: factura.id,
+        justificacion: cuadra ? undefined : justificacion.trim(),
+      })
+      notify({
+        variant: 'success', title: 'Listo',
+        text: cuadra
+          ? 'Factura aprobada y devengada contra la cuenta puente de la recepción.'
+          : 'Factura aprobada con justificación; queda registrada quién la autorizó.',
+      })
+      onClose()
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo aprobar', text: e instanceof Error ? e.message : 'Error inesperado.' })
+    }
+  }
+
+  return (
+    <EditModal title={`Cuadre de ${factura.numero_factura ?? factura.concepto}`} onClose={onClose} size="lg"
+      footer={
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={btnSecundario}>Cerrar</button>
+          <button onClick={() => void confirmar()} disabled={aprobar.isPending || isLoading} style={btnPrimario}>
+            {cuadra ? 'Aprobar' : 'Aprobar de todos modos'}
+          </button>
+        </div>
+      }
+    >
+      {isLoading && <p style={{ fontSize: 12 }}>Comparando con la orden…</p>}
+
+      {!isLoading && filas.length === 0 && (
+        <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>
+          Esta factura no tiene renglones ligados a la orden, así que no hay nada
+          que comparar. Se aprobará por la ruta de siempre.
+        </p>
+      )}
+
+      {filas.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: 'var(--at-ink-soft)' }}>
+                <th style={{ padding: 4 }}>Renglón</th>
+                <th style={{ padding: 4, width: 70 }}>Pedido</th>
+                <th style={{ padding: 4, width: 80 }}>Recibido</th>
+                <th style={{ padding: 4, width: 80 }}>Se factura</th>
+                <th style={{ padding: 4, width: 100 }}>Precio OC</th>
+                <th style={{ padding: 4, width: 100 }}>Precio factura</th>
+                <th style={{ padding: 4 }}>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.linea} style={{ background: f.dentro_tolerancia ? undefined : 'var(--at-danger-tint)' }}>
+                  <td style={{ padding: 4 }}>{f.descripcion}</td>
+                  <td style={{ padding: 4 }}>{f.cantidad_ordenada}</td>
+                  <td style={{ padding: 4 }}>{f.cantidad_recibida}</td>
+                  <td style={{ padding: 4 }}>{f.cantidad_factura}</td>
+                  <td style={{ padding: 4 }}>{formatCurrency(f.precio_orden, factura.moneda ?? monedaBase)}</td>
+                  <td style={{ padding: 4 }}>
+                    {formatCurrency(f.precio_factura, factura.moneda ?? monedaBase)}
+                    {f.diferencia_pct !== null && f.diferencia_pct !== 0 && (
+                      <span style={{ marginLeft: 4, color: f.dentro_tolerancia ? 'var(--at-ink-soft)' : 'var(--at-danger)' }}>
+                        ({f.diferencia_pct > 0 ? '+' : ''}{f.diferencia_pct}%)
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: 4 }}>
+                    <StatusBadge tone={f.dentro_tolerancia ? 'success' : 'danger'}>
+                      {f.dentro_tolerancia ? 'Cuadra' : f.motivo}
+                    </StatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!cuadra && filas.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Campo label="¿Por qué se aprueba de todos modos? *">
+            <textarea
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              placeholder="Ej.: alza de precio autorizada por gerencia (correo del 12/08)."
+              style={{ ...input, width: '100%', minHeight: 60 }}
+            />
+          </Campo>
+        </div>
+      )}
+    </EditModal>
+  )
+}
+
+// ── Modal: emitir contraseña de pago ────────────────────────────────────────
+// El acuse que se le devuelve al proveedor cuando entrega sus facturas: dice
+// cuáles se le recibieron y qué día se le pagan. Agrupa varias del MISMO
+// proveedor y después una sola orden de pago las cancela todas.
+
+function ContrasenaFormModal({ companyId, projectId, monedaBase, facturas, onClose }: {
+  companyId: string
+  projectId: string | null
+  monedaBase: string
+  facturas: FacturaProveedorConProveedor[]
+  onClose: () => void
+}) {
+  const crear = useCrearContrasenaMutation(companyId, projectId)
+  const [proveedorId, setProveedorId] = useState('')
+  const [fechaPago, setFechaPago] = useState('')
+  const [entregadaPor, setEntregadaPor] = useState('')
+  const [recibidaPor, setRecibidaPor] = useState('')
+  const [elegidas, setElegidas] = useState<Record<string, boolean>>({})
+
+  // Solo facturas con saldo del proveedor elegido: la contraseña no mezcla
+  // proveedores (la BD lo rechaza) y no puede cubrir más que el saldo vivo.
+  const candidatas = useMemo(
+    () => facturas.filter((f) => f.proveedor_id === proveedorId && saldoFactura(f) > 0),
+    [facturas, proveedorId],
+  )
+  const proveedoresConSaldo = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const f of facturas) {
+      if (saldoFactura(f) > 0) m.set(f.proveedor_id, f.proveedores?.nombre ?? '—')
+    }
+    return [...m.entries()]
+  }, [facturas])
+
+  const total = candidatas.reduce((s, f) => s + (elegidas[f.id] ? saldoFactura(f) : 0), 0)
+
+  async function guardar() {
+    const parsed = contrasenaFormSchema.safeParse({
+      proveedor_id: proveedorId,
+      fecha_emision: hoyLocalISO(),
+      fecha_pago_programada: fechaPago,
+      entregada_por: entregadaPor.trim() || null,
+      recibida_por: recibidaPor.trim() || null,
+      observaciones: null,
+      facturas: candidatas
+        .filter((f) => elegidas[f.id])
+        .map((f) => ({ factura_id: f.id, monto: saldoFactura(f) })),
+    })
+    if (!parsed.success) {
+      notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
+      return
+    }
+    try {
+      await crear.mutateAsync(parsed.data)
+      notify({
+        variant: 'success', title: 'Contraseña emitida',
+        text: 'Queda en la pestaña Compras. Al pagarla, una sola orden cancela todas sus facturas.',
+      })
+      onClose()
+    } catch (e) {
+      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo emitir.' })
+    }
+  }
+
+  return (
+    <EditModal title="Emitir contraseña de pago" onClose={onClose} size="md"
+      footer={
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={btnSecundario}>Cancelar</button>
+          <button onClick={() => void guardar()} disabled={crear.isPending || total <= 0} style={btnPrimario}>Emitir</button>
+        </div>
+      }
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Campo label="Proveedor *">
+          <select
+            value={proveedorId}
+            onChange={(e) => { setProveedorId(e.target.value); setElegidas({}) }}
+            style={input}
+          >
+            <option value="">Selecciona…</option>
+            {proveedoresConSaldo.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Se le paga el *">
+          <input type="date" value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} style={input} />
+        </Campo>
+        <Campo label="Entregada por">
+          <input value={entregadaPor} onChange={(e) => setEntregadaPor(e.target.value)} style={input} />
+        </Campo>
+        <Campo label="Recibida por (del proveedor)">
+          <input value={recibidaPor} onChange={(e) => setRecibidaPor(e.target.value)} style={input} />
+        </Campo>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <strong style={{ fontSize: 12 }}>Facturas que cubre</strong>
+        {!proveedorId && (
+          <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>Elige primero el proveedor.</p>
+        )}
+        {proveedorId && candidatas.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--at-ink-soft)' }}>
+            Este proveedor no tiene facturas aprobadas con saldo en esta contabilidad.
+          </p>
+        )}
+        {candidatas.map((f) => (
+          <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={!!elegidas[f.id]}
+              onChange={(e) => setElegidas((s) => ({ ...s, [f.id]: e.target.checked }))}
+            />
+            <span style={{ flex: 1 }}>{f.numero_factura ?? f.concepto}</span>
+            <span>{formatCurrency(saldoFactura(f), f.moneda ?? monedaBase)}</span>
+          </label>
+        ))}
+        {total > 0 && (
+          <p style={{ margin: '10px 0 0', textAlign: 'right', fontSize: 13 }}>
+            <strong>Total de la contraseña: {formatCurrency(total, monedaBase)}</strong>
+          </p>
+        )}
+      </div>
+    </EditModal>
   )
 }
 

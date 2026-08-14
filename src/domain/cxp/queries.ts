@@ -28,8 +28,22 @@ export function useProveedoresQuery(companyId?: string) {
 }
 
 export interface FacturasFiltro {
+  /**
+   * IDENTIDAD de la contabilidad, no un filtro: `null` = la de la EMPRESA.
+   * Mismo idioma que contabilidad/queries.ts y que los RPCs del ledger, que
+   * comparan con `IS NOT DISTINCT FROM`. Antes esto se trataba como "filtro
+   * opcional" y un `null` devolvía las facturas de TODAS las contabilidades.
+   */
   projectId?: string | null
   estado?: string
+}
+
+/** Acota una consulta al ledger: NULL = empresa, uuid = ese proyecto. */
+function alLedger<T extends { eq: (c: string, v: string) => T; is: (c: string, v: null) => T }>(
+  q: T,
+  projectId?: string | null,
+): T {
+  return projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
 }
 
 export function useFacturasProveedorQuery(companyId?: string, filtro: FacturasFiltro = {}) {
@@ -47,7 +61,7 @@ export function useFacturasProveedorQuery(companyId?: string, filtro: FacturasFi
           .eq('company_id', companyId!)
           .order('fecha_emision', { ascending: false })
           .order('id', { ascending: true })
-        if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
+        q = alLedger(q as never, filtro.projectId)
         if (filtro.estado) q = q.eq('estado', filtro.estado)
         return q.range(from, to).abortSignal(signal)
       }),
@@ -67,7 +81,7 @@ export function useOrdenesPagoQuery(companyId?: string, filtro: FacturasFiltro =
           .eq('company_id', companyId!)
           .order('created_at', { ascending: false })
           .order('id', { ascending: true })
-        if (filtro.projectId) q = q.eq('project_id', filtro.projectId)
+        q = alLedger(q as never, filtro.projectId)
         if (filtro.estado) q = q.eq('estado', filtro.estado)
         return q.range(from, to).abortSignal(signal)
       }),

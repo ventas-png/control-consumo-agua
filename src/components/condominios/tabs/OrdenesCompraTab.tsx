@@ -4,6 +4,8 @@ import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { OrdenCompra, ContratoProveedor } from '../../../types'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { proveedorHabilitado } from '../../../types/compras'
 
 interface Props {
   ordenes: OrdenCompra[]
@@ -22,16 +24,24 @@ const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; n
   borrador:  { label: 'Borrador',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)', next: 'aprobada',  nextLabel: 'Aprobar' },
   aprobada:  { label: 'Aprobada',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', next: 'emitida',   nextLabel: 'Emitir OC' },
   emitida:   { label: 'Emitida',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', next: 'recibida',  nextLabel: 'Marcar recibida' },
+  // `recibida_parcial` y `cerrada` los pone la contabilidad (Compras → recepción
+  // y factura). Sin entrada aquí, `ESTADO_CFG[orden.estado]` sería `undefined`
+  // y la tarjeta reventaba en cuanto una orden pasara por el riel nuevo.
+  recibida_parcial: { label: 'Recibida parcial', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   recibida:  { label: 'Recibida',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  cerrada:   { label: 'Cerrada',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   cancelada: { label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const BLANK = {
-  proveedor_nombre: '', concepto: '', descripcion: '', monto_estimado: '',
+  proveedor_id: '', proveedor_nombre: '', concepto: '', descripcion: '', monto_estimado: '',
   fecha_entrega_esperada: '', notas: '',
 }
 
-export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+// `proveedores` (contratos_proveedores) sigue en Props porque el registro de
+// pestañas lo pasa, pero esta pantalla ya no lo usa: el proveedor de una orden
+// sale del catálogo de Contabilidad, que es el único que sabe de autorizaciones.
+export default function OrdenesCompraTab({ ordenes, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoOC | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -39,15 +49,26 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   const [saving, setSaving] = useState(false)
   const [expandida, setExpandida] = useState<string | null>(null)
 
+  // Catálogo de Contabilidad (no `contratos_proveedores`, que es otra lista).
+  const { data: catalogo = [] } = useProveedoresQuery(companyId)
+  const autorizados = useMemo(
+    () => catalogo.filter(p => proveedorHabilitado(p, hoyLocalISO())),
+    [catalogo],
+  )
+
   const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
 
-  const totalesPorEstado = useMemo(() => ({
-    borrador:  ordenes.filter(o => o.estado === 'borrador').length,
-    aprobada:  ordenes.filter(o => o.estado === 'aprobada').length,
-    emitida:   ordenes.filter(o => o.estado === 'emitida').length,
-    recibida:  ordenes.filter(o => o.estado === 'recibida').length,
-    cancelada: ordenes.filter(o => o.estado === 'cancelada').length,
-  }), [ordenes])
+  // Se cuenta recorriendo ESTADO_CFG en vez de enumerar los estados a mano: así
+  // agregar uno nuevo al ciclo no vuelve a dejar una tarjeta sin su conteo.
+  const totalesPorEstado = useMemo(() => {
+    const base = Object.fromEntries(
+      (Object.keys(ESTADO_CFG) as EstadoOC[]).map(e => [e, 0]),
+    ) as Record<EstadoOC, number>
+    for (const o of ordenes) {
+      if (o.estado in base) base[o.estado] += 1
+    }
+    return base
+  }, [ordenes])
 
   const montoTotal = ordenes.filter(o => o.estado !== 'cancelada').reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
 
@@ -56,12 +77,13 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   }
 
   async function guardar() {
-    if (!form.concepto.trim() || !form.proveedor_nombre.trim()) {
-      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Proveedor y concepto son obligatorios.' }); return
+    if (!form.concepto.trim() || !form.proveedor_id) {
+      notify({ variant: 'warning', title: 'Campos requeridos', text: 'Elige un proveedor autorizado y escribe el concepto.' }); return
     }
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,
+      proveedor_id: form.proveedor_id,
       proveedor_nombre: form.proveedor_nombre.trim(),
       concepto: form.concepto.trim(),
       descripcion: form.descripcion.trim() || null,
@@ -125,7 +147,9 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 16 }}>
+      {/* auto-fit en vez de 5 columnas fijas: el ciclo pasó de 5 estados a 7 y
+          las tarjetas se salían de la fila en pantallas angostas. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 8, marginBottom: 16 }}>
         {(Object.keys(ESTADO_CFG) as EstadoOC[]).map(e => {
           const cfg = ESTADO_CFG[e]
           return (
@@ -159,13 +183,31 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor *</label>
-              <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
-                placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
-              <datalist id="proveedores-list">
-                {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
-              </datalist>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor autorizado *</label>
+              {/* Antes era texto libre con un datalist de sugerencias, así que
+                  cada orden inventaba su propio proveedor y no había forma de
+                  exigir que estuviera autorizado. Ahora se elige del catálogo
+                  de Contabilidad, y solo aparecen los autorizados y vigentes:
+                  el trigger de BD rechaza aprobar la orden en cualquier otro
+                  caso, y ofrecer aquí a quien va a ser rechazado sería una
+                  trampa. */}
+              <select
+                value={form.proveedor_id}
+                onChange={e => {
+                  const id = e.target.value
+                  const p = autorizados.find(x => x.id === id)
+                  setForm(f => ({ ...f, proveedor_id: id, proveedor_nombre: p?.nombre ?? '' }))
+                }}
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
+              >
+                <option value="">Selecciona…</option>
+                {autorizados.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+              {autorizados.length === 0 && (
+                <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--at-ink-3)' }}>
+                  No hay proveedores autorizados. Autorízalos en Contabilidad → Proveedores.
+                </p>
+              )}
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto estimado ({moneda})</label>
@@ -251,7 +293,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                         </button>
                       )}
                       {canEdit && orden.estado === 'borrador' && (
-                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
+                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_id: orden.proveedor_id ?? '', proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
                           style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-surface-2)' }}>
                           ✏️ Editar
                         </button>
