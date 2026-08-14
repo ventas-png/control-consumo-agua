@@ -108,17 +108,18 @@ export default function SuministrosTab({ suministros, movimientos, proveedores, 
       realizado_por: movForm.realizado_por.trim() || null, fecha: movForm.fecha,
       notas: movForm.notas.trim() || null,
     })
-    if (errMov) { setSaving(false); notify({ variant: 'error', title: 'Error', text: errMov.message }); return }
-
-    // Actualizar stock
-    let nuevoStock = selected.stock_actual
-    if (movForm.tipo === 'entrada') nuevoStock += cant
-    else if (movForm.tipo === 'salida') nuevoStock = Math.max(0, nuevoStock - cant)
-    else nuevoStock = cant // ajuste directo
-
-    const { error: errStock } = await updateCondominioRow('suministros_condominio', selected.id, { stock_actual: nuevoStock })
     setSaving(false)
-    if (errStock) { notify({ variant: 'error', title: 'Error', text: errStock.message }); return }
+    if (errMov) { notify({ variant: 'error', title: 'Error', text: errMov.message }); return }
+
+    // El stock ya NO se calcula aquí. Antes eran dos escrituras separadas
+    // —insertar el movimiento y luego un UPDATE del stock— y si la segunda
+    // fallaba, o dos personas movían el mismo insumo a la vez, `stock_actual`
+    // quedaba mintiendo sin que nada lo detectara. Ahora lo recalcula el
+    // trigger `suministros_tg_stock` (migración 20260821000200) en la misma
+    // transacción que el movimiento, con la misma semántica de siempre:
+    // entrada suma, salida resta con piso en 0 y `ajuste` FIJA el stock.
+    // La BD además ignora los UPDATE directos a `stock_actual`, así que
+    // reponerlos aquí no serviría de nada más que para contar doble.
 
     setMovForm({ tipo: 'salida', cantidad: '', motivo: '', area_destino: '', realizado_por: '', fecha: hoyLocalISO(), notas: '' })
     setVista('lista')

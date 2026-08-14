@@ -9,17 +9,21 @@ import { BalanzaTab } from './BalanzaTab'
 import { MapeoCuentasTab } from './MapeoCuentasTab'
 import { ProveedoresTab } from './ProveedoresTab'
 import { CuentasPorPagarTab } from './CuentasPorPagarTab'
+import { ComprasTab } from './ComprasTab'
 import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
 
-type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
+type SubTab = 'polizas' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'configuracion'
 
 const TABS: { id: SubTab; label: string; icon: string }[] = [
   { id: 'polizas', label: 'Pólizas', icon: '📒' },
   { id: 'balanza', label: 'Balanza', icon: '⚖️' },
   { id: 'eeff', label: 'Estados financieros', icon: '📊' },
   { id: 'bancos', label: 'Bancos', icon: '🏦' },
+  // El riel de compras va ANTES de CxP porque ese es el orden en que ocurre:
+  // la orden y la recepción nacen antes que la factura.
+  { id: 'compras', label: 'Compras', icon: '🛒' },
   { id: 'cxp', label: 'Cuentas por pagar', icon: '🧾' },
   { id: 'proveedores', label: 'Proveedores', icon: '🚚' },
   { id: 'presupuesto', label: 'Presupuesto', icon: '🎯' },
@@ -151,6 +155,9 @@ export function ContabilidadSection() {
       )}
       {tab === 'bancos' && (
         <BancosTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+      )}
+      {tab === 'compras' && (
+        <ComprasTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
       )}
       {tab === 'cxp' && (
         <CuentasPorPagarTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
