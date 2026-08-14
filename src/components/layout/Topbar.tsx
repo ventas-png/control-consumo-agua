@@ -5,6 +5,7 @@ import { useOffline } from '../../hooks/useOffline'
 import { useTheme } from '../../hooks/useTheme'
 import { getDisplayRoleLabel } from '../../lib/permissions'
 import { NotificationBell } from './NotificationBell'
+import { toAppSection } from '../../domain/comunicacion/notificationCatalog'
 
 const PAGE_TITLES: Record<AppSection, string> = {
   clientes: 'Clientes',
@@ -191,8 +192,19 @@ export function Topbar({ activeSection, onMenuToggle, onNavigate, sidebarOpen = 
           {isOnline ? 'Conectado' : 'Sin conexión'}
         </span>
 
-        {/* Campana de notificaciones */}
-        {onNavigate && <NotificationBell userId={currentUser.user_id} onNavigate={onNavigate} />}
+        {/* Campana de notificaciones. `seccion` es texto libre en la BD y los
+            productores escriben también destinos del portal del residente
+            ('anuncios'), que no son AppSection: sin el filtro se navegaba a
+            `undefined`. */}
+        {onNavigate && (
+          <NotificationBell
+            userId={currentUser.user_id}
+            onNavigate={seccion => {
+              const destino = toAppSection(seccion)
+              if (destino) onNavigate(destino)
+            }}
+          />
+        )}
 
         {/* Theme toggle (auto → claro → oscuro) */}
         <button

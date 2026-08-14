@@ -3,7 +3,9 @@ import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, ReservaAmenidad, PolizaSeguro,
   SugerenciaCondominio, VencimientoExtra, InspeccionNormativa,
-  ContratoArrendamiento, Unidad,
+  ContratoArrendamiento, Unidad, MensajePortal, SolicitudResidente,
+  SolicitudConcierge, SolicitudCertificado, SolicitudRentaUnidad,
+  SolicitudMudanzaUnidad, ComunicadoCondominio,
 } from '../../../types'
 
 interface Props {
@@ -17,10 +19,20 @@ interface Props {
   contratos: ContratoArrendamiento[]
   unidades: Unidad[]
   moneda: string
+  // Actividad entrante: lo que llega del residente y lo que sale hacia él. Es
+  // la mitad que faltaba en este panel — cubría vencimientos y cobros, pero no
+  // el mensaje ni la solicitud que alguien acaba de meter.
+  mensajesPortal: MensajePortal[]
+  solicitudes: SolicitudResidente[]
+  solicitudesConcierge: SolicitudConcierge[]
+  certificados: SolicitudCertificado[]
+  solicitudesRenta: SolicitudRentaUnidad[]
+  solicitudesMudanza: SolicitudMudanzaUnidad[]
+  comunicados: ComunicadoCondominio[]
 }
 
 type Urgencia = 'critico' | 'alto' | 'medio' | 'info'
-type CategoriaNotif = 'finanzas' | 'mantenimiento' | 'normativa' | 'comunidad' | 'residentes'
+type CategoriaNotif = 'finanzas' | 'mantenimiento' | 'normativa' | 'comunidad' | 'residentes' | 'comunicacion'
 
 interface Notificacion {
   id: string
@@ -41,10 +53,8 @@ const URG: Record<Urgencia, { color: string; bg: string; border: string; label: 
 
 const CAT_ICON: Record<CategoriaNotif, string> = {
   finanzas: '💰', mantenimiento: '🔧', normativa: '📋', comunidad: '🏘️', residentes: '🏠',
+  comunicacion: '💬',
 }
-
-const hoy = hoyLocalISO()
-const mesActual = hoy.slice(0, 7)
 
 function diasHasta(fecha: string) {
   return Math.round((new Date(fecha).getTime() - Date.now()) / 86400000)
@@ -53,7 +63,14 @@ function diasHasta(fecha: string) {
 export default function CentroNotificacionesTab({
   cuotas, tickets, reservas, polizas, sugerencias, vencimientosExtra,
   inspecciones, contratos, unidades, moneda,
+  mensajesPortal, solicitudes, solicitudesConcierge, certificados,
+  solicitudesRenta, solicitudesMudanza, comunicados,
 }: Props) {
+  // Dentro del render y no a nivel de módulo: este panel se deja abierto, y con
+  // la fecha congelada al import "pendientes este mes" seguía contando el mes
+  // anterior después de medianoche del día 1.
+  const hoy = hoyLocalISO()
+  const mesActual = hoy.slice(0, 7)
 
   const notificaciones = useMemo((): Notificacion[] => {
     const lista: Notificacion[] = []
@@ -134,6 +151,80 @@ export default function CentroNotificacionesTab({
       conteo: vencimientosCriticos.length,
     })
 
+    // ── Comunicación: lo que acaba de entrar ──────────────────────────────────
+    const mensajesNuevos = mensajesPortal.filter(m => m.estado === 'nuevo')
+    const emergencias = mensajesNuevos.filter(m => m.tipo === 'emergencia')
+    if (emergencias.length > 0) lista.push({
+      id: 'portal-emergencias', urgencia: 'critico', categoria: 'comunicacion',
+      titulo: `${emergencias.length} emergencia(s) reportada(s) desde el portal`,
+      detalle: emergencias.map(m => `${m.unidad_nombre ?? 'Unidad'} — ${m.asunto}`).slice(0, 3).join(' · '),
+      accion: 'Ver en Residentes → Mensajes del portal',
+      conteo: emergencias.length,
+    })
+
+    const mensajesNormales = mensajesNuevos.filter(m => m.tipo !== 'emergencia')
+    if (mensajesNormales.length > 0) lista.push({
+      id: 'portal-mensajes', urgencia: 'alto', categoria: 'comunicacion',
+      titulo: `${mensajesNormales.length} mensaje(s) nuevo(s) del portal sin leer`,
+      detalle: mensajesNormales.map(m => `${m.unidad_nombre ?? 'Unidad'} — ${m.asunto}`).slice(0, 3).join(' · ')
+        + (mensajesNormales.length > 3 ? '…' : ''),
+      accion: 'Ver en Residentes → Mensajes del portal',
+      conteo: mensajesNormales.length,
+    })
+
+    // Un comunicado recién publicado no es una acción pendiente, pero sí lo que
+    // el administrador quiere confirmar de un vistazo: que salió.
+    const comunicadosRecientes = comunicados.filter(c => {
+      const d = diasHasta(c.fecha_envio)
+      return d <= 0 && d >= -7
+    })
+    if (comunicadosRecientes.length > 0) lista.push({
+      id: 'comunicados-recientes', urgencia: 'info', categoria: 'comunicacion',
+      titulo: `${comunicadosRecientes.length} comunicado(s) publicado(s) en los últimos 7 días`,
+      detalle: comunicadosRecientes.map(c => c.titulo).slice(0, 3).join(' · '),
+      accion: 'Ver en Comunidad → Comunicados',
+      conteo: comunicadosRecientes.length,
+    })
+
+    // ── Solicitudes: una tarjeta por cola, para que se vea CUÁL está atascada ──
+    const colasSolicitud: { id: string; etiqueta: string; urgencia: Urgencia; pendientes: number; accion: string }[] = [
+      {
+        id: 'solicitudes-residente', etiqueta: 'solicitud(es) de residente',
+        urgencia: 'alto', accion: 'Ver en Residentes → Solicitudes',
+        pendientes: solicitudes.filter(s => s.estado === 'pendiente').length,
+      },
+      {
+        id: 'solicitudes-renta', etiqueta: 'autorización(es) de renta',
+        urgencia: 'alto', accion: 'Ver en Residentes → Autorizac. Renta',
+        pendientes: solicitudesRenta.filter(s => s.estado === 'pendiente').length,
+      },
+      {
+        id: 'solicitudes-mudanza', etiqueta: 'autorización(es) de mudanza',
+        urgencia: 'alto', accion: 'Ver en Residentes → Autorizac. Mudanza',
+        pendientes: solicitudesMudanza.filter(s => s.estado === 'pendiente').length,
+      },
+      {
+        id: 'solicitudes-certificado', etiqueta: 'solicitud(es) de certificado',
+        urgencia: 'medio', accion: 'Ver en Administración → Certificados',
+        pendientes: certificados.filter(s => s.estado === 'pendiente').length,
+      },
+      {
+        id: 'solicitudes-concierge', etiqueta: 'pedido(s) de concierge',
+        urgencia: 'medio', accion: 'Ver en Servicios → Concierge',
+        pendientes: solicitudesConcierge.filter(s => s.estado === 'pendiente').length,
+      },
+    ]
+    for (const cola of colasSolicitud) {
+      if (cola.pendientes === 0) continue
+      lista.push({
+        id: cola.id, urgencia: cola.urgencia, categoria: 'residentes',
+        titulo: `${cola.pendientes} ${cola.etiqueta} sin resolver`,
+        detalle: 'Esperando respuesta de la administración',
+        accion: cola.accion,
+        conteo: cola.pendientes,
+      })
+    }
+
     // ── Comunidad ─────────────────────────────────────────────────────────────
     const sugerenciasPendientes = sugerencias.filter(s => s.estado === 'pendiente')
     if (sugerenciasPendientes.length > 0) lista.push({
@@ -184,7 +275,9 @@ export default function CentroNotificacionesTab({
     })
 
     return lista.sort((a, b) => URG[a.urgencia].order - URG[b.urgencia].order)
-  }, [cuotas, tickets, reservas, polizas, sugerencias, vencimientosExtra, inspecciones, contratos, unidades, moneda])
+  }, [cuotas, tickets, reservas, polizas, sugerencias, vencimientosExtra, inspecciones, contratos,
+      unidades, moneda, mensajesPortal, solicitudes, solicitudesConcierge, certificados,
+      solicitudesRenta, solicitudesMudanza, comunicados, mesActual])
 
   const criticos = notificaciones.filter(n => n.urgencia === 'critico').length
   const altos    = notificaciones.filter(n => n.urgencia === 'alto').length

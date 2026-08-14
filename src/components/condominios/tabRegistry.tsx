@@ -562,7 +562,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'alertas', label: 'Alertas', icon: '🔔', render: (ctx) =>
     <AlertasTab alertas={ctx.alertasCondominio} polizas={ctx.polizas} contratos={ctx.contratosProveedores} inspecciones={ctx.inspecciones} llaves={ctx.llaves} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('alertas')} canEdit={ctx.canEdit('alertas')} onRefresh={ctx.onRefresh} /> },
   { id: 'centro_notificaciones', label: 'Centro notif.', icon: '📬', render: (ctx) =>
-    <CentroNotificacionesTab cuotas={ctx.cuotas} tickets={ctx.tickets} reservas={ctx.reservas} polizas={ctx.polizas} sugerencias={ctx.sugerencias} vencimientosExtra={ctx.vencimientosExtra} inspecciones={ctx.inspecciones} contratos={ctx.contratos} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} /> },
+    <CentroNotificacionesTab cuotas={ctx.cuotas} tickets={ctx.tickets} reservas={ctx.reservas} polizas={ctx.polizas} sugerencias={ctx.sugerencias} vencimientosExtra={ctx.vencimientosExtra} inspecciones={ctx.inspecciones} contratos={ctx.contratos} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} mensajesPortal={ctx.mensajesPortal} solicitudes={ctx.solicitudes} solicitudesConcierge={ctx.solicitudesConcierge} certificados={ctx.certificados} solicitudesRenta={ctx.solicitudesRenta} solicitudesMudanza={ctx.solicitudesMudanza} comunicados={ctx.comunicados} /> },
   { id: 'reportes', label: 'Reportes', icon: '📑', render: (ctx) =>
     <ReportesTab cuotas={ctx.cuotas} tickets={ctx.tickets} visitantes={ctx.visitantes} contratos={ctx.contratosProveedores} gastos={ctx.gastos} presupuestos={ctx.presupuestos} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'estadocuenta', label: 'Estado Cuenta', icon: '🧾', render: (ctx) =>
