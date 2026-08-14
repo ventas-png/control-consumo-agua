@@ -17,6 +17,7 @@ import {
   useActivosFijosQuery,
   useCompromisosQuery,
   useContrasenasQuery,
+  useDuplicadosQuery,
   useOrdenCompraLineasQuery,
   useOrdenesCompraQuery,
   useRecepcionesQuery,
@@ -26,6 +27,8 @@ import {
   useCambiarEstadoRecepcionMutation,
   useCrearOrdenCompraMutation,
   useCrearRecepcionMutation,
+  useDescartarDuplicadoMutation,
+  useEnlazarGastoAFacturaMutation,
 } from '../../domain/compras/mutations'
 import { ordenCompraFormSchema, pendienteDeRecibir, recepcionFormSchema, totalesOrden } from '../../domain/compras/schemas'
 import { formatCurrency, formatDateShort, hoyLocalISO } from '../../lib/format'
@@ -39,6 +42,7 @@ import {
   type ActivoFijo,
   type ContrasenaConRelaciones,
   type DestinoLinea,
+  type FilaDuplicado,
   type OrdenCompraConRelaciones,
   type RecepcionConRelaciones,
 } from '../../types/compras'
@@ -51,7 +55,7 @@ interface Props {
   monedaBase: string
 }
 
-type Vista = 'ordenes' | 'recepciones' | 'contrasenas' | 'activos' | 'compromisos'
+type Vista = 'ordenes' | 'recepciones' | 'contrasenas' | 'activos' | 'compromisos' | 'duplicados'
 
 const TONO_OC = {
   borrador: 'info', aprobada: 'warning', emitida: 'warning',
@@ -87,9 +91,12 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const { data: activos = [], isLoading: cargandoActivos } = useActivosFijosQuery(companyId, projectId)
   const { data: compromisos = [] } = useCompromisosQuery(companyId, projectId)
   const { data: proveedores = [] } = useProveedoresQuery(companyId)
+  const { data: duplicados = [], isLoading: cargandoDuplicados } = useDuplicadosQuery(companyId, projectId)
 
   const cambiarOrden = useCambiarEstadoOrdenCompraMutation()
   const cambiarRecepcion = useCambiarEstadoRecepcionMutation()
+  const enlazarGasto = useEnlazarGastoAFacturaMutation()
+  const descartarDuplicado = useDescartarDuplicadoMutation(companyId)
 
   const hoy = hoyLocalISO()
   const autorizados = useMemo(
@@ -235,6 +242,94 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
     },
   ]
 
+  // ── Posibles duplicados (gasto ↔ factura) ─────────────────────────────────
+  // El reporte NO corrige nada solo: propone pares y una persona decide. Enlazar
+  // deja UN asiento (el de la factura); descartar recuerda que ya se revisó.
+  const columnasDuplicado: DataTableColumn<FilaDuplicado>[] = [
+    {
+      key: 'gasto', header: 'Gasto capturado', accessor: (d) => d.gasto_concepto, sortable: true,
+      render: (d) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{d.gasto_concepto}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>
+            {formatDateShort(d.gasto_fecha)} · {formatCurrency(d.gasto_monto, monedaBase)}
+            {d.gasto_contabilizado && ' · contabilizado'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'factura', header: 'Factura del proveedor', accessor: (d) => d.factura_numero ?? '', sortable: true,
+      render: (d) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{d.factura_numero ?? 'Sin número'}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-soft)' }}>
+            {formatDateShort(d.factura_fecha)} · {formatCurrency(d.factura_monto, monedaBase)}
+            {d.proveedor ? ` · ${d.proveedor}` : ''}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'razones', header: 'Por qué se parecen', accessor: (d) => d.razones, hideOnMobile: true,
+      render: (d) => <span style={{ fontSize: 12 }}>{d.razones}</span>,
+    },
+    {
+      key: 'puntaje', header: 'Indicio', accessor: (d) => d.puntaje, numeric: true, width: 100, sortable: true,
+      render: (d) => (
+        <StatusBadge tone={d.puntaje >= 80 ? 'danger' : d.puntaje >= 60 ? 'warning' : 'info'}>
+          {d.puntaje >= 80 ? 'Alto' : d.puntaje >= 60 ? 'Medio' : 'Bajo'}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: 'acciones', header: '', width: 190,
+      render: (d) => (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          {puedeCrear && (
+            <button style={btnLink} onClick={async (e) => {
+              e.stopPropagation()
+              const ok = await confirm({
+                title: 'Es el mismo desembolso',
+                text: d.gasto_contabilizado
+                  ? 'El gasto ya está contabilizado: se anulará y su asiento se reversará, de modo que solo quede el de la factura. La factura no se toca.'
+                  : 'El gasto queda enlazado a la factura y ya no generará asiento propio: la factura es la que contabiliza.',
+                confirmText: 'Enlazar',
+              })
+              if (!ok) return
+              await accion(
+                () => enlazarGasto.mutateAsync({
+                  gastoId: d.gasto_id,
+                  facturaId: d.factura_id,
+                  yaContabilizado: d.gasto_contabilizado,
+                }),
+                d.gasto_contabilizado
+                  ? 'Gasto enlazado y anulado; su asiento quedó reversado.'
+                  : 'Gasto enlazado a la factura.',
+              )
+            }}>Enlazar</button>
+          )}
+          {puedeCrear && (
+            <button style={btnLink} onClick={async (e) => {
+              e.stopPropagation()
+              const r = await openPromptDialog({
+                title: 'No es duplicado',
+                description: 'El par deja de aparecer en el reporte. Queda escrito quién lo revisó y por qué.',
+                fields: [{ name: 'motivo', label: '¿Por qué son desembolsos distintos?', control: 'textarea', rows: 2 }],
+              })
+              const motivo = r?.motivo?.trim()
+              if (!motivo) return
+              await accion(
+                () => descartarDuplicado.mutateAsync({ gastoId: d.gasto_id, facturaId: d.factura_id, motivo }),
+                'Par descartado. No volverá a aparecer.',
+              )
+            }}>Descartar</button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   const totalComprometido = compromisos.reduce((s, c) => s + c.pendiente, 0)
 
   return (
@@ -246,6 +341,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           { value: 'contrasenas', label: 'Contraseñas de pago', count: contrasenas.filter((c) => c.estado === 'emitida').length },
           { value: 'activos', label: 'Activos fijos', count: activos.filter((a) => a.estado !== 'dado_de_baja').length },
           { value: 'compromisos', label: 'Comprometido' },
+          { value: 'duplicados', label: 'Posibles duplicados', count: duplicados.length },
         ]}
         value={vista}
         onChange={setVista}
@@ -333,6 +429,29 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
               { key: 'pendiente', header: 'Pendiente', accessor: (c) => c.pendiente, numeric: true, render: (c) => formatCurrency(c.pendiente, monedaBase), width: 120 },
             ]}
             emptyState={{ title: 'Nada comprometido', description: 'No hay órdenes vivas con entregas pendientes en esta contabilidad.' }}
+          />
+        </div>
+      )}
+
+      {vista === 'duplicados' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--at-ink-soft)' }}>
+            Un gasto y una factura de proveedor que probablemente son el mismo
+            desembolso, capturado dos veces. Mientras no se enlacen, la
+            contabilidad los reconoce por separado y el gasto sale duplicado.
+            Nada se corrige solo: revisa el par y decide.
+          </p>
+          <DataTable<FilaDuplicado>
+            data={duplicados}
+            columns={columnasDuplicado}
+            rowKey={(d) => `${d.gasto_id}:${d.factura_id}`}
+            isLoading={cargandoDuplicados}
+            searchableKeys={['gasto_concepto', (d) => d.factura_numero ?? '', (d) => d.proveedor ?? '']}
+            searchPlaceholder="Buscar par…"
+            emptyState={{
+              title: 'Sin duplicados a la vista',
+              description: 'No hay gastos que calcen con una factura de proveedor de esta contabilidad. Los gastos son para desembolsos SIN factura de proveedor —caja chica, reembolsos, compras menores—; lo facturado entra por Órdenes de compra y Cuentas por pagar.',
+            }}
           />
         </div>
       )}

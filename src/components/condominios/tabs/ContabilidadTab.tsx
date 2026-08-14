@@ -7,6 +7,8 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { FilterChips } from '../../shared/FilterChips'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 import { usePartidaEstadoQuery } from '../../../domain/presupuesto/queries'
+import { useProveedoresQuery } from '../../../domain/cxp/queries'
+import { useDuplicadoProbableQuery } from '../../../domain/compras/queries'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -38,7 +40,8 @@ const ESTADO_CONFIG: Record<EstadoGasto, { label: string; color: string; bg: str
 const blank = (): Partial<GastoCondominio> => ({
   concepto: '', categoria: 'otros', monto: undefined,
   fecha: hoyLocalISO(),
-  proveedor_nombre: '', estado: 'pagado', metodo_pago: 'transferencia',
+  proveedor_id: null, proveedor_nombre: '', factura_id: null,
+  estado: 'pagado', metodo_pago: 'transferencia',
   comprobante_num: '', notas: '',
 })
 
@@ -63,6 +66,28 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   )
   const excedePartida = !!partida && partida.presupuestado > 0 &&
     (partida.ejecutado + (form.monto ?? 0)) > partida.presupuestado
+
+  // Catálogo de proveedores de Contabilidad. El campo era texto libre, así que
+  // `proveedor_id` —que existe en BD desde junio— quedaba SIEMPRE en NULL y no
+  // había con qué cruzar un gasto contra su factura.
+  const { data: proveedores = [] } = useProveedoresQuery(companyId)
+
+  // Aviso de doble captura: facturas del mismo proveedor y ledger que calzan
+  // con lo que se está escribiendo. Advierte y ofrece enlazar; no bloquea.
+  const { data: candidatas = [] } = useDuplicadoProbableQuery({
+    companyId: showForm ? companyId : undefined,
+    projectId: proyectoId,
+    proveedorId: form.proveedor_id ?? null,
+    monto: form.monto ?? null,
+    fecha: form.fecha ?? null,
+    comprobante: form.comprobante_num ?? null,
+  })
+  // El estado «enlazado» lo manda `form.factura_id`, NO la lista de candidatas:
+  // si el enlace dependiera de que la factura siga calzando, tocar el monto la
+  // sacaría de la lista y el aviso desaparecería mientras el enlace se guarda
+  // igual. La lista solo sirve para poder nombrarla.
+  const hayEnlace = !!form.factura_id
+  const facturaEnlazada = candidatas.find(c => c.factura_id === form.factura_id)
 
   const thisMonth = mesLocalISO()
   const thisYear  = new Date().getFullYear().toString()
@@ -108,7 +133,10 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   function startEdit(g: GastoCondominio) {
     setForm({
       concepto: g.concepto, categoria: g.categoria, monto: g.monto, fecha: g.fecha,
-      proveedor_nombre: g.proveedor_nombre ?? '', estado: g.estado,
+      proveedor_id: g.proveedor_id ?? null,
+      proveedor_nombre: g.proveedor_nombre ?? '',
+      factura_id: g.factura_id ?? null,
+      estado: g.estado,
       metodo_pago: g.metodo_pago ?? 'transferencia',
       comprobante_num: g.comprobante_num ?? '', notas: g.notas ?? '',
     })
@@ -125,7 +153,11 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
       company_id: companyId, project_id: proyectoId,
       concepto: form.concepto!.trim(), categoria: form.categoria ?? 'otros',
       monto: form.monto!, fecha: form.fecha!,
+      proveedor_id: form.proveedor_id || null,
       proveedor_nombre: form.proveedor_nombre || null,
+      // Con la factura enlazada el gasto NO genera asiento: la factura ya
+      // devengó ese desembolso (20260823000000_gastos_enlace_factura.sql).
+      factura_id: form.factura_id || null,
       estado: form.estado ?? 'pagado',
       metodo_pago: form.metodo_pago || null,
       comprobante_num: form.comprobante_num || null,
@@ -180,6 +212,17 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             </div>
           </div>
 
+          {/* Alcance (Fase 7 ERP): dos rutas escriben al mismo libro y hasta
+              ahora no se conocían. Dejar dicho para qué es ESTA evita el
+              duplicado en el origen, que es más barato que detectarlo después. */}
+          <p style={{ margin: '0 0 16px', padding: '10px 14px', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '12px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+            Aquí van los desembolsos <strong>sin factura de proveedor</strong>: caja chica, reembolsos,
+            compras menores. Lo que llega con factura entra por <strong>Contabilidad → Compras</strong>{' '}
+            (orden de compra → recepción → factura → contraseña de pago) y lo contabiliza la factura.
+            Si un gasto de aquí resulta ser el mismo desembolso que una factura, enlázalos: así se
+            contabiliza una sola vez.
+          </p>
+
           {showForm && (
             <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Gasto' : 'Registrar Gasto'}</h3>
@@ -210,7 +253,27 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                 </div>
                 <div>
                   <label style={labelStyle}>Proveedor</label>
-                  <input style={inputStyle} value={form.proveedor_nombre ?? ''} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))} placeholder="Nombre empresa/persona" />
+                  {/* Del catálogo, no texto libre: es lo que permite cruzar el
+                      gasto contra sus facturas y detectar el doble conteo. Se
+                      sigue guardando el nombre porque lo pintan los reportes. */}
+                  <select
+                    style={inputStyle}
+                    value={form.proveedor_id ?? ''}
+                    onChange={e => {
+                      const id = e.target.value || null
+                      const p = proveedores.find(x => x.id === id)
+                      setForm(f => ({
+                        ...f,
+                        proveedor_id: id,
+                        proveedor_nombre: p?.nombre ?? '',
+                        // Cambiar de proveedor invalida el enlace anterior.
+                        factura_id: null,
+                      }))
+                    }}
+                  >
+                    <option value="">— sin proveedor —</option>
+                    {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Método de pago</label>
@@ -247,6 +310,38 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                     Partida {partida.cuenta_codigo} ({partida.periodo}): disponible {moneda} {(partida.presupuestado - partida.ejecutado - (form.monto ?? 0)).toFixed(2)} de {moneda} {partida.presupuestado.toFixed(2)}.
                   </div>
                 )
+              )}
+              {/* Doble captura (Fase 7 ERP): este desembolso puede ya estar en
+                  cuentas por pagar. Advierte y ofrece enlazar — enlazado, el
+                  gasto NO genera asiento y deja de contarse dos veces. No
+                  bloquea: dos pagos parecidos al mismo proveedor existen. */}
+              {hayEnlace ? (
+                <div style={{ marginTop: '12px', background: 'var(--at-success-tint)', border: '1.5px solid var(--at-success)', borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px' }}>
+                  🔗 <strong>Enlazado a la factura {facturaEnlazada?.factura_numero ?? 'del proveedor'}</strong> — este gasto queda como
+                  registro operativo y <strong>no generará asiento</strong>, porque la factura ya contabilizó el desembolso.
+                  {' '}<button
+                    onClick={() => setForm(f => ({ ...f, factura_id: null }))}
+                    style={{ border: 'none', background: 'transparent', color: 'var(--at-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: '12.5px' }}
+                  >Quitar el enlace</button>
+                </div>
+              ) : candidatas.length > 0 && (
+                <div style={{ marginTop: '12px', background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning)', borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
+                  ⚠️ <strong>Puede que ya esté en cuentas por pagar</strong> — si es el mismo desembolso, enlázalo para no contarlo dos veces.
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                    {candidatas.map(c => (
+                      <div key={c.factura_id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span>
+                          Factura <strong>{c.factura_numero ?? '(sin número)'}</strong> del {c.factura_fecha} ·{' '}
+                          {moneda} {c.factura_monto.toFixed(2)} · <em>{c.razones}</em>
+                        </span>
+                        <button
+                          onClick={() => setForm(f => ({ ...f, factura_id: c.factura_id }))}
+                          style={{ padding: '3px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 6, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                        >Enlazar</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
               <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
                 <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>

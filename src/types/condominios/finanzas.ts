@@ -25,6 +25,21 @@ export interface GastoCondominio {
   comprobante_num?: string | null
   notas?: string | null
   created_at: string
+  /**
+   * FK al catálogo de proveedores. Existe en BD desde 20260611010000 pero la
+   * interfaz no la declaraba, así que la pantalla nunca la seteaba y quedaba en
+   * NULL para todo lo capturado desde junio. La Fase 7 la revive: sin ella no
+   * hay con qué cruzar un gasto contra una factura.
+   */
+  proveedor_id?: string | null
+  /**
+   * Factura de proveedor que YA contabilizó este desembolso. Con la factura
+   * enlazada el gasto NO genera asiento (es el mismo hecho económico visto
+   * desde la operación) — ver 20260823000000_gastos_enlace_factura.sql.
+   */
+  factura_id?: string | null
+  /** Sellado por trg_sellar_creado_por (20260731000000); inmutable. */
+  creado_por?: string | null
 }
 
 export interface PresupuestoCondominio {

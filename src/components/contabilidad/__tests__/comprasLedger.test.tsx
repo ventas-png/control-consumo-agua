@@ -40,6 +40,12 @@ vi.mock('../../../domain/compras/queries', () => ({
   useCompromisosQuery: (companyId?: string, projectId?: string | null) => {
     state.compras.push({ hook: 'compromisos', companyId, projectId }); return vacio
   },
+  // El reporte de duplicados cruza gastos contra facturas: si se pidiera sin
+  // ledger propondría enlazar un gasto de un proyecto con la factura de otro, y
+  // el guard de la BD lo rechazaría dejando un botón que nunca funciona.
+  useDuplicadosQuery: (companyId?: string, projectId?: string | null) => {
+    state.compras.push({ hook: 'duplicados', companyId, projectId }); return vacio
+  },
   useOrdenCompraLineasQuery: () => vacio,
   useCuadreQuery: () => vacio,
 }))
@@ -51,6 +57,8 @@ vi.mock('../../../domain/compras/mutations', () => ({
   useCrearRecepcionMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAprobarFacturaConCuadreMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCrearContrasenaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useEnlazarGastoAFacturaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDescartarDuplicadoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../../domain/cxp/queries', () => ({
@@ -106,10 +114,10 @@ describe('ComprasTab', () => {
     expect(state.compras.every((l) => l.companyId === 'c1' && l.projectId === 'p1')).toBe(true)
   })
 
-  it('cubre los cinco documentos del riel, no solo el que se ve al abrir', () => {
+  it('cubre las seis vistas del riel, no solo la que se ve al abrir', () => {
     render(<ComprasTab companyId="c1" projectId="p1" monedaBase="GTQ" />)
     const hooks = new Set(state.compras.map((l) => l.hook))
-    for (const h of ['ordenes', 'recepciones', 'contrasenas', 'activos', 'compromisos']) {
+    for (const h of ['ordenes', 'recepciones', 'contrasenas', 'activos', 'compromisos', 'duplicados']) {
       expect(hooks.has(h)).toBe(true)
     }
   })

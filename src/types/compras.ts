@@ -232,6 +232,44 @@ export interface FilaCompromiso {
   pendiente: number
 }
 
+/**
+ * Fila de `conta_gastos_duplicados`: un gasto y una factura del mismo ledger
+ * que probablemente son el MISMO desembolso capturado dos veces.
+ * `razones` viene armada en el servidor y es lo que de verdad se lee — el
+ * puntaje solo ordena.
+ */
+export interface FilaDuplicado {
+  gasto_id: string
+  gasto_concepto: string
+  gasto_fecha: string
+  gasto_monto: number
+  gasto_estado: string
+  /** Si ya tiene asiento vivo, enlazarlo exige anularlo (lo hace la BD). */
+  gasto_contabilizado: boolean
+  factura_id: string
+  factura_numero: string | null
+  factura_fecha: string
+  factura_monto: number
+  proveedor: string | null
+  mismo_comprobante: boolean
+  mismo_proveedor: boolean
+  diferencia_monto: number
+  dias_diferencia: number
+  puntaje: number
+  razones: string
+}
+
+/** Fila de `conta_gasto_duplicado_probable`: aviso al capturar un gasto. */
+export interface FacturaCandidata {
+  factura_id: string
+  factura_numero: string | null
+  factura_fecha: string
+  factura_monto: number
+  saldo: number
+  proveedor: string | null
+  razones: string
+}
+
 export interface ComprasConfig {
   company_id: string
   tolerancia_cantidad_pct: number
