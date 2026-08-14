@@ -14,6 +14,8 @@ import {
 import { distribuirAnual, presupuestoFormSchema, totalFila, type PartidaInput } from '../../domain/presupuesto/schemas'
 import { proyeccionPresupuesto } from '../../domain/presupuesto/proyeccion'
 import { PresupuestoVsRealChart } from './PresupuestoVsRealChart'
+import { ImportPartidasModal, type ModoCarga } from './ImportPartidasModal'
+import type { PartidaResuelta } from '../../domain/presupuesto/importPartidas'
 import { formatCurrency, formatPercent } from '../../lib/format'
 import {
   ESTADO_PRESUPUESTO_LABELS,
@@ -251,6 +253,7 @@ function PartidasEditorModal({ companyId, presupuesto, monedaBase, onClose }: {
   // grid: cuenta_id → 12 montos (índice = mes-1)
   const [grid, setGrid] = useState<Record<string, number[]>>({})
   const [cuentaNueva, setCuentaNueva] = useState('')
+  const [importando, setImportando] = useState(false)
 
   useEffect(() => {
     const g: Record<string, number[]> = {}
@@ -277,6 +280,25 @@ function PartidasEditorModal({ companyId, presupuesto, monedaBase, onClose }: {
       const meses = [...(g[cuentaId] ?? Array(12).fill(0))]
       meses[mes] = parseFloat(valor) || 0
       return { ...g, [cuentaId]: meses }
+    })
+  }
+
+  /**
+   * Vuelca las partidas del archivo en el grid. No guarda: el usuario revisa y
+   * usa "Guardar partidas", que es el único camino de escritura (y el que la BD
+   * bloquea si el presupuesto ya está aprobado).
+   */
+  function aplicarImportacion(partidas: PartidaResuelta[], modo: ModoCarga) {
+    setGrid((g) => {
+      const base: Record<string, number[]> = modo === 'reemplazar' ? {} : { ...g }
+      for (const p of partidas) base[p.cuenta_id] = [...p.meses]
+      return base
+    })
+    setImportando(false)
+    notify({
+      variant: 'success',
+      title: 'Partidas cargadas',
+      text: `${partidas.length} cuenta${partidas.length === 1 ? '' : 's'} en el editor. Revisa los montos y presiona "Guardar partidas".`,
     })
   }
 
@@ -340,7 +362,18 @@ function PartidasEditorModal({ companyId, presupuesto, monedaBase, onClose }: {
             >
               Agregar
             </button>
+            <button onClick={() => setImportando(true)} style={btnSecundario}>📥 Carga masiva</button>
           </div>
+
+          {importando && (
+            <ImportPartidasModal
+              cuentas={elegibles}
+              anio={presupuesto.anio}
+              monedaBase={monedaBase}
+              onAplicar={aplicarImportacion}
+              onClose={() => setImportando(false)}
+            />
+          )}
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
