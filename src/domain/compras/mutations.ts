@@ -302,6 +302,60 @@ export function useCrearOrdenPagoDeContrasenaMutation(companyId?: string) {
   })
 }
 
+// ── Duplicados gasto ↔ factura ──────────────────────────────────────────────
+
+/**
+ * Declara que un gasto y una factura son el MISMO desembolso.
+ *
+ * Si el gasto ya está contabilizado hay que anularlo en la misma operación: su
+ * asiento tiene que desaparecer y el reverso por anulación es el único camino
+ * limpio —un asiento reversado sigue ocupando su clave única, así que no se
+ * puede «re-emitir»—. La BD rechaza el enlace sin anulación, y aquí se manda
+ * todo junto para que el reverso lo dispare el trigger de siempre.
+ */
+export function useEnlazarGastoAFacturaMutation() {
+  const invalidar = useInvalidarCompras()
+  return useMutation({
+    mutationFn: async (vars: { gastoId: string; facturaId: string; yaContabilizado: boolean }) => {
+      await runQuery((signal) =>
+        supabase
+          .from('gastos_condominio')
+          .update({
+            factura_id: vars.facturaId,
+            ...(vars.yaContabilizado ? { estado: 'anulado' } : {}),
+          })
+          .eq('id', vars.gastoId)
+          .abortSignal(signal),
+      )
+    },
+    onSuccess: () => invalidar(),
+  })
+}
+
+/** El par se revisó y NO es duplicado: no vuelve a aparecer en el reporte. */
+export function useDescartarDuplicadoMutation(companyId?: string) {
+  const invalidar = useInvalidarCompras()
+  return useMutation({
+    mutationFn: async (vars: { gastoId: string; facturaId: string; motivo: string }) => {
+      if (!companyId) throw new Error('Falta companyId.')
+      const { data: auth } = await supabase.auth.getUser()
+      await runQuery((signal) =>
+        supabase
+          .from('conta_duplicados_descartados')
+          .insert({
+            company_id: companyId,
+            gasto_id: vars.gastoId,
+            factura_id: vars.facturaId,
+            motivo: vars.motivo,
+            revisado_por: auth.user?.id ?? null,
+          })
+          .abortSignal(signal),
+      )
+    },
+    onSuccess: () => invalidar(),
+  })
+}
+
 // ── Factura contra orden (cuadre) ───────────────────────────────────────────
 
 /**

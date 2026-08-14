@@ -95,10 +95,25 @@ Antes de esto la cadena existía a medias y partida en dos módulos: `proveedore
 ### Límites declarados de la Fase 6
 
 - **Depreciación mensual**: no entra. Se sembraron las cuentas (`1409`, `5107`) y los campos del activo (vida útil, valor residual, las tres cuentas) para que después sea un RPC y un trigger, no un rediseño.
-- **`gastos_condominio` ↔ `facturas_proveedor` sin unificar**: las dos rutas siguen posteando al mismo ledger sin conocerse, así que el mismo desembolso capturado por ambas se cuenta dos veces y nada lo detecta. Esta fase deja `facturas_proveedor` como canónica del riel de compras; unificarlas es trabajo aparte.
+- ~~**`gastos_condominio` ↔ `facturas_proveedor` sin unificar**~~: **cerrado por la Fase 7** (abajo).
 - **Variación de precio de compra**: se reconoce como **gasto del periodo**, no se capitaliza. Es a propósito: el kardex y el registro de activos se valúan al precio de la ORDEN, y capitalizar la diferencia dejaría el mayor por encima del auxiliar de forma permanente.
 - **`proformas_condominio` → orden de compra**: sigue sin enlace (`convertida_oc` es solo un estado).
 - **El alta de un proveedor ya no autoriza por sí sola**: es lo pedido, pero cambia el flujo — un proveedor nuevo nace en `borrador` y no aparece en los selectores hasta que se le autoriza.
+
+## Fase 7 — Un hecho económico, un solo asiento ✅
+
+Cierra el límite más serio que dejó declarado la Fase 6: `gastos_condominio` y `facturas_proveedor` posteaban al **mismo libro sin conocerse**, así que el mismo desembolso capturado por las dos rutas se contabilizaba **dos veces** y nada lo detectaba. Migraciones `20260823*`.
+
+La causa era estructural, no un descuido: la clave de idempotencia de los asientos es `(company_id, origen_tabla, origen_id, origen_evento)`, y como `origen_tabla` forma parte de la clave, un gasto y su factura producen **claves distintas, cero conflicto** y dos débitos a la misma cuenta. El índice garantizaba *un asiento por evento de documento*, no *un asiento por hecho económico*.
+
+**Qué es cada tabla, ahora por escrito** (`COMMENT ON TABLE`): `gastos_condominio` es el desembolso **SIN** factura de proveedor —caja chica, reembolsos, compras menores—; lo facturado entra por el riel de compras y lo contabiliza `facturas_proveedor`.
+
+- **El enlace**: `gastos_condominio.factura_id` → `facturas_proveedor`. Con enlace, `conta_tg_gastos` **no genera asiento**: la factura ya lo hizo. Sin enlace el comportamiento es idéntico al de siempre, así que es aditivo y degradable.
+- **Coherencia obligatoria** (`gastos_tg_factura_coherente`): la factura tiene que ser del **mismo ledger** y del **mismo proveedor** (si el gasto no lo tenía, lo hereda), y no puede estar anulada. Enlazar un gasto **ya contabilizado** exige anularlo en la misma operación —su asiento se reversa por la ruta de siempre—, porque un asiento reversado **sigue ocupando su clave única** y no se puede «re-emitir». Desenlazar vuelve a contabilizar: el enlace no es de un solo sentido.
+- **`proveedor_id` revivido**: el campo existía desde junio y estaba muerto —la UI capturaba el proveedor como **texto libre** y el payload nunca escribía la FK—. Ahora es un selector del catálogo, con backfill por nombre para las filas creadas después del backfill original. Sin esto la detección no tendría con qué cruzar.
+- **Detección del histórico**: `conta_gastos_duplicados` propone pares (gasto, factura) con **puntaje y razones legibles** —mismo comprobante, mismo proveedor, monto dentro de tolerancia, fecha dentro de ±N días—, excluyendo enlazados, anulados y descartados. `conta_duplicados_descartados` recuerda lo ya revisado, con motivo y quién: sin esa memoria el mismo par reaparece cada mes y el reporte se vuelve ruido que nadie mira. **Nunca corrige solo**: propone y una persona decide, en la sub-vista «Posibles duplicados» de Compras.
+- **Aviso en la captura**: `conta_gasto_duplicado_probable` avisa al escribir el gasto —«esto ya está como factura A-4471»— con salida a **enlazar** ahí mismo. Advierte, no bloquea.
+- **Verificación**: `supabase/tests/gastos_duplicados/run.sh`, con el mismo patrón que la Fase 6. Incluye lo que de verdad mata estos reportes —que **no** marque dos pagos legítimamente distintos del mismo proveedor por el mismo monto— y la no-regresión del gasto sin factura.
 
 ## Dependencias y orden
 
@@ -114,6 +129,6 @@ Fase 1 (contabilidad) ──► Fase 2 (CxP)      ──► Fase 4 (bancos/conci
                      Fase 5 (EEFF + cierre)
 ```
 
-Fase 6 depende de la 2 (proveedores y facturas) y de la 1 (catálogo y asientos automáticos); alimenta a la 3 avisando cuando una orden compromete más de lo presupuestado.
+Fase 6 depende de la 2 (proveedores y facturas) y de la 1 (catálogo y asientos automáticos); alimenta a la 3 avisando cuando una orden compromete más de lo presupuestado. Fase 7 depende de la 6 y de la 2, y corrige hacia atrás lo que las dos dejaban duplicado.
 
 Fase 3 puede arrancar en paralelo con Fase 2 (solo depende del catálogo de cuentas). Fase 5 requiere 1–4 para que los estados financieros estén completos, aunque P&L/balance básicos funcionan desde Fase 1.

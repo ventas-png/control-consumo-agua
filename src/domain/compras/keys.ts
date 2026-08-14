@@ -27,4 +27,17 @@ export const comprasKeys = {
     [...comprasKeys.all, 'documentos-proveedor', proveedorId ?? null] as const,
   config: (companyId?: string) =>
     [...comprasKeys.all, 'config', companyId ?? null] as const,
+  duplicados: (companyId?: string, projectId?: string | null) =>
+    [...comprasKeys.all, 'duplicados', companyId ?? null, projectId ?? null] as const,
+  // El aviso de captura depende de los datos del formulario, no de un id: la
+  // key los lleva para que cambiar el monto o la fecha vuelva a consultar.
+  duplicadoProbable: (
+    companyId?: string,
+    projectId?: string | null,
+    proveedorId?: string | null,
+    monto?: number | null,
+    fecha?: string | null,
+  ) =>
+    [...comprasKeys.all, 'duplicado-probable', companyId ?? null, projectId ?? null,
+     proveedorId ?? null, monto ?? null, fecha ?? null] as const,
 } as const

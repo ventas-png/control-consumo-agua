@@ -12,8 +12,10 @@ import type {
   ContrasenaConRelaciones,
   ContrasenaPagoFactura,
   ComprasConfig,
+  FacturaCandidata,
   FilaCompromiso,
   FilaCuadre,
+  FilaDuplicado,
   OrdenCompraConRelaciones,
   OrdenCompraLinea,
   ProveedorDocumento,
@@ -208,6 +210,60 @@ export function useDocumentosProveedorQuery(proveedorId?: string) {
           .select('*')
           .eq('proveedor_id', proveedorId!)
           .order('vence_el', { ascending: true, nullsFirst: false })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/**
+ * Pares (gasto, factura) que probablemente son el mismo desembolso.
+ * El servidor ya excluye los enlazados, los anulados y los descartados.
+ */
+export function useDuplicadosQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: comprasKeys.duplicados(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<FilaDuplicado[]>((signal) =>
+        supabase
+          .rpc('conta_gastos_duplicados', {
+            p_company_id: companyId!,
+            p_project_id: projectId ?? null,
+          })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/**
+ * Aviso al capturar: facturas del mismo proveedor y ledger que calzan con el
+ * gasto que se está escribiendo. Solo consulta con proveedor, monto y fecha
+ * puestos — sin los tres no hay nada que comparar.
+ */
+export function useDuplicadoProbableQuery(args: {
+  companyId?: string
+  projectId?: string | null
+  proveedorId?: string | null
+  monto?: number | null
+  fecha?: string | null
+  comprobante?: string | null
+}) {
+  const { companyId, projectId, proveedorId, monto, fecha, comprobante } = args
+  const listo = !!companyId && !!proveedorId && !!monto && monto > 0 && !!fecha
+  return useQuery({
+    queryKey: comprasKeys.duplicadoProbable(companyId, projectId, proveedorId, monto, fecha),
+    enabled: listo,
+    queryFn: async () =>
+      (await runQuery<FacturaCandidata[]>((signal) =>
+        supabase
+          .rpc('conta_gasto_duplicado_probable', {
+            p_company_id: companyId!,
+            p_project_id: projectId ?? null,
+            p_proveedor_id: proveedorId!,
+            p_monto: monto!,
+            p_fecha: fecha!,
+            p_comprobante: comprobante ?? null,
+          })
           .abortSignal(signal),
       )) ?? [],
   })

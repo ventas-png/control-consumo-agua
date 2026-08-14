@@ -69,6 +69,11 @@ CREATE TABLE IF NOT EXISTS public.cuotas_condominio (
   mora_monto numeric(12,2),
   deleted_at timestamptz
 );
+-- `comprobante_num` y `notas` no las toca ningún trigger contable, pero SÍ el
+-- cruce de duplicados de la Fase 7 (el número de comprobante contra el de la
+-- factura es la evidencia más fuerte de que son el mismo desembolso). El stub
+-- se mantiene fiel a la tabla real de 20260420000009 para que un harness no
+-- falle por una columna que en producción existe.
 CREATE TABLE IF NOT EXISTS public.gastos_condominio (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL,
@@ -79,7 +84,10 @@ CREATE TABLE IF NOT EXISTS public.gastos_condominio (
   fecha date NOT NULL,
   proveedor_nombre text,
   estado text NOT NULL DEFAULT 'pagado',
-  metodo_pago text
+  metodo_pago text,
+  comprobante_num text,
+  notas text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS public.cierres_mensuales (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
