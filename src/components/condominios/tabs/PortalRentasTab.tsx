@@ -13,6 +13,12 @@ import {
   fetchReservasStrByUnidad,
   fetchHuespedesByReservas,
 } from '../../../domain/condominios/tabQueries'
+import {
+  fetchInquilinosDeUnidad,
+  registrarInquilino,
+  quitarInquilino,
+  type InquilinoDeUnidad,
+} from '../../../domain/portal/inquilinos'
 import { ImageUploader } from '../../shared/ImageUploader'
 import type {
   ContratoArrendamiento, ReservaSTR,
@@ -35,6 +41,21 @@ interface HuespedSTRForm {
 const defaultHuesped = (): Omit<HuespedSTRForm, 'id' | 'visitante_id'> => ({
   nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '',
   foto_url: null, foto_documento_url: null,
+})
+
+// Datos que el propietario captura para dar acceso al portal a su inquilino.
+// DPI + fecha de nacimiento + email son los TRES datos con los que el inquilino
+// luego activa su login (auto-registro create-cliente-account, match 3-de-3).
+interface InquilinoForm {
+  nombre: string
+  email: string
+  cuiDui: string
+  fechaNacimiento: string
+  telefono: string
+}
+
+const blankInquilino = (): InquilinoForm => ({
+  nombre: '', email: '', cuiDui: '', fechaNacimiento: '', telefono: '',
 })
 
 interface Props {
@@ -228,6 +249,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   const [formCA, setFormCA]       = useState<Partial<ContratoArrendamiento>>(blankContrato())
   const [savingCA, setSavingCA]   = useState(false)
 
+  // Acceso del inquilino al portal (self-service del propietario)
+  const [inquilinos, setInquilinos]   = useState<InquilinoDeUnidad[]>([])
+  const [showInq, setShowInq]         = useState(false)
+  const [formInq, setFormInq]         = useState<InquilinoForm>(blankInquilino())
+  const [savingInq, setSavingInq]     = useState(false)
+
   // STR form
   const [showSTR, setShowSTR]     = useState(false)
   const [editSTR, setEditSTR]     = useState<ReservaSTR | null>(null)
@@ -276,6 +303,61 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       setSubTab(allowedSubTabs[0])
     }
   }, [allowedSubTabs, subTab])
+
+  // Inquilino con acceso al portal: solo aplica cuando la autorización cubre
+  // arrendamiento (el RPC igualmente lo exige server-side).
+  const permiteArrendamiento = tipoAprobado === 'arrendamiento' || tipoAprobado === 'ambas'
+
+  const cargarInquilinos = useCallback(async () => {
+    if (!unidadId || !permiteArrendamiento) { setInquilinos([]); return }
+    const { data } = await fetchInquilinosDeUnidad(unidadId)
+    setInquilinos(data)
+  }, [unidadId, permiteArrendamiento])
+
+  useEffect(() => { cargarInquilinos() }, [cargarInquilinos])
+
+  // ── Inquilino helpers ───────────────────────────────────────────────────────
+
+  const inquilinosActivos = inquilinos.filter(i => i.activo)
+
+  async function saveInquilino() {
+    if (!formInq.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del inquilino es requerido.' }); return }
+    if (!formInq.email.trim()) { notify({ variant: 'error', title: 'Error', text: 'El email del inquilino es requerido.' }); return }
+    if (!formInq.cuiDui.trim()) { notify({ variant: 'error', title: 'Error', text: 'El DPI/CUI del inquilino es requerido.' }); return }
+    if (!formInq.fechaNacimiento) { notify({ variant: 'error', title: 'Error', text: 'La fecha de nacimiento es requerida.' }); return }
+    setSavingInq(true)
+    const { error } = await registrarInquilino({
+      unidadId,
+      nombre: formInq.nombre.trim(),
+      email: formInq.email.trim(),
+      cuiDui: formInq.cuiDui.trim(),
+      fechaNacimiento: formInq.fechaNacimiento,
+      telefono: formInq.telefono,
+    })
+    setSavingInq(false)
+    if (error) { notify({ variant: 'error', title: 'No se pudo dar acceso', text: error }); return }
+    setShowInq(false); setFormInq(blankInquilino())
+    notify({
+      variant: 'success',
+      title: 'Acceso otorgado',
+      text: 'Su inquilino ya puede crear su cuenta en la app con su DPI/CUI, fecha de nacimiento y email, y verá únicamente esta unidad.',
+      duration: 5000,
+    })
+    cargarInquilinos()
+  }
+
+  async function removeInquilino(i: InquilinoDeUnidad) {
+    const r = await confirm({
+      title: '¿Quitar acceso al inquilino?',
+      text: `${i.cliente_nombre} dejará de ver esta unidad en su portal de inmediato. Su cuenta no se elimina.`,
+      icon: 'warning', variant: 'danger', confirmText: 'Quitar acceso',
+    })
+    if (!r.isConfirmed) return
+    const { error } = await quitarInquilino(unidadId, i.cliente_id)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
+    notify({ variant: 'success', title: 'Acceso revocado', duration: 1400 })
+    cargarInquilinos()
+  }
 
   // ── Contrato helpers ────────────────────────────────────────────────────────
 
@@ -573,6 +655,57 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
         <EmptyState icon="📋" title="Cargando…" />
       ) : subTab === 'arrendamiento' ? (
         <>
+          {/* Acceso del inquilino al portal — el propietario decide quién ve SU
+            * unidad. La membresía 'arrendatario' le abre al inquilino el portal
+            * de esta unidad (solo lo operativo: reservas, tickets, visitantes…). */}
+          <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>👥 Acceso de mi inquilino al portal</div>
+                <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                  Tu inquilino podrá entrar con su propia cuenta y ver únicamente esta unidad: reservar amenidades, reportar mantenimiento, registrar visitantes y más.
+                </div>
+              </div>
+              {inquilinosActivos.length === 0 && (
+                <button
+                  onClick={() => { setFormInq(blankInquilino()); setShowInq(true) }}
+                  style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                >+ Dar acceso</button>
+              )}
+            </div>
+
+            {inquilinosActivos.length === 0 ? (
+              <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '8px' }}>
+                Aún no has dado acceso a ningún inquilino en esta unidad.
+              </div>
+            ) : inquilinosActivos.map(i => (
+              <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '10px 14px', marginTop: '10px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--at-ink)' }}>
+                    👤 {i.cliente_nombre}
+                    <span style={{
+                      marginLeft: 8, padding: '2px 8px', borderRadius: 20, fontSize: 10.5, fontWeight: 700,
+                      background: i.tiene_cuenta ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                      color: i.tiene_cuenta ? 'var(--at-success)' : 'var(--at-warning-strong)',
+                    }}>{i.tiene_cuenta ? '✓ Con cuenta' : 'Cuenta pendiente'}</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '2px' }}>
+                    {i.cliente_email && <>✉️ {i.cliente_email}</>}{i.cliente_email && i.cliente_telefono && '  ·  '}{i.cliente_telefono && <>📞 {i.cliente_telefono}</>}
+                  </div>
+                  {!i.tiene_cuenta && (
+                    <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                      Pídele que cree su cuenta en la app con su DPI/CUI, fecha de nacimiento y email.
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => removeInquilino(i)}
+                  style={{ padding: '7px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                >Quitar acceso</button>
+              </div>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
             <button onClick={openNewCA} style={{ padding: '8px 18px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo contrato</button>
           </div>
@@ -668,6 +801,50 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   <button onClick={() => setShowCA(false)} style={{ padding: '9px 20px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-2)' }}>Cancelar</button>
                   <button onClick={saveCA} disabled={savingCA} style={{ padding: '9px 22px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '8px', cursor: savingCA ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingCA ? 0.7 : 1 }}>
                     {savingCA ? 'Guardando…' : editCA ? 'Actualizar' : 'Crear contrato'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            </ModalPortal>
+          )}
+
+          {showInq && (
+            <ModalPortal>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+              <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Dar acceso a mi inquilino</h3>
+                  <button onClick={() => setShowInq(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--at-ink-3)' }}>✕</button>
+                </div>
+                <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+                  Con estos datos tu inquilino creará su cuenta en la app (validando DPI/CUI + fecha de nacimiento + email) y verá <strong>solo esta unidad</strong>. Verifícalos con su documento.
+                </p>
+                <div style={rowStyle}>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={labelStyle}>Nombre completo *</label>
+                    <input style={fieldStyle} value={formInq.nombre} onChange={e => setFormInq(p => ({ ...p, nombre: e.target.value }))} placeholder="Como aparece en su documento" />
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={labelStyle}>Email *</label>
+                    <input style={fieldStyle} type="email" value={formInq.email} onChange={e => setFormInq(p => ({ ...p, email: e.target.value }))} placeholder="correo@ejemplo.com" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>DPI / CUI *</label>
+                    <input style={fieldStyle} value={formInq.cuiDui} onChange={e => setFormInq(p => ({ ...p, cuiDui: e.target.value }))} placeholder="Número de documento" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Fecha de nacimiento *</label>
+                    <input style={fieldStyle} type="date" value={formInq.fechaNacimiento} onChange={e => setFormInq(p => ({ ...p, fechaNacimiento: e.target.value }))} />
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={labelStyle}>Teléfono</label>
+                    <input style={fieldStyle} value={formInq.telefono} onChange={e => setFormInq(p => ({ ...p, telefono: e.target.value }))} placeholder="+502 0000-0000" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowInq(false)} style={{ padding: '9px 20px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-2)' }}>Cancelar</button>
+                  <button onClick={saveInquilino} disabled={savingInq} style={{ padding: '9px 22px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '8px', cursor: savingInq ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingInq ? 0.7 : 1 }}>
+                    {savingInq ? 'Guardando…' : 'Dar acceso'}
                   </button>
                 </div>
               </div>
