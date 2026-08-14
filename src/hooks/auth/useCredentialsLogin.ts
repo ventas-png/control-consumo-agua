@@ -12,6 +12,7 @@ import { storeSession } from '../../lib/authSession'
 import { recordLoginFailure, clearLoginFailures, getLoginLockoutMessage } from '../../lib/loginRateLimit'
 import { isNative } from '../../lib/platform'
 import { buildSessionFromSupabase } from '../../domain/auth/session'
+import { connectivityLoginMessage } from '../../domain/auth/loginErrors'
 import { waitForLateSession } from '../../domain/auth/lateSession'
 import { type MfaChallenge, needsTotpStepUp, findVerifiedTotpFactor, isValidTotpCode, classifyMfaVerifyError } from '../../domain/auth/mfa'
 
@@ -91,6 +92,19 @@ export function useCredentialsLogin(setCurrentUser: (s: UserSession) => void) {
       const { data, error } = authResult
 
       if (error || !data?.session || !data?.user) {
+        // Fallo SIN respuesta del servidor (o con un 5xx): las credenciales no
+        // se llegaron a evaluar, así que NO cuenta para el bloqueo local —si no,
+        // una red intermitente gasta los 5 intentos y encima acusa a la persona
+        // de "demasiados intentos"— y no se registra como intento fallido en la
+        // bitácora de seguridad, que audita credenciales, no cortes de red.
+        const connectivityMsg = connectivityLoginMessage(error)
+        if (connectivityMsg) {
+          const reason = error?.message ?? 'network_error'
+          logSecurityEvent('login_error', { email: cleanEmail, error: reason }).catch(console.error)
+          reportSLOError('login.error_rate', { reason })
+          return connectivityMsg
+        }
+
         recordLoginFailure()
         logSecurityEvent('failed_login_attempt', {
           email: cleanEmail,
@@ -139,13 +153,12 @@ export function useCredentialsLogin(setCurrentUser: (s: UserSession) => void) {
         }
         return 'La conexión con el servidor tardó demasiado. Verifique su internet, cierre otras pestañas de la aplicación e intente de nuevo.'
       }
-      const isNetworkError = msg.toLowerCase().includes('fetch') ||
-        msg.toLowerCase().includes('network') ||
-        msg.toLowerCase().includes('failed to fetch') ||
-        msg.toLowerCase().includes('load failed')
-      if (isNetworkError) {
-        return 'Sin conexión con el servidor. Use "Diagnóstico del sistema" para verificar la URL activa.'
-      }
+      // Mismo clasificador que el camino de arriba: el mensaje de red es uno
+      // solo, venga el fallo devuelto en `{ error }` o lanzado.
+      const connectivityMsg = connectivityLoginMessage(
+        error instanceof Error ? { name: error.name, message: error.message } : { message: msg },
+      )
+      if (connectivityMsg) return connectivityMsg
       if (msg.includes('desactivada')) return msg
       return `Error de conexión: ${msg}`
     }
