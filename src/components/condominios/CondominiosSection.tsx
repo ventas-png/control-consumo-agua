@@ -7,6 +7,7 @@ import {
   fetchCondominiosTareasData,
   fetchTareasBloqueData,
   fetchCondominiosLimpiezaData,
+  fetchCondominiosTurnosData,
   fetchClientesConCumple,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
@@ -46,6 +47,7 @@ import type {
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
   ChecklistArea, ProgramacionLimpieza, EjecucionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
+  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
@@ -269,6 +271,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [bitacoraGuardia, setBitacoraGuardia] = useState<BitacoraGuardia[]>([])
   const [equiposComunes, setEquiposComunes] = useState<EquipoComun[]>([])
   const [presenciaPersonal, setPresenciaPersonal] = useState<PresenciaPersonal[]>([])
+  const [plantillasHorario, setPlantillasHorario] = useState<PlantillaHorario[]>([])
+  const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>([])
+  const [diasNoLaborables, setDiasNoLaborables] = useState<DiaNoLaborable[]>([])
+  const [ausenciasPersonal, setAusenciasPersonal] = useState<AusenciaPersonal[]>([])
   // Fase 21
   const [suministros, setSuministros] = useState<SuministroCondominio[]>([])
   const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
@@ -501,6 +507,33 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       setTareasBloque([]); setRevisionesTarea([])
     }
 
+    // Control de asignación de turnos (20260820000000 / 000100). Aparte del
+    // Promise.all grande por el mismo motivo que las rutas de limpieza: las
+    // tablas son nuevas y, si un entorno todavía no tiene la migración
+    // aplicada, el fallo se queda aquí (listas vacías) y no tumba el panel.
+    const [plantillasHorarioRes, asignacionesTurnoRes, diasNoLabRes, ausenciasRes] =
+      await fetchCondominiosTurnosData(pid, cid)
+    setPlantillasHorario((plantillasHorarioRes.data ?? []) as PlantillaHorario[])
+    setAsignacionesTurno(
+      (asignacionesTurnoRes.data ?? []).map((a: Record<string, unknown>) => ({
+        ...a,
+        // Las columnas jsonb llegan como Json; el shape lo fija AsignacionTurno.
+        dias_semana: (a.dias_semana as number[] | null) ?? [],
+        fechas_especificas: (a.fechas_especificas as string[] | null) ?? [],
+        personal_nombre: (a.personal_condominio as { nombre: string; cargo: string } | null)?.nombre,
+        personal_cargo:  (a.personal_condominio as { nombre: string; cargo: string } | null)?.cargo,
+        plantilla_nombre: (a.plantillas_horario as { nombre: string } | null)?.nombre,
+      })) as AsignacionTurno[]
+    )
+    setDiasNoLaborables((diasNoLabRes.data ?? []) as DiaNoLaborable[])
+    setAusenciasPersonal(
+      (ausenciasRes.data ?? []).map((a: Record<string, unknown>) => ({
+        ...a,
+        personal_nombre: (a.personal_condominio as { nombre: string; cargo: string } | null)?.nombre,
+        personal_cargo:  (a.personal_condominio as { nombre: string; cargo: string } | null)?.cargo,
+      })) as AusenciaPersonal[]
+    )
+
     // Rutas de limpieza (20260807130000). Va aparte del Promise.all grande
     // porque la tabla es nueva: si el entorno todavía no tiene la migración
     // aplicada, el error se queda aquí (lista vacía) en vez de tumbar la carga
@@ -726,6 +759,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
+    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,
@@ -758,6 +792,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     fondoReserva, permisosObra, tarifas, incidentes, checklistAreas,
     progLimpieza, ejecLimpieza, consumoEnergia, historialRes, estacVisita, bitacoraGuardia,
     equiposComunes, presenciaPersonal, suministros, movimientosSuministro,
+    plantillasHorario, asignacionesTurno, diasNoLaborables, ausenciasPersonal,
     tareasCond, cobranzas, certificados, visitasFrecuentes, reglamento,
     controlPlagas, cargosAdicionales, programaActividades, registroAutoridades,
     notasAdmin, controlPiscina, mantenimientoJardineria, incidenciasElevador,

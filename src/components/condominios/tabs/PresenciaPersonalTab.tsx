@@ -1,11 +1,16 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { formatHoras, horasJornada } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
-import { PresenciaPersonal, EstadoPresencia } from '../../../types'
+import { PresenciaPersonal, EstadoPresencia, PersonalCondominio, BloqueTurno } from '../../../types'
 
 interface Props {
   registros: PresenciaPersonal[]
+  /** Plantilla del condominio: el marcaje se ata a un empleado, no a un texto. */
+  personal: PersonalCondominio[]
+  /** Turnos planificados del día, para atar el marcaje al que le corresponde. */
+  bloques: BloqueTurno[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -21,13 +26,14 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
   { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
 ]
 
-export default function PresenciaPersonalTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export default function PresenciaPersonalTab({ registros, personal, bloques, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({
+    personal_id: '',
     nombre: '',
     cargo: '',
     fecha: hoy,
@@ -39,6 +45,20 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
 
   const registrosDia = registros.filter(r => r.fecha === fechaFiltro)
 
+  // Solo se ficha a quien sigue en plantilla. Si el condominio todavía no tiene
+  // personal registrado, el campo degrada a texto libre para no bloquear el
+  // fichaje (es como funcionaba antes de que la tabla tuviera personal_id).
+  const activos = useMemo(() => personal.filter(p => p.estado !== 'inactivo'), [personal])
+
+  const turnoDelDia = useMemo(() => {
+    if (!form.personal_id) return null
+    const b = bloques.find(x => x.personal_id === form.personal_id && x.fecha === form.fecha)
+    if (!b) return null
+    return b.hora_inicio && b.hora_fin
+      ? `${b.hora_inicio.slice(0, 5)}–${b.hora_fin.slice(0, 5)}`
+      : b.turno
+  }, [bloques, form.personal_id, form.fecha])
+
   const contadores = ESTADOS_PRESENCIA.reduce((acc, s) => {
     acc[s.value] = registrosDia.filter(r => r.estado === s.value).length
     return acc
@@ -47,9 +67,17 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
   async function guardar() {
     if (!form.nombre.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Nombre obligatorio' }); return }
     setSaving(true)
+    // `personal_id` es lo que hace posible el cómputo de horas por empleado: sin
+    // él, «Juan Pérez» y «J. Pérez» son dos personas distintas. Se conserva
+    // `nombre` porque la tabla también registra a quien no está en plantilla.
+    const bloqueDelDia = form.personal_id
+      ? bloques.find(b => b.personal_id === form.personal_id && b.fecha === form.fecha)
+      : undefined
     const { error } = await createCondominioRow('presencia_personal', {
       company_id: companyId,
       project_id: proyectoId,
+      personal_id: form.personal_id || null,
+      bloque_id: bloqueDelDia?.id ?? null,
       nombre: form.nombre.trim(),
       cargo: form.cargo.trim() || null,
       fecha: form.fecha,
@@ -60,7 +88,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ nombre: '', cargo: '', fecha: hoy, hora_entrada: '', hora_salida: '', estado: 'presente', observaciones: '' })
+    setForm({ personal_id: '', nombre: '', cargo: '', fecha: hoy, hora_entrada: '', hora_salida: '', estado: 'presente', observaciones: '' })
     setMostrarForm(false)
     onRefresh()
   }
@@ -118,12 +146,37 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar asistencia</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
-              <label style={lbl}>Nombre *</label>
-              <input style={inp} placeholder="Juan Pérez" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+              <label style={lbl} htmlFor="presencia-empleado">Empleado *</label>
+              {activos.length > 0 ? (
+                <select
+                  id="presencia-empleado"
+                  style={inp}
+                  value={form.personal_id}
+                  onChange={e => {
+                    const emp = activos.find(p => p.id === e.target.value)
+                    setForm(p => ({
+                      ...p,
+                      personal_id: e.target.value,
+                      nombre: emp?.nombre ?? '',
+                      cargo: emp?.cargo ?? '',
+                    }))
+                  }}
+                >
+                  <option value="">Elegir…</option>
+                  {activos.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
+                </select>
+              ) : (
+                <input style={inp} placeholder="Juan Pérez" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+              )}
+              {activos.length > 0 && (
+                <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 3 }}>
+                  {turnoDelDia ? `Turno asignado: ${turnoDelDia}` : 'Sin turno asignado ese día'}
+                </div>
+              )}
             </div>
             <div>
-              <label style={lbl}>Cargo</label>
-              <input style={inp} placeholder="Guardia, Conserje…" value={form.cargo} onChange={e => setForm(p => ({ ...p, cargo: e.target.value }))} />
+              <label style={lbl} htmlFor="presencia-cargo">Cargo</label>
+              <input id="presencia-cargo" style={inp} placeholder="Guardia, Conserje…" value={form.cargo} onChange={e => setForm(p => ({ ...p, cargo: e.target.value }))} />
             </div>
             <div>
               <label style={lbl}>Fecha</label>
@@ -164,14 +217,12 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
         <div style={{ display: 'grid', gap: 8 }}>
           {registrosDia.map(r => {
             const est = ESTADOS_PRESENCIA.find(s => s.value === r.estado)
-            const horasTotal = r.hora_entrada && r.hora_salida
-              ? (() => {
-                  const [hE, mE] = r.hora_entrada.split(':').map(Number)
-                  const [hS, mS] = r.hora_salida.split(':').map(Number)
-                  const mins = (hS * 60 + mS) - (hE * 60 + mE)
-                  return mins > 0 ? `${Math.floor(mins / 60)}h ${mins % 60}min` : null
-                })()
-              : null
+            // Antes esto restaba a pelo y devolvía null si el resultado era
+            // negativo: un turno de 22:00 a 06:00 daba -960 minutos y las horas
+            // desaparecían de pantalla. `horasJornada` trata fin <= inicio como
+            // cruce de medianoche, que es la única lectura posible.
+            const horas = horasJornada(r.hora_entrada, r.hora_salida)
+            const horasTotal = horas ? formatHoras(horas) : null
             return (
               <div key={r.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

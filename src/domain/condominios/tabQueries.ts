@@ -9,7 +9,8 @@
 // contra el esquema generado). `supabase` (sin tipar) queda SOLO para las dos
 // tablas que no existen en el esquema generado (ver comentarios in situ).
 import { reportDegradedQuery } from '../queryFetch'
-import { db } from '../../lib/supabase'
+import { db, supabase } from '../../lib/supabase'
+import type { HorasPersonal } from '../../types'
 
 // ── DirectorioTab ──
 
@@ -454,4 +455,30 @@ export async function fetchGastosAnioMontos(
     .lte('fecha', `${year}-12-31`)
   reportDegradedQuery('condominios.fetchGastosAnioMontos', error)
   return (data as Array<{ monto: number }> | null) ?? []
+}
+
+// ── HorasExtraTab ──
+
+/**
+ * Consolidado de jornada por empleado en un rango (RPC `calcular_horas_personal`,
+ * 20260820000300): planificado vs marcado, ordinarias, extra, nocturnas y
+ * asueto con su factor. NO se persiste — se recalcula del marcaje vigente, para
+ * que corregir una hora de salida mal tecleada corrija también el total.
+ *
+ * Va en `supabase` (sin tipar) y no en `db`: la RPC es nueva y no existe en
+ * database.types.ts hasta la próxima corrida de `npm run gen:db-types`.
+ * Degrada a `[]`.
+ */
+export async function fetchHorasPersonal(
+  projectId: string,
+  desde: string,
+  hasta: string,
+): Promise<HorasPersonal[]> {
+  const { data, error } = await supabase.rpc('calcular_horas_personal', {
+    p_project_id: projectId,
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  reportDegradedQuery('condominios.fetchHorasPersonal', error)
+  return (data as HorasPersonal[] | null) ?? []
 }

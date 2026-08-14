@@ -27,6 +27,9 @@ export interface PlantillaTareaCargo {
 export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'
 export type TurnoTipo = 'manana' | 'tarde' | 'noche'
 
+/** De dónde salió el bloque: alta manual o materialización de una regla. */
+export type OrigenBloqueTurno = 'manual' | 'recurrencia'
+
 export interface BloqueTurno {
   id: string
   company_id: string
@@ -41,6 +44,15 @@ export interface BloqueTurno {
   creado_por?: string | null
   notas?: string | null
   created_at: string
+  // Horario del bloque (20260820000000). Nullable en los bloques anteriores a
+  // esa migración, que no tenían horas.
+  plantilla_horario_id?: string | null
+  asignacion_id?: string | null
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  cruza_medianoche?: boolean | null
+  horas_planificadas?: number | null
+  origen?: OrigenBloqueTurno | null
   // joins
   personal_nombre?: string
   personal_cargo?: string
@@ -79,6 +91,138 @@ export interface RevisionTarea {
   comentario?: string | null
   revisado_en: string
   created_at: string
+}
+
+// ━━ Control de asignación de turnos (20260820000000 … 000300) ━━
+// Tres piezas que no hay que confundir:
+//   PlantillaHorario   el catálogo de jornadas ("Nocturno 22:00–06:00")
+//   AsignacionTurno    la REGLA recurrente ("a Pérez, el nocturno, L-V")
+//   BloqueTurno        la OCURRENCIA (arriba): el día concreto ya materializado
+
+/** Periodicidad de una regla de asignación. Extiende el vocabulario de `rutas`. */
+export type FrecuenciaTurno =
+  | 'unica' | 'diaria' | 'semanal' | 'quincenal' | 'mensual'
+  | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'fechas'
+
+export interface PlantillaHorario {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  codigo?: string | null
+  turno: TurnoTipo
+  hora_inicio: string
+  hora_fin: string
+  cruza_medianoche: boolean
+  minutos_descanso: number
+  /** Derivada: la sella la BD (trg_turnos_sellar_horas). No la escribe la UI. */
+  horas_jornada?: number | null
+  tolerancia_entrada_min: number
+  color?: string | null
+  activo: boolean
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
+export interface AsignacionTurno {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id: string
+  plantilla_horario_id: string
+  nombre?: string | null
+  frecuencia: FrecuenciaTurno
+  /** Días ISO 1..7 (1 = lunes). Vacío en semanal = toda la semana. */
+  dias_semana: number[]
+  intervalo_dias?: number | null
+  dia_mes?: number | null
+  mes_ancla?: number | null
+  /** Fechas ISO sueltas para `frecuencia = 'fechas'`. */
+  fechas_especificas: string[]
+  fecha_inicio: string
+  fecha_fin?: string | null
+  cubre_dias_no_laborables: boolean
+  activa: boolean
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+  // joins
+  personal_nombre?: string
+  personal_cargo?: string
+  plantilla_nombre?: string
+}
+
+export type TipoDiaNoLaborable =
+  | 'festivo_nacional' | 'asueto_local' | 'suspension_labores' | 'dia_no_laboral'
+
+export interface DiaNoLaborable {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  nombre: string
+  tipo: TipoDiaNoLaborable
+  recurre_anual: boolean
+  paga_recargo: boolean
+  factor_recargo: number
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
+export type TipoAusencia =
+  | 'vacaciones' | 'permiso_goce' | 'permiso_sin_goce'
+  | 'incapacidad' | 'suspension' | 'falta' | 'licencia'
+export type EstadoAusencia = 'solicitada' | 'aprobada' | 'rechazada' | 'cancelada'
+
+export interface AusenciaPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id: string
+  tipo: TipoAusencia
+  fecha_inicio: string
+  fecha_fin: string
+  dias_habiles?: number | null
+  goce_salario: boolean
+  estado: EstadoAusencia
+  motivo?: string | null
+  documento_url?: string | null
+  aprobada_por?: string | null
+  aprobada_en?: string | null
+  creado_por?: string | null
+  created_at: string
+  // joins
+  personal_nombre?: string
+  personal_cargo?: string
+}
+
+/** Una fila de `calcular_horas_personal()`. Se recalcula, no se persiste. */
+export interface HorasPersonal {
+  personal_id: string
+  nombre: string
+  cargo: string
+  dias_planificados: number
+  dias_trabajados: number
+  dias_ausencia: number
+  dias_asueto_trabajado: number
+  tardanzas: number
+  horas_planificadas: number
+  horas_trabajadas: number
+  horas_ordinarias: number
+  horas_extra: number
+  horas_nocturnas: number
+  horas_asueto: number
+  horas_asueto_ponderadas: number
+}
+
+/** Conteo que devuelve `generar_bloques_turno()`, por bucket. */
+export interface ResultadoGeneracionTurnos {
+  generados: number
+  omitidos_ausencia: number
+  omitidos_no_laborable: number
+  omitidos_existente: number
 }
 
 export interface NovedadSeguridad {
