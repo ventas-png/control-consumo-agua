@@ -25,6 +25,7 @@ import { PerfilTab } from './customer/PerfilTab'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
 import { BrandLogo } from '../shared/BrandLogo'
+import { NotificationBell } from '../layout/NotificationBell'
 
 interface Props {
   currentUser: UserSession
@@ -33,6 +34,26 @@ interface Props {
 
 
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
+
+// `user_notifications.seccion` habla en secciones de la app de staff; aquí sólo
+// existen cinco tabs. Se traduce lo que tiene equivalente y se ignora el resto:
+// mandar al cliente a un tab que no responde a su notificación es peor que
+// dejarlo donde está.
+const SECCION_A_TAB: Record<string, PortalTab> = {
+  comunicacion: 'comunicacion',
+  cobros: 'pagos',
+  lecturas: 'servicios',
+  tabla: 'servicios',
+  contadores: 'servicios',
+  perfil: 'perfil',
+  dashboard: 'dashboard',
+}
+
+function destinoPortalCliente(setTab: (t: PortalTab) => void) {
+  return (seccion: string) => {
+    if (Object.prototype.hasOwnProperty.call(SECCION_A_TAB, seccion)) setTab(SECCION_A_TAB[seccion])
+  }
+}
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [tab, setTab] = useState<PortalTab>('dashboard')
@@ -441,17 +462,23 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               </div>
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            style={{
-              padding: '8px 18px', background: 'rgba(255,255,255,0.15)',
-              color: 'white', border: '1.5px solid rgba(255,255,255,0.3)',
-              borderRadius: '10px', fontSize: '13px', fontWeight: 500,
-              cursor: 'pointer', transition: 'background 0.2s',
-            }}
-          >
-            Cerrar sesión
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Los comunicados de difusión y las respuestas del administrador
+                llegan a la campana; sin ella el cliente sólo se enteraba por
+                correo, y quien no tiene correo registrado no se enteraba. */}
+            <NotificationBell userId={currentUser.user_id} onNavigate={destinoPortalCliente(setTab)} />
+            <button
+              onClick={onLogout}
+              style={{
+                padding: '8px 18px', background: 'rgba(255,255,255,0.15)',
+                color: 'white', border: '1.5px solid rgba(255,255,255,0.3)',
+                borderRadius: '10px', fontSize: '13px', fontWeight: 500,
+                cursor: 'pointer', transition: 'background 0.2s',
+              }}
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
 
         {/* Tabs — misma tira que el portal de Condominios: una sola línea con

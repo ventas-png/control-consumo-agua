@@ -36,6 +36,23 @@ interface Props {
 
 type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes' | 'anuncios' | 'rentas' | 'mudanza' | 'asambleas' | 'transparencia'
 
+// `user_notifications.seccion` es texto libre: los productores escriben tanto
+// secciones de la app de staff ('condominios', 'cobros') como destinos del
+// portal ('anuncios', 'paquetes'). Se traduce lo que tiene equivalente aquí y se
+// ignora el resto — antes sólo se atendía 'paquetes' y todo lo demás, incluido
+// el aviso de anuncio nuevo que 20260801000500 ya emitía, no llevaba a ninguna
+// parte.
+const SECCION_A_TAB: Record<string, PortalTab> = {
+  paquetes: 'paquetes',
+  anuncios: 'anuncios',
+  condominios: 'mi_unidad',
+  condominios_dashboard: 'mi_unidad',
+  condominios_cuotas: 'cuenta',
+  cobros: 'cuenta',
+  condominios_mantenimiento: 'tickets',
+  condominios_visitantes: 'visitantes',
+}
+
 const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mi_unidad',     label: 'Mi Unidad',       icon: '🏠' },
   { id: 'reservas',      label: 'Reservas',        icon: '🏊' },
@@ -340,7 +357,12 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               }}>🏠 {unidad.nombre}</div>
             )}
 
-            <NotificationBell userId={currentUser.user_id} onNavigate={s => { if (s === 'paquetes') setTab('paquetes') }} />
+            <NotificationBell
+              userId={currentUser.user_id}
+              onNavigate={s => {
+                if (Object.prototype.hasOwnProperty.call(SECCION_A_TAB, s)) setTab(SECCION_A_TAB[s])
+              }}
+            />
 
             <button
               onClick={onLogout}
