@@ -257,6 +257,11 @@ export interface PresenciaPersonal {
   estado: EstadoPresencia
   observaciones?: string | null
   created_at: string
+  // Vínculo con el expediente y con el turno planificado (20260820000100). Sin
+  // `personal_id` no hay cómputo de horas por empleado: `nombre` es texto libre.
+  // Nullable porque la tabla también registra a quien no está en plantilla.
+  personal_id?: string | null
+  bloque_id?: string | null
 }
 
 

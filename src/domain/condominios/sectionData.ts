@@ -290,6 +290,32 @@ export async function fetchCondominiosLimpiezaData(pid: string, cid: string, dia
   return supabase.from('ejecuciones_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).gte('fecha', desdeISO).order('fecha', { ascending: false }).order('orden').limit(2000)
 }
 
+/**
+ * Control de asignación de turnos (20260820000000 / 000100): jornadas, reglas
+ * recurrentes, calendario de días no laborables y ausencias del personal.
+ *
+ * Batch aparte y no una entrada más del Promise.all grande, por dos motivos:
+ * el destructuring de ese batch es POSICIONAL —meter cuatro entradas en medio
+ * desplazaría ~130 variables sin que TS lo note— y estas tablas son nuevas, así
+ * que si un entorno todavía no tiene la migración aplicada el error se queda
+ * aquí (listas vacías) en vez de tumbar la carga del panel entero. Mismo
+ * criterio que `fetchCondominiosLimpiezaData`.
+ *
+ * Va en `supabase` (sin tipar) y no en `db`: las cuatro tablas las crean las
+ * migraciones 20260820000000/000100 y no existen en database.types.ts hasta la
+ * próxima corrida de `npm run gen:db-types`. El shape lo fijan
+ * `PlantillaHorario`, `AsignacionTurno`, `DiaNoLaborable` y `AusenciaPersonal`
+ * en types/condominios.
+ */
+export async function fetchCondominiosTurnosData(pid: string, cid: string) {
+  return Promise.all([
+    supabase.from('plantillas_horario').select('*').eq('project_id', pid).eq('company_id', cid).order('hora_inicio'),
+    supabase.from('asignaciones_turno').select('*, personal_condominio(nombre, cargo), plantillas_horario(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+    supabase.from('dias_no_laborables').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+    supabase.from('ausencias_personal').select('*, personal_condominio(nombre, cargo)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }).limit(500),
+  ])
+}
+
 /** Tareas + revisiones de un conjunto de bloques de turno. */
 export async function fetchTareasBloqueData(bloqueIds: string[]) {
   return Promise.all([

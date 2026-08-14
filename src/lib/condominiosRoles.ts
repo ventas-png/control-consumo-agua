@@ -106,6 +106,7 @@ const TODAS_INSTALACIONES = [
 const TODAS_SEGURIDAD = [
   'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
   'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
+  'turnos', 'ausencias', 'horas_extra',
   'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia', 'panel_turno', 'emergencias',
 ]
 

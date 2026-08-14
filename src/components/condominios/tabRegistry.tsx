@@ -16,6 +16,7 @@ import type {
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
   PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
+  PlantillaHorario, AsignacionTurno, DiaNoLaborable, AusenciaPersonal,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
   ContactoEmergencia, DocumentoCondominio, RegistroResiduo,
@@ -102,6 +103,7 @@ export type CondominioTab =
   | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
   | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
   | 'benchmarking'
+  | 'turnos' | 'ausencias' | 'horas_extra'
 
 // ── Contexto pasado a cada `render(ctx)` ─────────────────────────────────────
 // Centraliza todo el estado y derivados que CondominiosSection tenía dispersos
@@ -221,6 +223,10 @@ export interface CondominiosTabContext {
   bitacoraGuardia: BitacoraGuardia[]
   equiposComunes: EquipoComun[]
   presenciaPersonal: PresenciaPersonal[]
+  plantillasHorario: PlantillaHorario[]
+  asignacionesTurno: AsignacionTurno[]
+  diasNoLaborables: DiaNoLaborable[]
+  ausenciasPersonal: AusenciaPersonal[]
   suministros: SuministroCondominio[]
   movimientosSuministro: MovimientoSuministro[]
   tareasCond: TareaCondominio[]
@@ -372,6 +378,9 @@ const EstacionamientoVisitaTab = lazy(() => import('./tabs/EstacionamientoVisita
 const BitacoraGuardiaTab = lazy(() => import('./tabs/BitacoraGuardiaTab'))
 const EquiposComunesTab = lazy(() => import('./tabs/EquiposComunesTab'))
 const PresenciaPersonalTab = lazy(() => import('./tabs/PresenciaPersonalTab'))
+const TurnosTab = lazy(() => import('./tabs/TurnosTab'))
+const AusenciasTab = lazy(() => import('./tabs/AusenciasTab'))
+const HorasExtraTab = lazy(() => import('./tabs/HorasExtraTab'))
 const SuministrosTab = lazy(() => import('./tabs/SuministrosTab'))
 const TareasCondominioTab = lazy(() => import('./tabs/TareasCondominioTab'))
 const GestionCobranzaTab = lazy(() => import('./tabs/GestionCobranzaTab'))
@@ -491,7 +500,7 @@ export const TAB_REGISTRY: TabDef[] = [
     <RutasRondaTab areas={ctx.areas} rutas={ctx.rutas} puntosControl={ctx.puntosControl} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('rutas_ronda')} canEdit={ctx.canEdit('rutas_ronda')} onRefresh={ctx.onRefresh} /> },
   { id: 'plantillas_cargo', label: 'Plantillas', icon: '📋', render: (ctx) =>
     <PlantillasCargoTab plantillas={ctx.plantillasCargo} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('plantillas_cargo')} canEdit={ctx.canEdit('plantillas_cargo')} onRefresh={ctx.onRefresh} /> },
-  { id: 'tareas_personal', label: 'Turnos/Tareas', icon: '⚙️', render: (ctx) =>
+  { id: 'tareas_personal', label: 'Tareas por turno', icon: '⚙️', render: (ctx) =>
     <TareasPersonalTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} plantillas={ctx.plantillasCargo} personal={ctx.personal} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('tareas_personal')} canEdit={ctx.canEdit('tareas_personal')} onRefresh={ctx.onRefresh} /> },
   { id: 'revision_tareas', label: 'Revisión Admin', icon: '🔍', render: (ctx) =>
     <RevisionTareasTab bloques={ctx.bloquesTurno} tareas={ctx.tareasBloque} revisiones={ctx.revisionesTarea} personal={ctx.personal} userId={ctx.uid} canEdit={ctx.canEdit('revision_tareas')} onRefresh={ctx.onRefresh} /> },
@@ -660,7 +669,13 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'equipos', label: 'Equipos', icon: '⚙️', render: (ctx) =>
     <EquiposComunesTab equipos={ctx.equiposComunes} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('equipos')} canEdit={ctx.canEdit('equipos')} onRefresh={ctx.onRefresh} /> },
   { id: 'presencia', label: 'Presencia', icon: '📋', render: (ctx) =>
-    <PresenciaPersonalTab registros={ctx.presenciaPersonal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('presencia')} canEdit={ctx.canEdit('presencia')} onRefresh={ctx.onRefresh} /> },
+    <PresenciaPersonalTab registros={ctx.presenciaPersonal} personal={ctx.personal} bloques={ctx.bloquesTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('presencia')} canEdit={ctx.canEdit('presencia')} onRefresh={ctx.onRefresh} /> },
+  { id: 'turnos', label: 'Asignación turnos', icon: '🗓️', render: (ctx) =>
+    <TurnosTab plantillas={ctx.plantillasHorario} asignaciones={ctx.asignacionesTurno} bloques={ctx.bloquesTurno} ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('turnos')} canEdit={ctx.canEdit('turnos')} onRefresh={ctx.onRefresh} /> },
+  { id: 'ausencias', label: 'Ausencias', icon: '🌴', render: (ctx) =>
+    <AusenciasTab ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('ausencias')} canEdit={ctx.canEdit('ausencias')} onRefresh={ctx.onRefresh} /> },
+  { id: 'horas_extra', label: 'Horas y extras', icon: '⏱️', render: (ctx) =>
+    <HorasExtraTab proyectoId={ctx.proyectoId} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'suministros', label: 'Suministros', icon: '🗃️', render: (ctx) =>
     <SuministrosTab suministros={ctx.suministros} movimientos={ctx.movimientosSuministro} proveedores={ctx.contratosProveedores} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('suministros')} canEdit={ctx.canEdit('suministros')} onRefresh={ctx.onRefresh} /> },
   { id: 'tareas_cond', label: 'Tareas', icon: '✅', render: (ctx) =>

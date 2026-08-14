@@ -16,6 +16,7 @@
 // P2 tipos: las funciones con tabla/RPC LITERAL usan el cliente tipado `db`;
 // los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
 import { supabase, db } from '../../lib/supabase'
+import type { ResultadoGeneracionTurnos } from '../../types'
 
 /** Error con el shape mínimo que consume la UI (mensaje legible). */
 export type RowError = { message: string } | null
@@ -190,4 +191,28 @@ export async function autorizarSalidaPaquete(
     p_notas: p.notas ?? undefined,
   })
   return { data: (data as Record<string, unknown>) ?? null, error }
+}
+
+/**
+ * Materializa las reglas de turno activas del proyecto en `bloques_turno` para
+ * el rango dado (RPC `generar_bloques_turno`, 20260820000200). Se salta
+ * ausencias aprobadas, días no laborables y lo ya existente — incluidos los
+ * bloques puestos a mano, que nunca se pisan. Volver a llamarla no duplica.
+ *
+ * Va en `supabase` (sin tipar) y no en `db`: la RPC es nueva y no existe en
+ * database.types.ts hasta la próxima corrida de `npm run gen:db-types`.
+ * Devuelve UNA fila (RETURNS TABLE con un solo RETURN NEXT).
+ */
+export async function generarBloquesTurno(
+  projectId: string,
+  desde: string,
+  hasta: string,
+): Promise<{ data: ResultadoGeneracionTurnos | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('generar_bloques_turno', {
+    p_project_id: projectId,
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoGeneracionTurnos | null) ?? null, error }
 }
