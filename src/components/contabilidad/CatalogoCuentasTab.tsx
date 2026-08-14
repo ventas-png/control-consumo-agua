@@ -2,9 +2,17 @@ import { useMemo, useState } from 'react'
 import { DataTable, type DataTableColumn } from '../shared'
 import { EditModal } from '../shared'
 import { StatusBadge } from '../shared/StatusBadge'
-import { notify } from '../shared/Dialog'
+import { confirm, notify } from '../shared/Dialog'
 import { useCuentasQuery } from '../../domain/contabilidad/queries'
-import { useActualizarCuentaMutation, useCrearCuentaMutation } from '../../domain/contabilidad/mutations'
+import {
+  fetchCuentasEnUso,
+  useActualizarCuentaMutation,
+  useCrearCuentaMutation,
+  useEliminarCuentasMutation,
+} from '../../domain/contabilidad/mutations'
+import { planificarBorradoCuentas, resumirBloqueadas } from '../../domain/contabilidad/borrarCuentas'
+import { useBulkSelection } from '../../hooks/useBulkSelection'
+import { SelectionToolbar } from '../shared/SelectionToolbar'
 import { buildArbolCuentas, flattenArbol, type CuentaNode } from '../../domain/contabilidad/arbol'
 import { cuentaFormSchema } from '../../domain/contabilidad/schemas'
 import { NATURALEZA_POR_TIPO, TIPO_CUENTA_LABELS, type CuentaContable, type TipoCuenta } from '../../types/contabilidad'
@@ -40,19 +48,25 @@ const FORM_VACIO: FormState = {
 }
 
 export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos }: Props) {
-  const { puedeCrear, puedeEditar, puedeCambiarEstado } = usePermisosContabilidad()
+  const { puedeCrear, puedeEditar, puedeCambiarEstado, puedeEliminar } = usePermisosContabilidad()
   const { data: cuentas = [], isLoading } = useCuentasQuery(companyId, projectId)
   const crear = useCrearCuentaMutation(companyId, projectId)
   const actualizar = useActualizarCuentaMutation(companyId, projectId)
+  const eliminarCuentas = useEliminarCuentasMutation(companyId, projectId)
 
   const [form, setForm] = useState<FormState | null>(null)
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [importando, setImportando] = useState(false)
+  const [borrando, setBorrando] = useState(false)
 
   const filas = useMemo(() => {
     const visibles = mostrarInactivas ? cuentas : cuentas.filter((c) => c.activa)
     return flattenArbol(buildArbolCuentas(visibles))
   }, [cuentas, mostrarInactivas])
+
+  // La selección se calcula contra las filas VISIBLES (el hook lo hace), así
+  // que "seleccionar todo" respeta el buscador y el filtro de inactivas.
+  const bulk = useBulkSelection(filas, (c) => c.id)
 
   function abrirNueva() {
     setForm({ ...FORM_VACIO })
@@ -103,6 +117,58 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
     }
   }
 
+  /**
+   * Borra una cuenta o la selección. Primero le pregunta al servidor qué está
+   * referenciado: sin ese paso, una sola cuenta con movimientos abortaría el
+   * lote entero con un error de FK ilegible. Las que no se pueden borrar se
+   * explican; las demás se borran igual.
+   */
+  async function eliminar(candidatas: CuentaContable[]) {
+    if (candidatas.length === 0) return
+    setBorrando(true)
+    try {
+      const enUso = await fetchCuentasEnUso(candidatas.map((c) => c.id))
+      const plan = planificarBorradoCuentas(candidatas, enUso)
+
+      if (plan.borrables.length === 0) {
+        notify({
+          variant: 'warning',
+          title: candidatas.length === 1 ? 'La cuenta no se puede borrar' : 'Ninguna se puede borrar',
+          text: resumirBloqueadas(plan.bloqueadas),
+        })
+        return
+      }
+
+      const cuerpo = plan.borrables.length === 1
+        ? `Se eliminará "${plan.borrables[0].codigo} — ${plan.borrables[0].nombre}".`
+        : `Se eliminarán ${plan.borrables.length} cuentas del catálogo.`
+      const nota = plan.bloqueadas.length > 0
+        ? `\n\nQuedan fuera ${plan.bloqueadas.length}:\n${resumirBloqueadas(plan.bloqueadas)}`
+        : ''
+      const { isConfirmed } = await confirm({
+        title: '¿Eliminar del catálogo?',
+        text: `${cuerpo} Esta acción no se puede deshacer.${nota}`,
+        confirmText: 'Eliminar',
+        variant: 'danger',
+      })
+      if (!isConfirmed) return
+
+      await eliminarCuentas.mutateAsync(plan.borrables.map((c) => c.id))
+      bulk.clear()
+      notify({
+        variant: 'success',
+        title: 'Listo',
+        text: plan.bloqueadas.length > 0
+          ? `${plan.borrables.length} eliminada(s); ${plan.bloqueadas.length} quedaron por estar en uso.`
+          : `${plan.borrables.length} cuenta(s) eliminada(s).`,
+      })
+    } catch (e) {
+      notify({ variant: 'error', title: 'Error', text: e instanceof Error ? e.message : 'No se pudo eliminar.' })
+    } finally {
+      setBorrando(false)
+    }
+  }
+
   async function toggleActiva(c: CuentaContable) {
     try {
       await actualizar.mutateAsync({ id: c.id, patch: { activa: !c.activa } })
@@ -112,6 +178,30 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
   }
 
   const columns: DataTableColumn<CuentaNode>[] = [
+    // La casilla solo aparece con permiso de borrado: es lo único que se hace
+    // hoy con la selección, y una columna que no lleva a ninguna acción estorba.
+    ...(puedeEliminar ? [{
+      key: 'sel',
+      header: (
+        <input
+          type="checkbox"
+          checked={bulk.isAllSelected}
+          onChange={bulk.toggleAll}
+          aria-label="Seleccionar todas las cuentas visibles"
+        />
+      ),
+      render: (c: CuentaNode) => (
+        <input
+          type="checkbox"
+          checked={bulk.isSelected(c.id)}
+          onChange={() => bulk.toggle(c.id)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Seleccionar ${c.codigo} ${c.nombre}`}
+        />
+      ),
+      width: 44,
+      align: 'center' as const,
+    }] : []),
     {
       key: 'codigo',
       header: 'Código',
@@ -163,14 +253,39 @@ export function CatalogoCuentasTab({ companyId, projectId, monedaBase, proyectos
               {c.activa ? 'Desactivar' : 'Activar'}
             </button>
           )}
+          {!c.es_sistema && puedeEliminar && (
+            <button
+              onClick={(e) => { e.stopPropagation(); void eliminar([c]) }}
+              disabled={borrando}
+              style={{ ...btnLink, color: 'var(--at-danger)' }}
+            >
+              Eliminar
+            </button>
+          )}
         </div>
       ),
-      width: 150,
+      width: 210,
     },
   ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-3)' }}>
+      {puedeEliminar && (
+        <SelectionToolbar
+          count={bulk.count}
+          actions={[{
+            id: 'eliminar',
+            label: 'Eliminar seleccionadas',
+            icon: '🗑️',
+            variant: 'danger',
+            onClick: () => void eliminar(bulk.selectedItems),
+            disabled: borrando,
+          }]}
+          onClear={bulk.clear}
+          entityLabel={{ one: 'cuenta', many: 'cuentas' }}
+        />
+      )}
+
       <DataTable<CuentaNode>
         data={filas}
         columns={columns}
