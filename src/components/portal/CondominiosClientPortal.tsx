@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchCondominiosPortalData, fetchPortalUnidadesByCliente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
+import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
+import { PORTAL_TABS, tabsForRol, type PortalTab } from '../../lib/portalTabs'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
 import { notify } from '../shared/Dialog'
@@ -34,7 +35,11 @@ interface Props {
   onLogout: () => void
 }
 
-type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes' | 'anuncios' | 'rentas' | 'mudanza' | 'asambleas' | 'transparencia'
+// Unidad del portal: la fila de `unidades` más el rol del residente y flags de
+// servicio que agrega portal_mis_unidades() (20260822000000). El rol decide qué
+// tabs se muestran para ESA unidad (un cliente puede ser propietario en un
+// proyecto e inquilino en otro).
+type UnidadPortal = Unidad & { rol?: string }
 
 // `user_notifications.seccion` es texto libre: los productores escriben tanto
 // secciones de la app de staff ('condominios', 'cobros') como destinos del
@@ -53,19 +58,8 @@ const SECCION_A_TAB: Record<string, PortalTab> = {
   condominios_visitantes: 'visitantes',
 }
 
-const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
-  { id: 'mi_unidad',     label: 'Mi Unidad',       icon: '🏠' },
-  { id: 'reservas',      label: 'Reservas',        icon: '🏊' },
-  { id: 'cuenta',        label: 'Mi Cuenta',       icon: '💳' },
-  { id: 'tickets',       label: 'Mantenimiento',   icon: '🔧' },
-  { id: 'visitantes',    label: 'Visitantes',      icon: '🚪' },
-  { id: 'paquetes',      label: 'Paquetería',      icon: '📦' },
-  { id: 'anuncios',      label: 'Anuncios',        icon: '📢' },
-  { id: 'asambleas',     label: 'Asambleas',       icon: '🏛️' },
-  { id: 'transparencia', label: 'Transparencia',   icon: '📊' },
-  { id: 'rentas',        label: 'Rentas',          icon: '🏨' },
-  { id: 'mudanza',       label: 'Mudanzas',        icon: '🚛' },
-]
+// PORTAL_TABS y la visibilidad por rol viven en lib/portalTabs (módulo puro,
+// testeable sin montar el portal).
 
 // Los estilos .condo-skeleton/.condo-tab (y keyframes) viven ahora en
 // src/styles/runtime.css (I24).
@@ -75,7 +69,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   const [loading, setLoading]                     = useState(true)
   const [tab, setTab]                             = useState<PortalTab>('mi_unidad')
-  const [unidades, setUnidades]                   = useState<Unidad[]>([])
+  const [unidades, setUnidades]                   = useState<UnidadPortal[]>([])
   const [selectedUnidadId, setSelectedUnidadId]   = useState('')
   const [resolvedCompanyId, setResolvedCompanyId] = useState(currentUser.company_id ?? '')
   const [moneda, setMoneda]                       = useState('Q')
@@ -100,9 +94,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     if (!clienteId) { setLoading(false); return }
     setLoading(true)
     try {
-      // Batch 1: load client's units
-      const uData = await fetchPortalUnidadesByCliente(clienteId)
-      const unidadesList = (uData as Unidad[]) ?? []
+      // Batch 1: unidades del residente (RPC dual: incluye las que tiene como
+      // inquilino vía unidad_residentes, no solo las propias por cliente_id).
+      const uData = await fetchPortalUnidadesResidente()
+      const unidadesList = (uData as UnidadPortal[]) ?? []
       setUnidades(unidadesList)
 
       if (unidadesList.length === 0) return
@@ -223,6 +218,15 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     if (pend.some(p => !seen.includes(p.id))) setPopupOpen(true)
   }, [loading, paquetes])
 
+  // Visibilidad por rol: si el tab activo no está permitido para la unidad
+  // seleccionada (p.ej. la campana navegó, o el cliente pasó de una unidad
+  // propia a una donde es inquilino), volver a Mi Unidad. El selector de unidad
+  // ya resetea a mi_unidad al cambiar; esto cubre el resto de caminos.
+  useEffect(() => {
+    const rol = (unidades.find(u => u.id === selectedUnidadId) ?? unidades[0])?.rol
+    if (!tabsForRol(rol).includes(tab)) setTab('mi_unidad')
+  }, [tab, unidades, selectedUnidadId])
+
   // No services guard (only after initial load)
   if (!loading && unidades.length === 0) {
     return (
@@ -264,6 +268,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   const unidad     = unidades.find(u => u.id === selectedUnidadId) ?? unidades[0] ?? null
   const proyectoId = unidad?.project_id ?? ''
+
+  // Tabs visibles según el rol del residente en ESTA unidad (propietario ve
+  // todo; inquilino/familiar solo lo operativo — ver lib/portalTabs).
+  const tabsVisibles = PORTAL_TABS.filter(t => tabsForRol(unidad?.rol).includes(t.id))
 
   // Data filtered to selected unit
   const cuotasU        = cuotas.filter(c => c.unidad_id === selectedUnidadId)
@@ -377,7 +385,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
         {/* Tab navigation */}
         <div className="tab-strip-scrollable" style={{ maxWidth: '960px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '4px', overflowX: 'auto' }}>
-          {PORTAL_TABS.map(t => (
+          {tabsVisibles.map(t => (
             <button
               key={t.id}
               className={`condo-tab${tab === t.id ? ' active' : ''}`}

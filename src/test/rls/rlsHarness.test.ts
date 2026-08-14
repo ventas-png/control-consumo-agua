@@ -188,6 +188,34 @@ const ESTATUS_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unkn
   { name: 'fiscal_pac_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
 ]
 
+// RPCs del self-service del propietario (20260822000000): SECURITY DEFINER con
+// REVOKE FROM public, anon. anon SIEMPRE rechazado. Para authenticated, las de
+// escritura con una unidad AJENA (FOREIGN_COMPANY_ID) deben fallar por el guard
+// interno (rol ≠ cliente o unidad no propia) SIN efectos secundarios.
+const PORTAL_INQUILINO_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+  { name: 'portal_mis_unidades', args: {} },
+  { name: 'portal_inquilinos_de_unidad', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
+  {
+    name: 'portal_registrar_inquilino',
+    args: {
+      p_unidad_id: FOREIGN_COMPANY_ID,
+      p_nombre: 'Intruso RLS',
+      p_email: 'intruso-rls@example.com',
+      p_cui_dui: '0000000000000',
+      p_fecha_nacimiento: '2000-01-01',
+      p_telefono: null,
+    },
+  },
+  {
+    name: 'portal_quitar_inquilino',
+    args: { p_unidad_id: FOREIGN_COMPANY_ID, p_cliente_id: FOREIGN_COMPANY_ID },
+  },
+]
+
+const PORTAL_INQUILINO_RPCS_ESCRITURA = PORTAL_INQUILINO_RPCS_ANON.filter((r) =>
+  ['portal_registrar_inquilino', 'portal_quitar_inquilino'].includes(r.name),
+)
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -486,6 +514,36 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(negado, `${name} no debe exponer metadata de otro tenant`).toBe(true)
       })
     }
+  })
+
+  describe('guard RPCs del self-service de inquilinos (20260822000000)', () => {
+    for (const { name, args } of PORTAL_INQUILINO_RPCS_ANON) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args)
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+    }
+
+    // authenticated apuntando a una unidad AJENA: el guard interno (rol cliente +
+    // unidad propia + renta aprobada) debe rechazar las escrituras sin efectos.
+    for (const { name, args } of PORTAL_INQUILINO_RPCS_ESCRITURA) {
+      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+        const { data, error } = await userA.rpc(name, args)
+        expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+
+    // portal_inquilinos_de_unidad es de lectura: con unidad ajena devuelve 0
+    // filas (el predicado "unidad propia" filtra), nunca residentes de otro.
+    it('authenticated (A) NO lista inquilinos de una unidad ajena', async () => {
+      const { data, error } = await userA.rpc('portal_inquilinos_de_unidad', {
+        p_unidad_id: FOREIGN_COMPANY_ID,
+      })
+      const negado = error !== null || (data ?? []).length === 0
+      expect(negado, 'portal_inquilinos_de_unidad no debe exponer residentes ajenos').toBe(true)
+    })
   })
 })
 

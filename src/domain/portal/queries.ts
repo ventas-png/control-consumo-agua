@@ -214,15 +214,21 @@ export async function fetchPortalRecargoTarjeta(companyId: string): Promise<Reca
 // (iniciarPagoRegistro / iniciarPagoCuota) con conciliación server-side vía
 // confirm-charge. `iniciarCobroPayfac` quedó obsoleto y se removió (F2).
 
-/** Unidades activas de un cliente (batch 1 del portal de condominios). */
-export async function fetchPortalUnidadesByCliente(clienteId: string): Promise<unknown[] | null> {
-  const { data, error } = await db
-    .from('unidades')
-    .select('*')
-    .eq('cliente_id', clienteId)
-    .eq('activo', true)
-  reportDegradedQuery('portal.fetchPortalUnidadesByCliente', error)
-  return data
+/**
+ * Unidades del residente (batch 1 del portal de condominios), vía el RPC
+ * portal_mis_unidades (20260822000000). A diferencia del filtro legacy
+ * `unidades.cliente_id`, resuelve con la MISMA unión dual que las policies
+ * (mis_unidad_roles): incluye las unidades donde el llamante es inquilino/
+ * familiar por `unidad_residentes`. Cada fila es la unidad completa más `rol`
+ * (propietario/arrendatario/…) y los flags de servicio de su empresa; para
+ * no-propietarios el contacto del propietario viene redactado server-side.
+ * Identidad derivada de auth.uid() en el RPC — no recibe cliente_id.
+ * `supabase` laxo: el RPC no está en el esquema generado (próximo gen:db-types).
+ */
+export async function fetchPortalUnidadesResidente(): Promise<unknown[] | null> {
+  const { data, error } = await supabase.rpc('portal_mis_unidades')
+  reportDegradedQuery('portal.fetchPortalUnidadesResidente', error)
+  return (data as unknown[] | null)
 }
 
 // ── CondominiosClientPortal ────────────────────────────────────────────────

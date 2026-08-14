@@ -95,18 +95,17 @@ export async function buildSessionFromSupabase(
           mfa_required = flags.mfa_required === true
         }
       } else if (clienteId) {
-        type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
-        const { data: unidadesFlags } = await supabase
-          .from('unidades')
-          .select('projects(companies(servicio_agua, servicio_condominios))')
-          .eq('cliente_id', clienteId)
-          .eq('activo', true)
+        // portal_mis_unidades (20260822000000) resuelve las unidades con la
+        // misma unión dual que las policies (legacy unidades.cliente_id ∪
+        // unidad_residentes) y ya trae los flags de la empresa. El filtro
+        // anterior por unidades.cliente_id dejaba a un inquilino puro sin
+        // servicio_condominios → ruteado al portal de agua equivocado.
+        type UnidadPortalFlags = { servicio_agua?: boolean; servicio_condominios?: boolean }
+        const { data: unidadesFlags } = await supabase.rpc('portal_mis_unidades')
         if (unidadesFlags) {
-          for (const u of (unidadesFlags as unknown as UnidadRow[])) {
-            const flags = u.projects?.companies
-            if (!flags) continue
-            if (flags.servicio_condominios) servicio_condominios = true
-            if (flags.servicio_agua) servicio_agua = true
+          for (const u of (unidadesFlags as UnidadPortalFlags[])) {
+            if (u.servicio_condominios) servicio_condominios = true
+            if (u.servicio_agua) servicio_agua = true
           }
         }
       }
