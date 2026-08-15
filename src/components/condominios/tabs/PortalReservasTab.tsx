@@ -2,8 +2,7 @@ import { hoyLocalISO } from '../../../lib/format'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
-import { createCondominioRow, createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { softDelete } from '../../../lib/softDelete'
+import { reservarAmenidad, cancelarReservaAmenidad } from '../../../domain/portal/reservas'
 import { useSignedUrls } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
 import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from '../../../lib/amenidadesReglas'
@@ -44,8 +43,6 @@ interface Props {
   reservas: ReservaAmenidad[]
   bloqueos: BloqueoAmenidad[]
   unidadId: string
-  proyectoId: string
-  companyId: string
   moneda: string
   onRefresh: () => void
 }
@@ -70,7 +67,7 @@ function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string;
   return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad', reglamento_aceptado: false }
 }
 
-export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
+export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, moneda, onRefresh }: Props) {
   const [showForm, setShowForm]   = useState(false)
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(blankForm())
@@ -157,57 +154,40 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       if (errReglas) { notify({ variant: 'warning', title: 'No permitido', text: errReglas }); return }
     }
 
+    // La tarifa client-side solo decide si hay que ENVIAR método de pago; el
+    // monto real lo calcula y sella el servidor (RPC 20260822030000).
     const tarifaCalc = amenidadSel ? tarifaAplicable(amenidadSel, form.fecha) : 0
     const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && tarifaCalc > 0)
-    const montoTarifa = aplicaTarifa ? tarifaCalc : null
-    const metodoPago = aplicaTarifa ? form.metodo_pago_tarifa : null
-    const requiereAprob = !!amenidadSel?.requiere_aprobacion
-    const estadoInicial: 'confirmada' | 'pendiente' = requiereAprob ? 'pendiente' : 'confirmada'
 
     setSaving(true)
-    let cuotaId: string | null = null
-    // Sólo generar cuota cuando la reserva queda confirmada de inmediato
-    if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
-      const periodo = form.fecha.slice(0, 7)
-      const { data: cuotaData, error: cuotaErr } = await createCondominioRowReturning('cuotas_condominio', {
-        company_id: companyId,
-        project_id: proyectoId,
-        unidad_id: unidadId,
-        concepto: 'amenidad',
-        monto: montoTarifa,
-        periodo,
-        fecha_vencimiento: form.fecha,
-        estado: 'pendiente',
-        notas: `Reserva ${amenidadSel!.nombre} ${form.fecha} ${form.hora_inicio}-${form.hora_fin}`,
-      })
-      if (cuotaErr) { setSaving(false); notify({ variant: 'error', title: 'Error', text: `No se pudo generar el cargo: ${cuotaErr.message}` }); return }
-      cuotaId = (cuotaData?.id as string | undefined) ?? null
-    }
-
-    const { error } = await createCondominioRow('reservas_amenidades', {
-      company_id: companyId, amenidad_id: form.amenidad_id,
-      unidad_id: unidadId, fecha: form.fecha,
-      hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
-      num_invitados: form.num_invitados, notas: form.notas.trim() || null,
-      estado: estadoInicial,
-      monto_tarifa: montoTarifa,
-      metodo_pago_tarifa: metodoPago,
-      tarifa_pagada: false,
-      cuota_id: cuotaId,
-      deposito_estado: amenidadSel?.requiere_deposito ? 'pendiente' : 'no_aplica',
-      reglamento_aceptado_at: amenidadSel?.reglamento ? new Date().toISOString() : null,
+    // Todo lo anterior es pre-chequeo UX (mensajes inmediatos); el RPC re-valida
+    // TODO server-side — incluido el conflicto GLOBAL contra reservas de otras
+    // unidades que este cliente no puede ver — y crea cuota + reserva en una
+    // sola transacción (muere la compensación best-effort del navegador).
+    const { data, error } = await reservarAmenidad({
+      amenidadId: form.amenidad_id,
+      unidadId,
+      fecha: form.fecha,
+      horaInicio: form.hora_inicio,
+      horaFin: form.hora_fin,
+      numInvitados: form.num_invitados,
+      notas: form.notas.trim() || undefined,
+      metodoPago: aplicaTarifa ? form.metodo_pago_tarifa : null,
+      reglamentoAceptado: form.reglamento_aceptado,
     })
     setSaving(false)
-    if (error) {
-      if (cuotaId) await softDelete('cuotas_condominio', { id: cuotaId })
-      notify({ variant: 'error', title: 'Error', text: error.message }); return
+    if (error || !data) {
+      notify({ variant: 'error', title: 'No se pudo reservar', text: error ?? 'Error desconocido. Intenta de nuevo.' })
+      return
     }
-    const titulo = requiereAprob
+    // El toast usa el monto DEVUELTO por el servidor — es el que realmente se cargó.
+    const montoSrv = data.monto_tarifa != null ? Number(data.monto_tarifa) : null
+    const titulo = data.estado === 'pendiente'
       ? 'Solicitud enviada. La administración debe aprobarla.'
-      : aplicaTarifa
-        ? metodoPago === 'cargar_unidad'
-          ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
-          : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+      : montoSrv != null
+        ? data.metodo_pago_tarifa === 'cargar_unidad'
+          ? `Reserva confirmada. Se cargó ${moneda} ${montoSrv.toFixed(2)} a tu cuenta.`
+          : `Reserva confirmada. Pagar ${moneda} ${montoSrv.toFixed(2)} en sitio.`
         : '¡Reserva confirmada!'
     notify({ variant: 'success', title: titulo, duration: 2600 })
     descartarForm(); onRefresh()
@@ -216,11 +196,11 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
   async function cancelarReserva(id: string) {
     const r = await confirm({ title: '¿Cancelar reserva?', icon: 'question', confirmText: 'Sí, cancelar', cancelText: 'No' })
     if (!r.isConfirmed) return
-    const reserva = reservas.find(x => x.id === id)
-    await updateCondominioRow('reservas_amenidades', id, { estado: 'cancelada' })
-    if (reserva?.cuota_id) {
-      await softDelete('cuotas_condominio', { id: reserva.cuota_id, estado: 'pendiente' })
-    }
+    // El RPC cancela y anula la cuota pendiente en una sola operación; antes el
+    // update + softDelete corrían por separado y sus errores morían en silencio.
+    const { error } = await cancelarReservaAmenidad(id)
+    if (error) { notify({ variant: 'error', title: 'No se pudo cancelar', text: error }); return }
+    notify({ variant: 'success', title: 'Reserva cancelada', duration: 1600 })
     onRefresh()
   }
 

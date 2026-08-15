@@ -216,6 +216,28 @@ const PORTAL_INQUILINO_RPCS_ESCRITURA = PORTAL_INQUILINO_RPCS_ANON.filter((r) =>
   ['portal_registrar_inquilino', 'portal_quitar_inquilino'].includes(r.name),
 )
 
+// RPCs de reservas del portal (20260822030000): SECURITY DEFINER, REVOKE FROM
+// public/anon. anon SIEMPRE rechazado; authenticated (usuarios A/B del harness)
+// rechazado por el guard interno (unidad/reserva inexistente o ajena) SIN
+// efectos secundarios.
+const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+  {
+    name: 'portal_reservar_amenidad',
+    args: {
+      p_amenidad_id: FOREIGN_COMPANY_ID,
+      p_unidad_id: FOREIGN_COMPANY_ID,
+      p_fecha: '2099-01-01',
+      p_hora_inicio: '10:00',
+      p_hora_fin: '11:00',
+      p_num_invitados: 0,
+      p_notas: null,
+      p_metodo_pago: null,
+      p_reglamento_aceptado: false,
+    },
+  },
+  { name: 'portal_cancelar_reserva', args: { p_reserva_id: FOREIGN_COMPANY_ID } },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -544,6 +566,22 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       const negado = error !== null || (data ?? []).length === 0
       expect(negado, 'portal_inquilinos_de_unidad no debe exponer residentes ajenos').toBe(true)
     })
+  })
+
+  describe('guard RPCs de reservas del portal (20260822030000)', () => {
+    for (const { name, args } of PORTAL_RESERVAS_RPCS) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args)
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      it(`authenticated (A) NO puede ejecutar ${name} sobre ids ajenos`, async () => {
+        const { data, error } = await userA.rpc(name, args)
+        expect(error, `${name} sobre ids ajenos debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
   })
 })
 

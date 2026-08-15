@@ -485,8 +485,6 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                   reservas={misReservas}
                   bloqueos={bloqueosP}
                   unidadId={selectedUnidadId}
-                  proyectoId={proyectoId}
-                  companyId={resolvedCompanyId}
                   moneda={moneda}
                   onRefresh={cargarDatos}
                 />
