@@ -179,8 +179,6 @@ export function PortalResidenteTab({
                 reservas={reservas}
                 bloqueos={bloqueosAmenidades}
                 unidadId={selectedUnidadId}
-                proyectoId={proyectoId}
-                companyId={companyId}
                 moneda={moneda}
                 onRefresh={onRefresh}
               />
