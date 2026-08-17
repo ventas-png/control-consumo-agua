@@ -87,7 +87,7 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] =
 
 // ── Secciones de navegación de 2 niveles ─────────────────────────────────────
 // SECTIONS + helpers viven ahora en ./sections (fuente única compartida con el
-// Sidebar global, que expone las 9 secciones bajo "Manejo Condominios").
+// Sidebar global, que expone las 10 secciones bajo "Manejo Condominios").
 
 
 interface Props {
@@ -145,7 +145,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const setActiveTab = useCallback((next: CondominioTab) => navigate(tabToPath(next)), [navigate])
   // La sección activa se deriva del tab en la URL (fuente única). Cambiar de
   // sección = navegar a su primer tab; ya no hay state local ni riel interno
-  // (las 9 secciones viven en el sidebar global).
+  // (las 10 secciones viven en el sidebar global).
   const activeSection = sectionForTab(activeTab)
   // cond:B5/B6 — El condominio activo vive ahora en ActiveCondominioContext
   // (estado global persistido + filtrado por rol). `selectedProyectoId` se
@@ -879,7 +879,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
 
       </div>
 
-      {/* Body: contenido a todo el ancho. Las 9 secciones viven en el sidebar
+      {/* Body: contenido a todo el ancho. Las 10 secciones viven en el sidebar
           global; arriba quedan las pestañas de la sección activa. */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}

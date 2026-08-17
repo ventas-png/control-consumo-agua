@@ -117,6 +117,18 @@ const TODA_COMUNIDAD = [
   'encuesta_dashboard', 'comunicados', 'recordatorios', 'comunicacion_condominios',
 ]
 
+// Sección "Comunicación" (espejo de SECTIONS en components/condominios/sections.ts).
+// SOLO agrupación del editor de roles: el acceso efectivo por rol
+// (CONDOMINIOS_TAB_ACCESS) no cambia — los Sets de cada rol quedan intactos.
+const COMUNICACION_TABS = [
+  'centro_notificaciones', 'comunicados', 'comunidad', 'recordatorios',
+  'mensajes_portal', 'comunicacion_condominios', 'buzon_sugerencias',
+  'reclamos', 'encuestas', 'encuesta_dashboard', 'mantenimiento',
+  'plantillas_mensaje', 'envio_masivo',
+]
+const COMUNICACION_SET = new Set(COMUNICACION_TABS)
+const sinComunicacion = (tabs: string[]) => tabs.filter(t => !COMUNICACION_SET.has(t))
+
 export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null> = {
   administrador_general: null, // all tabs
 
@@ -219,14 +231,15 @@ export const CONDOMINIOS_SECTION_GROUPS: SectionGroup[] = [
   {
     key: 'panel',
     label: 'Panel / Dashboard',
-    tabs: [...new Set([...PANEL_ESTRATEGICO, ...PANEL_OPERATIVO, ...PANEL_MINIMO])],
+    tabs: sinComunicacion([...new Set([...PANEL_ESTRATEGICO, ...PANEL_OPERATIVO, ...PANEL_MINIMO])]),
   },
-  { key: 'finanzas',      label: 'Finanzas',      tabs: TODAS_FINANZAS },
-  { key: 'residentes',    label: 'Residentes',     tabs: TODAS_RESIDENTES },
-  { key: 'operaciones',   label: 'Operaciones',    tabs: TODAS_OPERACIONES },
+  { key: 'comunicacion',  label: 'Comunicación',   tabs: COMUNICACION_TABS },
+  { key: 'finanzas',      label: 'Finanzas',       tabs: TODAS_FINANZAS },
+  { key: 'residentes',    label: 'Residentes',     tabs: sinComunicacion(TODAS_RESIDENTES) },
+  { key: 'operaciones',   label: 'Operaciones',    tabs: sinComunicacion(TODAS_OPERACIONES) },
   { key: 'instalaciones', label: 'Instalaciones',  tabs: TODAS_INSTALACIONES },
-  { key: 'seguridad',     label: 'Seguridad',      tabs: TODAS_SEGURIDAD },
-  { key: 'comunidad',     label: 'Comunidad',      tabs: TODA_COMUNIDAD },
+  { key: 'seguridad',     label: 'Seguridad',      tabs: sinComunicacion(TODAS_SEGURIDAD) },
+  { key: 'comunidad',     label: 'Comunidad',      tabs: sinComunicacion(TODA_COMUNIDAD) },
 ]
 
 /**
