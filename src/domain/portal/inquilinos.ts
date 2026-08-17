@@ -58,12 +58,75 @@ export async function registrarInquilino(
   return { error: error?.message ?? null }
 }
 
-/** Quita la membresía del inquilino (revoca su acceso; no toca su cuenta). */
+/**
+ * Quita la membresía del inquilino (revoca su acceso; no toca su cuenta).
+ * Desde 20260825000000 revoca EN CASCADA los accesos familiares de su núcleo y
+ * devuelve el conteo.
+ */
 export async function quitarInquilino(
   unidadId: string,
   clienteId: string,
+): Promise<{ familiaresRevocados: number; error: string | null }> {
+  const { data, error } = await supabase.rpc('portal_quitar_inquilino', {
+    p_unidad_id: unidadId,
+    p_cliente_id: clienteId,
+  })
+  const familiares = (data as { familiares_revocados?: number } | null)?.familiares_revocados ?? 0
+  return { familiaresRevocados: familiares, error: error?.message ?? null }
+}
+
+// ── Accesos familiares (20260825000000) ──────────────────────────────────────
+
+/** Acceso no-propietario de una unidad (inquilino o familiar, con su núcleo). */
+export interface AccesoDeUnidad {
+  id: string
+  cliente_id: string
+  tipo: 'arrendatario' | 'familiar' | 'otro'
+  /** Cliente cuyo núcleo integra este familiar (propietario o arrendatario); NULL en filas legacy. */
+  nucleo_cliente_id: string | null
+  activo: boolean
+  created_at: string
+  cliente_nombre: string
+  cliente_email: string | null
+  cliente_telefono: string | null
+  tiene_cuenta: boolean
+}
+
+/** Todos los accesos no-propietario de una unidad PROPIA (0 filas si no es del llamante). */
+export async function fetchAccesosDeUnidad(
+  unidadId: string,
+): Promise<{ data: AccesoDeUnidad[]; error: string | null }> {
+  const { data, error } = await supabase.rpc('portal_accesos_de_unidad', {
+    p_unidad_id: unidadId,
+  })
+  return { data: (data as AccesoDeUnidad[] | null) ?? [], error: error?.message ?? null }
+}
+
+/**
+ * Registra un acceso familiar en una unidad propia (máx. 3 por núcleo). El
+ * servidor decide el núcleo: con arrendatario activo es la familia del
+ * inquilino; sin renta, la familia del propietario.
+ */
+export async function registrarFamiliar(
+  input: RegistrarInquilinoInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('portal_quitar_inquilino', {
+  const { error } = await supabase.rpc('portal_registrar_familiar', {
+    p_unidad_id: input.unidadId,
+    p_nombre: input.nombre,
+    p_email: input.email,
+    p_cui_dui: input.cuiDui,
+    p_fecha_nacimiento: input.fechaNacimiento,
+    p_telefono: input.telefono?.trim() || null,
+  })
+  return { error: error?.message ?? null }
+}
+
+/** Revoca un acceso familiar de una unidad propia (no toca el cliente ni su login). */
+export async function quitarFamiliar(
+  unidadId: string,
+  clienteId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('portal_quitar_familiar', {
     p_unidad_id: unidadId,
     p_cliente_id: clienteId,
   })

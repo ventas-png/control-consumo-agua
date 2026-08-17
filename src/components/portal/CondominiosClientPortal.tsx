@@ -470,6 +470,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
                 isAdmin={false}
+                esPropietario={(unidad.rol ?? 'propietario') === 'propietario'}
                 autorNombre={currentUser.name}
                 autorUserId={currentUser.user_id}
                 onRefresh={cargarDatos}

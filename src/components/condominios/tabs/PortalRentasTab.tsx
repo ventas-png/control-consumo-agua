@@ -349,13 +349,20 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   async function removeInquilino(i: InquilinoDeUnidad) {
     const r = await confirm({
       title: '¿Quitar acceso al inquilino?',
-      text: `${i.cliente_nombre} dejará de ver esta unidad en su portal de inmediato. Su cuenta no se elimina.`,
+      text: `${i.cliente_nombre} y los accesos de su núcleo familiar dejarán de ver esta unidad de inmediato. Sus cuentas no se eliminan.`,
       icon: 'warning', variant: 'danger', confirmText: 'Quitar acceso',
     })
     if (!r.isConfirmed) return
-    const { error } = await quitarInquilino(unidadId, i.cliente_id)
+    const { familiaresRevocados, error } = await quitarInquilino(unidadId, i.cliente_id)
     if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
-    notify({ variant: 'success', title: 'Acceso revocado', duration: 1400 })
+    notify({
+      variant: 'success',
+      title: 'Acceso revocado',
+      text: familiaresRevocados > 0
+        ? `También se revocaron ${familiaresRevocados} acceso(s) de su núcleo familiar.`
+        : undefined,
+      duration: familiaresRevocados > 0 ? 3000 : 1400,
+    })
     cargarInquilinos()
   }
 
