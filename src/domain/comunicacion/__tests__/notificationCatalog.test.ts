@@ -31,6 +31,7 @@ describe('groupOf', () => {
     expect(groupOf('seguridad')).toBe('cuenta')
     expect(groupOf('ruta_recordatorio')).toBe('operacion')
     expect(groupOf('cierre_ciclo_automatico')).toBe('operacion')
+    expect(groupOf('alerta_notificaciones')).toBe('operacion')
   })
 
   // Las familias crecen (paquete_pendiente, paquete_retirado, …): el prefijo
