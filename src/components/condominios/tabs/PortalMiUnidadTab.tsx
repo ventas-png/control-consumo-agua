@@ -7,6 +7,7 @@ import { MultiFileUploader, ListaAdjuntos } from '../../shared/FileUploader'
 import { MensajePortalChatModal } from './MensajePortalChatModal'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchConteoComentariosMensajePortal } from '../../../domain/condominios/tabQueries'
+import { AccesosUnidadSection } from './AccesosUnidadSection'
 import type { Unidad, MensajePortal, TipoMensajePortal } from '../../../types'
 
 interface Props {
@@ -15,6 +16,10 @@ interface Props {
   proyectoId: string
   companyId: string
   isAdmin: boolean
+  /** true cuando el residente logueado es PROPIETARIO de esta unidad: habilita
+   *  la sección "Accesos de mi unidad" (familia / núcleo del inquilino). Los
+   *  RPCs que usa son de propietario, así que la vista previa staff no la pinta. */
+  esPropietario?: boolean
   /** Firma los mensajes del hilo (residente o miembro del equipo). */
   autorNombre?: string
   autorUserId?: string
@@ -40,7 +45,7 @@ function blankMsg() {
   return { asunto: '', cuerpo: '', tipo: 'consulta' as TipoMensajePortal }
 }
 
-export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isAdmin, autorNombre = '', autorUserId, onRefresh, onGenerarToken }: Props) {
+export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isAdmin, esPropietario = false, autorNombre = '', autorUserId, onRefresh, onGenerarToken }: Props) {
   const [showMsgForm, setShowMsgForm] = useState(false)
   const [saving, setSaving]           = useState(false)
   const [msgForm, setMsgForm]         = useState(blankMsg())
@@ -104,6 +109,9 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
           </div>
         )}
       </div>
+
+      {/* Accesos familiares / del núcleo del inquilino (solo el propietario) */}
+      {esPropietario && <AccesosUnidadSection unidadId={unidad.id} />}
 
       {/* Link del portal (solo admin) */}
       {isAdmin && (
