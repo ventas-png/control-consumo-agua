@@ -16,6 +16,7 @@ export type NotificationGroup =
   | 'mensajes'
   | 'difusiones'
   | 'solicitudes'
+  | 'reservas'
   | 'paquetes'
   | 'cobros'
   | 'operacion'
@@ -36,11 +37,12 @@ export const GROUP_META: Record<NotificationGroup, GroupMeta> = {
   mensajes:    { label: 'mensajes',    labelSingular: 'mensaje',    icon: '💬', order: 0 },
   difusiones:  { label: 'difusiones',  labelSingular: 'difusión',   icon: '📢', order: 1 },
   solicitudes: { label: 'solicitudes', labelSingular: 'solicitud',  icon: '📥', order: 2 },
-  paquetes:    { label: 'paquetes',    labelSingular: 'paquete',    icon: '📦', order: 3 },
-  cobros:      { label: 'cobros',      labelSingular: 'cobro',      icon: '💰', order: 4 },
-  operacion:   { label: 'operación',   labelSingular: 'operación',  icon: '🛠️', order: 5 },
-  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 6 },
-  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 7 },
+  reservas:    { label: 'reservas',    labelSingular: 'reserva',    icon: '🏊', order: 3 },
+  paquetes:    { label: 'paquetes',    labelSingular: 'paquete',    icon: '📦', order: 4 },
+  cobros:      { label: 'cobros',      labelSingular: 'cobro',      icon: '💰', order: 5 },
+  operacion:   { label: 'operación',   labelSingular: 'operación',  icon: '🛠️', order: 6 },
+  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 7 },
+  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 8 },
 }
 
 // `tipo` exactos que emiten los productores. Los que no estén aquí caen en
@@ -51,6 +53,7 @@ const TIPO_TO_GROUP: Record<string, NotificationGroup> = {
   difusion: 'difusiones',
   anuncio: 'difusiones',
   solicitud: 'solicitudes',
+  reserva: 'reservas',
   seguridad: 'cuenta',
   ruta_recordatorio: 'operacion',
   cierre_ciclo_automatico: 'operacion',
