@@ -238,6 +238,25 @@ const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: Record<string, u
   { name: 'portal_cancelar_reserva', args: { p_reserva_id: FOREIGN_COMPANY_ID } },
 ]
 
+// RPCs de accesos familiares (20260825000000): mismo contrato que los de
+// inquilinos — anon SIEMPRE rechazado (REVOKE); authenticated sobre una unidad
+// ajena rechazado por el guard interno SIN efectos secundarios.
+const PORTAL_FAMILIARES_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+  {
+    name: 'portal_registrar_familiar',
+    args: {
+      p_unidad_id: FOREIGN_COMPANY_ID,
+      p_nombre: 'Intruso RLS',
+      p_email: 'intruso-familiar-rls@example.com',
+      p_cui_dui: '0000000000001',
+      p_fecha_nacimiento: '2000-01-01',
+      p_telefono: null,
+    },
+  },
+  { name: 'portal_quitar_familiar', args: { p_unidad_id: FOREIGN_COMPANY_ID, p_cliente_id: FOREIGN_COMPANY_ID } },
+  { name: 'portal_accesos_de_unidad', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -582,6 +601,37 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
+  })
+
+  describe('guard RPCs de accesos familiares (20260825000000)', () => {
+    for (const { name, args } of PORTAL_FAMILIARES_RPCS) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args)
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+    }
+
+    // Escrituras con unidad AJENA: el guard interno (rol cliente + unidad
+    // propia) debe rechazar sin efectos.
+    for (const { name, args } of PORTAL_FAMILIARES_RPCS.filter((r) =>
+      ['portal_registrar_familiar', 'portal_quitar_familiar'].includes(r.name),
+    )) {
+      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+        const { data, error } = await userA.rpc(name, args)
+        expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+
+    // portal_accesos_de_unidad es de lectura: con unidad ajena devuelve 0 filas.
+    it('authenticated (A) NO lista accesos de una unidad ajena', async () => {
+      const { data, error } = await userA.rpc('portal_accesos_de_unidad', {
+        p_unidad_id: FOREIGN_COMPANY_ID,
+      })
+      const negado = error !== null || (data ?? []).length === 0
+      expect(negado, 'portal_accesos_de_unidad no debe exponer accesos ajenos').toBe(true)
+    })
   })
 })
 
