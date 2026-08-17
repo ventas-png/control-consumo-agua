@@ -126,7 +126,7 @@ function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeSection: AppSection = pathToSection(location.pathname) ?? 'clientes'
-  // Sección activa del Módulo Completo de Condominios (las 9 secciones viven en
+  // Sección activa del Módulo Completo de Condominios (las 10 secciones viven en
   // el sidebar global). null cuando no estamos en una sección del módulo.
   const activeCondominiosSection: SectionKey | null = sectionForPath(location.pathname)
   const navigateSection = useCallback((section: AppSection) => {

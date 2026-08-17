@@ -53,7 +53,6 @@ import type {
   FondoReservaMovimiento,
   ConfigCondominio,
 } from '../../types'
-import { ComunicacionSection } from '../comunicacion/ComunicacionSection'
 
 // ── Identificador de cada tab (la unión completa) ───────────────────────────
 export type CondominioTab =
@@ -342,6 +341,7 @@ const MensajesPortalTab = lazy(() => import('./tabs/MensajesPortalTab').then(m =
 const JuntaTab = lazy(() => import('./tabs/JuntaTab').then(m => ({ default: m.JuntaTab })))
 const PrestamoEquiposTab = lazy(() => import('./tabs/PrestamoEquiposTab').then(m => ({ default: m.PrestamoEquiposTab })))
 const ComunicadosTab = lazy(() => import('./tabs/ComunicadosTab').then(m => ({ default: m.ComunicadosTab })))
+const ComunicacionSection = lazy(() => import('../comunicacion/ComunicacionSection').then(m => ({ default: m.ComunicacionSection })))
 const ActasTab = lazy(() => import('./tabs/ActasTab').then(m => ({ default: m.ActasTab })))
 const CierresMensualesTab = lazy(() => import('./tabs/CierresMensualesTab').then(m => ({ default: m.CierresMensualesTab })))
 const NotificacionesTab = lazy(() => import('./tabs/NotificacionesTab').then(m => ({ default: m.NotificacionesTab })))
@@ -596,7 +596,7 @@ export const TAB_REGISTRY: TabDef[] = [
     <PrestamoEquiposTab prestamos={ctx.prestamos} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prestamos')} canEdit={ctx.canEdit('prestamos')} onRefresh={ctx.onRefresh} /> },
   { id: 'comunicados', label: 'Comunicados', icon: '✉️', render: (ctx) =>
     <ComunicadosTab comunicados={ctx.comunicados} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('comunicados')} canEdit={ctx.canEdit('comunicados')} onRefresh={ctx.onRefresh} /> },
-  { id: 'comunicacion_condominios', label: 'Comunicación', icon: '💬', render: (ctx) =>
+  { id: 'comunicacion_condominios', label: 'Conversaciones', icon: '💬', render: (ctx) =>
     <ComunicacionSection currentUser={ctx.currentUser} clientes={[]} proyectos={ctx.proyectosActivos} unidades={ctx.unidadesProyecto} canCreate={ctx.canCreate('comunicacion_condominios')} canEdit={ctx.canEdit('comunicacion_condominios')} serviceType="condominios" /> },
   { id: 'actas', label: 'Actas', icon: '📝', render: (ctx) =>
     <ActasTab actas={ctx.actas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('actas')} canEdit={ctx.canEdit('actas')} onRefresh={ctx.onRefresh} /> },
@@ -858,7 +858,7 @@ export const TAB_REGISTRY: TabDef[] = [
     <GanttMantenimientoTab tickets={ctx.tickets} moneda={ctx.moneda} /> },
   { id: 'mapa_calor_cuotas', label: 'Mapa de calor', icon: '🌡️', render: (ctx) =>
     <MapaCalorCuotasTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} moneda={ctx.moneda} /> },
-  { id: 'encuesta_dashboard', label: 'Encuestas', icon: '📝', render: (ctx) =>
+  { id: 'encuesta_dashboard', label: 'Resultados encuestas', icon: '📝', render: (ctx) =>
     <EncuestaDashboardTab encuestas={ctx.encuestas} respuestas={ctx.respuestasEncuesta} /> },
   { id: 'analisis_visitantes', label: 'Visitantes', icon: '👥', render: (ctx) =>
     <AnalisisVisitantesTab visitantes={ctx.visitantes} unidades={ctx.unidadesProyecto} /> },

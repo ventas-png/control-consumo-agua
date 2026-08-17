@@ -1,12 +1,12 @@
 // Secciones de navegación de 2 niveles del Módulo Completo de Condominios.
 // Fuente única compartida por CondominiosSection (cuerpo del módulo) y el
-// Sidebar global (que ahora expone las 9 secciones bajo "Manejo Condominios").
+// Sidebar global (que ahora expone las 10 secciones bajo "Manejo Condominios").
 // IMPORTANTE: mantener este módulo libre de dependencias pesadas (no importar
 // tabRegistry) para no inflar el bundle inicial del sidebar. Los íconos SVG de
 // cada sección viven en ./sectionIcons (.tsx); aquí solo datos de navegación.
 
 export type SectionKey =
-  | 'panel' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones'
+  | 'panel' | 'comunicacion' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones'
   | 'seguridad' | 'comunidad' | 'administracion' | 'especiales'
 
 export interface SectionDef { id: SectionKey; label: string; tabs: string[] }
@@ -15,8 +15,14 @@ export const SECTIONS: SectionDef[] = [
   { id: 'panel', label: 'Panel', tabs: [
     'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
     'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
-    'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
+    'bitacora_actividad', 'gestor_alertas', 'alertas', 'graficas_tendencias', 'metricas_servicio',
     'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado', 'benchmarking',
+  ]},
+  { id: 'comunicacion', label: 'Comunicación', tabs: [
+    'centro_notificaciones', 'comunicados', 'comunidad', 'recordatorios',
+    'mensajes_portal', 'comunicacion_condominios', 'buzon_sugerencias',
+    'reclamos', 'encuestas', 'encuesta_dashboard', 'mantenimiento',
+    'plantillas_mensaje', 'envio_masivo',
   ]},
   { id: 'finanzas', label: 'Finanzas', tabs: [
     'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
@@ -30,12 +36,12 @@ export const SECTIONS: SectionDef[] = [
   ]},
   { id: 'residentes', label: 'Residentes', tabs: [
     'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
-    'entrega_unidad', 'portal', 'mensajes_portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
+    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
     'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
     'scoring_unidades',
   ]},
   { id: 'operaciones', label: 'Operaciones', tabs: [
-    'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
+    'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
     'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
     'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
     'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas',
@@ -50,21 +56,20 @@ export const SECTIONS: SectionDef[] = [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
     'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
     'turnos', 'ausencias', 'horas_extra',
-    'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia',
+    'paqueteria', 'objetos', 'incidentes', 'bitacora_guardia', 'presencia',
     'panel_turno', 'emergencias',
   ]},
   { id: 'comunidad', label: 'Comunidad', tabs: [
-    'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
-    'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
-    'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
-    'comunicados', 'recordatorios', 'comunicacion_condominios',
+    'asambleas', 'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos',
+    'infracciones', 'sanciones', 'gestion_conflictos', 'eventos_comunidad',
+    'agenda', 'cumpleanos', 'programa_actividades',
   ]},
   { id: 'administracion', label: 'Administración', tabs: [
     'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
     'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
     'actividad_equipo',
     'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
-    'automatizaciones', 'plantillas_mensaje', 'flujo_aprobacion', 'envio_masivo',
+    'automatizaciones', 'flujo_aprobacion',
     'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',
   ]},
   { id: 'especiales', label: 'Especiales', tabs: [
