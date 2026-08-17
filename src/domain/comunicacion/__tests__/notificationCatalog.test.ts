@@ -27,6 +27,7 @@ describe('groupOf', () => {
     expect(groupOf('difusion')).toBe('difusiones')
     expect(groupOf('anuncio')).toBe('difusiones')
     expect(groupOf('solicitud')).toBe('solicitudes')
+    expect(groupOf('reserva')).toBe('reservas')
     expect(groupOf('seguridad')).toBe('cuenta')
     expect(groupOf('ruta_recordatorio')).toBe('operacion')
     expect(groupOf('cierre_ciclo_automatico')).toBe('operacion')
@@ -66,10 +67,12 @@ describe('groupCounts', () => {
       notif('mensaje'),
       notif('mensaje', true),
       notif('solicitud'),
+      notif('reserva'),
     ])
-    expect(counts.map(c => c.group)).toEqual(['mensajes', 'solicitudes', 'paquetes'])
+    expect(counts.map(c => c.group)).toEqual(['mensajes', 'solicitudes', 'reservas', 'paquetes'])
     expect(counts[0]).toMatchObject({ group: 'mensajes', unread: 1, total: 2 })
-    expect(counts[2]).toMatchObject({ group: 'paquetes', unread: 1, total: 1 })
+    expect(counts[2]).toMatchObject({ group: 'reservas', unread: 1, total: 1 })
+    expect(counts[3]).toMatchObject({ group: 'paquetes', unread: 1, total: 1 })
   })
 
   it('omite los grupos sin notificaciones', () => {
