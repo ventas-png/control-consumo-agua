@@ -57,6 +57,7 @@ const TIPO_TO_GROUP: Record<string, NotificationGroup> = {
   seguridad: 'cuenta',
   ruta_recordatorio: 'operacion',
   cierre_ciclo_automatico: 'operacion',
+  alerta_notificaciones: 'operacion',
 }
 
 // Familias con varios tipos (`paquete_pendiente`, `paquete_retirado`, …). Se
