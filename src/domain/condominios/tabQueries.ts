@@ -10,7 +10,7 @@
 // tablas que no existen en el esquema generado (ver comentarios in situ).
 import { reportDegradedQuery } from '../queryFetch'
 import { db, supabase } from '../../lib/supabase'
-import type { HorasPersonal } from '../../types'
+import type { HorasPersonal, UsuarioAsignablePersonal } from '../../types'
 
 // ── DirectorioTab ──
 
@@ -481,4 +481,36 @@ export async function fetchHorasPersonal(
   })
   reportDegradedQuery('condominios.fetchHorasPersonal', error)
   return (data as HorasPersonal[] | null) ?? []
+}
+
+// ── PersonalTab ──
+
+/**
+ * Cuentas de ingreso vinculables a un empleado del condominio (RPC
+ * `personal_usuarios_asignables`, 20260826000000): nombre, correo, rol, si la
+ * cuenta está activa, si tiene acceso a ESTE proyecto y a qué empleado está ya
+ * vinculada.
+ *
+ * Es un RPC y no un select a `app_users`: la policy `app_users_select`
+ * (20260417000012) solo deja enumerar la empresa a `company_owner`/`admin`, así
+ * que un administrador de condominio con tier `operator` vería la lista vacía.
+ *
+ * Va en `supabase` (sin tipar) y no en `db`: la RPC es nueva y no existe en
+ * database.types.ts hasta la próxima corrida de `npm run gen:db-types`.
+ *
+ * Devuelve `{ data, error }` (con shape `{ message }`) y NO degrada a `[]`: la
+ * RPC exige el permiso del tab, y "no tienes acceso" leído como "no hay usuarios
+ * que asignar" mandaría al administrador a crear una cuenta que ya existe.
+ */
+export async function fetchUsuariosAsignablesPersonal(
+  projectId: string,
+): Promise<{ data: UsuarioAsignablePersonal[]; error: { message: string } | null }> {
+  const { data, error } = await supabase.rpc('personal_usuarios_asignables', {
+    p_project_id: projectId,
+  })
+  reportDegradedQuery('condominios.fetchUsuariosAsignablesPersonal', error)
+  return {
+    data: (data as UsuarioAsignablePersonal[] | null) ?? [],
+    error: error ? { message: error.message } : null,
+  }
 }
