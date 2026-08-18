@@ -51,7 +51,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     } finally {
       setLoading(false)
     }
-  }, [companyId, clienteId, isCliente])
+  }, [companyId, clienteId, isCliente, serviceType])
 
   // ── Cargar mensajes de una conversación ───────────────────────────────────
   const loadMessages = useCallback(async (conversationId: string) => {
@@ -85,7 +85,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     } finally {
       setSending(false)
     }
-  }, [userId, isCliente])
+  }, [userId, isCliente, serviceType])
 
   // ── Crear conversación interna (equipo) ──────────────────────────────────
   const createInternalConversation = useCallback(async (params: {
@@ -104,7 +104,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     } finally {
       setSending(false)
     }
-  }, [userId])
+  }, [userId, serviceType])
 
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (params: {

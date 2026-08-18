@@ -3,7 +3,8 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { StatTile } from '../../shared/StatTile'
 import { UsuarioChip } from '../../shared/UsuarioChip'
 import { useActividadEquipo, type ActividadUsuario } from '../../../domain/condominios/actividad'
-import { dateLocalISO, hoyLocalISO } from '../../../lib/format'
+import { dateLocalISO } from '../../../lib/format'
+import { useHoyLocalISO } from '../../../hooks/useHoy'
 
 // ============================================================================
 // ActividadEquipoTab — qué hizo cada persona del equipo en el período.
@@ -35,11 +36,16 @@ function isoHaceDias(dias: number): string {
 
 export default function ActividadEquipoTab({ proyectoId, companyId }: Props) {
   const [dias, setDias] = useState<number>(30)
-  const hasta = useMemo(() => hoyLocalISO(), [])
+  // `useMemo(() => hoyLocalISO(), [])` congelaba el extremo del rango: una
+  // pantalla abierta de madrugada seguía consultando hasta ayer. useHoyLocalISO
+  // mantiene la identidad estable dentro del día y la refresca a medianoche.
+  const hasta = useHoyLocalISO()
   const desde = useMemo(() => isoHaceDias(dias), [dias])
 
   const { data, isLoading, isError, error } = useActividadEquipo(proyectoId, desde, hasta)
-  const filas = data ?? []
+  // `data ?? []` creaba un array nuevo en cada render, así que los dos memos de
+  // abajo se recalculaban siempre (memoización inútil). Estabilizado aquí.
+  const filas = useMemo(() => data ?? [], [data])
 
   const totales = useMemo(() => filas.reduce(
     (acc, f) => ({

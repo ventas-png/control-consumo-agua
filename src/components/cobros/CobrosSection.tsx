@@ -68,6 +68,17 @@ interface Props {
 
 type Tab = 'pendientes' | 'verificaciones' | 'historial' | 'convenios'
 
+// Total y saldo de un registro. Puros sobre la fila: viven en el módulo para
+// que no se recreen en cada render del componente — así el memo de
+// `saldoSeleccionado` puede declarar sus dependencias reales sin arrastrarlos.
+function getTotal(r: Registro) {
+  return r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
+}
+
+function getSaldo(r: Registro) {
+  return Math.max(0, getTotal(r) - (r.monto_pagado ?? 0))
+}
+
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   efectivo: '💵 Efectivo',
   transferencia: '🏦 Transferencia',
@@ -243,19 +254,14 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
     return new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
   })
 
-  function getTotal(r: Registro) {
-    return r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
-  }
-
-  function getSaldo(r: Registro) {
-    return Math.max(0, getTotal(r) - (r.monto_pagado ?? 0))
-  }
-
   const totalPendiente = registrosFiltrados.reduce((acc, r) => acc + getSaldo(r), 0)
   const countMora = registrosPendientes.filter(r => r.estado === 'mora').length
 
   const bulk = useBulkSelection(registrosFiltrados, r => r.id)
 
+  // getTotal/getSaldo viven ahora en el módulo (ver arriba): son puros sobre el
+  // registro, así que sacarlos del cuerpo del componente elimina la
+  // recreación por render sin tener que meterlos en las deps del memo.
   const saldoSeleccionado = useMemo(
     () => bulk.selectedItems.reduce((acc, r) => acc + getSaldo(r), 0),
     [bulk.selectedItems],

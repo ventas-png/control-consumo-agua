@@ -346,6 +346,11 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const restoCargadoRef = useRef(false)
   const runSeqRef = useRef(0)
 
+  // Espejo de la prop `unidades` para que `cargarDatos` lea siempre la última
+  // sin declararla como dependencia (ver el comentario en el punto de uso).
+  const unidadesRef = useRef(unidades)
+  useEffect(() => { unidadesRef.current = unidades }, [unidades])
+
   // P2 perf — carga por FASES: abrir Condominios dispara solo las 9 colecciones
   // del tab Panel (fetchCondominiosPanelData); el resto (~132 queries en 5
   // batches) se difiere al primer tab distinto de Panel. `restoCargadoRef` marca
@@ -576,11 +581,18 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
     setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
     setPersonal((personalRes.data ?? []) as PersonalCondominio[])
-    // Fetch clients linked to project units (for birthday calendar)
-    const clienteIds = unidades.filter(u => u.project_id === pid && u.cliente_id).map(u => u.cliente_id as string)
+    // Fetch clients linked to project units (for birthday calendar).
+    // `unidadesRef` y no la prop directa: `cargarDatos` dispara el batch pesado
+    // de ~90 consultas y su identidad gobierna el efecto de carga inicial. Meter
+    // `unidades` (array nuevo cada vez que el padre re-renderiza) en sus deps
+    // relanzaría ese batch entero sin motivo; leer del ref da el valor MÁS
+    // RECIENTE en el momento de la llamada — que es justo lo que la closure
+    // vieja no daba — sin cambiar cuándo se recarga.
+    const unidadesActuales = unidadesRef.current
+    const clienteIds = unidadesActuales.filter(u => u.project_id === pid && u.cliente_id).map(u => u.cliente_id as string)
     if (clienteIds.length > 0) {
       const { data: cliData } = await fetchClientesConCumple(clienteIds)
-      const unidadesPid = unidades.filter(u => u.project_id === pid)
+      const unidadesPid = unidadesActuales.filter(u => u.project_id === pid)
       setClientesBirthday((cliData ?? []).map(c => ({
         id: c.id, nombre: c.nombre, fecha_nacimiento: c.fecha_nacimiento!,
         unidad_nombre: unidadesPid.find(u => u.cliente_id === c.id)?.nombre,
@@ -826,7 +838,9 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
           },
         }))
     })
-  }, [currentUser])
+    // setActiveTab es un useCallback sobre `navigate`, no un setter nativo:
+    // omitirlo dejaba los items del palette navegando con un router viejo.
+  }, [currentUser, setActiveTab])
 
   // Registra los tabs de Condominios en el palette global (App.tsx). El
   // CommandPalette en App.tsx renderiza todos los items registrados + las

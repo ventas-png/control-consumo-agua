@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useHoyDate } from '../../../hooks/useHoy'
 import type { PersonalCondominio } from '../../../types'
 
 interface ClienteBirthday {
@@ -54,7 +55,11 @@ function diasHastaSiguiente(mesdia: string): number {
 }
 
 export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Condominio' }: Props) {
-  const hoy = new Date()
+  // `new Date()` por render hacía imposible declarar `hoy` como dependencia del
+  // memo de "próximos 7 días" sin recalcularlo siempre. useHoyDate mantiene la
+  // identidad estable dentro del día y la renueva al cruzar la medianoche, así
+  // que el panel se actualiza solo si la pantalla queda abierta de noche.
+  const hoy = useHoyDate()
   const [mes, setMes] = useState(hoy.getMonth())
   const [anio, setAnio] = useState(hoy.getFullYear())
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'residente' | 'personal'>('todos')
@@ -98,7 +103,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
 
   const semanaMes = useMemo(() => {
     const inicio = hoy
-    const fin7 = new Date(Date.now() + 7 * 86400000)
+    const fin7 = new Date(hoy.getTime() + 7 * 86400000)
     return todos.filter(c => {
       const [mm, dd] = c.mesdia.split('-').map(Number)
       const fecha = new Date(hoy.getFullYear(), mm - 1, dd)
@@ -108,7 +113,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       }
       return fecha <= fin7
     })
-  }, [todos])
+  }, [todos, hoy])
 
   // Calendar grid
   const diasEnMes = new Date(anio, mes + 1, 0).getDate()

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type CSSProperties} from 'react'
+import { useState, useEffect, useCallback, useMemo, type CSSProperties} from 'react'
 import type { UserSession, Proyecto, Unidad, AppSection } from '../../types'
 import { fetchCondominioStatsForProject, fetchCondominioStatsRows } from '../../domain/condominios/queries'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -34,7 +34,13 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   const [perProject, setPerProject] = useState<Record<string, ProjectStats>>({})
   const companyId = currentUser.company_id
 
-  const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
+  // useMemo: el `.filter()` suelto devolvía un array nuevo por render, así que
+  // el efecto no podía declararlo en deps sin re-ejecutarse siempre — de ahí el
+  // `.length`, que no detecta un cambio de proyectos con el mismo conteo.
+  const proyectosActivos = useMemo(
+    () => proyectos.filter(p => p.estado === 'activo'),
+    [proyectos],
+  )
 
   useEffect(() => {
     if (proyectosActivos.length > 0 && !projectInitialized) {
@@ -43,7 +49,9 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
       }
       setProjectInitialized(true)
     }
-  }, [proyectosActivos.length, projectInitialized])
+    // `projectInitialized` es la guarda del propio efecto: vuelve a correr una
+    // vez tras ponerse en true y la condición lo corta. No hay ciclo.
+  }, [proyectosActivos, projectInitialized])
 
   const cargarStats = useCallback(async () => {
     if (!companyId) return

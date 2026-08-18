@@ -87,7 +87,9 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       unidad: u,
       mensaje: resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda, proyectoNombre),
     }))
-  }, [plantilla, destinatarios, cuotas, moneda])
+    // proyectoNombre alimenta {{proyecto}} dentro de resolverVariables: sin él
+    // en deps, la vista previa se quedaba con el nombre del proyecto anterior.
+  }, [plantilla, destinatarios, cuotas, moneda, proyectoNombre])
 
   async function enviar() {
     if (!plantilla || destinatarios.length === 0) return

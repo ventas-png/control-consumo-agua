@@ -1,5 +1,5 @@
-import { hoyLocalISO } from '../../../lib/format'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useHoyLocalISO } from '../../../hooks/useHoy'
 import { fetchProyectosResumen } from '../../../domain/condominios/tabQueries'
 import { Proyecto } from '../../../types'
 
@@ -26,11 +26,24 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
   const [resumenes, setResumenes] = useState<ResumenProyecto[]>([])
   const [loading, setLoading] = useState(true)
 
-  const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
-  const hoy = hoyLocalISO()
+  // `.filter()` devolvía un array nuevo por render: el efecto no podía
+  // declararlo en deps (recarga infinita) y por eso se conformaba con
+  // `.length`, quedándose con la lista vieja si cambiaban los proyectos sin
+  // cambiar el conteo (renombrar, activar uno y desactivar otro).
+  const proyectosActivos = useMemo(
+    () => proyectos.filter(p => p.estado === 'activo'),
+    [proyectos],
+  )
+  // String estable dentro del día: ya se puede declarar como dependencia real y
+  // el comparativo se recalcula al cruzar la medianoche.
+  const hoy = useHoyLocalISO()
 
   useEffect(() => {
     if (proyectosActivos.length === 0) { setLoading(false); return }
+
+    // Guarda de cancelación: si cambia el proyecto (o se desmonta) mientras la
+    // consulta vuela, la respuesta vieja ya no pisa el estado.
+    let cancelado = false
 
     async function cargar() {
       setLoading(true)
@@ -52,11 +65,13 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
           visitantesHoy: visitantesCount,
         } as ResumenProyecto
       })
+      if (cancelado) return
       setResumenes(resultado)
       setLoading(false)
     }
-    cargar()
-  }, [proyectosActivos.length, companyId])
+    void cargar()
+    return () => { cancelado = true }
+  }, [proyectosActivos, companyId, hoy])
 
   if (proyectosActivos.length <= 1) {
     return (
