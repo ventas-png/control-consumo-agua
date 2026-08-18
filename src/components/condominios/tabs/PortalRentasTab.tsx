@@ -17,6 +17,7 @@ import {
   fetchInquilinosDeUnidad,
   registrarInquilino,
   quitarInquilino,
+  darDeBajaRenta,
   type InquilinoDeUnidad,
 } from '../../../domain/portal/inquilinos'
 import { ImageUploader } from '../../shared/ImageUploader'
@@ -128,9 +129,10 @@ function blankReserva(): Partial<ReservaSTR> {
 
 // ── Authorization request form ────────────────────────────────────────────────
 
-function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada }: {
+function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada, prevBaja }: {
   unidadId: string; proyectoId: string; companyId: string; clienteId: string
   onSolicitudChange: () => void; prevRechazada: SolicitudRentaUnidad | null
+  prevBaja: SolicitudRentaUnidad | null
 }) {
   const [tipo, setTipo]       = useState<TipoRenta>('arrendamiento')
   const [motivo, setMotivo]   = useState('')
@@ -168,6 +170,18 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           Para gestionar contratos o reservas en tu unidad, primero debes solicitar autorización a la administración.
         </p>
       </div>
+
+      {prevBaja && (
+        <div style={{
+          background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>🚫 Autorización dada de baja</div>
+          <div style={{ color: 'var(--at-ink-3)' }}>
+            Diste de baja tu {prevBaja.fecha_resolucion ? `autorización el ${new Date(prevBaja.fecha_resolucion).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}` : 'autorización'}. Puedes solicitar una nueva cuando quieras.
+          </div>
+        </div>
+      )}
 
       {prevRechazada && (
         <div style={{
@@ -556,6 +570,35 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     notify({ variant: 'success', title: 'Eliminada', duration: 1200 })
   }
 
+  // ── Baja de la autorización (o retiro de la solicitud pendiente) ────────────
+
+  const [dandoBaja, setDandoBaja] = useState(false)
+  async function darBaja() {
+    const pendiente = solicitudRenta?.estado === 'pendiente'
+    const res = await confirm({
+      title: pendiente ? '¿Retirar la solicitud?' : '¿Dar de baja la autorización?',
+      text: pendiente
+        ? 'Tu solicitud dejará de estar en revisión. Podrás solicitar autorización de nuevo cuando quieras.'
+        : 'Tu unidad dejará de estar autorizada para renta. Si tu inquilino tiene acceso al portal, él y su núcleo familiar perderán el acceso de inmediato. Podrás solicitar autorización de nuevo cuando quieras.',
+      icon: 'warning', variant: 'danger',
+      confirmText: pendiente ? 'Retirar solicitud' : 'Dar de baja',
+    })
+    if (!res.isConfirmed) return
+    setDandoBaja(true)
+    const { inquilinoRevocado, familiaresRevocados, error } = await darDeBajaRenta(unidadId)
+    setDandoBaja(false)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
+    notify({
+      variant: 'success',
+      title: pendiente ? 'Solicitud retirada' : 'Autorización dada de baja',
+      text: inquilinoRevocado
+        ? `Se revocó el acceso del inquilino${familiaresRevocados > 0 ? ` y de ${familiaresRevocados} familiar${familiaresRevocados === 1 ? '' : 'es'} de su núcleo` : ''}.`
+        : undefined,
+      duration: 2800,
+    })
+    onSolicitudChange()
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const fieldStyle: React.CSSProperties = {
@@ -581,7 +624,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   // ── State: no authorization or rejected ─────────────────────────────────────
 
-  if (!solicitudRenta || solicitudRenta.estado === 'rechazada') {
+  if (!solicitudRenta || solicitudRenta.estado === 'rechazada' || solicitudRenta.estado === 'baja') {
     return (
       <div>
         {header}
@@ -592,6 +635,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           clienteId={clienteId}
           onSolicitudChange={onSolicitudChange}
           prevRechazada={solicitudRenta?.estado === 'rechazada' ? solicitudRenta : null}
+          prevBaja={solicitudRenta?.estado === 'baja' ? solicitudRenta : null}
         />
       </div>
     )
@@ -618,6 +662,16 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           <div style={{ marginTop: '12px', fontSize: '12.5px', color: '#a16207' }}>
             Te notificaremos cuando haya una respuesta.
           </div>
+          <button
+            onClick={darBaja}
+            disabled={dandoBaja}
+            style={{
+              marginTop: '16px', padding: '8px 16px', background: 'var(--at-danger-tint)',
+              color: 'var(--at-danger)', border: 'none', borderRadius: '8px',
+              fontSize: '12.5px', fontWeight: 600, cursor: dandoBaja ? 'default' : 'pointer',
+              opacity: dandoBaja ? 0.6 : 1,
+            }}
+          >{dandoBaja ? 'Retirando…' : 'Retirar solicitud'}</button>
         </div>
       </div>
     )
@@ -629,15 +683,27 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     <div>
       {header}
 
-      {/* Authorization badge */}
-      <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: '6px',
-        background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)',
-        borderRadius: '20px', padding: '4px 14px', marginBottom: '16px',
-        fontSize: '12px', fontWeight: 600, color: 'var(--at-success)',
-      }}>
-        ✅ Autorizado: {TIPO_RENTA_LABEL[tipoAprobado!]}
-        {solicitudRenta.aprobado_por && <span style={{ fontWeight: 400, opacity: 0.8 }}>— {solicitudRenta.aprobado_por}</span>}
+      {/* Authorization badge + baja */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)',
+          borderRadius: '20px', padding: '4px 14px',
+          fontSize: '12px', fontWeight: 600, color: 'var(--at-success)',
+        }}>
+          ✅ Autorizado: {TIPO_RENTA_LABEL[tipoAprobado!]}
+          {solicitudRenta.aprobado_por && <span style={{ fontWeight: 400, opacity: 0.8 }}>— {solicitudRenta.aprobado_por}</span>}
+        </div>
+        <button
+          onClick={darBaja}
+          disabled={dandoBaja}
+          style={{
+            padding: '5px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
+            border: '1px solid var(--at-danger-border)', borderRadius: '20px',
+            fontSize: '12px', fontWeight: 600, cursor: dandoBaja ? 'default' : 'pointer',
+            opacity: dandoBaja ? 0.6 : 1,
+          }}
+        >{dandoBaja ? 'Dando de baja…' : 'Dar de baja la autorización'}</button>
       </div>
 
       {/* Sub-tabs */}
