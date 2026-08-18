@@ -255,6 +255,8 @@ const PORTAL_FAMILIARES_RPCS: ReadonlyArray<{ name: string; args: Record<string,
   },
   { name: 'portal_quitar_familiar', args: { p_unidad_id: FOREIGN_COMPANY_ID, p_cliente_id: FOREIGN_COMPANY_ID } },
   { name: 'portal_accesos_de_unidad', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
+  // Baja de la autorización de renta (20260827000000): mismo contrato de guard.
+  { name: 'portal_baja_renta', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
 ]
 
 function freshClient(): SupabaseClient {
@@ -615,7 +617,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // Escrituras con unidad AJENA: el guard interno (rol cliente + unidad
     // propia) debe rechazar sin efectos.
     for (const { name, args } of PORTAL_FAMILIARES_RPCS.filter((r) =>
-      ['portal_registrar_familiar', 'portal_quitar_familiar'].includes(r.name),
+      ['portal_registrar_familiar', 'portal_quitar_familiar', 'portal_baja_renta'].includes(r.name),
     )) {
       it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         const { data, error } = await userA.rpc(name, args)
