@@ -302,10 +302,12 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
             {/* B5: QR local (antes api.qrserver.com — la CSP lo bloqueaba y filtraba el código a un tercero) */}
             {verCodigo.codigo_retiro && (
               <div aria-label="QR del código" style={{ display: 'inline-block', padding: '8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
-                <QRCodeSVG value={qrPayloadRetiro(verCodigo.codigo_retiro)} size={164} level="M" marginSize={2} />
+                <QRCodeSVG value={qrPayloadRetiro(verCodigo.codigo_retiro)} size={200} level="M" marginSize={4} />
               </div>
             )}
-            <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '14px' }}>Te avisaremos cuando sea retirado.</p>
+            <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '14px' }}>
+              En portería pueden escanear el QR con la cámara del teléfono o teclear el código. Te avisaremos cuando sea retirado.
+            </p>
           </div>
         </EditModal>
       )}

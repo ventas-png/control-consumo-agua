@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import {
   createCondominioRowReturning,
@@ -7,7 +7,7 @@ import {
 } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { generarCodigoRetiro, qrPayloadRetiro } from '../../../lib/paquetes'
+import { generarCodigoRetiro, qrPayloadRetiro, codigoRetiroDesdeURL, normalizarCodigoRetiro } from '../../../lib/paquetes'
 import { QRCodeSVG } from 'qrcode.react'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -39,10 +39,23 @@ const inputStyle = {
 }
 const labelStyle = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' } as const
 
+// Paleta del aviso de código escaneado, por tono.
+const TONO_ESCANEO = {
+  info: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', color: 'var(--at-ink-2)' },
+  warn: { bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)', color: 'var(--at-warning-strong)' },
+  ok:   { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success)' },
+}
+
 export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [busqueda, setBusqueda] = useState('')
+  // Deep link del QR de retiro: .../condominios/paqueteria#retiro=<código>.
+  // El guardia escanea con la cámara del teléfono, el enlace abre este tab y el
+  // código llega en el fragmento (nunca en el query string — ver lib/paquetes).
+  const [codigoEscaneado, setCodigoEscaneado] = useState<string | null>(
+    () => (typeof window === 'undefined' ? null : codigoRetiroDesdeURL(window.location.hash)),
+  )
+  const [busqueda, setBusqueda] = useState(() => codigoEscaneado ?? '')
   const [filtroEstado, setFiltroEstado] = useState<EstadoPaquete | 'todos'>('todos')
   const [form, setForm] = useState({
     unidad_id: '', tipo: 'paquete' as TipoPaquete, descripcion: '',
@@ -55,6 +68,36 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
   const [entregaCodigo, setEntregaCodigo] = useState('')
   const [entregaNombre, setEntregaNombre] = useState('')
   const [entregaSaving, setEntregaSaving] = useState(false)
+  const autoAbiertoRef = useRef(false)
+
+  // El fragmento se limpia en cuanto se lee: el código no queda a la vista en la
+  // barra de direcciones ni se vuelve a disparar al navegar dentro del módulo.
+  useEffect(() => {
+    if (!codigoEscaneado || typeof window === 'undefined') return
+    window.history.replaceState({}, '', window.location.pathname + window.location.search)
+  }, [codigoEscaneado])
+
+  const paqueteEscaneado = useMemo(() => {
+    if (!codigoEscaneado) return null
+    return paquetes.find(p => (p.codigo_retiro || '').toUpperCase() === codigoEscaneado) ?? null
+  }, [codigoEscaneado, paquetes])
+
+  // Con el paquete localizado y en custodia, abrimos la entrega ya cargada: el
+  // guardia escanea y solo le queda la firma. Una sola vez (autoAbiertoRef) para
+  // no reabrir el modal si el guardia lo cierra y la lista se refresca.
+  useEffect(() => {
+    if (!paqueteEscaneado || autoAbiertoRef.current) return
+    if (!canEdit || paqueteEscaneado.estado !== 'pendiente' || !paqueteEscaneado.recibido_por) return
+    autoAbiertoRef.current = true
+    setEntregando(paqueteEscaneado)
+    setEntregaCodigo(paqueteEscaneado.codigo_retiro || '')
+    setEntregaNombre(paqueteEscaneado.autorizado_nombre || '')
+  }, [paqueteEscaneado, canEdit])
+
+  function limpiarEscaneo() {
+    setCodigoEscaneado(null)
+    setBusqueda('')
+  }
 
   const filtrados = paquetes.filter(p => {
     const matchEstado = filtroEstado === 'todos' || p.estado === filtroEstado
@@ -107,7 +150,9 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
 
   async function handleEntregar(file: File) {
     if (!entregando) return
-    if (entregaCodigo.trim().toUpperCase() !== (entregando.codigo_retiro || '').toUpperCase()) {
+    // normalizarCodigoRetiro acepta el código a secas, la URL del QR o el
+    // payload `PAQUETE:` viejo — el guardia a veces pega lo que leyó el lector.
+    if (normalizarCodigoRetiro(entregaCodigo) !== (entregando.codigo_retiro || '').toUpperCase()) {
       notify({ variant: 'error', title: 'Código incorrecto', text: 'El código de retiro no coincide. Verifique con quien recoge.' })
       return
     }
@@ -143,6 +188,32 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     onRefresh()
   }
 
+  // Estado del escaneo en palabras. No hay flag de carga en el contexto de tabs,
+  // así que mientras la lista está vacía decimos "buscando" en vez de afirmar
+  // que el código no existe.
+  const avisoEscaneo = (() => {
+    if (!codigoEscaneado) return null
+    const p = paqueteEscaneado
+    if (!p) {
+      return paquetes.length === 0
+        ? { tono: 'info' as const, texto: 'Buscando el paquete…' }
+        : { tono: 'warn' as const, texto: 'Ese código no corresponde a ninguna salida de este condominio. Verifique el condominio seleccionado arriba.' }
+    }
+    if (p.estado === 'entregado') {
+      return { tono: 'warn' as const, texto: `Este paquete ya fue retirado${p.entregado_a_nombre ? ` por ${p.entregado_a_nombre}` : ''}. El código es de un solo uso.` }
+    }
+    if (p.estado === 'devuelto') {
+      return { tono: 'warn' as const, texto: 'Este paquete fue devuelto al residente y ya no está en portería.' }
+    }
+    if (!p.recibido_por) {
+      return { tono: 'warn' as const, texto: `${p.descripcion} · el residente aún no lo deja en portería. Confirme la custodia antes de entregarlo.` }
+    }
+    if (!canEdit) {
+      return { tono: 'warn' as const, texto: `${p.descripcion} · no tiene permiso para registrar la entrega. Avise al administrador.` }
+    }
+    return { tono: 'ok' as const, texto: `${p.descripcion} · para ${p.autorizado_nombre}. Complete la entrega y la firma.` }
+  })()
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -156,6 +227,18 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
           </button>
         )}
       </div>
+
+      {avisoEscaneo && (
+        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', padding: '12px 14px', borderRadius: '12px', background: TONO_ESCANEO[avisoEscaneo.tono].bg, border: `1.5px solid ${TONO_ESCANEO[avisoEscaneo.tono].border}` }}>
+          <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.12em', color: TONO_ESCANEO[avisoEscaneo.tono].color }}>{codigoEscaneado}</span>
+          <span style={{ flex: 1, minWidth: '180px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+            <strong style={{ color: TONO_ESCANEO[avisoEscaneo.tono].color }}>Código escaneado</strong> · {avisoEscaneo.texto}
+          </span>
+          <button onClick={limpiarEscaneo} style={{ padding: '5px 10px', background: 'var(--at-surface)', color: 'var(--at-ink-3)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600 }}>
+            Quitar filtro
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por descripción, autorizado, código, unidad..."
@@ -305,11 +388,12 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
             {/* B5: QR local (antes api.qrserver.com — la CSP lo bloqueaba y filtraba el código a un tercero) */}
             {verCodigo.codigo_retiro && (
               <div aria-label="QR del código" style={{ display: 'inline-block', padding: '8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
-                <QRCodeSVG value={qrPayloadRetiro(verCodigo.codigo_retiro)} size={164} level="M" marginSize={2} />
+                <QRCodeSVG value={qrPayloadRetiro(verCodigo.codigo_retiro)} size={200} level="M" marginSize={4} />
               </div>
             )}
             <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '14px' }}>
-              Comparta este código con quien recogerá el paquete. Lo necesitará en portería.
+              Comparta este código con quien recogerá el paquete. En portería pueden escanear el QR con la cámara del teléfono
+              —abre esta pantalla con el código cargado— o teclearlo a mano.
             </p>
           </div>
         </EditModal>
