@@ -7,7 +7,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { afterAll, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -145,16 +145,22 @@ describe('evaluateAppendOnly — lo prohibido', () => {
 })
 
 describe('resolveRange — selección de rango por contexto', () => {
-  it('--base/--head explícitos tienen prioridad', () => {
+  it('--base/--head explícitos tienen prioridad y son LINEALES por definición (rango exacto, sin merge-base)', () => {
+    // La invocación de apply-migrations-prod.yml es esta forma explícita: si no
+    // fuera lineal, un force-push con `before` alcanzable pero divergente se
+    // compararía desde el merge-base y la reescritura pasaría como alta.
     expect(resolveRange({ argv: ['--base', 'abc123', '--head', 'def456'], env: {} })).toMatchObject(
-      { base: 'abc123', head: 'def456' },
+      { base: 'abc123', head: 'def456', linear: true },
     )
   })
 
-  it('pull_request usa origin/<base_ref> (merge-base)', () => {
-    expect(
-      resolveRange({ argv: [], env: { GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: 'main' } }),
-    ).toMatchObject({ base: 'origin/main', head: 'HEAD' })
+  it('pull_request usa origin/<base_ref> con merge-base (NO lineal)', () => {
+    const r = resolveRange({
+      argv: [],
+      env: { GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: 'main' },
+    })
+    expect(r).toMatchObject({ base: 'origin/main', head: 'HEAD' })
+    expect(r.linear).toBeUndefined()
   })
 
   it('push usa before..HEAD lineal', () => {
@@ -178,8 +184,10 @@ describe('resolveRange — selección de rango por contexto', () => {
     ).toMatchObject({ base: null })
   })
 
-  it('sin contexto de CI cae a origin/main (uso local)', () => {
-    expect(resolveRange({ argv: [], env: {} })).toMatchObject({ base: 'origin/main' })
+  it('sin contexto de CI cae a origin/main con merge-base (NO lineal)', () => {
+    const r = resolveRange({ argv: [], env: {} })
+    expect(r).toMatchObject({ base: 'origin/main' })
+    expect(r.linear).toBeUndefined()
   })
 })
 
@@ -310,5 +318,82 @@ describe('CLI — fail-closed sobre repos git temporales', () => {
     })
     expect(conReescritura.code).toBe(1)
     expect(conReescritura.out).toContain('20260101000000_base.sql — MODIFICADA')
+  })
+
+  // ── Force-push DIVERGENTE con el old head todavía alcanzable ──────────────
+  // P (base) → rama vieja X añade m.sql v1 (histórica ya aplicada) → historia
+  // nueva Y, divergente desde P, con m.sql reescrita o eliminada. Aquí
+  // merge-base(X, Y) = P, y un diff desde P vería la reescritura como ALTA (o
+  // no vería la eliminación) — por eso el rango explícito --base/--head tiene
+  // que ser EXACTO (before..after), que la ve como M o D.
+  function repoDivergente(variante) {
+    const dir = mkdtempSync(join(tmpdir(), 'append-only-div-'))
+    dirs.push(dir)
+    gitc(dir, 'init', '-q')
+    mkdirSync(join(dir, 'supabase/migrations'), { recursive: true })
+    writeFileSync(join(dir, 'otro.txt'), 'p\n')
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'P: base')
+    const shaP = gitc(dir, 'rev-parse', 'HEAD')
+    gitc(dir, 'checkout', '-q', '-b', 'vieja')
+    writeFileSync(join(dir, 'supabase/migrations/20260101000000_m.sql'), '-- v1\n')
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'X: añade m.sql v1')
+    const shaX = gitc(dir, 'rev-parse', 'HEAD') // sigue alcanzable vía la rama `vieja`
+    gitc(dir, 'checkout', '-q', '-b', 'nueva', shaP)
+    if (variante === 'reescrita') {
+      // El checkout a P dejó supabase/migrations/ vacío y git lo eliminó.
+      mkdirSync(join(dir, 'supabase/migrations'), { recursive: true })
+      writeFileSync(join(dir, 'supabase/migrations/20260101000000_m.sql'), '-- v2 REESCRITA\n')
+    } else {
+      writeFileSync(join(dir, 'otro.txt'), 'y\n')
+    }
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'Y: historia nueva divergente')
+    const shaY = gitc(dir, 'rev-parse', 'HEAD')
+    return { dir, shaP, shaX, shaY }
+  }
+
+  it('divergente con m.sql REESCRITA: el merge-base la vería como ALTA; before..after exacto la detecta como M y rechaza', () => {
+    const { dir, shaP, shaX, shaY } = repoDivergente('reescrita')
+    // Lo que vería un diff desde el merge-base (P): un alta inocente.
+    const desdeMergeBase = gitc(
+      dir, 'diff', '--name-status', '-M', shaP, shaY, '--', 'supabase/migrations',
+    )
+    expect(desdeMergeBase).toMatch(/^A\t/)
+    // La invocación EXACTA del workflow: --base $PUSH_BEFORE --head $PUSH_AFTER.
+    const res = correr(dir, { args: ['--base', shaX, '--head', shaY] })
+    expect(res.code).toBe(1)
+    expect(res.out).toContain('20260101000000_m.sql — MODIFICADA')
+  })
+
+  it('divergente con m.sql ELIMINADA: el merge-base no la vería; before..after exacto la detecta como D y rechaza', () => {
+    const { dir, shaP, shaX, shaY } = repoDivergente('eliminada')
+    const desdeMergeBase = gitc(
+      dir, 'diff', '--name-status', '-M', shaP, shaY, '--', 'supabase/migrations',
+    )
+    expect(desdeMergeBase).toBe('') // desde el merge-base la desaparición es invisible
+    const res = correr(dir, { args: ['--base', shaX, '--head', shaY] })
+    expect(res.code).toBe(1)
+    expect(res.out).toContain('20260101000000_m.sql — ELIMINADA')
+  })
+})
+
+// El workflow de producción DEBE invocar el guard con el rango exacto del push
+// y solo en eventos push. Si alguien edita el workflow y pierde la invocación
+// (o los flags), este test lo hace visible en el PR en vez de en producción.
+describe('contrato con apply-migrations-prod.yml', () => {
+  it('invoca el guard con --base "$PUSH_BEFORE" --head "$PUSH_AFTER" y solo en push', () => {
+    const wf = readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        '..', '..', '.github', 'workflows', 'apply-migrations-prod.yml',
+      ),
+      'utf8',
+    )
+    expect(wf).toContain(
+      'node scripts/migrations-append-only.mjs --base "$PUSH_BEFORE" --head "$PUSH_AFTER"',
+    )
+    expect(wf).toContain("if: github.event_name == 'push'")
   })
 })

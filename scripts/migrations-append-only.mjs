@@ -25,9 +25,16 @@
 // CÓMO SE COMPARA
 //   · PR (GITHUB_EVENT_NAME=pull_request): merge-base(origin/$GITHUB_BASE_REF,
 //     HEAD)..HEAD — el diff del PR, sin arrastrar cambios que ya están en main.
-//   · push (GITHUB_EVENT_NAME=push): $GITHUB_EVENT_BEFORE..HEAD.
+//   · push (GITHUB_EVENT_NAME=push): $GITHUB_EVENT_BEFORE..HEAD, rango EXACTO.
 //   · Local / otros: merge-base(origin/main, HEAD)..HEAD.
-//   · Override explícito: --base <ref> [--head <ref>].
+//   · Override explícito: --base <ref> [--head <ref>] — rango EXACTO (dos
+//     puntos), SIN merge-base. Es la invocación de apply-migrations-prod.yml
+//     (--base $PUSH_BEFORE --head $PUSH_AFTER) y tiene que serlo: en un
+//     force-push con `before` alcanzable pero NO ancestro de `after`, el
+//     merge-base es el punto de divergencia y una histórica reescrita en la
+//     historia nueva aparecería como ALTA (o una eliminada no aparecería) —
+//     before..after exacto la ve como M o D. El merge-base implícito queda
+//     SOLO para comparar contra una RAMA (modos pull_request y local).
 // FAIL-CLOSED: si la base no se puede resolver — `before` vacío/0000…/
 // inalcanzable (force-push, rama nueva), ref de PR u origin/main ausentes,
 // --base inexistente, o sin merge-base — el guard TERMINA CON ERROR sin validar
@@ -135,7 +142,11 @@ export function resolveRange({ argv = [], env = {} } = {}) {
   }
   const head = flag('--head') ?? 'HEAD'
   const baseArg = flag('--base')
-  if (baseArg) return { base: baseArg, head, mode: 'explícito' }
+  // Un rango explícito es LINEAL por definición: quien pasa --base/--head pide
+  // exactamente ese diff. Pasarlo por merge-base sería fail-open con historias
+  // divergentes (force-push con `before` alcanzable): la reescritura posterior
+  // al punto de divergencia se vería como alta y pasaría (ver cabecera).
+  if (baseArg) return { base: baseArg, head, mode: 'explícito', linear: true }
 
   if (env.GITHUB_EVENT_NAME === 'pull_request' && env.GITHUB_BASE_REF) {
     return { base: `origin/${env.GITHUB_BASE_REF}`, head, mode: 'merge-base (PR)' }
