@@ -395,7 +395,30 @@ export interface PersonalCondominio {
   banco?: string | null
   numero_cuenta?: string | null
   tipo_cuenta?: string | null
+  // Cuenta de ingreso con la que este empleado entra al sistema (app_users).
+  // NULL = sin cuenta, que es el caso normal del personal operativo. Es el
+  // puente entre el expediente y lo que la cuenta ejecuta (creado_por,
+  // actividad del equipo, asignación de tareas); NO otorga permisos por sí solo.
+  user_id?: string | null
   created_at: string
+}
+
+/**
+ * Fila del catálogo `personal_usuarios_asignables` (20260826000000): las cuentas
+ * de staff de la empresa que pueden vincularse a un empleado del condominio.
+ * `personal_id`/`personal_nombre` vienen con el empleado que YA la tiene tomada
+ * en ese proyecto (null si está libre), y `tiene_acceso_proyecto` avisa cuando la
+ * cuenta todavía no ve el condominio y por tanto no podría registrar nada en él.
+ */
+export interface UsuarioAsignablePersonal {
+  usuario_id: string
+  nombre: string
+  email: string | null
+  rol: string
+  activo: boolean
+  tiene_acceso_proyecto: boolean
+  personal_id: string | null
+  personal_nombre: string | null
 }
 
 

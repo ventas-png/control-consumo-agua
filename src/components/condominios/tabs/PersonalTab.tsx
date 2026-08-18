@@ -1,8 +1,10 @@
-import { useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchUsuariosAsignablesPersonal } from '../../../domain/condominios/tabQueries'
 import type {
   PersonalCondominio, CargoPersonal, EstadoPersonal, TurnoPersonal,
   ContactoEmergenciaPersonal, CodigoAccesoPersonal, EquipoAsignadoPersonal,
+  UsuarioAsignablePersonal,
 } from '../../../types'
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -49,7 +51,19 @@ const blank = (): Partial<PersonalCondominio> => ({
   tags: [], codigos_acceso: [], equipo_asignado: [],
   tipo_sangre: '', alergias: '', tipo_contrato: '', fecha_fin_contrato: '', supervisor: '',
   direccion: '', genero: '', estado_civil: '', banco: '', numero_cuenta: '', tipo_cuenta: '',
+  user_id: null,
 })
+
+// El índice único (project_id, user_id) de 20260826000000 protege el vínculo
+// aunque el selector ya deshabilite las cuentas tomadas (dos pestañas abiertas,
+// una lista servida antes de que otro admin asignara). Su mensaje crudo es
+// ilegible; se traduce al hecho concreto.
+function mensajeGuardado(raw: string): string {
+  if (raw.includes('personal_condominio_user_unico_por_proyecto')) {
+    return 'Esa cuenta ya está vinculada a otro empleado de este condominio. Recarga la lista y elige otra.'
+  }
+  return raw
+}
 
 export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [filtroCargo, setFiltroCargo] = useState<CargoPersonal | 'todos'>('todos')
@@ -60,6 +74,23 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const [saving, setSaving] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Catálogo de cuentas de ingreso de la empresa. Se carga al montar (y no al
+  // abrir el formulario) porque las tarjetas también lo usan: sin él, un empleado
+  // vinculado se vería igual que uno sin cuenta.
+  const [usuarios, setUsuarios] = useState<UsuarioAsignablePersonal[]>([])
+  const [usuariosError, setUsuariosError] = useState<string | null>(null)
+
+  const cargarUsuarios = useCallback(async () => {
+    const { data, error } = await fetchUsuariosAsignablesPersonal(proyectoId)
+    setUsuarios(data)
+    setUsuariosError(error?.message ?? null)
+  }, [proyectoId])
+
+  useEffect(() => { void cargarUsuarios() }, [cargarUsuarios])
+
+  const usuarioPorId = new Map(usuarios.map(u => [u.usuario_id, u]))
+  const usuarioSeleccionado = form.user_id ? usuarioPorId.get(form.user_id) : undefined
+  const sinCuenta = personal.filter(p => p.estado === 'activo' && !p.user_id).length
 
   const filtered = personal.filter(p => {
     if (filtroCargo !== 'todos' && p.cargo !== filtroCargo) return false
@@ -110,6 +141,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
       tipo_contrato: p.tipo_contrato ?? '', fecha_fin_contrato: p.fecha_fin_contrato ?? '', supervisor: p.supervisor ?? '',
       direccion: p.direccion ?? '', genero: p.genero ?? '', estado_civil: p.estado_civil ?? '',
       banco: p.banco ?? '', numero_cuenta: p.numero_cuenta ?? '', tipo_cuenta: p.tipo_cuenta ?? '',
+      user_id: p.user_id ?? null,
     })
     setEditId(p.id); setShowForm(true)
   }
@@ -142,12 +174,16 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
       supervisor: form.supervisor || null,
       direccion: form.direccion || null, genero: form.genero || null, estado_civil: form.estado_civil || null,
       banco: form.banco || null, numero_cuenta: form.numero_cuenta || null, tipo_cuenta: form.tipo_cuenta || null,
+      user_id: form.user_id || null,
     }
     const { error } = editId
       ? await updateCondominioRow('personal_condominio', editId, payload)
       : await createCondominioRow('personal_condominio', payload)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: mensajeGuardado(error.message) }); setSaving(false); return }
     setSaving(false); cancelForm(); onRefresh()
+    // El catálogo trae "a qué empleado está vinculada cada cuenta": tras asignar
+    // o liberar una, la copia en memoria quedó vieja.
+    void cargarUsuarios()
   }
 
   async function handleDelete(id: string) {
@@ -156,6 +192,8 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
     const { error } = await deleteCondominioRow('personal_condominio', id)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
+    // Borrar el expediente libera su cuenta para otro empleado.
+    void cargarUsuarios()
   }
 
   async function handleEstado(id: string, estado: EstadoPersonal) {
@@ -178,6 +216,11 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const miniInput: CSSProperties = { ...inputStyle, padding: '6px 8px', fontSize: '12px' }
   const addBtnStyle: CSSProperties = { padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1.5px dashed var(--at-line-strong)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }
   const rmRowStyle: CSSProperties = { padding: '6px 9px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }
+  const avisoStyle = (tono: 'warning' | 'danger'): CSSProperties => ({
+    fontSize: '12px', lineHeight: 1.5, padding: '6px 10px', borderRadius: '8px',
+    background: tono === 'danger' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)',
+    color: tono === 'danger' ? 'var(--at-danger)' : 'var(--at-warning-strong)',
+  })
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -189,6 +232,11 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
               Planilla mensual activa: <strong style={{ color: 'var(--at-primary)' }}>{moneda} {planillaMensual.toFixed(2)}</strong>
             </span>
+          )}
+          {sinCuenta > 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
+              🔐 {sinCuenta} {sinCuenta === 1 ? 'activo sin usuario de ingreso' : 'activos sin usuario de ingreso'}
+            </div>
           )}
         </div>
         {canCreate && !showForm && (
@@ -258,6 +306,60 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
               <div style={{ maxWidth: 180 }}>
                 <ImageUploader value={form.foto_url ?? null} onChange={url => setForm(f => ({ ...f, foto_url: url }))} folder="personal" label="📷 Fotografía" capture />
               </div>
+            </div>
+
+            {/* Usuario de ingreso al sistema */}
+            <div style={sectionTitleStyle}>🔐 Usuario de ingreso al sistema</div>
+            <div style={{ ...fullCol, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ maxWidth: 460 }}>
+                <label style={labelStyle} htmlFor="personal-user-id">Cuenta con la que ingresa</label>
+                <select id="personal-user-id" style={inputStyle} value={form.user_id ?? ''}
+                  onChange={e => setForm(f => ({ ...f, user_id: e.target.value || null }))}>
+                  <option value="">— Sin usuario asignado —</option>
+                  {/* La cuenta ya vinculada puede faltar en el catálogo (falló la
+                      carga, o se dio de baja): sin esta opción el select se vería
+                      vacío y guardar lo desvincularía sin que nadie lo pidiera. */}
+                  {form.user_id && !usuarioSeleccionado && (
+                    <option value={form.user_id}>Cuenta vinculada (no disponible en la lista)</option>
+                  )}
+                  {usuarios.map(u => {
+                    const tomada = u.personal_id !== null && u.personal_id !== editId
+                    return (
+                      <option key={u.usuario_id} value={u.usuario_id} disabled={tomada}>
+                        {u.nombre}
+                        {u.email ? ` · ${u.email}` : ''}
+                        {u.activo ? '' : ' · inactivo'}
+                        {tomada ? ` — ya es ${u.personal_nombre}` : ''}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+
+              {usuariosError && (
+                <span style={avisoStyle('danger')}>
+                  ⚠️ No se pudo cargar la lista de usuarios: {usuariosError}
+                </span>
+              )}
+              {!usuariosError && usuarios.length === 0 && (
+                <span style={avisoStyle('warning')}>
+                  Esta empresa todavía no tiene usuarios que asignar. Créalos en Administración › Usuarios.
+                </span>
+              )}
+              {usuarioSeleccionado && !usuarioSeleccionado.activo && (
+                <span style={avisoStyle('warning')}>
+                  ⚠️ Esta cuenta está desactivada: la persona no podrá ingresar hasta reactivarla en Administración › Usuarios.
+                </span>
+              )}
+              {usuarioSeleccionado && !usuarioSeleccionado.tiene_acceso_proyecto && (
+                <span style={avisoStyle('warning')}>
+                  ⚠️ Esta cuenta aún no tiene acceso a este condominio. Dáselo en Administración › Usuarios › Asignar acceso, o no podrá registrar nada aquí.
+                </span>
+              )}
+              <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+                Vincular la cuenta permite asignarle tareas y deja registrado quién ejecuta cada cosa.
+                No otorga permisos: lo que puede hacer lo siguen definiendo su rol y sus permisos.
+              </span>
             </div>
 
             {/* Afiliaciones */}
@@ -460,10 +562,11 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             const nContactos = p.contactos_emergencia?.length ?? 0
             const nCodigos = p.codigos_acceso?.length ?? 0
             const nEquipos = p.equipo_asignado?.length ?? 0
+            const cuenta = p.user_id ? usuarioPorId.get(p.user_id) : undefined
             const hasDetail = Boolean(nContactos || nCodigos || nEquipos || p.email || p.dpi ||
               p.numero_igss || p.numero_irtra || p.nit || p.tipo_sangre || p.alergias ||
               p.tipo_contrato || p.fecha_fin_contrato || p.supervisor || p.direccion ||
-              p.genero || p.estado_civil || p.banco || p.numero_cuenta || p.notas)
+              p.genero || p.estado_civil || p.banco || p.numero_cuenta || p.notas || p.user_id)
             return (
               <div key={p.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -492,6 +595,11 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                   {p.telefono && <div>📞 {p.telefono}</div>}
                   {p.fecha_ingreso && <div>📅 Desde: {p.fecha_ingreso}</div>}
                   {p.salario != null && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{moneda} {p.salario.toFixed(2)}/mes</div>}
+                  {/* El vínculo se ve sin desplegar: es lo que decide si esta
+                      persona puede recibir tareas y dejar rastro de lo que hace. */}
+                  {p.user_id
+                    ? <div>🔐 {cuenta?.nombre ?? 'Cuenta vinculada'}</div>
+                    : <div>🔓 Sin usuario de ingreso</div>}
                 </div>
 
                 {/* Tags */}
@@ -515,6 +623,15 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                 {/* Detalle expandible */}
                 {hasDetail && isOpen && (
                   <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', color: 'var(--at-ink-2)' }}>
+                    {p.user_id && (
+                      <DetailRow label="🔐 Usuario"
+                        value={[
+                          cuenta?.nombre ?? 'Cuenta vinculada',
+                          cuenta?.email,
+                          cuenta && !cuenta.activo ? 'cuenta inactiva' : null,
+                          cuenta && !cuenta.tiene_acceso_proyecto ? 'sin acceso a este condominio' : null,
+                        ].filter(Boolean).join(' · ')} />
+                    )}
                     {p.email && <DetailRow label="Email" value={p.email} />}
                     {p.dpi && <DetailRow label="DPI" value={p.dpi} />}
                     {(p.numero_igss || p.numero_irtra || p.nit) && (
