@@ -8,7 +8,6 @@ import {
   fetchTareasBloqueData,
   fetchCondominiosLimpiezaData,
   fetchCondominiosTurnosData,
-  fetchClientesConCumple,
 } from '../../domain/condominios/sectionData'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission, canActInCondominiosTab } from '../../lib/permissions'
@@ -20,6 +19,7 @@ import { AccessDenied } from '../shared/AccessDenied'
 import { MediaScopeProvider } from '../shared/MediaScopeContext'
 import { TabStrip } from '../shared/TabStrip'
 import { ActiveCondominioProvider, useActiveCondominio } from './ActiveCondominioContext'
+import { useClientesCumple } from '../../domain/condominios/cumpleanos'
 import { CondominioContextBar } from './CondominioContextBar'
 import type {
   UserSession, Proyecto, Unidad,
@@ -190,7 +190,9 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [polizas, setPolizas] = useState<PolizaSeguro[]>([])
   const [inspecciones, setInspecciones] = useState<InspeccionNormativa[]>([])
   const [personal, setPersonal] = useState<PersonalCondominio[]>([])
-  const [clientesBirthday, setClientesBirthday] = useState<{ id: string; nombre: string; fecha_nacimiento: string; unidad_nombre?: string }[]>([])
+  // Cumpleaños de residentes: hook propio, con sus dependencias reales y
+  // cancelación de respuestas atrasadas (ver domain/condominios/cumpleanos).
+  const clientesBirthday = useClientesCumple(unidades, selectedProyectoId)
   // Fase 5
   const [contactosEmergencia, setContactosEmergencia] = useState<ContactoEmergencia[]>([])
   const [documentos, setDocumentos] = useState<DocumentoCondominio[]>([])
@@ -345,11 +347,6 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
 
   const restoCargadoRef = useRef(false)
   const runSeqRef = useRef(0)
-
-  // Espejo de la prop `unidades` para que `cargarDatos` lea siempre la última
-  // sin declararla como dependencia (ver el comentario en el punto de uso).
-  const unidadesRef = useRef(unidades)
-  useEffect(() => { unidadesRef.current = unidades }, [unidades])
 
   // P2 perf — carga por FASES: abrir Condominios dispara solo las 9 colecciones
   // del tab Panel (fetchCondominiosPanelData); el resto (~132 queries en 5
@@ -581,25 +578,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
     setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
     setPersonal((personalRes.data ?? []) as PersonalCondominio[])
-    // Fetch clients linked to project units (for birthday calendar).
-    // `unidadesRef` y no la prop directa: `cargarDatos` dispara el batch pesado
-    // de ~90 consultas y su identidad gobierna el efecto de carga inicial. Meter
-    // `unidades` (array nuevo cada vez que el padre re-renderiza) en sus deps
-    // relanzaría ese batch entero sin motivo; leer del ref da el valor MÁS
-    // RECIENTE en el momento de la llamada — que es justo lo que la closure
-    // vieja no daba — sin cambiar cuándo se recarga.
-    const unidadesActuales = unidadesRef.current
-    const clienteIds = unidadesActuales.filter(u => u.project_id === pid && u.cliente_id).map(u => u.cliente_id as string)
-    if (clienteIds.length > 0) {
-      const { data: cliData } = await fetchClientesConCumple(clienteIds)
-      const unidadesPid = unidadesActuales.filter(u => u.project_id === pid)
-      setClientesBirthday((cliData ?? []).map(c => ({
-        id: c.id, nombre: c.nombre, fecha_nacimiento: c.fecha_nacimiento!,
-        unidad_nombre: unidadesPid.find(u => u.cliente_id === c.id)?.nombre,
-      })))
-    } else {
-      setClientesBirthday([])
-    }
+    // Los cumpleaños de residentes YA NO se cargan aquí: dependen de `unidades`,
+    // que cambia por su cuenta, y meterlas en las deps de este callback
+    // relanzaría el batch entero. Viven en `useClientesCumple`, que
+    // reacciona solo a las unidades del proyecto.
     setContactosEmergencia((contactosEmergRes.data ?? []) as ContactoEmergencia[])
     setDocumentos((documentosRes.data ?? []) as DocumentoCondominio[])
     setResiduos((residuosRes.data ?? []) as RegistroResiduo[])

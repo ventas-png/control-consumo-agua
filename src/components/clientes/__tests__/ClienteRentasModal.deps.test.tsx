@@ -7,12 +7,12 @@
 // early-return y nunca volvía a intentarlo: contratos y reservas del cliente
 // quedaban en blanco de forma permanente.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import type { Cliente, Unidad } from '../../../types'
 
 const h = vi.hoisted(() => ({
-  fetchContratosByUnidades: vi.fn(async () => []),
-  fetchReservasByUnidades: vi.fn(async () => []),
+  fetchContratosByUnidades: vi.fn(async (): Promise<unknown[]> => []),
+  fetchReservasByUnidades: vi.fn(async (): Promise<unknown[]> => []),
 }))
 
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -83,6 +83,60 @@ describe('ClienteRentasModal — el efecto declara `fetchData`', () => {
     await act(async () => {})
 
     expect(h.fetchContratosByUnidades).toHaveBeenCalledTimes(1)
+  })
+
+  // Revisión, punto 5: el early-return por lista vacía solo apagaba el loading y
+  // dejaba `contratos`/`reservas` de la carga anterior en el estado. Hoy eso NO
+  // llega a verse porque el cuerpo del modal está tras dos guardas
+  // (`clienteUnidades.length === 0` → EmptyState, y `loading` → spinner), así
+  // que estas pruebas NO fallan contra el código sin corregir: fijan el
+  // contrato observable ("no se muestran registros del cliente anterior") para
+  // que siga siendo cierto si alguna de esas guardas cambia. La limpieza del
+  // estado se hace igual, porque conservarlo es incorrecto en sí mismo.
+  it('al quedarse sin unidades NO deja en pantalla los datos del cliente anterior', async () => {
+    h.fetchContratosByUnidades.mockResolvedValue([
+      {
+        id: 'ct-1', unidad_id: 'u1', arrendatario_nombre: 'INQUILINO ANTERIOR',
+        fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31',
+        monto_renta: 4500, dia_pago: 5, estado: 'activo',
+      },
+    ])
+
+    const { rerender } = render(modal([unidad('u1', 'cli-1')]))
+    await act(async () => {})
+    expect(screen.getByText(/INQUILINO ANTERIOR/)).toBeTruthy()
+
+    // El padre cambia a un cliente sin unidades (o se las quitan todas).
+    rerender(modal([], { id: 'cli-2', nombre: 'Beto' } as unknown as Cliente))
+    await act(async () => {})
+
+    expect(screen.queryByText(/INQUILINO ANTERIOR/)).toBeNull()
+    expect(screen.getByText('Este cliente no tiene unidades asignadas')).toBeTruthy()
+  })
+
+  it('al recuperar unidades, lo que se pinta viene de la consulta NUEVA', async () => {
+    h.fetchContratosByUnidades.mockResolvedValueOnce([
+      {
+        id: 'ct-1', unidad_id: 'u1', arrendatario_nombre: 'CONTRATO VIEJO',
+        fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31',
+        monto_renta: 4500, dia_pago: 5, estado: 'activo',
+      },
+    ])
+
+    const { rerender } = render(modal([unidad('u1', 'cli-1')]))
+    await act(async () => {})
+    expect(screen.getByText(/CONTRATO VIEJO/)).toBeTruthy()
+
+    rerender(modal([]))
+    await act(async () => {})
+
+    // Vuelven unidades: la consulta se relanza y ahora no hay contratos.
+    h.fetchContratosByUnidades.mockResolvedValueOnce([])
+    rerender(modal([unidad('u2', 'cli-1')]))
+    await act(async () => {})
+
+    expect(h.fetchContratosByUnidades).toHaveBeenLastCalledWith(['u2'])
+    expect(screen.queryByText(/CONTRATO VIEJO/)).toBeNull()
   })
 
   it('ignora unidades de otro cliente (el memo filtra por cliente.id)', async () => {

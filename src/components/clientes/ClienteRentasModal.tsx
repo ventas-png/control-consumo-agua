@@ -89,7 +89,16 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
   // Antes el efecto solo miraba `cliente.id`: si las unidades llegaban después
   // (carga asíncrona del padre) la lista seguía vacía y no se recargaba nunca.
   const fetchData = useCallback(async (estaCancelado: () => boolean = () => false) => {
-    if (clienteUnidades.length === 0) { setLoading(false); return }
+    // Sin unidades no hay nada que consultar, PERO tampoco puede quedarse en
+    // pantalla lo del cliente/unidades anteriores: el early-return se limitaba a
+    // apagar el loading y dejaba visibles contratos y reservas de la carga
+    // previa. Se limpia el estado antes de salir.
+    if (clienteUnidades.length === 0) {
+      setContratos([])
+      setReservas([])
+      setLoading(false)
+      return
+    }
     const unidadIds = clienteUnidades.map(u => u.id)
     setLoading(true)
     const [contratosData, reservasData] = await Promise.all([

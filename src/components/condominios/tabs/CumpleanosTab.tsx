@@ -37,15 +37,18 @@ interface Cumpleanero {
   subtitulo: string
 }
 
-function calcularEdadAnio(anioNac: number | null, diasHasta: number): string {
+// `hoy` llega SIEMPRE por parámetro. Cuando estas funciones leían `new Date()`
+// por su cuenta, el memo que las llama (dependiente solo de `[todos]`) se
+// quedaba con el cálculo del primer render: al cruzar la medianoche los días
+// restantes no se movían y un cumpleaños no entraba ni salía de la ventana de
+// 30 días. Con el parámetro explícito, `hoy` es una dependencia real del memo.
+function calcularEdadAnio(anioNac: number | null, diasHasta: number, hoy: Date): string {
   if (!anioNac || anioNac < 1920) return ''
-  const hoy = new Date()
   const edad = hoy.getFullYear() - anioNac + (diasHasta === 0 ? 0 : 1)
   return `${edad} años`
 }
 
-function diasHastaSiguiente(mesdia: string): number {
-  const hoy = new Date()
+function diasHastaSiguiente(mesdia: string, hoy: Date): number {
   const [mm, dd] = mesdia.split('-').map(Number)
   const esteAnio = new Date(hoy.getFullYear(), mm - 1, dd)
   if (esteAnio.toDateString() === hoy.toDateString()) return 0
@@ -96,10 +99,10 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
 
   const proximos30 = useMemo(() => (
     todos
-      .map(c => ({ ...c, dias: diasHastaSiguiente(c.mesdia) }))
+      .map(c => ({ ...c, dias: diasHastaSiguiente(c.mesdia, hoy) }))
       .filter(c => c.dias <= 30)
       .sort((a, b) => a.dias - b.dias)
-  ), [todos])
+  ), [todos, hoy])
 
   const semanaMes = useMemo(() => {
     const inicio = hoy
@@ -190,7 +193,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
             <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: '14px', marginBottom: '6px' }}>¡Hoy es el cumpleaños de:</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {cumpleHoy.map(c => {
-                const edad = calcularEdadAnio(c.anioNac, 0)
+                const edad = calcularEdadAnio(c.anioNac, 0, hoy)
                 return (
                   <span key={c.id} style={{ padding: '5px 14px', background: COLOR[c.tipo].bg, color: COLOR[c.tipo].color, border: `1px solid ${COLOR[c.tipo].border}`, borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                     {c.nombre}{edad ? ` · ${edad}` : ''}
@@ -294,7 +297,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', maxHeight: '420px', overflowY: 'auto' }}>
                 {proximos30.map(c => {
-                  const edad = calcularEdadAnio(c.anioNac, c.dias)
+                  const edad = calcularEdadAnio(c.anioNac, c.dias, hoy)
                   const [mm, dd] = c.mesdia.split('-')
                   return (
                     <div key={c.id} style={{

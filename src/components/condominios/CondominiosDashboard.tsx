@@ -29,7 +29,6 @@ const EMPTY_STATS = (): ProjectStats => ({
 
 export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavigateSection }: Props) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
-  const [projectInitialized, setProjectInitialized] = useState(false)
   const [stats, setStats] = useState<ProjectStats>(EMPTY_STATS())
   const [perProject, setPerProject] = useState<Record<string, ProjectStats>>({})
   const companyId = currentUser.company_id
@@ -42,16 +41,28 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
     [proyectos],
   )
 
+  // Reconcilia la selección con los proyectos activos VIGENTES. El enfoque
+  // anterior (`projectInitialized`) solo miraba la lista una vez: si el
+  // proyecto seleccionado se archivaba, o si la lista cambiaba de composición
+  // manteniendo el conteo, el dashboard seguía pidiendo stats de un proyecto
+  // que ya no está en el selector.
+  //
+  // Reglas, en orden:
+  //   1. selección todavía válida  → se conserva tal cual;
+  //   2. inválida y hay UN activo  → se elige ese;
+  //   3. inválida en cualquier otro caso (cero o varios) → '' (vista agregada).
+  //
+  // Actualización funcional: la decisión se toma sobre el valor ACTUAL del
+  // estado, así que `selectedProjectId` no entra en las dependencias y el
+  // efecto no se re-dispara por su propio setState. Devolver `actual` cuando no
+  // hay cambio evita además el render extra (React descarta el update).
   useEffect(() => {
-    if (proyectosActivos.length > 0 && !projectInitialized) {
-      if (proyectosActivos.length === 1) {
-        setSelectedProjectId(proyectosActivos[0].id)
-      }
-      setProjectInitialized(true)
-    }
-    // `projectInitialized` es la guarda del propio efecto: vuelve a correr una
-    // vez tras ponerse en true y la condición lo corta. No hay ciclo.
-  }, [proyectosActivos, projectInitialized])
+    setSelectedProjectId(actual => {
+      if (actual && proyectosActivos.some(p => p.id === actual)) return actual
+      if (proyectosActivos.length === 1) return proyectosActivos[0].id
+      return actual === '' ? actual : ''
+    })
+  }, [proyectosActivos])
 
   const cargarStats = useCallback(async () => {
     if (!companyId) return

@@ -90,6 +90,36 @@ describe('CumpleanosTab — "hoy" reactivo', () => {
     expect(screen.getByText('Esta semana').parentElement?.innerHTML).toBe(antes)
   })
 
+  // Regresión de la revisión: `diasHastaSiguiente` leía `new Date()` por su
+  // cuenta dentro de un memo dependiente solo de `[todos]`, así que la ventana
+  // de "próximos 30 días" se congelaba en el cálculo del primer render. Ahora
+  // `hoy` entra por parámetro y es dependencia real del memo.
+  it('al cruzar la medianoche un cumpleaños ENTRA en la ventana de 30 días', () => {
+    // 18/ago → 18/sep quedan 31 días (fuera); el 19/ago pasan a ser 30 (dentro).
+    render(<CumpleanosTab personal={[persona('p1', 'Sofía', '1990-09-18')]} clientesBirthday={[]} />)
+    expect(kpi('Próximos 30d')).toBe(0)
+
+    act(() => { vi.advanceTimersByTime(9.5 * 3600 * 1000 + 1000) })
+
+    expect(kpi('Próximos 30d')).toBe(1)
+  })
+
+  it('al cruzar la medianoche el cumpleaños de ayer SALE de la ventana', () => {
+    render(<CumpleanosTab personal={[persona('p1', 'Marta', '1990-08-18')]} clientesBirthday={[]} />)
+    expect(kpi('Próximos 30d')).toBe(1)
+
+    act(() => { vi.advanceTimersByTime(9.5 * 3600 * 1000 + 1000) })
+
+    // Ya pasó: la siguiente vez es dentro de 364 días.
+    expect(kpi('Próximos 30d')).toBe(0)
+  })
+
+  it('la edad mostrada se calcula con el `hoy` vigente, no con el reloj suelto', () => {
+    render(<CumpleanosTab personal={[persona('p1', 'Marta', '1990-08-18')]} clientesBirthday={[]} />)
+    // Cumple hoy (18/ago/2026) y nació en 1990 → 36 años.
+    expect(cumplenHoy()).toContain('36 años')
+  })
+
   it('bajo StrictMode no duplica temporizadores ni deja efectos colgando', () => {
     const { unmount } = render(
       <StrictMode>

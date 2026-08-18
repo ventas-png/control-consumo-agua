@@ -6,7 +6,7 @@
 // `hasta` era `useMemo(() => hoyLocalISO(), [])`, es decir la fecha CONGELADA
 // del primer render: la consulta seguía pidiendo "hasta ayer" de madrugada.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ActividadUsuario } from '../../../../domain/condominios/actividad'
 
@@ -59,13 +59,29 @@ describe('ActividadEquipoTab — `filas` estable y `hasta` reactivo', () => {
     expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-07-19', '2026-08-18')
   })
 
-  it('al cruzar la medianoche vuelve a consultar con el rango del día NUEVO', () => {
+  it('al cruzar la medianoche el rango se DESPLAZA: avanzan los dos extremos', () => {
     h.useActividadEquipo.mockReturnValue(resultado([]))
     render(<ActividadEquipoTab proyectoId="p1" companyId="c1" />)
+    expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-07-19', '2026-08-18')
 
     act(() => { vi.advanceTimersByTime(9.5 * 3600 * 1000 + 1000) })
 
-    expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-07-19', '2026-08-19')
+    // `desde` se deriva de `hasta`, así que la ventana sigue siendo de 30 días
+    // en vez de estirarse a 31 (que es lo que pasaba cuando `isoHaceDias` leía
+    // el reloj por su cuenta dentro de un memo dependiente solo de `dias`).
+    expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-07-20', '2026-08-19')
+  })
+
+  it('cambiar el rango recalcula `desde` sobre el `hasta` vigente', () => {
+    h.useActividadEquipo.mockReturnValue(resultado([]))
+    render(<ActividadEquipoTab proyectoId="p1" companyId="c1" />)
+
+    fireEvent.click(screen.getByText('Últimos 7 días'))
+    expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-08-11', '2026-08-18')
+
+    act(() => { vi.advanceTimersByTime(9.5 * 3600 * 1000 + 1000) })
+
+    expect(h.useActividadEquipo).toHaveBeenLastCalledWith('p1', '2026-08-12', '2026-08-19')
   })
 
   it('con `data` undefined trata las filas como lista vacía sin romper los totales', () => {

@@ -28,10 +28,14 @@ const RANGOS = [
 
 // dateLocalISO y no toISOString(): en husos negativos (todo LATAM) el ISO
 // devuelve la fecha UTC y después de las 18:00 locales el rango se corre un día.
-function isoHaceDias(dias: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - dias)
-  return dateLocalISO(d)
+//
+// El ancla es el extremo SUPERIOR del rango ('YYYY-MM-DD'), no `new Date()`:
+// leer el reloj aquí dentro dejaba `desde` congelado en el día del primer
+// render (el memo que lo llama solo depende de `dias`), así que al cruzar la
+// medianoche el rango se estiraba a 31 días en vez de desplazarse.
+function isoHaceDias(hastaISO: string, dias: number): string {
+  const [y, m, d] = hastaISO.split('-').map(Number)
+  return dateLocalISO(new Date(y, m - 1, d - dias))
 }
 
 export default function ActividadEquipoTab({ proyectoId, companyId }: Props) {
@@ -40,7 +44,8 @@ export default function ActividadEquipoTab({ proyectoId, companyId }: Props) {
   // pantalla abierta de madrugada seguía consultando hasta ayer. useHoyLocalISO
   // mantiene la identidad estable dentro del día y la refresca a medianoche.
   const hasta = useHoyLocalISO()
-  const desde = useMemo(() => isoHaceDias(dias), [dias])
+  // Derivado de `hasta`: ambos extremos del rango avanzan juntos a medianoche.
+  const desde = useMemo(() => isoHaceDias(hasta, dias), [hasta, dias])
 
   const { data, isLoading, isError, error } = useActividadEquipo(proyectoId, desde, hasta)
   // `data ?? []` creaba un array nuevo en cada render, así que los dos memos de
