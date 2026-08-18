@@ -121,6 +121,25 @@ export async function registrarFamiliar(
   return { error: error?.message ?? null }
 }
 
+/**
+ * Retira la solicitud de renta pendiente o da de baja la autorización aprobada
+ * de una unidad propia (estado → 'baja'). Con inquilino activo revoca en
+ * cascada su acceso y el de su núcleo familiar (RPC 20260827000000).
+ */
+export async function darDeBajaRenta(
+  unidadId: string,
+): Promise<{ inquilinoRevocado: boolean; familiaresRevocados: number; error: string | null }> {
+  const { data, error } = await supabase.rpc('portal_baja_renta', {
+    p_unidad_id: unidadId,
+  })
+  const r = data as { inquilino_revocado?: boolean; familiares_revocados?: number } | null
+  return {
+    inquilinoRevocado: r?.inquilino_revocado ?? false,
+    familiaresRevocados: r?.familiares_revocados ?? 0,
+    error: error?.message ?? null,
+  }
+}
+
 /** Revoca un acceso familiar de una unidad propia (no toca el cliente ni su login). */
 export async function quitarFamiliar(
   unidadId: string,

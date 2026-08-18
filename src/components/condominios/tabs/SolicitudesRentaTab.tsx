@@ -24,6 +24,9 @@ const ESTADO_CFG: Record<EstadoSolicitudRenta, { label: string; color: string; b
   pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⏳' },
   aprobada:  { label: 'Aprobada',  color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
   rechazada: { label: 'Rechazada', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '❌' },
+  // El PROPIETARIO retiró su solicitud o dio de baja la autorización (RPC
+  // portal_baja_renta, 20260827000000). Neutro: no es una decisión del admin.
+  baja:      { label: 'Dada de baja', color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', icon: '🚫' },
 }
 
 export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdit, onRefresh }: Props) {

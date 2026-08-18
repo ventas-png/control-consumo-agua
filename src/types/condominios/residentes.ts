@@ -27,7 +27,7 @@ export interface UnidadResidente {
 // ── Autorización de Renta por Unidad ──────────────────────────────────────
 
 export type TipoRenta = 'arrendamiento' | 'str' | 'ambas'
-export type EstadoSolicitudRenta = 'pendiente' | 'aprobada' | 'rechazada'
+export type EstadoSolicitudRenta = 'pendiente' | 'aprobada' | 'rechazada' | 'baja'
 
 export interface SolicitudRentaUnidad {
   id: string
