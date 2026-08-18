@@ -25,6 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Historia completa: el guard append-only de migraciones compara
+          # contra el merge-base con la rama base (PR) o contra `before` (push);
+          # con el checkout superficial por defecto ninguno de los dos existe.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -41,6 +46,16 @@ jobs:
       # `npm ci` para dar feedback en segundos.
       - name: Migrations guard (RLS + scope de RPCs)
         run: node scripts/migrations-guard.mjs
+
+      # Las migraciones ya mergeadas son INMUTABLES: prod y las preview branches
+      # ya las aplicaron, y el apply de push reaplicaría una modificada contra
+      # producción (--diff-filter=AM). Este guard compara el diff Git del PR
+      # (merge-base) o del push (before..HEAD) y solo permite AÑADIR archivos.
+      # También nativo de Node y sin dependencias: va antes de `npm ci`.
+      - name: Migrations append-only (histórico inmutable)
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: node scripts/migrations-append-only.mjs
 
       - name: Install dependencies
         run: npm ci

@@ -93,6 +93,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Cortafuegos append-only ANTES de seleccionar nada: el paso `list` de
+      # abajo selecciona con --diff-filter=AM, así que una migración histórica
+      # MODIFICADA en el push se reaplicaría contra producción tal cual (la
+      # clase del incidente 2026-08-03). Si el push tocó el histórico
+      # (modificar/eliminar/renombrar), se aborta aquí sin ejecutar SQL.
+      # FAIL-CLOSED: si `before` no es alcanzable (force-push a main), también
+      # aborta — sin rango verificable no se valida nada; un force-push puede
+      # reescribir históricas en commits anteriores al último y el diff de un
+      # solo commit no las vería. Recuperación: revisar el histórico a mano y
+      # aplicar lo pendiente con workflow_dispatch (modo reconciliar).
+      # Solo aplica a push: workflow_dispatch no trae rango y el modo
+      # reconciliar re-aplica pendientes por diseño.
+      - name: Migrations append-only (histórico inmutable)
+        if: github.event_name == 'push'
+        run: node scripts/migrations-append-only.mjs --base "$PUSH_BEFORE" --head "$PUSH_AFTER"
+
       - name: Build list of migrations to apply
         id: list
         run: |
