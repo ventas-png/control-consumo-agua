@@ -25,11 +25,16 @@
 // CÓMO SE COMPARA
 //   · PR (GITHUB_EVENT_NAME=pull_request): merge-base(origin/$GITHUB_BASE_REF,
 //     HEAD)..HEAD — el diff del PR, sin arrastrar cambios que ya están en main.
-//   · push (GITHUB_EVENT_NAME=push): $GITHUB_EVENT_BEFORE..HEAD, con el mismo
-//     guard que apply-migrations-prod.yml: si `before` es 0000… o inalcanzable
-//     (force-push, rama nueva), se degrada a inspeccionar solo HEAD con warning.
+//   · push (GITHUB_EVENT_NAME=push): $GITHUB_EVENT_BEFORE..HEAD.
 //   · Local / otros: merge-base(origin/main, HEAD)..HEAD.
 //   · Override explícito: --base <ref> [--head <ref>].
+// FAIL-CLOSED: si la base no se puede resolver — `before` vacío/0000…/
+// inalcanzable (force-push, rama nueva), ref de PR u origin/main ausentes,
+// --base inexistente, o sin merge-base — el guard TERMINA CON ERROR sin validar
+// nada. Degradar a mirar solo el commit HEAD sería fail-open: un force-push
+// puede reescribir migraciones históricas en commits ANTERIORES al último y el
+// diff de un solo commit no las ve. Se exige historia completa o un rango
+// verificable, y el error lo dice.
 // El diff corre con -M (detección de renombres ACTIVA). No confundir con el
 // `--no-renames` del apply: allí se descompone R en D+A para no SALTARSE la
 // aplicación del archivo nuevo; aquí queremos VER el renombre para prohibirlo.
@@ -138,41 +143,51 @@ export function resolveRange({ argv = [], env = {} } = {}) {
   if (env.GITHUB_EVENT_NAME === 'push') {
     const before = env.GITHUB_EVENT_BEFORE
     if (before && before !== SHA_VACIO) return { base: before, head, mode: 'push', linear: true }
-    return { base: null, head, mode: 'push sin before (force-push o rama nueva)' }
+    return { base: null, head, mode: 'push sin `before` utilizable (vacío o 0000… — force-push o rama nueva)' }
   }
   return { base: 'origin/main', head, mode: 'merge-base (local)' }
+}
+
+// Sin rango verificable NO se valida nada: fail-closed. Mirar "solo HEAD" sería
+// fail-open — un force-push puede reescribir históricas en commits anteriores
+// al último y ese diff no las ve (ver cabecera).
+function abortarSinRango(motivo) {
+  console.error(`❌ migrations-append-only: sin rango Git VERIFICABLE — ${motivo}.`)
+  console.error('   Este guard es fail-closed a propósito: validar solo el commit HEAD dejaría')
+  console.error('   pasar un force-push que reescriba migraciones históricas en commits')
+  console.error('   ANTERIORES al último. NO se validó nada y NO se ejecutó ningún SQL.')
+  console.error('   Para desbloquear se necesita historia completa o un rango verificable:')
+  console.error('   · en CI, checkout con fetch-depth: 0 (ci.yml ya lo hace);')
+  console.error('   · restaura la ref que falta, o pasa --base <commit existente>;')
+  console.error('   · si esto abortó el apply de producción tras un force-push a main,')
+  console.error('     revisa el histórico a mano y aplica lo pendiente con workflow_dispatch')
+  console.error('     (modo reconciliar) — nunca re-lances a ciegas.')
+  process.exit(1)
 }
 
 async function main() {
   const range = resolveRange({ argv: process.argv.slice(2), env: process.env })
 
-  let diffText
-  let descripcion
-  if (range.base && gitOk(['cat-file', '-e', `${range.base}^{commit}`])) {
-    // En PR/local el punto de comparación es el merge-base, para no atribuir al
-    // PR cambios que ya están en la base. En push (rango lineal) before..head.
-    const desde = range.linear
-      ? range.base
-      : git(['merge-base', range.base, range.head]).trim()
-    diffText = git(['diff', '--name-status', '-M', desde, range.head, '--', MIG_DIR])
-    descripcion = `${desde.slice(0, 12)}..${range.head} (${range.mode})`
-  } else {
-    // Sin base alcanzable no hay rango honesto: se degrada a inspeccionar el
-    // commit HEAD solo, avisando — mismo criterio que apply-migrations-prod.yml.
-    console.warn(
-      `⚠️  Base no disponible (${range.mode}); se inspecciona solo el commit ${range.head}.`,
-    )
-    diffText = git([
-      'show',
-      '--name-status',
-      '-M',
-      '--pretty=format:',
-      range.head,
-      '--',
-      MIG_DIR,
-    ])
-    descripcion = `solo ${range.head} (${range.mode})`
+  if (!range.base) abortarSinRango(range.mode)
+  if (!gitOk(['cat-file', '-e', `${range.base}^{commit}`])) {
+    abortarSinRango(`la base "${range.base}" no existe o no es alcanzable (${range.mode})`)
   }
+  // En PR/local el punto de comparación es el merge-base, para no atribuir al
+  // PR cambios que ya están en la base. En push (rango lineal) before..head.
+  let desde
+  if (range.linear) {
+    desde = range.base
+  } else {
+    try {
+      desde = git(['merge-base', range.base, range.head]).trim()
+    } catch {
+      abortarSinRango(
+        `sin merge-base entre "${range.base}" y "${range.head}" (¿historial truncado o no relacionado?)`,
+      )
+    }
+  }
+  const diffText = git(['diff', '--name-status', '-M', desde, range.head, '--', MIG_DIR])
+  const descripcion = `${desde.slice(0, 12)}..${range.head} (${range.mode})`
 
   const entries = parseNameStatus(diffText)
   const violations = evaluateAppendOnly(entries)

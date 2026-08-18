@@ -5,7 +5,12 @@
 // `git diff --name-status -M` (campos separados por TAB), sin tocar git ni las
 // migraciones reales. vitest recoge este archivo por su patrón por defecto.
 // ════════════════════════════════════════════════════════════════════════════
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   evaluateAppendOnly,
   parseNameStatus,
@@ -175,5 +180,135 @@ describe('resolveRange — selección de rango por contexto', () => {
 
   it('sin contexto de CI cae a origin/main (uso local)', () => {
     expect(resolveRange({ argv: [], env: {} })).toMatchObject({ base: 'origin/main' })
+  })
+})
+
+// ─── CLI end-to-end contra repos git TEMPORALES ──────────────────────────────
+// Aquí se prueba la política FAIL-CLOSED del binario real: sin rango
+// verificable el guard termina con exit 1 sin validar nada. Degradar a mirar
+// solo HEAD sería fail-open — un force-push puede reescribir históricas en
+// commits ANTERIORES al último y ese diff no las ve (caso de regresión abajo).
+// Cada escenario corre el script con execFileSync sobre un repo git creado en
+// un directorio temporal; no se toca ni el repo real ni sus migraciones.
+describe('CLI — fail-closed sobre repos git temporales', () => {
+  const SCRIPT = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'migrations-append-only.mjs',
+  )
+  const SHA_BOGUS = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+  const dirs = []
+  afterAll(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true })
+  })
+
+  function gitc(cwd, ...args) {
+    return execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+      cwd,
+      encoding: 'utf8',
+    }).trim()
+  }
+
+  // Repo con: A (migración histórica) → B (la MODIFICA) → C (añade una nueva).
+  // La reescritura queda en un commit ANTERIOR al HEAD a propósito.
+  function repoConHistoriaReescrita() {
+    const dir = mkdtempSync(join(tmpdir(), 'append-only-'))
+    dirs.push(dir)
+    gitc(dir, 'init', '-q')
+    mkdirSync(join(dir, 'supabase/migrations'), { recursive: true })
+    const historica = join(dir, 'supabase/migrations/20260101000000_base.sql')
+    writeFileSync(historica, '-- base\n')
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'A: histórica')
+    const shaA = gitc(dir, 'rev-parse', 'HEAD')
+    appendFileSync(historica, '-- REESCRITA\n')
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'B: modifica la histórica')
+    writeFileSync(join(dir, 'supabase/migrations/20260102000000_nueva.sql'), '-- nueva\n')
+    gitc(dir, 'add', '-A')
+    gitc(dir, 'commit', '-qm', 'C: añade nueva')
+    return { dir, shaA }
+  }
+
+  function correr(dir, { args = [], env = {} } = {}) {
+    const limpio = {
+      ...process.env,
+      GITHUB_EVENT_NAME: undefined,
+      GITHUB_BASE_REF: undefined,
+      GITHUB_EVENT_BEFORE: undefined,
+      ...env,
+    }
+    try {
+      const out = execFileSync(process.execPath, [SCRIPT, ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: limpio,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      return { code: 0, out }
+    } catch (e) {
+      return { code: e.status, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
+    }
+  }
+
+  const esperaFailClosed = (res) => {
+    expect(res.code).toBe(1)
+    expect(res.out).toContain('rango Git VERIFICABLE')
+    expect(res.out).toContain('ningún SQL')
+  }
+
+  it('push con before 0000… (force-push/rama nueva): exit 1, sin validar', () => {
+    const { dir } = repoConHistoriaReescrita()
+    esperaFailClosed(
+      correr(dir, {
+        env: {
+          GITHUB_EVENT_NAME: 'push',
+          GITHUB_EVENT_BEFORE: '0000000000000000000000000000000000000000',
+        },
+      }),
+    )
+  })
+
+  it('push con before INEXISTENTE: exit 1, sin validar', () => {
+    const { dir } = repoConHistoriaReescrita()
+    esperaFailClosed(
+      correr(dir, { env: { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_BEFORE: SHA_BOGUS } }),
+    )
+  })
+
+  it('--base explícita inexistente: exit 1, sin validar', () => {
+    const { dir } = repoConHistoriaReescrita()
+    esperaFailClosed(correr(dir, { args: ['--base', SHA_BOGUS] }))
+  })
+
+  it('base de PR (origin/<base_ref>) inaccesible: exit 1, sin validar', () => {
+    const { dir } = repoConHistoriaReescrita() // sin remoto: origin/main no existe
+    esperaFailClosed(
+      correr(dir, { env: { GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: 'main' } }),
+    )
+  })
+
+  it('REGRESIÓN fail-open: histórica reescrita en un commit ANTERIOR al HEAD con before inalcanzable → rechazado (la degradación a `git show HEAD` habría dado verde)', () => {
+    const { dir } = repoConHistoriaReescrita()
+    // HEAD (C) solo añade una migración nueva; la modificación vive en B.
+    // Un diff de "solo HEAD" no la vería — por eso sin rango se falla cerrado.
+    const res = correr(dir, {
+      env: { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_BEFORE: SHA_BOGUS },
+    })
+    esperaFailClosed(res)
+  })
+
+  it('camino feliz: rango válido con solo altas → exit 0; con la modificación en rango → exit 1 nombrándola', () => {
+    const { dir, shaA } = repoConHistoriaReescrita()
+    // Rango C..HEAD no existe; usamos HEAD~1..HEAD (solo el alta de C): pasa.
+    const soloAltas = correr(dir, { args: ['--base', 'HEAD~1'] })
+    expect(soloAltas.code).toBe(0)
+    expect(soloAltas.out).toContain('migraciones nuevas: 1')
+    // Rango A..HEAD incluye la modificación de B: falla nombrando el archivo.
+    const conReescritura = correr(dir, {
+      env: { GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_BEFORE: shaA },
+    })
+    expect(conReescritura.code).toBe(1)
+    expect(conReescritura.out).toContain('20260101000000_base.sql — MODIFICADA')
   })
 })
