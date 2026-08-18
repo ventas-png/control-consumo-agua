@@ -14,6 +14,7 @@ import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
 import { SignaturePad } from '../../shared/SignaturePad'
 import { PaqueteriaSalientesTab } from './PaqueteriaSalientesTab'
+import { codigoRetiroDesdeURL } from '../../../lib/paquetes'
 import type { PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
 
 interface Props {
@@ -51,7 +52,11 @@ function fechaCorta(iso?: string | null): string {
 }
 
 export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
-  const [vista, setVista] = useState<'entrante' | 'saliente_tercero'>('entrante')
+  // Si venimos del QR de retiro (#retiro=<código>) arrancamos en Salidas: es
+  // donde vive la entrega y donde PaqueteriaSalientesTab consume el fragmento.
+  const [vista, setVista] = useState<'entrante' | 'saliente_tercero'>(
+    () => (typeof window !== 'undefined' && codigoRetiroDesdeURL(window.location.hash) ? 'saliente_tercero' : 'entrante'),
+  )
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoPaquete | 'todos'>('todos')
