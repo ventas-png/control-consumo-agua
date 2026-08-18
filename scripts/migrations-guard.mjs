@@ -39,13 +39,22 @@
 //       ANTES del merge. Aplica solo a funciones nacidas después del fix
 //       (20260825010000): el legado está saneado en prod y auditado; exigirlo
 //       retroactivamente forzaría ~30 entradas de allowlist sin valor.
+//       La ACL se modela POR FIRMA (nombre + tipos normalizados, como
+//       pg_get_function_identity_arguments): PostgreSQL permite overloads y
+//       cada uno tiene su propia ACL — un REVOKE sobre foo(uuid) no protege
+//       foo(text). Y se procesan también los GRANT: un GRANT EXECUTE ... TO
+//       PUBLIC o TO anon POSTERIOR al REVOKE re-expone la función y vuelve a
+//       contar como hallazgo. Ambos eran falsos negativos de la primera
+//       versión de la regla.
 //
 // Uso:  node scripts/migrations-guard.mjs
+// Test: scripts/__tests__/migrations-guard.test.mjs (vitest) — importa los
+//       helpers exportados; por eso main() solo corre como módulo principal.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS_DIR = join(__dirname, '..', 'supabase', 'migrations')
@@ -56,7 +65,7 @@ const ALLOWLIST_PATH = join(__dirname, 'migrations-guard.allowlist.json')
 // Se despojan antes de aplicar los patrones para que un ejemplo citado dentro
 // de un comentario no cuente como código real — esto importa mucho aquí,
 // porque varias migraciones citan el SQL vulnerable que vienen a arreglar.
-function stripComments(sql) {
+export function stripComments(sql) {
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/--[^\n]*/g, ' ')
@@ -75,12 +84,111 @@ const RE_CREATE_POLICY =
   /CREATE\s+POLICY\s+(?:"[^"]+"|[\w]+)\s+ON\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
 const RE_ENABLE_RLS =
   /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi
-const RE_DROP_FUNCTION =
-  /DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
-// REVOKE que cierra el grant implícito: PUBLIC tiene que figurar en la lista de
-// roles DESPUÉS del FROM (el `public.` de antes es el esquema, no el rol).
-const RE_REVOKE_FN_PUBLIC =
-  /REVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?[^;]*?\bFROM\b[^;]*?\bPUBLIC\b/gi
+// ── Regla (e): identidad y firma de funciones ───────────────────────────────
+// La identidad canónica es nombre + lista de TIPOS normalizados (equivalente a
+// pg_get_function_identity_arguments). El repo escribe los REVOKE/GRANT con
+// tipos pelados ('uuid, text') y los CREATE con nombre de parámetro
+// ('p_movimiento_id uuid'); además mezcla alias ('int' e 'integer' conviven en
+// las migraciones actuales). Ambas grafías deben producir la misma clave, o un
+// REVOKE correcto se daría por ausente (falso positivo) o se asignaría al
+// overload equivocado (falso negativo).
+const TYPE_ALIASES = new Map([
+  ['int', 'integer'],
+  ['int2', 'smallint'],
+  ['int4', 'integer'],
+  ['int8', 'bigint'],
+  ['bool', 'boolean'],
+  ['varchar', 'character varying'],
+  ['timestamptz', 'timestamp with time zone'],
+  ['float4', 'real'],
+  ['float8', 'double precision'],
+])
+// Si el PRIMER token del parámetro es uno de estos, no hay nombre de parámetro:
+// todo el texto es un tipo multi-palabra ('double precision', 'character
+// varying', 'timestamp with time zone').
+const MULTIWORD_TYPE_STARTERS = new Set([
+  'double',
+  'timestamp',
+  'time',
+  'character',
+  'char',
+  'bit',
+  'national',
+])
+
+// Split por comas de nivel superior: los typmods llevan comas propias
+// (numeric(10,2)) y un split ingenuo partiría el tipo en dos parámetros.
+function splitTopLevel(raw) {
+  const parts = []
+  let depth = 0
+  let cur = ''
+  for (const ch of raw) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === ',' && depth === 0) {
+      parts.push(cur)
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  parts.push(cur)
+  return parts
+}
+
+export function normalizeArgs(raw) {
+  const tipos = []
+  for (let part of splitTopLevel(raw ?? '')) {
+    part = part.trim()
+    if (part === '') continue
+    // DEFAULT/'=' no forman parte de la identidad.
+    part = part.replace(/\s+DEFAULT\s[\s\S]*$/i, '').replace(/\s*=[\s\S]*$/, '')
+    // Modo del parámetro: IN/INOUT/VARIADIC se descartan del texto; los OUT no
+    // forman parte de la identidad de la función (igual que en Postgres).
+    const modo = /^(IN|OUT|INOUT|VARIADIC)\s+/i.exec(part)
+    if (modo) {
+      if (modo[1].toUpperCase() === 'OUT') continue
+      part = part.slice(modo[0].length)
+    }
+    let tokens = part.trim().split(/\s+/)
+    if (tokens.length > 1 && !MULTIWORD_TYPE_STARTERS.has(tokens[0].toLowerCase())) {
+      tokens = tokens.slice(1) // el primer token era el nombre del parámetro
+    }
+    let tipo = tokens.join(' ').toLowerCase()
+    const esArray = /\[\s*\]$/.test(tipo)
+    tipo = tipo
+      .replace(/\[\s*\]$/, '')
+      .replace(/^public\./, '')
+      .replace(/\([^)]*\)/g, '') // typmod fuera: numeric(10,2) ≡ numeric
+      .replace(/\s+/g, ' ')
+      .trim()
+    tipo = TYPE_ALIASES.get(tipo) ?? tipo
+    tipos.push(tipo + (esArray ? '[]' : ''))
+  }
+  return tipos.join(',')
+}
+
+export function fnKey(name, rawArgs) {
+  return `${name.toLowerCase()}(${normalizeArgs(rawArgs)})`
+}
+
+// Referencia a función en DROP/REVOKE/GRANT: la firma es OPCIONAL (Postgres la
+// permite omitir si el nombre no es ambiguo) — sin paréntesis, el evento aplica
+// a TODOS los overloads del nombre. Los args toleran un nivel de anidación
+// (typmods).
+const FN_REF = String.raw`(?:public\.)?"?([a-zA-Z_][\w]*)"?\s*(\(((?:[^()]|\([^()]*\))*)\))?`
+const RE_DROP_FUNCTION = new RegExp(
+  String.raw`DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?${FN_REF}`,
+  'gi',
+)
+const RE_REVOKE_FN = new RegExp(
+  String.raw`REVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION\s+${FN_REF}\s+FROM\s+([^;]*)`,
+  'gi',
+)
+const RE_GRANT_FN = new RegExp(
+  String.raw`GRANT\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION\s+${FN_REF}\s+TO\s+([^;]*)`,
+  'gi',
+)
 
 function collect(re, text) {
   const out = []
@@ -91,11 +199,12 @@ function collect(re, text) {
 }
 
 // Extrae definiciones de función con su cuerpo, para poder inspeccionar si el
-// cuerpo lleva el guard. Soporta $$ y $etiqueta$ como delimitadores.
-function extractFunctions(sql) {
+// cuerpo lleva el guard. Soporta $$ y $etiqueta$ como delimitadores. Los args
+// toleran un nivel de anidación (typmods/DEFAULTs con paréntesis).
+export function extractFunctions(sql) {
   const out = []
   const re =
-    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?\s*\(([^)]*)\)/gi
+    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?\s*\(((?:[^()]|\([^()]*\))*)\)/gi
   let m
   while ((m = re.exec(sql)) !== null) {
     const name = m[1].toLowerCase()
@@ -116,6 +225,158 @@ function extractFunctions(sql) {
   return out
 }
 
+// ── Regla (e): eventos de ACL por firma ─────────────────────────────────────
+// Corte de retroactividad: 20260825010000 cerró las 8 del P1; lo anterior está
+// saneado en prod (guard nocturno verde) y queda grandfathered. Un DROP+CREATE
+// de una función vieja en una migración nueva SÍ queda sujeto.
+export const SECDEF_CUTOFF = '20260825010000'
+
+function roleFlags(rolesRaw) {
+  // El `public.` que precede al nombre de la función es el ESQUEMA; aquí solo
+  // se mira la lista de roles después de FROM/TO, donde `public` es el rol.
+  return {
+    public: /\bpublic\b/i.test(rolesRaw ?? ''),
+    anon: /\banon\b/i.test(rolesRaw ?? ''),
+  }
+}
+
+// Devuelve los eventos create/drop/revoke/grant de un SQL (ya sin comentarios),
+// en ORDEN DOCUMENTAL. Procesarlos agrupados por tipo rompe los dos patrones
+// reales del repo: `DROP viejo + CREATE con firma nueva` (los drops agrupados
+// al final borrarían la encarnación recién creada → falso negativo) y `CREATE
+// helper temporal + DROP al final del archivo` (los creates agrupados dejarían
+// viva una función que ya no existe → falso positivo).
+// `args === null` significa "sin firma escrita" → aplica a todos los overloads.
+export function extractAclEvents(sql) {
+  const events = []
+  for (const fn of extractFunctions(sql)) {
+    events.push({
+      i: fn.index,
+      kind: 'create',
+      name: fn.name,
+      args: fn.args,
+      isSecdef: /SECURITY\s+DEFINER/i.test(fn.header),
+    })
+  }
+  for (const m of sql.matchAll(RE_DROP_FUNCTION)) {
+    events.push({ i: m.index, kind: 'drop', name: m[1].toLowerCase(), args: m[2] ? m[3] : null })
+  }
+  for (const m of sql.matchAll(RE_REVOKE_FN)) {
+    events.push({
+      i: m.index,
+      kind: 'revoke',
+      name: m[1].toLowerCase(),
+      args: m[2] ? m[3] : null,
+      ...roleFlags(m[4]),
+    })
+  }
+  for (const m of sql.matchAll(RE_GRANT_FN)) {
+    events.push({
+      i: m.index,
+      kind: 'grant',
+      name: m[1].toLowerCase(),
+      args: m[2] ? m[3] : null,
+      ...roleFlags(m[4]),
+    })
+  }
+  // REVOKE/GRANT dinámicos: `DO $$ ... FOREACH fn IN ARRAY
+  // ARRAY['f()','public.g(uuid)'] ... EXECUTE format('REVOKE ... FROM PUBLIC...',
+  // fn) $$` — el patrón de la casa para barridos (20260604250000, 20260612192952,
+  // 20260825010000). Cada literal del ARRAY lleva su FIRMA COMPLETA y se asocia
+  // a ella (no al nombre pelado). Solo cuentan literales con paréntesis, así los
+  // arrays de TABLAS de los DO de policies no se confunden con funciones. Los
+  // roles se leen del string del format(), acotado por su comilla de cierre.
+  for (const m of sql.matchAll(/DO\s*\$\$[\s\S]*?END\s*\$\$/gi)) {
+    const block = m[0]
+    const revoke = /REVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION[^']*?\bFROM\b([^']*)'/i.exec(
+      block,
+    )
+    const grant = /GRANT\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION[^']*?\bTO\b([^']*)'/i.exec(
+      block,
+    )
+    if (!revoke && !grant) continue
+    for (const arr of block.match(/ARRAY\s*\[([^\]]*)\]/gi) ?? []) {
+      for (const lit of arr.matchAll(/'(?:public\.)?([a-zA-Z_][\w]*)\(([^']*?)\)'/g)) {
+        if (revoke) {
+          events.push({
+            i: m.index,
+            kind: 'revoke',
+            name: lit[1].toLowerCase(),
+            args: lit[2],
+            ...roleFlags(revoke[1]),
+          })
+        }
+        if (grant) {
+          events.push({
+            i: m.index,
+            kind: 'grant',
+            name: lit[1].toLowerCase(),
+            args: lit[2],
+            ...roleFlags(grant[1]),
+          })
+        }
+      }
+    }
+  }
+  return events.sort((a, b) => a.i - b.i)
+}
+
+// Aplica los eventos de un archivo sobre el estado acumulado de ACLs.
+// La ENCARNACIÓN por firma es lo que importa: CREATE OR REPLACE conserva la ACL
+// (y por tanto un REVOKE previo), DROP + CREATE la resetea al grant implícito
+// de PUBLIC, y un GRANT posterior a PUBLIC/anon la RE-EXPONE.
+export function applyAclEvents(acl, events, { file, version }) {
+  const overloadKeys = (name) => [...acl.keys()].filter((k) => k.startsWith(`${name}(`))
+  for (const ev of events) {
+    if (ev.kind === 'create') {
+      const key = fnKey(ev.name, ev.args)
+      const prev = acl.get(key)
+      if (prev) {
+        prev.isSecdef = ev.isSecdef // OR REPLACE: cambia la definición, conserva la ACL
+      } else {
+        acl.set(key, {
+          createdIn: file,
+          createdVersion: version,
+          isSecdef: ev.isSecdef,
+          publicGrant: true, // el grant implícito de CREATE FUNCTION
+          anonGrant: false,
+        })
+      }
+    } else if (ev.kind === 'drop') {
+      const keys = ev.args === null ? overloadKeys(ev.name) : [fnKey(ev.name, ev.args)]
+      for (const k of keys) acl.delete(k)
+    } else {
+      const keys = ev.args === null ? overloadKeys(ev.name) : [fnKey(ev.name, ev.args)]
+      const expone = ev.kind === 'grant'
+      for (const k of keys) {
+        const entry = acl.get(k)
+        if (!entry) continue
+        if (ev.public) entry.publicGrant = expone
+        if (ev.anon) entry.anonGrant = expone
+      }
+    }
+  }
+  return acl
+}
+
+// Una firma viola la regla si es SECURITY DEFINER, anon puede ejecutarla (por
+// el grant de PUBLIC o por grant directo), nació después del corte y no está
+// exceptuada. El allowlist acepta la firma completa normalizada (recomendado)
+// o el nombre pelado (compatibilidad con el formato original).
+export function evaluateSecdefRule(acl, { cutoff = SECDEF_CUTOFF, allowSet = new Set() } = {}) {
+  return [...acl.entries()]
+    .filter(
+      ([key, s]) =>
+        s.isSecdef &&
+        (s.publicGrant || s.anonGrant) &&
+        s.createdVersion > cutoff &&
+        !allowSet.has(key) &&
+        !allowSet.has(key.slice(0, key.indexOf('('))),
+    )
+    .map(([key, s]) => ({ key, file: s.createdIn }))
+    .sort((a, b) => a.key.localeCompare(b.key))
+}
+
 async function main() {
   const files = (await readdir(MIGRATIONS_DIR))
     .filter((f) => f.endsWith('.sql'))
@@ -129,7 +390,15 @@ async function main() {
   const allowNoRls = norm(allowlist.tables_without_rls, 'table')
   const allowNoScope = norm(allowlist.functions_without_company_scope, 'fn')
   const allowNoPolicy = norm(allowlist.tables_without_policy, 'table')
-  const allowNoPublicRevoke = norm(allowlist.security_definer_without_public_revoke, 'fn')
+  // Regla (e): las entradas con firma se normalizan igual que los eventos, para
+  // que 'foo(uuid)' y 'foo(p_id uuid)' casen; un nombre pelado sigue valiendo
+  // por compatibilidad (exceptúa todos los overloads).
+  const allowNoPublicRevoke = new Set(
+    [...norm(allowlist.security_definer_without_public_revoke, 'fn')].map((s) => {
+      const m = /^(?:public\.)?([a-zA-Z_][\w]*)\s*\(([\s\S]*)\)\s*$/.exec(s)
+      return m ? fnKey(m[1], m[2]) : s.toLowerCase()
+    }),
+  )
 
   // Estado acumulado aplicando las migraciones en orden.
   const liveTables = new Set() // creadas y no dropeadas
@@ -138,14 +407,8 @@ async function main() {
   const functions = new Map() // nombre → última definición (last writer gana)
   const grantedToAuthenticated = new Set()
   const tablesWithPolicy = new Set()
-  // Regla (e): ACL efectiva por función. La ENCARNACIÓN es lo que importa:
-  // CREATE OR REPLACE conserva la ACL (y por tanto un REVOKE previo), pero
-  // DROP + CREATE la resetea al grant implícito de PUBLIC — la reabre.
-  const secdefAcl = new Map() // nombre → { createdIn, createdVersion, revokedPublic, isSecdef }
-  // Corte de retroactividad: 20260825010000 cerró las 8 del P1; lo anterior
-  // está saneado en prod (guard nocturno verde) y queda grandfathered. Un
-  // DROP+CREATE de una función vieja en una migración nueva SÍ queda sujeto.
-  const SECDEF_CUTOFF = '20260825010000'
+  // Regla (e): ACL efectiva por FIRMA (ver extractAclEvents/applyAclEvents).
+  const secdefAcl = new Map() // firma → { createdIn, createdVersion, isSecdef, publicGrant, anonGrant }
 
   for (const file of files) {
     const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf8')
@@ -177,70 +440,12 @@ async function main() {
       }
     }
 
-    // Regla (e): los eventos create/drop/revoke del archivo se aplican en ORDEN
-    // DOCUMENTAL, no por tipo. Procesarlos agrupados rompe los dos patrones
-    // reales del repo: `DROP viejo + CREATE con firma nueva` (los drops
-    // agrupados al final borrarían la encarnación recién creada → falso
-    // negativo) y `CREATE helper temporal + DROP al final del archivo` (los
-    // creates agrupados dejarían viva una función que ya no existe → falso
-    // positivo).
-    const aclEvents = []
+    // Regla (b): mapa por nombre, last-writer-gana (sin cambios).
     for (const fn of extractFunctions(sql)) {
       functions.set(fn.name, { ...fn, file })
-      aclEvents.push({
-        i: fn.index,
-        kind: 'create',
-        name: fn.name,
-        isSecdef: /SECURITY\s+DEFINER/i.test(fn.header),
-      })
     }
-    for (const m of sql.matchAll(RE_DROP_FUNCTION)) {
-      aclEvents.push({ i: m.index, kind: 'drop', name: m[1].toLowerCase() })
-    }
-    for (const m of sql.matchAll(RE_REVOKE_FN_PUBLIC)) {
-      aclEvents.push({ i: m.index, kind: 'revoke', name: m[1].toLowerCase() })
-    }
-    // REVOKE dinámico: `DO $$ ... FOREACH fn IN ARRAY ARRAY['f()','public.g(uuid)']
-    // ... EXECUTE format('REVOKE ... ON FUNCTION ... FROM PUBLIC...', fn) $$` —
-    // el patrón de la casa para barridos (20260604250000, 20260612192952,
-    // 20260825010000). Sin esto, el barrido correcto daría falso positivo.
-    // Solo cuentan literales con paréntesis ('nombre(...)'), así los arrays de
-    // TABLAS de los DO de policies no se confunden con funciones.
-    for (const m of sql.matchAll(/DO\s*\$\$[\s\S]*?END\s*\$\$/gi)) {
-      const block = m[0]
-      if (
-        !/REVOKE\s+(?:EXECUTE|ALL)[\s\S]*?ON\s+FUNCTION[\s\S]*?\bFROM\b[\s\S]*?\bPUBLIC\b/i.test(
-          block,
-        )
-      )
-        continue
-      for (const arr of block.match(/ARRAY\s*\[([^\]]*)\]/gi) ?? []) {
-        for (const lit of arr.matchAll(/'(?:public\.)?([a-zA-Z_][\w]*)\(/g)) {
-          aclEvents.push({ i: m.index, kind: 'revoke', name: lit[1].toLowerCase() })
-        }
-      }
-    }
-    aclEvents.sort((a, b) => a.i - b.i)
-    for (const ev of aclEvents) {
-      if (ev.kind === 'create') {
-        const prev = secdefAcl.get(ev.name)
-        if (prev) {
-          prev.isSecdef = ev.isSecdef // OR REPLACE: cambia la definición, conserva la ACL
-        } else {
-          secdefAcl.set(ev.name, {
-            createdIn: file,
-            createdVersion: fileVersion,
-            revokedPublic: false,
-            isSecdef: ev.isSecdef,
-          })
-        }
-      } else if (ev.kind === 'drop') {
-        secdefAcl.delete(ev.name)
-      } else {
-        const entry = secdefAcl.get(ev.name)
-        if (entry) entry.revokedPublic = true
-      }
-    }
+    // Regla (e): eventos por firma en orden documental.
+    applyAclEvents(secdefAcl, extractAclEvents(sql), { file, version: fileVersion })
 
     // GRANT EXECUTE ... TO ... authenticated
     const grantRe =
@@ -334,22 +539,17 @@ async function main() {
     if (!guarded) missingScope.push({ name, file: fn.file })
   }
 
-  // ── Regla (e): SECURITY DEFINER nueva sin REVOKE ... FROM PUBLIC ──────────
+  // ── Regla (e): SECURITY DEFINER nueva ejecutable por anon ─────────────────
   // CREATE FUNCTION concede EXECUTE a PUBLIC por defecto y `anon` lo hereda;
   // el ALTER DEFAULT PRIVILEGES de 20260610061000 no es fiable (lo advierte él
   // mismo). Un `REVOKE ... FROM anon` a secas NO cierra nada (el P1 de
-  // conta_puede_escribir): tiene que figurar PUBLIC. Aplica a encarnaciones
-  // nacidas después del corte; ver SECDEF_CUTOFF arriba.
-  const missingPublicRevoke = [...secdefAcl.entries()]
-    .filter(
-      ([name, s]) =>
-        s.isSecdef &&
-        !s.revokedPublic &&
-        s.createdVersion > SECDEF_CUTOFF &&
-        !allowNoPublicRevoke.has(name),
-    )
-    .map(([name, s]) => ({ name, file: s.createdIn }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // conta_puede_escribir): tiene que figurar PUBLIC. Y un GRANT posterior a
+  // PUBLIC o a anon re-expone la firma. Aplica a encarnaciones nacidas después
+  // del corte; ver SECDEF_CUTOFF arriba.
+  const missingPublicRevoke = evaluateSecdefRule(secdefAcl, {
+    cutoff: SECDEF_CUTOFF,
+    allowSet: allowNoPublicRevoke,
+  })
 
   // ── Reporte ───────────────────────────────────────────────────────────────
   const report = ['🔎 Migrations guard — análisis estático del repo', '']
@@ -370,11 +570,11 @@ async function main() {
     report.push(`    ✗ ${f.name}  [última definición en ${f.file} — falta assert_company_scope()]`)
   }
   report.push(
-    `(e) funciones SECURITY DEFINER nuevas SIN REVOKE ... FROM PUBLIC: ${missingPublicRevoke.length}`,
+    `(e) firmas SECURITY DEFINER nuevas ejecutables por anon: ${missingPublicRevoke.length}`,
   )
   for (const f of missingPublicRevoke) {
     report.push(
-      `    ✗ ${f.name}  [creada en ${f.file} — anon hereda EXECUTE del grant implícito a PUBLIC; añade REVOKE EXECUTE ... FROM PUBLIC, anon]`,
+      `    ✗ ${f.key}  [creada en ${f.file} — anon puede ejecutarla (grant implícito de PUBLIC, o un GRANT posterior a PUBLIC/anon); añade REVOKE EXECUTE ... FROM PUBLIC, anon sobre ESTA firma]`,
     )
   }
   report.push(
@@ -411,7 +611,13 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((err) => {
-  console.error(`❌ migrations-guard: error inesperado — ${err.stack || err.message}`)
-  process.exit(1)
-})
+// Solo como módulo principal: el test (vitest) importa los helpers exportados
+// y NO debe disparar el análisis completo ni el process.exit.
+const esModuloPrincipal =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (esModuloPrincipal) {
+  main().catch((err) => {
+    console.error(`❌ migrations-guard: error inesperado — ${err.stack || err.message}`)
+    process.exit(1)
+  })
+}
