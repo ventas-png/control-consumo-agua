@@ -29,6 +29,17 @@
 // `user_module_permissions` sin notar que la tabla se había dropeado con CASCADE
 // un mes antes. Un guard que no modele el DROP repetiría ese falso positivo.
 //
+//   (e) El P1 del 2026-08 (#765): 8 funciones SECURITY DEFINER se mergearon sin
+//       `REVOKE ... FROM PUBLIC` y quedaron ejecutables por `anon` — CREATE
+//       FUNCTION concede EXECUTE a PUBLIC por defecto. La única que intentó
+//       cerrarse (`conta_puede_escribir`, 20260818000000) hizo `REVOKE FROM
+//       anon` SIN PUBLIC, que es un no-op: anon nunca tuvo grant directo,
+//       hereda el de PUBLIC. La única red era el security-guard nocturno, que
+//       mira PROD DESPUÉS del merge. Esta regla exige el REVOKE en el repo,
+//       ANTES del merge. Aplica solo a funciones nacidas después del fix
+//       (20260825010000): el legado está saneado en prod y auditado; exigirlo
+//       retroactivamente forzaría ~30 entradas de allowlist sin valor.
+//
 // Uso:  node scripts/migrations-guard.mjs
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -64,6 +75,12 @@ const RE_CREATE_POLICY =
   /CREATE\s+POLICY\s+(?:"[^"]+"|[\w]+)\s+ON\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
 const RE_ENABLE_RLS =
   /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi
+const RE_DROP_FUNCTION =
+  /DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?([a-zA-Z_][\w]*)"?/gi
+// REVOKE que cierra el grant implícito: PUBLIC tiene que figurar en la lista de
+// roles DESPUÉS del FROM (el `public.` de antes es el esquema, no el rol).
+const RE_REVOKE_FN_PUBLIC =
+  /REVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?[^;]*?\bFROM\b[^;]*?\bPUBLIC\b/gi
 
 function collect(re, text) {
   const out = []
@@ -94,7 +111,7 @@ function extractFunctions(sql) {
       const end = rest.indexOf(tag, start)
       body = end === -1 ? rest.slice(start) : rest.slice(start, end)
     }
-    out.push({ name, args, header, body })
+    out.push({ name, args, header, body, index: m.index })
   }
   return out
 }
@@ -112,6 +129,7 @@ async function main() {
   const allowNoRls = norm(allowlist.tables_without_rls, 'table')
   const allowNoScope = norm(allowlist.functions_without_company_scope, 'fn')
   const allowNoPolicy = norm(allowlist.tables_without_policy, 'table')
+  const allowNoPublicRevoke = norm(allowlist.security_definer_without_public_revoke, 'fn')
 
   // Estado acumulado aplicando las migraciones en orden.
   const liveTables = new Set() // creadas y no dropeadas
@@ -120,10 +138,19 @@ async function main() {
   const functions = new Map() // nombre → última definición (last writer gana)
   const grantedToAuthenticated = new Set()
   const tablesWithPolicy = new Set()
+  // Regla (e): ACL efectiva por función. La ENCARNACIÓN es lo que importa:
+  // CREATE OR REPLACE conserva la ACL (y por tanto un REVOKE previo), pero
+  // DROP + CREATE la resetea al grant implícito de PUBLIC — la reabre.
+  const secdefAcl = new Map() // nombre → { createdIn, createdVersion, revokedPublic, isSecdef }
+  // Corte de retroactividad: 20260825010000 cerró las 8 del P1; lo anterior
+  // está saneado en prod (guard nocturno verde) y queda grandfathered. Un
+  // DROP+CREATE de una función vieja en una migración nueva SÍ queda sujeto.
+  const SECDEF_CUTOFF = '20260825010000'
 
   for (const file of files) {
     const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf8')
     const sql = stripComments(raw)
+    const fileVersion = (/^(\d{14})_/.exec(file) ?? [])[1] ?? ''
 
     for (const t of collect(RE_CREATE_TABLE, sql)) {
       if (!liveTables.has(t)) createdIn.set(t, file)
@@ -150,9 +177,71 @@ async function main() {
       }
     }
 
+    // Regla (e): los eventos create/drop/revoke del archivo se aplican en ORDEN
+    // DOCUMENTAL, no por tipo. Procesarlos agrupados rompe los dos patrones
+    // reales del repo: `DROP viejo + CREATE con firma nueva` (los drops
+    // agrupados al final borrarían la encarnación recién creada → falso
+    // negativo) y `CREATE helper temporal + DROP al final del archivo` (los
+    // creates agrupados dejarían viva una función que ya no existe → falso
+    // positivo).
+    const aclEvents = []
     for (const fn of extractFunctions(sql)) {
       functions.set(fn.name, { ...fn, file })
+      aclEvents.push({
+        i: fn.index,
+        kind: 'create',
+        name: fn.name,
+        isSecdef: /SECURITY\s+DEFINER/i.test(fn.header),
+      })
     }
+    for (const m of sql.matchAll(RE_DROP_FUNCTION)) {
+      aclEvents.push({ i: m.index, kind: 'drop', name: m[1].toLowerCase() })
+    }
+    for (const m of sql.matchAll(RE_REVOKE_FN_PUBLIC)) {
+      aclEvents.push({ i: m.index, kind: 'revoke', name: m[1].toLowerCase() })
+    }
+    // REVOKE dinámico: `DO $$ ... FOREACH fn IN ARRAY ARRAY['f()','public.g(uuid)']
+    // ... EXECUTE format('REVOKE ... ON FUNCTION ... FROM PUBLIC...', fn) $$` —
+    // el patrón de la casa para barridos (20260604250000, 20260612192952,
+    // 20260825010000). Sin esto, el barrido correcto daría falso positivo.
+    // Solo cuentan literales con paréntesis ('nombre(...)'), así los arrays de
+    // TABLAS de los DO de policies no se confunden con funciones.
+    for (const m of sql.matchAll(/DO\s*\$\$[\s\S]*?END\s*\$\$/gi)) {
+      const block = m[0]
+      if (
+        !/REVOKE\s+(?:EXECUTE|ALL)[\s\S]*?ON\s+FUNCTION[\s\S]*?\bFROM\b[\s\S]*?\bPUBLIC\b/i.test(
+          block,
+        )
+      )
+        continue
+      for (const arr of block.match(/ARRAY\s*\[([^\]]*)\]/gi) ?? []) {
+        for (const lit of arr.matchAll(/'(?:public\.)?([a-zA-Z_][\w]*)\(/g)) {
+          aclEvents.push({ i: m.index, kind: 'revoke', name: lit[1].toLowerCase() })
+        }
+      }
+    }
+    aclEvents.sort((a, b) => a.i - b.i)
+    for (const ev of aclEvents) {
+      if (ev.kind === 'create') {
+        const prev = secdefAcl.get(ev.name)
+        if (prev) {
+          prev.isSecdef = ev.isSecdef // OR REPLACE: cambia la definición, conserva la ACL
+        } else {
+          secdefAcl.set(ev.name, {
+            createdIn: file,
+            createdVersion: fileVersion,
+            revokedPublic: false,
+            isSecdef: ev.isSecdef,
+          })
+        }
+      } else if (ev.kind === 'drop') {
+        secdefAcl.delete(ev.name)
+      } else {
+        const entry = secdefAcl.get(ev.name)
+        if (entry) entry.revokedPublic = true
+      }
+    }
+
     // GRANT EXECUTE ... TO ... authenticated
     const grantRe =
       /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+(?:public\.)?"?([a-zA-Z_][\w]*)"?[^;]*?\bauthenticated\b/gi
@@ -245,6 +334,23 @@ async function main() {
     if (!guarded) missingScope.push({ name, file: fn.file })
   }
 
+  // ── Regla (e): SECURITY DEFINER nueva sin REVOKE ... FROM PUBLIC ──────────
+  // CREATE FUNCTION concede EXECUTE a PUBLIC por defecto y `anon` lo hereda;
+  // el ALTER DEFAULT PRIVILEGES de 20260610061000 no es fiable (lo advierte él
+  // mismo). Un `REVOKE ... FROM anon` a secas NO cierra nada (el P1 de
+  // conta_puede_escribir): tiene que figurar PUBLIC. Aplica a encarnaciones
+  // nacidas después del corte; ver SECDEF_CUTOFF arriba.
+  const missingPublicRevoke = [...secdefAcl.entries()]
+    .filter(
+      ([name, s]) =>
+        s.isSecdef &&
+        !s.revokedPublic &&
+        s.createdVersion > SECDEF_CUTOFF &&
+        !allowNoPublicRevoke.has(name),
+    )
+    .map(([name, s]) => ({ name, file: s.createdIn }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   // ── Reporte ───────────────────────────────────────────────────────────────
   const report = ['🔎 Migrations guard — análisis estático del repo', '']
   report.push(
@@ -264,6 +370,14 @@ async function main() {
     report.push(`    ✗ ${f.name}  [última definición en ${f.file} — falta assert_company_scope()]`)
   }
   report.push(
+    `(e) funciones SECURITY DEFINER nuevas SIN REVOKE ... FROM PUBLIC: ${missingPublicRevoke.length}`,
+  )
+  for (const f of missingPublicRevoke) {
+    report.push(
+      `    ✗ ${f.name}  [creada en ${f.file} — anon hereda EXECUTE del grant implícito a PUBLIC; añade REVOKE EXECUTE ... FROM PUBLIC, anon]`,
+    )
+  }
+  report.push(
     `(d) versiones de migración duplicadas o nombres no parseables: ${duplicateVersions.length + malformedNames.length}`,
   )
   for (const [version, group] of duplicateVersions) {
@@ -280,17 +394,20 @@ async function main() {
     missingRls.length +
     rlsNoPolicy.length +
     missingScope.length +
+    missingPublicRevoke.length +
     duplicateVersions.length +
     malformedNames.length
   if (total > 0) {
     console.error(`❌ migrations-guard: ${total} hallazgo(s) en el repo.`)
-    console.error('   (a)/(b)/(c): añade la migración que falta, o —si la excepción es intencional')
-    console.error('   y revisada— documéntala en scripts/migrations-guard.allowlist.json con su')
-    console.error('   `reason`. (d) NO es allowlisteable: renombra el archivo (el nombre es la')
-    console.error('   identidad de la migración en el historial remoto).')
+    console.error('   (a)/(b)/(c)/(e): añade la migración que falta, o —si la excepción es')
+    console.error('   intencional y revisada— documéntala en scripts/migrations-guard.allowlist.json')
+    console.error('   con su `reason`. (d) NO es allowlisteable: renombra el archivo (el nombre es')
+    console.error('   la identidad de la migración en el historial remoto).')
     process.exit(1)
   }
-  console.log('✅ migrations-guard: RLS + policies declaradas y RPCs con scope.')
+  console.log(
+    '✅ migrations-guard: RLS + policies declaradas, RPCs con scope y SECURITY DEFINER nuevas con REVOKE de PUBLIC.',
+  )
   process.exit(0)
 }
 

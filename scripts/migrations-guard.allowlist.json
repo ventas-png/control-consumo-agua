@@ -42,5 +42,9 @@
       "fn": "conta_cuenta_para",
       "reason": "Resolutor evento→cuenta contable, invocado desde 9 cuerpos de función (incluido presupuesto_estado_partida, que sí deriva la empresa del caller antes de llamarlo). Devuelve un uuid de cuenta del catálogo."
     }
-  ]
+  ],
+
+  "_NOTA_REGLA_E": "Regla (e): toda función SECURITY DEFINER creada en migraciones POSTERIORES a 20260825010000 (el fix del P1 #765) debe llevar `REVOKE ... FROM PUBLIC` — CREATE FUNCTION concede EXECUTE a PUBLIC por defecto y `anon` lo hereda; un `REVOKE FROM anon` sin PUBLIC es un no-op. Lo anterior al corte queda grandfathered (saneado en prod, guard nocturno verde). Excepción legítima aquí: una RPC intencionalmente anon-callable (estilo sso_lookup_domain), que además debe figurar en security-guard.allowlist.json.",
+
+  "security_definer_without_public_revoke": []
 }
