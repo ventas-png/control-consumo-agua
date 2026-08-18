@@ -3,6 +3,7 @@ import type { AmenidadesCtx } from './ctx'
 import { pillStyle, RESERVA_CAL_COLORS } from './ui'
 import { ImageUploader } from '../../../shared/ImageUploader'
 import { EmptyState } from './comunes'
+import { formatFechaCalendario } from '../../../../lib/format'
 
 export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
   const { amenidades, reservas, moneda, canCreate, canEdit, showAmenidadForm, setShowAmenidadForm, saving, amenidadFotoUrl, setAmenidadFotoUrl, amenidadForm, setAmenidadForm, editingAmenidad, setEditingAmenidad, editAmenidadFotoUrl, setEditAmenidadFotoUrl, editAmenidadForm, setEditAmenidadForm, savingEdit, hoy, amenidadFotoUrls, guardarAmenidad, guardarEdicion, toggleAmenidad, eliminarAmenidad, abrirEdicion } = ctx
@@ -312,7 +313,7 @@ export function VistaAmenidades({ ctx }: { ctx: AmenidadesCtx }) {
                           <strong style={{ color: paleta.color, fontSize: 14 }}>{reservasA.length}</strong> reservas confirmadas
                         </div>
                         {proxima && (
-                          <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>Próxima: {proxima.fecha === hoy ? 'HOY' : new Date(proxima.fecha + 'T12:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })} {proxima.hora_inicio}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>Próxima: {proxima.fecha === hoy ? 'HOY' : formatFechaCalendario(proxima.fecha, { day: '2-digit', month: 'short' }, 'es', '—')} {proxima.hora_inicio}</div>
                         )}
                       </div>
                       {canEdit && (

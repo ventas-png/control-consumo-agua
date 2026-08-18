@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import { notify, confirm } from '../../shared/Dialog'
@@ -359,7 +359,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   function buildMensajeRecordatorio(r: ReservaAmenidad, unidad: Unidad | undefined): string {
-    const fechaStr = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })
+    const fechaStr = formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')
     const tarifa = r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada
       ? `\n\n💰 Recuerda traer ${moneda} ${Number(r.monto_tarifa).toFixed(2)} para la tarifa de uso.`
       : ''

@@ -27,7 +27,7 @@ import {
   useCrearContrasenaMutation,
 } from '../../domain/compras/mutations'
 import { contrasenaFormSchema } from '../../domain/compras/schemas'
-import { formatCurrency, formatDateShort, hoyLocalISO } from '../../lib/format'
+import { formatCurrency, formatDateShort, hoyLocalISO, sumarDiasCalendario } from '../../lib/format'
 import {
   CATEGORIAS_GASTO_CXP,
   ESTADO_FACTURA_PROV_LABELS,
@@ -653,9 +653,7 @@ function FacturaFormModal({ companyId, projectId, monedaBase, onClose }: {
     const p = proveedores.find((x) => x.id === id)
     let vence = f.fecha_vencimiento
     if (p && p.dias_credito > 0 && !vence) {
-      const d = new Date(f.fecha_emision + 'T12:00:00')
-      d.setDate(d.getDate() + p.dias_credito)
-      vence = d.toISOString().slice(0, 10)
+      vence = sumarDiasCalendario(f.fecha_emision, p.dias_credito) ?? vence
     }
     setF({ ...f, proveedor_id: id, categoria: p?.categoria_default ?? f.categoria, fecha_vencimiento: vence })
   }

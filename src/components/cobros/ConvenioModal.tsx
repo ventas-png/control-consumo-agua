@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { useState, type FormEvent} from 'react'
 import { notify } from '../shared/Dialog'
 import { EditModal } from '../shared/EditModal'
@@ -195,7 +195,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
               {calendario.map(c => (
                 <div key={c.numero} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 12px', fontSize: '13px', borderTop: '1px solid var(--at-line)' }}>
                   <span style={{ color: 'var(--at-ink-3)', minWidth: '58px' }}>Cuota {c.numero}</span>
-                  <span style={{ color: 'var(--at-ink-2)' }}>{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</span>
+                  <span style={{ color: 'var(--at-ink-2)' }}>{formatFechaCalendario(c.fecha_vencimiento, {}, 'es-GT', '—')}</span>
                   <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</span>
                 </div>
               ))}

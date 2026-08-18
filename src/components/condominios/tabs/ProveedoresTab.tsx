@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
@@ -72,7 +72,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   const porVencer = contratos.filter(c =>
     c.estado === 'activo' && c.fecha_fin &&
     c.fecha_fin >= hoy &&
-    new Date(c.fecha_fin).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+    (diasHastaFechaCalendario(c.fecha_fin) ?? Infinity) < 30
   )
 
   function startEdit(c: ContratoProveedor) {

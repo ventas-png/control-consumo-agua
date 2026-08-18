@@ -4,7 +4,7 @@
 import type { CSSProperties } from 'react'
 import type { Contador } from '../../types'
 import type { DataTableColumn } from '../shared'
-import { formatDate, formatNumber } from '../../lib/format'
+import { formatDate, formatNumber, diasHastaFechaCalendario } from '../../lib/format'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 import type { ContadoresCtx } from './ctx'
 import { TIPO_COLORES, tipoLabel } from './ui'
@@ -196,13 +196,8 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
     c.contratista_instalador || c.garantia_instalacion_vence
   if (!hasAny) return <span style={{ color: 'var(--at-line-strong)' }}>—</span>
 
-  const now = new Date()
-  const reemplazoVencido = c.fecha_reemplazo_sugerida
-    ? new Date(c.fecha_reemplazo_sugerida + 'T12:00:00') <= now
-    : false
-  const garantiaVencida = c.garantia_instalacion_vence
-    ? new Date(c.garantia_instalacion_vence + 'T12:00:00') <= now
-    : false
+  const reemplazoVencido = (diasHastaFechaCalendario(c.fecha_reemplazo_sugerida) ?? Infinity) <= 0
+  const garantiaVencida = (diasHastaFechaCalendario(c.garantia_instalacion_vence) ?? Infinity) <= 0
 
   return (
     <div style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>

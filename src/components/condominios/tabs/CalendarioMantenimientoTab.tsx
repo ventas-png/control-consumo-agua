@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { TicketMantenimiento, ReservaAmenidad, PlanMantenimiento, InspeccionNormativa, VencimientoExtra } from '../../../types'
+import { formatFechaCalendario } from '../../../lib/format'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -203,7 +204,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
           <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)' }}>
-                {new Date(diaDetalle + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {formatFechaCalendario(diaDetalle, { weekday: 'long', day: 'numeric', month: 'long' }, 'es', '—')}
               </div>
               <button onClick={() => setDiaDetalle(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--at-ink-3)' }}>×</button>

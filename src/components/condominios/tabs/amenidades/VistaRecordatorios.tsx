@@ -1,6 +1,7 @@
 // Vista extraída de AmenidadesTab (fase B): JSX idéntico al original.
 import type { AmenidadesCtx } from './ctx'
 import { EmptyState } from './comunes'
+import { formatFechaCalendario } from '../../../../lib/format'
 
 export function VistaRecordatorios({ ctx }: { ctx: AmenidadesCtx }) {
   const { reservas, unidades, hoy, enviarRecordatorio } = ctx
@@ -31,7 +32,7 @@ export function VistaRecordatorios({ ctx }: { ctx: AmenidadesCtx }) {
                       <div style={{ flex: 1, minWidth: 220 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{r.amenidad_nombre}</div>
                         <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                          {r.unidad_nombre} · {r.fecha === hoy ? 'HOY' : new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio}–{r.hora_fin}
+                          {r.unidad_nombre} · {r.fecha === hoy ? 'HOY' : formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · {r.hora_inicio}–{r.hora_fin}
                         </div>
                         <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 2 }}>
                           {unidad?.propietario_nombre || '— sin propietario —'} {tieneTel ? `· ${unidad?.propietario_telefono}` : '· sin teléfono'}

@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, esFechaCalendarioVencida, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -61,11 +61,10 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     (filtroResultado === '' || r.resultado === filtroResultado)
   )
 
-  const vencidosHoy = registros.filter(r => r.fecha_vencimiento && new Date(r.fecha_vencimiento) < new Date())
+  const vencidosHoy = registros.filter(r => esFechaCalendarioVencida(r.fecha_vencimiento))
   const proximosVencer = registros.filter(r => {
-    if (!r.fecha_vencimiento) return false
-    const diff = (new Date(r.fecha_vencimiento).getTime() - new Date().setHours(0,0,0,0)) / 86400000
-    return diff >= 0 && diff <= 30
+    const diff = diasHastaFechaCalendario(r.fecha_vencimiento)
+    return diff !== null && diff >= 0 && diff <= 30
   })
 
   const resumenPorTipo = TIPOS_SISTEMA.map(t => ({
@@ -145,7 +144,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
         {lista.map(r => {
           const tipo = TIPOS_SISTEMA.find(t => t.value === r.tipo_sistema)
           const res = RESULTADOS.find(x => x.value === r.resultado)
-          const vencido = r.fecha_vencimiento && new Date(r.fecha_vencimiento) < new Date()
+          const vencido = esFechaCalendarioVencida(r.fecha_vencimiento)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-danger-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${vencido ? 'var(--at-danger)' : tipo?.color}` }}>
@@ -241,7 +240,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           const tipo = TIPOS_SISTEMA.find(t => t.value === selected.tipo_sistema)
           const res = RESULTADOS.find(x => x.value === selected.resultado)
           const tipoInsp = TIPOS_INSPECCION.find(t => t.value === selected.tipo_inspeccion)
-          const vencido = selected.fecha_vencimiento && new Date(selected.fecha_vencimiento) < new Date()
+          const vencido = esFechaCalendarioVencida(selected.fecha_vencimiento)
           return (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>

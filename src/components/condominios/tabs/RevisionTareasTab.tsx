@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -138,7 +138,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                       {empleado?.nombre ?? 'Empleado'} — {empleado?.cargo ?? ''}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
-                      <span>{new Date(bloque.fecha + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
+                      <span>{formatFechaCalendario(bloque.fecha, { day: '2-digit', month: 'short' }, 'es', '—')}</span>
                       {bloque.turno === 'manana' && <span>🌅 Mañana</span>}
                       {bloque.turno === 'tarde'  && <span>☀️ Tarde</span>}
                       {bloque.turno === 'noche'  && <span>🌙 Noche</span>}

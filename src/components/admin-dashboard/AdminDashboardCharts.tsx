@@ -44,8 +44,8 @@ function AdminDashboardChartsImpl({ registros }: Props) {
       if (r.estado === 'pagado') pagado++
       else if (r.estado === 'pendiente') pendiente++
       else if (r.estado === 'mora') mora++
-      // parseFecha ancla las fechas date-only a T12:00 local: sin él, en
-      // GMT-6 una lectura del día 1 caía al mes anterior (auditoría D2).
+      // parseFecha lee las fechas date-only como fecha de CALENDARIO local:
+      // sin eso, en GMT-6 una lectura del día 1 caía al mes anterior (D2).
       const d = parseFecha(r.fecha)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       const b = buckets[key]

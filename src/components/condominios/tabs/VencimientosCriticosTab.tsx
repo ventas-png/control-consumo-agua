@@ -5,6 +5,7 @@ import {
   VencimientoExtra, CategoriaVencimiento,
   PolizaSeguro, ContratoProveedor, InspeccionNormativa,
 } from '../../../types'
+import { diasHastaFechaCalendario, formatFechaCalendario } from '../../../lib/format'
 
 interface Props {
   vencimientosExtra: VencimientoExtra[]
@@ -60,8 +61,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
   const [form, setForm] = useState(BLANK)
 
   const hoy = new Date()
-  const diffDias = (fechaStr: string) =>
-    Math.floor((new Date(fechaStr).getTime() - hoy.getTime()) / 86400000)
+  const diffDias = (fechaStr: string) => diasHastaFechaCalendario(fechaStr, hoy) ?? 0
 
   const items: ItemVenc[] = useMemo(() => {
     const list: ItemVenc[] = []
@@ -243,7 +243,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{item.titulo}</div>
                   <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
                     {item.tipo}{item.entidad ? ` · ${item.entidad}` : ''}
-                    {' · '}{new Date(item.fecha).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {' · '}{formatFechaCalendario(item.fecha, { day: '2-digit', month: 'short', year: 'numeric' }, 'es', '—')}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>

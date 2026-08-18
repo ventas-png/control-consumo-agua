@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, dateLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import {
   createCondominioRow,
@@ -50,7 +50,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     if (a.trigger_tipo === 'cuota_vencida_dias') {
       return cuotas.filter(c => {
         if (!c.fecha_vencimiento || c.estado === 'pagado') return false
-        const d = Math.floor((Date.now() - new Date(c.fecha_vencimiento).getTime()) / 86400000)
+        const d = -(diasHastaFechaCalendario(c.fecha_vencimiento) ?? 0)
         return d >= dias
       }).length
     }

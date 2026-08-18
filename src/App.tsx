@@ -1,4 +1,4 @@
-import { hoyLocalISO } from './lib/format'
+import { hoyLocalISO, formatFechaCalendario } from './lib/format'
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { lazySafe as lazy } from './lib/lazyWithPreload'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
@@ -550,7 +550,7 @@ function AppShell() {
               <span style={{ fontSize: '13.5px', color: '#78350f', fontWeight: 500 }}>
                 Tienes <strong style={{ color: '#92400e' }}>{rutasPendientes.length} ruta{rutasPendientes.length !== 1 ? 's' : ''}</strong> programada{rutasPendientes.length !== 1 ? 's' : ''}.
                 {' '}Próxima: <strong style={{ color: '#92400e' }}>{proximaRuta.nombre}</strong> el{' '}
-                {new Date(proximaRuta.fecha_programada! + 'T12:00:00').toLocaleDateString('es-GT')}
+                {formatFechaCalendario(proximaRuta.fecha_programada, {}, 'es-GT', '—')}
               </span>
             </div>
             <button

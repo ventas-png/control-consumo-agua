@@ -1,4 +1,4 @@
-import { hoyLocalISO, mesLocalISO } from '../../lib/format'
+import { hoyLocalISO, mesLocalISO, formatFechaCalendario } from '../../lib/format'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { TabStrip } from '../shared/TabStrip'
@@ -1070,8 +1070,8 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                 </div>
                 {conv.descripcion && <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '8px' }}>{conv.descripcion}</div>}
                 <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--at-ink-2)' }}>
-                  <span>📅 Inicio: <strong>{new Date(conv.fecha_inicio + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>
-                  {conv.fecha_vencimiento && <span>⏰ Vence: <strong>{new Date(conv.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>}
+                  <span>📅 Inicio: <strong>{formatFechaCalendario(conv.fecha_inicio, {}, 'es-GT', '—')}</strong></span>
+                  {conv.fecha_vencimiento && <span>⏰ Vence: <strong>{formatFechaCalendario(conv.fecha_vencimiento, {}, 'es-GT', '—')}</strong></span>}
                   {conv.cuotas_pactadas && <span>📋 Cuotas: <strong>{conv.cuotas_pactadas}</strong></span>}
                 </div>
                 {conv.cuotas && conv.cuotas.length > 0 && (
@@ -1083,7 +1083,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                       {conv.cuotas.map((c, i) => (
                         <div key={c.numero} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '6px 12px', fontSize: '12.5px', borderTop: i === 0 ? 'none' : '1px solid var(--at-line)' }}>
                           <span style={{ color: 'var(--at-ink-3)', minWidth: '54px' }}>Cuota {c.numero}</span>
-                          <span style={{ color: 'var(--at-ink-2)' }}>{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</span>
+                          <span style={{ color: 'var(--at-ink-2)' }}>{formatFechaCalendario(c.fecha_vencimiento, {}, 'es-GT', '—')}</span>
                           <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</span>
                         </div>
                       ))}

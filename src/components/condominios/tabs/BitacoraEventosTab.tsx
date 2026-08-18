@@ -4,6 +4,7 @@ import {
   AnuncioComunidad, OrdenCompra, AsambleaDigital,
   GastoCondominio, CuotaCondominio,
 } from '../../../types'
+import { formatFechaCalendario } from '../../../lib/format'
 
 interface Props {
   visitantes: Visitante[]
@@ -202,7 +203,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
                 <div key={e.id}>
                   {showDateSep && (
                     <div style={{ paddingLeft: 44, paddingTop: idx === 0 ? 0 : 16, paddingBottom: 6, fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>
-                      {e.fecha ? new Date(e.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' }) : 'Sin fecha'}
+                      {formatFechaCalendario(e.fecha, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' }, 'es', 'Sin fecha')}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 12, paddingBottom: 6 }}>

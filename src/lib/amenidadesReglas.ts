@@ -4,6 +4,7 @@
 // completo del tab). Son la lógica de NEGOCIO de reservas: mantener puras y
 // testeadas.
 import type { Amenidad, BloqueoAmenidad, ReservaAmenidad } from '../types'
+import { parseFechaCalendario } from './format'
 
 /** ¿El bloqueo (rango de fechas + horario opcional) pisa la reserva propuesta? */
 export function bloqueoSolapaReserva(b: BloqueoAmenidad, fecha: string, hi: string, hf: string): boolean {
@@ -14,7 +15,7 @@ export function bloqueoSolapaReserva(b: BloqueoAmenidad, fecha: string, hi: stri
 
 export function esFinDeSemana(fecha: string): boolean {
   if (!fecha) return false
-  const dow = new Date(fecha + 'T12:00:00').getDay()
+  const dow = parseFechaCalendario(fecha)?.getDay() ?? -1
   return dow === 0 || dow === 6
 }
 

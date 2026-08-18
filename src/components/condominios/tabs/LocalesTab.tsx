@@ -4,6 +4,7 @@ import type { LocalComercial, EstadoLocal, GiroLocal } from '../../../types'
 import { notify, confirm } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
+import { esFechaCalendarioVencida } from '../../../lib/format'
 
 interface Props {
   locales: LocalComercial[]
@@ -227,7 +228,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
           },
         ]}
         emptyState={{ icon: '🏪', title: t('condominios.locales.empty') }}
-        rowStyle={l => (l.fecha_fin && l.estado === 'ocupado' && new Date(l.fecha_fin) < today) ? { background: 'var(--at-warning-tint)' } : {}}
+        rowStyle={l => (l.fecha_fin && l.estado === 'ocupado' && esFechaCalendarioVencida(l.fecha_fin, today)) ? { background: 'var(--at-warning-tint)' } : {}}
         columns={[
           {
             key: 'numero_local', header: t('condominios.locales.col_local'), sortable: true,
@@ -276,7 +277,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
             accessor: l => l.fecha_fin ?? '',
             render: l => {
               if (!l.fecha_fin) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
-              const vence = new Date(l.fecha_fin) < today
+              const vence = esFechaCalendarioVencida(l.fecha_fin, today)
               return <span style={{ fontSize: '12px', color: vence ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>📅 {l.fecha_fin}{vence ? ` ⚠️ ${t('condominios.locales.vencido')}` : ''}</span>
             },
           },

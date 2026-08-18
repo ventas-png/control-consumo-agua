@@ -5,7 +5,8 @@
 //      de un año de histórico, julio 2025 y julio 2026 se sumaban juntos.
 //   2. new Date('YYYY-MM-DD') parsea medianoche UTC: en husos negativos
 //      (GMT-6) las fechas date-only caían al día/mes anterior. parseFecha
-//      (lib/format) ya resuelve esto anclando a T12:00:00.
+//      (lib/format) ya resuelve esto delegando en parseFechaCalendario, que
+//      construye la fecha con los componentes LOCALES de año/mes/día.
 import type { Registro } from '../types'
 import { calcularTotalPagar } from './business'
 import { parseFecha } from './format'

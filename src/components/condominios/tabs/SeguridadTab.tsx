@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { confirm, notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -215,7 +215,7 @@ export function SeguridadTab({
   }
 
   function precargarDesdeSTR(r: ReservaSTR) {
-    const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    const noches = Math.max(0, diasEntreFechasCalendario(r.fecha_entrada, r.fecha_salida) ?? 0)
     setStrReservaId(r.id)
     setRegForm({
       nombre: r.huesped_nombre,

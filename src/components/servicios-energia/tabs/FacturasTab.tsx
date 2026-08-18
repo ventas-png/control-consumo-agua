@@ -3,6 +3,7 @@ import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Pr
 import { notify, confirm } from '../../shared/Dialog'
 import FacturaEnergiaModal from '../FacturaEnergiaModal'
 import { useCrearFacturaEnergiaMutation, useActualizarFacturaEnergiaMutation, useEliminarFacturaEnergiaMutation } from '../../../domain/energia/mutations'
+import { formatFechaCalendario } from '../../../lib/format'
 
 interface FacturasTabProps {
   facturasEnergia: FacturaEnergia[]
@@ -180,8 +181,8 @@ export default function FacturasTab({
                   <tr key={f.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '0.5rem' }}>{fuente?.nombre || '?'}</td>
                     <td style={{ padding: '0.5rem' }}>
-                      {new Date(f.periodo_inicio).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })} -
-                      {new Date(f.periodo_fin).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatFechaCalendario(f.periodo_inicio, { month: 'short', day: 'numeric' }, 'es-MX', '—')} -
+                      {formatFechaCalendario(f.periodo_fin, { month: 'short', day: 'numeric', year: 'numeric' }, 'es-MX', '—')}
                     </td>
                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{f.kwh_consumidos.toFixed(2)}</td>
                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{f.kwh_exportados ? f.kwh_exportados.toFixed(2) : '-'}</td>

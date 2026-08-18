@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { ItemInventario, CategoriaInventario, EstadoInventario } from '../../../types'
@@ -63,7 +63,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
   const stockBajo = inventario.filter(i => i.cantidad <= i.cantidad_minima && i.estado !== 'dado_de_baja')
   const porVencer = inventario.filter(i => i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
-    new Date(i.fecha_vencimiento).getTime() - Date.now() < 30 * 24 * 3600 * 1000 && i.estado !== 'dado_de_baja')
+    (diasHastaFechaCalendario(i.fecha_vencimiento) ?? Infinity) < 30 && i.estado !== 'dado_de_baja')
 
   const filtered = inventario.filter(i => {
     if (filtroCategoria !== 'todos' && i.categoria !== filtroCategoria) return false
@@ -280,7 +280,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
             key: 'nombre', header: t('condominios.inventario.col_item'), sortable: true,
             render: i => {
               const venceProx = i.fecha_vencimiento && i.fecha_vencimiento >= hoy &&
-                new Date(i.fecha_vencimiento).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+                (diasHastaFechaCalendario(i.fecha_vencimiento) ?? Infinity) < 30
               return (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

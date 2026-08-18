@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -56,7 +56,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
   )
 
   const totalCosto = registros.filter(r => r.estado === 'completado' && r.costo).reduce((s, r) => s + (r.costo ?? 0), 0)
-  const proximos = registros.filter(r => r.proxima_visita && new Date(r.proxima_visita) >= new Date()).sort((a, b) => a.proxima_visita!.localeCompare(b.proxima_visita!))
+  const proximos = registros.filter(r => r.proxima_visita && !esFechaCalendarioVencida(r.proxima_visita)).sort((a, b) => a.proxima_visita!.localeCompare(b.proxima_visita!))
 
   function toggleArea(area: string) {
     setForm(p => ({

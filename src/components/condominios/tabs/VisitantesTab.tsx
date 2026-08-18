@@ -16,6 +16,7 @@ import { ListaVisitantes } from './visitantes/ListaVisitantes'
 import { VisitanteDetalle } from './visitantes/VisitanteDetalle'
 import { SalidaPanel } from './visitantes/SalidaPanel'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { diasEntreFechasCalendario } from '../../../lib/format'
 
 
 interface Props {
@@ -149,7 +150,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   }
 
   function abrirRegistroSTR(r: ReservaSTR, huesped?: HuespedSTR) {
-    const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    const noches = Math.max(0, diasEntreFechasCalendario(r.fecha_entrada, r.fecha_salida) ?? 0)
     setForm({
       nombre: huesped ? huesped.nombre : r.huesped_nombre,
       unidad_id: r.unidad_id ?? '',

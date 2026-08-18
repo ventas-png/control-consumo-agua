@@ -2,6 +2,7 @@
 import type { VisitantesCtx } from './ctx'
 import { PLATAFORMA_LABEL, PLATAFORMA_COLOR } from './ui'
 import { ModalPortal } from '../../../shared/ModalPortal'
+import { diasEntreFechasCalendario } from '../../../../lib/format'
 
 export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
   const { visitantes, reservasSTR, setShowStrModal, strSearch, setStrSearch, strHuespedes, hoy, abrirRegistroSTR } = ctx
@@ -49,7 +50,7 @@ export function StrModal({ ctx }: { ctx: VisitantesCtx }) {
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto' }}>
                     {reservasFiltradas.map(r => {
-                      const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+                      const noches = Math.max(0, diasEntreFechasCalendario(r.fecha_entrada, r.fecha_salida) ?? 0)
                       const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
                       const capacidad = r.num_adultos + r.num_ninos
                       // Count only people currently in premises (exits and re-entries don't block capacity)

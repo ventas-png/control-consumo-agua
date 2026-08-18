@@ -7,6 +7,7 @@ import { ImageUploader } from '../../../shared/ImageUploader'
 import { SecureImage } from '../../../shared/SecureImage'
 import { CheckoutForm } from './comunes'
 import { ModalPortal } from '../../../shared/ModalPortal'
+import { formatFechaCalendario } from '../../../../lib/format'
 
 export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
   const { amenidades, moneda, canEdit, onRefresh, reservaDetalle, setReservaDetalle, registrarCheckin, registrarCheckout, actualizarEstadoDeposito, retenerDeposito, aprobarReserva, rechazarReserva } = ctx
@@ -127,7 +128,7 @@ export function ReservaDetalle({ ctx }: { ctx: AmenidadesCtx }) {
                   <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Reserva · {r.estado}</div>
                   <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{r.amenidad_nombre}</div>
                   <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>
-                    🏠 {r.unidad_nombre} · 📅 {new Date(r.fecha + 'T12:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · ⏰ {r.hora_inicio}–{r.hora_fin}
+                    🏠 {r.unidad_nombre} · 📅 {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · ⏰ {r.hora_inicio}–{r.hora_fin}
                   </div>
                 </div>
                 <button onClick={() => setReservaDetalle(null)} style={{ background: 'rgba(255,255,255,0.18)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>✕</button>

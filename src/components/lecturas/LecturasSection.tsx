@@ -5,7 +5,7 @@ import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto }
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { createRegistro, uploadRegistroFoto } from '../../domain/agua/mutations'
 import { registroExiste } from '../../domain/agua/queries'
-import { hoyLocalISO } from '../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
 import {
@@ -525,7 +525,7 @@ export function LecturasSection({
         bg: 'var(--at-primary-tint)',
         border: 'var(--at-primary-soft-2)',
         color: 'var(--at-ink-deep)',
-        texto: `🗺️ Ruta: ${rutaActiva.nombre} — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}${rutaActiva.fecha_programada ? ` | 📅 ${new Date(rutaActiva.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')}` : ''}`,
+        texto: `🗺️ Ruta: ${rutaActiva.nombre} — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}${rutaActiva.fecha_programada ? ` | 📅 ${formatFechaCalendario(rutaActiva.fecha_programada, {}, 'es-GT', '—')}` : ''}`,
       }
     : rutaModoManual
     ? {

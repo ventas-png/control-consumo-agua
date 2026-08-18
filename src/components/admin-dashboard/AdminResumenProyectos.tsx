@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { Registro, Contador, Proyecto, Unidad, TipoAgua } from '../../types'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
+import { formatFechaCalendario } from '../../lib/format'
 
 interface Props {
   registros: Registro[]
@@ -93,7 +94,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
     }
   }
 
-  const fmtDate = (s?: string) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const fmtDate = (s?: string) => formatFechaCalendario(s, { day: 'numeric', month: 'short', year: 'numeric' }, 'es')
   const rangoLabel = fechaDesde && fechaHasta
     ? `${fmtDate(fechaDesde)} — ${fmtDate(fechaHasta)}`
     : hoy.toLocaleString('es', { month: 'long', year: 'numeric' })

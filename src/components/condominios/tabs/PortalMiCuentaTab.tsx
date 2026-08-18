@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties } from 'react'
 import type { CuotaCondominio, EstadoCuota } from '../../../types'
 import { notify } from '../../shared/Dialog'
@@ -118,7 +118,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
                     {c.rol_responsable && <div style={{ marginTop: '4px' }}><ResponsableCuotaBadge rol={c.rol_responsable} /></div>}
                     {c.fecha_vencimiento && (
                       <div style={{ fontSize: '12.5px', color: esVencida ? 'var(--at-danger)' : 'var(--at-ink-3)', marginTop: '2px' }}>
-                        {esVencida ? '⚠ Vencida el ' : 'Vence el '}{new Date(c.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        {esVencida ? '⚠ Vencida el ' : 'Vence el '}{formatFechaCalendario(c.fecha_vencimiento, { day: '2-digit', month: 'long', year: 'numeric' }, 'es', '—')}
                       </div>
                     )}
                     {c.notas && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.notas}</div>}
@@ -145,7 +145,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre, recargoRows, c
                 <span style={{ fontSize: '18px' }}>✅</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--at-ink-2)' }}>{c.concepto.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} — {c.periodo}</div>
-                  {c.fecha_pago && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Pagado el {new Date(c.fecha_pago + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}{c.metodo_pago ? ` · ${c.metodo_pago}` : ''}</div>}
+                  {c.fecha_pago && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Pagado el {formatFechaCalendario(c.fecha_pago, { day: '2-digit', month: 'short', year: 'numeric' }, 'es', '—')}{c.metodo_pago ? ` · ${c.metodo_pago}` : ''}</div>}
                 </div>
                 <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-success)', flexShrink: 0 }}>{moneda} {c.monto.toFixed(2)}</div>
               </div>

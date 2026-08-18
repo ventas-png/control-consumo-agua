@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -44,8 +44,8 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   // Auto-detect vencidos
   const proxVencer = capacitaciones.filter(c => {
     if (!c.fecha_vencimiento_cert) return false
-    const dias = Math.floor((new Date(c.fecha_vencimiento_cert).getTime() - Date.now()) / 86400000)
-    return dias >= 0 && dias <= 30
+    const dias = diasHastaFechaCalendario(c.fecha_vencimiento_cert)
+    return dias !== null && dias >= 0 && dias <= 30
   }).length
 
   const totalCosto = capacitaciones.reduce((s, c) => s + (c.costo ?? 0), 0)

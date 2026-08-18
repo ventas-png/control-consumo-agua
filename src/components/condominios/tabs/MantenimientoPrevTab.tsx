@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, useEffect, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -25,15 +25,13 @@ const FREQ_LABELS: Record<string, string> = {
 }
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return sumarDiasCalendario(dateStr, days) ?? dateStr
 }
 
 function getStatus(p: PlanMantenimiento): 'vencido' | 'urgente' | 'proximo' | 'ok' | 'sin_fecha' {
   if (!p.proxima_ejecucion) return 'sin_fecha'
-  const today = hoyLocalISO()
-  const diff = Math.ceil((new Date(p.proxima_ejecucion).getTime() - new Date(today).getTime()) / 86400000)
+  const diff = diasHastaFechaCalendario(p.proxima_ejecucion)
+  if (diff === null) return 'sin_fecha'
   if (diff < 0) return 'vencido'
   if (diff <= 3) return 'urgente'
   if (diff <= 7) return 'proximo'

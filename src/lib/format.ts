@@ -19,18 +19,156 @@ export function getDefaultLocale(): string {
   return defaultLocale
 }
 
+// ── Fechas de calendario (columnas SQL `date` / cadenas 'YYYY-MM-DD') ──────
+//
+// Una columna SQL `date` NO es un instante: es una fecha de calendario. El
+// 2026-01-01 de una factura es el 1 de enero en Guatemala, en Tokio y en la
+// consola de Supabase. `new Date('2026-01-01')` en cambio lo interpreta como
+// medianoche **UTC** (ECMA-262 §21.4.3.2: el formato date-only es UTC), así
+// que en cualquier huso negativo —America/Guatemala GMT-6,
+// America/Los_Angeles GMT-8— `getDate()` devuelve 31 y la UI muestra el día
+// ANTERIOR.
+//
+// Estas funciones son la ÚNICA forma soportada de leer una fecha de
+// calendario en la app. No concatenar 'T12:00:00' en cada componente: ese
+// parche estaba disperso en ~30 archivos, no validaba la entrada (un null
+// producía la cadena 'nullT12:00:00' → Invalid Date) y no cubría la
+// aritmética de días.
+//
+// Para timestamps REALES (timestamptz: created_at, fecha_envio de
+// notificaciones, registros.fecha del módulo de agua) NO usar esto: ahí el
+// instante y su conversión a la zona del usuario son justamente el
+// comportamiento correcto.
+
+/** 'YYYY-MM-DD', tolerando un sufijo de hora que Postgres nunca manda en `date`. */
+const RE_FECHA_CALENDARIO = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
+
+/**
+ * Parsea una fecha de calendario 'YYYY-MM-DD' como medianoche LOCAL, de modo
+ * que año, mes y día se conservan en cualquier zona horaria.
+ *
+ * Devuelve `null` —nunca un Invalid Date— para null, undefined, cadena vacía,
+ * formato no reconocido o fecha inexistente (2026-02-29, 2026-13-01).
+ */
+export function parseFechaCalendario(value: string | Date | null | undefined): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+  if (typeof value !== 'string') return null
+  const m = RE_FECHA_CALENDARIO.exec(value.trim())
+  if (!m) return null
+  const [, ys, ms, ds] = m
+  const y = Number(ys)
+  const mes = Number(ms)
+  const d = Number(ds)
+  if (mes < 1 || mes > 12 || d < 1 || d > 31) return null
+  const out = new Date(y, mes - 1, d)
+  // Años < 100 los mapea el constructor a 19xx; y el round-trip descarta
+  // desbordes de calendario (31 de febrero → 3 de marzo).
+  out.setFullYear(y)
+  if (out.getFullYear() !== y || out.getMonth() !== mes - 1 || out.getDate() !== d) return null
+  return out
+}
+
+/** `true` si el valor es una cadena de fecha de calendario válida. */
+export function esFechaCalendario(value: unknown): value is string {
+  return typeof value === 'string' && parseFechaCalendario(value) !== null
+}
+
+/**
+ * Formatea una fecha de calendario conservando el día. Sustituye a
+ * `new Date(col).toLocaleDateString(...)` y a `new Date(col + 'T12:00:00')`.
+ *
+ * Los valores no parseables devuelven `fallback` (por defecto ''), nunca
+ * 'Invalid Date'.
+ */
+export function formatFechaCalendario(
+  value: string | Date | null | undefined,
+  opciones: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' },
+  locale = defaultLocale,
+  fallback = '',
+): string {
+  const d = parseFechaCalendario(value)
+  if (!d) return fallback
+  return d.toLocaleDateString(locale, opciones)
+}
+
+/** Hoy como fecha de calendario LOCAL (medianoche local). */
+export function hoyCalendario(): Date {
+  const n = new Date()
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+}
+
+/** Número de día absoluto, inmune a DST (no usa la duración real del día). */
+function diaAbsoluto(d: Date): number {
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000
+}
+
+/**
+ * Días completos de `desde` a `hasta` (positivo si `hasta` es posterior).
+ * `null` si alguno no es una fecha de calendario válida.
+ *
+ * Acepta también un `Date` (p. ej. `new Date()`) del que toma su día LOCAL.
+ */
+export function diasEntreFechasCalendario(
+  desde: string | Date | null | undefined,
+  hasta: string | Date | null | undefined,
+): number | null {
+  const a = parseFechaCalendario(desde)
+  const b = parseFechaCalendario(hasta)
+  if (!a || !b) return null
+  return diaAbsoluto(b) - diaAbsoluto(a)
+}
+
+/**
+ * Días que faltan desde hoy hasta la fecha de calendario. Negativo si ya pasó,
+ * 0 si es hoy, `null` si el valor es inválido. Reemplaza el patrón
+ * `Math.ceil((new Date(col).getTime() - Date.now()) / 86400000)`, que en husos
+ * negativos se equivocaba en un día.
+ */
+export function diasHastaFechaCalendario(
+  value: string | Date | null | undefined,
+  referencia: Date = new Date(),
+): number | null {
+  return diasEntreFechasCalendario(referencia, value)
+}
+
+/** `true` si la fecha de calendario es ESTRICTAMENTE anterior a hoy. */
+export function esFechaCalendarioVencida(
+  value: string | Date | null | undefined,
+  referencia: Date = new Date(),
+): boolean {
+  const dias = diasHastaFechaCalendario(value, referencia)
+  return dias !== null && dias < 0
+}
+
+/**
+ * Suma días a una fecha de calendario y devuelve 'YYYY-MM-DD' (`null` si la
+ * entrada es inválida). Puro sobre el calendario: sin round-trip por UTC, así
+ * que no se desplaza en husos negativos ni en cambios de horario.
+ */
+export function sumarDiasCalendario(
+  value: string | Date | null | undefined,
+  dias: number,
+): string | null {
+  const d = parseFechaCalendario(value)
+  if (!d || !Number.isFinite(dias)) return null
+  d.setDate(d.getDate() + Math.trunc(dias))
+  return dateLocalISO(d)
+}
+
 // ── Dates ──────────────────────────────────────────────────────────────────
 
 /**
  * Parsea una fecha que puede venir como 'YYYY-MM-DD' o ISO completo.
- * Para 'YYYY-MM-DD' agrega T12:00:00 para evitar shift de zona horaria
- * (las fechas puras de BD se trataban como UTC midnight y aparecían un
- * día antes en husos negativos).
+ * Las fechas de calendario van por `parseFechaCalendario` (medianoche local);
+ * los ISO con hora conservan su semántica de instante.
  */
 export function parseFecha(value: string | Date | null | undefined): Date {
   if (!value) return new Date(NaN)
   if (value instanceof Date) return value
-  return new Date(value.includes('T') ? value : value + 'T12:00:00')
+  if (!value.includes('T')) return parseFechaCalendario(value) ?? new Date(NaN)
+  return new Date(value)
 }
 
 /**

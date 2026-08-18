@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -46,12 +46,12 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   const vencidosHoy = recordatorios.filter(r => !r.completado && r.fecha_limite <= hoy).length
   const proximosSemana = recordatorios.filter(r => {
     if (r.completado) return false
-    const dias = Math.ceil((new Date(r.fecha_limite).getTime() - new Date(hoy).getTime()) / (1000 * 60 * 60 * 24))
-    return dias > 0 && dias <= 7
+    const dias = diasEntreFechasCalendario(hoy, r.fecha_limite)
+    return dias !== null && dias > 0 && dias <= 7
   }).length
 
   function diasRestantes(fecha: string) {
-    return Math.ceil((new Date(fecha).getTime() - new Date(hoy).getTime()) / (1000 * 60 * 60 * 24))
+    return diasEntreFechasCalendario(hoy, fecha) ?? 0
   }
 
   function resetForm() {

@@ -3,6 +3,7 @@
 import type { Ruta } from '../../types'
 import type { RutasCtx } from './ctx'
 import { describirRecurrencia, estadoRuta } from '../../lib/rutasReglas'
+import { formatFechaCalendario } from '../../lib/format'
 
 export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
   const {
@@ -45,7 +46,7 @@ export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
 
       <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div>🔁 {describirRecurrencia(ruta)}</div>
-        <div>📅 {ruta.fecha_programada ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT') : ((ruta.frecuencia ?? 'unica') !== 'unica' ? 'Recurrente' : 'Sin fecha')}</div>
+        <div>📅 {ruta.fecha_programada ? formatFechaCalendario(ruta.fecha_programada, {}, 'es-GT', '—') : ((ruta.frecuencia ?? 'unica') !== 'unica' ? 'Recurrente' : 'Sin fecha')}</div>
         <div>👤 {ruta.asignado_nombre ?? 'Sin asignar'}</div>
         <div>📍 {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}</div>
       </div>
