@@ -44,7 +44,7 @@
     }
   ],
 
-  "_NOTA_REGLA_E": "Regla (e): toda función SECURITY DEFINER creada en migraciones POSTERIORES a 20260825010000 (el fix del P1 #765) debe llevar `REVOKE ... FROM PUBLIC` — CREATE FUNCTION concede EXECUTE a PUBLIC por defecto y `anon` lo hereda; un `REVOKE FROM anon` sin PUBLIC es un no-op. Lo anterior al corte queda grandfathered (saneado en prod, guard nocturno verde). Excepción legítima aquí: una RPC intencionalmente anon-callable (estilo sso_lookup_domain), que además debe figurar en security-guard.allowlist.json.",
+  "_NOTA_REGLA_E": "Regla (e): toda función SECURITY DEFINER creada en migraciones POSTERIORES a 20260825010000 (el fix del P1 #765) debe llevar `REVOKE ... FROM PUBLIC` — CREATE FUNCTION concede EXECUTE a PUBLIC por defecto y `anon` lo hereda; un `REVOKE FROM anon` sin PUBLIC es un no-op, y un GRANT posterior a PUBLIC o a anon RE-EXPONE la firma. La ACL se modela POR FIRMA (los overloads foo(uuid)/foo(text) son independientes): escribe las entradas con su firma completa, p. ej. `{\"fn\": \"mi_rpc(text)\", \"reason\": \"…\"}` — el nombre pelado sigue aceptado por compatibilidad, pero exceptúa TODOS los overloads. Lo anterior al corte queda grandfathered (saneado en prod, guard nocturno verde). Excepción legítima aquí: una RPC intencionalmente anon-callable (estilo sso_lookup_domain), que además debe figurar en security-guard.allowlist.json.",
 
   "security_definer_without_public_revoke": []
 }
