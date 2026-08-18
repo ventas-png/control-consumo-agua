@@ -17,15 +17,14 @@
 -- `FROM PUBLIC, anon` (PUBLIC es lo que cierra el hueco; nombrar anon
 -- documenta la intención y cubre un eventual grant directo futuro).
 --
--- POR QUÉ TAMBIÉN cxp_seed_on_company() y cxp_seed_iva_on_company()
--- El barrido 20260612192952 revocó 14 funciones trigger del ledger pero omitió
--- estas 2 hermanas de la misma banda 20260611: también SECURITY DEFINER,
--- también RETURNS trigger, también nacidas con el grant implícito según el
--- repo. Se cierran aquí de una vez; si en prod ya estuvieran cerradas por otra
--- vía, el REVOKE es un no-op (idempotente).
+-- ALCANCE: exactamente las 8 del reporte del guard. Se evaluó ampliar a
+-- cxp_seed_on_company() y cxp_seed_iva_on_company() (sin REVOKE en su
+-- migración de origen), pero 20260612000000 las DROPEA — no existen en el
+-- esquema final, y un REVOKE sobre función inexistente es ERROR, no no-op
+-- (lo confirmó la preview branch de Supabase al aplicar esta migración).
 --
 -- CLASIFICACIÓN Y TRATAMIENTO
--- (1) 7 funciones trigger → REVOKE de PUBLIC, anon Y authenticated. Nadie las
+-- (1) 5 funciones trigger → REVOKE de PUBLIC, anon Y authenticated. Nadie las
 --     invoca vía PostgREST, y Postgres verifica el EXECUTE sobre la función de
 --     trigger al hacer CREATE TRIGGER, no en cada disparo — los triggers
 --     siguen funcionando para roles sin EXECUTE (verificado ejecutándolo:
@@ -64,8 +63,6 @@ BEGIN
     'banco_tg_movimiento_ledger()',            -- 20260813000000
     'banco_tg_propagar_ledger_movimientos()',  -- 20260813000000
     'conta_tg_linea_mismo_ledger()',           -- 20260813120000
-    'cxp_seed_iva_on_company()',               -- 20260611070000 (omitida en 20260612192952)
-    'cxp_seed_on_company()',                   -- 20260611010100 (omitida en 20260612192952)
     'fn_sincronizar_estado_personal()',        -- 20260820000100
     'set_registros_project_id()'               -- 20260816000000
   ] LOOP
@@ -99,8 +96,6 @@ DECLARE
     'banco_tg_movimiento_ledger()',
     'banco_tg_propagar_ledger_movimientos()',
     'conta_tg_linea_mismo_ledger()',
-    'cxp_seed_iva_on_company()',
-    'cxp_seed_on_company()',
     'fn_sincronizar_estado_personal()',
     'set_registros_project_id()'
   ];

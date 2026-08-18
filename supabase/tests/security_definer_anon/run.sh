@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE de la migración 20260825010000 (P1 del security
-# guard: 8 SECURITY DEFINER anon-ejecutables + 2 hermanas cxp_seed_* omitidas
-# en el barrido 20260612192952).
+# guard: 8 SECURITY DEFINER de public anon-ejecutables).
 #
 # QUÉ COMPRUEBA
-#   1/4  el fixture reproduce el hallazgo: anon ejecuta las 10 (grant implícito
+#   1/4  el fixture reproduce el hallazgo: anon ejecuta las 8 (grant implícito
 #        de PUBLIC), INCLUIDA conta_puede_escribir pese a su REVOKE FROM anon
 #        de 20260818000000 (causa raíz: REVOKE FROM anon sin PUBLIC es no-op)
-#   2/4  tras la migración: anon=false en las 10; authenticated=false en las 7
+#   2/4  tras la migración: anon=false en las 8; authenticated=false en las 5
 #        funciones trigger y =true en los 3 helpers de policy; la consulta (a)
-#        del guard (verbatim de security-guard.mjs) pasa de 10 hallazgos a 0
+#        del guard (verbatim de security-guard.mjs) pasa de 8 hallazgos a 0
 #   3/4  IDEMPOTENCIA: re-aplicar la migración no falla y deja el mismo estado
 #   4/4  un rol SIN EXECUTE sigue disparando el trigger (Postgres verifica el
 #        EXECUTE en CREATE TRIGGER, no en cada disparo — como pr27 §4)
@@ -104,4 +103,4 @@ SQL
 echo "  OK    Postgres verifica EXECUTE en CREATE TRIGGER, no en cada disparo"
 
 echo
-echo "✅ security_definer_anon: las 10 ACLs cerradas, idempotente, triggers vivos."
+echo "✅ security_definer_anon: las 8 ACLs cerradas, idempotente, triggers vivos."

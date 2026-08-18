@@ -1,10 +1,10 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Fixture de security_definer_anon.
 --
--- Crea las 10 funciones del hallazgo P1 como STUBS con las MISMAS firmas y el
+-- Crea las 8 funciones del hallazgo P1 como STUBS con las MISMAS firmas y el
 -- MISMO estado de ACL que dejaron sus migraciones de origen (verificado contra
--- 20260611010100/070000, 20260813000000/120000, 20260814000000, 20260816000000,
--- 20260818000000 y 20260820000100). No se aplican esas migraciones reales: sus
+-- 20260813000000/120000, 20260814000000, 20260816000000, 20260818000000 y
+-- 20260820000100). No se aplican esas migraciones reales: sus
 -- dependencias abarcan 5 módulos sin relación entre sí (la cadena contable sola
 -- son 21 migraciones, ver compras_flujo/run.sh) y lo que se prueba aquí es SOLO
 -- la ACL. Mismo patrón que compras_flujo/fixture.sql (stub de
@@ -15,7 +15,7 @@
 -- (to_regprocedure + REVOKE sobre firma inexistente), no en silencio.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- ── 7 funciones trigger (nacen SIN revoke: grant implícito a PUBLIC) ────────
+-- ── 5 funciones trigger (nacen SIN revoke: grant implícito a PUBLIC) ────────
 -- banco_tg_movimiento_ledger es la que se cablea a tg_smoke más abajo; su
 -- cuerpo marca la fila para probar "el trigger dispara sin EXECUTE".
 CREATE FUNCTION public.banco_tg_movimiento_ledger()
@@ -27,14 +27,6 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_t
 BEGIN RETURN NEW; END $$;
 
 CREATE FUNCTION public.conta_tg_linea_mismo_ledger()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-BEGIN RETURN NEW; END $$;
-
-CREATE FUNCTION public.cxp_seed_iva_on_company()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-BEGIN RETURN NEW; END $$;
-
-CREATE FUNCTION public.cxp_seed_on_company()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN RETURN NEW; END $$;
 
