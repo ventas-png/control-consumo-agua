@@ -1,17 +1,11 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-// Seed del sandbox para el harness de RLS (auditoría 2026-07-28).
+// Seed del sandbox para el harness de RLS.
 //
 // POR QUÉ EXISTE
 // `src/test/rls/rlsHarness.test.ts` verifica el aislamiento multi-tenant contra
 // un Supabase REAL: dos usuarios de DISTINTA empresa, y la afirmación de que los
-// conjuntos de `company_id` que ve cada uno son disjuntos. Es la comprobación
-// que respalda todo el Bloque A de la auditoría… y NUNCA se ha ejecutado, porque
-// nadie tenía dos usuarios de dos empresas con contraseña conocida. El job está
-// verde por omisión desde que se creó.
-//
-// Este script crea exactamente eso, para que activar el harness sea "correr esto
-// y pegar 6 secretos" en vez de un proyecto manual.
+// conjuntos de `company_id` que ve cada uno son disjuntos.
 //
 // ⚠️ EL DETALLE QUE HACE QUE ESTO NO SEA COSMÉTICO
 // La aserción de aislamiento es:
@@ -19,25 +13,43 @@
 //     for (const co of bCos) expect(aCos.has(co)).toBe(false)
 //
 // Si A y B no ven NINGUNA fila, ambos conjuntos son vacíos, el bucle no itera y
-// **el test pasa sin probar nada**. Sería exactamente el mismo verde hueco que
-// venimos persiguiendo. Por eso el seed no se limita a crear usuarios: siembra
-// filas reales en tablas tenant-scoped para las DOS empresas, y al final
-// VERIFICA que cada usuario ve las suyas y no las de la otra. Si el seed no
-// puede demostrar eso, sale con error en vez de dejar un sandbox que produzca
-// un verde vacío.
+// **el test pasa sin probar nada**. Por eso este script no se limita a crear
+// usuarios: siembra filas reales en TODAS las tablas declaradas como cobertura
+// no trivial (`src/test/rls/coverage.json` → `noTriviales`) y luego VERIFICA,
+// entrando como cada usuario con la anon key, que cada uno ve ≥1 fila propia y
+// CERO filas de la otra empresa, tabla por tabla. Si no puede demostrarlo, sale
+// con error: nunca deja un sandbox que produzca un verde vacío.
 //
 // USO
 //   SEED_SUPABASE_URL=https://<ref>.supabase.co \
 //   SEED_SERVICE_ROLE_KEY=<service_role del SANDBOX> \
+//   SEED_ANON_KEY=<anon public del SANDBOX> \
+//   SEED_CONFIRM=si \
 //   node scripts/seed-rls-sandbox.mjs
 //
 // Es idempotente: se puede volver a correr sin duplicar nada.
 //
-// ⚠️ NUNCA CONTRA PRODUCCIÓN. El script se niega a correr contra el ref de prod
-// y exige una confirmación explícita para cualquier proyecto (abajo).
+// ⚠️ NUNCA CONTRA PRODUCCIÓN. Se niega a correr contra el ref de prod y exige
+// confirmación explícita para cualquier proyecto.
+//
+// ⚠️ LA service_role SÓLO SE USA AQUÍ, en la máquina del operador. NO va a
+// ningún secreto de GitHub: CI sólo recibe la anon key y las credenciales de
+// los dos usuarios de prueba, que son de bajo privilegio (company_owner de una
+// empresa de juguete en un proyecto desechable).
 // ════════════════════════════════════════════════════════════════════════════
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
+
+const AQUI = dirname(fileURLToPath(import.meta.url))
+
+// Manifiesto compartido con el harness: no puede desincronizarse.
+const COBERTURA = JSON.parse(
+  readFileSync(join(AQUI, '..', 'src', 'test', 'rls', 'coverage.json'), 'utf8'),
+)
+const NO_TRIVIALES = COBERTURA.noTriviales
 
 // ── Salvaguardas ────────────────────────────────────────────────────────────
 // El ref de producción, quemado a propósito: este script CREA usuarios y datos
@@ -46,40 +58,50 @@ const PROD_REF = 'nnsqmeigtgewatameexo'
 
 const URL = process.env.SEED_SUPABASE_URL ?? ''
 const KEY = process.env.SEED_SERVICE_ROLE_KEY ?? ''
+const ANON = process.env.SEED_ANON_KEY ?? ''
+
+function abortar(mensaje) {
+  console.error(`\n${mensaje}\n`)
+  process.exit(1)
+}
 
 if (!URL || !KEY) {
-  console.error(`
-❌ Faltan variables.
+  abortar(`❌ Faltan variables.
 
    SEED_SUPABASE_URL=https://<ref>.supabase.co
    SEED_SERVICE_ROLE_KEY=<service_role key del SANDBOX>
 
-   La service_role key está en: Dashboard → Project Settings → API → service_role.
-   NO la pegues en el repo ni en un secreto de GitHub: sólo se usa aquí, en local.
-`)
-  process.exit(1)
+   La service_role está en: Dashboard → Project Settings → API → service_role.
+   NO la pegues en el repo ni en un secreto de GitHub: sólo se usa aquí, en local.`)
+}
+
+// SEED_ANON_KEY es OBLIGATORIA: sin ella el script podría sembrar y salir
+// "verde" sin haber comprobado el aislamiento desde un cliente autenticado, que
+// es justo la garantía por la que existe. Antes era opcional y ese era el hueco.
+if (!ANON) {
+  abortar(`❌ Falta SEED_ANON_KEY (obligatoria).
+
+   SEED_ANON_KEY=<anon public key del SANDBOX>   (Dashboard → API → anon public)
+
+   Es la clave con la que el script entra como cada usuario para DEMOSTRAR el
+   aislamiento. Sin ella sólo podría insertar filas y afirmar que todo está bien
+   sin haberlo comprobado — exactamente el verde hueco que este seed evita.`)
 }
 
 if (URL.includes(PROD_REF)) {
-  console.error(`
-❌ ABORTADO: la URL apunta al proyecto de PRODUCCIÓN (${PROD_REF}).
+  abortar(`❌ ABORTADO: la URL apunta al proyecto de PRODUCCIÓN (${PROD_REF}).
 
    Este script crea empresas y usuarios de prueba. Creá un proyecto Supabase
-   aparte para el sandbox y volvé a intentarlo con su URL.
-`)
-  process.exit(1)
+   aparte para el sandbox y volvé a intentarlo con su URL.`)
 }
 
 if (process.env.SEED_CONFIRM !== 'si') {
-  console.error(`
-⚠️  Confirmación requerida.
+  abortar(`⚠️  Confirmación requerida.
 
    Vas a crear 2 empresas, 2 usuarios y datos de prueba en:
      ${URL}
 
-   Si es el sandbox correcto, repetí el comando añadiendo SEED_CONFIRM=si
-`)
-  process.exit(1)
+   Si es el sandbox correcto, repetí el comando añadiendo SEED_CONFIRM=si`)
 }
 
 // ── Datos a crear ───────────────────────────────────────────────────────────
@@ -99,17 +121,22 @@ const admin = createClient(URL, KEY, { auth: { persistSession: false, autoRefres
 
 const log = (...a) => console.log('  ', ...a)
 
-/** Empresa por nombre, creándola si no existe (idempotente). */
-async function upsertEmpresa(nombre) {
-  const { data: found, error: e1 } = await admin
-    .from('companies').select('id').eq('nombre', nombre).maybeSingle()
-  if (e1) throw new Error(`companies select: ${e1.message}`)
+/** Inserta si no existe una fila que case con `match`. Devuelve su id. */
+async function upsertPorMatch(tabla, match, fila) {
+  let q = admin.from(tabla).select('id')
+  for (const [k, v] of Object.entries(match)) q = q.eq(k, v)
+  const { data: found, error: eSel } = await q.maybeSingle()
+  if (eSel) throw new Error(`${tabla} select: ${eSel.message}`)
   if (found) return found.id
 
-  const { data, error } = await admin
-    .from('companies').insert({ nombre }).select('id').single()
-  if (error) throw new Error(`companies insert: ${error.message}`)
+  const { data, error } = await admin.from(tabla).insert(fila).select('id').single()
+  if (error) throw new Error(`${tabla} insert: ${error.message}`)
   return data.id
+}
+
+/** Empresa por nombre, creándola si no existe (idempotente). */
+async function upsertEmpresa(nombre) {
+  return upsertPorMatch('companies', { nombre }, { nombre })
 }
 
 /** Usuario de auth por email, creándolo si no existe. Devuelve su id. */
@@ -135,7 +162,7 @@ async function upsertUsuario(email, pass) {
   return data.user.id
 }
 
-/** Fila de app_users que ata el usuario a su empresa (es lo que lee get_my_company_id). */
+/** Fila de app_users que ata el usuario a su empresa (lo que lee get_my_company_id). */
 async function upsertAppUser(userId, companyId, nombre) {
   const { error } = await admin.from('app_users').upsert({
     id: userId, company_id: companyId, role: 'company_owner',
@@ -145,84 +172,152 @@ async function upsertAppUser(userId, companyId, nombre) {
 }
 
 /**
- * Filas en tablas TENANT_SCOPED para que la aserción de disjunción tenga algo
- * que comparar. Se eligen `proveedores` y `conta_cuentas` porque están en la
- * lista del harness y sólo necesitan `company_id` — `cuotas_condominio` exigiría
- * montar proyecto y unidades.
+ * Siembra TODAS las tablas declaradas como cobertura no trivial.
+ *
+ * `proveedores` y `conta_cuentas` sólo necesitan company_id. `cuotas_condominio`
+ * exige proyecto (y se le da unidad, para que la fila sea realista) y
+ * `documentos_fiscales` exige régimen: por eso el seed crea antes un proyecto y
+ * una unidad por empresa. Esa dependencia es la razón por la que la versión
+ * anterior las dejaba fuera y su aserción de disjunción era trivial.
  */
 async function seedDatos(companyId, key) {
-  const prov = { company_id: companyId, nombre: `Proveedor sandbox ${key}` }
-  const { data: pExist } = await admin
-    .from('proveedores').select('id').eq('company_id', companyId).eq('nombre', prov.nombre).maybeSingle()
-  if (!pExist) {
-    const { error } = await admin.from('proveedores').insert(prov)
-    if (error) throw new Error(`proveedores insert: ${error.message}`)
-  }
+  // Proyecto y unidad: prerequisitos de cuotas_condominio.
+  const projectId = await upsertPorMatch(
+    'projects',
+    { company_id: companyId, nombre: `Proyecto sandbox ${key}` },
+    { company_id: companyId, nombre: `Proyecto sandbox ${key}`, estado: 'activo' },
+  )
 
-  const cta = {
-    company_id: companyId, codigo: `1000-${key}`, nombre: `Caja sandbox ${key}`,
-    tipo: 'activo', naturaleza: 'deudora',
-  }
-  const { data: cExist } = await admin
-    .from('conta_cuentas').select('id').eq('company_id', companyId).eq('codigo', cta.codigo).maybeSingle()
-  if (!cExist) {
-    const { error } = await admin.from('conta_cuentas').insert(cta)
-    if (error) throw new Error(`conta_cuentas insert: ${error.message}`)
-  }
+  const unidadId = await upsertPorMatch(
+    'unidades',
+    { company_id: companyId, project_id: projectId, nombre: `Unidad sandbox ${key}` },
+    { company_id: companyId, project_id: projectId, nombre: `Unidad sandbox ${key}` },
+  )
+
+  await upsertPorMatch(
+    'proveedores',
+    { company_id: companyId, nombre: `Proveedor sandbox ${key}` },
+    { company_id: companyId, nombre: `Proveedor sandbox ${key}` },
+  )
+
+  await upsertPorMatch(
+    'conta_cuentas',
+    { company_id: companyId, codigo: `1000-${key}` },
+    {
+      company_id: companyId, codigo: `1000-${key}`, nombre: `Caja sandbox ${key}`,
+      tipo: 'activo', naturaleza: 'deudora', nivel: 1,
+    },
+  )
+
+  await upsertPorMatch(
+    'cuotas_condominio',
+    { company_id: companyId, project_id: projectId, periodo: '2099-01' },
+    {
+      company_id: companyId, project_id: projectId, unidad_id: unidadId,
+      concepto: `Cuota sandbox ${key}`, monto: 100, periodo: '2099-01', estado: 'pendiente',
+    },
+  )
+
+  await upsertPorMatch(
+    'documentos_fiscales',
+    { company_id: companyId, serie: `SANDBOX-${key}` },
+    {
+      company_id: companyId, regimen: 'general', tipo: 'factura',
+      serie: `SANDBOX-${key}`, numero: '1',
+    },
+  )
+
+  return { projectId, unidadId }
 }
 
 // ── Ejecución ───────────────────────────────────────────────────────────────
 console.log('\n🌱 Seed del sandbox RLS\n')
-console.log(`   Proyecto: ${URL}\n`)
+console.log(`   Proyecto: ${URL}`)
+console.log(`   Tablas con cobertura NO TRIVIAL: ${NO_TRIVIALES.join(', ')}\n`)
 
 const creado = []
 for (const t of TENANTS) {
   const companyId = await upsertEmpresa(t.empresa)
   const userId = await upsertUsuario(t.email, t.pass)
   await upsertAppUser(userId, companyId, `Usuario RLS ${t.key}`)
-  await seedDatos(companyId, t.key)
-  creado.push({ ...t, companyId, userId })
+  const { projectId } = await seedDatos(companyId, t.key)
+  creado.push({ ...t, companyId, userId, projectId })
   log(`✔ ${t.key}: empresa ${companyId}  usuario ${userId}`)
 }
 
 // ── Verificación: que el sandbox NO produzca un verde vacío ─────────────────
-// Se entra como cada usuario con la anon key y se comprueba que (1) ve filas
-// suyas y (2) no ve ninguna de la otra empresa. Sin esto, un seed a medias
-// dejaría un harness que pasa sin comparar nada.
-console.log('\n🔍 Verificando que el aislamiento sea COMPROBABLE (no vacío)\n')
+// Se entra como CADA usuario con la anon key y se comprueba, TABLA POR TABLA,
+// que (1) ve ≥1 fila suya y (2) no ve NINGUNA de la otra empresa. Un fallo en
+// cualquiera de las dos condiciones aborta: la primera dejaría una disjunción
+// trivial (verde hueco); la segunda sería una fuga real de tenant.
+console.log('\n🔍 Verificando el aislamiento como cada usuario (anon key + login)\n')
 
-const ANON = process.env.SEED_ANON_KEY ?? ''
-if (!ANON) {
-  console.log('   ⚠️  Sin SEED_ANON_KEY no se puede verificar como usuario final.')
-  console.log('       Añadila (Dashboard → API → anon public) y volvé a correr para')
-  console.log('       comprobar el aislamiento de verdad antes de fiarte del harness.\n')
-} else {
-  let fallos = 0
-  for (const t of creado) {
-    const cli = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } })
-    const { error: eLogin } = await cli.auth.signInWithPassword({ email: t.email, password: t.pass })
-    if (eLogin) throw new Error(`login ${t.email}: ${eLogin.message}`)
+const fallos = []
+const resumen = []
 
-    const { data: provs, error } = await cli.from('proveedores').select('company_id')
-    if (error) throw new Error(`select proveedores como ${t.key}: ${error.message}`)
+for (const t of creado) {
+  const cli = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { error: eLogin } = await cli.auth.signInWithPassword({ email: t.email, password: t.pass })
+  if (eLogin) {
+    // Fail-closed: sin poder autenticar no hay nada demostrado.
+    abortar(`❌ No se pudo autenticar ${t.email}: ${eLogin.message}
+   El sandbox no queda verificado; no se emite "Sandbox listo".`)
+  }
 
-    const vistos = new Set((provs ?? []).map((r) => r.company_id))
+  const ajenas = creado.filter((o) => o.key !== t.key).map((o) => o.companyId)
+
+  for (const tabla of NO_TRIVIALES) {
+    const { data, error } = await cli.from(tabla).select('company_id')
+    if (error) {
+      fallos.push(`${t.key} · ${tabla}: error leyendo (${error.message})`)
+      continue
+    }
+    const vistos = new Set((data ?? []).map((r) => r.company_id))
     const propias = vistos.has(t.companyId)
-    const ajenas = creado.filter((o) => o.key !== t.key).some((o) => vistos.has(o.companyId))
+    const fuga = ajenas.filter((c) => vistos.has(c))
 
-    if (!propias) { console.log(`   ❌ ${t.key} NO ve sus propias filas — la disjunción sería trivial`); fallos++ }
-    else if (ajenas) { console.log(`   ❌ ${t.key} VE filas de la otra empresa — fuga real de tenant`); fallos++ }
-    else console.log(`   ✔ ${t.key} ve sus filas y ninguna de la otra empresa`)
+    if (!propias) {
+      fallos.push(`${t.key} · ${tabla}: NO ve ninguna fila propia → la disjunción sería trivial`)
+    } else if (fuga.length > 0) {
+      fallos.push(`${t.key} · ${tabla}: VE filas de otra empresa (${fuga.join(', ')}) → fuga real de tenant`)
+    } else {
+      resumen.push(`${t.key} · ${tabla}: ${vistos.size} company_id visible (sólo el propio)`)
+      log(`✔ ${t.key} · ${tabla}: ve lo suyo y nada ajeno`)
+    }
   }
-  if (fallos > 0) {
-    console.error('\n❌ El sandbox no está en condiciones: el harness daría un verde sin significado.\n')
-    process.exit(1)
-  }
+
+  await cli.auth.signOut()
+}
+
+if (fallos.length > 0) {
+  console.error('\n❌ El sandbox NO está en condiciones. El harness daría un verde sin significado:\n')
+  for (const f of fallos) console.error(`   • ${f}`)
+  console.error(`
+   Si alguna de estas tablas no se puede sembrar en tu esquema, NO la dejes
+   declarada como cobertura real: movela de "noTriviales" a "estructurales" en
+   src/test/rls/coverage.json y documentá la limitación. Lo que no se puede
+   demostrar no se declara demostrado.
+`)
+  process.exit(1)
 }
 
 // ── Salida ──────────────────────────────────────────────────────────────────
+// Sólo se llega aquí si CADA usuario fue autenticado y CADA tabla no trivial
+// quedó verificada en ambos sentidos.
+console.log('\n📋 Cobertura demostrada (A y B con datos propios y sin fuga):\n')
+for (const r of resumen) console.log(`   • ${r}`)
+
+const estructurales = COBERTURA.estructurales
 console.log(`
-✅ Sandbox listo.
+📋 Cobertura ESTRUCTURAL (tablas que quedan VACÍAS — su disjunción NO demuestra
+   aislamiento; el harness sólo comprueba que la policy responde sin fuga):
+`)
+for (const e of estructurales) {
+  console.log(`   • ${e} — ${COBERTURA.motivoEstructural[e] ?? 'sin sembrar'}`)
+}
+
+console.log(`
+✅ Sandbox listo y VERIFICADO como ambos usuarios.
 
 Pegá estos 6 secretos en el repo
 (Settings → Secrets and variables → Actions → New repository secret):
@@ -234,8 +329,8 @@ Pegá estos 6 secretos en el repo
   RLS_USER_B_EMAIL        ${creado[1].email}
   RLS_USER_B_PASSWORD     ${creado[1].pass}
 
-Con eso, el job "RLS harness (server-side)" deja de ser un no-op y pasa a
-verificar el aislamiento multi-tenant de verdad en cada PR.
+⚠️  La service_role NO va a GitHub. CI sólo recibe la anon key y estas dos
+   cuentas de bajo privilegio.
 
 Las contraseñas se generan nuevas en cada corrida y NO se guardan en ningún
 sitio: si las perdés, volvé a correr el script y usá las nuevas.

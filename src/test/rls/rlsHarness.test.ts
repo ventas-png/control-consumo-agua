@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import {
+  TENANT_SCOPED_NO_TRIVIALES,
+  TENANT_SCOPED_ESTRUCTURALES,
+} from './coverage'
 
 // ════════════════════════════════════════════════════════════════════════════
 // plat:P15 — Harness liviano de RBAC/RLS contra un Supabase REAL (preview/sandbox).
@@ -15,10 +19,21 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 //   3. anon NO puede leer NINGUNA tabla de negocio sensible (no hay policy anon).
 //   4. Aislamiento por TENANT: A y B (empresas distintas) ven conjuntos de
 //      company_id DISJUNTOS en las tablas calientes que exponen company_id.
+//      Se distinguen DOS niveles (ver ./coverage.json, compartido con el seed):
+//        · NO TRIVIAL   — el seed garantiza filas de las dos empresas, así que
+//          aquí se EXIGE que ambos conjuntos sean NO VACÍOS antes de compararlos.
+//          Sin esa exigencia, dos conjuntos vacíos hacen que el bucle de
+//          disjunción no itere y el test pase sin comparar nada: el mismo verde
+//          hueco que el job traía de fábrica, sólo que disfrazado de ejecución.
+//        · ESTRUCTURAL  — la tabla puede estar vacía (sembrarla exigiría montar
+//          flujos completos). Se comprueba que la policy responde y que no hay
+//          fuga observable, pero su disjunción NO demuestra aislamiento.
 //   5. Aislamiento USER-scoped: cada usuario sólo ve SUS filas (user_id = auth.uid())
 //      en notification_preferences / user_preferences.
 //   6. NEGATIVE WRITE: A NO puede INSERT/UPDATE con company_id ajeno (RLS WITH
-//      CHECK lo rechaza → no persiste nada; el harness NO siembra ni limpia).
+//      CHECK lo rechaza → no persiste nada). El harness NO siembra; los datos
+//      del sandbox los pone `scripts/seed-rls-sandbox.mjs`. Lo único que borra
+//      es lo que un negative-write nunca debió dejar (barrido en afterAll).
 //   7. GUARD anon/authenticated sobre los RPCs sensibles del orquestador de
 //      notificaciones (#378/#380): enqueue_notification, claim_notifications_batch,
 //      mark_notification_result, run_notifications_dispatcher — TODOS rechazados.
@@ -45,6 +60,12 @@ const ENABLED = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los
 // negative-write sin necesidad de conocer el company_id real de B.
 const FOREIGN_COMPANY_ID = '00000000-0000-0000-0000-000000000000'
+
+// Marcador de cualquier fila que un negative-write pudiera dejar si RLS fallara.
+// Los INSERT de esta suite DEBEN ser rechazados; si alguno se colara, este texto
+// permite barrerlo en afterAll. El harness no siembra nada: sólo limpia lo que
+// nunca debió existir (defensa en profundidad, no parte del contrato).
+const MARCADOR_EFIMERO = 'RLS-NEGATIVE-NO-DEBE-PERSISTIR'
 
 // Tablas deny-all: el secreto/credencial NUNCA se proyecta al cliente. Sólo
 // service_role (BYPASSRLS) las lee desde edge functions.
@@ -108,30 +129,10 @@ const ANON_DENY_TABLES = [
   'empresa',
 ] as const
 
-// Tablas calientes que exponen company_id directo → aislamiento por tenant
-// verificable comparando los conjuntos de company_id de A y B.
-const TENANT_SCOPED_TABLES = [
-  'cuotas_condominio',
-  'documentos_fiscales',
-  'notifications_outbox',
-  'user_invitations',
-  // ERP financiero: el dinero es lo más sensible al cross-tenant.
-  'conta_cuentas',
-  'conta_asientos',
-  'proveedores',
-  'facturas_proveedor',
-  'presupuestos',
-  'cuentas_bancarias',
-  'banco_movimientos',
-  // Tablas de julio 2026 con company_id directo (auditoría 2026-07-16, S5):
-  // el portal de residentes y la config de email OAuth por tenant.
-  'unidad_residentes',
-  'company_email_configs',
-  // Auditoría 2026-07-28 (Bloque A · PR-1): sus policies ya acotaban por
-  // `company_id = get_my_company_id()`, pero sin RLS encendida no se evaluaban.
-  // (`empresa` NO va aquí: no tiene columna de tenant — ver 20260729000000.)
-  'fuentes_agua',
-] as const
+// Las tablas tenant-scoped y su NIVEL de cobertura viven en `./coverage.ts`,
+// compartido con `scripts/seed-rls-sandbox.mjs`. La separación es lo que impide
+// el verde vacío: para las NO_TRIVIALES el seed garantiza filas de A y de B, así
+// que aquí se puede EXIGIR que los conjuntos no estén vacíos antes de compararlos.
 
 // Tablas con scope POR USUARIO (no por empresa): RLS = user_id = auth.uid().
 const USER_SCOPED_TABLES = ['notification_preferences', 'user_preferences'] as const
@@ -299,6 +300,17 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   })
 
   afterAll(async () => {
+    // Barrido de seguridad: ninguna de las escrituras negativas debería haber
+    // persistido (RLS las rechaza), pero si una se colara quedaría basura en el
+    // sandbox y —peor— un falso verde en la siguiente corrida. Es best-effort:
+    // los errores se ignoran a propósito, porque lo normal es que no haya nada
+    // que borrar y el DELETE devuelva 0 filas.
+    await Promise.allSettled([
+      userA?.from('cuotas_condominio').delete().eq('concepto', MARCADOR_EFIMERO),
+      userA?.from('conta_cuentas').delete().eq('nombre', MARCADOR_EFIMERO),
+      userA?.from('conta_asientos').delete().eq('concepto', MARCADOR_EFIMERO),
+      userA?.from('documentos_fiscales').delete().eq('company_id', FOREIGN_COMPANY_ID),
+    ])
     await Promise.allSettled([userA?.auth.signOut(), userB?.auth.signOut()])
   })
 
@@ -355,23 +367,77 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('aislamiento por tenant (company_id disjunto entre A y B)', () => {
-    for (const table of TENANT_SCOPED_TABLES) {
+  // Devuelve los company_id que cada usuario ve en `table`.
+  async function companyIdsVistos(table: string) {
+    const [{ data: aRows, error: aErr }, { data: bRows, error: bErr }] = await Promise.all([
+      userA.from(table).select('company_id'),
+      userB.from(table).select('company_id'),
+    ])
+    expect(aErr, `A no debe recibir error leyendo ${table}`).toBeNull()
+    expect(bErr, `B no debe recibir error leyendo ${table}`).toBeNull()
+    return {
+      a: new Set((aRows ?? []).map((r) => (r as { company_id: string }).company_id)),
+      b: new Set((bRows ?? []).map((r) => (r as { company_id: string }).company_id)),
+    }
+  }
+
+  function assertDisjuntos(a: Set<string>, b: Set<string>, table: string) {
+    for (const co of b) {
+      expect(a.has(co), `company_id ${co} de B no debe ser visible para A en ${table}`).toBe(false)
+    }
+    for (const co of a) {
+      expect(b.has(co), `company_id ${co} de A no debe ser visible para B en ${table}`).toBe(false)
+    }
+  }
+
+  // ── Cobertura REAL ────────────────────────────────────────────────────────
+  // El seed garantiza filas de las DOS empresas en estas tablas, así que aquí se
+  // EXIGE que los conjuntos no estén vacíos ANTES de compararlos. Sin esta
+  // aserción, un sandbox sin sembrar produce dos conjuntos vacíos, el bucle de
+  // disjunción no itera y el test pasa sin haber comparado nada — el mismo verde
+  // hueco que este PR viene a eliminar, sólo que disfrazado de ejecución.
+  describe('aislamiento por tenant — cobertura NO TRIVIAL (conjuntos no vacíos)', () => {
+    for (const table of TENANT_SCOPED_NO_TRIVIALES) {
+      it(`${table}: A ve al menos una fila PROPIA`, async () => {
+        const { a } = await companyIdsVistos(table)
+        expect(
+          a.size,
+          `A no ve ninguna fila de ${table}: el sandbox no está sembrado y la disjunción sería trivial. Corré scripts/seed-rls-sandbox.mjs.`,
+        ).toBeGreaterThan(0)
+      })
+
+      it(`${table}: B ve al menos una fila PROPIA`, async () => {
+        const { b } = await companyIdsVistos(table)
+        expect(
+          b.size,
+          `B no ve ninguna fila de ${table}: el sandbox no está sembrado y la disjunción sería trivial. Corré scripts/seed-rls-sandbox.mjs.`,
+        ).toBeGreaterThan(0)
+      })
+
+      it(`${table}: A y B ven company_id DISJUNTOS (comparación con datos reales)`, async () => {
+        const { a, b } = await companyIdsVistos(table)
+        expect(a.size, 'precondición: A debe ver filas').toBeGreaterThan(0)
+        expect(b.size, 'precondición: B debe ver filas').toBeGreaterThan(0)
+        assertDisjuntos(a, b, table)
+      })
+    }
+  })
+
+  // ── Cobertura ESTRUCTURAL ─────────────────────────────────────────────────
+  // Estas tablas pueden estar VACÍAS en el sandbox (sembrarlas exigiría montar
+  // flujos completos — ver ./coverage.ts). Se comprueba que la policy responde
+  // sin error y que no hay fuga observable, pero su disjunción NO demuestra
+  // aislamiento y NO debe declararse como tal.
+  describe('aislamiento por tenant — cobertura ESTRUCTURAL (puede estar vacía)', () => {
+    for (const table of TENANT_SCOPED_ESTRUCTURALES) {
       it(`${table}: A lee lo suyo sin error`, async () => {
         const { error } = await userA.from(table).select('company_id').limit(1)
         expect(error).toBeNull()
       })
 
-      it(`${table}: A y B (empresas distintas) ven company_id DISJUNTOS`, async () => {
-        const [{ data: aRows }, { data: bRows }] = await Promise.all([
-          userA.from(table).select('company_id'),
-          userB.from(table).select('company_id'),
-        ])
-        const aCos = new Set((aRows ?? []).map((r) => (r as { company_id: string }).company_id))
-        const bCos = new Set((bRows ?? []).map((r) => (r as { company_id: string }).company_id))
-        for (const co of bCos) {
-          expect(aCos.has(co), `company_id ${co} de B no debe ser visible para A`).toBe(false)
-        }
+      it(`${table}: sin fuga observable entre A y B`, async () => {
+        const { a, b } = await companyIdsVistos(table)
+        assertDisjuntos(a, b, table)
       })
     }
   })
@@ -410,7 +476,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         .insert({
           company_id: FOREIGN_COMPANY_ID,
           project_id: FOREIGN_COMPANY_ID,
-          concepto: 'mantenimiento',
+          concepto: MARCADOR_EFIMERO,
           monto: 1,
           periodo: '2099-01',
           estado: 'pendiente',
@@ -459,7 +525,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         .insert({
           company_id: FOREIGN_COMPANY_ID,
           codigo: '9999-RLS',
-          nombre: 'Cuenta intrusa',
+          nombre: MARCADOR_EFIMERO,
           tipo: 'activo',
           naturaleza: 'deudora',
           nivel: 1,
@@ -483,7 +549,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
           company_id: aOwnedCompanyId ?? FOREIGN_COMPANY_ID,
           fecha: '2099-01-01',
           tipo: 'diario',
-          concepto: 'Intento de publicación directa',
+          concepto: MARCADOR_EFIMERO,
           estado: 'publicado',
           origen: 'manual',
           moneda_base: 'GTQ',

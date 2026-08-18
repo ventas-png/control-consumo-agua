@@ -1,0 +1,40 @@
+{
+  "_comentario": [
+    "Manifiesto de cobertura del harness RLS — FUENTE ÚNICA DE VERDAD.",
+    "Lo consumen dos piezas que tienen que estar de acuerdo o el harness miente:",
+    "  scripts/seed-rls-sandbox.mjs  — siembra y VERIFICA las tablas de 'noTriviales'.",
+    "  src/test/rls/rlsHarness.test.ts — exige conjuntos NO VACÍOS en esas mismas tablas.",
+    "Mover una tabla a 'noTriviales' sin sembrarla rompe el seed y rompe el harness:",
+    "es la única forma de declarar cobertura real sin poder falsearla."
+  ],
+  "noTriviales": [
+    "proveedores",
+    "conta_cuentas",
+    "cuotas_condominio",
+    "documentos_fiscales"
+  ],
+  "estructurales": [
+    "notifications_outbox",
+    "user_invitations",
+    "conta_asientos",
+    "facturas_proveedor",
+    "presupuestos",
+    "cuentas_bancarias",
+    "banco_movimientos",
+    "unidad_residentes",
+    "company_email_configs",
+    "fuentes_agua"
+  ],
+  "motivoEstructural": {
+    "notifications_outbox": "la llena el orquestador, no un INSERT directo",
+    "user_invitations": "exige el flujo de invitación por correo",
+    "conta_asientos": "publicar exige la RPC y el folio correlativo",
+    "facturas_proveedor": "exige orden de compra y recepción",
+    "presupuestos": "exige partidas y ejercicio abierto",
+    "cuentas_bancarias": "exige catálogo contable enlazado",
+    "banco_movimientos": "exige cuenta bancaria e importación",
+    "unidad_residentes": "exige portal activo y cliente residente",
+    "company_email_configs": "exige OAuth de correo por tenant",
+    "fuentes_agua": "exige el módulo de agua configurado"
+  }
+}

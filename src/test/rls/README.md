@@ -90,3 +90,22 @@ menos una preferencia cada uno.
   cobertura más profunda (INSERT/UPDATE/DELETE denegados cross-tenant) pero es más
   caro de operar; queda como mejora futura. Hoy priorizamos lectura + deny-all de
   secretos + aislamiento, que son los invariantes críticos.
+
+## Cobertura: real vs. estructural
+
+`coverage.json` es la fuente única que comparten este harness y
+`scripts/seed-rls-sandbox.mjs`:
+
+- **`noTriviales`** (`proveedores`, `conta_cuentas`, `cuotas_condominio`,
+  `documentos_fiscales`) — el seed garantiza filas de las DOS empresas y lo
+  verifica entrando como cada usuario. El harness **exige conjuntos no vacíos**
+  antes de comprobar la disjunción, porque dos conjuntos vacíos hacen que el
+  bucle no itere y el test pase sin comparar nada.
+- **`estructurales`** — la tabla puede estar vacía. Se comprueba que la policy
+  responde y que no hay fuga observable, pero **su disjunción no demuestra
+  aislamiento**.
+
+Mover una tabla a `noTriviales` sin sembrarla rompe el seed y rompe el harness:
+es la única forma de que «cobertura declarada» y «cobertura real» coincidan.
+
+Detalle completo y limitaciones: `docs/ACTIVAR_HARNESS_RLS.md`.

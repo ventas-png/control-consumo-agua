@@ -4,8 +4,10 @@ name: Coverage gate & E2E
 # (sin umbral). Este workflow agrega lo que falta para el Track T8:
 #   • coverage-gate: umbral DURO sobre la lógica de negocio crítica (money/auth).
 #   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
-#   • rls-harness:   verificación RLS server-side (gated por secreto).
-# Los jobs gated son no-op verdes cuando faltan los secretos del repo.
+#   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
+# `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
+# `rls-harness` YA NO: exige las 6 variables RLS_* y falla si falta cualquiera,
+# salvo en PRs de forks, donde GitHub no expone secretos por diseño.
 
 on:
   pull_request:
@@ -231,44 +233,112 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Gate por RLS_SUPABASE_URL
-        id: gate
+      # ── Preflight FAIL-CLOSED ────────────────────────────────────────────
+      #
+      # Antes este gate miraba UNA sola variable (RLS_SUPABASE_URL) y, si
+      # faltaba, dejaba el job VERDE con un warning. Dos agujeros:
+      #
+      #   1. Con la URL puesta pero (por ejemplo) RLS_USER_B_PASSWORD vacía, el
+      #      job entraba a correr, el harness se auto-saltaba por su propio
+      #      ENABLED y terminaba verde con CERO pruebas. Verde sin ejecutar,
+      #      otra vez, y esta vez sin ni siquiera el warning.
+      #   2. Un verde por omisión es indistinguible de un verde por
+      #      verificación. La rama protegida lo contaba como cobertura.
+      #
+      # Ahora: se exigen las SEIS variables. Si falta cualquiera en un PR
+      # interno o en push a main, el job FALLA. La única omisión legítima es el
+      # PR de un fork, donde GitHub no expone secretos por diseño — y ahí se
+      # omite EXPLÍCITAMENTE y sin ejecutar nada del fork con credenciales.
+      - name: Preflight fail-closed de los secretos RLS_*
+        id: preflight
+        env:
+          # `head.repo.fork` sólo existe en eventos pull_request; en push a main
+          # queda vacío → se trata como interno → fail-closed. Correcto.
+          ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
         run: |
-          if [ -n "$RLS_SUPABASE_URL" ]; then
+          set -euo pipefail
+          faltan=()
+          for v in RLS_SUPABASE_URL RLS_SUPABASE_ANON_KEY \
+                   RLS_USER_A_EMAIL RLS_USER_A_PASSWORD \
+                   RLS_USER_B_EMAIL RLS_USER_B_PASSWORD; do
+            if [ -z "${!v:-}" ]; then faltan+=("$v"); fi
+          done
+
+          if [ ${#faltan[@]} -eq 0 ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            # Igualado al gate de E2E: warning + step summary. Antes era un `echo`
-            # suelto que no dejaba rastro en la UI, así que el job aparecía como
-            # verde a secas y NADIE veía que las 22 aserciones de aislamiento
-            # multi-tenant no se habían ejecutado nunca. Un no-op invisible es
-            # peor que un fallo: se contabiliza como cobertura que no existe.
-            echo "::warning title=Harness RLS omitido::RLS_SUPABASE_URL no configurado — las aserciones de aislamiento multi-tenant NO se ejecutaron (no-op verde). Ver docs/ACTIVAR_HARNESS_RLS.md."
-            {
-              echo "### ⚠️ Harness RLS omitido — el aislamiento multi-tenant NO se verificó"
-              echo ""
-              echo "Este job quedó **verde sin correr** por falta del secreto \`RLS_SUPABASE_URL\`."
-              echo "Las aserciones que NO se ejecutaron incluyen la principal de la auditoría:"
-              echo "que dos usuarios de **empresas distintas** vean \`company_id\` **disjuntos**."
-              echo ""
-              echo "Para activarlo hay un script que crea el sandbox y lo verifica:"
-              echo "**\`docs/ACTIVAR_HARNESS_RLS.md\`** → \`scripts/seed-rls-sandbox.mjs\`."
-              echo ""
-              echo "Secretos: \`RLS_SUPABASE_URL\`, \`RLS_SUPABASE_ANON_KEY\`,"
-              echo "\`RLS_USER_A_EMAIL\`/\`RLS_USER_A_PASSWORD\`, \`RLS_USER_B_EMAIL\`/\`RLS_USER_B_PASSWORD\`."
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Las 6 variables RLS_* están presentes: el harness se ejecuta."
+            exit 0
           fi
 
+          # Los nombres de las variables NO son secretos; sus valores nunca se
+          # imprimen (sólo se comprueba si están vacíos).
+          if [ "${ES_FORK:-}" = "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Harness RLS omitido (PR de fork)::GitHub no expone secretos a los forks por diseño. El aislamiento multi-tenant NO se verificó en este PR; se verificará al ejecutarse desde una rama del repositorio."
+            {
+              echo "### ⏭️ Harness RLS omitido — PR desde un fork"
+              echo ""
+              echo "GitHub **no expone secretos a los forks** por diseño, así que este job"
+              echo "no puede verificar el aislamiento multi-tenant y **no ejecuta código del"
+              echo "fork con credenciales**. Es la única omisión legítima."
+              echo ""
+              echo "Faltan: \`${faltan[*]}\`"
+              echo ""
+              echo "La verificación real corre en los PR internos y en cada push a \`main\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::error title=Harness RLS sin configurar::Faltan variables RLS_* (${faltan[*]}). El job falla en vez de quedar verde: un verde sin ejecutar se contabiliza como cobertura que no existe. Ver docs/ACTIVAR_HARNESS_RLS.md."
+          {
+            echo "### ❌ Harness RLS sin configurar — el job FALLA (fail-closed)"
+            echo ""
+            echo "El aislamiento multi-tenant **no se verificó** y este job ya no se queda"
+            echo "verde por ello. Faltan estas variables de repositorio:"
+            echo ""
+            for v in "${faltan[@]}"; do echo "- \`$v\`"; done
+            echo ""
+            echo "Se exigen **las seis**: con la URL puesta pero una credencial vacía el"
+            echo "harness se auto-saltaba y terminaba verde con **cero** pruebas."
+            echo ""
+            echo "Activación (crear sandbox, sembrarlo y pegar los secretos):"
+            echo "**\`docs/ACTIVAR_HARNESS_RLS.md\`** → \`scripts/seed-rls-sandbox.mjs\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - uses: actions/setup-node@v7
-        if: steps.gate.outputs.run == 'true'
+        if: steps.preflight.outputs.run == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        if: steps.gate.outputs.run == 'true'
+        if: steps.preflight.outputs.run == 'true'
         run: npm ci
 
+      # El reporte JSON es la EVIDENCIA de que se ejecutaron pruebas. `vitest run`
+      # sobre un harness auto-saltado termina en 0 con cero tests, así que el
+      # exit code por sí solo no distingue "verificado" de "omitido".
       - name: Run RLS harness
-        if: steps.gate.outputs.run == 'true'
-        run: npx vitest run src/test/rls/rlsHarness.test.ts
+        if: steps.preflight.outputs.run == 'true'
+        run: |
+          npx vitest run src/test/rls/rlsHarness.test.ts \
+            --reporter=default \
+            --reporter=json --outputFile=rls-report.json
+
+      # Fail-closed de salida: pruebas > 0, sin fallos, sin el marcador "omitido"
+      # y por encima del piso mínimo de aserciones.
+      - name: Verificar que se ejecutaron pruebas REALES (> 0, sin omisión)
+        if: steps.preflight.outputs.run == 'true'
+        run: node scripts/assert-rls-ejecutado.mjs rls-report.json 100
+
+      # El reporte sólo contiene nombres de prueba y recuentos (literales del
+      # repo): ningún valor de secreto, ninguna URL de sandbox, ningún token.
+      - name: Upload reporte del harness RLS
+        if: ${{ steps.preflight.outputs.run == 'true' && always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: rls-report-${{ github.run_id }}
+          path: rls-report.json
+          retention-days: 14
+          if-no-files-found: warn
