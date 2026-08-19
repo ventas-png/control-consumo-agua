@@ -269,6 +269,19 @@ jobs:
       RLS_USER_A_PASSWORD: ${{ secrets.RLS_USER_A_PASSWORD }}
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
+      # Gate por CLASE de paquetes_recibidos: cuatro usuarios de la MISMA
+      # empresa (ver src/test/rls/README.md). Mientras estos secretos no
+      # existan, ese bloque se SKIPEA — y los omitidos del reporte son
+      # exactamente esos. Se declaran aquí para que empiecen a correr en cuanto
+      # se configuren, sin tocar el workflow otra vez.
+      RLS_USER_PAQ_EMAIL: ${{ secrets.RLS_USER_PAQ_EMAIL }}
+      RLS_USER_PAQ_PASSWORD: ${{ secrets.RLS_USER_PAQ_PASSWORD }}
+      RLS_USER_CORR_EMAIL: ${{ secrets.RLS_USER_CORR_EMAIL }}
+      RLS_USER_CORR_PASSWORD: ${{ secrets.RLS_USER_CORR_PASSWORD }}
+      RLS_USER_ADMIN_EMAIL: ${{ secrets.RLS_USER_ADMIN_EMAIL }}
+      RLS_USER_ADMIN_PASSWORD: ${{ secrets.RLS_USER_ADMIN_PASSWORD }}
+      RLS_USER_OWNER_EMAIL: ${{ secrets.RLS_USER_OWNER_EMAIL }}
+      RLS_USER_OWNER_PASSWORD: ${{ secrets.RLS_USER_OWNER_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
 
