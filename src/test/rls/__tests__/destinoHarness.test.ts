@@ -198,3 +198,64 @@ describe('ninguna limpieza puede tocar fixtures preexistentes', () => {
     }
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// Regresión: las pruebas deny-all no pueden asumir que existe una columna.
+// ════════════════════════════════════════════════════════════════════════════
+// Contra el sandbox real, el bloque «anon no puede leer tablas de negocio»
+// pedía `select('id')` para las 31 tablas, y dos de ellas no tienen `id`:
+// `notification_preferences` y `user_preferences` van por `user_id`. Resultado:
+// 42703 (undefined_column) y dos pruebas en rojo — 125/127.
+//
+// Lo importante es qué habría pasado ANTES de endurecer `esperaDenegacion`: con
+// el `expect(data ?? []).toHaveLength(0)` original, ese error se habría contado
+// como «0 filas» y el job habría salido verde sin haber comprobado nada. El
+// fallo es, en realidad, la prueba de que el deny-all estricto funciona.
+//
+// La corrección es `select('*')`, que es además lo que el bloque quiere: sólo
+// pregunta «¿error permitido, o cero filas?», nunca el valor de una columna.
+describe('deny-all: ninguna aserción asume una columna concreta', () => {
+  /** Todas las llamadas a `esperaDenegacion` del harness, con sus argumentos. */
+  const llamadas = [...FUENTE_HARNESS.matchAll(/esperaDenegacion\(([^)]*)\)/g)].map((m) =>
+    m[1].split(',').map((a) => a.trim()),
+  )
+
+  it('hay llamadas que auditar (si no, esta prueba sería vacua)', () => {
+    expect(llamadas.length).toBeGreaterThan(3)
+  })
+
+  it('el bloque de tablas de negocio NO pide `id`', () => {
+    // La regresión concreta: `esperaDenegacion(anon, table, 'id', 'anon')`.
+    const conId = llamadas.filter((args) => args[2] === "'id'")
+    expect(conId, `siguen pidiendo 'id': ${JSON.stringify(conId)}`).toEqual([])
+  })
+
+  it('toda llamada iterada sobre una LISTA de tablas proyecta `*`', () => {
+    // Cuando el nombre de la tabla es una variable de bucle, no se puede saber
+    // qué columnas tiene: la única proyección segura es `*`. Una columna literal
+    // sólo se admite para una tabla concreta y nombrada (p. ej. user_sessions,
+    // que sí se sabe que tiene `sid`).
+    const iteradas = llamadas.filter((args) => args[1] === 'table')
+    expect(iteradas.length).toBeGreaterThan(0)
+    for (const args of iteradas) {
+      expect(args[2], `proyección insegura sobre una tabla variable: ${args.join(', ')}`).toBe("'*'")
+    }
+  })
+
+  it('las dos tablas del fallo real se consultan por user_id, no por id', () => {
+    // Comprobación de que el diagnóstico era correcto: en el bloque user-scoped
+    // —que sí pasó— estas tablas se leen por `user_id`.
+    for (const tabla of ['notification_preferences', 'user_preferences']) {
+      expect(FUENTE_HARNESS).toContain(tabla)
+    }
+    expect(FUENTE_HARNESS).toMatch(/USER_SCOPED_TABLES[\s\S]{0,200}notification_preferences/)
+    expect(FUENTE_HARNESS).toContain("select('user_id')")
+  })
+
+  it('esperaDenegacion sigue distinguiendo «denegado» de «roto»', () => {
+    // Si alguien lo relajara a `expect(data ?? []).toHaveLength(0)`, un 42703
+    // volvería a pasar por verde. Es lo que hizo visible este fallo.
+    expect(FUENTE_HARNESS).toContain('CODIGOS_DENEGACION_OK')
+    expect(FUENTE_HARNESS).toContain('recibió un error INESPERADO')
+  })
+})

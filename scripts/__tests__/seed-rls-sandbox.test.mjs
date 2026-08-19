@@ -108,154 +108,171 @@ describe('validarUrlSandbox — contra el manifiesto REAL', () => {
   })
 })
 
+
 // ════════════════════════════════════════════════════════════════════════════
-// Listado de usuarios de Auth: paginación real.
+// Búsqueda de usuarios de Auth: consulta FILTRADA, no listado paginado.
 // ════════════════════════════════════════════════════════════════════════════
-// FALLO REPRODUCIDO contra el sandbox jwpmivhvlstslncrtokb:
+// EVIDENCIA REAL contra el sandbox, con sólo 4 usuarios en el proyecto:
 //
-//   listUsers({ page: 1, perPage: 1 })     → OK
-//   listUsers({ perPage: 1000 })           → AuthApiError status 500, message "{}"
-//   listUsers({ page: 1, perPage: 1000 })  → AuthApiError status 500
+//   page=1 per_page=1  → 200
+//   page=1 per_page=2  → 200
+//   page=1 per_page=3  → 200
+//   page=1 per_page=4  → AuthRetryableFetchError 500
+//   page=4 per_page=1  → AuthRetryableFetchError 500
 //
-// Es decir: el problema es el TAMAÑO DE PÁGINA, no las credenciales ni la
-// ausencia de `page`. El seed pedía 1000 usuarios de una vez y moría ahí, antes
-// de sembrar nada.
+// Esto REFUTA la hipótesis anterior ("perPage 1000 es demasiado; con 50 se
+// arregla"). No hay un límite de tamaño que respetar: lo que rompe es que la
+// respuesta incluya UN REGISTRO CONCRETO del listado general. `per_page=3` cabe
+// porque se detiene antes de él; `page=4, per_page=1` falla porque cae justo
+// encima. Bajar el tamaño de página sólo mueve la frontera — con otro orden, o
+// con un usuario más, el registro vuelve a entrar y el seed vuelve a morir.
 //
-// Y el `perPage: 1000` era frágil por dos motivos independientes del bug: sólo
-// funcionaba mientras el proyecto tuviera menos de 1000 usuarios, y el error se
-// reportaba como `listUsers: {}` —message vacío, status perdido— que es
-// exactamente lo que impidió diagnosticarlo a la primera.
-import {
-  PAGINA_USUARIOS,
-  buscarUsuarioPorEmail,
-  detalleErrorAuth,
-  upsertUsuario,
-} from '../seed-rls-sandbox.mjs'
+// La consulta filtrada nunca lo materializa:
+//   GET /auth/v1/admin/users?page=1&per_page=1&filter=rls-a%40sandbox.invalid → 200
+// y con ella el seed llegó a "Sandbox listo y VERIFICADO como ambos usuarios".
+import { buscarUsuarioPorEmail, detalleErrorAuth, upsertUsuario } from '../seed-rls-sandbox.mjs'
 
-const usuario = (n) => ({ id: `id-${n}`, email: `u${n}@sandbox.invalid` })
+const URL_SANDBOX = 'https://jwpmivhvlstslncrtokb.supabase.co'
+const CLAVE = 'service-role-de-juguete'
 
-/**
- * Cliente admin de mentira sobre una lista de usuarios, que pagina de verdad y
- * REGISTRA cada llamada. Las llamadas registradas son lo que permite afirmar
- * que nunca se pide una página mayor que la permitida.
- */
-function adminFalso(usuarios, { errorEnPagina = null, error = null } = {}) {
-  const llamadas = []
-  const creados = []
-  const actualizados = []
-
-  return {
-    llamadas,
-    creados,
-    actualizados,
-    auth: {
-      admin: {
-        async listUsers(opciones) {
-          llamadas.push(opciones)
-          if (error) return { data: null, error }
-          if (errorEnPagina !== null && opciones.page === errorEnPagina) {
-            return { data: null, error: { name: 'AuthApiError', status: 500, code: 'unexpected_failure', message: '{}' } }
-          }
-          const desde = (opciones.page - 1) * opciones.perPage
-          return { data: { users: usuarios.slice(desde, desde + opciones.perPage) }, error: null }
-        },
-        async createUser({ email }) {
-          const nuevo = { id: `nuevo-${email}`, email }
-          creados.push(nuevo)
-          usuarios.push(nuevo)
-          return { data: { user: nuevo }, error: null }
-        },
-        async updateUserById(id) {
-          actualizados.push(id)
-          return { data: null, error: null }
-        },
-      },
-    },
+/** fetch de mentira que registra la petición y devuelve la respuesta indicada. */
+function fetchFalso(respuesta) {
+  const peticiones = []
+  const impl = async (url, opciones) => {
+    peticiones.push({ url, opciones })
+    if (typeof respuesta === 'function') return respuesta(url, opciones)
+    return respuesta
   }
+  impl.peticiones = peticiones
+  return impl
 }
 
-describe('buscarUsuarioPorEmail — paginación', () => {
-  it('nunca pide una página mayor que PAGINA_USUARIOS, y ésta es 50', () => {
-    // La regresión concreta: perPage 1000 devuelve 500 en el sandbox real.
-    expect(PAGINA_USUARIOS).toBe(50)
+const respuestaOk = (users) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ users }),
+})
+
+const buscar = (fetchImpl, email) =>
+  buscarUsuarioPorEmail({ url: URL_SANDBOX, serviceKey: CLAVE, fetchImpl }, email)
+
+describe('buscarUsuarioPorEmail — consulta filtrada', () => {
+  it('encuentra al usuario existente', async () => {
+    const usuario = { id: 'id-a', email: 'rls-a@sandbox.invalid' }
+    const f = fetchFalso(respuestaOk([usuario]))
+
+    expect(await buscar(f, 'rls-a@sandbox.invalid')).toEqual(usuario)
   })
 
-  it('encuentra al usuario en la PRIMERA página y no pide una segunda', async () => {
-    const admin = adminFalso([usuario(1), usuario(2), usuario(3)])
-    const hallado = await buscarUsuarioPorEmail(admin, 'u2@sandbox.invalid')
+  it('pide el endpoint admin con filter, page=1 y per_page=1', async () => {
+    const f = fetchFalso(respuestaOk([]))
+    await buscar(f, 'rls-a@sandbox.invalid')
 
-    expect(hallado?.id).toBe('id-2')
-    expect(admin.llamadas).toEqual([{ page: 1, perPage: 50 }])
+    const { url } = f.peticiones[0]
+    expect(url).toContain('/auth/v1/admin/users')
+    expect(url).toContain('page=1')
+    expect(url).toContain('per_page=1')
+    // El email va URL-encoded: la arroba rompería el query string.
+    expect(url).toContain('filter=rls-a%40sandbox.invalid')
   })
 
-  it('encuentra al usuario en la SEGUNDA página', async () => {
-    // 50 usuarios llenan la primera página, así que el objetivo sólo aparece
-    // tras pedir la siguiente. Con la versión anterior —una única consulta— este
-    // caso dependía por completo de que cupiera en el primer lote.
-    const usuarios = Array.from({ length: 50 }, (_, i) => usuario(i))
-    usuarios.push({ id: 'id-objetivo', email: 'objetivo@sandbox.invalid' })
+  it('NO pagina el listado general: una sola petición y sin per_page grande', async () => {
+    const f = fetchFalso(respuestaOk([]))
+    await buscar(f, 'nadie@sandbox.invalid')
 
-    const admin = adminFalso(usuarios)
-    const hallado = await buscarUsuarioPorEmail(admin, 'objetivo@sandbox.invalid')
-
-    expect(hallado?.id).toBe('id-objetivo')
-    expect(admin.llamadas).toEqual([
-      { page: 1, perPage: 50 },
-      { page: 2, perPage: 50 },
-    ])
+    expect(f.peticiones).toHaveLength(1)
+    expect(f.peticiones[0].url).not.toMatch(/per_page=(?!1\b)\d+/)
   })
 
-  it('devuelve null cuando el usuario no existe, tras agotar las páginas', async () => {
-    const usuarios = Array.from({ length: 120 }, (_, i) => usuario(i))
-    const admin = adminFalso(usuarios)
+  it('manda apikey y Authorization Bearer con la service_role', async () => {
+    const f = fetchFalso(respuestaOk([]))
+    await buscar(f, 'rls-a@sandbox.invalid')
 
-    expect(await buscarUsuarioPorEmail(admin, 'nadie@sandbox.invalid')).toBeNull()
-    // 120 usuarios = dos páginas llenas + una de 20 (incompleta ⇒ es la última).
-    expect(admin.llamadas.map((l) => l.page)).toEqual([1, 2, 3])
+    const { headers } = f.peticiones[0].opciones
+    expect(headers.apikey).toBe(CLAVE)
+    expect(headers.Authorization).toBe(`Bearer ${CLAVE}`)
   })
 
-  it('para en una página vacía sin pedir más', async () => {
-    const admin = adminFalso([])
-    expect(await buscarUsuarioPorEmail(admin, 'nadie@sandbox.invalid')).toBeNull()
-    expect(admin.llamadas).toHaveLength(1)
+  it('devuelve null cuando el usuario no existe', async () => {
+    const f = fetchFalso(respuestaOk([]))
+    expect(await buscar(f, 'nadie@sandbox.invalid')).toBeNull()
   })
 
-  it('para cuando el total es múltiplo exacto de la página', async () => {
-    // 100 usuarios = dos páginas llenas; la tercera vuelve vacía y corta el bucle.
-    const admin = adminFalso(Array.from({ length: 100 }, (_, i) => usuario(i)))
-    expect(await buscarUsuarioPorEmail(admin, 'nadie@sandbox.invalid')).toBeNull()
-    expect(admin.llamadas.map((l) => l.page)).toEqual([1, 2, 3])
+  it('la comparación final es EXACTA: una coincidencia parcial no se acepta', async () => {
+    // `filter` es una búsqueda parcial del lado del servidor, así que buscar
+    // "rls-a@sandbox.invalid" puede devolver "otro-rls-a@sandbox.invalid".
+    // Aceptarlo sería reutilizar la identidad de otro usuario.
+    const f = fetchFalso(respuestaOk([
+      { id: 'id-otro', email: 'otro-rls-a@sandbox.invalid' },
+      { id: 'id-largo', email: 'rls-a@sandbox.invalid.mx' },
+    ]))
+
+    expect(await buscar(f, 'rls-a@sandbox.invalid')).toBeNull()
   })
 
-  it('EN NINGÚN caso solicita perPage mayor que 50', async () => {
-    const admin = adminFalso(Array.from({ length: 200 }, (_, i) => usuario(i)))
-    await buscarUsuarioPorEmail(admin, 'nadie@sandbox.invalid')
+  it('la comparación NO distingue mayúsculas (los emails no son sensibles a caja)', async () => {
+    const f = fetchFalso(respuestaOk([{ id: 'id-a', email: 'RLS-A@Sandbox.Invalid' }]))
+    expect((await buscar(f, 'rls-a@sandbox.invalid'))?.id).toBe('id-a')
+  })
 
-    expect(admin.llamadas.length).toBeGreaterThan(1)
-    for (const l of admin.llamadas) {
-      expect(l.perPage, `perPage ${l.perPage} supera el máximo seguro`).toBeLessThanOrEqual(50)
-      expect(l.page, 'page debe empezar en 1, no en 0').toBeGreaterThanOrEqual(1)
+  it('elige la coincidencia exacta aunque venga acompañada de parciales', async () => {
+    const f = fetchFalso(respuestaOk([
+      { id: 'id-otro', email: 'otro-rls-a@sandbox.invalid' },
+      { id: 'id-a', email: 'rls-a@sandbox.invalid' },
+    ]))
+    expect((await buscar(f, 'rls-a@sandbox.invalid'))?.id).toBe('id-a')
+  })
+})
+
+describe('buscarUsuarioPorEmail — fail-closed', () => {
+  it('un HTTP no-2xx aborta en vez de asumir que no existe', async () => {
+    // Tratar un 500 como "no existe" haría que el seed CREARA un usuario que ya
+    // estaba: dos identidades para el mismo email.
+    const f = fetchFalso({ ok: false, status: 500, statusText: 'Internal Server Error' })
+    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/HTTP 500/)
+  })
+
+  it('el error de HTTP no filtra la clave, las cabeceras ni el cuerpo', async () => {
+    const f = fetchFalso({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => ({ eco: `apikey=${CLAVE}` }),
+    })
+
+    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(
+      expect.objectContaining({
+        message: expect.not.stringContaining(CLAVE),
+      }),
+    )
+  })
+
+  it('un cuerpo que no es JSON aborta', async () => {
+    const f = fetchFalso({
+      ok: true,
+      status: 200,
+      json: async () => { throw new Error('Unexpected token < in JSON') },
+    })
+    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/no es JSON válido/)
+  })
+
+  it('`users` ausente o de otro tipo aborta: "no lo sé" no es "no existe"', async () => {
+    for (const cuerpo of [{}, { users: null }, { users: 'nope' }, { users: { 0: 'x' } }]) {
+      const f = fetchFalso({ ok: true, status: 200, json: async () => cuerpo })
+      await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/arreglo `users`/)
     }
   })
 
-  it('propaga el error de listUsers CONSERVANDO status y code', async () => {
-    // Lo que hacía indiagnosticable el fallo real: `${error.message}` daba
-    // "listUsers: {}" y el status 500 se perdía por el camino.
-    const admin = adminFalso([], {
-      error: { name: 'AuthApiError', status: 500, code: 'unexpected_failure', message: '{}' },
-    })
+  it('un fallo de red aborta sin exponer la petición', async () => {
+    // La URL lleva el email y las cabeceras la service_role: ni una ni otras
+    // pueden acabar en el log.
+    const f = fetchFalso(() => { throw new Error('ECONNREFUSED') })
+    const promesa = buscar(f, 'rls-a@sandbox.invalid')
 
-    await expect(buscarUsuarioPorEmail(admin, 'x@sandbox.invalid')).rejects.toThrow(/status=500/)
-    await expect(buscarUsuarioPorEmail(admin, 'x@sandbox.invalid')).rejects.toThrow(/code=unexpected_failure/)
-    await expect(buscarUsuarioPorEmail(admin, 'x@sandbox.invalid')).rejects.toThrow(/AuthApiError/)
-  })
-
-  it('el error dice en qué página y con qué tamaño falló', async () => {
-    const usuarios = Array.from({ length: 60 }, (_, i) => usuario(i))
-    const admin = adminFalso(usuarios, { errorEnPagina: 2 })
-
-    await expect(buscarUsuarioPorEmail(admin, 'nadie@sandbox.invalid'))
-      .rejects.toThrow(/page=2, perPage=50/)
+    await expect(promesa).rejects.toThrow(/ECONNREFUSED/)
+    await expect(promesa).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining(CLAVE) }),
+    )
   })
 })
 
@@ -266,6 +283,8 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
   })
 
   it('serializa el message cuando no es una cadena', () => {
+    // GoTrue devolvió literalmente `{}` en el fallo del listado: quedarse con
+    // `.message` borraba la única pista útil, el status.
     expect(detalleErrorAuth({ status: 500, message: {} })).toContain('message={}')
     expect(detalleErrorAuth({ status: 500, message: { a: 1 } })).toContain('message={"a":1}')
     expect(detalleErrorAuth({ status: 500, message: null })).toContain('message=null')
@@ -283,13 +302,11 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
   })
 
   it('NO filtra headers, cuerpo crudo ni nada parecido a una credencial', () => {
-    // Se le pasa un error con basura sensible en campos que NO deben leerse.
     const d = detalleErrorAuth({
       name: 'AuthApiError',
       status: 500,
       message: 'fallo',
       headers: { Authorization: 'Bearer sk-secreta' },
-      __isAuthError: true,
       response: { body: 'service_role=clave-secretisima' },
       apiKey: 'clave-que-no-debe-salir',
     })
@@ -306,33 +323,41 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
 })
 
 describe('upsertUsuario — idempotencia', () => {
-  it('actualiza la contraseña si el usuario existe y NO crea otro', async () => {
-    const admin = adminFalso([usuario(1), { id: 'id-a', email: 'a@sandbox.invalid' }])
+  /** Cliente admin de mentira: registra creaciones y actualizaciones. */
+  function adminFalso() {
+    const creados = []
+    const actualizados = []
+    return {
+      creados,
+      actualizados,
+      auth: {
+        admin: {
+          async createUser({ email }) {
+            const nuevo = { id: `nuevo-${email}`, email }
+            creados.push(nuevo)
+            return { data: { user: nuevo }, error: null }
+          },
+          async updateUserById(id) {
+            actualizados.push(id)
+            return { data: null, error: null }
+          },
+        },
+      },
+    }
+  }
 
-    const id = await upsertUsuario(admin, 'a@sandbox.invalid', 'clave-nueva')
+  it('actualiza la contraseña si el usuario existe y NO crea otro', async () => {
+    const admin = adminFalso()
+    const id = await upsertUsuario(admin, 'a@sandbox.invalid', 'clave', async () => ({ id: 'id-a' }))
 
     expect(id).toBe('id-a')
     expect(admin.actualizados).toEqual(['id-a'])
     expect(admin.creados, 'no debe crearse un usuario duplicado').toEqual([])
   })
 
-  it('lo encuentra aunque esté en una página posterior, sin duplicarlo', async () => {
-    // Es el caso que el `perPage: 1000` disimulaba: con paginación rota, un
-    // usuario existente pero fuera del primer lote se habría vuelto a crear.
-    const usuarios = Array.from({ length: 50 }, (_, i) => usuario(i))
-    usuarios.push({ id: 'id-b', email: 'b@sandbox.invalid' })
-    const admin = adminFalso(usuarios)
-
-    const id = await upsertUsuario(admin, 'b@sandbox.invalid', 'clave')
-
-    expect(id).toBe('id-b')
-    expect(admin.creados).toEqual([])
-    expect(admin.actualizados).toEqual(['id-b'])
-  })
-
   it('crea el usuario si no existe', async () => {
-    const admin = adminFalso([usuario(1)])
-    const id = await upsertUsuario(admin, 'nuevo@sandbox.invalid', 'clave')
+    const admin = adminFalso()
+    const id = await upsertUsuario(admin, 'nuevo@sandbox.invalid', 'clave', async () => null)
 
     expect(id).toBe('nuevo-nuevo@sandbox.invalid')
     expect(admin.creados).toHaveLength(1)
@@ -340,15 +365,26 @@ describe('upsertUsuario — idempotencia', () => {
   })
 
   it('dos corridas seguidas dejan UN solo usuario', async () => {
-    // La definición operativa de idempotente: correr el seed dos veces no puede
-    // dejar dos identidades con el mismo email.
-    const admin = adminFalso([])
+    // La definición operativa de idempotente. El buscador de mentira imita al
+    // real: tras crearlo, la siguiente búsqueda ya lo encuentra.
+    const admin = adminFalso()
+    const registro = new Map()
+    const buscarReg = async (email) => registro.get(email) ?? null
 
-    const primera = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-1')
-    const segunda = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-2')
+    const primera = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-1', buscarReg)
+    registro.set('rls-a@sandbox.invalid', { id: primera })
+    const segunda = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-2', buscarReg)
 
     expect(segunda).toBe(primera)
     expect(admin.creados).toHaveLength(1)
     expect(admin.actualizados).toEqual([primera])
+  })
+
+  it('un fallo de la búsqueda ABORTA en vez de crear a ciegas', async () => {
+    const admin = adminFalso()
+    const buscarRoto = async () => { throw new Error('HTTP 500') }
+
+    await expect(upsertUsuario(admin, 'a@sandbox.invalid', 'clave', buscarRoto)).rejects.toThrow(/500/)
+    expect(admin.creados, 'no debe crear nada si no sabe si ya existe').toEqual([])
   })
 })

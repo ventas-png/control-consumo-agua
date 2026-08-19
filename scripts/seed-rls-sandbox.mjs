@@ -106,24 +106,12 @@ async function upsertPorMatch(admin, tabla, match, fila) {
 }
 
 /**
- * Tamaño de página del listado de usuarios de Auth.
- *
- * NO es un número elegido por gusto. Contra el sandbox real, GoTrue devuelve
- * **500 con un cuerpo vacío** (`AuthApiError`, `message: "{}"`) para
- * `perPage: 1000`, mientras que `perPage: 1` responde perfectamente. El fallo
- * es del tamaño de página, no de las credenciales ni de omitir `page`. Un
- * listado paginado de verdad es además lo correcto con independencia del bug:
- * "el sandbox tiene pocos usuarios" es una suposición que caduca sola.
- */
-export const PAGINA_USUARIOS = 50
-
-/**
  * Detalle de un error de Auth, seguro para imprimir.
  *
- * Los errores de GoTrue no siempre traen un `message` legible —en el fallo de
- * `perPage: 1000` llega literalmente `"{}"`— así que quedarse con `.message`
- * borra la única pista útil: el `status`. Aquí se conservan `name`, `status`,
- * `code` y `message`, y se serializa `message` cuando no es una cadena.
+ * Los errores de GoTrue no siempre traen un `message` legible —en el fallo del
+ * listado llega literalmente `"{}"`— así que quedarse con `.message` borra la
+ * única pista útil: el `status`. Aquí se conservan `name`, `status`, `code` y
+ * `message`, y se serializa `message` cuando no es una cadena.
  *
  * Sólo se leen esos cuatro campos: nunca `headers`, ni el cuerpo crudo de la
  * respuesta, ni nada que pueda arrastrar la service_role o un token.
@@ -158,40 +146,110 @@ function safeJson(valor) {
 }
 
 /**
- * Busca un usuario de Auth por email paginando el listado.
+ * Busca un usuario de Auth por email con una consulta FILTRADA al endpoint
+ * administrativo, en vez de recorrer el listado general.
  *
- * No hay `getUserByEmail` en la API admin, así que hay que recorrer páginas.
- * Se para en cuanto lo encuentra, y también cuando una página vuelve incompleta
- * (`users.length < PAGINA_USUARIOS`), que es la señal de última página.
+ * ─── POR QUÉ NO SE PAGINA EL LISTADO ────────────────────────────────────────
+ * La primera hipótesis —«perPage 1000 es demasiado, con 50 se arregla»— quedó
+ * REFUTADA por la evidencia del sandbox. Con sólo 4 usuarios en el proyecto:
  *
+ *   page=1 per_page=1  → 200
+ *   page=1 per_page=2  → 200
+ *   page=1 per_page=3  → 200
+ *   page=1 per_page=4  → AuthRetryableFetchError 500
+ *   page=4 per_page=1  → AuthRetryableFetchError 500
+ *
+ * No hay ningún límite fijo que respetar: lo que rompe es **incluir en la
+ * respuesta un registro concreto** del listado general. `per_page=3` cabe
+ * porque se queda antes de él; `page=4, per_page=1` falla porque cae justo
+ * encima. Bajar el tamaño de página sólo mueve la frontera — con otro orden, o
+ * con un usuario más, el mismo registro vuelve a entrar y el seed vuelve a
+ * morir. Paginar es tratar el síntoma.
+ *
+ * La búsqueda filtrada nunca materializa ese registro:
+ *
+ *   GET /auth/v1/admin/users?page=1&per_page=1&filter=rls-a%40sandbox.invalid → 200
+ *
+ * y con ella el seed llegó a imprimir «Sandbox listo y VERIFICADO como ambos
+ * usuarios».
+ *
+ * ─── POR QUÉ FETCH DIRECTO Y NO EL SDK ──────────────────────────────────────
+ * `admin.auth.admin.listUsers()` no expone el parámetro `filter`, que es justo
+ * lo que evita el registro venenoso. Se llama al endpoint REST a mano.
+ *
+ * `filter` es una búsqueda PARCIAL del lado del servidor: sirve para acotar la
+ * consulta, no para decidir identidad. La igualdad final se comprueba aquí,
+ * exacta y sin distinguir mayúsculas (los emails no son sensibles a caja), para
+ * que "rls-a@sandbox.invalid" jamás case con "otro-rls-a@sandbox.invalid".
+ *
+ * @param {{ url: string, serviceKey: string, fetchImpl?: Function }} destino
+ *   Inyectados a propósito: sin esto no habría forma de probar la función.
  * @returns el usuario, o null si no existe.
  */
-export async function buscarUsuarioPorEmail(admin, email) {
-  for (let page = 1; ; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: PAGINA_USUARIOS,
+export async function buscarUsuarioPorEmail({ url, serviceKey, fetchImpl }, email) {
+  const doFetch = fetchImpl ?? globalThis.fetch
+  const base = String(url ?? '').replace(/\/+$/, '')
+  const endpoint =
+    `${base}/auth/v1/admin/users?page=1&per_page=1&filter=${encodeURIComponent(email)}`
+
+  let respuesta
+  try {
+    respuesta = await doFetch(endpoint, {
+      method: 'GET',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Accept: 'application/json',
+      },
     })
-
-    if (error) {
-      throw new Error(
-        `listUsers(page=${page}, perPage=${PAGINA_USUARIOS}): ${detalleErrorAuth(error)}`,
-      )
-    }
-
-    const usuarios = data?.users ?? []
-    const encontrado = usuarios.find((u) => u.email === email)
-    if (encontrado) return encontrado
-
-    // Página incompleta (o vacía) ⇒ no hay más. Sin esto, un backend que
-    // devuelva siempre la misma página dejaría el bucle corriendo para siempre.
-    if (usuarios.length < PAGINA_USUARIOS) return null
+  } catch (e) {
+    // Fallo de red/DNS. Se reporta el mensaje del error, nunca la petición:
+    // la URL lleva el email y las cabeceras llevan la service_role.
+    throw new Error(`buscarUsuario(${email}): la petición falló — ${e?.message ?? e}`)
   }
+
+  // Fail-closed: cualquier respuesta que no sea 2xx aborta. NO se imprime el
+  // cuerpo, que puede traer eco de la petición o de las cabeceras.
+  if (!respuesta || respuesta.ok !== true) {
+    throw new Error(
+      `buscarUsuario(${email}): respuesta HTTP ${respuesta?.status ?? 'desconocida'} ` +
+      `${respuesta?.statusText ?? ''}`.trim() +
+      '. No se continúa: sin un listado fiable no se puede decidir si el usuario existe, ' +
+      'y crearlo a ciegas duplicaría la identidad.',
+    )
+  }
+
+  let cuerpo
+  try {
+    cuerpo = await respuesta.json()
+  } catch {
+    throw new Error(
+      `buscarUsuario(${email}): la respuesta no es JSON válido. Fail-closed: no se asume ` +
+      'que el usuario no existe.',
+    )
+  }
+
+  // Fail-closed también ante una forma inesperada: `users` ausente o no-arreglo
+  // NO significa "no existe", significa "no lo sé".
+  if (!Array.isArray(cuerpo?.users)) {
+    throw new Error(
+      `buscarUsuario(${email}): la respuesta no trae un arreglo \`users\` ` +
+      `(recibido: ${typeof cuerpo?.users}). Fail-closed: no se asume que el usuario no existe.`,
+    )
+  }
+
+  // `filter` es parcial: la identidad la decide esta comparación, no el servidor.
+  const buscado = email.toLowerCase()
+  return cuerpo.users.find((u) => String(u?.email ?? '').toLowerCase() === buscado) ?? null
 }
 
-/** Usuario de auth por email, creándolo si no existe. Devuelve su id. */
-export async function upsertUsuario(admin, email, pass) {
-  const existing = await buscarUsuarioPorEmail(admin, email)
+/**
+ * Usuario de auth por email, creándolo si no existe. Devuelve su id.
+ *
+ * `buscar` se inyecta (misma razón que en `buscarUsuarioPorEmail`: probarlo).
+ */
+export async function upsertUsuario(admin, email, pass, buscar) {
+  const existing = await buscar(email)
 
   if (existing) {
     // Se reescribe la contraseña para que la impresa al final sea siempre la
@@ -413,6 +471,11 @@ async function main(env) {
 
   const admin = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 
+  // Búsqueda de usuarios por consulta FILTRADA al endpoint admin. El listado
+  // general de este proyecto revienta con 500 en cuanto la respuesta incluye
+  // cierto registro (ver `buscarUsuarioPorEmail`), así que no se pagina.
+  const buscarUsuario = (email) => buscarUsuarioPorEmail({ url: URL, serviceKey: KEY }, email)
+
   console.log('\n🌱 Seed del sandbox RLS\n')
   console.log(`   Proyecto: ${URL}  (ref ${destino.ref})`)
   console.log(`   Tablas con cobertura NO TRIVIAL: ${NO_TRIVIALES.join(', ')}\n`)
@@ -420,7 +483,7 @@ async function main(env) {
   const creado = []
   for (const t of TENANTS) {
     const companyId = await upsertPorMatch(admin, 'companies', { nombre: t.empresa }, { nombre: t.empresa })
-    const userId = await upsertUsuario(admin, t.email, t.pass)
+    const userId = await upsertUsuario(admin, t.email, t.pass, buscarUsuario)
     await upsertAppUser(admin, userId, companyId, `Usuario RLS ${t.key}`)
     const recursos = await seedDatos(admin, companyId, t.key)
     creado.push({ ...t, companyId, userId, ...recursos })

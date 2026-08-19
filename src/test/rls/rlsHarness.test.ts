@@ -582,9 +582,20 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   })
 
   describe('anon no puede leer tablas de negocio', () => {
+    // `select('*')`, NUNCA una columna concreta. Aquí se pedía `id` y dos tablas
+    // no lo tienen —`notification_preferences` y `user_preferences` van por
+    // `user_id`—, así que la consulta moría con 42703 (undefined_column) contra
+    // el sandbox real. No es un detalle cosmético: `id` no era ni siquiera lo
+    // que se quería comprobar. Este bloque sólo pregunta «¿error permitido, o
+    // cero filas?», y para eso `*` es la proyección correcta y además la más
+    // estricta: si la policy dejara pasar una fila, se ve entera.
+    //
+    // El fallo 42703 lo detectó `esperaDenegacion` precisamente porque distingue
+    // «denegado» de «roto». Con el `expect(data ?? []).toHaveLength(0)` original
+    // habría pasado como verde: 0 filas, ningún aislamiento demostrado.
     for (const table of ANON_DENY_TABLES) {
       it(`${table}: anon obtiene 0 filas`, async () => {
-        await esperaDenegacion(anon, table, 'id', 'anon')
+        await esperaDenegacion(anon, table, '*', 'anon')
       })
     }
   })
