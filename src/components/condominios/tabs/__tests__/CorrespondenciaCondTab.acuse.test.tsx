@@ -16,20 +16,36 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import type { PiezaRecepcion } from '../../../../types'
 
-const notify = vi.fn()
-const confirm = vi.fn(async () => ({ isConfirmed: true }))
+// Los espías se declaran TIPADOS: `vi.fn()` sin firma produce una tupla de
+// argumentos vacía, y entonces `mock.calls[0][0]` no compila. Las fábricas de
+// `vi.mock` se izan por encima de estas constantes, así que reenvían con
+// `Parameters<typeof …>` en vez de referenciarlas directo.
+type Toast = { variant: string; title: string; text?: string }
+type Confirmacion = { title: string; text: string; confirmText?: string; cancelText?: string }
+type Patch = Record<string, unknown>
+
+const notify = vi.fn<(o: Toast) => void>()
+const confirm = vi.fn<(o: Confirmacion) => Promise<{ isConfirmed: boolean }>>(
+  async () => ({ isConfirmed: true }),
+)
 vi.mock('../../../shared/Dialog', () => ({
-  notify: (...args: unknown[]) => notify(...(args as [])),
-  confirm: (...args: unknown[]) => confirm(...(args as [])),
+  notify: (...args: Parameters<typeof notify>) => notify(...args),
+  confirm: (...args: Parameters<typeof confirm>) => confirm(...args),
 }))
 
-const createCondominioRow = vi.fn(async () => ({ data: { id: 'nueva-1' }, error: null }))
-const updateCondominioRow = vi.fn(async () => ({ error: null }))
-const registrarAcuse = vi.fn(async () => ({ error: null as { message: string } | null }))
+const createCondominioRow = vi.fn<
+  (tabla: string, payload: Patch) => Promise<{ data: { id: string } | null; error: { message: string } | null }>
+>(async () => ({ data: { id: 'nueva-1' }, error: null }))
+const updateCondominioRow = vi.fn<
+  (tabla: string, id: string, patch: Patch) => Promise<{ error: { message: string } | null }>
+>(async () => ({ error: null }))
+const registrarAcuse = vi.fn<
+  (p: { piezaId: string; nombre: string; firmaPath: string | null }) => Promise<{ error: { message: string } | null }>
+>(async () => ({ error: null }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
-  createCondominioRowReturning: (...args: unknown[]) => createCondominioRow(...(args as [])),
-  updateCondominioRow: (...args: unknown[]) => updateCondominioRow(...(args as [])),
-  registrarAcuseCorrespondencia: (...args: unknown[]) => registrarAcuse(...(args as [])),
+  createCondominioRowReturning: (...args: Parameters<typeof createCondominioRow>) => createCondominioRow(...args),
+  updateCondominioRow: (...args: Parameters<typeof updateCondominioRow>) => updateCondominioRow(...args),
+  registrarAcuseCorrespondencia: (...args: Parameters<typeof registrarAcuse>) => registrarAcuse(...args),
 }))
 
 // `avisarConReintento` decide el toast según el resultado real del aviso y
@@ -39,9 +55,11 @@ vi.mock('../../avisoRecepcion', () => ({
   avisarConReintento: (...args: unknown[]) => avisarConReintento(...(args as [])),
 }))
 
-const uploadMedia = vi.fn(async () => ({ data: { path: 'x' }, error: null }))
+const uploadMedia = vi.fn<
+  (bucket: string, ruta: string, cuerpo: Blob | File, opts?: unknown) => Promise<{ data: { path: string } | null; error: string | null }>
+>(async () => ({ data: { path: 'x' }, error: null }))
 vi.mock('../../../../domain/shared/storage', () => ({
-  uploadMedia: (...args: unknown[]) => uploadMedia(...(args as [])),
+  uploadMedia: (...args: Parameters<typeof uploadMedia>) => uploadMedia(...args),
 }))
 vi.mock('../../../shared/ImageUploader', () => ({ MultiImageUploader: () => null }))
 vi.mock('../../../shared/SecureImage', () => ({ SecureImage: () => null }))
@@ -154,7 +172,7 @@ describe('CorrespondenciaCondTab — la entrega pasa por la RPC', () => {
     await vi.waitFor(() => expect(registrarAcuse).toHaveBeenCalled())
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(confirm.mock.calls[0][0]).toMatchObject({ title: 'Confirmar entrega' })
-    expect(String((confirm.mock.calls[0][0] as { text: string }).text)).toContain('SIN firma')
+    expect(confirm.mock.calls[0][0].text).toContain('SIN firma')
     expect(registrarAcuse).toHaveBeenCalledWith({
       piezaId: 'c1', nombre: 'Marta Solís', firmaPath: null,
     })
@@ -169,7 +187,7 @@ describe('CorrespondenciaCondTab — la entrega pasa por la RPC', () => {
     fireEvent.click(screen.getByTestId('firma-pad'))
 
     await vi.waitFor(() => expect(registrarAcuse).toHaveBeenCalled())
-    const [bucket, ruta] = uploadMedia.mock.calls[0] as unknown as [string, string]
+    const [bucket, ruta] = uploadMedia.mock.calls[0]
     expect(bucket, 'no en condominios-media, que lo lee cualquier vecino').toBe('recepcion-evidencias')
     expect(ruta.startsWith('proj/c1/')).toBe(true)
     expect(registrarAcuse.mock.calls[0][0]).toMatchObject({ nombre: 'Marta Solís', firmaPath: ruta })
@@ -199,7 +217,7 @@ describe('CorrespondenciaCondTab — la entrega pasa por la RPC', () => {
     fireEvent.click(screen.getByText('Entregar sin firma'))
 
     await vi.waitFor(() => expect(registrarAcuse).toHaveBeenCalled())
-    const ultimo = notify.mock.calls[notify.mock.calls.length - 1][0] as { variant: string; title: string; text: string }
+    const ultimo = notify.mock.calls[notify.mock.calls.length - 1][0]
     expect(ultimo).toMatchObject({ variant: 'error', title: 'No se registró la entrega' })
     expect(String(ultimo.text)).toContain('ya no está pendiente')
   })
@@ -209,7 +227,7 @@ describe('CorrespondenciaCondTab — las otras salidas de custodia', () => {
   it('archivar NO inventa una entrega: archivar no es entregar', () => {
     renderTab()
     fireEvent.click(screen.getByText('Archivar'))
-    const [, , patch] = updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
+    const [, , patch] = updateCondominioRow.mock.calls[0]
     expect(patch).toEqual({ estado: 'archivado' })
   })
 
@@ -219,7 +237,7 @@ describe('CorrespondenciaCondTab — las otras salidas de custodia', () => {
     // hubo receptor a quien nombrar.
     renderTab()
     fireEvent.click(screen.getByText('↩ Devolver'))
-    const [, , patch] = updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
+    const [, , patch] = updateCondominioRow.mock.calls[0]
     expect(patch.estado).toBe('devuelto')
     expect(patch.entregado_por).toBe('user-1')
     expect(typeof patch.hora_entrega).toBe('string')
@@ -244,7 +262,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     abrirYEscribir('Sobre judicial')
     fireEvent.click(screen.getByText('Guardar'))
     await vi.waitFor(() => expect(createCondominioRow).toHaveBeenCalled())
-    const [tabla, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [tabla, payload] = createCondominioRow.mock.calls[0]
     expect(tabla).toBe('paquetes_recibidos')
     // La clase es lo que separa esta fila de un paquete, en la RLS y en la UI.
     expect(payload.clase).toBe('correspondencia')
@@ -260,7 +278,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     abrirYEscribir('Citación')
     fireEvent.click(screen.getByText('Guardar'))
     await vi.waitFor(() => expect(createCondominioRow).toHaveBeenCalled())
-    const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [, payload] = createCondominioRow.mock.calls[0]
     expect(payload.unidad_id).toBeNull()
     expect(payload.destinatario_tipo).toBe('administracion')
     // No hay residente destinatario: mandar un aviso sería spam a nadie.
@@ -273,7 +291,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     fireEvent.change(screen.getByDisplayValue('— Administración —'), { target: { value: 'u1' } })
     fireEvent.click(screen.getByText('Guardar'))
     await vi.waitFor(() => expect(avisarConReintento).toHaveBeenCalledWith('nueva-1'))
-    const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [, payload] = createCondominioRow.mock.calls[0]
     expect(payload.unidad_id).toBe('u1')
     expect(payload.destinatario_tipo).toBe('unidad')
   })
@@ -288,11 +306,11 @@ describe('CorrespondenciaCondTab — registro', () => {
     fireEvent.click(screen.getByText('Guardar'))
     await vi.waitFor(() => expect(createCondominioRow).toHaveBeenCalled())
 
-    const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [, payload] = createCondominioRow.mock.calls[0]
     expect(payload.direccion).toBe('saliente')
     expect(payload.unidad_id).toBe('u1')
     expect(avisarConReintento).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(notify).toHaveBeenCalled())
-    expect(String((notify.mock.calls[0][0] as { text: string }).text)).toContain('sale del condominio')
+    expect(String(notify.mock.calls[0][0].text)).toContain('sale del condominio')
   })
 })
