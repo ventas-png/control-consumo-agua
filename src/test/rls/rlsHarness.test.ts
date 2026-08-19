@@ -5,11 +5,10 @@ import {
   TENANT_SCOPED_ESTRUCTURALES,
   FIXTURES,
 } from './coverage'
-import cobertura from './coverage.json'
-// MISMA validación que usan el seed y el preflight del workflow. Se importa, no
-// se reimplementa: tres copias divergen y la que se quede corta es la que
-// escribe donde no debe.
-import { validarDestino } from '../../../scripts/rls-destino.mjs'
+// Guard de destino: la MISMA validación que usan el seed y el preflight del
+// workflow, repetida aquí como defensa en profundidad. Vive en su propio módulo
+// para poder probarla sin importar este archivo de pruebas desde otro.
+import { exigirDestinoDeclarado } from './destino'
 
 // ════════════════════════════════════════════════════════════════════════════
 // plat:P15 — Harness liviano de RBAC/RLS contra un Supabase REAL (preview/sandbox).
@@ -73,34 +72,18 @@ const A_PASS = process.env.RLS_USER_A_PASSWORD
 const B_EMAIL = process.env.RLS_USER_B_EMAIL
 const B_PASS = process.env.RLS_USER_B_PASSWORD
 
-const CREDENCIALES_OK = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
-
-/**
- * Destino validado con la misma función pura que el seed y el preflight. Se
- * evalúa en tiempo de módulo, así que ocurre antes que cualquier `createClient`.
- */
-export const DESTINO = CREDENCIALES_OK
-  ? validarDestino({
-      url: URL,
-      esperado: EXPECTED_REF,
-      cobertura,
-      variable: 'RLS_EXPECTED_PROJECT_REF',
-    })
-  : ({ ok: false, clave: 'sin-credenciales', motivo: 'faltan variables RLS_*' } as const)
-
-if (CREDENCIALES_OK && !DESTINO.ok) {
-  // Ruidoso a propósito: con credenciales presentes, un destino rechazado es un
-  // error de configuración que hay que ver, no una omisión silenciosa. El
-  // preflight ya habría fallado en CI; esto cubre la ejecución a mano.
-  throw new Error(
-    `Harness RLS ABORTADO — destino no declarado: ${DESTINO.motivo}\n` +
-    'Esta suite hace INSERT, UPDATE y DELETE de filas de prueba. No se abre ninguna ' +
-    'conexión hasta que RLS_SUPABASE_URL y RLS_EXPECTED_PROJECT_REF coincidan y no ' +
-    'apunten a producción.',
-  )
-}
-
-const ENABLED = CREDENCIALES_OK && DESTINO.ok
+// Se evalúa en tiempo de módulo, así que ocurre antes que cualquier
+// `createClient`: con un destino rechazado esto LANZA y no se abre ni una
+// conexión. Ver `./destino.ts` y `./__tests__/destinoHarness.test.ts`.
+const { habilitado: ENABLED } = exigirDestinoDeclarado({
+  RLS_SUPABASE_URL: URL,
+  RLS_SUPABASE_ANON_KEY: ANON,
+  RLS_EXPECTED_PROJECT_REF: EXPECTED_REF,
+  RLS_USER_A_EMAIL: A_EMAIL,
+  RLS_USER_A_PASSWORD: A_PASS,
+  RLS_USER_B_EMAIL: B_EMAIL,
+  RLS_USER_B_PASSWORD: B_PASS,
+})
 
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los

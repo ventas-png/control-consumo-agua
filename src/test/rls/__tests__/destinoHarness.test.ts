@@ -1,139 +1,156 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import cobertura from '../coverage.json'
+import { credencialesPresentes, exigirDestinoDeclarado, resolverDestino } from '../destino'
 
 // ════════════════════════════════════════════════════════════════════════════
-// DEFENSA EN PROFUNDIDAD: el harness se niega a conectarse a un destino no
-// declarado, aunque nadie haya pasado por el preflight.
+// DEFENSA EN PROFUNDIDAD: el harness se niega a operar contra un destino que no
+// esté declarado, aunque nadie haya pasado por el preflight del workflow.
 // ════════════════════════════════════════════════════════════════════════════
-// El preflight del workflow protege el camino de CI. No protege a quien exporta
+// El preflight protege el camino de CI y sólo ese. No protege a quien exporta
 // las variables en su terminal y corre `npx vitest src/test/rls/rlsHarness.test.ts`
 // —que es exactamente cómo se depura esta suite— ni al día en que alguien
 // reordene los pasos del YAML. Como el harness hace INSERT, UPDATE y DELETE, la
 // comprobación se repite dentro del propio módulo.
 //
-// Lo que estas pruebas demuestran no es que el mensaje sea bonito, sino que
-// **no se abre ninguna conexión**: se sustituye `@supabase/supabase-js` por un
-// espía y se afirma que `createClient` no se llamó ni una vez.
+// SOBRE "ABORTA ANTES DE CONECTARSE"
+// No se demuestra observando el orden de las líneas, sino por construcción:
+// `../destino.ts` no importa `@supabase/supabase-js` ni nada capaz de abrir un
+// socket, y su grafo de importaciones completo se comprueba abajo. Un guard que
+// no puede conectarse no puede conectarse antes de abortar.
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
-const FUENTE = readFileSync(join(RAIZ, 'src', 'test', 'rls', 'rlsHarness.test.ts'), 'utf8')
-
-const createClientEspia = vi.fn(() => {
-  throw new Error('createClient NO debería llamarse con un destino rechazado')
-})
-vi.mock('@supabase/supabase-js', () => ({ createClient: createClientEspia }))
+const leer = (ruta: string) => readFileSync(join(RAIZ, ruta), 'utf8')
+const FUENTE_HARNESS = leer('src/test/rls/rlsHarness.test.ts')
+const FUENTE_GUARD = leer('src/test/rls/destino.ts')
 
 const REF_PROD = cobertura.refProduccionProhibido
-const CLAVES = [
-  'RLS_SUPABASE_URL',
-  'RLS_SUPABASE_ANON_KEY',
-  'RLS_EXPECTED_PROJECT_REF',
-  'RLS_USER_A_EMAIL',
-  'RLS_USER_A_PASSWORD',
-  'RLS_USER_B_EMAIL',
-  'RLS_USER_B_PASSWORD',
-] as const
+const SANDBOX = 'refdesandbox'
 
-const originales: Record<string, string | undefined> = {}
-
-/** Exporta un entorno COMPLETO (las siete) con el destino que se le indique. */
-function conDestino(url: string, esperado: string) {
-  process.env.RLS_SUPABASE_URL = url
-  process.env.RLS_EXPECTED_PROJECT_REF = esperado
-  process.env.RLS_SUPABASE_ANON_KEY = 'anon-de-juguete'
-  process.env.RLS_USER_A_EMAIL = 'a@sandbox.invalid'
-  process.env.RLS_USER_A_PASSWORD = 'clave-a'
-  process.env.RLS_USER_B_EMAIL = 'b@sandbox.invalid'
-  process.env.RLS_USER_B_PASSWORD = 'clave-b'
-}
-
-/**
- * Importa el harness de cero y devuelve el error que lanzó, o null.
- * `resetModules` es imprescindible: sin él la segunda importación reutilizaría
- * la evaluación de la primera y el caso no se ejercitaría.
- */
-async function importarHarness(): Promise<Error | null> {
-  vi.resetModules()
-  try {
-    await import('../rlsHarness.test')
-    return null
-  } catch (e) {
-    return e as Error
-  }
-}
-
-beforeEach(() => {
-  for (const k of CLAVES) originales[k] = process.env[k]
-  createClientEspia.mockClear()
+/** Entorno completo (las siete) con el destino que se le indique. */
+const entorno = (url: string, esperado: string) => ({
+  RLS_SUPABASE_URL: url,
+  RLS_EXPECTED_PROJECT_REF: esperado,
+  RLS_SUPABASE_ANON_KEY: 'anon-de-juguete',
+  RLS_USER_A_EMAIL: 'a@sandbox.invalid',
+  RLS_USER_A_PASSWORD: 'clave-a',
+  RLS_USER_B_EMAIL: 'b@sandbox.invalid',
+  RLS_USER_B_PASSWORD: 'clave-b',
 })
 
-afterEach(() => {
-  for (const k of CLAVES) {
-    if (originales[k] === undefined) delete process.env[k]
-    else process.env[k] = originales[k]
-  }
+describe('el harness aborta ante un destino no declarado', () => {
+  it('PRODUCCIÓN: lanza aunque la URL y el ref declarado coincidan', () => {
+    // El caso más peligroso, porque todo "cuadra": alguien pega la URL de prod y
+    // declara su ref, así que el cerrojo de la declaración previa no salta. La
+    // lista negra explícita existe para este único escenario.
+    const env = entorno(`https://${REF_PROD}.supabase.co`, REF_PROD)
+    expect(() => exigirDestinoDeclarado(env)).toThrow(/PRODUCCIÓN/)
+    expect(resolverDestino(env).ok).toBe(false)
+  })
+
+  it('DOMINIO DESCONOCIDO: lanza', () => {
+    const env = entorno('https://loquesea.evil.example.com', 'loquesea')
+    expect(() => exigirDestinoDeclarado(env)).toThrow(/no está reconocido como Supabase/)
+  })
+
+  it('REF AUSENTE: con las credenciales puestas pero sin declaración, lanza', () => {
+    const env = entorno('https://unsandboxcualquiera.supabase.co', '')
+    expect(() => exigirDestinoDeclarado(env)).toThrow(/RLS_EXPECTED_PROJECT_REF/)
+  })
+
+  it('REF DISTINTO: URL de un proyecto y declaración de otro, lanza', () => {
+    const env = entorno('https://proyecto-uno.supabase.co', 'proyecto-dos')
+    expect(() => exigirDestinoDeclarado(env)).toThrow(/NO coincide/)
+  })
+
+  it('el mensaje explica por qué se aborta en vez de omitir', () => {
+    try {
+      exigirDestinoDeclarado(entorno(`https://${REF_PROD}.supabase.co`, REF_PROD))
+      expect.unreachable('debería haber lanzado')
+    } catch (e) {
+      expect((e as Error).message).toContain('INSERT, UPDATE y DELETE')
+      expect((e as Error).message).toContain('No se abre ninguna conexión')
+    }
+  })
+
+  it('DESTINO VÁLIDO: habilita la suite y devuelve el ref', () => {
+    const r = exigirDestinoDeclarado(entorno(`https://${SANDBOX}.supabase.co`, SANDBOX))
+    expect(r.habilitado).toBe(true)
+    expect(r.destino).toEqual({ ok: true, ref: SANDBOX })
+  })
+
+  it('SIN CREDENCIALES: no lanza y deja la suite deshabilitada', () => {
+    // Es el caso local normal. No debe confundirse con un destino peligroso: sin
+    // variables no hay nada contra lo que operar, así que la suite simplemente
+    // no declara pruebas. En CI esto no ocurre — el preflight falla antes.
+    const r = exigirDestinoDeclarado({})
+    expect(r.habilitado).toBe(false)
+    expect(r.destino).toMatchObject({ ok: false, clave: 'sin-credenciales' })
+  })
+
+  it('faltando UNA credencial cualquiera, sigue siendo "sin credenciales"', () => {
+    const completo = entorno(`https://${SANDBOX}.supabase.co`, SANDBOX)
+    for (const k of Object.keys(completo) as Array<keyof typeof completo>) {
+      if (k === 'RLS_EXPECTED_PROJECT_REF') continue // ésa no es credencial
+      const parcial = { ...completo, [k]: '' }
+      expect(credencialesPresentes(parcial), `${k} vacía`).toBe(false)
+      expect(exigirDestinoDeclarado(parcial).habilitado).toBe(false)
+    }
+  })
 })
 
-describe('el harness aborta ANTES de conectarse a un destino no declarado', () => {
-  it('PRODUCCIÓN: lanza al importar y no crea ningún cliente', async () => {
-    conDestino(`https://${REF_PROD}.supabase.co`, REF_PROD)
-    const error = await importarHarness()
-    expect(error, 'importar el harness apuntando a producción debe lanzar').not.toBeNull()
-    expect(error!.message).toContain('PRODUCCIÓN')
-    expect(createClientEspia, 'no debe abrirse ninguna conexión').not.toHaveBeenCalled()
+describe('el guard no puede abrir una conexión ni queriendo', () => {
+  it('no importa el SDK de Supabase ni ningún cliente HTTP', () => {
+    // Se miran los IMPORTS, no el texto: el comentario del módulo nombra el SDK
+    // justamente para explicar por qué no se usa.
+    const imports = [...FUENTE_GUARD.matchAll(/from '([^']+)'/g)].map((m) => m[1])
+    for (const prohibido of ['@supabase/supabase-js', 'node:http', 'node:https']) {
+      expect(imports, `destino.ts no debe importar ${prohibido}`).not.toContain(prohibido)
+    }
+    // Y tampoco una llamada suelta a fetch, que no aparecería como import.
+    expect(FUENTE_GUARD).not.toMatch(/\bfetch\s*\(/)
   })
 
-  it('DOMINIO DESCONOCIDO: lanza y no crea ningún cliente', async () => {
-    conDestino('https://loquesea.evil.example.com', 'loquesea')
-    const error = await importarHarness()
-    expect(error).not.toBeNull()
-    expect(error!.message).toContain('no está reconocido como Supabase')
-    expect(createClientEspia).not.toHaveBeenCalled()
+  it('su grafo de importaciones se limita al manifiesto y a la validación pura', () => {
+    const imports = [...FUENTE_GUARD.matchAll(/from '([^']+)'/g)].map((m) => m[1])
+    expect(imports.sort()).toEqual(['../../../scripts/rls-destino.mjs', './coverage.json'])
   })
 
-  it('REF AUSENTE: con las credenciales puestas pero sin declaración, lanza', async () => {
-    conDestino('https://unsandboxcualquiera.supabase.co', '')
-    const error = await importarHarness()
-    expect(error).not.toBeNull()
-    expect(error!.message).toContain('RLS_EXPECTED_PROJECT_REF')
-    expect(createClientEspia).not.toHaveBeenCalled()
-  })
-
-  it('REF DISTINTO: URL de un proyecto y declaración de otro, lanza', async () => {
-    conDestino('https://proyecto-uno.supabase.co', 'proyecto-dos')
-    const error = await importarHarness()
-    expect(error).not.toBeNull()
-    expect(error!.message).toContain('NO coincide')
-    expect(createClientEspia).not.toHaveBeenCalled()
-  })
-
-  // El caso "sin credenciales" NO se prueba importando: ahí el módulo NO lanza,
-  // así que llega a su `describe`, y vitest prohíbe registrar suites desde
-  // dentro de un test. Que la ausencia de secretos no se confunda con un
-  // destino peligroso queda cubierto por el bloque estático de abajo
-  // (`ENABLED = CREDENCIALES_OK && DESTINO.ok`) y por las pruebas del preflight.
-})
-
-describe('el guard está donde tiene que estar', () => {
   it('la validación se importa, no se reimplementa', () => {
-    expect(FUENTE).toContain("import { validarDestino } from '../../../scripts/rls-destino.mjs'")
+    expect(FUENTE_GUARD).toContain("from '../../../scripts/rls-destino.mjs'")
   })
 
-  it('el destino se evalúa antes de la primera línea que crea un cliente', () => {
-    // Orden en el fuente: si `createClient` apareciera antes del guard, el
-    // módulo podría abrir una conexión durante su propia evaluación.
-    const iGuard = FUENTE.indexOf('validarDestino({')
-    const iCliente = FUENTE.indexOf('createClient(URL!')
+  it('el harness llama al guard y de él sale su ENABLED', () => {
+    expect(FUENTE_HARNESS).toContain("import { exigirDestinoDeclarado } from './destino'")
+    expect(FUENTE_HARNESS).toContain('const { habilitado: ENABLED } = exigirDestinoDeclarado({')
+  })
+
+  it('el guard se invoca antes de la primera línea que crea un cliente', () => {
+    const iGuard = FUENTE_HARNESS.indexOf('exigirDestinoDeclarado({')
+    const iCliente = FUENTE_HARNESS.indexOf('createClient(URL!')
     expect(iGuard).toBeGreaterThan(0)
     expect(iCliente).toBeGreaterThan(iGuard)
   })
 
-  it('ENABLED exige credenciales Y destino válido', () => {
-    expect(FUENTE).toContain('const ENABLED = CREDENCIALES_OK && DESTINO.ok')
+  it('las siete variables llegan al guard', () => {
+    const bloque = FUENTE_HARNESS.slice(
+      FUENTE_HARNESS.indexOf('exigirDestinoDeclarado({'),
+      FUENTE_HARNESS.indexOf('exigirDestinoDeclarado({') + 500,
+    )
+    for (const v of [
+      'RLS_SUPABASE_URL',
+      'RLS_SUPABASE_ANON_KEY',
+      'RLS_EXPECTED_PROJECT_REF',
+      'RLS_USER_A_EMAIL',
+      'RLS_USER_A_PASSWORD',
+      'RLS_USER_B_EMAIL',
+      'RLS_USER_B_PASSWORD',
+    ]) {
+      expect(bloque, `${v} no se le pasa al guard`).toContain(v)
+    }
   })
 })
 
@@ -148,9 +165,9 @@ describe('el guard está donde tiene que estar', () => {
 // hubiera relajado esa aserción para "arreglarlo", la disjunción habría vuelto a
 // ser trivial: verde hueco otra vez, por la puerta de atrás.
 describe('ninguna limpieza puede tocar fixtures preexistentes', () => {
-  // Sólo código: los comentarios de este archivo CITAN el DELETE amplio que se
+  // Sólo código: los comentarios de estos archivos CITAN el DELETE amplio que se
   // eliminó, y esa cita no debe contarse como una limpieza viva.
-  const borrados = FUENTE.split('\n')
+  const borrados = FUENTE_HARNESS.split('\n')
     .map((l) => l.trim())
     .filter((l) => l.includes('.delete()') && !l.startsWith('//') && !l.startsWith('*'))
 
@@ -172,14 +189,10 @@ describe('ninguna limpieza puede tocar fixtures preexistentes', () => {
   })
 
   it('el marcador es único por corrida (dos ejecuciones no se pisan)', () => {
-    // Sin la parte aleatoria, dos corridas simultáneas contra el mismo sandbox
-    // se borrarían las filas la una a la otra.
-    expect(FUENTE).toMatch(/MARCADOR_EFIMERO\s*=\s*`RLS-NEG-\$\{Date\.now\(\)\}-\$\{Math\.random\(\)/)
+    expect(FUENTE_HARNESS).toMatch(/MARCADOR_EFIMERO\s*=\s*`RLS-NEG-\$\{Date\.now\(\)\}-\$\{Math\.random\(\)/)
   })
 
   it('el marcador no puede colisionar con los fixtures del seed', () => {
-    // Los fixtures llevan prefijos propios (SANDBOX, CLI-SANDBOX…). Si alguno
-    // empezara por RLS-NEG, la limpieza se lo llevaría.
     for (const [clave, valor] of Object.entries(cobertura.fixtures)) {
       expect(String(valor).startsWith('RLS-NEG'), `el fixture ${clave} colisiona con el marcador`).toBe(false)
     }

@@ -148,18 +148,22 @@ describe('las tres piezas comparten ESTA función, no una copia', () => {
     expect(leer('scripts/rls-preflight.mjs')).toContain("from './rls-destino.mjs'")
   })
 
-  it('el harness la importa', () => {
-    expect(leer('src/test/rls/rlsHarness.test.ts')).toContain("scripts/rls-destino.mjs")
+  it('el harness la importa, a través de su guard de destino', () => {
+    // El guard vive en `src/test/rls/destino.ts` y no dentro del propio archivo
+    // de pruebas: así se puede probar sin que un test importe a otro test.
+    expect(leer('src/test/rls/destino.ts')).toContain('scripts/rls-destino.mjs')
+    expect(leer('src/test/rls/rlsHarness.test.ts')).toContain("from './destino'")
   })
 
-  it('ninguna de las tres reimplementa la lista negra por su cuenta', () => {
+  it('ninguna de las piezas reimplementa la lista negra por su cuenta', () => {
     // Si el ref de producción aparece literal en otro archivo, hay una segunda
     // copia de la regla — y una copia es una que se puede quedar corta.
     for (const ruta of [
       'scripts/seed-rls-sandbox.mjs',
       'scripts/rls-preflight.mjs',
-      'src/test/rls/rlsHarness.test.ts',
       'scripts/rls-destino.mjs',
+      'src/test/rls/destino.ts',
+      'src/test/rls/rlsHarness.test.ts',
     ]) {
       expect(leer(ruta), `${ruta} no debe llevar el ref de producción escrito a mano`).not.toContain(PROD)
     }
