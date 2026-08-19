@@ -8,12 +8,13 @@ import { assertEmailAddress } from '../_shared/emailHeaders.ts'
 import {
   type Row,
   applyVars,
-  autorizadoParaEmpresa,
   buildMetaWaPayload,
   buildPaqueteInAppRows,
   buildTwilioWaParams,
+  type PerfilLlamante,
   copyPieza,
   motivoOmision,
+  puedeNotificar,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
@@ -25,6 +26,9 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
+// Ventana durante la que una ejecución conserva el envío en exclusiva. Cubre de
+// sobra los tres canales (Gmail + Meta/Twilio); pasada, otra puede reintentar.
+const LEASE_AVISO_SEGUNDOS = 120
 
 // WhatsApp (opcional). Si no hay credenciales el canal se omite silenciosamente.
 // Proveedores soportados: 'meta' (WhatsApp Cloud API) o 'twilio'.
@@ -225,9 +229,11 @@ Deno.serve(async (req: Request) => {
     const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
 
     // ── Auth: interno (service key) o usuario de la empresa (JWT) ──
+    //
+    // La identidad sale SIEMPRE del JWT que valida GoTrue. Nada de lo que manda
+    // el navegador en el cuerpo participa en la decisión.
     let internal = false
-    let callerIsSuperAdmin = false
-    let callerCompanyId: string | null = null
+    let perfil: PerfilLlamante | null = null
 
     if (token && await timingSafeEqualSecret(token, SERVICE_ROLE_KEY)) {
       internal = true
@@ -236,8 +242,31 @@ Deno.serve(async (req: Request) => {
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
       const { data: au } = await admin.from('app_users').select('company_id, role').eq('id', user.id).maybeSingle()
       if (!au) return json({ error: 'Forbidden' }, 403)
-      if (au.role === 'super_admin') callerIsSuperAdmin = true
-      else callerCompanyId = au.company_id as string
+
+      // Esta función corre con service_role, que salta la RLS entera: aquí
+      // dentro la tabla no protege nada. Hay que rehacer a mano los dos gates
+      // que la RLS habría aplicado — el permiso de la clase y el alcance por
+      // proyecto—, así que se cargan los permisos efectivos y las asignaciones.
+      const [{ data: roles }, { data: asignaciones }] = await Promise.all([
+        admin.from('user_roles')
+          .select('role_id, expires_at, role_permissions(permission_key, effect)')
+          .eq('user_id', user.id),
+        admin.from('user_project_assignments').select('project_id').eq('user_id', user.id),
+      ])
+      const ahora = Date.now()
+      const permisos: string[] = []
+      for (const ur of (roles ?? []) as Row[]) {
+        if (ur.expires_at && new Date(ur.expires_at as string).getTime() <= ahora) continue
+        for (const rp of (ur.role_permissions ?? []) as Row[]) {
+          if (rp.effect === 'allow' && rp.permission_key) permisos.push(rp.permission_key as string)
+        }
+      }
+      perfil = {
+        role: (au.role as string | null) ?? null,
+        companyId: (au.company_id as string | null) ?? null,
+        permisos,
+        proyectos: ((asignaciones ?? []) as Row[]).map(a => a.project_id as string),
+      }
     } else {
       return json({ error: 'Unauthorized' }, 401)
     }
@@ -253,8 +282,16 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
     if (!pkg) return json({ error: 'Paquete no encontrado' }, 404)
 
-    // Autorización por empresa para el camino con JWT.
-    if (!autorizadoParaEmpresa({ internal, callerIsSuperAdmin, callerCompanyId }, (pkg as Row).company_id)) {
+    // Autorización REAL: empresa + proyecto + permiso de la clase. Antes solo
+    // se comparaba company_id, así que un operador de paquetería podía disparar
+    // el aviso de una notificación legal ajena con solo conocer su id.
+    const permitido = puedeNotificar({ internal, perfil }, {
+      company_id: (pkg as Row).company_id ?? null,
+      project_id: (pkg as Row).project_id ?? null,
+      clase: ((pkg as Row).clase as string | null) ?? 'paquete',
+    })
+    if (!permitido.ok) {
+      console.warn('[notify-package] denegado', permitido.motivo)
       return json({ error: 'Forbidden' }, 403)
     }
 
@@ -268,6 +305,27 @@ Deno.serve(async (req: Request) => {
     // donde no se puede saltar.
     const omision = motivoOmision(pkg as Row)
     if (omision) return json({ success: true, skipped: omision, delivered: false })
+
+    // ── Claim: solo una ejecución envía ──
+    //
+    // El patrón anterior era leer `notificado_at IS NULL` y sellarlo al final.
+    // Entre esas dos cosas cabe otra invocación entera, y el residente recibía
+    // el mismo correo dos veces. `paquete_reclamar_aviso` hace el UPDATE
+    // condicional en una sola sentencia: el row lock serializa a las dos y solo
+    // una encuentra la fila libre. El lease evita que una ejecución que muere a
+    // mitad deje la pieza bloqueada para siempre.
+    const { data: reclamado, error: errClaim } = await admin
+      .rpc('paquete_reclamar_aviso', { p_pieza_id: (pkg as Row).id, p_lease_segundos: LEASE_AVISO_SEGUNDOS })
+    if (errClaim) {
+      console.error('[notify-package] claim failed', errClaim.message)
+      return json({ error: 'No se pudo reservar el envío' }, 503)
+    }
+    if (reclamado !== true) {
+      // O ya se notificó, o hay otra ejecución dentro del lease. En ninguno de
+      // los dos casos hay que volver a enviar: la respuesta lo dice con su
+      // propio motivo, para que la UI no lo confunda con "sin datos de contacto".
+      return json({ success: true, skipped: 'already_notified', delivered: false })
+    }
 
     const unidad = (pkg as Row).unidades as Row | null
     const clienteId: string | null = unidad?.cliente_id ?? null
@@ -358,18 +416,35 @@ Deno.serve(async (req: Request) => {
     const waTo = ((cliente as Row)?.whatsapp as string | null) || ((cliente as Row)?.telefono as string | null) || null
     whatsapp = await sendWhatsApp(waTo, vars, clase)
 
-    // Marca de notificado SOLO si algún canal entregó.
+    // ── Cierre del claim ──
     //
-    // POR QUÉ: `notificado_at` es la guarda de idempotencia — con ella puesta,
-    // el early-return de arriba responde 'already_notified' y no se vuelve a
-    // intentar NUNCA. Sellarla cuando los tres canales fallaron convertía un
-    // fallo transitorio (Gmail caído, WhatsApp con 500) en un aviso perdido para
-    // siempre, y encima le decía "listo" al que registró la pieza.
+    // `notificado_at` es la guarda de idempotencia: con ella puesta, la pieza no
+    // se avisa NUNCA más. Sellarla cuando los tres canales fallaron convertiría
+    // un fallo transitorio (Gmail caído, WhatsApp con 500) en un aviso perdido
+    // para siempre, así que solo se sella si algo entregó; si no, se libera el
+    // claim y un reintento explícito puede volver a intentarlo.
+    //
+    // SEMÁNTICA DE REINTENTOS — sin promesas que no podemos cumplir:
+    //   · El claim garantiza que no hay DOS ejecuciones enviando a la vez.
+    //   · NO garantiza exactly-once de cara al residente: si Gmail acepta el
+    //     mensaje y esta función muere antes de sellar, el lease caduca y un
+    //     reintento manual puede mandar un segundo correo. Ni Gmail ni Meta ni
+    //     Twilio ofrecen idempotencia de entrega, así que la garantía real es
+    //     at-least-once por canal, con la ventana del lease como techo.
+    //   · Por eso el reintento es SIEMPRE explícito (lo pide el operador desde
+    //     la pantalla). No hay reintento automático ante entrega parcial o
+    //     estado incierto: duplicar un aviso es peor que pedir un clic.
     const entregado = notified > 0 || emailed > 0 || whatsapp === 'sent'
-    if (entregado) {
-      await admin.from('paquetes_recibidos')
-        .update({ notificado_at: new Date().toISOString() })
-        .eq('id', (pkg as Row).id)
+    const { data: finalizado, error: errFin } = await admin
+      .rpc('paquete_finalizar_aviso', { p_pieza_id: (pkg as Row).id, p_entregado: entregado })
+    if (errFin || finalizado !== true) {
+      // Antes este error se ignoraba: la pieza quedaba sin sellar y la pantalla
+      // decía "avisado". Ahora se dice la verdad, con lo que sí salió.
+      console.error('[notify-package] finalize failed', errFin?.message ?? 'fila no encontrada')
+      return json({
+        success: false, notified, emailed, whatsapp, delivered: entregado,
+        error: 'El aviso salió pero no se pudo registrar; puede repetirse en un reintento',
+      }, 500)
     }
 
     return json({ success: entregado, notified, emailed, whatsapp, delivered: entregado })

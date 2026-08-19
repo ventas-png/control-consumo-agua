@@ -46,6 +46,16 @@ export async function avisarConReintento(paqueteId: string): Promise<ResultadoAv
   for (;;) {
     const r = await intentarAvisar(paqueteId)
 
+    // Ya estaba avisado: ni éxito nuevo ni fallo. Ofrecer reintento aquí sería
+    // ofrecer duplicar el aviso.
+    if (r.estado === 'ya_avisado') {
+      notify({
+        variant: 'info', title: 'Ya se le había avisado', duration: 2600,
+        text: 'Esta pieza ya tenía su aviso enviado; no se manda otro.',
+      })
+      return r
+    }
+
     if (r.estado === 'entregado') {
       const vias = canales(r)
       notify({

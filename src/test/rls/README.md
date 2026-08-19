@@ -100,7 +100,7 @@ resto del esquema— pero sí se ejecutan siempre.
 | Runner | Qué prueba |
 |---|---|
 | `scripts/rls-recepcion-sandbox.sh` | Las policies de `paquetes_recibidos` por clase (**extrae** la sección 5 de `20260829000000`): quién ve, crea, reclasifica y borra correspondencia frente a paquetería. |
-| `scripts/rls-evidencias-sandbox.sh` | El bucket `recepcion-evidencias` y el acuse (**aplica la migración entera** `20260831000000`): dos residentes vecinos, la correspondencia a la administración, el reparto de DELETE, la ausencia de UPDATE, y la RPC `correspondencia_registrar_acuse` (nombre vacío, receptor distinto del destinatario, con y sin firma, doble ejecución). |
+| `scripts/rls-evidencias-sandbox.sh` | Monta `paquetes_recibidos` **tal como era antes del motor** y le aplica la cadena real de migraciones (`20260829` → `20260830` → `20260831` → `20260901`). Así hereda el FK y los CHECK de verdad: la primera versión partía de una tabla simplificada y eso ocultó que `ON DELETE SET NULL` era incompatible con los CHECK de unidad. Cubre el borrado de una unidad con historial, el bucket de evidencias, la RPC del acuse con la firma verificada, la inmutabilidad tras el cierre y el claim del aviso. |
 
 El segundo cubre justo lo que el bucket viejo dejaba abierto: en
 `condominios-media` las cuatro policies autorizan por proyecto, así que

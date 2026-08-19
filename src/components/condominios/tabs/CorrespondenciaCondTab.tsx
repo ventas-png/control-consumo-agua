@@ -3,7 +3,7 @@ import { useRef, useState, type CSSProperties } from 'react'
 import {
   createCondominioRowReturning, registrarAcuseCorrespondencia, updateCondominioRow,
 } from '../../../domain/condominios/tabMutations'
-import { uploadMedia } from '../../../domain/shared/storage'
+import { uploadMedia, removeMedia } from '../../../domain/shared/storage'
 import { BUCKET_EVIDENCIAS } from '../../../domain/shared/buckets'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { avisarConReintento } from '../avisoRecepcion'
@@ -226,7 +226,15 @@ export function CorrespondenciaCondTab({
         if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
       }
       const { error } = await registrarAcuseCorrespondencia({ piezaId: acuse.id, nombre, firmaPath })
-      if (error) { notify({ variant: 'error', title: 'No se registró la entrega', text: error.message }); return }
+      if (error) {
+        // La RPC valida la firma y puede rechazarla DESPUÉS de haberla subido.
+        // El objeto queda huérfano: nadie lo referencia, así que no es prueba de
+        // nada y solo estorba en el bucket. Se retira aquí — la policy de DELETE
+        // lo permite justo porque no está referenciado (20260901000000).
+        if (firmaPath) await removeMedia(BUCKET_EVIDENCIAS, [firmaPath])
+        notify({ variant: 'error', title: 'No se registró la entrega', text: error.message })
+        return
+      }
       setAcuse(null); setAcuseNombre('')
       notify({
         variant: 'success', title: 'Entrega registrada', duration: 2000,

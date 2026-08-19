@@ -101,3 +101,28 @@ describe('avisarConReintento', () => {
     }
   })
 })
+
+// ── "Ya se le había avisado" ────────────────────────────────────────────────
+describe('cuando el servidor dice que el aviso ya estaba hecho', () => {
+  const YA: ResultadoAviso = {
+    estado: 'ya_avisado',
+    detalle: { success: true, skipped: 'already_notified', delivered: false },
+  }
+
+  it('lo informa sin ofrecer reintento: reintentar sería duplicar el aviso', async () => {
+    intentarAvisar.mockResolvedValueOnce(YA)
+    const r = await avisarConReintento('p1')
+    expect(r.estado).toBe('ya_avisado')
+    expect(confirm, 'no hay nada que reintentar').not.toHaveBeenCalled()
+    expect(intentarAvisar).toHaveBeenCalledTimes(1)
+  })
+
+  it('NO le dice al operador que el residente no tiene datos de contacto', async () => {
+    intentarAvisar.mockResolvedValueOnce(YA)
+    await avisarConReintento('p1')
+    const t = ultimoToast()
+    expect(t.variant).toBe('info')
+    expect(String(t.title)).toMatch(/[Yy]a se le había avisado/)
+    expect(String(t.text)).not.toMatch(/correo|teléfono|contacto/i)
+  })
+})

@@ -58,8 +58,12 @@ vi.mock('../../avisoRecepcion', () => ({
 const uploadMedia = vi.fn<
   (bucket: string, ruta: string, cuerpo: Blob | File, opts?: unknown) => Promise<{ data: { path: string } | null; error: string | null }>
 >(async () => ({ data: { path: 'x' }, error: null }))
+const removeMedia = vi.fn<(bucket: string, rutas: string[]) => Promise<{ error: string | null }>>(
+  async () => ({ error: null }),
+)
 vi.mock('../../../../domain/shared/storage', () => ({
   uploadMedia: (...args: Parameters<typeof uploadMedia>) => uploadMedia(...args),
+  removeMedia: (...args: Parameters<typeof removeMedia>) => removeMedia(...args),
 }))
 vi.mock('../../../shared/ImageUploader', () => ({ MultiImageUploader: () => null }))
 vi.mock('../../../shared/SecureImage', () => ({ SecureImage: () => null }))
@@ -116,6 +120,7 @@ function campoNombre(): HTMLInputElement {
 beforeEach(() => {
   createCondominioRow.mockClear(); updateCondominioRow.mockClear(); avisarConReintento.mockClear()
   notify.mockClear(); uploadMedia.mockClear()
+  removeMedia.mockClear()
   confirm.mockClear(); confirm.mockImplementation(async () => ({ isConfirmed: true }))
   registrarAcuse.mockClear(); registrarAcuse.mockImplementation(async () => ({ error: null }))
 })
@@ -220,6 +225,47 @@ describe('CorrespondenciaCondTab — la entrega pasa por la RPC', () => {
     const ultimo = notify.mock.calls[notify.mock.calls.length - 1][0]
     expect(ultimo).toMatchObject({ variant: 'error', title: 'No se registró la entrega' })
     expect(String(ultimo.text)).toContain('ya no está pendiente')
+  })
+})
+
+describe('CorrespondenciaCondTab — la firma que no llegó a asociarse', () => {
+  it('si la RPC rechaza la firma, el objeto huérfano se retira del bucket', async () => {
+    // La RPC valida la firma DESPUÉS de que la UI la subió (ruta, dueño, tipo).
+    // Un rechazo dejaba el archivo colgado en el bucket sin que nadie lo
+    // referenciara: ni prueba de nada, ni borrable por el operador.
+    registrarAcuse.mockImplementation(async () => ({
+      error: { message: 'La firma no existe en el bucket de evidencias' },
+    }))
+    renderTab()
+    fireEvent.click(screen.getByText('✍ Entregar'))
+    fireEvent.change(campoNombre(), { target: { value: 'Marta Solís' } })
+    fireEvent.click(screen.getByTestId('firma-pad'))
+
+    await vi.waitFor(() => expect(removeMedia).toHaveBeenCalled())
+    const [bucket, rutas] = removeMedia.mock.calls[0]
+    expect(bucket).toBe('recepcion-evidencias')
+    expect(rutas[0]).toBe(uploadMedia.mock.calls[0][1])
+  })
+
+  it('si la entrega fue SIN firma, no hay nada que limpiar', async () => {
+    registrarAcuse.mockImplementation(async () => ({ error: { message: 'lo que sea' } }))
+    renderTab()
+    fireEvent.click(screen.getByText('✍ Entregar'))
+    fireEvent.change(campoNombre(), { target: { value: 'Marta Solís' } })
+    fireEvent.click(screen.getByText('Entregar sin firma'))
+
+    await vi.waitFor(() => expect(registrarAcuse).toHaveBeenCalled())
+    expect(removeMedia).not.toHaveBeenCalled()
+  })
+
+  it('si la RPC acepta, la firma se queda donde está', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText('✍ Entregar'))
+    fireEvent.change(campoNombre(), { target: { value: 'Marta Solís' } })
+    fireEvent.click(screen.getByTestId('firma-pad'))
+
+    await vi.waitFor(() => expect(registrarAcuse).toHaveBeenCalled())
+    expect(removeMedia, 'ya es prueba: no se toca').not.toHaveBeenCalled()
   })
 })
 

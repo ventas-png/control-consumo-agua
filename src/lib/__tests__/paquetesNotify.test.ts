@@ -16,7 +16,7 @@ vi.mock('../logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { avisoEntregado, notificarPieza, ErrorAvisoHttp } from '../paquetesNotify'
+import { avisoEntregado, intentarAvisar, notificarPieza, ErrorAvisoHttp } from '../paquetesNotify'
 
 describe('avisoEntregado', () => {
   it('respeta el veredicto del servidor cuando viene', () => {
@@ -117,5 +117,34 @@ describe('notificarPieza — política de reintentos', () => {
     fetchMock.mockResolvedValue(respuesta(403, { error: 'Failed to fetch' }))
     await expect(notificarPieza('p1', SIN_ESPERA)).rejects.toThrow('Failed to fetch')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── "Ya se le había avisado" no es "no tiene datos de contacto" ─────────────
+// Con el claim del servidor (20260901000000) una segunda llamada responde
+// `already_notified`. Tratarlo como `sin_canales` le decía al operador que el
+// residente no tenía correo ni teléfono — cuando el correo ya había salido.
+describe('intentarAvisar — el servidor dice que ya está hecho', () => {
+  for (const skipped of ['already_notified', 'aviso_en_curso']) {
+    it(`${skipped} se distingue de "sin canales"`, async () => {
+      fetchMock.mockResolvedValue(respuesta(200, { success: true, skipped, delivered: false }))
+      const r = await intentarAvisar('p1', SIN_ESPERA)
+      expect(r.estado).toBe('ya_avisado')
+    })
+  }
+
+  it('un 200 sin entrega y sin skip sigue siendo "sin canales"', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { success: true, notified: 0, emailed: 0 }))
+    expect((await intentarAvisar('p1', SIN_ESPERA)).estado).toBe('sin_canales')
+  })
+
+  it('un skip por falta de residente NO es "ya avisado"', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { success: true, skipped: 'no_cliente', delivered: false }))
+    expect((await intentarAvisar('p1', SIN_ESPERA)).estado).toBe('sin_canales')
+  })
+
+  it('si algo entregó, manda la entrega aunque venga un skip', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { delivered: true, emailed: 1, skipped: 'already_notified' }))
+    expect((await intentarAvisar('p1', SIN_ESPERA)).estado).toBe('entregado')
   })
 })

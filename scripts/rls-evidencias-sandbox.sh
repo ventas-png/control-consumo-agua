@@ -1,39 +1,43 @@
 #!/usr/bin/env bash
-# Corre el sandbox de evidencias de recepción y acuse contra un Postgres desechable.
+# Sandbox conductual de recepción contra un Postgres desechable.
 #
-# A diferencia del sandbox del motor (rls-recepcion-sandbox.sh, que EXTRAE una
-# sección del archivo), aquí se aplica LA MIGRACIÓN ENTERA: 20260831000000 solo
-# toca cosas que el andamiaje ya provee (storage.buckets/objects, los helpers de
-# RBAC y paquetes_recibidos), así que se puede ejecutar tal cual. Lo que se
-# prueba es, literalmente, el archivo que se va a desplegar.
+# No copia SQL: monta la tabla TAL COMO ERA antes del motor único y le aplica
+# LAS MIGRACIONES REALES en orden. Así el banco de pruebas hereda las
+# constraints y el FK de verdad — que es donde estaba escondida la
+# contradicción del ON DELETE SET NULL.
 #
-#   scripts/rls-evidencias-sandbox.sh            # levanta su propio Postgres
+#   scripts/rls-evidencias-sandbox.sh                        # levanta su Postgres
 #   PGURL=postgres://... scripts/rls-evidencias-sandbox.sh   # contra uno existente
 #
 # Requiere: initdb/pg_ctl/psql (postgresql-16) o un PGURL a una base DESECHABLE.
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MOTOR="$RAIZ/supabase/migrations/20260829000000_recepcion_motor_unico.sql"
-MIGRACION="$RAIZ/supabase/migrations/20260831000000_recepcion_evidencias_y_acuse.sql"
+MIGR="$RAIZ/supabase/migrations"
+MOTOR="$MIGR/20260829000000_recepcion_motor_unico.sql"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# Las policies de `paquetes_recibidos` hacen falta porque la de SELECT de
-# storage se apoya en ellas (el EXISTS corre con la RLS de esa tabla). Se
-# extraen igual que en el otro sandbox: de la migración, no de una copia.
+# De 20260829000000 solo se pueden ejecutar dos tramos: el resto migra filas
+# desde `correspondencia_condominio`, que aquí no existe. Se extraen por sus
+# encabezados de sección; si cambian, el archivo sale vacío y esto aborta.
+awk '/^-- ── 2\) Generalizar paquetes_recibidos/{f=1} /^-- ── 3\) Migrar las filas/{f=0} f' \
+  "$MOTOR" > "$TMP/motor-esquema.sql"
 awk '/^-- ── 5\) Policies por clase/{f=1} /^-- ── 6\) Índices/{f=0} f' \
-  "$MOTOR" > "$TMP/policies-motor.sql"
-if ! grep -q 'CREATE POLICY paquetes_recibidos_select' "$TMP/policies-motor.sql"; then
-  echo "✗ No se pudieron extraer las policies de $MOTOR (¿cambiaron los marcadores?)" >&2
-  exit 1
-fi
-echo "→ Policies del motor extraídas: $(grep -c 'CREATE POLICY' "$TMP/policies-motor.sql")"
+  "$MOTOR" > "$TMP/motor-policies.sql"
 
-if [[ ! -f "$MIGRACION" ]]; then
-  echo "✗ Falta la migración $MIGRACION" >&2
+if ! grep -q 'paquetes_unidad_por_clase_chk' "$TMP/motor-esquema.sql" \
+   || ! grep -q 'CREATE POLICY paquetes_recibidos_select' "$TMP/motor-policies.sql"; then
+  echo "✗ No se pudieron extraer las secciones de $MOTOR (¿cambiaron los marcadores?)" >&2
   exit 1
 fi
+echo "→ Del motor: $(grep -c 'ADD CONSTRAINT' "$TMP/motor-esquema.sql") constraints y $(grep -c 'CREATE POLICY' "$TMP/motor-policies.sql") policies"
+
+for m in 20260830000000_correspondencia_devolucion \
+         20260831000000_recepcion_evidencias_y_acuse \
+         20260901000000_recepcion_integridad_final; do
+  [[ -f "$MIGR/$m.sql" ]] || { echo "✗ Falta la migración $m.sql" >&2; exit 1; }
+done
 
 # ── Base desechable ─────────────────────────────────────────────────────────
 if [[ -n "${PGURL:-}" ]]; then
@@ -55,14 +59,24 @@ else
   PSQL=(psql -h "$SOCK" -p 55433 -U postgres -d postgres)
 fi
 
-echo "→ Montando andamiaje y datos"
-"${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$RAIZ/scripts/rls-evidencias-sandbox.sql" >/dev/null
+aplicar() { "${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$1" >/dev/null; }
 
-echo "→ Policies de paquetes_recibidos (20260829000000)"
-"${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$TMP/policies-motor.sql" >/dev/null
+echo "→ Andamiaje: la tabla como estaba ANTES del motor"
+aplicar "$RAIZ/scripts/rls-evidencias-sandbox.sql"
 
-echo "→ Aplicando la migración completa 20260831000000"
-"${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$MIGRACION" >/dev/null
+echo "→ 20260829000000 · esquema (columnas, FK y CHECKs reales)"
+aplicar "$TMP/motor-esquema.sql"
+echo "→ 20260829000000 · policies por clase"
+aplicar "$TMP/motor-policies.sql"
+echo "→ 20260830000000 · devolución"
+aplicar "$MIGR/20260830000000_correspondencia_devolucion.sql"
+echo "→ 20260831000000 · evidencias y acuse"
+aplicar "$MIGR/20260831000000_recepcion_evidencias_y_acuse.sql"
+echo "→ 20260901000000 · integridad final"
+aplicar "$MIGR/20260901000000_recepcion_integridad_final.sql"
+
+echo "→ Fixtures"
+aplicar "$RAIZ/scripts/rls-evidencias-datos.sql"
 
 echo "→ Escenarios"
 SALIDA="$TMP/salida.txt"

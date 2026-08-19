@@ -133,15 +133,87 @@ export function motivoOmision(pkg: Row): MotivoOmision | null {
 // Autorización por empresa (camino con JWT)
 // ---------------------------------------------------------------------------
 
+// El gate anterior (`autorizadoParaEmpresa`, que solo comparaba company_id) se
+// retira: `puedeNotificar` lo subsume y dejarlo exportado invitaba a volver a
+// usarlo creyendo que basta. route-reminders conserva el suyo, que es otro
+// archivo y otro flujo.
+
+/** Clave RBAC que gobierna una pieza, según su clase. */
+export function permisoDeClase(clase: string | null | undefined): string {
+  return clase === 'correspondencia'
+    ? 'condominios.tab.correspondencia'
+    : 'condominios.tab.paqueteria'
+}
+
+/** Lo que el handler carga del llamante para decidir. Todo viene del JWT + BD. */
+export interface PerfilLlamante {
+  /** `app_users.role`. */
+  role: string | null
+  /** `app_users.company_id`. */
+  companyId: string | null
+  /** Claves de permiso efectivas (efecto allow, sin caducar) del usuario. */
+  permisos: string[]
+  /** project_ids asignados explícitamente en `user_project_assignments`. */
+  proyectos: string[]
+}
+
+const ROLES_TODO_PERMISO = ['super_admin', 'superadmin', 'company_owner', 'admin']
+const ROLES_TODO_PROYECTO = ['super_admin', 'superadmin', 'company_owner']
+
+/** Espeja `public.user_has_permission` (20260518000008). */
+export function tienePermiso(perfil: PerfilLlamante, clave: string): boolean {
+  if (perfil.role && ROLES_TODO_PERMISO.includes(perfil.role)) return true
+  return perfil.permisos.includes(clave)
+}
+
+/** Espeja `public.can_access_project` (20260815000000). */
+export function accedeAlProyecto(perfil: PerfilLlamante, projectId: string | null): boolean {
+  if (projectId === null) return true                    // fila sin proyecto sellado: ambigua
+  if (perfil.role && ROLES_TODO_PROYECTO.includes(perfil.role)) return true
+  if (perfil.role === 'admin' && perfil.proyectos.length === 0) return true
+  return perfil.proyectos.includes(projectId)
+}
+
+/** Motivo por el que un llamante no puede disparar el aviso, o null si puede. */
+export type MotivoDenegado =
+  | 'sin_perfil' | 'otra_empresa' | 'proyecto_no_asignado' | 'sin_permiso_de_clase'
+
 /**
- * Gate de tenant: interno (service key) y super_admin pasan siempre; un usuario
- * de empresa solo puede notificar paquetes de SU empresa.
+ * ¿Puede ESTE llamante hacer que salga un correo, un WhatsApp y una
+ * notificación in-app por ESTA pieza?
+ *
+ * POR QUÉ HACE FALTA. La función corre con `service_role`, que salta la RLS
+ * entera: dentro de ella, la tabla no protege nada. La comprobación anterior
+ * era solo `company_id`, así que cualquier usuario del tenant —un operador de
+ * paquetería, un residente con sesión, cualquiera con un JWT válido— podía
+ * enumerar ids y provocar avisos de correspondencia ajena. Aquí se rehacen a
+ * mano los dos gates que la RLS habría aplicado: el permiso DE LA CLASE y el
+ * alcance por proyecto.
+ *
+ * `auth.uid()` sale del JWT que valida GoTrue (`admin.auth.getUser(token)`), no
+ * de nada que mande el navegador en el cuerpo.
  */
-export function autorizadoParaEmpresa(
-  auth: { internal: boolean; callerIsSuperAdmin: boolean; callerCompanyId: string | null },
-  pkgCompanyId: string | null,
-): boolean {
-  return auth.internal || auth.callerIsSuperAdmin || pkgCompanyId === auth.callerCompanyId
+export function puedeNotificar(
+  auth: { internal: boolean; perfil: PerfilLlamante | null },
+  pieza: { company_id: string | null; project_id: string | null; clase: string | null },
+): { ok: true } | { ok: false; motivo: MotivoDenegado } {
+  // Llamada interna con la service key (cron, otra edge function): ya es de casa.
+  if (auth.internal) return { ok: true }
+  if (!auth.perfil) return { ok: false, motivo: 'sin_perfil' }
+  const perfil = auth.perfil
+
+  if (perfil.role === 'super_admin' || perfil.role === 'superadmin') return { ok: true }
+
+  if (!pieza.company_id || pieza.company_id !== perfil.companyId) {
+    return { ok: false, motivo: 'otra_empresa' }
+  }
+  if (!accedeAlProyecto(perfil, pieza.project_id)) {
+    return { ok: false, motivo: 'proyecto_no_asignado' }
+  }
+  if (!tienePermiso(perfil, permisoDeClase(pieza.clase))) {
+    return { ok: false, motivo: 'sin_permiso_de_clase' }
+  }
+  return { ok: true }
 }
 
 // ---------------------------------------------------------------------------

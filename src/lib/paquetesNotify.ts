@@ -17,10 +17,20 @@ export interface NotifyPackageResult {
 /** Cómo le fue al aviso, para que la UI diga la verdad. */
 export type ResultadoAviso =
   | { estado: 'entregado'; detalle: NotifyPackageResult }
+  /**
+   * Ya se había avisado (o hay otra ejecución dentro del lease). NO es un fallo
+   * y no se ofrece reintentar: reintentar solo mandaría un segundo aviso al
+   * residente. Va aparte de `sin_canales` porque decirle al operador "no tiene
+   * datos de contacto" cuando el correo ya salió es información falsa.
+   */
+  | { estado: 'ya_avisado'; detalle: NotifyPackageResult }
   /** El servidor respondió OK pero ningún canal entregó (sin contacto, canales caídos). */
   | { estado: 'sin_canales'; detalle: NotifyPackageResult }
   /** No se pudo ni preguntar: red caída, 4xx/5xx tras los reintentos. */
   | { estado: 'fallo'; error: Error }
+
+/** Motivos por los que el servidor no volvió a enviar porque ya estaba hecho. */
+const YA_AVISADO = ['already_notified', 'aviso_en_curso']
 
 /**
  * ¿Entregó algo? El servidor manda `delivered`; para respuestas de una versión
@@ -46,9 +56,11 @@ export async function intentarAvisar(
 ): Promise<ResultadoAviso> {
   try {
     const detalle = await notificarPieza(paqueteId, opts)
-    return avisoEntregado(detalle)
-      ? { estado: 'entregado', detalle }
-      : { estado: 'sin_canales', detalle }
+    if (avisoEntregado(detalle)) return { estado: 'entregado', detalle }
+    if (detalle.skipped && YA_AVISADO.includes(detalle.skipped)) {
+      return { estado: 'ya_avisado', detalle }
+    }
+    return { estado: 'sin_canales', detalle }
   } catch (err) {
     return { estado: 'fallo', error: err instanceof Error ? err : new Error(String(err)) }
   }

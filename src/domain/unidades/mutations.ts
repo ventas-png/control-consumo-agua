@@ -33,10 +33,36 @@ export async function setUnidadActiva(id: string, activo: boolean): Promise<{ er
   return { error: error?.message ?? null }
 }
 
-/** Elimina una unidad por id (sus contadores quedan con unidad_id null por FK). */
+/**
+ * Traduce el rechazo del FK a algo accionable.
+ *
+ * `paquetes_recibidos.unidad_id` es RESTRICT desde 20260901000000: una unidad
+ * con historial de recepción NO se borra, porque su constancia de entrega —una
+ * notificación legal incluida— tiene que sobrevivir a la baja de la unidad. El
+ * mensaje crudo de Postgres ("violates foreign key constraint … on table
+ * paquetes_recibidos") no le dice a la administradora ni qué pasó ni qué hacer.
+ */
+export function mensajeBorradoUnidad(error: { code?: string; message: string } | null): string | null {
+  if (!error) return null
+  const esFk = error.code === '23503' || /foreign key constraint/i.test(error.message)
+  if (esFk && /paquetes_recibidos/i.test(error.message)) {
+    return 'Esta unidad tiene historial de recepción (paquetes o correspondencia) y por eso no se puede borrar: '
+      + 'la constancia de entrega debe conservarse. Desactívala para retirarla de la operación.'
+  }
+  if (esFk) {
+    return 'Esta unidad tiene registros asociados y no se puede borrar. Desactívala para retirarla de la operación.'
+  }
+  return error.message
+}
+
+/**
+ * Elimina una unidad por id. Falla a propósito si tiene historial de recepción
+ * (ver `mensajeBorradoUnidad`); la operación recomendada en ese caso es
+ * `setUnidadActiva(id, false)`.
+ */
 export async function deleteUnidad(id: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from('unidades').delete().eq('id', id)
-  return { error: error?.message ?? null }
+  return { error: mensajeBorradoUnidad(error) }
 }
 
 /** Asigna un conjunto de contadores a una unidad. */

@@ -9,14 +9,18 @@ import {
   TIPO_LABEL,
   type WhatsAppEnv,
   applyVars,
-  autorizadoParaEmpresa,
   buildMetaWaPayload,
   buildPaqueteInAppRows,
   buildTwilioWaParams,
   digits,
   escapeHtml,
+  type PerfilLlamante,
+  accedeAlProyecto,
   esPiezaSaliente,
   motivoOmision,
+  permisoDeClase,
+  puedeNotificar,
+  tienePermiso,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
@@ -54,18 +58,6 @@ describe('notify-package/tipoLabel', () => {
     expect(tipoLabel('otro', 'correspondencia')).toBe('Correspondencia')
     expect(tipoLabel('lo_que_sea', 'correspondencia')).toBe('Correspondencia')
     expect(TIPO_LABEL).toEqual({ paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío' })
-  })
-})
-
-describe('notify-package/autorizadoParaEmpresa (gate por tenant)', () => {
-  it('interno (service key) y super_admin pasan siempre', () => {
-    expect(autorizadoParaEmpresa({ internal: true, callerIsSuperAdmin: false, callerCompanyId: null }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: true, callerCompanyId: 'otra' }, 'c1')).toBe(true)
-  })
-
-  it('usuario de empresa solo notifica paquetes de SU empresa (no cross-tenant)', () => {
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c2')).toBe(false)
   })
 })
 
@@ -389,5 +381,98 @@ describe('notify-package/canales según la dirección', () => {
   it('SALIDA de paquetería (retiro por tercero): mismo corte', () => {
     const pieza = { direccion: 'saliente_tercero', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
     expect(motivoOmision(pieza)).toBe('pieza_saliente')
+  })
+})
+
+// ── RBAC del aviso ──────────────────────────────────────────────────────────
+// El hallazgo: la función corre con service_role —que salta la RLS entera— y
+// solo comparaba `company_id`. Cualquier usuario del tenant con un JWT válido
+// podía enumerar ids y provocar correo, WhatsApp y notificación in-app por
+// correspondencia que no le compete.
+describe('notify-package/puedeNotificar', () => {
+  const CORR = { company_id: 'emp', project_id: 'proy', clase: 'correspondencia' }
+  const PAQ  = { company_id: 'emp', project_id: 'proy', clase: 'paquete' }
+
+  function perfil(over: Partial<PerfilLlamante> = {}): PerfilLlamante {
+    return { role: 'operator', companyId: 'emp', permisos: [], proyectos: ['proy'], ...over }
+  }
+  const jwt = (p: PerfilLlamante) => ({ internal: false, perfil: p })
+
+  const OP_PAQ  = perfil({ permisos: ['condominios.tab.paqueteria'] })
+  const OP_CORR = perfil({ permisos: ['condominios.tab.correspondencia'] })
+
+  it('el operador de paquetería NO notifica correspondencia', () => {
+    expect(puedeNotificar(jwt(OP_PAQ), CORR)).toEqual({ ok: false, motivo: 'sin_permiso_de_clase' })
+  })
+
+  it('el operador de correspondencia NO notifica paquetes', () => {
+    expect(puedeNotificar(jwt(OP_CORR), PAQ)).toEqual({ ok: false, motivo: 'sin_permiso_de_clase' })
+  })
+
+  it('CONTROL POSITIVO: cada uno sí notifica lo suyo', () => {
+    expect(puedeNotificar(jwt(OP_PAQ), PAQ)).toEqual({ ok: true })
+    expect(puedeNotificar(jwt(OP_CORR), CORR)).toEqual({ ok: true })
+  })
+
+  it('mismo permiso pero proyecto NO asignado: rechazado', () => {
+    const otraTorre = perfil({ permisos: ['condominios.tab.correspondencia'], proyectos: ['otra-torre'] })
+    expect(puedeNotificar(jwt(otraTorre), CORR)).toEqual({ ok: false, motivo: 'proyecto_no_asignado' })
+  })
+
+  it('otra empresa: rechazado antes de mirar nada más', () => {
+    const ajeno = perfil({ role: 'admin', companyId: 'otra' })
+    expect(puedeNotificar(jwt(ajeno), CORR)).toEqual({ ok: false, motivo: 'otra_empresa' })
+  })
+
+  it('admin y company_owner de la empresa sí pasan', () => {
+    expect(puedeNotificar(jwt(perfil({ role: 'admin', proyectos: [] })), CORR)).toEqual({ ok: true })
+    expect(puedeNotificar(jwt(perfil({ role: 'company_owner', proyectos: [] })), CORR)).toEqual({ ok: true })
+  })
+
+  it('un admin CON asignaciones ya no es exento de proyecto', () => {
+    // Espeja user_is_project_exempt (20260815000000): el admin ve todo mientras
+    // no tenga asignaciones explícitas; en cuanto las tiene, se acota a ellas.
+    const admin = perfil({ role: 'admin', proyectos: ['otra-torre'] })
+    expect(puedeNotificar(jwt(admin), CORR)).toEqual({ ok: false, motivo: 'proyecto_no_asignado' })
+  })
+
+  it('super_admin pasa aunque sea de otra empresa (soporte)', () => {
+    expect(puedeNotificar(jwt(perfil({ role: 'super_admin', companyId: 'otra' })), CORR)).toEqual({ ok: true })
+  })
+
+  it('la llamada interna con la service key pasa sin perfil', () => {
+    expect(puedeNotificar({ internal: true, perfil: null }, CORR)).toEqual({ ok: true })
+  })
+
+  it('sin perfil y sin ser interna, no pasa', () => {
+    expect(puedeNotificar({ internal: false, perfil: null }, CORR)).toEqual({ ok: false, motivo: 'sin_perfil' })
+  })
+
+  it('una pieza sin empresa no autoriza a nadie', () => {
+    expect(puedeNotificar(jwt(OP_CORR), { ...CORR, company_id: null }))
+      .toEqual({ ok: false, motivo: 'otra_empresa' })
+  })
+})
+
+describe('notify-package/helpers de RBAC', () => {
+  it('la clave de permiso la decide la clase', () => {
+    expect(permisoDeClase('correspondencia')).toBe('condominios.tab.correspondencia')
+    expect(permisoDeClase('paquete')).toBe('condominios.tab.paqueteria')
+    expect(permisoDeClase(null)).toBe('condominios.tab.paqueteria')
+  })
+
+  it('tienePermiso espeja el helper de la base (admin dice true a todo)', () => {
+    const admin = { role: 'admin', companyId: 'e', permisos: [], proyectos: [] }
+    expect(tienePermiso(admin, 'lo.que.sea')).toBe(true)
+    const granular = { role: 'operator', companyId: 'e', permisos: ['a'], proyectos: [] }
+    expect(tienePermiso(granular, 'a')).toBe(true)
+    expect(tienePermiso(granular, 'b')).toBe(false)
+  })
+
+  it('accedeAlProyecto: una fila sin proyecto sellado es ambigua, no ajena', () => {
+    const granular = { role: 'operator', companyId: 'e', permisos: [], proyectos: [] }
+    expect(accedeAlProyecto(granular, null)).toBe(true)
+    expect(accedeAlProyecto(granular, 'p1')).toBe(false)
+    expect(accedeAlProyecto({ ...granular, proyectos: ['p1'] }, 'p1')).toBe(true)
   })
 })
