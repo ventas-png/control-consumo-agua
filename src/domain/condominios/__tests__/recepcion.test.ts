@@ -3,7 +3,7 @@
 // conserve su vocabulario, que una sola búsqueda encuentre la pieza sin saber
 // de qué clase es, que la guía se compare como la teclea la gente, y que un
 // registro duplicado entre clases se detecte en vez de pasar inadvertido.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
   construirBandejaRecepcion, buscarEnRecepcion, duplicadosPorGuia,
   normalizarGuia, diasParaVencer, diasEnCustodia, piezasEnRiesgo, piezaAItemRecepcion,
@@ -197,6 +197,44 @@ describe('diasEnCustodia', () => {
 
   it('nunca es negativo aunque el reloj vaya atrás', () => {
     expect(diasEnCustodia({ hora_recepcion: '2026-08-20T09:00:00Z' }, '2026-08-18')).toBe(0)
+  })
+
+  it('descarta una hora_recepcion inválida en vez de inventar una antigüedad', () => {
+    expect(diasEnCustodia({ hora_recepcion: 'no-es-fecha' }, '2026-08-18')).toBe(0)
+  })
+
+  // ── Recepciones nocturnas: el bug que motivó usar dateLocalISO ─────────────
+  // `hora_recepcion` es timestamptz y llega en UTC. Cortar los 10 primeros
+  // caracteres tomaba el DÍA UTC: una pieza recibida a las 20:30 del 11 en
+  // Guatemala (02:30Z del 12) contaba como recibida el 12 y salía un día más
+  // joven — justo la clase de error que hace que una pieza cruce el umbral de
+  // devolución un día tarde.
+  describe('recepción nocturna, por zona horaria', () => {
+    const TZ_ORIGINAL = process.env.TZ
+    // 20:30 del 11 en Guatemala (UTC-6) = 02:30Z del 12.
+    const NOCTURNA = { hora_recepcion: '2026-08-12T02:30:00Z' }
+
+    afterEach(() => { process.env.TZ = TZ_ORIGINAL })
+
+    it('America/Guatemala: cuenta desde el 11, que es el día que se vivió ahí', () => {
+      process.env.TZ = 'America/Guatemala'
+      expect(diasEnCustodia(NOCTURNA, '2026-08-12')).toBe(1)
+      expect(diasEnCustodia(NOCTURNA, '2026-08-11')).toBe(0)
+    })
+
+    it('UTC: el mismo instante ya es día 12, y ahí cuenta desde el 12', () => {
+      process.env.TZ = 'UTC'
+      expect(diasEnCustodia(NOCTURNA, '2026-08-12')).toBe(0)
+      expect(diasEnCustodia(NOCTURNA, '2026-08-13')).toBe(1)
+    })
+
+    it('la diferencia entre zonas es exactamente el día de calendario local', () => {
+      process.env.TZ = 'America/Guatemala'
+      const enGuatemala = diasEnCustodia(NOCTURNA, '2026-08-20')
+      process.env.TZ = 'UTC'
+      const enUTC = diasEnCustodia(NOCTURNA, '2026-08-20')
+      expect(enGuatemala - enUTC).toBe(1)
+    })
   })
 })
 

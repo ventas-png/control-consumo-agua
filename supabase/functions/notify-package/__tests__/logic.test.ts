@@ -15,6 +15,7 @@ import {
   buildTwilioWaParams,
   digits,
   escapeHtml,
+  plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
   tipoLabel,
@@ -151,6 +152,82 @@ describe('notify-package/buildPaqueteInAppRows', () => {
     expect(rows[0].seccion).toBe('correspondencia')
     expect(rows[0].tipo).toBe('correspondencia_pendiente')
     expect(rows[0].titulo).toBe('📬 Notificación legal en administración')
+  })
+})
+
+// ── WhatsApp por clase (motor único, 20260829000000) ────────────────────────
+// Meta manda PLANTILLAS APROBADAS: su texto es fijo y no lo escribimos nosotros.
+// Reutilizar la de paquetería para anunciar correspondencia le mandaría al
+// residente un mensaje falso ("tienes un paquete en portería") por un canal que
+// no puede contrastar. Twilio manda texto libre, así que ahí sí adaptamos.
+describe('notify-package/WhatsApp por clase', () => {
+  const envMeta: WhatsAppEnv = {
+    provider: 'meta', metaToken: 'tok', metaPhoneId: '123', metaTemplate: 'paquete_es',
+    twilioSid: '', twilioToken: '', twilioFrom: '',
+  }
+  const envTwilio: WhatsAppEnv = {
+    provider: 'twilio', metaToken: '', metaPhoneId: '', metaTemplate: '',
+    twilioSid: 'AC1', twilioToken: 'tk', twilioFrom: 'whatsapp:+50200000000',
+  }
+  const varsPaquete = { tipo_label: 'Paquete', descripcion: 'Caja', unidad: 'A-3', clase: 'paquete' }
+  const varsCorreo = {
+    tipo_label: 'Notificación legal', descripcion: 'Citación', unidad: 'A-3',
+    clase: 'correspondencia',
+  }
+
+  describe('Meta', () => {
+    it('paquetería sigue igual: resuelve meta con su plantilla de siempre', () => {
+      expect(resolveWhatsAppProvider(envMeta, 'paquete')).toBe('meta')
+      expect(plantillaMeta(envMeta, 'paquete')).toBe('paquete_es')
+    })
+
+    it('correspondencia SIN plantilla propia: no se envía por Meta', () => {
+      // Preferimos no mandar WhatsApp antes que mandar el texto de paquetes.
+      expect(plantillaMeta(envMeta, 'correspondencia')).toBeNull()
+      expect(resolveWhatsAppProvider(envMeta, 'correspondencia')).toBeNull()
+    })
+
+    it('correspondencia CON plantilla propia: se envía con ESA plantilla', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: 'correspondencia_es' }
+      expect(resolveWhatsAppProvider(env, 'correspondencia')).toBe('meta')
+      expect(plantillaMeta(env, 'correspondencia')).toBe('correspondencia_es')
+      expect(buildMetaWaPayload('50255551234', varsCorreo, 'correspondencia_es', 'es').template)
+        .toMatchObject({ name: 'correspondencia_es' })
+    })
+
+    it('una plantilla en blanco cuenta como no configurada', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: '   ' }
+      expect(resolveWhatsAppProvider(env, 'correspondencia')).toBeNull()
+    })
+
+    it('la plantilla de correspondencia no altera la de paquetería', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: 'correspondencia_es' }
+      expect(plantillaMeta(env, 'paquete')).toBe('paquete_es')
+    })
+  })
+
+  describe('Twilio', () => {
+    it('paquetería conserva EXACTAMENTE el cuerpo anterior', () => {
+      const body = buildTwilioWaParams('50255551234', varsPaquete, envTwilio.twilioFrom).Body
+      expect(body).toBe('📦 Tienes Paquete en portería para A-3: Caja. Pasa a recogerlo cuando gustes.')
+    })
+
+    it('correspondencia usa su icono, su lugar y su cierre', () => {
+      const body = buildTwilioWaParams('50255551234', varsCorreo, envTwilio.twilioFrom).Body
+      expect(body).toBe('📬 Tienes Notificación legal en administración para A-3: Citación. Puedes retirarla presentando tu identificación.')
+      expect(body).not.toContain('portería')
+      expect(body).not.toContain('recogerlo')
+    })
+
+    it('sirve a las dos clases: no necesita plantilla aprobada', () => {
+      expect(resolveWhatsAppProvider(envTwilio, 'paquete')).toBe('twilio')
+      expect(resolveWhatsAppProvider(envTwilio, 'correspondencia')).toBe('twilio')
+    })
+
+    it('sin `clase` en vars se comporta como paquetería (compatibilidad)', () => {
+      const body = buildTwilioWaParams('50255551234', { tipo_label: 'Paquete', descripcion: 'Caja', unidad: 'A-3' }, envTwilio.twilioFrom).Body
+      expect(body).toContain('portería')
+    })
   })
 })
 

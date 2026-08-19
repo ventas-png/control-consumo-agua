@@ -19,9 +19,11 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: (...args: unknown[]) => updateCondominioRow(...(args as [])),
 }))
 
-const notificarPieza = vi.fn(async () => ({ success: true }))
-vi.mock('../../../../lib/paquetesNotify', () => ({
-  notificarPieza: (...args: unknown[]) => notificarPieza(...(args as [])),
+// `avisarConReintento` decide el toast según el resultado real del aviso y
+// ofrece reintentar; su lógica se prueba en condominios/__tests__/avisoRecepcion.
+const avisarConReintento = vi.fn(async () => ({ estado: 'entregado' as const, detalle: {} }))
+vi.mock('../../avisoRecepcion', () => ({
+  avisarConReintento: (...args: unknown[]) => avisarConReintento(...(args as [])),
 }))
 
 vi.mock('../../../../domain/shared/storage', () => ({ uploadCondominiosMedia: vi.fn(async () => ({ error: null })) }))
@@ -65,7 +67,7 @@ function renderTab(over: Partial<PiezaRecepcion> = {}) {
 }
 
 beforeEach(() => {
-  createCondominioRow.mockClear(); updateCondominioRow.mockClear(); notificarPieza.mockClear()
+  createCondominioRow.mockClear(); updateCondominioRow.mockClear(); avisarConReintento.mockClear()
 })
 afterEach(cleanup)
 
@@ -140,7 +142,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     expect(payload.unidad_id).toBeNull()
     expect(payload.destinatario_tipo).toBe('administracion')
     // No hay residente destinatario: mandar un aviso sería spam a nadie.
-    expect(notificarPieza).not.toHaveBeenCalled()
+    expect(avisarConReintento).not.toHaveBeenCalled()
   })
 
   it('con unidad, avisa al residente igual que paquetería', async () => {
@@ -149,7 +151,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     fireEvent.change(screen.getByPlaceholderText('Descripción del documento'), { target: { value: 'Carta certificada' } })
     fireEvent.change(screen.getByDisplayValue('— Administración —'), { target: { value: 'u1' } })
     fireEvent.click(screen.getByText('Guardar'))
-    await vi.waitFor(() => expect(notificarPieza).toHaveBeenCalledWith('nueva-1'))
+    await vi.waitFor(() => expect(avisarConReintento).toHaveBeenCalledWith('nueva-1'))
     const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(payload.unidad_id).toBe('u1')
     expect(payload.destinatario_tipo).toBe('unidad')

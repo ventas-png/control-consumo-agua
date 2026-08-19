@@ -7,6 +7,7 @@
 // teclea una guía, detección de duplicados y el cálculo de plazos.
 //
 // Es puro y sin I/O: los datos ya vienen cargados en el contexto de tabs.
+import { dateLocalISO } from '../../lib/format'
 import type {
   ClasePieza, EstadoPieza, PiezaRecepcion, SubtipoPieza,
 } from '../../types'
@@ -217,7 +218,15 @@ export function diasParaVencer(fechaLimite: string, hoyISO: string): number {
  * ser muy anterior y daría una antigüedad que no es responsabilidad de nadie).
  */
 export function diasEnCustodia(pieza: Pick<PiezaRecepcion, 'hora_recepcion'>, hoyISO: string): number {
-  const desde = Date.parse(`${pieza.hora_recepcion.slice(0, 10)}T00:00:00`)
+  // `hora_recepcion` es timestamptz y llega en UTC. Cortar los 10 primeros
+  // caracteres tomaba el día UTC: una pieza recibida a las 20:30 del 11 en
+  // Guatemala (02:30Z del 12) se contaba como recibida el 12 y salía un día
+  // más joven de lo que es. `dateLocalISO` es el helper central del repo para
+  // pasar un instante a fecha de calendario LOCAL, que es la que ve quien está
+  // parado en la recepción.
+  const recibida = new Date(pieza.hora_recepcion)
+  if (Number.isNaN(recibida.getTime())) return 0
+  const desde = Date.parse(`${dateLocalISO(recibida)}T00:00:00`)
   const hoy = Date.parse(`${hoyISO}T00:00:00`)
   if (Number.isNaN(desde) || Number.isNaN(hoy)) return 0
   return Math.max(0, Math.round((hoy - desde) / 86_400_000))

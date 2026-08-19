@@ -86,6 +86,19 @@ const { habilitado: ENABLED } = exigirDestinoDeclarado({
   RLS_USER_B_PASSWORD: B_PASS,
 })
 
+// ── Gate por CLASE en paquetes_recibidos (motor único, 20260829000000) ───────
+// Verificar que un admin con permiso de UNA clase no ve ni borra la otra exige
+// dos usuarios de la MISMA empresa con permisos distintos — algo que los
+// usuarios A/B (empresas distintas) no pueden expresar. Van en sus propias env
+// vars y el bloque se omite si no están:
+//   RLS_USER_PAQ_EMAIL / RLS_USER_PAQ_PASSWORD    admin con condominios.tab.paqueteria (sin correspondencia)
+//   RLS_USER_CORR_EMAIL / RLS_USER_CORR_PASSWORD  admin con condominios.tab.correspondencia (sin paquetería)
+const PAQ_EMAIL = process.env.RLS_USER_PAQ_EMAIL
+const PAQ_PASS = process.env.RLS_USER_PAQ_PASSWORD
+const CORR_EMAIL = process.env.RLS_USER_CORR_EMAIL
+const CORR_PASS = process.env.RLS_USER_CORR_PASSWORD
+const CLASE_ENABLED = Boolean(URL && ANON && PAQ_EMAIL && PAQ_PASS && CORR_EMAIL && CORR_PASS)
+
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los
 // negative-write sin necesidad de conocer el company_id real de B.
@@ -1018,6 +1031,127 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Gate por CLASE en paquetes_recibidos (motor único, 20260829000000)
+// ════════════════════════════════════════════════════════════════════════════
+// Las cuatro policies resuelven el permiso POR FILA con un CASE sobre `clase`.
+// Que esté ESCRITO lo verifica src/__tests__/recepcionMotorUnicoRls.test.ts;
+// que FUNCIONE solo se puede comprobar contra una base real, y eso es esto.
+//
+// El caso que más importa es DELETE: antes de la unificación, borrar
+// correspondencia exigía estar en su tabla; al fusionarlas, un admin con
+// permiso solo de paquetería podría borrar notificaciones legales si el gate
+// fallara.
+//
+// NO DESTRUCTIVO: cada prueba crea su propia fila desechable con el usuario que
+// SÍ tiene permiso, intenta borrarla con el que NO lo tiene (debe afectar 0
+// filas), comprueba que sigue viva y la limpia al final. Nunca toca datos
+// preexistentes.
+describe.skipIf(!CLASE_ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox)', () => {
+  let paqUser: SupabaseClient
+  let corrUser: SupabaseClient
+  /** Scope (empresa/proyecto/unidad) visible para cada usuario, para poder sembrar. */
+  let scopeCorr: { company_id: string; project_id: string } | null = null
+  let scopePaq: { company_id: string; project_id: string; unidad_id: string } | null = null
+  const basura: Array<{ cliente: () => SupabaseClient; id: string }> = []
+
+  beforeAll(async () => {
+    paqUser = await signedInClient(PAQ_EMAIL!, PAQ_PASS!)
+    corrUser = await signedInClient(CORR_EMAIL!, CORR_PASS!)
+
+    const { data: proyCorr } = await corrUser.from('projects').select('id, company_id').limit(1)
+    const p = proyCorr?.[0] as { id: string; company_id: string } | undefined
+    if (p) scopeCorr = { company_id: p.company_id, project_id: p.id }
+
+    const { data: uni } = await paqUser.from('unidades').select('id, project_id, company_id').limit(1)
+    const u = uni?.[0] as { id: string; project_id: string; company_id: string } | undefined
+    if (u) scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+  })
+
+  afterAll(async () => {
+    // Limpieza best-effort de lo que sembramos, con el dueño de cada fila.
+    for (const { cliente, id } of basura) {
+      await cliente().from('paquetes_recibidos').delete().eq('id', id)
+    }
+    await Promise.allSettled([paqUser?.auth.signOut(), corrUser?.auth.signOut()])
+  })
+
+  it('el admin de correspondencia puede crear correspondencia (control positivo)', async () => {
+    expect(scopeCorr, 'el usuario de correspondencia no ve ningún proyecto').not.toBeNull()
+    const { data, error } = await corrUser.from('paquetes_recibidos').insert({
+      company_id: scopeCorr!.company_id, project_id: scopeCorr!.project_id,
+      clase: 'correspondencia', destinatario_tipo: 'administracion', unidad_id: null,
+      tipo: 'carta', descripcion: 'RLS harness — desechable', estado: 'pendiente',
+      direccion: 'entrante',
+    }).select('id')
+    expect(error, 'quien tiene el permiso de correspondencia sí debe poder crearla').toBeNull()
+    const id = (data?.[0] as { id: string } | undefined)?.id
+    expect(id).toBeTruthy()
+    basura.push({ cliente: () => corrUser, id: id! })
+  })
+
+  it('el admin de paquetería NO ve correspondencia', async () => {
+    const { data } = await paqUser.from('paquetes_recibidos').select('id').eq('clase', 'correspondencia')
+    expect(data ?? [], 'sin permiso de correspondencia no debe proyectarse ninguna fila').toHaveLength(0)
+  })
+
+  it('el admin de paquetería NO puede borrar correspondencia', async () => {
+    const objetivo = basura[0]?.id
+    expect(objetivo, 'hace falta la fila sembrada por el control positivo').toBeTruthy()
+
+    const { data: borradas } = await paqUser
+      .from('paquetes_recibidos').delete().eq('id', objetivo!).select('id')
+    // La RLS filtra en silencio: no hay error, hay 0 filas afectadas.
+    expect(borradas ?? [], 'el DELETE cross-clase no debe afectar filas').toHaveLength(0)
+
+    // Y la fila sigue viva para quien sí la puede ver.
+    const { data: viva } = await corrUser.from('paquetes_recibidos').select('id').eq('id', objetivo!)
+    expect(viva ?? [], 'la correspondencia no debe haber desaparecido').toHaveLength(1)
+  })
+
+  it('el admin de paquetería puede crear paquetería (control positivo)', async () => {
+    expect(scopePaq, 'el usuario de paquetería no ve ninguna unidad').not.toBeNull()
+    const { data, error } = await paqUser.from('paquetes_recibidos').insert({
+      company_id: scopePaq!.company_id, project_id: scopePaq!.project_id,
+      unidad_id: scopePaq!.unidad_id,
+      clase: 'paquete', destinatario_tipo: 'unidad',
+      tipo: 'paquete', descripcion: 'RLS harness — desechable', estado: 'pendiente',
+      direccion: 'entrante',
+    }).select('id')
+    expect(error, 'quien tiene el permiso de paquetería sí debe poder crearla').toBeNull()
+    const id = (data?.[0] as { id: string } | undefined)?.id
+    expect(id).toBeTruthy()
+    basura.push({ cliente: () => paqUser, id: id! })
+  })
+
+  it('el admin de correspondencia NO ve paquetería', async () => {
+    const { data } = await corrUser.from('paquetes_recibidos').select('id').eq('clase', 'paquete')
+    expect(data ?? [], 'sin permiso de paquetería no debe proyectarse ninguna fila').toHaveLength(0)
+  })
+
+  it('el admin de correspondencia NO puede borrar paquetería', async () => {
+    const objetivo = basura[1]?.id
+    expect(objetivo, 'hace falta la fila sembrada por el control positivo').toBeTruthy()
+
+    const { data: borradas } = await corrUser
+      .from('paquetes_recibidos').delete().eq('id', objetivo!).select('id')
+    expect(borradas ?? [], 'el DELETE cross-clase no debe afectar filas').toHaveLength(0)
+
+    const { data: viva } = await paqUser.from('paquetes_recibidos').select('id').eq('id', objetivo!)
+    expect(viva ?? [], 'el paquete no debe haber desaparecido').toHaveLength(1)
+  })
+
+  it('ninguno puede mover una pieza a la otra clase con UPDATE', async () => {
+    // USING mira la fila vieja y WITH CHECK la nueva: cambiar de clase exige
+    // AMBOS permisos, así que con uno solo el UPDATE no afecta filas.
+    const objetivo = basura[0]?.id
+    const { data } = await corrUser
+      .from('paquetes_recibidos').update({ clase: 'paquete' }).eq('id', objetivo!).select('id')
+    const rechazado = (data ?? []).length === 0
+    expect(rechazado, 'no debe poder reclasificar sin el permiso de destino').toBe(true)
   })
 })
 

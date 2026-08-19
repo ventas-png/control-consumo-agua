@@ -60,6 +60,8 @@ export interface CopyPieza {
    *  (20260829000000), así que prometerlo sería mentirle al residente. */
   cta: string
   cierre: string
+  /** Cierre corto para el cuerpo de WhatsApp (Twilio, texto libre). */
+  cierreWhatsApp: string
 }
 
 export function copyPieza(clase: string): CopyPieza {
@@ -69,12 +71,14 @@ export function copyPieza(clase: string): CopyPieza {
         templateKey: 'correspondencia_recibida', tipoNotificacion: 'correspondencia_pendiente',
         cta: 'Ver mi correspondencia',
         cierre: 'Puedes retirarla en administración presentando tu identificación.',
+        cierreWhatsApp: 'Puedes retirarla presentando tu identificación.',
       }
     : {
         icono: '📦', lugar: 'portería', seccion: 'paquetes',
         templateKey: 'paquete_recibido', tipoNotificacion: 'paquete_pendiente',
         cta: 'Ver y firmar recepción',
         cierre: 'Al retirarlo podrás firmar la recepción desde tu portal.',
+        cierreWhatsApp: 'Pasa a recogerlo cuando gustes.',
       }
 }
 
@@ -182,18 +186,41 @@ export interface WhatsAppEnv {
   metaToken: string
   metaPhoneId: string
   metaTemplate: string
+  /**
+   * Plantilla aprobada por Meta para CORRESPONDENCIA. Sin ella el canal se
+   * omite para esa clase: ver `plantillaMeta`.
+   */
+  metaTemplateCorrespondencia?: string
   twilioSid: string
   twilioToken: string
   twilioFrom: string
 }
 
 /**
+ * Plantilla de Meta que corresponde a la clase, o null si no está configurada.
+ *
+ * POR QUÉ null Y NO UN FALLBACK: una plantilla de Meta es un texto fijo,
+ * aprobado, con parámetros posicionales. La de paquetería dice que hay un
+ * paquete esperando en portería. Usarla para anunciar una notificación legal le
+ * mandaría al residente un mensaje FALSO por un canal que él no puede
+ * contrastar — y además rompería el contrato de la plantilla aprobada. Preferimos
+ * no mandar WhatsApp: el aviso in-app y el correo sí salen, con su texto correcto.
+ */
+export function plantillaMeta(env: WhatsAppEnv, clase = 'paquete'): string | null {
+  const t = clase === 'correspondencia' ? env.metaTemplateCorrespondencia : env.metaTemplate
+  return t && t.trim() !== '' ? t : null
+}
+
+/**
  * Decide qué proveedor de WhatsApp usar: 'meta' o 'twilio' SOLO si el proveedor
  * elegido tiene TODAS sus credenciales; si no, null (canal omitido en silencio,
  * el handler responde 'not_configured'). Nunca cae de un proveedor al otro.
+ *
+ * Para 'meta', las credenciales incluyen LA PLANTILLA DE ESA CLASE (ver
+ * `plantillaMeta`). Twilio manda texto libre, así que le basta con las suyas.
  */
-export function resolveWhatsAppProvider(env: WhatsAppEnv): 'meta' | 'twilio' | null {
-  if (env.provider === 'meta' && env.metaToken && env.metaPhoneId && env.metaTemplate) return 'meta'
+export function resolveWhatsAppProvider(env: WhatsAppEnv, clase = 'paquete'): 'meta' | 'twilio' | null {
+  if (env.provider === 'meta' && env.metaToken && env.metaPhoneId && plantillaMeta(env, clase)) return 'meta'
   if (env.provider === 'twilio' && env.twilioSid && env.twilioToken && env.twilioFrom) return 'twilio'
   return null
 }
@@ -236,9 +263,13 @@ export function buildTwilioWaParams(
   vars: Record<string, string>,
   from: string,
 ): Record<string, string> {
+  // Twilio manda texto libre, así que el mensaje SÍ se adapta a la clase
+  // (icono, lugar de retiro y cierre). Es la diferencia con Meta, donde el texto
+  // vive en una plantilla aprobada y no lo escribimos nosotros.
+  const copy = copyPieza(vars.clase ?? 'paquete')
   return {
     From: from,
     To: `whatsapp:+${digits(to)}`,
-    Body: `📦 Tienes ${vars.tipo_label} en portería para ${vars.unidad}: ${vars.descripcion}. Pasa a recogerlo cuando gustes.`,
+    Body: `${copy.icono} Tienes ${vars.tipo_label} en ${copy.lugar} para ${vars.unidad}: ${vars.descripcion}. ${copy.cierreWhatsApp}`,
   }
 }

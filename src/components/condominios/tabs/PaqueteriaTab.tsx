@@ -7,7 +7,7 @@ import {
 } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { notificarPieza } from '../../../lib/paquetesNotify'
+import { avisarConReintento } from '../avisoRecepcion'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -123,8 +123,10 @@ export function PaqueteriaTab({
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    try { if (data?.id) await notificarPieza(data.id as string) } catch { /* best-effort */ }
-    notify({ variant: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', duration: 1600 })
+    // El aviso puede fallar sin que el registro falle. La pantalla dice cuál de
+    // las dos cosas pasó, en vez de anunciar un aviso que quizá no salió.
+    if (data?.id) await avisarConReintento(data.id as string)
+    else notify({ variant: 'success', title: 'Paquete registrado', duration: 1600 })
     resetForm(); onRefresh()
   }
 

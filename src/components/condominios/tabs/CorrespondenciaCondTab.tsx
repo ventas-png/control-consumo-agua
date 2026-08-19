@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from 'react'
 import { createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { notificarPieza } from '../../../lib/paquetesNotify'
+import { avisarConReintento } from '../avisoRecepcion'
 import { diasEnCustodia, diasParaVencer, SUBTIPOS } from '../../../domain/condominios/recepcion'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import type { CategoriaCorrespondencia, EstadoCorrespondencia, PiezaRecepcion, Unidad } from '../../../types'
@@ -123,14 +123,16 @@ export function CorrespondenciaCondTab({
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     // Aviso al residente, igual que paquetería. Solo cuando la pieza va a una
     // unidad: la dirigida a la administración no tiene a quién avisarle, y su
-    // plazo ya lo vigila la alerta del Panel General.
+    // plazo ya lo vigila la alerta del Panel General. El resultado real del
+    // aviso decide el mensaje; nunca se anuncia un aviso que no salió.
     if (form.unidad_id && data?.id) {
-      try { await notificarPieza(data.id as string) } catch { /* best-effort: el registro ya quedó */ }
+      await avisarConReintento(data.id as string)
+    } else {
+      notify({
+        variant: 'success', title: 'Correspondencia registrada', duration: 1600,
+        text: 'Dirigida a la administración.',
+      })
     }
-    notify({
-      variant: 'success', title: 'Correspondencia registrada', duration: 1600,
-      text: form.unidad_id ? 'Se avisó al residente.' : 'Dirigida a la administración.',
-    })
     resetForm(); onRefresh()
   }
 

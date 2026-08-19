@@ -2,25 +2,23 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
-// Guard del motor único de recepción (20260829000000).
+// Guards ESTÁTICOS del motor único de recepción (20260829000000).
 //
-// Al unificar `correspondencia_condominio` dentro de `paquetes_recibidos`, el
-// permiso dejó de venir dado por la TABLA y pasó a resolverse POR FILA según
-// `clase`. Eso es lo único que impide que un guardia con
-// condominios.tab.paqueteria lea las notificaciones legales del condominio.
-//
-// El riesgo concreto: el repo tiene un generador de policies RBAC por tabla
-// (20260518000010) con un mapping `tabla → permiso`. Si alguien vuelve a
-// correrlo, o copia ese patrón para "arreglar" algo, las policies de
-// paquetes_recibidos volverían a la forma tabla→paqueteria y la separación se
-// perdería EN SILENCIO: sin error, sin test roto, solo correspondencia visible
-// para quien no debe. Este test mira la ÚLTIMA definición de cada policy y
-// exige que siga discriminando por clase.
+// ALCANCE Y LÍMITE. Esto lee el SQL del repo; no ejecuta nada contra una base.
+// Comprueba que las reglas siguen ESCRITAS como deben, que es la regresión
+// realista aquí: el repo tiene un generador de policies RBAC por tabla
+// (20260518000010) con un mapping `tabla → permiso`; si alguien vuelve a
+// correrlo o copia ese patrón, las policies de paquetes_recibidos regresan a la
+// forma tabla→paqueteria y la separación entre clases se pierde EN SILENCIO —
+// sin error, sin test roto, solo correspondencia visible (o borrable) para quien
+// no debe. La verificación CONDUCTUAL vive en src/test/rls/rlsHarness.test.ts y
+// solo corre con credenciales de un preview/sandbox.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const TABLA = 'paquetes_recibidos'
 const PERM_PAQUETERIA = 'condominios.tab.paqueteria'
 const PERM_CORRESPONDENCIA = 'condominios.tab.correspondencia'
+const MIGRACION_UNIFICACION = '20260829000000_recepcion_motor_unico.sql'
 
 interface Policy { nombre: string; cuerpo: string; archivo: string }
 
@@ -54,9 +52,14 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     }
   })
 
-  // DELETE queda fuera: no se gobierna por permiso de tab sino por rol
-  // (company_owner/admin), igual que antes de la unificación.
-  for (const nombre of ['paquetes_recibidos_select', 'paquetes_recibidos_insert', 'paquetes_recibidos_update']) {
+  // LAS CUATRO, incluida DELETE: borrar una notificación legal es justo la
+  // operación que más daño hace si el gate de clase se pierde.
+  for (const nombre of [
+    'paquetes_recibidos_select',
+    'paquetes_recibidos_insert',
+    'paquetes_recibidos_update',
+    'paquetes_recibidos_delete',
+  ]) {
     it(`${nombre} resuelve el permiso por clase, no por tabla`, () => {
       const policy = vigentes.get(nombre)
       expect(policy, `falta ${nombre}`).toBeDefined()
@@ -64,14 +67,68 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
       // la reescribe con un solo permiso fijo, esto falla.
       expect(policy!.cuerpo).toContain(PERM_CORRESPONDENCIA)
       expect(policy!.cuerpo).toContain(PERM_PAQUETERIA)
-      expect(policy!.cuerpo).toMatch(/clase/)
+      expect(policy!.cuerpo).toMatch(/CASE\s+clase/i)
     })
   }
+
+  it('DELETE sigue exigiendo rol y empresa ADEMÁS del permiso de clase', () => {
+    // El gate de clase se suma a los anteriores; no los reemplaza.
+    const cuerpo = vigentes.get('paquetes_recibidos_delete')!.cuerpo
+    expect(cuerpo).toMatch(/current_user_role\(\)/)
+    expect(cuerpo).toMatch(/company_owner/)
+    expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
+  })
 
   it('el residente sigue viendo las piezas de su unidad', () => {
     // Rama que ya tenían las dos tablas por separado; perderla dejaría el
     // portal del residente sin sus paquetes.
     expect(vigentes.get('paquetes_recibidos_select')!.cuerpo).toContain('mis_unidades_ids')
+  })
+
+  it('el residente NO gana permiso de borrado por vivir en la unidad', () => {
+    expect(vigentes.get('paquetes_recibidos_delete')!.cuerpo).not.toContain('mis_unidades_ids')
+  })
+})
+
+/** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
+function soloCodigo(sql: string): string {
+  return sql.replace(/--[^\n]*/g, '')
+}
+
+describe('migración de datos: fail-closed', () => {
+  const sql = readFileSync(join(MIGRATIONS_DIR, MIGRACION_UNIFICACION), 'utf8')
+  const posInsert = sql.indexOf('INSERT INTO public.paquetes_recibidos')
+  const posDrop = sql.indexOf('DROP TABLE public.correspondencia_condominio')
+
+  it('el INSERT de migración no silencia colisiones de id', () => {
+    // `ON CONFLICT (id) DO NOTHING` saltaría la fila en conflicto y el DROP de
+    // después la borraría para siempre: pérdida silenciosa. Sin la cláusula, una
+    // colisión revienta la transacción y no se aplica nada.
+    expect(posInsert).toBeGreaterThan(-1)
+    // Se mira el CÓDIGO, no los comentarios: esta misma migración explica en
+    // prosa por qué no lleva la cláusula.
+    expect(soloCodigo(sql.slice(posInsert, posDrop))).not.toMatch(/ON\s+CONFLICT/i)
+  })
+
+  it('verifica fila por fila ANTES de dropear la tabla original', () => {
+    const previo = sql.slice(posInsert, posDrop)
+    expect(posDrop).toBeGreaterThan(posInsert)
+    // La comprobación tiene que ser por fila (NOT EXISTS sobre cada id), no un
+    // simple conteo: dos errores compensados darían el mismo total.
+    expect(previo).toMatch(/NOT EXISTS[\s\S]*p\.id = c\.id[\s\S]*p\.clase = 'correspondencia'/)
+    expect(previo).toMatch(/RAISE EXCEPTION/)
+  })
+
+  it('no dropea si el respaldo no está completo', () => {
+    const previo = sql.slice(posInsert, posDrop)
+    expect(previo).toMatch(/correspondencia_condominio_respaldo/)
+    expect(previo).toMatch(/v_respaldo <> v_origen/)
+  })
+
+  it('el respaldo se crea ANTES de tocar nada', () => {
+    const posRespaldo = sql.indexOf('CREATE TABLE IF NOT EXISTS public.correspondencia_condominio_respaldo')
+    expect(posRespaldo).toBeGreaterThan(-1)
+    expect(posRespaldo).toBeLessThan(posInsert)
   })
 })
 

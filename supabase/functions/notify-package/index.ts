@@ -13,6 +13,7 @@ import {
   buildPaqueteInAppRows,
   buildTwilioWaParams,
   copyPieza,
+  plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
   tipoLabel,
@@ -30,6 +31,9 @@ const WHATSAPP_PROVIDER = (Deno.env.get('WHATSAPP_PROVIDER') ?? '').toLowerCase(
 const WA_META_TOKEN = Deno.env.get('WHATSAPP_TOKEN') ?? ''
 const WA_META_PHONE_ID = Deno.env.get('WHATSAPP_PHONE_ID') ?? ''
 const WA_META_TEMPLATE = Deno.env.get('WHATSAPP_TEMPLATE') ?? ''
+// Plantilla aprobada para correspondencia. Sin ella el canal WhatsApp se omite
+// para esa clase en vez de reutilizar el texto de paquetería (ver plantillaMeta).
+const WA_META_TEMPLATE_CORRESPONDENCIA = Deno.env.get('WHATSAPP_TEMPLATE_CORRESPONDENCIA') ?? ''
 const WA_META_LANG = Deno.env.get('WHATSAPP_TEMPLATE_LANG') ?? 'es'
 const TWILIO_SID = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
 const TWILIO_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
@@ -144,10 +148,10 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
 // WhatsApp (I/O; payloads y selección de proveedor en ./logic.ts)
 // ---------------------------------------------------------------------------
 
-async function sendWhatsAppMeta(to: string, vars: Record<string, string>): Promise<void> {
+async function sendWhatsAppMeta(to: string, vars: Record<string, string>, plantilla: string): Promise<void> {
   const url = `https://graph.facebook.com/v19.0/${WA_META_PHONE_ID}/messages`
   // Mensaje iniciado por la empresa => requiere plantilla aprobada.
-  const body = buildMetaWaPayload(to, vars, WA_META_TEMPLATE, WA_META_LANG)
+  const body = buildMetaWaPayload(to, vars, plantilla, WA_META_LANG)
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_META_TOKEN}`, 'Content-Type': 'application/json' },
@@ -168,20 +172,30 @@ async function sendWhatsAppTwilio(to: string, vars: Record<string, string>): Pro
   if (!res.ok) throw new Error(`Twilio WhatsApp: ${await res.text()}`)
 }
 
-async function sendWhatsApp(to: string | null, vars: Record<string, string>): Promise<'sent' | 'not_configured' | 'error'> {
+async function sendWhatsApp(
+  to: string | null,
+  vars: Record<string, string>,
+  clase = 'paquete',
+): Promise<'sent' | 'not_configured' | 'error'> {
   if (!to) return 'not_configured'
   try {
-    const provider = resolveWhatsAppProvider({
+    const env = {
       provider: WHATSAPP_PROVIDER,
       metaToken: WA_META_TOKEN,
       metaPhoneId: WA_META_PHONE_ID,
       metaTemplate: WA_META_TEMPLATE,
+      metaTemplateCorrespondencia: WA_META_TEMPLATE_CORRESPONDENCIA,
       twilioSid: TWILIO_SID,
       twilioToken: TWILIO_TOKEN,
       twilioFrom: TWILIO_FROM,
-    })
+    }
+    const provider = resolveWhatsAppProvider(env, clase)
     if (provider === 'meta') {
-      await sendWhatsAppMeta(to, vars); return 'sent'
+      // No puede ser null: resolveWhatsAppProvider ya exigió la plantilla de
+      // esta clase para devolver 'meta'.
+      const plantilla = plantillaMeta(env, clase)
+      if (!plantilla) return 'not_configured'
+      await sendWhatsAppMeta(to, vars, plantilla); return 'sent'
     }
     if (provider === 'twilio') {
       await sendWhatsAppTwilio(to, vars); return 'sent'
@@ -338,14 +352,23 @@ Deno.serve(async (req: Request) => {
 
     // ── WhatsApp (opcional) ──
     const waTo = ((cliente as Row)?.whatsapp as string | null) || ((cliente as Row)?.telefono as string | null) || null
-    whatsapp = await sendWhatsApp(waTo, vars)
+    whatsapp = await sendWhatsApp(waTo, vars, clase)
 
-    // Marca de notificado (idempotencia).
-    await admin.from('paquetes_recibidos')
-      .update({ notificado_at: new Date().toISOString() })
-      .eq('id', (pkg as Row).id)
+    // Marca de notificado SOLO si algún canal entregó.
+    //
+    // POR QUÉ: `notificado_at` es la guarda de idempotencia — con ella puesta,
+    // el early-return de arriba responde 'already_notified' y no se vuelve a
+    // intentar NUNCA. Sellarla cuando los tres canales fallaron convertía un
+    // fallo transitorio (Gmail caído, WhatsApp con 500) en un aviso perdido para
+    // siempre, y encima le decía "listo" al que registró la pieza.
+    const entregado = notified > 0 || emailed > 0 || whatsapp === 'sent'
+    if (entregado) {
+      await admin.from('paquetes_recibidos')
+        .update({ notificado_at: new Date().toISOString() })
+        .eq('id', (pkg as Row).id)
+    }
 
-    return json({ success: true, notified, emailed, whatsapp })
+    return json({ success: entregado, notified, emailed, whatsapp, delivered: entregado })
   } catch (err) {
     return json({ error: String(err) }, 500)
   }

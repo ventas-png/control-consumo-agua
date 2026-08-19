@@ -63,8 +63,23 @@ export RLS_USER_A_PASSWORD="********"
 export RLS_USER_B_EMAIL="qa-b@example.com"
 export RLS_USER_B_PASSWORD="********"
 
+# OPCIONAL — gate por CLASE de paquetes_recibidos (motor único, 20260829000000).
+# Dos usuarios de la MISMA empresa con permisos DISTINTOS: uno solo con
+# condominios.tab.paqueteria y otro solo con condominios.tab.correspondencia.
+# A/B no sirven para esto: son de empresas distintas, así que el aislamiento que
+# se vería sería el de tenant, no el de clase. Sin estas vars ese bloque se
+# skipea y queda su marcador en el reporte.
+export RLS_USER_PAQ_EMAIL="qa-paqueteria@example.com"
+export RLS_USER_PAQ_PASSWORD="********"
+export RLS_USER_CORR_EMAIL="qa-correspondencia@example.com"
+export RLS_USER_CORR_PASSWORD="********"
+
 npx vitest run src/test/rls/rlsHarness.test.ts
 ```
+
+El bloque de clase es **no destructivo**: siembra su propia fila desechable con
+el usuario que sí tiene el permiso, intenta borrarla con el que no lo tiene
+(debe afectar 0 filas), comprueba que sigue viva y la limpia al terminar.
 
 En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
 `rls-harness`), que sólo se activa cuando los secretos del repo están presentes.

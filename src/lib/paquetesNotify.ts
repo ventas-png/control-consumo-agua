@@ -8,8 +8,50 @@ export interface NotifyPackageResult {
   notified?: number
   emailed?: number
   whatsapp?: 'sent' | 'not_configured' | 'error'
+  /** true si algún canal entregó. Lo decide el servidor; ver `avisoEntregado`. */
+  delivered?: boolean
   skipped?: string
   error?: string
+}
+
+/** Cómo le fue al aviso, para que la UI diga la verdad. */
+export type ResultadoAviso =
+  | { estado: 'entregado'; detalle: NotifyPackageResult }
+  /** El servidor respondió OK pero ningún canal entregó (sin contacto, canales caídos). */
+  | { estado: 'sin_canales'; detalle: NotifyPackageResult }
+  /** No se pudo ni preguntar: red caída, 4xx/5xx tras los reintentos. */
+  | { estado: 'fallo'; error: Error }
+
+/**
+ * ¿Entregó algo? El servidor manda `delivered`; para respuestas de una versión
+ * anterior de la edge function se deriva de los contadores, y NUNCA se asume
+ * entregado por el mero hecho de que la llamada devolviera 200.
+ */
+export function avisoEntregado(r: NotifyPackageResult): boolean {
+  if (typeof r.delivered === 'boolean') return r.delivered
+  return (r.notified ?? 0) > 0 || (r.emailed ?? 0) > 0 || r.whatsapp === 'sent'
+}
+
+/**
+ * Envoltura que NO lanza: devuelve qué pasó realmente para que la pantalla
+ * pueda mostrar éxito, advertencia o fallo — y ofrecer reintentar.
+ *
+ * Existe porque el patrón anterior (`try { notificarPieza() } catch {}`) se
+ * tragaba el error y la UI decía "Se avisó al residente" aunque no hubiera
+ * salido un solo aviso.
+ */
+export async function intentarAvisar(
+  paqueteId: string,
+  opts: NotifyOptions = {},
+): Promise<ResultadoAviso> {
+  try {
+    const detalle = await notificarPieza(paqueteId, opts)
+    return avisoEntregado(detalle)
+      ? { estado: 'entregado', detalle }
+      : { estado: 'sin_canales', detalle }
+  } catch (err) {
+    return { estado: 'fallo', error: err instanceof Error ? err : new Error(String(err)) }
+  }
 }
 
 interface NotifyOptions {

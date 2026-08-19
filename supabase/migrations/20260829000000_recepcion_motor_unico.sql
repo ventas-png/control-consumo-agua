@@ -183,8 +183,58 @@ SELECT
   -- se preserva aparte en fecha_pieza, sin inventar una hora.
   c.created_at, c.hora_entrega,
   c.recibido_por, c.entregado_por, c.creado_por, c.created_at
-FROM public.correspondencia_condominio c
-ON CONFLICT (id) DO NOTHING;
+FROM public.correspondencia_condominio c;
+-- SIN `ON CONFLICT DO NOTHING` a propósito. Una colisión de id entre las dos
+-- tablas significaría que una pieza de correspondencia comparte identidad con
+-- un paquete: saltarla en silencio dejaría la fila original sin migrar y el
+-- DROP de abajo la borraría para siempre. Que reviente y no se aplique nada es
+-- el resultado correcto. (Precheck en producción: 0 colisiones.)
+
+-- ── 3b) Verificación fail-closed ANTES de borrar nada ───────────────────────
+-- El DROP es irreversible dentro de esta transacción: si por cualquier motivo
+-- una fila no llegó a su destino, aquí se aborta y la migración entera se
+-- deshace, dejando la tabla original intacta.
+DO $$
+DECLARE
+  v_origen    bigint;
+  v_migradas  bigint;
+  v_respaldo  bigint;
+  v_faltantes bigint;
+BEGIN
+  SELECT count(*) INTO v_origen   FROM public.correspondencia_condominio;
+  SELECT count(*) INTO v_respaldo FROM public.correspondencia_condominio_respaldo;
+  SELECT count(*) INTO v_migradas FROM public.paquetes_recibidos WHERE clase = 'correspondencia';
+
+  -- Comprobación fila por fila, no solo de totales: cada id original tiene que
+  -- existir en el destino Y haber quedado con la clase correcta.
+  SELECT count(*) INTO v_faltantes
+    FROM public.correspondencia_condominio c
+   WHERE NOT EXISTS (
+     SELECT 1 FROM public.paquetes_recibidos p
+      WHERE p.id = c.id AND p.clase = 'correspondencia'
+   );
+
+  IF v_faltantes > 0 THEN
+    RAISE EXCEPTION
+      'Migración abortada: % de % filas de correspondencia no quedaron en paquetes_recibidos con clase=correspondencia',
+      v_faltantes, v_origen;
+  END IF;
+
+  IF v_migradas < v_origen THEN
+    RAISE EXCEPTION
+      'Migración abortada: origen=% filas, migradas=% filas', v_origen, v_migradas;
+  END IF;
+
+  -- El respaldo es la red por si hay que reconstruir; si quedó vacío o corto,
+  -- no hay red y no se dropea nada.
+  IF v_respaldo <> v_origen THEN
+    RAISE EXCEPTION
+      'Migración abortada: el respaldo tiene % filas y el origen % — sin respaldo completo no se borra la tabla',
+      v_respaldo, v_origen;
+  END IF;
+
+  RAISE NOTICE 'Correspondencia migrada: % filas (respaldo: %)', v_migradas, v_respaldo;
+END $$;
 
 -- ── 4) La tabla vieja cede su nombre a una vista de compatibilidad ──────────
 DROP TABLE public.correspondencia_condominio;
@@ -276,6 +326,11 @@ CREATE POLICY paquetes_recibidos_update ON public.paquetes_recibidos
     )
   );
 
+-- DELETE: rol Y empresa Y permiso de la clase. Antes de la unificación, borrar
+-- correspondencia exigía estar en `correspondencia_condominio`, cuyo DELETE ya
+-- iba con este mismo rol; al fusionar las tablas, un admin con permiso solo de
+-- paquetería habría podido borrar notificaciones legales sin tener el módulo.
+-- El gate de clase cierra esa puerta, igual que en las otras tres operaciones.
 DROP POLICY IF EXISTS paquetes_recibidos_delete ON public.paquetes_recibidos;
 CREATE POLICY paquetes_recibidos_delete ON public.paquetes_recibidos
   FOR DELETE TO authenticated
@@ -284,6 +339,10 @@ CREATE POLICY paquetes_recibidos_delete ON public.paquetes_recibidos
     OR (
       public.current_user_role() = ANY(ARRAY['company_owner','admin'])
       AND company_id = public.get_my_company_id()
+      AND public.user_has_permission(
+        CASE clase WHEN 'correspondencia'
+          THEN 'condominios.tab.correspondencia'
+          ELSE 'condominios.tab.paqueteria' END)
     )
   );
 
