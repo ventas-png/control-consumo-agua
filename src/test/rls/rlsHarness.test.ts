@@ -59,13 +59,51 @@ const ENABLED = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los
 // negative-write sin necesidad de conocer el company_id real de B.
-const FOREIGN_COMPANY_ID = '00000000-0000-0000-0000-000000000000'
-
 // Marcador de cualquier fila que un negative-write pudiera dejar si RLS fallara.
 // Los INSERT de esta suite DEBEN ser rechazados; si alguno se colara, este texto
 // permite barrerlo en afterAll. El harness no siembra nada: sólo limpia lo que
 // nunca debió existir (defensa en profundidad, no parte del contrato).
 const MARCADOR_EFIMERO = 'RLS-NEGATIVE-NO-DEBE-PERSISTIR'
+
+// ────────────────────────────────────────────────────────────────────────────
+// RECURSOS REALES DEL TENANT B
+// ────────────────────────────────────────────────────────────────────────────
+// La versión anterior usaba un UUID cero (`00000000-…`) como "tenant ajeno".
+// Eso debilitaba TODAS las pruebas negativas: un INSERT con
+// `project_id = 00000000-…` puede ser rechazado por la FOREIGN KEY antes de
+// que RLS llegue a evaluarse, así que el verde no demostraba que la policy
+// funcionara — sólo que el UUID no existía. Lo mismo en los RPC: pedir la
+// metadata de un company_id inexistente se niega de forma trivial.
+//
+// Ahora se leen los ids REALES de B (entrando como B, que sí ve lo suyo) y A
+// los usa como objetivo. Las FKs son válidas, así que si el write se rechaza,
+// el rechazo viene de RLS. Y si un RPC niega la lectura, niega datos que
+// EXISTEN.
+interface RecursosB {
+  companyId: string
+  projectId: string
+  unidadId: string
+}
+
+/** Contexto resuelto en beforeAll; los tests lo leen al ejecutarse. */
+let B: RecursosB
+
+/** Args de un RPC, construidos con los recursos reales de B. */
+type ArgsRpc = (b: RecursosB) => Record<string, unknown>
+
+// ────────────────────────────────────────────────────────────────────────────
+// DENY-ALL: qué cuenta como denegación legítima
+// ────────────────────────────────────────────────────────────────────────────
+// `expect(data ?? []).toHaveLength(0)` convertía CUALQUIER error en "0 filas",
+// así que una tabla inexistente, un schema cache desactualizado, una migración
+// sin aplicar o una caída de red producían el mismo verde que una policy
+// funcionando. Estos códigos son los ÚNICOS aceptables como denegación:
+//   42501    insufficient_privilege — el GRANT no está, que es deny-all real.
+//   PGRST116 el filtro no devolvió filas (variantes de PostgREST con .single()).
+// Todo lo demás —PGRST205 "no está en el schema cache", 42P01 tabla
+// inexistente, errores de auth o de red— es un FALLO: significa que la prueba
+// no comprobó nada.
+const CODIGOS_DENEGACION_OK = new Set(['42501', 'PGRST116'])
 
 // Tablas deny-all: el secreto/credencial NUNCA se proyecta al cliente. Sólo
 // service_role (BYPASSRLS) las lee desde edge functions.
@@ -137,79 +175,86 @@ const ANON_DENY_TABLES = [
 // Tablas con scope POR USUARIO (no por empresa): RLS = user_id = auth.uid().
 const USER_SCOPED_TABLES = ['notification_preferences', 'user_preferences'] as const
 
+// ────────────────────────────────────────────────────────────────────────────
+// RPCs sensibles. `args` es una FUNCIÓN de los recursos reales de B, no un
+// literal: los ids se conocen recién en beforeAll y apuntar a filas que EXISTEN
+// es lo que convierte estas pruebas en una comprobación de autorización y no en
+// una de "el id no existe".
+// ────────────────────────────────────────────────────────────────────────────
+
 // RPCs SECURITY DEFINER del orquestador de notificaciones que en #378 quedaron
 // anon-ejecutables y se cerraron en #380 (revoke por nombre de rol). El guard
 // regresa-guarda esa clase de bug: anon y authenticated deben ser RECHAZADOS.
-const SENSITIVE_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+const SENSITIVE_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   {
     name: 'enqueue_notification',
-    args: {
+    args: (b) => ({
       p_channel: 'in_app',
       p_recipient: 'attacker@example.com',
       p_payload: {},
-      p_company_id: FOREIGN_COMPANY_ID,
+      p_company_id: b.companyId,
       p_template_key: null,
       p_scheduled_at: null,
-    },
+    }),
   },
-  { name: 'claim_notifications_batch', args: { p_batch_size: 1 } },
+  { name: 'claim_notifications_batch', args: () => ({ p_batch_size: 1 }) },
   {
     name: 'mark_notification_result',
-    args: { p_id: FOREIGN_COMPANY_ID, p_ok: true, p_error: null, p_retriable: false },
+    args: (b) => ({ p_id: b.companyId, p_ok: true, p_error: null, p_retriable: false }),
   },
-  { name: 'run_notifications_dispatcher', args: {} },
+  { name: 'run_notifications_dispatcher', args: () => ({}) },
 ]
 
 // RPCs del ERP financiero: anon DEBE ser rechazado siempre (REVOKE FROM anon).
-// Para authenticated solo probamos las que reciben un id inexistente (fallan con
-// "no encontrado"/"no autorizado" SIN efectos secundarios posibles); el cierre
-// anual se omite para authenticated porque un admin legítimo SÍ puede ejecutarlo.
-const ERP_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
-  { name: 'conta_publicar_asiento', args: { p_asiento_id: FOREIGN_COMPANY_ID } },
-  { name: 'conta_anular_asiento', args: { p_asiento_id: FOREIGN_COMPANY_ID, p_motivo: null } },
-  { name: 'conta_cierre_anual', args: { p_anio: 2000 } },
+// Para authenticated se usan ids REALES del tenant B: la RPC debe negarse por
+// AUTORIZACIÓN ("no autorizado"), no porque el id no exista. El cierre anual se
+// excluye de la variante authenticated porque un admin legítimo SÍ puede
+// ejecutarlo sobre su propia empresa.
+const ERP_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'conta_publicar_asiento', args: (b) => ({ p_asiento_id: b.companyId }) },
+  { name: 'conta_anular_asiento', args: (b) => ({ p_asiento_id: b.companyId, p_motivo: null }) },
+  { name: 'conta_cierre_anual', args: () => ({ p_anio: 2000 }) },
   {
     name: 'banco_conciliar_movimiento',
-    args: { p_movimiento_id: FOREIGN_COMPANY_ID, p_match_tipo: 'pago', p_match_id: FOREIGN_COMPANY_ID },
+    args: (b) => ({ p_movimiento_id: b.companyId, p_match_tipo: 'pago', p_match_id: b.companyId }),
   },
-  { name: 'banco_desconciliar_movimiento', args: { p_movimiento_id: FOREIGN_COMPANY_ID } },
-  { name: 'banco_ajuste_conciliacion', args: { p_movimiento_id: FOREIGN_COMPANY_ID, p_descripcion: null } },
+  { name: 'banco_desconciliar_movimiento', args: (b) => ({ p_movimiento_id: b.companyId }) },
+  { name: 'banco_ajuste_conciliacion', args: (b) => ({ p_movimiento_id: b.companyId, p_descripcion: null }) },
 ]
 
 const ERP_RPCS_AUTH_SIN_EFECTOS = ERP_RPCS_ANON.filter((r) => r.name !== 'conta_cierre_anual')
 
-// RPCs de estatus de las bóvedas (metadata NO sensible): REVOKE FROM PUBLIC, anon
-// (whatsapp_estatus explícito; payfac/fiscal por el mismo patrón). anon SIEMPRE
-// rechazado. Regresa-guarda el fail-open trivaluado que el equipo cazó en #611
-// (guards IF NOT con helpers NULL exponían metadata de cualquier tenant).
-// Auditoría 2026-07-16, S5.
-const ESTATUS_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
-  { name: 'whatsapp_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
-  { name: 'payfac_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
-  { name: 'fiscal_pac_estatus', args: { p_company_id: FOREIGN_COMPANY_ID } },
+// RPCs de estatus de las bóvedas (metadata NO sensible): REVOKE FROM PUBLIC, anon.
+// anon SIEMPRE rechazado. Para authenticated se pide la metadata de la empresa
+// REAL de B: si el guard fail-closed funciona, A no la obtiene aunque exista.
+// Regresa-guarda el fail-open trivaluado que el equipo cazó en #611.
+const ESTATUS_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'whatsapp_estatus', args: (b) => ({ p_company_id: b.companyId }) },
+  { name: 'payfac_estatus', args: (b) => ({ p_company_id: b.companyId }) },
+  { name: 'fiscal_pac_estatus', args: (b) => ({ p_company_id: b.companyId }) },
 ]
 
 // RPCs del self-service del propietario (20260822000000): SECURITY DEFINER con
-// REVOKE FROM public, anon. anon SIEMPRE rechazado. Para authenticated, las de
-// escritura con una unidad AJENA (FOREIGN_COMPANY_ID) deben fallar por el guard
-// interno (rol ≠ cliente o unidad no propia) SIN efectos secundarios.
-const PORTAL_INQUILINO_RPCS_ANON: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
-  { name: 'portal_mis_unidades', args: {} },
-  { name: 'portal_inquilinos_de_unidad', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
+// REVOKE FROM public, anon. Las escrituras apuntan a la unidad REAL de B, así
+// que el rechazo demuestra el guard interno (rol ≠ cliente o unidad no propia)
+// y no una FK rota.
+const PORTAL_INQUILINO_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_mis_unidades', args: () => ({}) },
+  { name: 'portal_inquilinos_de_unidad', args: (b) => ({ p_unidad_id: b.unidadId }) },
   {
     name: 'portal_registrar_inquilino',
-    args: {
-      p_unidad_id: FOREIGN_COMPANY_ID,
+    args: (b) => ({
+      p_unidad_id: b.unidadId,
       p_nombre: 'Intruso RLS',
       p_email: 'intruso-rls@example.com',
       p_cui_dui: '0000000000000',
       p_fecha_nacimiento: '2000-01-01',
       p_telefono: null,
-    },
+    }),
   },
   {
     name: 'portal_quitar_inquilino',
-    args: { p_unidad_id: FOREIGN_COMPANY_ID, p_cliente_id: FOREIGN_COMPANY_ID },
+    args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.companyId }),
   },
 ]
 
@@ -217,16 +262,13 @@ const PORTAL_INQUILINO_RPCS_ESCRITURA = PORTAL_INQUILINO_RPCS_ANON.filter((r) =>
   ['portal_registrar_inquilino', 'portal_quitar_inquilino'].includes(r.name),
 )
 
-// RPCs de reservas del portal (20260822030000): SECURITY DEFINER, REVOKE FROM
-// public/anon. anon SIEMPRE rechazado; authenticated (usuarios A/B del harness)
-// rechazado por el guard interno (unidad/reserva inexistente o ajena) SIN
-// efectos secundarios.
-const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+// RPCs de reservas del portal (20260822030000): amenidad y unidad reales de B.
+const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   {
     name: 'portal_reservar_amenidad',
-    args: {
-      p_amenidad_id: FOREIGN_COMPANY_ID,
-      p_unidad_id: FOREIGN_COMPANY_ID,
+    args: (b) => ({
+      p_amenidad_id: b.companyId,
+      p_unidad_id: b.unidadId,
       p_fecha: '2099-01-01',
       p_hora_inicio: '10:00',
       p_hora_fin: '11:00',
@@ -234,31 +276,28 @@ const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: Record<string, u
       p_notas: null,
       p_metodo_pago: null,
       p_reglamento_aceptado: false,
-    },
+    }),
   },
-  { name: 'portal_cancelar_reserva', args: { p_reserva_id: FOREIGN_COMPANY_ID } },
+  { name: 'portal_cancelar_reserva', args: (b) => ({ p_reserva_id: b.companyId }) },
 ]
 
-// RPCs de accesos familiares (20260825000000): mismo contrato que los de
-// inquilinos — anon SIEMPRE rechazado (REVOKE); authenticated sobre una unidad
-// ajena rechazado por el guard interno SIN efectos secundarios.
-const PORTAL_FAMILIARES_RPCS: ReadonlyArray<{ name: string; args: Record<string, unknown> }> = [
+// RPCs de accesos familiares (20260825000000): mismo contrato, unidad real de B.
+const PORTAL_FAMILIARES_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   {
     name: 'portal_registrar_familiar',
-    args: {
-      p_unidad_id: FOREIGN_COMPANY_ID,
+    args: (b) => ({
+      p_unidad_id: b.unidadId,
       p_nombre: 'Intruso RLS',
       p_email: 'intruso-familiar-rls@example.com',
       p_cui_dui: '0000000000001',
       p_fecha_nacimiento: '2000-01-01',
       p_telefono: null,
-    },
+    }),
   },
-  { name: 'portal_quitar_familiar', args: { p_unidad_id: FOREIGN_COMPANY_ID, p_cliente_id: FOREIGN_COMPANY_ID } },
-  { name: 'portal_accesos_de_unidad', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
-  // Baja de la autorización de renta (20260827000000): mismo contrato de guard.
-  { name: 'portal_baja_renta', args: { p_unidad_id: FOREIGN_COMPANY_ID } },
+  { name: 'portal_quitar_familiar', args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.companyId }) },
+  { name: 'portal_accesos_de_unidad', args: (b) => ({ p_unidad_id: b.unidadId }) },
 ]
+
 
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
@@ -295,8 +334,37 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     userB = await signedInClient(B_EMAIL!, B_PASS!)
     ;[aId, bId] = await Promise.all([userId(userA), userId(userB)])
     expect(aId, 'A y B deben ser usuarios DISTINTOS').not.toBe(bId)
-    const { data } = await userA.from('cuotas_condominio').select('company_id').limit(1)
-    aOwnedCompanyId = (data?.[0] as { company_id: string } | undefined)?.company_id ?? null
+
+    const { data: filasA } = await userA.from('cuotas_condominio').select('company_id').limit(1)
+    aOwnedCompanyId = (filasA?.[0] as { company_id: string } | undefined)?.company_id ?? null
+
+    // Recursos REALES de B, leídos COMO B (que sí ve lo suyo). Son el objetivo
+    // de todas las pruebas negativas de A: con FKs válidas, un rechazo sólo
+    // puede venir de RLS. El seed garantiza esta fila (cuotas_condominio está
+    // en `noTriviales`), así que si falta, el sandbox no está sembrado y hay
+    // que enterarse aquí y no con un falso verde más abajo.
+    const { data: filasB, error: errorB } = await userB
+      .from('cuotas_condominio')
+      .select('company_id, project_id, unidad_id')
+      .limit(1)
+    expect(errorB, 'B debe poder leer sus propias cuotas').toBeNull()
+
+    const filaB = filasB?.[0] as
+      | { company_id: string; project_id: string; unidad_id: string | null }
+      | undefined
+    expect(
+      filaB,
+      'B no tiene ninguna cuota: el sandbox no está sembrado. Corré scripts/seed-rls-sandbox.mjs.',
+    ).toBeDefined()
+    expect(filaB!.unidad_id, 'la cuota sembrada de B debe tener unidad_id').toBeTruthy()
+
+    B = {
+      companyId: filaB!.company_id,
+      projectId: filaB!.project_id,
+      unidadId: filaB!.unidad_id as string,
+    }
+
+    expect(B.companyId, 'A y B deben pertenecer a empresas DISTINTAS').not.toBe(aOwnedCompanyId)
   })
 
   afterAll(async () => {
@@ -309,21 +377,50 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       userA?.from('cuotas_condominio').delete().eq('concepto', MARCADOR_EFIMERO),
       userA?.from('conta_cuentas').delete().eq('nombre', MARCADOR_EFIMERO),
       userA?.from('conta_asientos').delete().eq('concepto', MARCADOR_EFIMERO),
-      userA?.from('documentos_fiscales').delete().eq('company_id', FOREIGN_COMPANY_ID),
+      userA?.from('documentos_fiscales').delete().eq('company_id', B?.companyId ?? ''),
     ])
     await Promise.allSettled([userA?.auth.signOut(), userB?.auth.signOut()])
   })
 
+  /**
+   * Deny-all estricto. Antes esto era `expect(data ?? []).toHaveLength(0)`, que
+   * trataba CUALQUIER error como "0 filas": una tabla inexistente, un schema
+   * cache desactualizado, una migración sin aplicar, un fallo de auth o de red
+   * producían el mismo verde que una policy funcionando. Aquí:
+   *   · sin error  → se exige que devuelva 0 filas;
+   *   · con error  → sólo se acepta si el código está en CODIGOS_DENEGACION_OK;
+   *                  cualquier otro FALLA e informa código y mensaje, porque
+   *                  significa que la prueba no llegó a comprobar la policy.
+   */
+  async function esperaDenegacion(
+    cliente: SupabaseClient,
+    table: string,
+    columnas = '*',
+    quien = 'el cliente',
+  ) {
+    const { data, error } = await cliente.from(table).select(columnas)
+
+    if (error) {
+      expect(
+        CODIGOS_DENEGACION_OK.has(error.code ?? ''),
+        `${table}: ${quien} recibió un error INESPERADO (code=${error.code ?? 'sin código'}): ` +
+        `${error.message}. Esto NO demuestra deny-all — puede ser tabla inexistente, ` +
+        'schema cache desactualizado, migración sin aplicar, auth o red.',
+      ).toBe(true)
+      return
+    }
+
+    expect(data ?? [], `${table}: ${quien} no debe ver ninguna fila`).toHaveLength(0)
+  }
+
   describe('tablas de secretos = deny-all (nunca al cliente)', () => {
     for (const table of SECRET_TABLES) {
       it(`${table}: authenticated (empresa A) no ve filas`, async () => {
-        const { data } = await userA.from(table).select('*')
-        expect(data ?? []).toHaveLength(0)
+        await esperaDenegacion(userA, table, '*', 'authenticated (A)')
       })
 
       it(`${table}: anon no ve filas`, async () => {
-        const { data } = await anon.from(table).select('*')
-        expect(data ?? []).toHaveLength(0)
+        await esperaDenegacion(anon, table, '*', 'anon')
       })
     }
   })
@@ -331,13 +428,11 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('tablas sin policy de SELECT = deny-all para el cliente', () => {
     for (const table of NO_SELECT_TABLES) {
       it(`${table}: authenticated (empresa A) no ve filas`, async () => {
-        const { data } = await userA.from(table).select('*')
-        expect(data ?? []).toHaveLength(0)
+        await esperaDenegacion(userA, table, '*', 'authenticated (A)')
       })
 
       it(`${table}: anon no ve filas`, async () => {
-        const { data } = await anon.from(table).select('*')
-        expect(data ?? []).toHaveLength(0)
+        await esperaDenegacion(anon, table, '*', 'anon')
       })
     }
   })
@@ -348,21 +443,18 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // invariante "A no ve filas de otro usuario" se cumple de forma trivial: A no
     // ve NINGUNA fila (más fuerte que el aislamiento por usuario).
     it('authenticated (empresa A) no ve filas', async () => {
-      const { data } = await userA.from('user_sessions').select('sid')
-      expect(data ?? []).toHaveLength(0)
+      await esperaDenegacion(userA, 'user_sessions', 'sid', 'authenticated (A)')
     })
 
     it('anon no ve filas', async () => {
-      const { data } = await anon.from('user_sessions').select('sid')
-      expect(data ?? []).toHaveLength(0)
+      await esperaDenegacion(anon, 'user_sessions', 'sid', 'anon')
     })
   })
 
   describe('anon no puede leer tablas de negocio', () => {
     for (const table of ANON_DENY_TABLES) {
       it(`${table}: anon obtiene 0 filas`, async () => {
-        const { data } = await anon.from(table).select('id')
-        expect(data ?? []).toHaveLength(0)
+        await esperaDenegacion(anon, table, 'id', 'anon')
       })
     }
   })
@@ -467,15 +559,19 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   })
 
   describe('negative write (company_id ajeno → RECHAZADO, no persiste)', () => {
-    // El WITH CHECK de RLS exige company_id = get_my_company_id(); cualquier
-    // company_id ajeno (FOREIGN_COMPANY_ID) hace fallar el write SIN persistir.
+    // El WITH CHECK de RLS exige company_id = get_my_company_id(). Se apunta al
+    // tenant REAL de B —company_id, project_id y unidad_id que EXISTEN— para que
+    // todas las FKs sean válidas: así el rechazo sólo puede venir de RLS, no de
+    // una restricción de integridad. Con el UUID cero de antes, un INSERT podía
+    // morir en la FK y el test pasaba sin haber ejercitado la policy.
     // Defensa: si por un bug el write se colara, intentamos borrar lo escrito.
     it('cuotas_condominio: INSERT con company_id ajeno es rechazado', async () => {
       const { data, error } = await userA
         .from('cuotas_condominio')
         .insert({
-          company_id: FOREIGN_COMPANY_ID,
-          project_id: FOREIGN_COMPANY_ID,
+          company_id: B.companyId,
+          project_id: B.projectId,
+          unidad_id: B.unidadId,
           concepto: MARCADOR_EFIMERO,
           monto: 1,
           periodo: '2099-01',
@@ -497,8 +593,8 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       // el UPDATE afecta 0 filas (tampoco persiste): ambos resultados son válidos.
       const { data, error } = await userA
         .from('cuotas_condominio')
-        .update({ company_id: FOREIGN_COMPANY_ID })
-        .eq('company_id', aOwnedCompanyId ?? FOREIGN_COMPANY_ID)
+        .update({ company_id: B.companyId })
+        .eq('company_id', aOwnedCompanyId ?? B.companyId)
         .select('id')
 
       const rejected = error !== null || (data ?? []).length === 0
@@ -508,7 +604,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     it('documentos_fiscales: INSERT con company_id ajeno es rechazado', async () => {
       const { data, error } = await userA
         .from('documentos_fiscales')
-        .insert({ company_id: FOREIGN_COMPANY_ID, regimen: 'general', tipo: 'factura' })
+        .insert({ company_id: B.companyId, regimen: 'general', tipo: 'factura' })
         .select('id')
 
       if (data && data.length > 0) {
@@ -523,7 +619,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       const { data, error } = await userA
         .from('conta_cuentas')
         .insert({
-          company_id: FOREIGN_COMPANY_ID,
+          company_id: B.companyId,
           codigo: '9999-RLS',
           nombre: MARCADOR_EFIMERO,
           tipo: 'activo',
@@ -546,7 +642,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       const { data, error } = await userA
         .from('conta_asientos')
         .insert({
-          company_id: aOwnedCompanyId ?? FOREIGN_COMPANY_ID,
+          company_id: aOwnedCompanyId ?? B.companyId,
           fecha: '2099-01-01',
           tipo: 'diario',
           concepto: MARCADOR_EFIMERO,
@@ -568,7 +664,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard anon: RPCs sensibles de notificaciones (#378/#380) RECHAZADOS', () => {
     for (const { name, args } of SENSITIVE_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         // Rechazo = error presente (permission denied / función no visible /
         // PGRST). NUNCA debe devolver un resultado exitoso.
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
@@ -576,7 +672,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       })
 
       it(`authenticated (empresa A) NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await userA.rpc(name, args)
+        const { data, error } = await userA.rpc(name, args(B))
         expect(error, `authenticated no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a authenticated`).toBeNull()
       })
@@ -586,7 +682,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard RPCs del ERP financiero (REVOKE anon + validación interna)', () => {
     for (const { name, args } of ERP_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
@@ -597,7 +693,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // admin legítimo SÍ puede ejecutarlo (sería un falso positivo).
     for (const { name, args } of ERP_RPCS_AUTH_SIN_EFECTOS) {
       it(`authenticated con id inexistente NO obtiene éxito de ${name}`, async () => {
-        const { data, error } = await userA.rpc(name, args)
+        const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} con id inexistente debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
@@ -607,18 +703,19 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard anon: RPCs de estatus de bóvedas (#611) RECHAZADOS', () => {
     for (const { name, args } of ESTATUS_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
     }
 
-    // authenticated de la empresa A pidiendo la metadata de un tenant AJENO
-    // (FOREIGN_COMPANY_ID): el guard fail-closed debe negar — nunca metadata
-    // cross-tenant, aun con claims válidos. Esto cubre el bug trivaluado de #611.
+    // authenticated de la empresa A pidiendo la metadata de la empresa REAL de
+    // B: el guard fail-closed debe negar — nunca metadata cross-tenant, aun con
+    // claims válidos y aunque el tenant consultado exista de verdad. Esto cubre
+    // el bug trivaluado de #611, que un company_id inexistente no ejercitaba.
     for (const { name } of ESTATUS_RPCS_ANON) {
       it(`authenticated (A) NO obtiene metadata de un tenant ajeno vía ${name}`, async () => {
-        const { data, error } = await userA.rpc(name, { p_company_id: FOREIGN_COMPANY_ID })
+        const { data, error } = await userA.rpc(name, { p_company_id: B.companyId })
         const negado = error !== null || (data ?? []).length === 0
         expect(negado, `${name} no debe exponer metadata de otro tenant`).toBe(true)
       })
@@ -628,7 +725,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard RPCs del self-service de inquilinos (20260822000000)', () => {
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
@@ -638,7 +735,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // unidad propia + renta aprobada) debe rechazar las escrituras sin efectos.
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ESCRITURA) {
       it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
-        const { data, error } = await userA.rpc(name, args)
+        const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
@@ -648,7 +745,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // filas (el predicado "unidad propia" filtra), nunca residentes de otro.
     it('authenticated (A) NO lista inquilinos de una unidad ajena', async () => {
       const { data, error } = await userA.rpc('portal_inquilinos_de_unidad', {
-        p_unidad_id: FOREIGN_COMPANY_ID,
+        p_unidad_id: B.unidadId,
       })
       const negado = error !== null || (data ?? []).length === 0
       expect(negado, 'portal_inquilinos_de_unidad no debe exponer residentes ajenos').toBe(true)
@@ -658,13 +755,13 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard RPCs de reservas del portal (20260822030000)', () => {
     for (const { name, args } of PORTAL_RESERVAS_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
 
       it(`authenticated (A) NO puede ejecutar ${name} sobre ids ajenos`, async () => {
-        const { data, error } = await userA.rpc(name, args)
+        const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre ids ajenos debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
@@ -674,7 +771,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   describe('guard RPCs de accesos familiares (20260825000000)', () => {
     for (const { name, args } of PORTAL_FAMILIARES_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
-        const { data, error } = await anon.rpc(name, args)
+        const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
@@ -686,7 +783,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       ['portal_registrar_familiar', 'portal_quitar_familiar', 'portal_baja_renta'].includes(r.name),
     )) {
       it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
-        const { data, error } = await userA.rpc(name, args)
+        const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
@@ -695,7 +792,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // portal_accesos_de_unidad es de lectura: con unidad ajena devuelve 0 filas.
     it('authenticated (A) NO lista accesos de una unidad ajena', async () => {
       const { data, error } = await userA.rpc('portal_accesos_de_unidad', {
-        p_unidad_id: FOREIGN_COMPANY_ID,
+        p_unidad_id: B.unidadId,
       })
       const negado = error !== null || (data ?? []).length === 0
       expect(negado, 'portal_accesos_de_unidad no debe exponer accesos ajenos').toBe(true)
@@ -703,9 +800,14 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   })
 })
 
-// Marcador visible cuando el harness se omite por falta de credenciales: deja
-// constancia en el reporte de que NO se verificó RLS server-side (vs. un archivo
-// sin tests, que pasaría inadvertido).
-describe.runIf(!ENABLED)('RLS harness (server-side)', () => {
-  it.skip('omitido — define RLS_SUPABASE_URL/ANON_KEY + RLS_USER_A/B_* (ver README)', () => {})
-})
+// NO hay bloque alternativo `describe.runIf(!ENABLED)`. Lo hubo, con un
+// `it.skip('omitido — …')` que pretendía dejar constancia de la omisión, y era
+// un fallo PERMANENTE: vitest incluye las pruebas skipped en el reporte JSON,
+// así que ese test aparecía SIEMPRE —también con credenciales— y el verificador
+// (`scripts/assert-rls-ejecutado.mjs`) lo leía como "harness omitido". El job no
+// podía ponerse verde ni con el sandbox montado.
+//
+// La constancia de la omisión la da ahora quien tiene la información:
+// `scripts/rls-preflight.mjs`, que decide antes de instalar nada y deja notice +
+// resumen en la corrida. Aquí no queda ningún `it.skip`, y el verificador trata
+// cualquier skip como cobertura perdida.

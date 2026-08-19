@@ -7,7 +7,8 @@ name: Coverage gate & E2E
 #   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
 # `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
 # `rls-harness` YA NO: exige las 6 variables RLS_* y falla si falta cualquiera,
-# salvo en PRs de forks, donde GitHub no expone secretos por diseño.
+# salvo cuando GitHub no entrega secretos por diseño (PR de fork o ejecución de
+# Dependabot), donde se omite explícitamente. Sin `pull_request_target`.
 
 on:
   pull_request:
@@ -245,66 +246,22 @@ jobs:
       #   2. Un verde por omisión es indistinguible de un verde por
       #      verificación. La rama protegida lo contaba como cobertura.
       #
-      # Ahora: se exigen las SEIS variables. Si falta cualquiera en un PR
-      # interno o en push a main, el job FALLA. La única omisión legítima es el
-      # PR de un fork, donde GitHub no expone secretos por diseño — y ahí se
-      # omite EXPLÍCITAMENTE y sin ejecutar nada del fork con credenciales.
+      # La decisión vive en `scripts/rls-preflight.mjs` (Node, no inline en el
+      # YAML) para poder PROBARLA: `scripts/__tests__/rls-preflight.test.mjs`
+      # cubre los cuatro contextos — fork, Dependabot, PR interno y push a main.
+      #
+      # Node 22 viene preinstalado en el runner, así que este paso corre ANTES
+      # de setup-node y de npm ci: sin secretos no se instala nada.
       - name: Preflight fail-closed de los secretos RLS_*
         id: preflight
         env:
           # `head.repo.fork` sólo existe en eventos pull_request; en push a main
           # queda vacío → se trata como interno → fail-closed. Correcto.
           ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
-        run: |
-          set -euo pipefail
-          faltan=()
-          for v in RLS_SUPABASE_URL RLS_SUPABASE_ANON_KEY \
-                   RLS_USER_A_EMAIL RLS_USER_A_PASSWORD \
-                   RLS_USER_B_EMAIL RLS_USER_B_PASSWORD; do
-            if [ -z "${!v:-}" ]; then faltan+=("$v"); fi
-          done
-
-          if [ ${#faltan[@]} -eq 0 ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Las 6 variables RLS_* están presentes: el harness se ejecuta."
-            exit 0
-          fi
-
-          # Los nombres de las variables NO son secretos; sus valores nunca se
-          # imprimen (sólo se comprueba si están vacíos).
-          if [ "${ES_FORK:-}" = "true" ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Harness RLS omitido (PR de fork)::GitHub no expone secretos a los forks por diseño. El aislamiento multi-tenant NO se verificó en este PR; se verificará al ejecutarse desde una rama del repositorio."
-            {
-              echo "### ⏭️ Harness RLS omitido — PR desde un fork"
-              echo ""
-              echo "GitHub **no expone secretos a los forks** por diseño, así que este job"
-              echo "no puede verificar el aislamiento multi-tenant y **no ejecuta código del"
-              echo "fork con credenciales**. Es la única omisión legítima."
-              echo ""
-              echo "Faltan: \`${faltan[*]}\`"
-              echo ""
-              echo "La verificación real corre en los PR internos y en cada push a \`main\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          echo "::error title=Harness RLS sin configurar::Faltan variables RLS_* (${faltan[*]}). El job falla en vez de quedar verde: un verde sin ejecutar se contabiliza como cobertura que no existe. Ver docs/ACTIVAR_HARNESS_RLS.md."
-          {
-            echo "### ❌ Harness RLS sin configurar — el job FALLA (fail-closed)"
-            echo ""
-            echo "El aislamiento multi-tenant **no se verificó** y este job ya no se queda"
-            echo "verde por ello. Faltan estas variables de repositorio:"
-            echo ""
-            for v in "${faltan[@]}"; do echo "- \`$v\`"; done
-            echo ""
-            echo "Se exigen **las seis**: con la URL puesta pero una credencial vacía el"
-            echo "harness se auto-saltaba y terminaba verde con **cero** pruebas."
-            echo ""
-            echo "Activación (crear sandbox, sembrarlo y pegar los secretos):"
-            echo "**\`docs/ACTIVAR_HARNESS_RLS.md\`** → \`scripts/seed-rls-sandbox.mjs\`."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+          # Dependabot no recibe los Actions secrets: se trata como el fork.
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/rls-preflight.mjs
 
       - uses: actions/setup-node@v7
         if: steps.preflight.outputs.run == 'true'
@@ -328,9 +285,12 @@ jobs:
 
       # Fail-closed de salida: pruebas > 0, sin fallos, sin el marcador "omitido"
       # y por encima del piso mínimo de aserciones.
-      - name: Verificar que se ejecutaron pruebas REALES (> 0, sin omisión)
+      # Fail-closed de salida: pruebas > 0, sin fallos, sin skips/todos
+      # inesperados y con TODOS los escenarios obligatorios de coverage.json
+      # presentes como pruebas pasadas. El piso numérico es la red secundaria.
+      - name: Verificar que el harness ejecutó los escenarios obligatorios
         if: steps.preflight.outputs.run == 'true'
-        run: node scripts/assert-rls-ejecutado.mjs rls-report.json 100
+        run: node scripts/assert-rls-ejecutado.mjs rls-report.json
 
       # El reporte sólo contiene nombres de prueba y recuentos (literales del
       # repo): ningún valor de secreto, ninguna URL de sandbox, ningún token.

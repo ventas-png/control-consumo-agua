@@ -26,17 +26,39 @@ te dice que el motor la aplique como creés.
 termina con **exit code 0 y cero pruebas ejecutadas**. Para GitHub Actions eso
 es un job verde. Por eso ahora hay dos guardas:
 
-- **Preflight fail-closed**: se exigen las **seis** variables. Con la URL puesta
-  pero una credencial vacía, el harness se auto-saltaba y terminaba verde con
-  cero pruebas — sin ni siquiera el warning. Ahora falta cualquiera y el job
-  falla.
+- **Preflight fail-closed** (`scripts/rls-preflight.mjs`): se exigen las **seis**
+  variables. Con la URL puesta pero una credencial vacía, el harness se
+  auto-saltaba y terminaba verde con cero pruebas — sin ni siquiera el warning.
+  Ahora falta cualquiera y el job falla.
 - **Verificación de salida** (`scripts/assert-rls-ejecutado.mjs`): lee el
-  reporte JSON de vitest y exige pruebas > 0, cero fallos, ausencia del marcador
-  `omitido` y un piso mínimo de aserciones.
+  reporte JSON de vitest y exige pruebas > 0, cero fallos, **cero skips o todos**
+  y que **todos los escenarios obligatorios** de `coverage.json` aparezcan como
+  pruebas pasadas.
 
-La única omisión legítima es un **PR desde un fork**: GitHub no expone secretos
-a los forks por diseño, así que ahí el job se omite **explícitamente** (notice +
-resumen) y **no ejecuta código del fork con credenciales**.
+Las **únicas** omisiones legítimas son los contextos en que GitHub no entrega
+los Actions secrets por diseño:
+
+| Contexto | Por qué |
+|---|---|
+| PR desde un **fork** | GitHub no expone secretos a los forks |
+| Ejecución de **Dependabot** | los Actions secrets no llegan a `dependabot[bot]`; sólo los Dependabot secrets, que este repo no usa |
+
+En ambos el job se omite **explícitamente** (notice + resumen), **sin ejecutar
+código ajeno con credenciales** y **sin recurrir a `pull_request_target`**, que
+sí las expondría al código del PR. El aislamiento se verifica igualmente en el
+push a `main` posterior al merge.
+
+La tabla de verdad del gate (fork · Dependabot · PR interno · push a main) tiene
+prueba contractual en `scripts/__tests__/rls-preflight.test.mjs`.
+
+### Por qué el verificador ya no busca un marcador de omisión
+
+La primera versión rechazaba el reporte si el nombre de alguna prueba contenía
+`omitido`. Era un **fallo permanente**: vitest incluye las pruebas *skipped* en
+el reporte JSON, así que el `it.skip('omitido — …')` del bloque alternativo
+aparecía **siempre**, también con credenciales. El job no podía ponerse verde ni
+con el sandbox montado. El bloque alternativo se eliminó del harness y la
+constancia de la omisión la da el preflight, que es quien tiene la información.
 
 ### 2. El verde por conjuntos vacíos
 
@@ -71,8 +93,9 @@ forma de declarar cobertura real es tenerla.
 
 ## Qué cubre exactamente
 
-**El harness declara 127 aserciones** cuando está habilitado (128 contando el
-marcador de omisión, que sólo existe en la rama sin credenciales).
+**El harness declara 125 aserciones.** Sin credenciales las 125 salen como
+*skipped* y el verificador lo detecta (cero pasadas); con credenciales deben
+pasar las 125, sin ninguna omitida.
 
 ### Tablas con aislamiento REAL demostrado (`noTriviales`)
 
@@ -114,6 +137,37 @@ seed— tablas de secretos deny-all, tablas sin policy de SELECT, el store de
 sesiones, el deny total para `anon` sobre 31 tablas de negocio, el aislamiento
 user-scoped, las escrituras negativas cross-tenant y los guards `anon` /
 `authenticated` sobre los RPCs sensibles (notificaciones, ERP, bóvedas, portal).
+
+### Escenarios obligatorios
+
+`coverage.json` declara diez bloques que **deben** aparecer como pruebas pasadas
+en el reporte. Un piso numérico no bastaba: se podía borrar un `describe` entero
+y seguir por encima del mínimo. Ahora borrar cualquiera de estos rompe el job
+aunque el total suba:
+
+`secretos-deny-all` · `anon-deny-negocio` · `tenant-no-trivial` ·
+`tenant-estructural` · `user-scoped` · `negative-write` · `rpc-notificaciones` ·
+`rpc-erp` · `rpc-bovedas` · `rpc-portal`
+
+### Las pruebas negativas apuntan a recursos que EXISTEN
+
+Las escrituras y los RPC de A contra "el tenant ajeno" usan el `company_id`,
+`project_id` y `unidad_id` **reales de B**, leídos entrando como B. Antes se
+usaba un UUID cero, y eso debilitaba todas las pruebas: un INSERT con
+`project_id` inexistente puede morir en la **foreign key** antes de que RLS se
+evalúe, así que el verde no demostraba que la policy funcionara. Con FKs
+válidas, el rechazo sólo puede venir de RLS. Lo mismo con los RPC: negar la
+metadata de una empresa que existe es una comprobación de autorización; negar la
+de un id inventado no prueba nada.
+
+### Las pruebas deny-all distinguen "denegado" de "roto"
+
+`expect(data ?? []).toHaveLength(0)` convertía **cualquier** error en «0 filas»:
+una tabla inexistente, un schema cache desactualizado, una migración sin aplicar
+o un fallo de red producían el mismo verde que una policy funcionando. Ahora
+sólo se acepta: **sin error y con cero filas**, o un error cuyo código esté en la
+lista blanca de denegación (`42501`, `PGRST116`). Cualquier otro código falla e
+informa cuál era.
 
 ---
 
@@ -158,11 +212,23 @@ Las claves salen de **Dashboard → Project Settings → API**.
 
 ```bash
 SEED_SUPABASE_URL="https://<ref>.supabase.co" \
+SEED_EXPECTED_REF="<ref>" \
 SEED_SERVICE_ROLE_KEY="<service_role del sandbox>" \
 SEED_ANON_KEY="<anon public del sandbox>" \
 SEED_CONFIRM=si \
 node scripts/seed-rls-sandbox.mjs
 ```
+
+Cuatro cerrojos de destino, todos obligatorios, porque este script usa la
+`service_role` (BYPASSRLS) y apuntarlo al proyecto equivocado no es un CI en
+rojo sino datos de un cliente contaminados:
+
+| Cerrojo | Qué impide |
+|---|---|
+| Dominio en la lista de `coverage.json` | sembrar contra un host que no es Supabase |
+| Ref de producción en lista negra | el accidente conocido |
+| `SEED_EXPECTED_REF` == ref de la URL | **cualquier otro** proyecto: hay que declarar de antemano el destino, así que un copiar-pegar de la URL equivocada no ejecuta nada |
+| `SEED_CONFIRM=si` | la ejecución distraída |
 
 `SEED_ANON_KEY` es **obligatoria**: es lo que permite al script entrar como cada
 usuario y demostrar el aislamiento. Antes era opcional, y sin ella el seed
@@ -195,8 +261,8 @@ Aun así, la señal positiva está en el resumen de la corrida:
 
 ```
 ✅ Harness RLS ejecutado (aislamiento multi-tenant verificado)
-- Pruebas ejecutadas: 127 (total 127, fallos 0)
-- Marcador de omisión "omitido": ausente
+- Pruebas pasadas: 125 (total 125, fallos 0, omitidas 0)
+- Escenarios obligatorios presentes: 10/10
 ```
 
 Y el artefacto `rls-report-<run_id>` guarda el reporte JSON. **No contiene
@@ -253,12 +319,9 @@ y usa nombres fijos. Para fixtures reproducibles:
 
 ### Fallar si se omiten escenarios críticos
 
-`scripts/assert-rls-ejecutado.mjs` ya exige un piso de aserciones para que un
-archivo recortado no pase por harness completo. El paso natural siguiente es
-hacerlo por **escenario** en vez de por recuento:
+**Hecho.** `coverage.json` declara los diez escenarios obligatorios y
+`scripts/assert-rls-ejecutado.mjs` falla si alguno no aparece como prueba pasada,
+aunque el total supere el piso. El piso numérico queda como red secundaria.
 
-- Declarar en `coverage.json` los nombres de los bloques obligatorios
-  (aislamiento no trivial, negative write, guards de RPC) y que el verificador
-  falle si alguno no aparece en el reporte, aunque el total supere el piso.
-- Aplicar el mismo patrón al job de E2E cuando se active: hoy su ausencia es un
-  warning, y un warning no bloquea nada.
+Pendiente: aplicar el mismo patrón al job de E2E cuando se active — hoy su
+ausencia es un warning, y un warning no bloquea nada. Va en el PR de E2E.
