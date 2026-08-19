@@ -1,5 +1,8 @@
 import { SecureImage } from '../../shared/SecureImage'
-import { diasParaVencer, ESTADOS, SUBTIPOS } from '../../../domain/condominios/recepcion'
+import { BUCKET_EVIDENCIAS } from '../../../domain/shared/buckets'
+import {
+  diasParaVencer, esPiezaSaliente, etiquetaEstadoResidente, SUBTIPOS,
+} from '../../../domain/condominios/recepcion'
 import { hoyLocalISO } from '../../../lib/format'
 import type { PiezaRecepcion } from '../../../types'
 
@@ -19,6 +22,13 @@ interface Props {
  * portal —`paquete_firmar_recepcion` está acotada a clase='paquete'
  * (20260829000000)— porque se entrega en administración con identificación de
  * por medio; un acuse a distancia no probaría nada.
+ *
+ * ENTRADAS Y SALIDAS NO SE CUENTAN IGUAL. Una pieza `direccion='saliente'` es
+ * algo que el residente MANDÓ, no algo que le espera: presentarla como
+ * "pendiente de retiro", contarla entre las que tiene que ir a recoger y
+ * mostrarle un "plazo de respuesta" es pedirle que vaya a buscar su propio
+ * envío. Aquí sale con su vocabulario ("En trámite de envío" / "Enviada") y sin
+ * ninguna de esas tres cosas.
  */
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
@@ -26,13 +36,6 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
   atendido:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   archivado: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
   devuelto:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
-}
-
-// El residente lee "Pendiente de retiro", no el estado interno del operador.
-const ESTADO_LABEL_RESIDENTE: Record<string, string> = {
-  pendiente: 'Pendiente de retiro',
-  atendido: 'Entregada',
-  devuelto: 'Devuelta al remitente',
 }
 
 function fechaLarga(iso?: string | null): string {
@@ -44,7 +47,9 @@ function fechaLarga(iso?: string | null): string {
 
 export function PortalCorrespondenciaTab({ correspondencia }: Props) {
   const hoy = hoyLocalISO()
-  const pendientes = correspondencia.filter(c => c.estado === 'pendiente')
+  // Solo las ENTRADAS pendientes son "por retirar". Las salidas pendientes
+  // están esperando al mensajero, no al residente.
+  const pendientes = correspondencia.filter(c => c.estado === 'pendiente' && !esPiezaSaliente(c))
 
   if (correspondencia.length === 0) {
     return (
@@ -69,8 +74,12 @@ export function PortalCorrespondenciaTab({ correspondencia }: Props) {
         {correspondencia.map(c => {
           const subtipo = SUBTIPOS.correspondencia[c.tipo] ?? SUBTIPOS.correspondencia.otro
           const estilo = ESTADO_STYLE[c.estado] ?? ESTADO_STYLE.pendiente
-          const etiqueta = ESTADO_LABEL_RESIDENTE[c.estado] ?? ESTADOS.correspondencia[c.estado] ?? c.estado
-          const dias = c.estado === 'pendiente' && c.fecha_limite ? diasParaVencer(c.fecha_limite, hoy) : null
+          const salida = esPiezaSaliente(c)
+          const etiqueta = etiquetaEstadoResidente(c)
+          // El plazo de respuesta solo aplica a lo que le llegó: una salida no
+          // le exige nada al residente.
+          const dias = !salida && c.estado === 'pendiente' && c.fecha_limite
+            ? diasParaVencer(c.fecha_limite, hoy) : null
           return (
             <div key={c.id} style={{
               background: 'var(--at-surface)',
@@ -89,8 +98,11 @@ export function PortalCorrespondenciaTab({ correspondencia }: Props) {
                   )}
                 </div>
                 <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
-                  Recibida el {fechaLarga(c.fecha_pieza ?? c.hora_recepcion)}
-                  {c.remitente && ` · De: ${c.remitente}`}
+                  {salida ? 'Registrada para envío el ' : 'Recibida el '}
+                  {fechaLarga(c.fecha_pieza ?? c.hora_recepcion)}
+                  {salida
+                    ? (c.destinatario ? ` · Para: ${c.destinatario}` : '')
+                    : (c.remitente ? ` · De: ${c.remitente}` : '')}
                 </div>
                 {/* El plazo es lo único que le exige algo al residente: se
                     muestra solo mientras la pieza siga sin retirarse. */}
@@ -107,15 +119,21 @@ export function PortalCorrespondenciaTab({ correspondencia }: Props) {
                 )}
                 {c.estado === 'atendido' && (
                   <div style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600, marginTop: '4px' }}>
-                    ✓ Entregada {c.hora_entrega ? `el ${fechaLarga(c.hora_entrega)}` : ''}
-                    {c.entregado_a_nombre ? ` a ${c.entregado_a_nombre}` : ''}
-                    {c.firma_path ? ' · con firma de acuse' : ''}
+                    {salida ? (
+                      <>✓ Enviada {c.hora_entrega ? `el ${fechaLarga(c.hora_entrega)}` : ''}</>
+                    ) : (
+                      <>
+                        ✓ Entregada {c.hora_entrega ? `el ${fechaLarga(c.hora_entrega)}` : ''}
+                        {c.entregado_a_nombre ? ` a ${c.entregado_a_nombre}` : ''}
+                        {c.firma_path ? ' · con firma de acuse' : ''}
+                      </>
+                    )}
                   </div>
                 )}
                 {c.fotos && c.fotos.length > 0 && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                     {c.fotos.map(f => (
-                      <SecureImage key={f} src={f} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+                      <SecureImage key={f} src={f} bucket={BUCKET_EVIDENCIAS} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
                     ))}
                   </div>
                 )}

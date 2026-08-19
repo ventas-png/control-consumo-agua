@@ -258,3 +258,74 @@ export function piezasEnRiesgo(
 export function estadosDe(clase: ClasePieza): EstadoPieza[] {
   return Object.keys(ESTADOS[clase]) as EstadoPieza[]
 }
+
+// ── Entrada vs salida ───────────────────────────────────────────────────────
+// `direccion` distingue lo que ENTRA al condominio de lo que SALE. La
+// diferencia no es cosmética: una salida no tiene a quién avisarle que "pase a
+// recogerla" ni le corre un plazo de respuesta al residente, y presentarla como
+// "pendiente de retiro" en el portal le pide al vecino que vaya a buscar algo
+// que él mismo mandó.
+
+/** Valores de `direccion` que significan que la pieza SALE del condominio. */
+export const DIRECCIONES_SALIENTES = ['saliente', 'saliente_tercero'] as const
+
+export function esPiezaSaliente(p: Pick<PiezaRecepcion, 'direccion'>): boolean {
+  return (DIRECCIONES_SALIENTES as readonly string[]).includes(p.direccion ?? '')
+}
+
+/**
+ * ¿Corresponde avisar al residente de esta pieza?
+ *
+ * Solo las ENTRADAS dirigidas a una unidad. Una salida no se avisa (el
+ * residente es el remitente, no el destinatario) y lo dirigido a la
+ * administración no tiene residente a quién avisar. El servidor impone lo mismo
+ * (notify-package): esto es la primera de las dos capas, no la única.
+ */
+export function piezaAvisable(
+  p: Pick<PiezaRecepcion, 'direccion' | 'unidad_id' | 'destinatario_tipo'>,
+): boolean {
+  return !esPiezaSaliente(p)
+    && !!p.unidad_id
+    && (p.destinatario_tipo ?? 'unidad') === 'unidad'
+}
+
+/** Estado con el vocabulario del residente, según entre o salga la pieza. */
+const ESTADO_RESIDENTE_ENTRADA: Record<string, string> = {
+  pendiente: 'Pendiente de retiro',
+  atendido:  'Entregada',
+  entregado: 'Entregado',
+  devuelto:  'Devuelta al remitente',
+  archivado: 'Archivada',
+}
+const ESTADO_RESIDENTE_SALIDA: Record<string, string> = {
+  pendiente: 'En trámite de envío',
+  atendido:  'Enviada',
+  entregado: 'Enviado',
+  devuelto:  'No se pudo enviar',
+  archivado: 'Archivada',
+}
+
+export function etiquetaEstadoResidente(
+  p: Pick<PiezaRecepcion, 'direccion' | 'estado' | 'clase'>,
+): string {
+  const tabla = esPiezaSaliente(p) ? ESTADO_RESIDENTE_SALIDA : ESTADO_RESIDENTE_ENTRADA
+  return tabla[p.estado] ?? ESTADOS[claseDePieza(p)][p.estado] ?? p.estado
+}
+
+// ── Acuse de recibo ─────────────────────────────────────────────────────────
+
+/** Nombre de quien recibe, normalizado: sin bordes ni espacios repetidos. */
+export function nombreAcuse(valor: string | null | undefined): string {
+  return (valor ?? '').trim().replace(/\s+/g, ' ')
+}
+
+/**
+ * ¿Sirve como acuse el nombre tecleado?
+ *
+ * La base solo exige que no esté vacío; la pantalla pide algo más porque es
+ * donde se puede corregir al operador. Tres caracteres descartan el "x" y el
+ * "." con los que se salta un campo obligatorio, sin estorbar a un "Ana".
+ */
+export function nombreAcuseValido(valor: string | null | undefined): boolean {
+  return nombreAcuse(valor).length >= 3
+}

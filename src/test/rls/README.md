@@ -89,14 +89,23 @@ con quien sí tiene el permiso y las limpia al terminar. Empieza afirmando las
 precondiciones (misma empresa, roles esperados, permisos efectivos disjuntos)
 para que ningún caso pueda pasar por aislamiento de tenant o por falta del rol.
 
-## Sin credenciales: el sandbox de Postgres
+## Sin credenciales: los sandboxes de Postgres
 
-`scripts/rls-recepcion-sandbox.sh` prueba **las mismas policies** contra un
-Postgres desechable, sin Supabase ni secretos: monta el andamiaje mínimo
-(`auth.uid`, `app_users`, los helpers de RBAC), **extrae las policies del propio
-archivo de migración** y ejecuta los escenarios como cada usuario. No sustituye
-al harness —no cubre GoTrue ni el resto del esquema— pero sí se ejecuta siempre
-y falla si alguien rompe la separación por clase.
+Dos runners prueban **las reglas reales** contra un Postgres desechable, sin
+Supabase ni secretos. Montan el andamiaje mínimo (`auth.uid`, `app_users`, los
+helpers de RBAC), aplican el SQL **tal como se va a desplegar** y ejecutan los
+escenarios como cada usuario. No sustituyen al harness —no cubren GoTrue ni el
+resto del esquema— pero sí se ejecutan siempre.
+
+| Runner | Qué prueba |
+|---|---|
+| `scripts/rls-recepcion-sandbox.sh` | Las policies de `paquetes_recibidos` por clase (**extrae** la sección 5 de `20260829000000`): quién ve, crea, reclasifica y borra correspondencia frente a paquetería. |
+| `scripts/rls-evidencias-sandbox.sh` | El bucket `recepcion-evidencias` y el acuse (**aplica la migración entera** `20260831000000`): dos residentes vecinos, la correspondencia a la administración, el reparto de DELETE, la ausencia de UPDATE, y la RPC `correspondencia_registrar_acuse` (nombre vacío, receptor distinto del destinatario, con y sin firma, doble ejecución). |
+
+El segundo cubre justo lo que el bucket viejo dejaba abierto: en
+`condominios-media` las cuatro policies autorizan por proyecto, así que
+cualquier residente del condominio podía leer, sustituir y borrar la firma de
+acuse de su vecino.
 
 En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
 `rls-harness`), que sólo se activa cuando los secretos del repo están presentes.

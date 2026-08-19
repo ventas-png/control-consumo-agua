@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import {
   createCondominioRowReturning,
@@ -8,6 +8,7 @@ import {
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { avisarConReintento } from '../avisoRecepcion'
+import { crearRegistrador } from '../../../domain/condominios/registroPieza'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -71,6 +72,7 @@ export function PaqueteriaTab({
   )
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const registrar = useRef(crearRegistrador()).current
   const [filtroEstado, setFiltroEstado] = useState<EstadoPaquete | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
   const [form, setForm] = useState({
@@ -107,27 +109,38 @@ export function PaqueteriaTab({
     if (!form.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese una descripción del paquete.' }); return }
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad destinataria.' }); return }
     setSaving(true)
-    const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
-      company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
-      // Motor único (20260829000000): la clase decide el vocabulario y el
-      // permiso RBAC de la fila. Explícita, no confiada al DEFAULT.
-      clase: 'paquete', destinatario_tipo: 'unidad',
-      direccion: 'entrante', tipo: form.tipo,
-      descripcion: form.descripcion.trim(),
-      remitente: form.remitente.trim() || null,
-      num_guia: form.num_guia.trim() || null,
-      empresa_mensajeria: form.empresa_mensajeria.trim() || null,
-      notas: form.notas.trim() || null,
-      fotos: fotos.length ? fotos : null,
-      estado: 'pendiente', recibido_por: userId,
-    })
-    setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    // El aviso puede fallar sin que el registro falle. La pantalla dice cuál de
-    // las dos cosas pasó, en vez de anunciar un aviso que quizá no salió.
-    if (data?.id) await avisarConReintento(data.id as string)
-    else notify({ variant: 'success', title: 'Paquete registrado', duration: 1600 })
-    resetForm(); onRefresh()
+    try {
+      // Mismo cerrojo que en correspondencia: `avisarConReintento` puede tardar
+      // segundos y hasta abrir un diálogo, y mientras tanto el formulario seguía
+      // en pantalla con Guardar habilitado. Ahora se cierra en cuanto el INSERT
+      // está confirmado, y el segundo clic no llega a insertar.
+      await registrar({
+        crear: async () => {
+          const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
+            company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
+            // Motor único (20260829000000): la clase decide el vocabulario y el
+            // permiso RBAC de la fila. Explícita, no confiada al DEFAULT.
+            clase: 'paquete', destinatario_tipo: 'unidad',
+            direccion: 'entrante', tipo: form.tipo,
+            descripcion: form.descripcion.trim(),
+            remitente: form.remitente.trim() || null,
+            num_guia: form.num_guia.trim() || null,
+            empresa_mensajeria: form.empresa_mensajeria.trim() || null,
+            notas: form.notas.trim() || null,
+            fotos: fotos.length ? fotos : null,
+            estado: 'pendiente', recibido_por: userId,
+          })
+          return { id: (data?.id as string | undefined) ?? null, error: error?.message ?? null }
+        },
+        cerrar: () => { resetForm(); onRefresh() },
+        // El aviso puede fallar sin que el registro falle. La pantalla dice cuál
+        // de las dos cosas pasó, en vez de anunciar un aviso que quizá no salió.
+        avisar: id => avisarConReintento(id),
+        onError: mensaje => notify({ variant: 'error', title: 'Error', text: mensaje }),
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function marcarEntregado(id: string) {

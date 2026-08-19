@@ -28,6 +28,9 @@ function canales(r: ResultadoAviso): string {
 function motivo(r: ResultadoAviso): string {
   if (r.estado === 'fallo') return r.error.message
   if (r.detalle.skipped === 'no_cliente') return 'la unidad no tiene un residente registrado'
+  // El servidor rechaza avisar de una salida aunque se le pida (notify-package);
+  // la pestaña ya no lo intenta, pero si algo lo intentara, esto lo explica.
+  if (r.detalle.skipped === 'pieza_saliente') return 'la pieza es una salida y no se avisa al residente'
   if (r.detalle.whatsapp === 'error') return 'los canales configurados fallaron'
   return 'el residente no tiene correo, teléfono ni usuario del portal'
 }

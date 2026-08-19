@@ -1,13 +1,20 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useState, type CSSProperties } from 'react'
-import { createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { uploadCondominiosMedia } from '../../../domain/shared/storage'
+import { useRef, useState, type CSSProperties } from 'react'
+import {
+  createCondominioRowReturning, registrarAcuseCorrespondencia, updateCondominioRow,
+} from '../../../domain/condominios/tabMutations'
+import { uploadMedia } from '../../../domain/shared/storage'
+import { BUCKET_EVIDENCIAS } from '../../../domain/shared/buckets'
 import { buildUploadPath } from '../../../lib/fileValidation'
 import { avisarConReintento } from '../avisoRecepcion'
-import { diasEnCustodia, diasParaVencer, SUBTIPOS } from '../../../domain/condominios/recepcion'
+import {
+  diasEnCustodia, diasParaVencer, esPiezaSaliente, nombreAcuse, nombreAcuseValido,
+  piezaAvisable, SUBTIPOS,
+} from '../../../domain/condominios/recepcion'
+import { crearRegistrador } from '../../../domain/condominios/registroPieza'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import type { CategoriaCorrespondencia, EstadoCorrespondencia, PiezaRecepcion, Unidad } from '../../../types'
-import { notify } from '../../shared/Dialog'
+import { confirm, notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -83,65 +90,89 @@ export function CorrespondenciaCondTab({
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'salida'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<'todos' | EstadoCorrespondencia>('todos')
   const [selected, setSelected] = useState<string | null>(null)
-  const [firmando, setFirmando] = useState<PiezaRecepcion | null>(null)
-  const [firmaNombre, setFirmaNombre] = useState('')
-  const [firmaSaving, setFirmaSaving] = useState(false)
+  // Acuse: una sola puerta para cerrar la custodia, con o sin firma.
+  const [acuse, setAcuse] = useState<PiezaRecepcion | null>(null)
+  const [acuseNombre, setAcuseNombre] = useState('')
+  const [acuseSaving, setAcuseSaving] = useState(false)
+  // El id se genera ANTES del INSERT porque las fotos se suben a
+  // `<proyecto>/<pieza>/…` mientras se llena el formulario, y las policies de
+  // `recepcion-evidencias` resuelven el permiso a partir de esa pieza. De
+  // regalo, si dos clics lograran colarse el segundo chocaría contra la PK.
+  const [piezaId, setPiezaId] = useState(() => crypto.randomUUID())
+  // Un registrador por formulario: su cerrojo vive fuera del ciclo de render,
+  // que es donde tiene que estar para frenar el segundo clic del mismo tick.
+  const registrar = useRef(crearRegistrador()).current
 
   const hoy = hoyLocalISO()
 
   function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
 
   function resetForm() {
-    setForm({ ...BLANK }); setFotos([]); setShowForm(false)
+    setForm({ ...BLANK }); setFotos([]); setShowForm(false); setPiezaId(crypto.randomUUID())
   }
 
   async function handleSave() {
     if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
-    setSaving(true)
-    const { data, error } = await createCondominioRowReturning(TABLA, {
-      company_id: companyId, project_id: proyectoId,
-      clase: 'correspondencia',
-      // Sin unidad, la pieza va dirigida a la administración del condominio
-      // (citaciones, facturas de proveedor): el motor lo exige explícito.
+    const destino: Pick<PiezaRecepcion, 'unidad_id' | 'destinatario_tipo' | 'direccion'> = {
       unidad_id: form.unidad_id || null,
       destinatario_tipo: form.unidad_id ? 'unidad' : 'administracion',
       direccion: form.direccion,
-      tipo: form.categoria,
-      descripcion: form.asunto.trim(),
-      remitente: form.remitente || null, destinatario: form.destinatario || null,
-      fecha_pieza: form.fecha, num_guia: form.numero_guia || null,
-      empresa_mensajeria: form.empresa_mensajeria.trim() || null,
-      prioridad: form.prioridad, notas: form.observaciones || null,
-      estado: 'pendiente',
-      fecha_limite: form.fecha_limite || null,
-      fotos: fotos.length ? fotos : null,
-      // Trazabilidad: quién recibió la pieza en recepción. Sin esto, una
-      // notificación legal no tiene cadena de custodia.
-      recibido_por: userId,
-    })
-    setSaving(false)
-    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
-    // Aviso al residente, igual que paquetería. Solo cuando la pieza va a una
-    // unidad: la dirigida a la administración no tiene a quién avisarle, y su
-    // plazo ya lo vigila la alerta del Panel General. El resultado real del
-    // aviso decide el mensaje; nunca se anuncia un aviso que no salió.
-    if (form.unidad_id && data?.id) {
-      await avisarConReintento(data.id as string)
-    } else {
-      notify({
-        variant: 'success', title: 'Correspondencia registrada', duration: 1600,
-        text: 'Dirigida a la administración.',
-      })
     }
-    resetForm(); onRefresh()
+    setSaving(true)
+    try {
+      await registrar({
+        crear: async () => {
+          const { data, error } = await createCondominioRowReturning(TABLA, {
+            id: piezaId,
+            company_id: companyId, project_id: proyectoId,
+            clase: 'correspondencia',
+            // Sin unidad, la pieza va dirigida a la administración del condominio
+            // (citaciones, facturas de proveedor): el motor lo exige explícito.
+            ...destino,
+            tipo: form.categoria,
+            descripcion: form.asunto.trim(),
+            remitente: form.remitente || null, destinatario: form.destinatario || null,
+            fecha_pieza: form.fecha, num_guia: form.numero_guia || null,
+            empresa_mensajeria: form.empresa_mensajeria.trim() || null,
+            prioridad: form.prioridad, notas: form.observaciones || null,
+            estado: 'pendiente',
+            fecha_limite: form.fecha_limite || null,
+            fotos: fotos.length ? fotos : null,
+            // Trazabilidad: quién recibió la pieza en recepción. Sin esto, una
+            // notificación legal no tiene cadena de custodia.
+            recibido_por: userId,
+          })
+          return { id: (data?.id as string | undefined) ?? null, error: error?.message ?? null }
+        },
+        // El formulario se cierra aquí, con el INSERT ya confirmado y ANTES de
+        // que empiece el aviso (que puede tardar y abrir diálogos).
+        cerrar: () => { resetForm(); onRefresh() },
+        // Solo se avisa lo que ENTRA para una unidad. Una salida la despacha el
+        // propio residente y lo dirigido a la administración no tiene a quién
+        // avisar; el servidor impone lo mismo (notify-package).
+        avisar: piezaAvisable(destino) ? id => avisarConReintento(id) : undefined,
+        onSinAviso: () => notify({
+          variant: 'success', title: 'Correspondencia registrada', duration: 1800,
+          text: destino.direccion === 'saliente'
+            ? 'Salida registrada. No se avisa al residente: la pieza sale del condominio.'
+            : 'Dirigida a la administración.',
+        }),
+        onError: mensaje => notify({ variant: 'error', title: 'Error', text: mensaje }),
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  /** Cierra la pieza dejando la marca de quién la sacó de custodia y cuándo. */
-  async function cambiarEstado(id: string, estado: EstadoCorrespondencia) {
+  /**
+   * Salidas de custodia que NO son entrega: devolver al remitente y archivar.
+   * La entrega tiene su propia puerta (`confirmarAcuse`) porque exige acuse.
+   */
+  async function cambiarEstado(id: string, estado: 'devuelto' | 'archivado') {
     const patch: Record<string, unknown> = { estado }
-    // 'atendido' y 'devuelto' son salidas de custodia y sellan quién y cuándo.
-    // 'archivado' no: archivar no es entregar ni devolver.
-    if (estado === 'atendido' || estado === 'devuelto') {
+    // Devolver sí saca la pieza de custodia y sella quién y cuándo; archivar
+    // no: archivar no es entregar ni devolver.
+    if (estado === 'devuelto') {
       patch.hora_entrega = new Date().toISOString()
       patch.entregado_por = userId
       patch.entregado_via = 'porteria'
@@ -151,25 +182,63 @@ export function CorrespondenciaCondTab({
     onRefresh()
   }
 
-  async function handleFirmaEntrega(file: File) {
-    if (!firmando) return
-    setFirmaSaving(true)
-    try {
-      const path = buildUploadPath(`${proyectoId}/correspondencia-firmas`, 'firma.png', 'png')
-      const { error: upErr } = await uploadCondominiosMedia(path, file, { contentType: 'image/png', upsert: false })
-      if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
-      const { error } = await updateCondominioRow(TABLA, firmando.id, {
-        estado: 'atendido', hora_entrega: new Date().toISOString(), entregado_por: userId,
-        firma_path: path, entregado_a_nombre: firmaNombre.trim() || null, entregado_via: 'porteria',
+  /**
+   * Cierra la custodia con acuse completo. Una sola ruta para las dos formas de
+   * entregar —con firma y sin ella—, porque las dos necesitan lo mismo: el
+   * NOMBRE REAL de quien recibe. Antes "Atender" no guardaba ninguno y la
+   * entrega firmada aceptaba el campo vacío precargado con el destinatario del
+   * sobre, que muchas veces no es quien baja a recogerla.
+   *
+   * La transición la hace la RPC `correspondencia_registrar_acuse`
+   * (20260831000000): valida clase, estado anterior, permiso y nombre en una
+   * sola transacción, así que un segundo clic no puede re-sellar la entrega.
+   */
+  async function confirmarAcuse(firma: File | null) {
+    if (!acuse) return
+    const nombre = nombreAcuse(acuseNombre)
+    if (!nombreAcuseValido(nombre)) {
+      return notify({
+        variant: 'warning', title: 'Falta el acuse',
+        text: 'Escriba el nombre completo de quien recibe la pieza.',
       })
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-      setFirmando(null); setFirmaNombre(''); onRefresh()
+    }
+
+    const { isConfirmed } = await confirm({
+      title: 'Confirmar entrega',
+      text: `Se cierra la custodia de "${acuse.descripcion}". Recibe: ${nombre}`
+        + (firma ? ', con firma.' : ', SIN firma.')
+        + ' Queda registrado con su nombre, la fecha y la hora.',
+      confirmText: 'Registrar entrega',
+      cancelText: 'Revisar',
+      icon: 'warning',
+    })
+    if (!isConfirmed) return
+
+    setAcuseSaving(true)
+    try {
+      let firmaPath: string | null = null
+      if (firma) {
+        // Bucket propio y ruta por pieza: la firma es prueba, no una foto más.
+        firmaPath = buildUploadPath(`${proyectoId}/${acuse.id}`, 'firma.png', 'png')
+        const { error: upErr } = await uploadMedia(BUCKET_EVIDENCIAS, firmaPath, firma, {
+          contentType: 'image/png', upsert: false,
+        })
+        if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
+      }
+      const { error } = await registrarAcuseCorrespondencia({ piezaId: acuse.id, nombre, firmaPath })
+      if (error) { notify({ variant: 'error', title: 'No se registró la entrega', text: error.message }); return }
+      setAcuse(null); setAcuseNombre('')
+      notify({
+        variant: 'success', title: 'Entrega registrada', duration: 2000,
+        text: `${nombre} recibió la pieza${firmaPath ? ' y firmó el acuse' : ''}.`,
+      })
+      onRefresh()
     } finally {
-      setFirmaSaving(false)
+      setAcuseSaving(false)
     }
   }
 
-  const esEntrada = (c: PiezaRecepcion) => c.direccion !== 'saliente' && c.direccion !== 'saliente_tercero'
+  const esEntrada = (c: PiezaRecepcion) => !esPiezaSaliente(c)
 
   const filtered = correspondencia
     .filter(c => filtroTipo === 'todos' || (filtroTipo === 'entrada') === esEntrada(c))
@@ -340,7 +409,11 @@ export function CorrespondenciaCondTab({
               <div style={{ fontSize: '10.5px', color: 'var(--at-ink-3)', marginTop: '3px' }}>Para notificaciones con plazo de respuesta.</div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <MultiImageUploader values={fotos} onChange={setFotos} folder="correspondencia" label="Fotos del documento / sobre" maxFiles={4} capture />
+              {/* Carpeta = el id de la pieza que se va a crear, dentro del
+                  bucket privado de evidencias: así la policy sabe de quién es
+                  la foto antes incluso de que la fila exista. */}
+              <MultiImageUploader values={fotos} onChange={setFotos} folder={piezaId} bucket={BUCKET_EVIDENCIAS}
+                label="Fotos del documento / sobre" maxFiles={4} capture />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
@@ -470,13 +543,12 @@ export function CorrespondenciaCondTab({
                 render: (c) => (
                   canEdit && c.estado === 'pendiente' ? (
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      <button onClick={(e) => { e.stopPropagation(); setFirmando(c); setFirmaNombre(c.destinatario ?? '') }}
+                      {/* Una sola puerta de entrega: el acuse (nombre de quien
+                          recibe) es obligatorio con firma y sin ella. */}
+                      <button onClick={(e) => { e.stopPropagation(); setAcuse(c); setAcuseNombre('') }}
+                        title="Registrar quién recibe la pieza, con o sin firma"
                         style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                        ✍ Entregar c/ firma
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
-                        style={{ padding: '2px 7px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-                        Atender
+                        ✍ Entregar
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'devuelto') }}
                         title="La pieza vuelve al remitente sin haberse entregado"
@@ -525,14 +597,14 @@ export function CorrespondenciaCondTab({
             {detail.fotos && detail.fotos.length > 0 && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                 {detail.fotos.map(f => (
-                  <SecureImage key={f} src={f} alt="" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+                  <SecureImage key={f} src={f} bucket={BUCKET_EVIDENCIAS} alt="" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
                 ))}
               </div>
             )}
             {detail.firma_path && (
               <div style={{ marginTop: '10px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Acuse de recibo</div>
-                <SecureImage src={detail.firma_path} alt="firma" style={{ width: '100%', height: '80px', objectFit: 'contain', background: '#fff', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
+                <SecureImage src={detail.firma_path} bucket={BUCKET_EVIDENCIAS} alt="firma" style={{ width: '100%', height: '80px', objectFit: 'contain', background: '#fff', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
               </div>
             )}
             {detail.notas && (
@@ -544,22 +616,50 @@ export function CorrespondenciaCondTab({
         )}
       </div>
 
-      {/* Entrega con firma — prueba de entrega de la pieza */}
-      {firmando && (
+      {/* Acuse de recibo — el único camino para dar por entregada una pieza */}
+      {acuse && (
         <EditModal
-          title={`Acuse de recibo · ${firmando.unidad_nombre ?? firmando.destinatario ?? ''}`}
-          onClose={() => { if (!firmaSaving) { setFirmando(null); setFirmaNombre('') } }}
+          title="Acuse de recibo"
+          onClose={() => { if (!acuseSaving) { setAcuse(null); setAcuseNombre('') } }}
           maxWidth="460px"
         >
           <div style={{ marginBottom: '14px' }}>
-            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{firmando.descripcion}</div>
+            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{acuse.descripcion}</div>
             <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
-              Capture la firma de quien recibe. Queda como prueba de entrega con fecha y hora.
+              Dirigida a {acuse.unidad_nombre ?? 'la administración'}
+              {acuse.destinatario ? ` · a nombre de ${acuse.destinatario}` : ''}
             </div>
           </div>
-          <label style={labelStyle}>Nombre de quien recibe</label>
-          <input value={firmaNombre} onChange={e => setFirmaNombre(e.target.value)} placeholder="Nombre y apellido" style={{ ...inputStyle, marginBottom: '14px' }} />
-          <SignaturePad onSave={handleFirmaEntrega} onCancel={() => { setFirmando(null); setFirmaNombre('') }} saving={firmaSaving} saveLabel="Confirmar entrega" />
+          <label style={labelStyle}>Nombre de quien recibe *</label>
+          <input
+            value={acuseNombre}
+            onChange={e => setAcuseNombre(e.target.value)}
+            placeholder="Nombre y apellido de quien se lleva la pieza"
+            autoFocus
+            style={{ ...inputStyle, marginBottom: '6px' }}
+          />
+          {/* El campo NO se precarga con el destinatario del sobre: quien baja
+              a recoger suele ser otra persona, y copiar el nombre impreso
+              convertía el acuse en una suposición. */}
+          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '14px' }}>
+            Escriba a quién se le entrega realmente, aunque no sea el destinatario del sobre.
+          </div>
+
+          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '8px' }}>
+            Capture la firma de quien recibe, o registre la entrega sin firma si no es posible.
+          </div>
+          <SignaturePad
+            onSave={file => confirmarAcuse(file)}
+            onCancel={() => { setAcuse(null); setAcuseNombre('') }}
+            saving={acuseSaving}
+            saveLabel="Confirmar entrega firmada"
+          />
+          <button
+            onClick={() => confirmarAcuse(null)}
+            disabled={acuseSaving}
+            style={{ marginTop: '10px', width: '100%', padding: '8px 12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: acuseSaving ? 'default' : 'pointer' }}>
+            {acuseSaving ? 'Registrando…' : 'Entregar sin firma'}
+          </button>
         </EditModal>
       )}
       </>

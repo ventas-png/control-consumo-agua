@@ -15,6 +15,8 @@ import {
   buildTwilioWaParams,
   digits,
   escapeHtml,
+  esPiezaSaliente,
+  motivoOmision,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
@@ -298,5 +300,94 @@ describe('notify-package/buildTwilioWaParams', () => {
       To: 'whatsapp:+50255551234',
       Body: '📦 Tienes Paquete en portería para A-3: Caja. Pasa a recogerlo cuando gustes.',
     })
+  })
+})
+
+// ── Entrada vs salida, impuesto en el SERVIDOR ──────────────────────────────
+// El hallazgo: una pieza `direccion='saliente'` podía notificarse. El aviso
+// entero está escrito desde "algo llegó para ti" — mandárselo al residente por
+// lo que él mismo despachó es decirle que vaya a buscar lo que acaba de
+// entregar. Que la pestaña ya no lo intente no basta: esta función es
+// invocable con cualquier id por cualquiera con un JWT de la empresa.
+describe('notify-package/esPiezaSaliente', () => {
+  it('reconoce las dos formas de salir', () => {
+    expect(esPiezaSaliente('saliente')).toBe(true)
+    expect(esPiezaSaliente('saliente_tercero')).toBe(true)
+  })
+
+  it('entrante, vacío o ausente son entradas', () => {
+    expect(esPiezaSaliente('entrante')).toBe(false)
+    expect(esPiezaSaliente(null)).toBe(false)
+    expect(esPiezaSaliente(undefined)).toBe(false)
+  })
+})
+
+describe('notify-package/motivoOmision', () => {
+  const entrante = {
+    direccion: 'entrante', notificado_at: null,
+    unidades: { nombre: 'A-3', cliente_id: 'cli-1' },
+  }
+
+  it('una ENTRADA a una unidad sí se avisa', () => {
+    expect(motivoOmision(entrante)).toBeNull()
+  })
+
+  it('una SALIDA no se avisa', () => {
+    expect(motivoOmision({ ...entrante, direccion: 'saliente' })).toBe('pieza_saliente')
+    expect(motivoOmision({ ...entrante, direccion: 'saliente_tercero' })).toBe('pieza_saliente')
+  })
+
+  it('la salida gana incluso sobre la idempotencia', () => {
+    // Importa el orden: una salida no debe ni sellarse como "ya notificada".
+    expect(motivoOmision({ ...entrante, direccion: 'saliente', notificado_at: '2026-08-19T00:00:00Z' }))
+      .toBe('pieza_saliente')
+  })
+
+  it('sigue respetando las dos razones que ya existían', () => {
+    expect(motivoOmision({ ...entrante, notificado_at: '2026-08-19T00:00:00Z' })).toBe('already_notified')
+    expect(motivoOmision({ ...entrante, unidades: null })).toBe('no_cliente')
+    expect(motivoOmision({ ...entrante, unidades: { nombre: 'Admin', cliente_id: null } })).toBe('no_cliente')
+  })
+})
+
+// Los tres canales se construyen igual para cualquier pieza: la decisión de
+// NO avisar una salida se toma antes, en motivoOmision. Estas pruebas fijan
+// las dos mitades de ese contrato — que la entrada produce los tres avisos con
+// su texto, y que la salida ni llega a construirlos.
+describe('notify-package/canales según la dirección', () => {
+  const varsEntrante = {
+    to_name: 'Ana', unidad: 'A-3', descripcion: 'Citación', tipo_label: 'Notificación legal',
+    clase: 'correspondencia', empresa_nombre: 'Torre Norte', app_url: 'https://app',
+  }
+  const envTwilio: WhatsAppEnv = {
+    provider: 'twilio', metaToken: '', metaPhoneId: '', metaTemplate: '',
+    twilioSid: 'AC', twilioToken: 't', twilioFrom: 'whatsapp:+1',
+  }
+
+  it('ENTRADA: correo, in-app y WhatsApp salen con el texto de "te llegó algo"', () => {
+    const pieza = { direccion: 'entrante', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBeNull()
+
+    const correo = renderPaquete(varsEntrante)
+    expect(correo.subject).toContain('disponible en administración')
+    expect(correo.html).toContain('Puedes retirarla en administración')
+
+    const [inApp] = buildPaqueteInAppRows(['u1'], varsEntrante, { companyId: 'c1', paqueteId: 'p1' })
+    expect(inApp.titulo).toBe('📬 Notificación legal en administración')
+    expect(inApp.seccion).toBe('correspondencia')
+
+    expect(resolveWhatsAppProvider(envTwilio, 'correspondencia')).toBe('twilio')
+    expect(buildTwilioWaParams('50255551234', varsEntrante, 'whatsapp:+1').Body)
+      .toBe('📬 Tienes Notificación legal en administración para A-3: Citación. Puedes retirarla presentando tu identificación.')
+  })
+
+  it('SALIDA: el handler corta antes, así que no se construye ningún canal', () => {
+    const pieza = { direccion: 'saliente', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBe('pieza_saliente')
+  })
+
+  it('SALIDA de paquetería (retiro por tercero): mismo corte', () => {
+    const pieza = { direccion: 'saliente_tercero', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBe('pieza_saliente')
   })
 })

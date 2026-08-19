@@ -83,6 +83,53 @@ export function copyPieza(clase: string): CopyPieza {
 }
 
 // ---------------------------------------------------------------------------
+// Entrada vs salida
+// ---------------------------------------------------------------------------
+
+/**
+ * Valores de `direccion` que significan que la pieza SALE del condominio:
+ * 'saliente' (correspondencia que la administración despacha) y
+ * 'saliente_tercero' (paquetería que un residente deja para que la recoja un
+ * mensajero).
+ */
+export const DIRECCIONES_SALIENTES = ['saliente', 'saliente_tercero']
+
+/**
+ * ¿Esta pieza sale del condominio?
+ *
+ * POR QUÉ IMPORTA AQUÍ: el aviso entero está escrito desde el punto de vista de
+ * algo que LLEGÓ — "tienes correspondencia en administración", "pasa a
+ * recogerlo". Mandárselo al residente por una pieza que él mismo despachó es
+ * decirle que vaya a buscar lo que acaba de entregar. La pestaña ya no lo
+ * intenta, pero esta función existe porque la UI no es el único cliente de la
+ * edge function: cualquiera con un JWT de la empresa puede invocarla con un id.
+ */
+export function esPiezaSaliente(direccion: string | null | undefined): boolean {
+  return DIRECCIONES_SALIENTES.includes(direccion ?? '')
+}
+
+/** Por qué esta pieza NO genera aviso, o null si sí lo genera. */
+export type MotivoOmision = 'pieza_saliente' | 'already_notified' | 'no_cliente'
+
+/**
+ * Decide, mirando la fila (con `unidades` embebido), si hay que avisar.
+ *
+ * Es la regla completa del servidor en una función pura, para que se pueda
+ * probar sin levantar el handler. El orden importa: una salida no se avisa
+ * NUNCA, ni siquiera para marcarla como ya notificada.
+ */
+export function motivoOmision(pkg: Row): MotivoOmision | null {
+  if (esPiezaSaliente(pkg.direccion as string | null)) return 'pieza_saliente'
+  if (pkg.notificado_at) return 'already_notified'
+  // Correspondencia dirigida a la administración (sin unidad): no hay residente
+  // a quién avisar. La administradora la ve en su pestaña y el Panel General le
+  // alerta de los plazos.
+  const unidad = pkg.unidades as Row | null
+  if (!unidad?.cliente_id) return 'no_cliente'
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Autorización por empresa (camino con JWT)
 // ---------------------------------------------------------------------------
 

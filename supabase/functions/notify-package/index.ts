@@ -13,6 +13,7 @@ import {
   buildPaqueteInAppRows,
   buildTwilioWaParams,
   copyPieza,
+  motivoOmision,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
@@ -257,8 +258,16 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Forbidden' }, 403)
     }
 
-    // Idempotencia: si ya se notificó, no reenviar.
-    if ((pkg as Row).notificado_at) return json({ success: true, skipped: 'already_notified' })
+    // Las tres razones para no avisar, resueltas en un solo sitio (logic.ts).
+    //
+    // La primera es nueva y es la que importa aquí: una SALIDA no se avisa. El
+    // aviso dice "tienes algo esperándote, pasa a recogerlo"; para una pieza
+    // que el propio residente despachó eso es falso. La pestaña ya no lo
+    // intenta, pero esta función es invocable con cualquier id por cualquiera
+    // con un JWT de la empresa, así que la regla vive también aquí — y aquí es
+    // donde no se puede saltar.
+    const omision = motivoOmision(pkg as Row)
+    if (omision) return json({ success: true, skipped: omision, delivered: false })
 
     const unidad = (pkg as Row).unidades as Row | null
     const clienteId: string | null = unidad?.cliente_id ?? null
@@ -271,11 +280,6 @@ Deno.serve(async (req: Request) => {
     const clase = ((pkg as Row).clase as string | null) ?? 'paquete'
     const copy = copyPieza(clase)
     const tipo = tipoLabel((pkg as Row).tipo as string, clase)
-
-    // Correspondencia dirigida a la administración (sin unidad) no tiene
-    // residente a quién avisar; la administradora la ve en su pestaña y el
-    // Panel General le alerta de los plazos.
-    if (!clienteId) return json({ success: true, skipped: 'no_cliente' })
 
     // Contacto del residente (clientes) + usuarios de app vinculados.
     const { data: cliente } = await admin

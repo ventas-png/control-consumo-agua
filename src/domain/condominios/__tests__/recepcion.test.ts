@@ -8,6 +8,7 @@ import {
   construirBandejaRecepcion, buscarEnRecepcion, duplicadosPorGuia,
   normalizarGuia, diasParaVencer, diasEnCustodia, piezasEnRiesgo, piezaAItemRecepcion,
   estadoLabel, subtipoDePieza, claseDePieza,
+  esPiezaSaliente, piezaAvisable, etiquetaEstadoResidente, nombreAcuse, nombreAcuseValido,
 } from '../recepcion'
 import type { PiezaRecepcion } from '../../../types'
 
@@ -260,5 +261,76 @@ describe('piezasEnRiesgo', () => {
     ], hoy)
     expect(vencidas).toHaveLength(0)
     expect(porVencer).toHaveLength(0)
+  })
+})
+
+// ── Entrada vs salida ───────────────────────────────────────────────────────
+// Lo que sale del condominio no se avisa ni se le presenta al residente como
+// algo que tiene que ir a recoger: él es quien lo mandó.
+describe('dirección de la pieza', () => {
+  it('reconoce las dos formas de salir', () => {
+    expect(esPiezaSaliente(correspondencia({ direccion: 'saliente' }))).toBe(true)
+    expect(esPiezaSaliente(paquete({ direccion: 'saliente_tercero' }))).toBe(true)
+    expect(esPiezaSaliente(paquete({ direccion: 'entrante' }))).toBe(false)
+  })
+
+  it('una fila sin direccion se trata como entrada (el default de la columna)', () => {
+    expect(esPiezaSaliente(paquete({ direccion: undefined as unknown as 'entrante' }))).toBe(false)
+  })
+
+  describe('piezaAvisable', () => {
+    it('avisa una ENTRADA dirigida a una unidad', () => {
+      expect(piezaAvisable({ direccion: 'entrante', unidad_id: 'u1', destinatario_tipo: 'unidad' })).toBe(true)
+    })
+
+    it('NO avisa una SALIDA, aunque tenga unidad', () => {
+      // El caso del hallazgo: la pieza tenía unidad_id y se avisaba igual.
+      expect(piezaAvisable({ direccion: 'saliente', unidad_id: 'u1', destinatario_tipo: 'unidad' })).toBe(false)
+      expect(piezaAvisable({ direccion: 'saliente_tercero', unidad_id: 'u1', destinatario_tipo: 'unidad' })).toBe(false)
+    })
+
+    it('NO avisa lo dirigido a la administración', () => {
+      expect(piezaAvisable({ direccion: 'entrante', unidad_id: null, destinatario_tipo: 'administracion' })).toBe(false)
+      // Ni aunque alguien deje una unidad colgada con destinatario 'administracion'.
+      expect(piezaAvisable({ direccion: 'entrante', unidad_id: 'u1', destinatario_tipo: 'administracion' })).toBe(false)
+    })
+  })
+
+  describe('etiquetaEstadoResidente', () => {
+    it('una ENTRADA pendiente está "Pendiente de retiro"', () => {
+      expect(etiquetaEstadoResidente(correspondencia({ estado: 'pendiente' }))).toBe('Pendiente de retiro')
+      expect(etiquetaEstadoResidente(correspondencia({ estado: 'atendido' }))).toBe('Entregada')
+    })
+
+    it('una SALIDA no está pendiente de retiro: está en trámite de envío', () => {
+      const salida = correspondencia({ direccion: 'saliente' })
+      expect(etiquetaEstadoResidente({ ...salida, estado: 'pendiente' })).toBe('En trámite de envío')
+      expect(etiquetaEstadoResidente({ ...salida, estado: 'atendido' })).toBe('Enviada')
+      expect(etiquetaEstadoResidente({ ...salida, estado: 'devuelto' })).toBe('No se pudo enviar')
+    })
+
+    it('un estado desconocido cae al vocabulario de la clase, no a un vacío', () => {
+      expect(etiquetaEstadoResidente(paquete({ estado: 'entregado' }))).toBe('Entregado')
+    })
+  })
+})
+
+// ── Acuse ───────────────────────────────────────────────────────────────────
+describe('nombre de quien recibe', () => {
+  it('normaliza bordes y espacios repetidos', () => {
+    expect(nombreAcuse('  Marta   Solís  ')).toBe('Marta Solís')
+    expect(nombreAcuse(null)).toBe('')
+  })
+
+  it('rechaza el vacío y los rellenos con los que se salta un campo obligatorio', () => {
+    expect(nombreAcuseValido('')).toBe(false)
+    expect(nombreAcuseValido('   ')).toBe(false)
+    expect(nombreAcuseValido('x')).toBe(false)
+    expect(nombreAcuseValido('.')).toBe(false)
+  })
+
+  it('acepta un nombre corto de verdad', () => {
+    expect(nombreAcuseValido('Ana')).toBe(true)
+    expect(nombreAcuseValido(' Ana ')).toBe(true)
   })
 })

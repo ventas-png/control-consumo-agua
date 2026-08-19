@@ -221,6 +221,39 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  rls-sandbox:
+    name: RLS sandbox de recepción (Postgres desechable)
+    runs-on: ubuntu-latest
+    # SIN gate por secretos, a diferencia de rls-harness: estos runners levantan
+    # su propio Postgres y aplican el SQL del repo, así que corren en CADA PR y
+    # fallan de verdad. Son la única verificación conductual de la RLS de
+    # recepción que no depende de tener un preview con usuarios sembrados.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Localizar el Postgres del runner
+        id: pg
+        run: |
+          set -euo pipefail
+          BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$BIN" ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql
+            BIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          fi
+          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
+          "$BIN/initdb" --version
+
+      - name: Motor de recepción — policies por clase
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-recepcion-sandbox.sh
+
+      - name: Evidencias y acuse — bucket privado y RPC de entrega
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-evidencias-sandbox.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
