@@ -258,7 +258,9 @@ jobs:
           # `head.repo.fork` sólo existe en eventos pull_request; en push a main
           # queda vacío → se trata como interno → fail-closed. Correcto.
           ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
-          # Dependabot no recibe los Actions secrets: se trata como el fork.
+          # Dependabot no recibe los Actions secrets: en `pull_request` se trata
+          # como el fork. En `push` NO se omite por el actor — ahí es donde se
+          # difirió la verificación y es lo que la hace comprobable.
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/rls-preflight.mjs
@@ -283,11 +285,10 @@ jobs:
             --reporter=default \
             --reporter=json --outputFile=rls-report.json
 
-      # Fail-closed de salida: pruebas > 0, sin fallos, sin el marcador "omitido"
-      # y por encima del piso mínimo de aserciones.
       # Fail-closed de salida: pruebas > 0, sin fallos, sin skips/todos
       # inesperados y con TODOS los escenarios obligatorios de coverage.json
-      # presentes como pruebas pasadas. El piso numérico es la red secundaria.
+      # presentes como pruebas pasadas, más CADA RPC crítica nombrada una a una.
+      # El piso numérico es la red secundaria, no el criterio principal.
       - name: Verificar que el harness ejecutó los escenarios obligatorios
         if: steps.preflight.outputs.run == 'true'
         run: node scripts/assert-rls-ejecutado.mjs rls-report.json

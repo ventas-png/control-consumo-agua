@@ -5,6 +5,14 @@
 > deliberado: antes quedaba **verde sin ejecutar nada**, y un verde por omisión
 > es indistinguible de un verde por verificación. Un job que miente sobre
 > cobertura es peor que uno rojo.
+>
+> **El harness todavía no se ha ejecutado contra un sandbox real.** Todo lo de
+> aquí abajo está implementado y probado en local (verificador, preflight,
+> contratos de esquema y de workflow), pero para poder afirmar que el
+> aislamiento quedó verificado faltan cuatro pasos que exigen infraestructura:
+> crear el sandbox, correr el seed contra él, cargar los seis secretos y obtener
+> un job RLS verde con más de cero pruebas. Hasta entonces, nada de este
+> documento debe citarse como «aislamiento demostrado en CI».
 
 ## Por qué importa más de lo que parece
 
@@ -31,25 +39,47 @@ es un job verde. Por eso ahora hay dos guardas:
   auto-saltaba y terminaba verde con cero pruebas — sin ni siquiera el warning.
   Ahora falta cualquiera y el job falla.
 - **Verificación de salida** (`scripts/assert-rls-ejecutado.mjs`): lee el
-  reporte JSON de vitest y exige pruebas > 0, cero fallos, **cero skips o todos**
-  y que **todos los escenarios obligatorios** de `coverage.json` aparezcan como
-  pruebas pasadas.
+  reporte JSON de vitest y exige pruebas > 0, cero fallos, **cero skips o todos**,
+  que **todos los escenarios obligatorios** de `coverage.json` aparezcan como
+  pruebas pasadas y que **cada una de las 23 RPC críticas** esté nombrada en
+  alguna de ellas.
 
 Las **únicas** omisiones legítimas son los contextos en que GitHub no entrega
-los Actions secrets por diseño:
+los Actions secrets por diseño, y **sólo en eventos `pull_request`**:
 
 | Contexto | Por qué |
 |---|---|
 | PR desde un **fork** | GitHub no expone secretos a los forks |
-| Ejecución de **Dependabot** | los Actions secrets no llegan a `dependabot[bot]`; sólo los Dependabot secrets, que este repo no usa |
+| PR de **Dependabot** | los Actions secrets no llegan a `dependabot[bot]`; sólo llegan los *Dependabot secrets*, que son un almacén aparte |
 
 En ambos el job se omite **explícitamente** (notice + resumen), **sin ejecutar
 código ajeno con credenciales** y **sin recurrir a `pull_request_target`**, que
-sí las expondría al código del PR. El aislamiento se verifica igualmente en el
-push a `main` posterior al merge.
+sí las expondría al código del PR.
 
-La tabla de verdad del gate (fork · Dependabot · PR interno · push a main) tiene
-prueba contractual en `scripts/__tests__/rls-preflight.test.mjs`.
+#### La garantía diferida de Dependabot, y por qué la anterior no servía
+
+La versión previa de este documento decía que «el aislamiento se verifica
+igualmente en el push a `main` posterior al merge». Eso **no era verificable**:
+si el merge lo hace el propio Dependabot (auto-merge), el push a `main` también
+corre con `github.actor = dependabot[bot]` y, con la regla anterior —que miraba
+sólo el actor—, se habría omitido **otra vez**. El bump nunca se habría
+verificado y nadie se habría enterado.
+
+La regla actual acota la omisión al evento `pull_request`. En `push` **no se
+omite jamás**, sea quien sea el actor: si faltan los secretos, el job falla y el
+hueco se ve. Eso convierte la omisión del PR en una garantía comprobable —«se
+difiere a main, y main no puede saltárselo»— en vez de una promesa.
+
+Si querés que un PR de Dependabot verifique RLS **en el propio PR**, declará las
+seis variables **también** como *Dependabot secrets*, con los mismos nombres:
+**Settings → Secrets and variables → Dependabot**. El preflight las ve igual y
+el job corre sin diferir nada.
+
+La tabla de verdad del gate (fork · PR de Dependabot · PR interno · push a main ·
+push a main iniciado por Dependabot · `workflow_dispatch`) tiene prueba
+contractual en `scripts/__tests__/rls-preflight.test.mjs`, junto con la
+comprobación de que el workflow conserva el disparador `push: branches: [main]`
+del que depende la garantía.
 
 ### Por qué el verificador ya no busca un marcador de omisión
 
@@ -138,21 +168,73 @@ sesiones, el deny total para `anon` sobre 31 tablas de negocio, el aislamiento
 user-scoped, las escrituras negativas cross-tenant y los guards `anon` /
 `authenticated` sobre los RPCs sensibles (notificaciones, ERP, bóvedas, portal).
 
-### Escenarios obligatorios
+### Escenarios obligatorios y RPC declaradas una a una
 
-`coverage.json` declara diez bloques que **deben** aparecer como pruebas pasadas
-en el reporte. Un piso numérico no bastaba: se podía borrar un `describe` entero
-y seguir por encima del mínimo. Ahora borrar cualquiera de estos rompe el job
-aunque el total suba:
+`coverage.json` declara **siete escenarios** que deben aparecer como pruebas
+pasadas. Un piso numérico no bastaba: se podía borrar un `describe` entero y
+seguir por encima del mínimo.
 
 `secretos-deny-all` · `anon-deny-negocio` · `tenant-no-trivial` ·
-`tenant-estructural` · `user-scoped` · `negative-write` · `rpc-notificaciones` ·
-`rpc-erp` · `rpc-bovedas` · `rpc-portal`
+`tenant-estructural` · `user-scoped` · `negative-write` ·
+`negative-write-verificado-como-b`
+
+Agrupar las RPC por dominio tenía el mismo defecto un nivel más abajo: bastaba
+con que sobreviviera el bloque «RPCs del ERP financiero» para dar por cubiertas
+sus seis RPC, así que borrar `banco_ajuste_conciliacion` no se notaba. Ahora
+`coverage.json` declara **las 23 RPC críticas una por una** y el verificador
+exige el nombre exacto de cada una en alguna prueba pasada.
+
+`scripts/__tests__/assert-rls-ejecutado.test.mjs` elimina de forma simulada
+**cada** escenario y **cada** RPC del reporte y comprueba que el verificador lo
+detecta: si alguien añade una al manifiesto y el verificador no la mira, esa
+prueba falla.
+
+### Qué demuestra el rechazo de cada RPC (y qué no)
+
+No todos los rechazos prueban lo mismo, y sumarlos como si fueran equivalentes
+es contar cobertura que no existe. Cada RPC declara su `garantia`, derivada del
+esquema y verificada por `src/test/rls/__tests__/esquemaFixtures.test.ts`:
+
+| Garantía | Cuántas | Qué demuestra |
+|---|---|---|
+| `tenant` | 11 | La RPC es ejecutable por `authenticated` y compara `get_my_company_id()` con la empresa del recurso. A es `company_owner`, así que pasa rol y permisos: **el rechazo sólo puede venir de la pertenencia**. Aislamiento demostrado |
+| `rol` | 8 | El guard exige ser cliente del portal (`current_user_role()` o `mis_unidades_propietario_ids()`) y los usuarios fixture son staff: rechaza **antes** de mirar la pertenencia. Demuestra que el guard existe y que la RPC no es anon-ejecutable. **No es aislamiento** |
+| `privilegio` | 4 | `REVOKE EXECUTE FROM PUBLIC` + `GRANT` sólo a `service_role`: ningún usuario del navegador puede invocarla, que es lo que se cerró en #378/#380. **Tampoco es aislamiento** |
+
+Las ocho de garantía `rol` son las `portal_*` del self-service del propietario.
+Para subirlas a `tenant` harían falta usuarios fixture con rol `cliente` y fila
+en `unidad_residentes`, lo que exige dos credenciales más allá de las seis
+`RLS_*` que define este PR. Queda declarado como limitación, no como cobertura.
+Las de reservas (`portal_reservar_amenidad`, `portal_cancelar_reserva`) sí llegan
+a `tenant` porque aceptan al staff del tenant y comparan `company_id`.
+
+### Los payloads negativos respetan los CHECK del esquema
+
+Un INSERT que viola un `CHECK` lo aborta Postgres **antes** de evaluar la
+policy: la prueba pasa sin haber probado aislamiento. Pasó de verdad con
+`documentos_fiscales.regimen = 'general'`, valor que el esquema no admite
+(`CHECK (regimen IN ('fel_gt','cfdi_mx'))`, migración `20260604220000`). Los
+fixtures viven ahora en `coverage.json` y
+`src/test/rls/__tests__/esquemaFixtures.test.ts` lee la migración y falla si
+alguno vuelve a salirse del dominio permitido.
+
+### Las escrituras cross-tenant se verifican COMO B
+
+«El INSERT devolvió `data` vacío para A» no prueba que la fila no se escribiera:
+RLS puede ocultarle a A una fila que sí quedó. Por eso cada escritura negativa
+lleva un marcador único por corrida (`RLS-NEG-<ts>-<rand>`) y, después del
+rechazo, **se consulta como B**. Si la fila apareció, se limpia como B y la
+prueba falla. El UPDATE cross-tenant apunta al `id` exacto de la cuota fixture
+de A —no a «todas las filas de la empresa»— y después se comprueba que esa fila
+sigue perteneciendo a A.
 
 ### Las pruebas negativas apuntan a recursos que EXISTEN
 
-Las escrituras y los RPC de A contra "el tenant ajeno" usan el `company_id`,
-`project_id` y `unidad_id` **reales de B**, leídos entrando como B. Antes se
+Las escrituras y los RPC de A contra "el tenant ajeno" usan recursos **reales de
+B**, leídos entrando como B: `company_id`, `project_id`, `unidad_id`, y también
+el asiento contable, el movimiento bancario, la amenidad, la reserva y el cliente
+que las RPC reciben por parámetro. Pasarles el `company_id` como si fuera un
+`asiento_id` hacía que la RPC fallara por «no existe», no por autorización. Antes se
 usaba un UUID cero, y eso debilitaba todas las pruebas: un INSERT con
 `project_id` inexistente puede morir en la **foreign key** antes de que RLS se
 evalúe, así que el verde no demostraba que la policy funcionara. Con FKs
@@ -238,6 +320,15 @@ El script sólo imprime **«Sandbox listo»** si autenticó a los dos usuarios y
 verificó las cuatro tablas no triviales en ambos sentidos. Si algo falla, sale
 con error y te dice qué mover a `estructurales`.
 
+Además de las tablas no triviales, el seed crea por tenant los recursos que las
+RPC reciben por parámetro —proyecto, unidad, asiento contable, cuenta bancaria y
+su movimiento, amenidad, reserva y cliente (con su fila en `company_clientes`,
+que es donde vive la pertenencia: `clientes` no tiene `company_id`)— e imprime
+sus ids. Esa traza es lo que separa «la RPC falló porque el id no existe» de «la
+RPC rechazó por pertenencia». Al final imprime también el desglose de las 23 RPC
+por garantía (`tenant` / `rol` / `privilegio`), para que el informe de la corrida
+no pueda sumarlas todas como aislamiento.
+
 Es idempotente y **regenera las contraseñas en cada corrida**: si las perdés,
 volvé a correrlo y usá las nuevas.
 
@@ -261,9 +352,16 @@ Aun así, la señal positiva está en el resumen de la corrida:
 
 ```
 ✅ Harness RLS ejecutado (aislamiento multi-tenant verificado)
-- Pruebas pasadas: 125 (total 125, fallos 0, omitidas 0)
-- Escenarios obligatorios presentes: 10/10
+- Pruebas pasadas: 127 (total 127, fallos 0, omitidas 0)
+- Escenarios obligatorios presentes: 7/7
+- RPC críticas verificadas una a una: 23/23
+- Piso mínimo exigido: 100
 ```
+
+El harness declara **127 pruebas** (comprobable sin sandbox con
+`npx vitest list src/test/rls/rlsHarness.test.ts`). Cualquier número por debajo
+del piso, cualquier `skip` inesperado o cualquier escenario o RPC ausente hace
+fallar el job.
 
 Y el artefacto `rls-report-<run_id>` guarda el reporte JSON. **No contiene
 secretos**: sólo nombres de prueba (literales del repo) y recuentos.
@@ -282,7 +380,17 @@ secretos**: sólo nombres de prueba (literales del repo) y recuentos.
 4. **El esquema del sandbox puede derivar del de producción** si alguien aplica
    migraciones en un sitio y no en el otro. `security-guard.yml` sigue siendo el
    que mira el catálogo real de prod.
-5. **Los E2E siguen siendo no-op verdes.** Se abordan en un PR aparte; su gate
+5. **Ocho de las 23 RPC críticas tienen garantía de ROL, no de tenant.** Son las
+   `portal_*` del self-service del propietario: con usuarios fixture staff, el
+   guard rechaza por rol antes de mirar la pertenencia. Se prueba que el guard
+   existe y que no son anon-ejecutables; **no** se prueba aislamiento entre
+   tenants. Otras cuatro (notificaciones) tienen garantía de PRIVILEGIO. El
+   desglose está en la tabla de garantías, más arriba.
+6. **No hay usuarios de portal sembrados.** El seed crea dos `company_owner`. Un
+   usuario con `app_users.role = 'cliente'` y fila en `unidad_residentes` por
+   tenant convertiría las ocho RPC de garantía `rol` en garantía `tenant`; exige
+   dos credenciales más y va en un PR aparte.
+7. **Los E2E siguen siendo no-op verdes.** Se abordan en un PR aparte; su gate
    por `E2E_BASE_URL` no se ha tocado aquí.
 
 ---
@@ -319,9 +427,12 @@ y usa nombres fijos. Para fixtures reproducibles:
 
 ### Fallar si se omiten escenarios críticos
 
-**Hecho.** `coverage.json` declara los diez escenarios obligatorios y
-`scripts/assert-rls-ejecutado.mjs` falla si alguno no aparece como prueba pasada,
-aunque el total supere el piso. El piso numérico queda como red secundaria.
+**Hecho.** `coverage.json` declara los siete escenarios obligatorios **y las 23
+RPC críticas una por una**; `scripts/assert-rls-ejecutado.mjs` falla si
+cualquiera no aparece como prueba pasada, aunque el total supere el piso. El
+piso numérico queda como red secundaria. Que el verificador realmente lo detecte
+está probado eliminando cada pieza de forma simulada
+(`scripts/__tests__/assert-rls-ejecutado.test.mjs`).
 
 Pendiente: aplicar el mismo patrón al job de E2E cuando se active — hoy su
 ausencia es un warning, y un warning no bloquea nada. Va en el PR de E2E.

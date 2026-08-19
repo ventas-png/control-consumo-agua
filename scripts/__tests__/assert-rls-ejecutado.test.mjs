@@ -13,7 +13,7 @@
 // rechaza es un skip REAL.
 // ════════════════════════════════════════════════════════════════════════════
 import { describe, expect, it } from 'vitest'
-import { evaluarReporte, pruebasDelReporte } from '../assert-rls-ejecutado.mjs'
+import { cargarCobertura as cargarCoberturaReal, evaluarReporte, pruebasDelReporte } from '../assert-rls-ejecutado.mjs'
 
 // Manifiesto mínimo, independiente del real: estas pruebas fijan el
 // COMPORTAMIENTO del verificador, no el contenido de coverage.json.
@@ -177,6 +177,92 @@ describe('evaluarReporte — el manifiesto REAL del repo', () => {
       expect(e.clave, 'cada escenario necesita clave').toBeTruthy()
       expect(e.patron, 'cada escenario necesita patrón').toBeTruthy()
       expect(e.porQue, 'cada escenario necesita justificación').toBeTruthy()
+    }
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Eliminación SIMULADA de cada escenario y de cada RPC obligatoria.
+// ════════════════════════════════════════════════════════════════════════════
+// La granularidad del verificador sólo vale si se demuestra una a una: que
+// "faltan escenarios" se detecte en el caso de ejemplo no prueba que se detecte
+// para TODOS. Aquí se sintetiza un reporte que cubre el manifiesto REAL del
+// repo y se le quita, de uno en uno, cada escenario y cada RPC; en cada
+// iteración el verificador debe pasar de ok a NO ok señalando exactamente lo
+// que se borró. Así, si alguien añade un escenario o una RPC al manifiesto y el
+// verificador no lo comprueba, esta prueba lo delata.
+const REAL = cargarCoberturaReal()
+
+/** Reporte sintético que cubre TODO el manifiesto real, con relleno hasta el piso. */
+function reporteCompletoReal() {
+  const pruebas = [
+    ...REAL.escenariosObligatorios.map((e) => ['passed', `RLS harness ${e.patron} — caso sintético`]),
+    ...REAL.rpcsObligatorias.map((r) => ['passed', `RLS harness guard RPC ${r.nombre}: rechazada para el tenant ajeno`]),
+  ]
+  // Relleno neutro: el piso mínimo no debe ser el motivo del fallo en estas
+  // pruebas — el motivo tiene que ser exclusivamente la pieza eliminada.
+  while (pruebas.length < REAL.minimoPruebas + 10) {
+    pruebas.push(['passed', `RLS harness relleno neutro ${pruebas.length}`])
+  }
+  return reporte(pruebas)
+}
+
+/** Quita del reporte toda prueba cuyo nombre contenga `texto`. */
+function sinPruebasQueContengan(rep, texto) {
+  const quedan = rep.testResults[0].assertionResults
+    .filter((a) => !a.fullName.includes(texto))
+    .map((a) => [a.status, a.fullName])
+  return reporte(quedan)
+}
+
+describe('evaluarReporte — el manifiesto real se verifica pieza por pieza', () => {
+  it('el reporte sintético completo es aceptado (control del experimento)', () => {
+    const v = evaluarReporte(reporteCompletoReal(), REAL)
+    expect(v.errores).toEqual([])
+    expect(v.ok).toBe(true)
+    expect(v.resumen.escenariosAusentes).toEqual([])
+    expect(v.resumen.rpcsAusentes).toEqual([])
+  })
+
+  it.each(REAL.escenariosObligatorios.map((e) => [e.clave, e.patron]))(
+    'detecta la desaparición del escenario «%s»',
+    (clave, patron) => {
+      const v = evaluarReporte(sinPruebasQueContengan(reporteCompletoReal(), patron), REAL)
+      expect(v.ok, `borrar «${patron}» dejó verde al verificador`).toBe(false)
+      expect(v.resumen.escenariosAusentes).toContain(clave)
+      expect(v.errores.join(' ')).toContain(patron)
+    },
+  )
+
+  it.each(REAL.rpcsObligatorias.map((r) => [r.nombre, r.dominio]))(
+    'detecta la desaparición de la RPC %s (dominio %s)',
+    (nombre) => {
+      const v = evaluarReporte(sinPruebasQueContengan(reporteCompletoReal(), nombre), REAL)
+      expect(v.ok, `borrar la RPC ${nombre} dejó verde al verificador`).toBe(false)
+      expect(v.resumen.rpcsAusentes).toContain(nombre)
+      expect(v.errores.join(' ')).toContain(nombre)
+    },
+  )
+
+  it('borrar una RPC NO se compensa con que sobreviva el resto de su dominio', () => {
+    // Es la regresión concreta: antes bastaba con que el bloque del dominio
+    // ("RPCs del ERP financiero") existiera para dar por cubiertas sus seis
+    // RPC. Aquí se borra una sola y el resto del dominio sigue presente.
+    const objetivo = REAL.rpcsObligatorias.find((r) => r.nombre === 'banco_ajuste_conciliacion')
+    expect(objetivo, 'banco_ajuste_conciliacion debe seguir declarada').toBeTruthy()
+    const v = evaluarReporte(sinPruebasQueContengan(reporteCompletoReal(), objetivo.nombre), REAL)
+    const hermanas = REAL.rpcsObligatorias.filter((r) => r.dominio === objetivo.dominio)
+    expect(hermanas.length).toBeGreaterThan(1)
+    expect(v.resumen.rpcsAusentes).toEqual([objetivo.nombre])
+    expect(v.ok).toBe(false)
+  })
+
+  it('cada RPC declarada trae dominio y justificación, y no hay duplicados', () => {
+    const nombres = REAL.rpcsObligatorias.map((r) => r.nombre)
+    expect(new Set(nombres).size, 'hay RPC duplicadas en coverage.json').toBe(nombres.length)
+    for (const r of REAL.rpcsObligatorias) {
+      expect(r.dominio, `${r.nombre} sin dominio`).toBeTruthy()
+      expect(r.porQue, `${r.nombre} sin justificación`).toBeTruthy()
     }
   })
 })

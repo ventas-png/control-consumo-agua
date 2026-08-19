@@ -2,12 +2,10 @@
   "_comentario": [
     "Manifiesto del harness RLS — FUENTE ÚNICA DE VERDAD.",
     "Lo consumen tres piezas que tienen que estar de acuerdo o el harness miente:",
-    "  scripts/seed-rls-sandbox.mjs     — siembra y VERIFICA las tablas de 'noTriviales'.",
-    "  src/test/rls/rlsHarness.test.ts  — exige conjuntos NO VACÍOS en esas mismas tablas.",
-    "  scripts/assert-rls-ejecutado.mjs — exige que TODOS los 'escenariosObligatorios'",
-    "                                     aparezcan como pruebas PASADAS en el reporte.",
-    "Mover una tabla a 'noTriviales' sin sembrarla rompe el seed y rompe el harness.",
-    "Borrar un describe obligatorio rompe el verificador aunque el total supere el mínimo."
+    "  scripts/seed-rls-sandbox.mjs     — siembra y VERIFICA lo declarado aquí.",
+    "  src/test/rls/rlsHarness.test.ts  — lee los fixtures y exige no-vacío.",
+    "  scripts/assert-rls-ejecutado.mjs — exige que TODOS los escenarios y TODAS",
+    "                                     las RPC obligatorias aparezcan pasadas."
   ],
   "noTriviales": [
     "proveedores",
@@ -30,21 +28,43 @@
   "motivoEstructural": {
     "notifications_outbox": "la llena el orquestador, no un INSERT directo",
     "user_invitations": "exige el flujo de invitación por correo",
-    "conta_asientos": "publicar exige la RPC y el folio correlativo",
+    "conta_asientos": "el seed crea un borrador para las RPC, pero no se declara aislamiento de la tabla",
     "facturas_proveedor": "exige orden de compra y recepción",
     "presupuestos": "exige partidas y ejercicio abierto",
-    "cuentas_bancarias": "exige catálogo contable enlazado",
-    "banco_movimientos": "exige cuenta bancaria e importación",
-    "unidad_residentes": "exige portal activo y cliente residente",
+    "cuentas_bancarias": "el seed crea una para las RPC de banco, sin declarar aislamiento de la tabla",
+    "banco_movimientos": "ídem: fixture para las RPC, no cobertura de aislamiento",
+    "unidad_residentes": "exige portal activo y usuario fixture con rol cliente (ver limitaciones)",
     "company_email_configs": "exige OAuth de correo por tenant",
     "fuentes_agua": "exige el módulo de agua configurado"
   },
-
+  "_fixtures": [
+    "Marcadores DETERMINISTAS que el seed escribe y el harness busca. Son el",
+    "canal por el que el seed 'entrega' los ids: no hay paso de parámetros entre",
+    "una ejecución local y un job de CI, así que la identidad viaja por la BD.",
+    "regimenDocumento respeta el CHECK de documentos_fiscales:",
+    "  CHECK (regimen IN ('fel_gt','cfdi_mx'))  — 20260604220000, línea 155.",
+    "Un valor fuera de esa lista hace fallar el INSERT por CHECK, no por RLS, y",
+    "convertiría la prueba negativa en un falso positivo."
+  ],
+  "fixtures": {
+    "periodoCuota": "2099-01",
+    "conceptoCuota": "Cuota sandbox",
+    "codigoCuenta": "1000",
+    "nombreProveedor": "Proveedor sandbox",
+    "serieDocumento": "SANDBOX",
+    "regimenDocumento": "fel_gt",
+    "tipoDocumento": "factura",
+    "conceptoAsiento": "Asiento sandbox",
+    "nombreCuentaBancaria": "Banco sandbox",
+    "descripcionMovimiento": "Movimiento sandbox",
+    "nombreAmenidad": "Amenidad sandbox",
+    "codigoCliente": "CLI-SANDBOX",
+    "fechaReserva": "2099-06-01"
+  },
   "_escenarios": [
     "Bloques del harness que DEBEN aparecer como pruebas pasadas en el reporte.",
     "Un piso numérico no basta: se puede borrar un describe entero y seguir por",
-    "encima del mínimo. `patron` se busca como subcadena del nombre completo de",
-    "la prueba (`fullName` del reporte JSON de vitest)."
+    "encima del mínimo. `patron` se busca como subcadena del `fullName`."
   ],
   "escenariosObligatorios": [
     {
@@ -60,7 +80,7 @@
     {
       "clave": "tenant-no-trivial",
       "patron": "cobertura NO TRIVIAL",
-      "porQue": "es la única comparación de aislamiento con datos reales de A y de B"
+      "porQue": "única comparación de aislamiento con datos reales de A y de B"
     },
     {
       "clave": "tenant-estructural",
@@ -75,35 +95,190 @@
     {
       "clave": "negative-write",
       "patron": "negative write",
-      "porQue": "el WITH CHECK de RLS debe rechazar escrituras hacia el tenant ajeno"
+      "porQue": "el WITH CHECK debe rechazar escrituras hacia el tenant ajeno"
     },
     {
-      "clave": "rpc-notificaciones",
-      "patron": "RPCs sensibles de notificaciones",
-      "porQue": "regresa-guarda de #378/#380 (RPCs SECURITY DEFINER anon-ejecutables)"
-    },
-    {
-      "clave": "rpc-erp",
-      "patron": "RPCs del ERP financiero",
-      "porQue": "el camino del dinero es lo más sensible al cross-tenant"
-    },
-    {
-      "clave": "rpc-bovedas",
-      "patron": "RPCs de estatus de bóvedas",
-      "porQue": "regresa-guarda del fail-open trivaluado de #611"
-    },
-    {
-      "clave": "rpc-portal",
-      "patron": "self-service de inquilinos",
-      "porQue": "escrituras del portal sobre unidades ajenas deben ser rechazadas"
+      "clave": "negative-write-verificado-como-b",
+      "patron": "verificado COMO B",
+      "porQue": "un data vacío para A no prueba que la fila no se escribiera; hay que mirarlo desde B"
     }
   ],
-
+  "_rpcs": [
+    "RPCs críticas, declaradas UNA A UNA. Antes bastaba con que sobreviviera un",
+    "bloque del dominio ('RPCs del ERP financiero') para dar por cubierto todo el",
+    "dominio: borrar una RPC concreta pasaba inadvertido. Ahora el verificador",
+    "exige el nombre exacto de cada una en alguna prueba pasada."
+  ],
+  "_garantias": [
+    "Qué demuestra REALMENTE la prueba de cada RPC. La distinción no es cosmética:",
+    "llamar \"aislamiento verificado\" a un rechazo que ocurrió por el privilegio de",
+    "ejecución o por el rol del llamante es contar cobertura que no existe. Cada",
+    "valor se deriva del esquema y lo verifica",
+    "src/test/rls/__tests__/esquemaFixtures.test.ts:",
+    "  tenant     — la RPC es ejecutable por authenticated y su guard compara",
+    "               get_my_company_id() con la empresa del recurso. El usuario A es",
+    "               company_owner, así que pasa rol y permisos: el rechazo sólo",
+    "               puede venir de la PERTENENCIA. Aislamiento demostrado.",
+    "  rol        — ejecutable por authenticated, pero el guard exige ser cliente",
+    "               del portal (current_user_role() o mis_unidades_*_ids()). Los",
+    "               usuarios fixture son staff, así que el rechazo ocurre ahí y NO",
+    "               llega a evaluarse la pertenencia. Demuestra que el guard existe",
+    "               y que la RPC no es anon-ejecutable; NO demuestra aislamiento.",
+    "  privilegio — EXECUTE revocado de PUBLIC y concedido sólo a service_role: no",
+    "               es invocable por ningún usuario del navegador. Demuestra el",
+    "               cierre de #378/#380; tampoco es aislamiento entre tenants."
+  ],
+  "motivoRpcRol": "Los usuarios fixture A y B son STAFF (app_users.role = company_owner), no clientes del portal. Las RPC de garantía «rol» abren exigiendo cliente del portal —por current_user_role() o por el filtro mis_unidades_propietario_ids()/mis_unidad_roles()—, así que rechazan a A antes de mirar la pertenencia de la unidad. Para convertirlas en garantía de tenant harían falta usuarios fixture con rol cliente y fila en unidad_residentes, lo que exige dos credenciales más allá de las seis RLS_* que define este PR: queda declarado como limitación, no como cobertura.",
+  "rpcsObligatorias": [
+    {
+      "nombre": "enqueue_notification",
+      "dominio": "notificaciones",
+      "porQue": "#378/#380 — quedó anon-ejecutable y encolaba a cualquier tenant",
+      "garantia": "privilegio"
+    },
+    {
+      "nombre": "claim_notifications_batch",
+      "dominio": "notificaciones",
+      "porQue": "#378/#380 — permitía drenar la cola ajena",
+      "garantia": "privilegio"
+    },
+    {
+      "nombre": "mark_notification_result",
+      "dominio": "notificaciones",
+      "porQue": "#378/#380 — permitía marcar entregas ajenas",
+      "garantia": "privilegio"
+    },
+    {
+      "nombre": "run_notifications_dispatcher",
+      "dominio": "notificaciones",
+      "porQue": "#378/#380 — disparaba el orquestador completo",
+      "garantia": "privilegio"
+    },
+    {
+      "nombre": "conta_publicar_asiento",
+      "dominio": "erp",
+      "porQue": "publicar una póliza ajena altera los estados financieros de otro tenant",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "conta_anular_asiento",
+      "dominio": "erp",
+      "porQue": "anular una póliza ajena destruye trazabilidad contable",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "conta_cierre_anual",
+      "dominio": "erp",
+      "porQue": "cerrar el ejercicio de otro tenant bloquea su contabilidad",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "banco_conciliar_movimiento",
+      "dominio": "erp",
+      "porQue": "conciliar movimientos ajenos falsea el efectivo de otro tenant",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "banco_desconciliar_movimiento",
+      "dominio": "erp",
+      "porQue": "ídem, en sentido inverso",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "banco_ajuste_conciliacion",
+      "dominio": "erp",
+      "porQue": "ajustes sobre cuentas ajenas",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "whatsapp_estatus",
+      "dominio": "bovedas",
+      "porQue": "#611 — el fail-open trivaluado exponía metadata de cualquier tenant",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "payfac_estatus",
+      "dominio": "bovedas",
+      "porQue": "#611 — mismo patrón sobre la bóveda de pagos",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "fiscal_pac_estatus",
+      "dominio": "bovedas",
+      "porQue": "#611 — mismo patrón sobre la bóveda del PAC",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "portal_mis_unidades",
+      "dominio": "inquilinos",
+      "porQue": "listar unidades ajenas revela el padrón de otro condominio",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_inquilinos_de_unidad",
+      "dominio": "inquilinos",
+      "porQue": "expone datos personales de residentes ajenos",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_registrar_inquilino",
+      "dominio": "inquilinos",
+      "porQue": "da acceso al portal de una unidad ajena",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_quitar_inquilino",
+      "dominio": "inquilinos",
+      "porQue": "revoca el acceso de un residente ajeno",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_reservar_amenidad",
+      "dominio": "reservas",
+      "porQue": "reservar sobre una amenidad ajena y cargar a una unidad ajena",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "portal_cancelar_reserva",
+      "dominio": "reservas",
+      "porQue": "cancelar la reserva de otro residente",
+      "garantia": "tenant"
+    },
+    {
+      "nombre": "portal_registrar_familiar",
+      "dominio": "familiares",
+      "porQue": "alta de acceso familiar en unidad ajena",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_quitar_familiar",
+      "dominio": "familiares",
+      "porQue": "baja de acceso familiar ajeno",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_accesos_de_unidad",
+      "dominio": "familiares",
+      "porQue": "lista los accesos de una unidad ajena",
+      "garantia": "rol"
+    },
+    {
+      "nombre": "portal_baja_renta",
+      "dominio": "baja-renta",
+      "porQue": "20260827000000 — dar de baja la autorización de renta de una unidad ajena revoca accesos de residentes de otro tenant",
+      "garantia": "rol"
+    }
+  ],
   "_sandbox": [
-    "Piso mínimo de pruebas ejecutadas y dominios admitidos para el seed.",
-    "`minimoPruebas` es una red secundaria: el gate real son los escenarios."
+    "Piso mínimo de pruebas y dominios admitidos para el seed.",
+    "`minimoPruebas` es la red secundaria: los gates reales son los escenarios y",
+    "las RPC declaradas una a una."
   ],
   "minimoPruebas": 100,
-  "dominiosSandboxPermitidos": ["supabase.co", "supabase.in"],
-  "refProduccionProhibido": "nnsqmeigtgewatameexo"
+  "dominiosSandboxPermitidos": [
+    "supabase.co",
+    "supabase.in"
+  ],
+  "refProduccionProhibido": "nnsqmeigtgewatameexo",
+  "motivoRpcPrivilegio": "REVOKE EXECUTE FROM PUBLIC + GRANT sólo a service_role: ningún usuario autenticado del navegador puede invocarlas, que es exactamente lo que se cerró en #378/#380. El rechazo llega del privilegio de ejecución, no de una comparación de tenant."
 }

@@ -55,6 +55,7 @@ const COBERTURA = JSON.parse(
   readFileSync(join(AQUI, '..', 'src', 'test', 'rls', 'coverage.json'), 'utf8'),
 )
 const NO_TRIVIALES = COBERTURA.noTriviales
+const FIX = COBERTURA.fixtures
 
 // ── Salvaguardas ────────────────────────────────────────────────────────────
 
@@ -178,13 +179,21 @@ async function upsertAppUser(admin, userId, companyId, nombre) {
 }
 
 /**
- * Siembra TODAS las tablas declaradas como cobertura no trivial.
+ * Siembra las tablas de cobertura no trivial MÁS los recursos reales que el
+ * harness necesita para sus pruebas negativas.
  *
- * `proveedores` y `conta_cuentas` sólo necesitan company_id. `cuotas_condominio`
- * exige proyecto (y se le da unidad, porque el harness lee de ahí los recursos
- * reales del tenant B) y `documentos_fiscales` exige régimen: por eso el seed
- * crea antes un proyecto y una unidad por empresa. Esa dependencia es la razón
- * por la que la versión anterior las dejaba fuera y su disjunción era trivial.
+ * POR QUÉ HACEN FALTA LOS RECURSOS "EXTRA"
+ * Las RPC del ERP y del portal reciben ids (asiento, movimiento bancario,
+ * amenidad, reserva, cliente). Pasarles el company_id como si fuera un
+ * asiento_id hacía que la RPC fallara por "no existe", no por autorización: el
+ * rechazo era real pero no probaba aislamiento. Aquí se crean de verdad, en el
+ * tenant B, para que el harness pueda pedir a A que los toque y comprobar que
+ * el guard los niega por PERTENENCIA.
+ *
+ * Todos los valores respetan los CHECK del esquema. En particular
+ * `documentos_fiscales.regimen` sólo admite 'fel_gt' | 'cfdi_mx'
+ * (20260604220000): un valor fuera de esa lista aborta por CHECK y nunca
+ * llegaría a evaluarse RLS.
  */
 async function seedDatos(admin, companyId, key) {
   const projectId = await upsertPorMatch(
@@ -199,42 +208,111 @@ async function seedDatos(admin, companyId, key) {
     { company_id: companyId, project_id: projectId, nombre: `Unidad sandbox ${key}` },
   )
 
+  // ── Cobertura NO TRIVIAL ────────────────────────────────────────────────
   await upsertPorMatch(
     admin, 'proveedores',
-    { company_id: companyId, nombre: `Proveedor sandbox ${key}` },
-    { company_id: companyId, nombre: `Proveedor sandbox ${key}` },
+    { company_id: companyId, nombre: `${FIX.nombreProveedor} ${key}` },
+    { company_id: companyId, nombre: `${FIX.nombreProveedor} ${key}` },
   )
 
-  await upsertPorMatch(
+  const cuentaId = await upsertPorMatch(
     admin, 'conta_cuentas',
-    { company_id: companyId, codigo: `1000-${key}` },
+    { company_id: companyId, codigo: `${FIX.codigoCuenta}-${key}` },
     {
-      company_id: companyId, codigo: `1000-${key}`, nombre: `Caja sandbox ${key}`,
-      tipo: 'activo', naturaleza: 'deudora', nivel: 1,
+      company_id: companyId, codigo: `${FIX.codigoCuenta}-${key}`,
+      nombre: `Caja sandbox ${key}`, tipo: 'activo', naturaleza: 'deudora', nivel: 1,
     },
   )
 
-  // unidad_id es obligatorio aquí: el harness lo lee para construir sus
-  // negative-write con FKs válidas.
-  await upsertPorMatch(
+  // El harness localiza ESTA fila por (periodo, concepto) para apuntar su
+  // UPDATE cross-tenant a un id exacto, en vez de a "todas las filas de A".
+  const cuotaId = await upsertPorMatch(
     admin, 'cuotas_condominio',
-    { company_id: companyId, project_id: projectId, periodo: '2099-01' },
+    { company_id: companyId, project_id: projectId, periodo: FIX.periodoCuota },
     {
       company_id: companyId, project_id: projectId, unidad_id: unidadId,
-      concepto: `Cuota sandbox ${key}`, monto: 100, periodo: '2099-01', estado: 'pendiente',
+      concepto: `${FIX.conceptoCuota} ${key}`, monto: 100,
+      periodo: FIX.periodoCuota, estado: 'pendiente',
     },
   )
 
   await upsertPorMatch(
     admin, 'documentos_fiscales',
-    { company_id: companyId, serie: `SANDBOX-${key}` },
+    { company_id: companyId, serie: `${FIX.serieDocumento}-${key}` },
     {
-      company_id: companyId, regimen: 'general', tipo: 'factura',
-      serie: `SANDBOX-${key}`, numero: '1',
+      company_id: companyId, regimen: FIX.regimenDocumento, tipo: FIX.tipoDocumento,
+      serie: `${FIX.serieDocumento}-${key}`, numero: '1',
     },
   )
 
-  return { projectId, unidadId }
+  // ── Recursos reales para las RPC ────────────────────────────────────────
+  // Estas tablas quedan declaradas como cobertura ESTRUCTURAL: el fixture
+  // existe para que las RPC reciban ids que EXISTEN, no para afirmar
+  // aislamiento de la tabla en sí.
+  const asientoId = await upsertPorMatch(
+    admin, 'conta_asientos',
+    { company_id: companyId, concepto: `${FIX.conceptoAsiento} ${key}` },
+    {
+      company_id: companyId, concepto: `${FIX.conceptoAsiento} ${key}`,
+      fecha: '2099-01-01', tipo: 'diario', estado: 'borrador',
+      origen: 'manual', moneda_base: 'GTQ',
+    },
+  )
+
+  const cuentaBancariaId = await upsertPorMatch(
+    admin, 'cuentas_bancarias',
+    { company_id: companyId, nombre: `${FIX.nombreCuentaBancaria} ${key}` },
+    {
+      company_id: companyId, nombre: `${FIX.nombreCuentaBancaria} ${key}`,
+      banco: 'Banco Sandbox', cuenta_contable_id: cuentaId,
+    },
+  )
+
+  const movimientoId = await upsertPorMatch(
+    admin, 'banco_movimientos',
+    { company_id: companyId, cuenta_bancaria_id: cuentaBancariaId, fecha: '2099-01-02' },
+    {
+      company_id: companyId, cuenta_bancaria_id: cuentaBancariaId,
+      fecha: '2099-01-02', monto: 50, descripcion: `${FIX.descripcionMovimiento} ${key}`,
+    },
+  )
+
+  const amenidadId = await upsertPorMatch(
+    admin, 'amenidades',
+    { company_id: companyId, project_id: projectId, nombre: `${FIX.nombreAmenidad} ${key}` },
+    { company_id: companyId, project_id: projectId, nombre: `${FIX.nombreAmenidad} ${key}` },
+  )
+
+  const reservaId = await upsertPorMatch(
+    admin, 'reservas_amenidades',
+    { company_id: companyId, amenidad_id: amenidadId, fecha: FIX.fechaReserva },
+    {
+      company_id: companyId, project_id: projectId, amenidad_id: amenidadId,
+      unidad_id: unidadId, fecha: FIX.fechaReserva,
+      hora_inicio: '10:00', hora_fin: '11:00',
+    },
+  )
+
+  // `clientes` NO lleva company_id: la pertenencia vive en la tabla puente
+  // `company_clientes` (20260326000001). Sin esa fila, el cliente no sería de
+  // NINGÚN tenant y un rechazo de las RPC que lo reciben sería ambiguo — podría
+  // venir de "no existe asociación" en vez de "es de otra empresa".
+  const clienteId = await upsertPorMatch(
+    admin, 'clientes',
+    { codigo: `${FIX.codigoCliente}-${key}` },
+    { codigo: `${FIX.codigoCliente}-${key}`, nombre: `Cliente sandbox ${key}`, project_id: projectId },
+  )
+
+  await upsertPorMatch(
+    admin, 'company_clientes',
+    { company_id: companyId, cliente_id: clienteId },
+    { company_id: companyId, cliente_id: clienteId },
+  )
+
+  return {
+    projectId, unidadId, cuotaId, asientoId, cuentaBancariaId,
+    movimientoId, amenidadId, reservaId, clienteId,
+  }
 }
 
 // ── Ejecución ───────────────────────────────────────────────────────────────
@@ -303,9 +381,16 @@ async function main(env) {
     const companyId = await upsertPorMatch(admin, 'companies', { nombre: t.empresa }, { nombre: t.empresa })
     const userId = await upsertUsuario(admin, t.email, t.pass)
     await upsertAppUser(admin, userId, companyId, `Usuario RLS ${t.key}`)
-    const { projectId, unidadId } = await seedDatos(admin, companyId, t.key)
-    creado.push({ ...t, companyId, userId, projectId, unidadId })
-    log(`✔ ${t.key}: empresa ${companyId}  usuario ${userId}`)
+    const recursos = await seedDatos(admin, companyId, t.key)
+    creado.push({ ...t, companyId, userId, ...recursos })
+    log(`✔ ${t.key}: empresa ${companyId}  usuario ${userId}  cuota ${recursos.cuotaId}`)
+    // Los ids de los recursos de las RPC se imprimen porque son la diferencia
+    // entre "la RPC falló porque el id no existe" y "la RPC rechazó por
+    // pertenencia". El harness los vuelve a resolver por su marcador, así que
+    // esto es traza para el operador, no un canal de paso de parámetros.
+    log(`   recursos RPC de ${t.key}: proyecto ${recursos.projectId} · unidad ${recursos.unidadId} · ` +
+        `asiento ${recursos.asientoId} · movimiento ${recursos.movimientoId} · ` +
+        `amenidad ${recursos.amenidadId} · reserva ${recursos.reservaId} · cliente ${recursos.clienteId}`)
   }
 
   // ── Verificación: que el sandbox NO produzca un verde vacío ───────────────
@@ -377,6 +462,21 @@ async function main(env) {
   for (const e of COBERTURA.estructurales) {
     console.log(`   • ${e} — ${COBERTURA.motivoEstructural[e] ?? 'sin sembrar'}`)
   }
+
+  // Las RPC no se agrupan por dominio sino por lo que su rechazo DEMUESTRA. Un
+  // informe que sume las 23 como "aislamiento verificado" estaría contando
+  // rechazos por privilegio de ejecución y por rol de portal.
+  const porGarantia = {}
+  for (const r of COBERTURA.rpcsObligatorias) (porGarantia[r.garantia] ??= []).push(r.nombre)
+  console.log(`
+📋 RPC críticas por lo que su rechazo demuestra:
+`)
+  console.log(`   • tenant     (${(porGarantia.tenant ?? []).length}) — aislamiento REAL: ${(porGarantia.tenant ?? []).join(', ')}`)
+  console.log(`   • rol        (${(porGarantia.rol ?? []).length}) — rechazo por rol de portal, NO aislamiento: ${(porGarantia.rol ?? []).join(', ')}`)
+  console.log(`   • privilegio (${(porGarantia.privilegio ?? []).length}) — no ejecutable por el navegador, NO aislamiento: ${(porGarantia.privilegio ?? []).join(', ')}`)
+  console.log(`
+   Por qué las de «rol» no llegan a tenant: ${COBERTURA.motivoRpcRol}
+`)
 
   console.log(`
 ✅ Sandbox listo y VERIFICADO como ambos usuarios.

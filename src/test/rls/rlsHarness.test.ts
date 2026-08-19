@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import {
   TENANT_SCOPED_NO_TRIVIALES,
   TENANT_SCOPED_ESTRUCTURALES,
+  FIXTURES,
 } from './coverage'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -63,7 +64,10 @@ const ENABLED = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
 // Los INSERT de esta suite DEBEN ser rechazados; si alguno se colara, este texto
 // permite barrerlo en afterAll. El harness no siembra nada: sólo limpia lo que
 // nunca debió existir (defensa en profundidad, no parte del contrato).
-const MARCADOR_EFIMERO = 'RLS-NEGATIVE-NO-DEBE-PERSISTIR'
+// ÚNICO POR EJECUCIÓN. Con un marcador fijo, una fila infiltrada por una
+// corrida anterior sería indistinguible de una escrita por ésta, y el barrido
+// de limpieza podría borrar evidencia de otra ejecución en paralelo.
+const MARCADOR_EFIMERO = `RLS-NEG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
 // ────────────────────────────────────────────────────────────────────────────
 // RECURSOS REALES DEL TENANT B
@@ -83,6 +87,16 @@ interface RecursosB {
   companyId: string
   projectId: string
   unidadId: string
+  cuotaId: string
+  // Recursos que el seed crea EXPRESAMENTE para que las RPC reciban ids que
+  // existen. Pasarles el company_id como asiento_id/movimiento_id/etc. hacía
+  // que la RPC fallara por "no encontrado" en vez de por autorización: el
+  // rechazo era real, pero no probaba aislamiento.
+  asientoId: string
+  movimientoId: string
+  amenidadId: string
+  reservaId: string
+  clienteId: string
 }
 
 /** Contexto resuelto en beforeAll; los tests lo leen al ejecutarse. */
@@ -211,15 +225,18 @@ const SENSITIVE_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
 // excluye de la variante authenticated porque un admin legítimo SÍ puede
 // ejecutarlo sobre su propia empresa.
 const ERP_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
-  { name: 'conta_publicar_asiento', args: (b) => ({ p_asiento_id: b.companyId }) },
-  { name: 'conta_anular_asiento', args: (b) => ({ p_asiento_id: b.companyId, p_motivo: null }) },
+  { name: 'conta_publicar_asiento', args: (b) => ({ p_asiento_id: b.asientoId }) },
+  { name: 'conta_anular_asiento', args: (b) => ({ p_asiento_id: b.asientoId, p_motivo: null }) },
   { name: 'conta_cierre_anual', args: () => ({ p_anio: 2000 }) },
   {
+    // El sujeto de la comprobación de autorización es `p_movimiento_id`: un
+    // movimiento REAL de B. `p_match_id` no lo es —la RPC valida la pertenencia
+    // del movimiento antes de mirar el match—, así que se reutiliza el mismo id.
     name: 'banco_conciliar_movimiento',
-    args: (b) => ({ p_movimiento_id: b.companyId, p_match_tipo: 'pago', p_match_id: b.companyId }),
+    args: (b) => ({ p_movimiento_id: b.movimientoId, p_match_tipo: 'pago', p_match_id: b.movimientoId }),
   },
-  { name: 'banco_desconciliar_movimiento', args: (b) => ({ p_movimiento_id: b.companyId }) },
-  { name: 'banco_ajuste_conciliacion', args: (b) => ({ p_movimiento_id: b.companyId, p_descripcion: null }) },
+  { name: 'banco_desconciliar_movimiento', args: (b) => ({ p_movimiento_id: b.movimientoId }) },
+  { name: 'banco_ajuste_conciliacion', args: (b) => ({ p_movimiento_id: b.movimientoId, p_descripcion: null }) },
 ]
 
 const ERP_RPCS_AUTH_SIN_EFECTOS = ERP_RPCS_ANON.filter((r) => r.name !== 'conta_cierre_anual')
@@ -234,10 +251,31 @@ const ESTATUS_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'fiscal_pac_estatus', args: (b) => ({ p_company_id: b.companyId }) },
 ]
 
-// RPCs del self-service del propietario (20260822000000): SECURITY DEFINER con
-// REVOKE FROM public, anon. Las escrituras apuntan a la unidad REAL de B, así
-// que el rechazo demuestra el guard interno (rol ≠ cliente o unidad no propia)
-// y no una FK rota.
+// ────────────────────────────────────────────────────────────────────────────
+// RPCs del PORTAL — leer antes de citar estas pruebas como "aislamiento".
+// ────────────────────────────────────────────────────────────────────────────
+// Las del self-service del propietario (inquilinos, familiares, baja de renta)
+// abren con
+//
+//     IF current_user_role() <> 'cliente' THEN RAISE EXCEPTION …
+//
+// o filtran por `mis_unidades_propietario_ids()`. Los usuarios fixture A y B son
+// STAFF (`app_users.role = company_owner`), no clientes del portal, así que el
+// rechazo ocurre en ese gate y NUNCA llega a evaluarse la pertenencia de la
+// unidad. Lo que demuestran es real y vale la pena —la RPC no es anon-ejecutable
+// y el guard existe—, pero NO es aislamiento entre tenants: `coverage.json` las
+// declara `garantia: 'rol'`.
+//
+// Las de RESERVAS son distintas y sí llegan a tenant: aceptan al staff del
+// tenant (`company_id = get_my_company_id()` + permiso) porque la vista previa
+// del portal la usa el staff. Con A como company_owner, rol y permiso pasan, así
+// que el único rechazo posible es la pertenencia.
+//
+// Los ids que se pasan son en todos los casos los REALES de B: si algún día se
+// siembran usuarios con rol cliente y fila en `unidad_residentes`, las mismas
+// pruebas pasan a demostrar pertenencia sin tocar un argumento. Eso exigiría dos
+// credenciales más allá de las seis RLS_* que define este PR, así que queda
+// documentado como limitación en docs/ACTIVAR_HARNESS_RLS.md, no como cobertura.
 const PORTAL_INQUILINO_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_mis_unidades', args: () => ({}) },
   { name: 'portal_inquilinos_de_unidad', args: (b) => ({ p_unidad_id: b.unidadId }) },
@@ -254,7 +292,7 @@ const PORTAL_INQUILINO_RPCS_ANON: ReadonlyArray<{ name: string; args: ArgsRpc }>
   },
   {
     name: 'portal_quitar_inquilino',
-    args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.companyId }),
+    args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.clienteId }),
   },
 ]
 
@@ -267,7 +305,7 @@ const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   {
     name: 'portal_reservar_amenidad',
     args: (b) => ({
-      p_amenidad_id: b.companyId,
+      p_amenidad_id: b.amenidadId,
       p_unidad_id: b.unidadId,
       p_fecha: '2099-01-01',
       p_hora_inicio: '10:00',
@@ -278,7 +316,7 @@ const PORTAL_RESERVAS_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
       p_reglamento_aceptado: false,
     }),
   },
-  { name: 'portal_cancelar_reserva', args: (b) => ({ p_reserva_id: b.companyId }) },
+  { name: 'portal_cancelar_reserva', args: (b) => ({ p_reserva_id: b.reservaId }) },
 ]
 
 // RPCs de accesos familiares (20260825000000): mismo contrato, unidad real de B.
@@ -294,10 +332,19 @@ const PORTAL_FAMILIARES_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
       p_telefono: null,
     }),
   },
-  { name: 'portal_quitar_familiar', args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.companyId }) },
+  { name: 'portal_quitar_familiar', args: (b) => ({ p_unidad_id: b.unidadId, p_cliente_id: b.clienteId }) },
   { name: 'portal_accesos_de_unidad', args: (b) => ({ p_unidad_id: b.unidadId }) },
 ]
 
+
+// RPC de baja de la autorización de renta (20260827000000). Es de ESCRITURA y
+// destructiva —revoca los accesos de inquilino y familiares de la unidad—, así
+// que un fallo de autorización aquí deja sin portal a residentes de otro
+// tenant. Faltaba por completo en el harness: la migración entró en main
+// después de escribirse esta suite.
+const PORTAL_BAJA_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_baja_renta', args: (b) => ({ p_unidad_id: b.unidadId }) },
+]
 
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
@@ -325,8 +372,11 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   let userB: SupabaseClient
   let aId: string
   let bId: string
-  // company_id propio de A, para el UPDATE negativo (re-etiquetar a tenant ajeno).
-  let aOwnedCompanyId: string | null = null
+  // Fixture propio de A: su company_id y el id EXACTO de su cuota sembrada. El
+  // UPDATE negativo apunta a ese id concreto — nunca a `.eq('company_id', …)`,
+  // que en un fallo de RLS habría re-etiquetado TODAS las filas de la empresa.
+  let aCompanyId: string
+  let aCuotaId: string
 
   beforeAll(async () => {
     anon = freshClient()
@@ -335,36 +385,68 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     ;[aId, bId] = await Promise.all([userId(userA), userId(userB)])
     expect(aId, 'A y B deben ser usuarios DISTINTOS').not.toBe(bId)
 
-    const { data: filasA } = await userA.from('cuotas_condominio').select('company_id').limit(1)
-    aOwnedCompanyId = (filasA?.[0] as { company_id: string } | undefined)?.company_id ?? null
-
-    // Recursos REALES de B, leídos COMO B (que sí ve lo suyo). Son el objetivo
-    // de todas las pruebas negativas de A: con FKs válidas, un rechazo sólo
-    // puede venir de RLS. El seed garantiza esta fila (cuotas_condominio está
-    // en `noTriviales`), así que si falta, el sandbox no está sembrado y hay
-    // que enterarse aquí y no con un falso verde más abajo.
-    const { data: filasB, error: errorB } = await userB
+    // ── Fixture de A ──────────────────────────────────────────────────────
+    const { data: filasA, error: errorA } = await userA
       .from('cuotas_condominio')
-      .select('company_id, project_id, unidad_id')
+      .select('id, company_id')
+      .eq('periodo', FIXTURES.periodoCuota)
       .limit(1)
-    expect(errorB, 'B debe poder leer sus propias cuotas').toBeNull()
-
-    const filaB = filasB?.[0] as
-      | { company_id: string; project_id: string; unidad_id: string | null }
-      | undefined
+    expect(errorA, 'A debe poder leer sus propias cuotas').toBeNull()
+    const filaA = filasA?.[0] as { id: string; company_id: string } | undefined
     expect(
-      filaB,
-      'B no tiene ninguna cuota: el sandbox no está sembrado. Corré scripts/seed-rls-sandbox.mjs.',
+      filaA,
+      `A no tiene la cuota fixture (periodo ${FIXTURES.periodoCuota}): el sandbox no está sembrado. ` +
+      'Corré scripts/seed-rls-sandbox.mjs.',
     ).toBeDefined()
-    expect(filaB!.unidad_id, 'la cuota sembrada de B debe tener unidad_id').toBeTruthy()
+    aCompanyId = filaA!.company_id
+    aCuotaId = filaA!.id
 
-    B = {
-      companyId: filaB!.company_id,
-      projectId: filaB!.project_id,
-      unidadId: filaB!.unidad_id as string,
+    // ── Recursos REALES de B ──────────────────────────────────────────────
+    // Leídos COMO B (que sí ve lo suyo). Son el objetivo de las pruebas
+    // negativas de A: con FKs válidas y filas que EXISTEN, un rechazo sólo
+    // puede venir de RLS o del guard interno de la RPC — nunca de "no existe".
+    const leerFixtureB = async (
+      tabla: string,
+      columnas: string,
+      filtros: Record<string, string>,
+    ) => {
+      let q = userB.from(tabla).select(columnas)
+      for (const [col, val] of Object.entries(filtros)) q = q.eq(col, val)
+      const { data, error } = await q.limit(1)
+      expect(error, `B debe poder leer su fixture de ${tabla}`).toBeNull()
+      const fila = data?.[0] as Record<string, string> | undefined
+      expect(
+        fila,
+        `B no tiene el fixture de ${tabla}: el sandbox no está sembrado o el seed falló ahí. ` +
+        'Corré scripts/seed-rls-sandbox.mjs y revisá su salida.',
+      ).toBeDefined()
+      return fila!
     }
 
-    expect(B.companyId, 'A y B deben pertenecer a empresas DISTINTAS').not.toBe(aOwnedCompanyId)
+    const cuotaB = await leerFixtureB('cuotas_condominio', 'id, company_id, project_id, unidad_id', {
+      periodo: FIXTURES.periodoCuota,
+    })
+    expect(cuotaB.unidad_id, 'la cuota sembrada de B debe tener unidad_id').toBeTruthy()
+
+    const asientoB = await leerFixtureB('conta_asientos', 'id', {})
+    const movimientoB = await leerFixtureB('banco_movimientos', 'id', {})
+    const amenidadB = await leerFixtureB('amenidades', 'id', {})
+    const reservaB = await leerFixtureB('reservas_amenidades', 'id', { fecha: FIXTURES.fechaReserva })
+    const clienteB = await leerFixtureB('clientes', 'id', {})
+
+    B = {
+      companyId: cuotaB.company_id,
+      projectId: cuotaB.project_id,
+      unidadId: cuotaB.unidad_id,
+      cuotaId: cuotaB.id,
+      asientoId: asientoB.id,
+      movimientoId: movimientoB.id,
+      amenidadId: amenidadB.id,
+      reservaId: reservaB.id,
+      clienteId: clienteB.id,
+    }
+
+    expect(B.companyId, 'A y B deben pertenecer a empresas DISTINTAS').not.toBe(aCompanyId)
   })
 
   afterAll(async () => {
@@ -558,14 +640,41 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('negative write (company_id ajeno → RECHAZADO, no persiste)', () => {
-    // El WITH CHECK de RLS exige company_id = get_my_company_id(). Se apunta al
-    // tenant REAL de B —company_id, project_id y unidad_id que EXISTEN— para que
-    // todas las FKs sean válidas: así el rechazo sólo puede venir de RLS, no de
-    // una restricción de integridad. Con el UUID cero de antes, un INSERT podía
-    // morir en la FK y el test pasaba sin haber ejercitado la policy.
-    // Defensa: si por un bug el write se colara, intentamos borrar lo escrito.
-    it('cuotas_condominio: INSERT con company_id ajeno es rechazado', async () => {
+  // ────────────────────────────────────────────────────────────────────────
+  // NEGATIVE WRITE — concluyente, verificado DESDE B
+  // ────────────────────────────────────────────────────────────────────────
+  // Antes bastaba con `expect(error).not.toBeNull()` y "A no ve la fila". Eso
+  // NO demuestra que la escritura no ocurriera: si RLS deja escribir pero la
+  // policy de SELECT la oculta a A, el `data` vacío de A es exactamente igual
+  // que un rechazo. La única evidencia real es mirarlo desde el tenant que la
+  // recibiría — B — y comprobar que la fila NO está.
+  //
+  // Cada intento usa MARCADOR_EFIMERO (único por ejecución) para que la
+  // búsqueda desde B no confunda una fila de otra corrida con una infiltrada
+  // por ésta. Si aparece, se limpia COMO B (el único que puede verla) y la
+  // prueba falla: dejarla sería contaminar el sandbox y envenenar la siguiente
+  // corrida.
+  async function noDebeExistirEnB(tabla: string, columna: string, valor: string) {
+    const { data, error } = await userB.from(tabla).select('id').eq(columna, valor)
+    expect(error, `B debe poder consultar ${tabla} para verificar la no-escritura`).toBeNull()
+
+    const infiltradas = (data ?? []) as { id: string }[]
+    if (infiltradas.length > 0) {
+      // Limpieza COMO B antes de fallar: la fila está en su tenant.
+      await userB.from(tabla).delete().in('id', infiltradas.map((r) => r.id))
+    }
+    expect(
+      infiltradas.length,
+      `FUGA REAL: A escribió ${infiltradas.length} fila(s) en ${tabla} del tenant de B ` +
+      `(${columna}=${valor}). Se limpiaron, pero RLS no está protegiendo la escritura.`,
+    ).toBe(0)
+  }
+
+  describe('negative write (hacia el tenant de B → RECHAZADO y verificado COMO B)', () => {
+    it('cuotas_condominio: INSERT hacia el tenant de B es rechazado — verificado COMO B', async () => {
+      // Payload íntegramente válido contra el esquema: company_id, project_id y
+      // unidad_id son FKs REALES de B. Si la fila no aparece, sólo puede ser
+      // por RLS.
       const { data, error } = await userA
         .from('cuotas_condominio')
         .insert({
@@ -574,53 +683,67 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
           unidad_id: B.unidadId,
           concepto: MARCADOR_EFIMERO,
           monto: 1,
-          periodo: '2099-01',
+          periodo: '2098-01',
           estado: 'pendiente',
         })
         .select('id')
 
-      if (data && data.length > 0) {
-        // No debería ocurrir: limpieza best-effort antes de fallar.
-        const ids = data.map((r) => (r as { id: string }).id)
-        await userA.from('cuotas_condominio').delete().in('id', ids)
-      }
       expect(error, 'el INSERT cross-tenant debe ser rechazado por RLS').not.toBeNull()
-      expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
+      expect(data ?? [], 'no debe devolver ninguna fila a A').toHaveLength(0)
+      await noDebeExistirEnB('cuotas_condominio', 'concepto', MARCADOR_EFIMERO)
     })
 
-    it('cuotas_condominio: UPDATE moviendo una fila propia a company_id ajeno es rechazado', async () => {
-      // Re-etiquetar a un tenant ajeno viola el WITH CHECK. Si A no tiene filas,
-      // el UPDATE afecta 0 filas (tampoco persiste): ambos resultados son válidos.
+    it('cuotas_condominio: UPDATE de UNA fila propia hacia el tenant de B es rechazado — verificado COMO B', async () => {
+      // Apunta al id EXACTO de la cuota fixture de A. La versión anterior
+      // filtraba por `company_id`, así que un fallo de RLS habría re-etiquetado
+      // TODAS las cuotas de A de una sola vez.
       const { data, error } = await userA
         .from('cuotas_condominio')
-        .update({ company_id: B.companyId })
-        .eq('company_id', aOwnedCompanyId ?? B.companyId)
+        .update({ company_id: B.companyId, concepto: MARCADOR_EFIMERO })
+        .eq('id', aCuotaId)
         .select('id')
 
-      const rejected = error !== null || (data ?? []).length === 0
-      expect(rejected, 'el UPDATE cross-tenant no debe re-etiquetar filas').toBe(true)
+      expect(
+        error !== null || (data ?? []).length === 0,
+        'el UPDATE cross-tenant no debe re-etiquetar la fila',
+      ).toBe(true)
+      await noDebeExistirEnB('cuotas_condominio', 'concepto', MARCADOR_EFIMERO)
+
+      // Y la fila de A debe seguir siendo de A, intacta.
+      const { data: sigue } = await userA
+        .from('cuotas_condominio')
+        .select('id, company_id')
+        .eq('id', aCuotaId)
+      const fila = (sigue ?? [])[0] as { company_id: string } | undefined
+      expect(fila, 'la cuota fixture de A debe seguir siendo visible para A').toBeDefined()
+      expect(fila!.company_id, 'la cuota de A no debe haber cambiado de empresa').toBe(aCompanyId)
     })
 
-    it('documentos_fiscales: INSERT con company_id ajeno es rechazado', async () => {
+    it('documentos_fiscales: INSERT hacia el tenant de B es rechazado — verificado COMO B', async () => {
+      // `regimen` respeta el CHECK del esquema ('fel_gt' | 'cfdi_mx'). Con un
+      // valor inválido el INSERT moría por CHECK y el "rechazo" no probaba RLS.
       const { data, error } = await userA
         .from('documentos_fiscales')
-        .insert({ company_id: B.companyId, regimen: 'general', tipo: 'factura' })
+        .insert({
+          company_id: B.companyId,
+          regimen: FIXTURES.regimenDocumento,
+          tipo: FIXTURES.tipoDocumento,
+          serie: MARCADOR_EFIMERO,
+          numero: '1',
+        })
         .select('id')
 
-      if (data && data.length > 0) {
-        const ids = data.map((r) => (r as { id: string }).id)
-        await userA.from('documentos_fiscales').delete().in('id', ids)
-      }
       expect(error, 'el INSERT cross-tenant debe ser rechazado').not.toBeNull()
-      expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
+      expect(data ?? [], 'no debe devolver ninguna fila a A').toHaveLength(0)
+      await noDebeExistirEnB('documentos_fiscales', 'serie', MARCADOR_EFIMERO)
     })
 
-    it('conta_cuentas: INSERT con company_id ajeno es rechazado (ERP)', async () => {
+    it('conta_cuentas: INSERT hacia el tenant de B es rechazado — verificado COMO B (ERP)', async () => {
       const { data, error } = await userA
         .from('conta_cuentas')
         .insert({
           company_id: B.companyId,
-          codigo: '9999-RLS',
+          codigo: `9999-${MARCADOR_EFIMERO.slice(-6)}`,
           nombre: MARCADOR_EFIMERO,
           tipo: 'activo',
           naturaleza: 'deudora',
@@ -628,22 +751,20 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         })
         .select('id')
 
-      if (data && data.length > 0) {
-        const ids = data.map((r) => (r as { id: string }).id)
-        await userA.from('conta_cuentas').delete().in('id', ids)
-      }
       expect(error, 'el INSERT cross-tenant debe ser rechazado').not.toBeNull()
-      expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
+      expect(data ?? [], 'no debe devolver ninguna fila a A').toHaveLength(0)
+      await noDebeExistirEnB('conta_cuentas', 'nombre', MARCADOR_EFIMERO)
     })
 
-    it('conta_asientos: INSERT directo con estado publicado es rechazado (guard de BD)', async () => {
-      // Aunque el tenant fuera el propio, publicar SIN la RPC debe fallar por el
-      // trigger conta_proteger_asiento (CONTA_PUBLICAR_RPC).
+    it('conta_asientos: publicar sin la RPC es rechazado por el guard de BD — verificado COMO A', async () => {
+      // Aquí el tenant es el PROPIO de A: lo que se prueba es el trigger
+      // conta_proteger_asiento, no el aislamiento. Por eso la verificación es
+      // sobre A y no sobre B.
       const { data, error } = await userA
         .from('conta_asientos')
         .insert({
-          company_id: aOwnedCompanyId ?? B.companyId,
-          fecha: '2099-01-01',
+          company_id: aCompanyId,
+          fecha: '2098-01-01',
           tipo: 'diario',
           concepto: MARCADOR_EFIMERO,
           estado: 'publicado',
@@ -653,15 +774,15 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         .select('id')
 
       if (data && data.length > 0) {
-        const ids = data.map((r) => (r as { id: string }).id)
-        await userA.from('conta_asientos').delete().in('id', ids)
+        await userA.from('conta_asientos').delete().in('id', data.map((r) => (r as { id: string }).id))
       }
       expect(error, 'publicar sin la RPC debe ser rechazado').not.toBeNull()
       expect(data ?? [], 'no debe persistir ninguna fila').toHaveLength(0)
     })
   })
 
-  describe('guard anon: RPCs sensibles de notificaciones (#378/#380) RECHAZADOS', () => {
+
+  describe('guard RPCs de notificaciones (#378/#380) — garantía de PRIVILEGIO', () => {
     for (const { name, args } of SENSITIVE_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -679,7 +800,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('guard RPCs del ERP financiero (REVOKE anon + validación interna)', () => {
+  describe('guard RPCs del ERP financiero (REVOKE anon + pertenencia) — garantía de TENANT', () => {
     for (const { name, args } of ERP_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -688,19 +809,20 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       })
     }
 
-    // authenticated con un id INEXISTENTE: la RPC debe fallar ("no encontrado"
-    // o "no autorizado") sin efectos. conta_cierre_anual se excluye porque un
-    // admin legítimo SÍ puede ejecutarlo (sería un falso positivo).
+    // authenticated (A) con el id REAL de un recurso de B: la RPC debe fallar sin
+    // efectos. El id existe, así que el rechazo no puede ser "no encontrado" —
+    // viene del guard de pertenencia. conta_cierre_anual se excluye porque un
+    // admin legítimo SÍ puede ejecutarlo sobre lo suyo (sería un falso positivo).
     for (const { name, args } of ERP_RPCS_AUTH_SIN_EFECTOS) {
-      it(`authenticated con id inexistente NO obtiene éxito de ${name}`, async () => {
+      it(`authenticated (A) NO obtiene éxito de ${name} sobre un recurso REAL de B`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
-        expect(error, `${name} con id inexistente debe fallar`).not.toBeNull()
+        expect(error, `${name} sobre un recurso de otro tenant debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
   })
 
-  describe('guard anon: RPCs de estatus de bóvedas (#611) RECHAZADOS', () => {
+  describe('guard RPCs de estatus de bóvedas (#611) — garantía de TENANT', () => {
     for (const { name, args } of ESTATUS_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -722,7 +844,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('guard RPCs del self-service de inquilinos (20260822000000)', () => {
+  describe('guard RPCs del self-service de inquilinos (20260822000000) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ANON) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -731,8 +853,9 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       })
     }
 
-    // authenticated apuntando a una unidad AJENA: el guard interno (rol cliente +
-    // unidad propia + renta aprobada) debe rechazar las escrituras sin efectos.
+    // authenticated (A, staff) apuntando a una unidad AJENA: el guard debe
+    // rechazar la escritura sin efectos. El primer gate que actúa es el de rol
+    // (`current_user_role() <> 'cliente'`), así que esto NO prueba pertenencia.
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ESCRITURA) {
       it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
@@ -752,7 +875,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     })
   })
 
-  describe('guard RPCs de reservas del portal (20260822030000)', () => {
+  describe('guard RPCs de reservas del portal (20260822030000) — garantía de TENANT', () => {
     for (const { name, args } of PORTAL_RESERVAS_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -768,7 +891,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
   })
 
-  describe('guard RPCs de accesos familiares (20260825000000)', () => {
+  describe('guard RPCs de accesos familiares (20260825000000) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_FAMILIARES_RPCS) {
       it(`anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
@@ -777,10 +900,10 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       })
     }
 
-    // Escrituras con unidad AJENA: el guard interno (rol cliente + unidad
-    // propia) debe rechazar sin efectos.
+    // Escrituras con unidad AJENA: el guard debe rechazar sin efectos. Igual que
+    // arriba, quien rechaza es el gate de rol — garantía de ROL, no de tenant.
     for (const { name, args } of PORTAL_FAMILIARES_RPCS.filter((r) =>
-      ['portal_registrar_familiar', 'portal_quitar_familiar', 'portal_baja_renta'].includes(r.name),
+      ['portal_registrar_familiar', 'portal_quitar_familiar'].includes(r.name),
     )) {
       it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
@@ -797,6 +920,34 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
       const negado = error !== null || (data ?? []).length === 0
       expect(negado, 'portal_accesos_de_unidad no debe exponer accesos ajenos').toBe(true)
     })
+  })
+
+  // ────────────────────────────────────────────────────────────────────────
+  // guard RPC de baja de autorización de renta (20260827000000)
+  // ────────────────────────────────────────────────────────────────────────
+  // Esta RPC estaba NOMBRADA en un filtro del harness pero NUNCA en ninguna
+  // colección, así que el filtro no producía ni una sola prueba: una referencia
+  // muerta que daba la impresión de estar cubierta. Es de escritura y
+  // destructiva —revoca el acceso al portal del inquilino y de los familiares
+  // de la unidad—, así que un fallo de autorización deja sin portal a
+  // residentes de OTRO tenant.
+  describe('guard RPCs de baja de renta (20260827000000) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_BAJA_RENTA_RPCS) {
+      it(`anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+        // La unidad es REAL y pertenece a B, así que el rechazo no puede venir de
+        // un id inexistente. Viene del gate de rol (A es staff, no cliente del
+        // portal): garantía de ROL, no de tenant — ver el bloque de arriba.
+        const { data, error } = await userA.rpc(name, args(B))
+        expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
   })
 })
 

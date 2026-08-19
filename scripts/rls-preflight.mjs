@@ -6,19 +6,31 @@
 // multi-tenant. Tres desenlaces y ninguno ambiguo:
 //
 //   run    — están las SEIS variables RLS_*: el harness se ejecuta.
-//   skip   — el ejecutor NO PUEDE tener secretos por diseño de GitHub:
+//   skip   — SÓLO en eventos `pull_request` donde GitHub no entrega los Actions
+//            secrets por diseño:
 //            · PR desde un fork,
-//            · ejecución iniciada por dependabot[bot] (los Actions secrets no
-//              se exponen a Dependabot; sólo los Dependabot secrets, que este
-//              repo no usa).
+//            · PR abierto por dependabot[bot].
 //            Se omite EXPLÍCITAMENTE, sin ejecutar código ajeno con
 //            credenciales y sin recurrir a `pull_request_target` —que sí las
 //            expondría al código del PR y es justo lo que no queremos.
-//            En ambos casos el aislamiento se valida igualmente en el push a
-//            `main` posterior al merge, donde los secretos sí están.
-//   fail   — cualquier otro contexto (PR interno, push a main) al que le falte
-//            alguna variable. Falla en vez de quedar verde: un verde por
-//            omisión se contabiliza como cobertura que no existe.
+//   fail   — TODO lo demás, incluido `push` a main sea quien sea el actor.
+//
+// LA GARANTÍA, Y POR QUÉ LA ANTERIOR NO SERVÍA
+// La versión previa afirmaba que «el aislamiento se valida igualmente en el
+// push a main posterior al merge». Eso no es verificable: si el merge lo hace
+// el propio Dependabot (auto-merge), el push a `main` también corre con
+// `github.actor = dependabot[bot]` y, con la regla anterior, se habría OMITIDO
+// otra vez. El cambio nunca se habría verificado y nadie se habría enterado.
+//
+// Ahora la omisión está acotada al evento `pull_request`. En `push` no se omite
+// jamás: si faltan los secretos, el job FALLA y el hueco se ve. Eso convierte
+// la omisión del PR en una garantía comprobable —«se difiere a main, y main no
+// puede saltárselo»— en vez de una promesa.
+//
+// Para que un PR de Dependabot verifique en el propio PR (y no sólo al
+// mergear), hay que declarar las seis variables TAMBIÉN como *Dependabot
+// secrets* con los mismos nombres: Settings → Secrets and variables →
+// Dependabot. Está documentado en docs/ACTIVAR_HARNESS_RLS.md.
 //
 // Vive en Node y no inline en el YAML para poder probarlo:
 // `scripts/__tests__/rls-preflight.test.mjs` cubre los cuatro contextos.
@@ -39,27 +51,39 @@ export const VARIABLES_RLS = [
 /**
  * Contextos en los que GitHub NO entrega los Actions secrets al ejecutor, así
  * que la ausencia de variables es estructural y no un error de configuración.
+ *
+ * CLAVE: sólo se admite la omisión en eventos `pull_request`. En `push` —donde
+ * vive la garantía— no se omite nunca, ni siquiera si el actor es Dependabot
+ * (caso real con auto-merge activado).
  */
 export function motivoSinSecretos({ esFork, actor, evento }) {
+  const esPullRequest = evento === undefined || evento === 'pull_request'
+  if (!esPullRequest) return null
+
   if (esFork === true || esFork === 'true') {
     return {
       clave: 'fork',
       titulo: 'PR desde un fork',
       detalle:
         'GitHub no expone secretos a los forks por diseño. No se ejecuta código del ' +
-        'fork con credenciales ni se usa `pull_request_target`, que sí las expondría.',
+        'fork con credenciales ni se usa `pull_request_target`, que sí las expondría. ' +
+        'La verificación no se pierde: el push a `main` posterior al merge es ' +
+        'fail-closed y no puede omitirse.',
     }
   }
+
   // Dependabot corre con su propio contexto: los Actions secrets NO están
-  // disponibles (sólo los Dependabot secrets). Un bump de dependencia no puede,
-  // ni debe, verificar RLS.
-  if (actor === 'dependabot[bot]' || evento === 'dependabot') {
+  // disponibles (sólo los *Dependabot secrets*). Un bump de dependencia no
+  // puede verificar RLS a menos que se declaren esos secretos aparte.
+  if (actor === 'dependabot[bot]') {
     return {
       clave: 'dependabot',
-      titulo: 'ejecución iniciada por Dependabot',
+      titulo: 'PR de Dependabot',
       detalle:
-        'Los Actions secrets no se exponen a dependabot[bot]. El aislamiento se ' +
-        'verifica en el push a `main` posterior al merge del bump.',
+        'Los Actions secrets no se exponen a dependabot[bot]. Se difiere al push a ' +
+        '`main`, que NO puede omitirse (fail-closed sea quien sea el actor, incluido ' +
+        'el propio Dependabot si hay auto-merge). Para verificar ya en el PR, declará ' +
+        'las seis variables también como *Dependabot secrets* con los mismos nombres.',
     }
   }
   return null
@@ -103,6 +127,10 @@ export function decidirPreflight(env = {}) {
     mensaje:
       `Faltan variables RLS_* (${faltan.join(' ')}). El job falla en vez de quedar verde: ` +
       'un verde sin ejecutar se contabiliza como cobertura que no existe. ' +
+      (env.GITHUB_EVENT_NAME === 'push' && env.GITHUB_ACTOR === 'dependabot[bot]'
+        ? 'Este push a main lo inició Dependabot: aquí NO se omite, porque es donde se ' +
+          'difería la verificación del PR. Declará los secretos de Dependabot o mergeá a mano. '
+        : '') +
       'Ver docs/ACTIVAR_HARNESS_RLS.md.',
   }
 }

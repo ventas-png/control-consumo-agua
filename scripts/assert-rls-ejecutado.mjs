@@ -15,7 +15,11 @@
 //   4. TODOS los escenarios obligatorios de `coverage.json` aparecen como
 //      pruebas PASADAS. Sin esto, borrar un `describe` entero seguiría pasando
 //      mientras el total superara el mínimo.
-//   5. Se alcanza el piso mínimo de pruebas (red secundaria).
+//   5. TODAS las RPC críticas aparecen NOMBRADAS en alguna prueba pasada, una a
+//      una. Antes bastaba con que sobreviviera el bloque del dominio ("RPCs del
+//      ERP financiero") para dar por cubiertas las seis RPC de ese dominio:
+//      borrar `banco_ajuste_conciliacion` no se notaba. Ahora sí.
+//   6. Se alcanza el piso mínimo de pruebas (red secundaria).
 //
 // POR QUÉ NO SE BUSCA UN MARCADOR DE OMISIÓN
 // La versión anterior fallaba si el nombre de alguna prueba contenía "omitido".
@@ -99,13 +103,24 @@ export function evaluarReporte(reporte, cobertura, { minimo } = {}) {
   const ausentes = escenarios.filter(
     (e) => !pasadas.some((p) => p.nombre.includes(e.patron)),
   )
-  if (ausentes.length > 0) {
-    for (const e of ausentes) {
-      errores.push(
-        `falta el escenario obligatorio "${e.clave}" (ninguna prueba pasada contiene «${e.patron}»). ` +
-        `Por qué importa: ${e.porQue}`,
-      )
-    }
+  for (const e of ausentes) {
+    errores.push(
+      `falta el escenario obligatorio "${e.clave}" (ninguna prueba pasada contiene «${e.patron}»). ` +
+      `Por qué importa: ${e.porQue}`,
+    )
+  }
+
+  // RPC críticas, UNA A UNA. La granularidad por dominio dejaba pasar la
+  // desaparición de una RPC concreta mientras su bloque siguiera existiendo.
+  const rpcs = cobertura?.rpcsObligatorias ?? []
+  const rpcsAusentes = rpcs.filter(
+    (r) => !pasadas.some((p) => p.nombre.includes(r.nombre)),
+  )
+  for (const r of rpcsAusentes) {
+    errores.push(
+      `falta la RPC obligatoria "${r.nombre}" (dominio ${r.dominio}): ninguna prueba pasada la nombra. ` +
+      `Por qué importa: ${r.porQue}`,
+    )
   }
 
   if (pasadas.length > 0 && pasadas.length < pisoMinimo) {
@@ -126,6 +141,8 @@ export function evaluarReporte(reporte, cobertura, { minimo } = {}) {
       suitesFallidas,
       escenariosExigidos: escenarios.length,
       escenariosAusentes: ausentes.map((e) => e.clave),
+      rpcsExigidas: rpcs.length,
+      rpcsAusentes: rpcsAusentes.map((r) => r.nombre),
       pisoMinimo,
     },
   }
@@ -139,6 +156,7 @@ export function resumenMarkdown({ ok, errores, resumen }) {
       '',
       `- Pruebas pasadas: **${resumen.pasadas}** (total ${resumen.total}, fallos ${resumen.fallidas}, omitidas ${resumen.omitidas})`,
       `- Escenarios obligatorios presentes: **${resumen.escenariosExigidos}/${resumen.escenariosExigidos}**`,
+      `- RPC críticas verificadas una a una: **${resumen.rpcsExigidas}/${resumen.rpcsExigidas}**`,
       `- Piso mínimo exigido: ${resumen.pisoMinimo}`,
       '',
       'Las tablas con cobertura real vs. estructural están declaradas en',
@@ -183,7 +201,8 @@ async function main(argv, env) {
   if (veredicto.ok) {
     console.log(
       `✅ Harness RLS ejecutado de verdad: ${veredicto.resumen.pasadas} pruebas pasadas, ` +
-      `0 fallos, 0 omitidas, ${veredicto.resumen.escenariosExigidos} escenarios obligatorios presentes.`,
+      `0 fallos, 0 omitidas, ${veredicto.resumen.escenariosExigidos} escenarios y ` +
+      `${veredicto.resumen.rpcsExigidas} RPC obligatorias presentes.`,
     )
   } else {
     console.error('\n❌ El harness RLS NO demostró haber verificado el aislamiento:\n')
