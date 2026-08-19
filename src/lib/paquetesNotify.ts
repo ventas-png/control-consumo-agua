@@ -54,6 +54,25 @@ export async function intentarAvisar(
   }
 }
 
+/**
+ * Error HTTP del endpoint de aviso, con el status a la vista.
+ *
+ * Existe para que la decisión de reintentar dependa del CÓDIGO y no del texto:
+ * el mensaje lo escribe el servidor y puede ser cualquier cosa.
+ */
+export class ErrorAvisoHttp extends Error {
+  readonly status: number
+  constructor(mensaje: string, status: number) {
+    super(mensaje)
+    this.name = 'ErrorAvisoHttp'
+    this.status = status
+  }
+  /** 4xx es del payload o de la autorización: repetirlo da exactamente lo mismo. */
+  get reintentable(): boolean {
+    return this.status < 400 || this.status >= 500
+  }
+}
+
 interface NotifyOptions {
   maxAttempts?: number
   // Delays entre intentos en ms. Si la lista tiene menos entradas que
@@ -118,7 +137,7 @@ export async function notificarPieza(
       if (res.status >= 400 && res.status < 500) {
         const msg = json.error ?? `notify-package falló con ${res.status}`
         logger.warn('paquetesNotify:client_error_no_retry', { paqueteId, status: res.status, msg })
-        throw new Error(msg)
+        throw new ErrorAvisoHttp(msg, res.status)
       }
 
       // 5xx: intento siguiente con backoff.
@@ -129,8 +148,13 @@ export async function notificarPieza(
     } catch (err) {
       // Fetch rejection (red caída, CORS, etc.): reintentar.
       lastError = err
-      // Si el catch atrapó el throw del 4xx anterior, no debemos seguir.
-      if (err instanceof Error && err.message.includes('notify-package falló con 4')) {
+      // El 4xx que lanzamos arriba se reconoce por su STATUS, no por su texto.
+      // Antes se comprobaba `message.includes('notify-package falló con 4')`, que
+      // solo acertaba cuando el servidor NO mandaba `error` en el body: en cuanto
+      // respondía `{"error":"Forbidden"}` el mensaje era "Forbidden", la
+      // comprobación fallaba y un 401/403/404 se reintentaba tres veces con
+      // backoff — ruido garantizado y ni un aviso más entregado.
+      if (err instanceof ErrorAvisoHttp && !err.reintentable) {
         throw err
       }
       logger.warn('paquetesNotify:network_error_will_retry', {

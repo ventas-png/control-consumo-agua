@@ -52,13 +52,11 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     }
   })
 
-  // LAS CUATRO, incluida DELETE: borrar una notificación legal es justo la
-  // operación que más daño hace si el gate de clase se pierde.
+  // SELECT/INSERT/UPDATE se gobiernan por PERMISO de la clase.
   for (const nombre of [
     'paquetes_recibidos_select',
     'paquetes_recibidos_insert',
     'paquetes_recibidos_update',
-    'paquetes_recibidos_delete',
   ]) {
     it(`${nombre} resuelve el permiso por clase, no por tabla`, () => {
       const policy = vigentes.get(nombre)
@@ -71,12 +69,30 @@ describe('policies de paquetes_recibidos tras la unificación', () => {
     })
   }
 
-  it('DELETE sigue exigiendo rol y empresa ADEMÁS del permiso de clase', () => {
-    // El gate de clase se suma a los anteriores; no los reemplaza.
-    const cuerpo = vigentes.get('paquetes_recibidos_delete')!.cuerpo
-    expect(cuerpo).toMatch(/current_user_role\(\)/)
-    expect(cuerpo).toMatch(/company_owner/)
-    expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
+  // DELETE va por ROL, no por permiso: `user_has_permission` devuelve true a
+  // cualquier clave para super_admin/company_owner/admin (20260518000008), así
+  // que un gate de permiso colocado detrás de un filtro de rol no filtra nada.
+  describe('DELETE se gobierna por rol, no por el helper de permisos', () => {
+    const cuerpo = () => vigentes.get('paquetes_recibidos_delete')!.cuerpo
+
+    it('NO usa user_has_permission (sería una condición siempre verdadera)', () => {
+      expect(cuerpo()).not.toMatch(/user_has_permission/)
+    })
+
+    it('la correspondencia solo la borra company_owner: `admin` no aparece en su rama', () => {
+      // La rama de correspondencia compara contra 'company_owner' a secas; el
+      // ARRAY con 'admin' es la rama de paquetería.
+      expect(cuerpo()).toMatch(/WHEN\s+'correspondencia'\s+THEN\s+public\.current_user_role\(\)\s*=\s*'company_owner'/)
+    })
+
+    it('paquetería conserva company_owner y admin', () => {
+      expect(cuerpo()).toMatch(/ELSE\s+public\.current_user_role\(\)\s*=\s*ANY\(ARRAY\['company_owner','admin'\]\)/)
+    })
+
+    it('sigue acotado a la empresa y con la llave de soporte', () => {
+      expect(cuerpo()).toMatch(/company_id = public\.get_my_company_id\(\)/)
+      expect(cuerpo()).toMatch(/is_super_admin\(\)/)
+    })
   })
 
   it('el residente sigue viendo las piezas de su unidad', () => {
@@ -125,10 +141,22 @@ describe('migración de datos: fail-closed', () => {
     expect(previo).toMatch(/v_respaldo <> v_origen/)
   })
 
-  it('el respaldo se crea ANTES de tocar nada', () => {
-    const posRespaldo = sql.indexOf('CREATE TABLE IF NOT EXISTS public.correspondencia_condominio_respaldo')
+  it('el respaldo se crea ANTES de tocar nada, y sin IF NOT EXISTS', () => {
+    // Sin `IF NOT EXISTS`: una tabla de respaldo preexistente es el resto de un
+    // intento anterior con contenido desconocido. Darla por buena sería seguir
+    // sin respaldo fresco de ESTAS filas; que falle obliga a mirarla.
+    const posRespaldo = sql.indexOf('CREATE TABLE public.correspondencia_condominio_respaldo')
     expect(posRespaldo).toBeGreaterThan(-1)
     expect(posRespaldo).toBeLessThan(posInsert)
+    expect(soloCodigo(sql)).not.toMatch(/CREATE TABLE IF NOT EXISTS public\.correspondencia_condominio_respaldo/)
+  })
+
+  it('el respaldo se verifica por ids, no solo por total', () => {
+    // Un respaldo con el mismo número de filas pero otras filas pasaría un
+    // conteo y no serviría de nada.
+    const previo = sql.slice(posInsert, posDrop)
+    expect(previo).toMatch(/NOT EXISTS[\s\S]*correspondencia_condominio_respaldo r WHERE r\.id = c\.id/)
+    expect(previo).toMatch(/v_sin_respaldo/)
   })
 })
 

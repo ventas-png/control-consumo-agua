@@ -33,7 +33,11 @@
 -- posterior lo elimina.
 
 -- ── 1) Respaldo de las filas originales ─────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.correspondencia_condominio_respaldo AS
+-- SIN `IF NOT EXISTS`: si ya existe una tabla con ese nombre, es el resto de un
+-- intento anterior y no sabemos qué contiene. Con IF NOT EXISTS la habríamos
+-- dado por buena y seguido adelante sin respaldo fresco de ESTAS filas. Que
+-- falle y obligue a mirarla es el resultado correcto.
+CREATE TABLE public.correspondencia_condominio_respaldo AS
   TABLE public.correspondencia_condominio;
 
 ALTER TABLE public.correspondencia_condominio_respaldo ENABLE ROW LEVEL SECURITY;
@@ -196,10 +200,11 @@ FROM public.correspondencia_condominio c;
 -- deshace, dejando la tabla original intacta.
 DO $$
 DECLARE
-  v_origen    bigint;
-  v_migradas  bigint;
-  v_respaldo  bigint;
-  v_faltantes bigint;
+  v_origen       bigint;
+  v_migradas     bigint;
+  v_respaldo     bigint;
+  v_faltantes    bigint;
+  v_sin_respaldo bigint;
 BEGIN
   SELECT count(*) INTO v_origen   FROM public.correspondencia_condominio;
   SELECT count(*) INTO v_respaldo FROM public.correspondencia_condominio_respaldo;
@@ -225,12 +230,19 @@ BEGIN
       'Migración abortada: origen=% filas, migradas=% filas', v_origen, v_migradas;
   END IF;
 
-  -- El respaldo es la red por si hay que reconstruir; si quedó vacío o corto,
-  -- no hay red y no se dropea nada.
-  IF v_respaldo <> v_origen THEN
+  -- El respaldo es la red por si hay que reconstruir. Se comprueba FILA A FILA
+  -- por id, no por total: un respaldo con el mismo número de filas pero otras
+  -- filas (resto de un intento anterior) contaría como bueno y no lo es.
+  SELECT count(*) INTO v_sin_respaldo
+    FROM public.correspondencia_condominio c
+   WHERE NOT EXISTS (
+     SELECT 1 FROM public.correspondencia_condominio_respaldo r WHERE r.id = c.id
+   );
+
+  IF v_sin_respaldo > 0 OR v_respaldo <> v_origen THEN
     RAISE EXCEPTION
-      'Migración abortada: el respaldo tiene % filas y el origen % — sin respaldo completo no se borra la tabla',
-      v_respaldo, v_origen;
+      'Migración abortada: respaldo incompleto (origen=%, respaldo=%, ids sin respaldar=%) — sin respaldo completo no se borra la tabla',
+      v_origen, v_respaldo, v_sin_respaldo;
   END IF;
 
   RAISE NOTICE 'Correspondencia migrada: % filas (respaldo: %)', v_migradas, v_respaldo;
@@ -326,23 +338,34 @@ CREATE POLICY paquetes_recibidos_update ON public.paquetes_recibidos
     )
   );
 
--- DELETE: rol Y empresa Y permiso de la clase. Antes de la unificación, borrar
--- correspondencia exigía estar en `correspondencia_condominio`, cuyo DELETE ya
--- iba con este mismo rol; al fusionar las tablas, un admin con permiso solo de
--- paquetería habría podido borrar notificaciones legales sin tener el módulo.
--- El gate de clase cierra esa puerta, igual que en las otras tres operaciones.
+-- DELETE: quién puede DESTRUIR una constancia de custodia.
+--
+-- Aquí NO se usa `user_has_permission`. Ese helper devuelve true de entrada para
+-- super_admin, company_owner y admin (20260518000008, rama del CASE por rol):
+-- pedirle el permiso de la clase a alguien que ya pasó el filtro de rol es una
+-- condición siempre verdadera — un gate que no gatea nada. La protección tiene
+-- que estar en el ROL, que es lo único que distingue a estas personas entre sí.
+--
+-- La decisión explícita:
+--   · paquetería      → company_owner y admin, exactamente como siempre. Borrar
+--                       un paquete mal tecleado es higiene operativa diaria.
+--   · correspondencia → SOLO company_owner (y super_admin). Una notificación
+--                       legal es prueba de un acto: quién la recibió, cuándo y
+--                       con qué firma. Destruirla no es corregir un typo, y no
+--                       debe estar al alcance de cualquier administrador de
+--                       condominio. Para retirar una pieza de la operación sin
+--                       destruirla está `estado='archivado'`.
 DROP POLICY IF EXISTS paquetes_recibidos_delete ON public.paquetes_recibidos;
 CREATE POLICY paquetes_recibidos_delete ON public.paquetes_recibidos
   FOR DELETE TO authenticated
   USING (
     public.is_super_admin()
     OR (
-      public.current_user_role() = ANY(ARRAY['company_owner','admin'])
-      AND company_id = public.get_my_company_id()
-      AND public.user_has_permission(
-        CASE clase WHEN 'correspondencia'
-          THEN 'condominios.tab.correspondencia'
-          ELSE 'condominios.tab.paqueteria' END)
+      company_id = public.get_my_company_id()
+      AND CASE clase
+            WHEN 'correspondencia' THEN public.current_user_role() = 'company_owner'
+            ELSE public.current_user_role() = ANY(ARRAY['company_owner','admin'])
+          END
     )
   );
 

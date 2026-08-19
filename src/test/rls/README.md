@@ -64,22 +64,39 @@ export RLS_USER_B_EMAIL="qa-b@example.com"
 export RLS_USER_B_PASSWORD="********"
 
 # OPCIONAL — gate por CLASE de paquetes_recibidos (motor único, 20260829000000).
-# Dos usuarios de la MISMA empresa con permisos DISTINTOS: uno solo con
-# condominios.tab.paqueteria y otro solo con condominios.tab.correspondencia.
-# A/B no sirven para esto: son de empresas distintas, así que el aislamiento que
-# se vería sería el de tenant, no el de clase. Sin estas vars ese bloque se
-# skipea y queda su marcador en el reporte.
-export RLS_USER_PAQ_EMAIL="qa-paqueteria@example.com"
+# CUATRO usuarios de la MISMA empresa, porque hay dos gates distintos:
+#   · SELECT/INSERT/UPDATE van por PERMISO de la clase. Solo se ve con usuarios
+#     SIN rol admin: `user_has_permission` le dice true a TODO a
+#     super_admin/company_owner/admin, así que un admin no sirve para probarlo.
+#   · DELETE va por ROL: la correspondencia solo la borra company_owner. Ahí sí
+#     hace falta un admin, para comprobar que NO puede.
+# A/B tampoco sirven: son de empresas distintas y lo que se vería es el
+# aislamiento de tenant. Sin estas vars el bloque se skipea con su marcador.
+export RLS_USER_PAQ_EMAIL="qa-paqueteria@example.com"      # rol granular (operator) + condominios.tab.paqueteria
 export RLS_USER_PAQ_PASSWORD="********"
-export RLS_USER_CORR_EMAIL="qa-correspondencia@example.com"
+export RLS_USER_CORR_EMAIL="qa-correspondencia@example.com" # rol granular + condominios.tab.correspondencia
 export RLS_USER_CORR_PASSWORD="********"
+export RLS_USER_ADMIN_EMAIL="qa-admin@example.com"          # rol admin, MISMA empresa
+export RLS_USER_ADMIN_PASSWORD="********"
+export RLS_USER_OWNER_EMAIL="qa-owner@example.com"          # rol company_owner, MISMA empresa
+export RLS_USER_OWNER_PASSWORD="********"
 
 npx vitest run src/test/rls/rlsHarness.test.ts
 ```
 
-El bloque de clase es **no destructivo**: siembra su propia fila desechable con
-el usuario que sí tiene el permiso, intenta borrarla con el que no lo tiene
-(debe afectar 0 filas), comprueba que sigue viva y la limpia al terminar.
+El bloque de clase es **no destructivo**: siembra sus propias filas desechables
+con quien sí tiene el permiso y las limpia al terminar. Empieza afirmando las
+precondiciones (misma empresa, roles esperados, permisos efectivos disjuntos)
+para que ningún caso pueda pasar por aislamiento de tenant o por falta del rol.
+
+## Sin credenciales: el sandbox de Postgres
+
+`scripts/rls-recepcion-sandbox.sh` prueba **las mismas policies** contra un
+Postgres desechable, sin Supabase ni secretos: monta el andamiaje mínimo
+(`auth.uid`, `app_users`, los helpers de RBAC), **extrae las policies del propio
+archivo de migración** y ejecuta los escenarios como cada usuario. No sustituye
+al harness —no cubre GoTrue ni el resto del esquema— pero sí se ejecuta siempre
+y falla si alguien rompe la separación por clase.
 
 En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
 `rls-harness`), que sólo se activa cuando los secretos del repo están presentes.
