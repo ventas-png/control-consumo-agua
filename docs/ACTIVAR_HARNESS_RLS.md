@@ -1,7 +1,7 @@
 # Activar el harness de RLS
 
 > **Estado hoy:** el job `RLS harness (server-side)` **falla** en PRs internos y
-> en push a `main` mientras no existan los seis secretos `RLS_*`. Eso es
+> en push a `main` mientras no existan las siete variables `RLS_*`. Eso es
 > deliberado: antes quedaba **verde sin ejecutar nada**, y un verde por omisión
 > es indistinguible de un verde por verificación. Un job que miente sobre
 > cobertura es peor que uno rojo.
@@ -10,7 +10,7 @@
 > aquí abajo está implementado y probado en local (verificador, preflight,
 > contratos de esquema y de workflow), pero para poder afirmar que el
 > aislamiento quedó verificado faltan cuatro pasos que exigen infraestructura:
-> crear el sandbox, correr el seed contra él, cargar los seis secretos y obtener
+> crear el sandbox, correr el seed contra él, cargar las siete variables y obtener
 > un job RLS verde con más de cero pruebas. Hasta entonces, nada de este
 > documento debe citarse como «aislamiento demostrado en CI».
 
@@ -34,7 +34,7 @@ te dice que el motor la aplique como creés.
 termina con **exit code 0 y cero pruebas ejecutadas**. Para GitHub Actions eso
 es un job verde. Por eso ahora hay dos guardas:
 
-- **Preflight fail-closed** (`scripts/rls-preflight.mjs`): se exigen las **seis**
+- **Preflight fail-closed** (`scripts/rls-preflight.mjs`): se exigen las **siete**
   variables. Con la URL puesta pero una credencial vacía, el harness se
   auto-saltaba y terminaba verde con cero pruebas — sin ni siquiera el warning.
   Ahora falta cualquiera y el job falla.
@@ -44,42 +44,56 @@ es un job verde. Por eso ahora hay dos guardas:
   pruebas pasadas y que **cada una de las 23 RPC críticas** esté nombrada en
   alguna de ellas.
 
-Las **únicas** omisiones legítimas son los contextos en que GitHub no entrega
-los Actions secrets por diseño, y **sólo en eventos `pull_request`**:
+Hay dos contextos en que GitHub **no entrega** los Actions secrets por diseño, y
+sólo en eventos `pull_request`:
 
 | Contexto | Por qué |
 |---|---|
 | PR desde un **fork** | GitHub no expone secretos a los forks |
 | PR de **Dependabot** | los Actions secrets no llegan a `dependabot[bot]`; sólo llegan los *Dependabot secrets*, que son un almacén aparte |
 
-En ambos el job se omite **explícitamente** (notice + resumen), **sin ejecutar
-código ajeno con credenciales** y **sin recurrir a `pull_request_target`**, que
-sí las expondría al código del PR.
+Identificarlos sirve para dar un mensaje honesto —«esto no lo arreglás poniendo
+los secretos»— pero **no cambia el desenlace: el check queda en rojo**.
 
-#### La garantía diferida de Dependabot, y por qué la anterior no servía
+#### Por qué una omisión también bloquea
 
-La versión previa de este documento decía que «el aislamiento se verifica
-igualmente en el push a `main` posterior al merge». Eso **no era verificable**:
-si el merge lo hace el propio Dependabot (auto-merge), el push a `main` también
-corre con `github.actor = dependabot[bot]` y, con la regla anterior —que miraba
-sólo el actor—, se habría omitido **otra vez**. El bump nunca se habría
-verificado y nadie se habría enterado.
+Antes, estos dos casos salían con exit 0 y un `::notice`: un check **verde** en un
+PR cuyo aislamiento **nadie había verificado**. Y un check verde es exactamente lo
+que autoriza a fusionar.
 
-La regla actual acota la omisión al evento `pull_request`. En `push` **no se
-omite jamás**, sea quien sea el actor: si faltan los secretos, el job falla y el
-hueco se ve. Eso convierte la omisión del PR en una garantía comprobable —«se
-difiere a main, y main no puede saltárselo»— en vez de una promesa.
+El argumento de entonces —«se valida igualmente en el push a `main` posterior al
+merge»— confunde **detección** con **prevención**. Cuando ese job falla, el cambio
+**ya está en main**. Y encima ni siquiera era cierto: con auto-merge, el push a
+`main` también corre con `github.actor = dependabot[bot]`, así que con la regla
+vieja —que sólo miraba el actor— se habría omitido otra vez.
 
-Si querés que un PR de Dependabot verifique RLS **en el propio PR**, declará las
-seis variables **también** como *Dependabot secrets*, con los mismos nombres:
-**Settings → Secrets and variables → Dependabot**. El preflight las ve igual y
-el job corre sin diferir nada.
+Ahora la omisión bloquea, y el resumen del job explica cómo desbloquear:
+
+1. Reproducir el cambio en una **rama interna** del repositorio (`gh pr checkout`
+   y push a una rama propia, o un cherry-pick). Ahí los Actions secrets sí llegan.
+2. Comprobar que `RLS harness (server-side)` pasa **en verde sobre ese commit**,
+   con pruebas > 0 y todos los escenarios obligatorios.
+3. Fusionar esa rama interna; el PR original se cierra como duplicado.
+
+Es más trabajo que antes, y es el trabajo correcto: la alternativa era fusionar
+sin verificar y contarlo como verificado.
+
+Para que los PR de **Dependabot** verifiquen por sí solos, declará las siete
+variables **también** como *Dependabot secrets*, con los mismos nombres:
+**Settings → Secrets and variables → Dependabot**. El preflight las ve igual y no
+hay nada que diferir.
+
+En ningún caso se recurre a **`pull_request_target`**, que sí expondría los
+secretos al código del PR: sería un problema peor que el que resuelve.
+
+En `push` no hay contexto que valga: si faltan las variables es un fallo de
+configuración, incluso si el actor es `dependabot[bot]`.
 
 La tabla de verdad del gate (fork · PR de Dependabot · PR interno · push a main ·
-push a main iniciado por Dependabot · `workflow_dispatch`) tiene prueba
-contractual en `scripts/__tests__/rls-preflight.test.mjs`, junto con la
-comprobación de que el workflow conserva el disparador `push: branches: [main]`
-del que depende la garantía.
+push a main iniciado por Dependabot · `workflow_dispatch` · destino rechazado)
+tiene prueba contractual en `scripts/__tests__/rls-preflight.test.mjs`, junto con
+la comprobación de que el workflow conserva el disparador `push: branches: [main]`
+y de que el preflight corre antes de `npm ci`.
 
 ### Por qué el verificador ya no busca un marcador de omisión
 
@@ -88,7 +102,8 @@ La primera versión rechazaba el reporte si el nombre de alguna prueba contenía
 el reporte JSON, así que el `it.skip('omitido — …')` del bloque alternativo
 aparecía **siempre**, también con credenciales. El job no podía ponerse verde ni
 con el sandbox montado. El bloque alternativo se eliminó del harness y la
-constancia de la omisión la da el preflight, que es quien tiene la información.
+constancia de que el harness no corrió la da el preflight —que es quien tiene la
+información— y además ya no como aviso verde, sino bloqueando el check.
 
 ### 2. El verde por conjuntos vacíos
 
@@ -203,7 +218,7 @@ esquema y verificada por `src/test/rls/__tests__/esquemaFixtures.test.ts`:
 
 Las ocho de garantía `rol` son las `portal_*` del self-service del propietario.
 Para subirlas a `tenant` harían falta usuarios fixture con rol `cliente` y fila
-en `unidad_residentes`, lo que exige dos credenciales más allá de las seis
+en `unidad_residentes`, lo que exige dos credenciales más allá de las siete
 `RLS_*` que define este PR. Queda declarado como limitación, no como cobertura.
 Las de reservas (`portal_reservar_amenidad`, `portal_cancelar_reserva`) sí llegan
 a `tenant` porque aceptan al staff del tenant y comparan `company_id`.
@@ -241,6 +256,25 @@ evalúe, así que el verde no demostraba que la policy funcionara. Con FKs
 válidas, el rechazo sólo puede venir de RLS. Lo mismo con los RPC: negar la
 metadata de una empresa que existe es una comprobación de autorización; negar la
 de un id inventado no prueba nada.
+
+### Las limpiezas no pueden tocar los fixtures
+
+El `afterAll` barre lo que un negative-write nunca debió dejar. Cada `DELETE` se
+filtra por el **marcador efímero de esa corrida** (`RLS-NEG-<ts>-<rand>`) o por
+**ids concretos** leídos antes; ninguno por `company_id`.
+
+La regla no es teórica: había un `documentos_fiscales.delete().eq('company_id',
+B.companyId)` que se llevaba por delante **todos** los comprobantes de B, incluido
+el que siembra el seed — el que hace que esa tabla tenga cobertura no trivial. La
+primera corrida pasaba y la segunda fallaba por «B no ve ninguna fila propia»; y si
+alguien hubiera relajado esa aserción para «arreglarlo», la disjunción habría
+vuelto a ser trivial. Una limpieza demasiado amplia no rompe la corrida en la que
+se escribe: rompe la siguiente, y en la dirección de un verde hueco.
+
+`src/test/rls/__tests__/destinoHarness.test.ts` audita el fuente y falla si algún
+`DELETE` vuelve a filtrar por `company_id` o queda sin acotar. Como el marcador
+lleva parte aleatoria, dos corridas simultáneas contra el mismo sandbox tampoco se
+pisan.
 
 ### Las pruebas deny-all distinguen "denegado" de "roto"
 
@@ -340,10 +374,38 @@ volvé a correrlo y usá las nuevas.
 |---|---|
 | `RLS_SUPABASE_URL` | URL del sandbox |
 | `RLS_SUPABASE_ANON_KEY` | Dashboard → API → `anon public` |
+| `RLS_EXPECTED_PROJECT_REF` | el ref del sandbox (el `<ref>` de la URL); lo imprime el script. **No es una credencial** |
 | `RLS_USER_A_EMAIL` · `RLS_USER_A_PASSWORD` | los imprime el script |
 | `RLS_USER_B_EMAIL` · `RLS_USER_B_PASSWORD` | los imprime el script |
 
-**Los seis.** Con cinco, el preflight falla — a propósito.
+**Las siete.** Con seis, el preflight falla — a propósito.
+
+### Por qué `RLS_EXPECTED_PROJECT_REF` es obligatoria
+
+No aporta secreto ninguno: aporta **declaración**. El harness hace `INSERT`,
+`UPDATE` y `DELETE` de filas de prueba, así que la pregunta «¿contra qué proyecto
+corre?» tiene consecuencias. Con una sola variable —la URL— cambiar ese secreto
+bastaría para redirigir todas esas escrituras a otro proyecto sin que nada lo
+notara. Exigir que URL y ref coincidan convierte ese cambio en un abort.
+
+El preflight valida el destino **antes de `setup-node` y de `npm ci`**, así que
+un destino rechazado no llega a instalar dependencias ni a abrir una conexión:
+
+| Caso | Desenlace |
+|---|---|
+| URL de producción (`nnsqmeigtgewatameexo`), aunque el ref declarado coincida | abortado — lista negra explícita |
+| Dominio que no es Supabase | abortado — sólo los de `coverage.json` |
+| `RLS_EXPECTED_PROJECT_REF` ausente | abortado — sin declaración no se opera |
+| Ref declarado ≠ ref de la URL | abortado — uno de los dos está mal y no se adivina cuál |
+
+La validación vive en **`scripts/rls-destino.mjs`**, es **pura** (no lee disco,
+no toca la red) y la comparten las tres piezas que pueden escribir: el seed, el
+preflight y **el propio harness**, que la repite como defensa en profundidad —
+porque quien corre `npx vitest` a mano no pasa por el preflight. Sus pruebas
+están en `scripts/__tests__/rls-destino.test.mjs` y
+`src/test/rls/__tests__/destinoHarness.test.ts`; estas últimas sustituyen
+`@supabase/supabase-js` por un espía y comprueban que `createClient` **no se
+llama ni una vez** cuando el destino se rechaza.
 
 ## Paso 5 — Comprobar que ahora sí corre
 

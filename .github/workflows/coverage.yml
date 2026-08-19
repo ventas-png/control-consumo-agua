@@ -227,6 +227,11 @@ jobs:
     env:
       RLS_SUPABASE_URL: ${{ secrets.RLS_SUPABASE_URL }}
       RLS_SUPABASE_ANON_KEY: ${{ secrets.RLS_SUPABASE_ANON_KEY }}
+      # Declaración del proyecto contra el que se opera. NO es una credencial:
+      # sin ella, cambiar `RLS_SUPABASE_URL` bastaría para que el harness —que
+      # hace INSERT, UPDATE y DELETE— escribiera en otro proyecto sin que nada
+      # lo notara. El preflight exige que coincida con el ref de la URL.
+      RLS_EXPECTED_PROJECT_REF: ${{ secrets.RLS_EXPECTED_PROJECT_REF }}
       RLS_USER_A_EMAIL: ${{ secrets.RLS_USER_A_EMAIL }}
       RLS_USER_A_PASSWORD: ${{ secrets.RLS_USER_A_PASSWORD }}
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
@@ -246,6 +251,13 @@ jobs:
       #   2. Un verde por omisión es indistinguible de un verde por
       #      verificación. La rama protegida lo contaba como cobertura.
       #
+      # El preflight comprueba además el DESTINO —dominio Supabase reconocido,
+      # ref de producción rechazado, y ref igual a RLS_EXPECTED_PROJECT_REF—
+      # ANTES de setup-node y de `npm ci`: si el destino no está declarado, el
+      # job termina sin haber instalado nada ni abierto ninguna conexión.
+      # La misma validación (scripts/rls-destino.mjs) la repiten el seed y el
+      # propio harness, como defensa en profundidad.
+      #
       # La decisión vive en `scripts/rls-preflight.mjs` (Node, no inline en el
       # YAML) para poder PROBARLA: `scripts/__tests__/rls-preflight.test.mjs`
       # cubre los cuatro contextos — fork, Dependabot, PR interno y push a main.
@@ -258,9 +270,10 @@ jobs:
           # `head.repo.fork` sólo existe en eventos pull_request; en push a main
           # queda vacío → se trata como interno → fail-closed. Correcto.
           ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
-          # Dependabot no recibe los Actions secrets: en `pull_request` se trata
-          # como el fork. En `push` NO se omite por el actor — ahí es donde se
-          # difirió la verificación y es lo que la hace comprobable.
+          # Dependabot no recibe los Actions secrets: en `pull_request` se
+          # identifica como contexto estructural, pero el desenlace sigue siendo
+          # ROJO. Un verde ahí autorizaría a fusionar sin verificar, y el fallo
+          # posterior en `main` sería detección, no prevención.
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/rls-preflight.mjs

@@ -5,6 +5,11 @@ import {
   TENANT_SCOPED_ESTRUCTURALES,
   FIXTURES,
 } from './coverage'
+import cobertura from './coverage.json'
+// MISMA validación que usan el seed y el preflight del workflow. Se importa, no
+// se reimplementa: tres copias divergen y la que se quede corta es la que
+// escribe donde no debe.
+import { validarDestino } from '../../../scripts/rls-destino.mjs'
 
 // ════════════════════════════════════════════════════════════════════════════
 // plat:P15 — Harness liviano de RBAC/RLS contra un Supabase REAL (preview/sandbox).
@@ -40,22 +45,62 @@ import {
 //      mark_notification_result, run_notifications_dispatcher — TODOS rechazados.
 //
 // CREDENCIAL-GATED: si faltan las env vars NO se crea ningún cliente ni se hace
-// red — el bloque se SKIPEA (CI verde sin secretos). Para correrlo, exporta:
+// red — el bloque no declara pruebas en local. En CI eso no puede pasar: el
+// preflight del workflow falla antes (fail-closed). Para correrlo, exporta:
 //   RLS_SUPABASE_URL, RLS_SUPABASE_ANON_KEY,
+//   RLS_EXPECTED_PROJECT_REF,                (ref del sandbox, declarado)
 //   RLS_USER_A_EMAIL, RLS_USER_A_PASSWORD,   (empresa A)
 //   RLS_USER_B_EMAIL, RLS_USER_B_PASSWORD    (empresa B, distinta de A)
 // apuntando al preview branch del PR o a un sandbox — NUNCA a producción.
 // Ver src/test/rls/README.md.
+//
+// DEFENSA EN PROFUNDIDAD SOBRE EL DESTINO
+// El preflight del workflow ya valida que la URL apunte al proyecto declarado,
+// pero esta suite escribe y borra filas: no puede depender de que quien la
+// invoque haya hecho su parte. Alguien que corra `npx vitest` a mano con la URL
+// de producción exportada no pasa por el preflight. Así que la MISMA validación
+// —dominio Supabase reconocido, ref de producción rechazado, ref igual a
+// RLS_EXPECTED_PROJECT_REF— se repite aquí, y su resultado se calcula ANTES de
+// construir ningún cliente: si el destino no está declarado, `ENABLED` es false
+// y no se abre una sola conexión.
 // ════════════════════════════════════════════════════════════════════════════
 
 const URL = process.env.RLS_SUPABASE_URL
 const ANON = process.env.RLS_SUPABASE_ANON_KEY
+const EXPECTED_REF = process.env.RLS_EXPECTED_PROJECT_REF
 const A_EMAIL = process.env.RLS_USER_A_EMAIL
 const A_PASS = process.env.RLS_USER_A_PASSWORD
 const B_EMAIL = process.env.RLS_USER_B_EMAIL
 const B_PASS = process.env.RLS_USER_B_PASSWORD
 
-const ENABLED = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
+const CREDENCIALES_OK = Boolean(URL && ANON && A_EMAIL && A_PASS && B_EMAIL && B_PASS)
+
+/**
+ * Destino validado con la misma función pura que el seed y el preflight. Se
+ * evalúa en tiempo de módulo, así que ocurre antes que cualquier `createClient`.
+ */
+export const DESTINO = CREDENCIALES_OK
+  ? validarDestino({
+      url: URL,
+      esperado: EXPECTED_REF,
+      cobertura,
+      variable: 'RLS_EXPECTED_PROJECT_REF',
+    })
+  : ({ ok: false, clave: 'sin-credenciales', motivo: 'faltan variables RLS_*' } as const)
+
+if (CREDENCIALES_OK && !DESTINO.ok) {
+  // Ruidoso a propósito: con credenciales presentes, un destino rechazado es un
+  // error de configuración que hay que ver, no una omisión silenciosa. El
+  // preflight ya habría fallado en CI; esto cubre la ejecución a mano.
+  throw new Error(
+    `Harness RLS ABORTADO — destino no declarado: ${DESTINO.motivo}\n` +
+    'Esta suite hace INSERT, UPDATE y DELETE de filas de prueba. No se abre ninguna ' +
+    'conexión hasta que RLS_SUPABASE_URL y RLS_EXPECTED_PROJECT_REF coincidan y no ' +
+    'apunten a producción.',
+  )
+}
+
+const ENABLED = CREDENCIALES_OK && DESTINO.ok
 
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los
@@ -455,11 +500,31 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // sandbox y —peor— un falso verde en la siguiente corrida. Es best-effort:
     // los errores se ignoran a propósito, porque lo normal es que no haya nada
     // que borrar y el DELETE devuelva 0 filas.
+    //
+    // ⚠️ REGLA DE LAS LIMPIEZAS, sin excepciones: cada DELETE se filtra por el
+    // MARCADOR_EFIMERO de ESTA corrida o por ids concretos leídos antes. Nunca
+    // por `company_id` ni por ningún otro campo compartido con los fixtures.
+    //
+    // Aquí había un `documentos_fiscales.delete().eq('company_id', B.companyId)`
+    // que borraba TODOS los comprobantes de la empresa B —incluido el que
+    // siembra `seed-rls-sandbox.mjs`, que es lo que hace que esa tabla tenga
+    // cobertura NO TRIVIAL—. Efecto: la primera corrida pasaba y la segunda
+    // fallaba por "B no ve ninguna fila propia", o peor, si alguien relajaba esa
+    // aserción, la disjunción volvía a ser trivial. Una limpieza que destruye el
+    // fixture convierte la suite en no repetible.
+    //
+    // El marcador es único por corrida (`RLS-NEG-<ts>-<rand>`), así que además
+    // dos ejecuciones simultáneas contra el mismo sandbox no se pisan.
     await Promise.allSettled([
       userA?.from('cuotas_condominio').delete().eq('concepto', MARCADOR_EFIMERO),
       userA?.from('conta_cuentas').delete().eq('nombre', MARCADOR_EFIMERO),
       userA?.from('conta_asientos').delete().eq('concepto', MARCADOR_EFIMERO),
-      userA?.from('documentos_fiscales').delete().eq('company_id', B?.companyId ?? ''),
+      userA?.from('documentos_fiscales').delete().eq('serie', MARCADOR_EFIMERO),
+      // Y lo mismo desde B: si una escritura cross-tenant se colara, la fila
+      // quedaría en el tenant de B y A no podría verla ni borrarla.
+      userB?.from('cuotas_condominio').delete().eq('concepto', MARCADOR_EFIMERO),
+      userB?.from('conta_cuentas').delete().eq('nombre', MARCADOR_EFIMERO),
+      userB?.from('documentos_fiscales').delete().eq('serie', MARCADOR_EFIMERO),
     ])
     await Promise.allSettled([userA?.auth.signOut(), userB?.auth.signOut()])
   })

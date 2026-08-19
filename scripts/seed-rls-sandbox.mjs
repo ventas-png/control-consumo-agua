@@ -22,6 +22,7 @@
 //
 // USO
 //   SEED_SUPABASE_URL=https://<ref>.supabase.co \
+//   SEED_EXPECTED_REF=<ref> \
 //   SEED_SERVICE_ROLE_KEY=<service_role del SANDBOX> \
 //   SEED_ANON_KEY=<anon public del SANDBOX> \
 //   SEED_CONFIRM=si \
@@ -35,7 +36,9 @@
 //   3. SEED_EXPECTED_REF debe COINCIDIR con el ref de la URL — hay que declarar
 //      de antemano contra qué sandbox se va a sembrar, así que un copiar-pegar
 //      de la URL equivocada no basta para ejecutar nada.
-// Más SEED_CONFIRM=si como confirmación interactiva.
+// Más SEED_CONFIRM=si como confirmación interactiva. Los tres primeros son la
+// MISMA función pura que usan el preflight del workflow y el propio harness
+// (`scripts/rls-destino.mjs`): una sola regla, no tres copias que divergen.
 //
 // ⚠️ LA service_role SÓLO SE USA AQUÍ, en la máquina del operador. NO va a
 // ningún secreto de GitHub: CI sólo recibe la anon key y las credenciales de
@@ -48,6 +51,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
+import { validarDestino } from './rls-destino.mjs'
+
 const AQUI = dirname(fileURLToPath(import.meta.url))
 
 // Manifiesto compartido con el harness: no puede desincronizarse.
@@ -58,69 +63,23 @@ const NO_TRIVIALES = COBERTURA.noTriviales
 const FIX = COBERTURA.fixtures
 
 // ── Salvaguardas ────────────────────────────────────────────────────────────
+// La validación del destino NO vive aquí: está en `scripts/rls-destino.mjs`,
+// compartida con el preflight del workflow y con el propio harness. Tres copias
+// de esta comprobación divergen con el tiempo, y la copia que se quede corta es
+// justo la que escribe donde no debe. Se re-exportan con los nombres históricos
+// para no romper a quien ya los importe.
 
-/** Ref del proyecto a partir de la URL `https://<ref>.<dominio>`. */
-export function refDeUrl(url) {
-  const m = /^https:\/\/([a-z0-9-]+)\.([a-z0-9.-]+)$/i.exec((url ?? '').trim().replace(/\/+$/, ''))
-  return m ? { ref: m[1], dominio: m[2] } : null
-}
+export { refDeUrl } from './rls-destino.mjs'
 
 /**
- * Valida que la URL apunte a un sandbox DECLARADO. Pura, para poder probarla.
- *
- * El bloqueo del ref de producción no basta por sí solo: protege contra UN
- * proyecto conocido y deja pasar cualquier otro, incluido el de otro cliente o
- * un dominio que no sea Supabase. Por eso se exige además que el operador
- * declare `SEED_EXPECTED_REF` y que coincida con el ref de la URL.
+ * Valida que la URL apunte al sandbox declarado en `SEED_EXPECTED_REF`.
+ * Envoltura fina sobre `validarDestino` que sólo fija el nombre de la variable,
+ * para que el mensaje de error diga cuál hay que corregir.
  *
  * @returns {{ ok: true, ref: string } | { ok: false, motivo: string }}
  */
 export function validarUrlSandbox(url, esperado, cobertura) {
-  const partes = refDeUrl(url)
-  if (!partes) {
-    return { ok: false, motivo: `la URL "${url}" no tiene la forma https://<ref>.<dominio>` }
-  }
-
-  const dominiosOk = cobertura?.dominiosSandboxPermitidos ?? []
-  if (!dominiosOk.some((d) => partes.dominio === d || partes.dominio.endsWith(`.${d}`))) {
-    return {
-      ok: false,
-      motivo:
-        `el dominio "${partes.dominio}" no está reconocido como Supabase ` +
-        `(permitidos: ${dominiosOk.join(', ')}). No se siembra contra un host desconocido.`,
-    }
-  }
-
-  const refProd = cobertura?.refProduccionProhibido
-  if (refProd && partes.ref === refProd) {
-    return {
-      ok: false,
-      motivo:
-        `la URL apunta al proyecto de PRODUCCIÓN (${refProd}). Este script crea ` +
-        'empresas y usuarios de prueba: creá un proyecto Supabase aparte.',
-    }
-  }
-
-  if (!esperado) {
-    return {
-      ok: false,
-      motivo:
-        'falta SEED_EXPECTED_REF. Declará de antemano el ref del sandbox contra el que ' +
-        `vas a sembrar (aquí sería "${partes.ref}"): sin esa declaración, un copiar-pegar ` +
-        'de la URL equivocada bastaría para escribir en el proyecto que no es.',
-    }
-  }
-
-  if (esperado !== partes.ref) {
-    return {
-      ok: false,
-      motivo:
-        `SEED_EXPECTED_REF="${esperado}" NO coincide con el ref de la URL ("${partes.ref}"). ` +
-        'Abortado: uno de los dos está mal y no se adivina cuál.',
-    }
-  }
-
-  return { ok: true, ref: partes.ref }
+  return validarDestino({ url, esperado, cobertura, variable: 'SEED_EXPECTED_REF' })
 }
 
 // ── Datos a crear ───────────────────────────────────────────────────────────
@@ -481,15 +440,21 @@ async function main(env) {
   console.log(`
 ✅ Sandbox listo y VERIFICADO como ambos usuarios.
 
-Pegá estos 6 secretos en el repo
+Pegá estos 7 secretos en el repo
 (Settings → Secrets and variables → Actions → New repository secret):
 
-  RLS_SUPABASE_URL        ${URL}
-  RLS_SUPABASE_ANON_KEY   <anon public key del sandbox>
-  RLS_USER_A_EMAIL        ${creado[0].email}
-  RLS_USER_A_PASSWORD     ${creado[0].pass}
-  RLS_USER_B_EMAIL        ${creado[1].email}
-  RLS_USER_B_PASSWORD     ${creado[1].pass}
+  RLS_SUPABASE_URL          ${URL}
+  RLS_SUPABASE_ANON_KEY     <anon public key del sandbox>
+  RLS_EXPECTED_PROJECT_REF  ${destino.ref}
+  RLS_USER_A_EMAIL          ${creado[0].email}
+  RLS_USER_A_PASSWORD       ${creado[0].pass}
+  RLS_USER_B_EMAIL          ${creado[1].email}
+  RLS_USER_B_PASSWORD       ${creado[1].pass}
+
+RLS_EXPECTED_PROJECT_REF no es una credencial: es la DECLARACIÓN del proyecto
+contra el que puede operar el harness. Sin ella, cambiar RLS_SUPABASE_URL
+bastaría para que las escrituras de prueba fueran a parar a otro proyecto.
+El preflight exige que ambas coincidan y aborta si no.
 
 ⚠️  La service_role NO va a GitHub. CI sólo recibe la anon key y estas dos
    cuentas de bajo privilegio.

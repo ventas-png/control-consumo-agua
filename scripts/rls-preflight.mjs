@@ -2,46 +2,64 @@
 // ════════════════════════════════════════════════════════════════════════════
 // Preflight FAIL-CLOSED del job "RLS harness (server-side)".
 // ════════════════════════════════════════════════════════════════════════════
-// Decide, ANTES de instalar nada, si el harness puede verificar el aislamiento
-// multi-tenant. Tres desenlaces y ninguno ambiguo:
+// Decide, ANTES de instalar dependencias o abrir ninguna conexión, si el
+// harness puede verificar el aislamiento multi-tenant. Tres desenlaces, y sólo
+// UNO deja el check en verde:
 //
-//   run    — están las SEIS variables RLS_*: el harness se ejecuta.
-//   skip   — SÓLO en eventos `pull_request` donde GitHub no entrega los Actions
-//            secrets por diseño:
-//            · PR desde un fork,
-//            · PR abierto por dependabot[bot].
-//            Se omite EXPLÍCITAMENTE, sin ejecutar código ajeno con
-//            credenciales y sin recurrir a `pull_request_target` —que sí las
-//            expondría al código del PR y es justo lo que no queremos.
-//   fail   — TODO lo demás, incluido `push` a main sea quien sea el actor.
+//   run       — están las SIETE variables RLS_* y el destino está declarado y
+//               validado: el harness se ejecuta. Exit 0.
+//   bloqueado — GitHub no entrega los Actions secrets por diseño (PR de fork o
+//               de dependabot[bot]). Exit 1: el check queda ROJO.
+//   fail      — TODO lo demás: faltan variables, o la URL apunta a un destino
+//               no declarado / a producción. Exit 1.
 //
-// LA GARANTÍA, Y POR QUÉ LA ANTERIOR NO SERVÍA
-// La versión previa afirmaba que «el aislamiento se valida igualmente en el
-// push a main posterior al merge». Eso no es verificable: si el merge lo hace
-// el propio Dependabot (auto-merge), el push a `main` también corre con
-// `github.actor = dependabot[bot]` y, con la regla anterior, se habría OMITIDO
-// otra vez. El cambio nunca se habría verificado y nadie se habría enterado.
+// POR QUÉ "bloqueado" TAMBIÉN ES ROJO
+// Antes, fork y Dependabot salían con exit 0 y un `::notice`. Eso producía un
+// check VERDE en un PR cuyo aislamiento NADIE había verificado, y un check verde
+// es exactamente lo que autoriza a fusionar. El argumento de entonces —«se
+// valida en el push a `main` posterior»— confunde detección con prevención: para
+// cuando ese push falla, el cambio YA ESTÁ en main. Un fallo posterior al merge
+// no previene nada.
 //
-// Ahora la omisión está acotada al evento `pull_request`. En `push` no se omite
-// jamás: si faltan los secretos, el job FALLA y el hueco se ve. Eso convierte
-// la omisión del PR en una garantía comprobable —«se difiere a main, y main no
-// puede saltárselo»— en vez de una promesa.
+// Ahora la omisión bloquea. Para desbloquear un PR de fork o de Dependabot hay
+// que conseguir una ejecución CONFIABLE en una rama interna del repo —donde los
+// secretos sí llegan— y comprobar allí que el harness pasa; el resumen del job
+// lo explica paso a paso. Es más trabajo, y es el trabajo correcto: la
+// alternativa era fusionar sin verificar y llamarlo verificado.
 //
-// Para que un PR de Dependabot verifique en el propio PR (y no sólo al
-// mergear), hay que declarar las seis variables TAMBIÉN como *Dependabot
-// secrets* con los mismos nombres: Settings → Secrets and variables →
-// Dependabot. Está documentado en docs/ACTIVAR_HARNESS_RLS.md.
+// `pull_request_target` NO se usa: expondría los secretos al código del PR, que
+// es un problema peor que el que resolvería.
 //
 // Vive en Node y no inline en el YAML para poder probarlo:
-// `scripts/__tests__/rls-preflight.test.mjs` cubre los cuatro contextos.
+// `scripts/__tests__/rls-preflight.test.mjs` cubre los contextos uno a uno.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 
-/** Las seis variables que el harness necesita. Sus NOMBRES no son secretos. */
+import { validarDestino } from './rls-destino.mjs'
+
+const AQUI = dirname(fileURLToPath(import.meta.url))
+
+/** Manifiesto compartido: dominios permitidos y ref de producción prohibido. */
+export function cargarCobertura(ruta = join(AQUI, '..', 'src', 'test', 'rls', 'coverage.json')) {
+  return JSON.parse(readFileSync(ruta, 'utf8'))
+}
+
+/**
+ * Las SIETE variables que el harness necesita. Sus NOMBRES no son secretos.
+ *
+ * `RLS_EXPECTED_PROJECT_REF` no es una credencial: es la DECLARACIÓN de contra
+ * qué proyecto se va a operar. Sin ella, cambiar el secreto `RLS_SUPABASE_URL`
+ * bastaría para que el harness —que hace INSERT, UPDATE y DELETE— apuntara a
+ * otro proyecto sin que nada lo notara. Con ella, la URL y la declaración tienen
+ * que coincidir o el job aborta.
+ */
 export const VARIABLES_RLS = [
   'RLS_SUPABASE_URL',
   'RLS_SUPABASE_ANON_KEY',
+  'RLS_EXPECTED_PROJECT_REF',
   'RLS_USER_A_EMAIL',
   'RLS_USER_A_PASSWORD',
   'RLS_USER_B_EMAIL',
@@ -52,9 +70,13 @@ export const VARIABLES_RLS = [
  * Contextos en los que GitHub NO entrega los Actions secrets al ejecutor, así
  * que la ausencia de variables es estructural y no un error de configuración.
  *
- * CLAVE: sólo se admite la omisión en eventos `pull_request`. En `push` —donde
- * vive la garantía— no se omite nunca, ni siquiera si el actor es Dependabot
- * (caso real con auto-merge activado).
+ * Identificarlos NO los absuelve: el desenlace sigue siendo rojo. Sirve para
+ * que el mensaje diga la verdad —«esto no lo arreglás poniendo los secretos»— y
+ * explique cómo desbloquear.
+ *
+ * Sólo aplica a eventos `pull_request`. En `push` no hay contexto que valga: si
+ * faltan las variables es un fallo de configuración, incluso si el actor es
+ * dependabot[bot] (lo que ocurre de verdad cuando hay auto-merge).
  */
 export function motivoSinSecretos({ esFork, actor, evento }) {
   const esPullRequest = evento === undefined || evento === 'pull_request'
@@ -65,93 +87,160 @@ export function motivoSinSecretos({ esFork, actor, evento }) {
       clave: 'fork',
       titulo: 'PR desde un fork',
       detalle:
-        'GitHub no expone secretos a los forks por diseño. No se ejecuta código del ' +
-        'fork con credenciales ni se usa `pull_request_target`, que sí las expondría. ' +
-        'La verificación no se pierde: el push a `main` posterior al merge es ' +
-        'fail-closed y no puede omitirse.',
+        'GitHub no expone secretos a los forks por diseño, y no se usa ' +
+        '`pull_request_target`, que sí los expondría al código del PR. El harness NO ' +
+        'se ejecutó, así que el aislamiento multi-tenant de este cambio está SIN ' +
+        'verificar y el check queda en rojo.',
     }
   }
 
   // Dependabot corre con su propio contexto: los Actions secrets NO están
-  // disponibles (sólo los *Dependabot secrets*). Un bump de dependencia no
-  // puede verificar RLS a menos que se declaren esos secretos aparte.
+  // disponibles (sólo los *Dependabot secrets*, que son un almacén aparte).
   if (actor === 'dependabot[bot]') {
     return {
       clave: 'dependabot',
       titulo: 'PR de Dependabot',
       detalle:
-        'Los Actions secrets no se exponen a dependabot[bot]. Se difiere al push a ' +
-        '`main`, que NO puede omitirse (fail-closed sea quien sea el actor, incluido ' +
-        'el propio Dependabot si hay auto-merge). Para verificar ya en el PR, declará ' +
-        'las seis variables también como *Dependabot secrets* con los mismos nombres.',
+        'Los Actions secrets no se exponen a dependabot[bot]. El harness NO se ' +
+        'ejecutó, así que el check queda en rojo. Para que los PR de Dependabot ' +
+        'verifiquen por sí solos, declará las siete variables también como ' +
+        '*Dependabot secrets* con los mismos nombres (Settings → Secrets and ' +
+        'variables → Dependabot).',
     }
   }
   return null
 }
 
+/** Cómo desbloquear un PR que no puede recibir secretos. Sin esto, "rojo" es un callejón. */
+const COMO_DESBLOQUEAR = [
+  'Cómo desbloquear este PR (en este orden):',
+  '1. Reproducí el cambio en una rama INTERNA del repositorio (`git checkout -b … && git cherry-pick …`',
+  '   o `gh pr checkout` y push a una rama del propio repo). Ahí los Actions secrets sí llegan.',
+  '2. Comprobá que el job `RLS harness (server-side)` pasa en verde sobre ESE commit,',
+  '   con pruebas > 0 y todos los escenarios obligatorios.',
+  '3. Fusioná esa rama interna. El PR original se puede cerrar como duplicado.',
+  '',
+  'Lo que NO cuenta como verificación: fusionar y esperar al push a `main`. Para cuando',
+  'ese job falle, el cambio ya está en main — eso es detección, no prevención.',
+]
+
 /**
- * Decide el desenlace. Pura: no toca el entorno ni el disco.
- * @returns {{ decision: 'run'|'skip'|'fail', faltan: string[], motivo: object|null, mensaje: string }}
+ * Decide el desenlace. Pura: no toca el entorno ni el disco (la cobertura entra
+ * por parámetro).
+ *
+ * @returns {{ decision: 'run'|'bloqueado'|'fail', faltan: string[], motivo: object|null,
+ *             destino: object|null, mensaje: string }}
  */
-export function decidirPreflight(env = {}) {
+export function decidirPreflight(env = {}, cobertura = {}) {
   const faltan = VARIABLES_RLS.filter((v) => !env[v])
 
-  if (faltan.length === 0) {
+  if (faltan.length > 0) {
+    const motivo = motivoSinSecretos({
+      esFork: env.ES_FORK,
+      actor: env.GITHUB_ACTOR,
+      evento: env.GITHUB_EVENT_NAME,
+    })
+
+    if (motivo) {
+      return {
+        decision: 'bloqueado',
+        faltan,
+        motivo,
+        destino: null,
+        mensaje:
+          `Harness RLS NO ejecutado (${motivo.titulo}). ${motivo.detalle} ` +
+          'El check queda en rojo a propósito: un verde aquí autorizaría a fusionar ' +
+          'un cambio cuyo aislamiento nadie verificó.',
+      }
+    }
+
     return {
-      decision: 'run',
+      decision: 'fail',
       faltan,
       motivo: null,
-      mensaje: 'Las 6 variables RLS_* están presentes: el harness se ejecuta.',
+      destino: null,
+      mensaje:
+        `Faltan variables RLS_* (${faltan.join(' ')}). El job falla en vez de quedar verde: ` +
+        'un verde sin ejecutar se contabiliza como cobertura que no existe. ' +
+        (env.GITHUB_EVENT_NAME === 'push' && env.GITHUB_ACTOR === 'dependabot[bot]'
+          ? 'Este push a main lo inició Dependabot: aquí no hay omisión posible. '
+          : '') +
+        'Ver docs/ACTIVAR_HARNESS_RLS.md.',
     }
   }
 
-  const motivo = motivoSinSecretos({
-    esFork: env.ES_FORK,
-    actor: env.GITHUB_ACTOR,
-    evento: env.GITHUB_EVENT_NAME,
+  // Están las siete. Falta lo más importante: que apunten a donde dicen.
+  // Esto ocurre ANTES de setup-node, de `npm ci` y de cualquier conexión.
+  const destino = validarDestino({
+    url: env.RLS_SUPABASE_URL,
+    esperado: env.RLS_EXPECTED_PROJECT_REF,
+    cobertura,
+    variable: 'RLS_EXPECTED_PROJECT_REF',
   })
 
-  if (motivo) {
+  if (!destino.ok) {
     return {
-      decision: 'skip',
+      decision: 'fail',
       faltan,
-      motivo,
-      mensaje: `Harness RLS omitido (${motivo.titulo}). ${motivo.detalle}`,
+      motivo: null,
+      destino,
+      mensaje:
+        `Destino RLS RECHAZADO: ${destino.motivo} ` +
+        'El harness escribe y borra filas: no se conecta a un proyecto que no esté ' +
+        'declarado. No se instaló nada ni se abrió ninguna conexión.',
     }
   }
 
   return {
-    decision: 'fail',
+    decision: 'run',
     faltan,
     motivo: null,
+    destino,
     mensaje:
-      `Faltan variables RLS_* (${faltan.join(' ')}). El job falla en vez de quedar verde: ` +
-      'un verde sin ejecutar se contabiliza como cobertura que no existe. ' +
-      (env.GITHUB_EVENT_NAME === 'push' && env.GITHUB_ACTOR === 'dependabot[bot]'
-        ? 'Este push a main lo inició Dependabot: aquí NO se omite, porque es donde se ' +
-          'difería la verificación del PR. Declará los secretos de Dependabot o mergeá a mano. '
-        : '') +
-      'Ver docs/ACTIVAR_HARNESS_RLS.md.',
+      `Las 7 variables RLS_* están presentes y el destino está declarado (ref ${destino.ref}): ` +
+      'el harness se ejecuta.',
   }
 }
 
-/** Resumen Markdown para la UI de Actions. Sólo nombres de variable, nunca valores. */
-export function resumenMarkdown({ decision, faltan, motivo }) {
+/** Resumen Markdown para la UI de Actions. Sólo nombres de variable y el ref, nunca valores. */
+export function resumenMarkdown({ decision, faltan, motivo, destino }) {
   if (decision === 'run') {
-    return '### ▶️ Harness RLS: las 6 variables `RLS_*` están presentes, se ejecuta.\n\n'
-  }
-  if (decision === 'skip') {
     return [
-      `### ⏭️ Harness RLS omitido — ${motivo.titulo}`,
+      `### ▶️ Harness RLS: las 7 variables \`RLS_*\` están presentes, se ejecuta.`,
+      '',
+      `Destino declarado y validado: ref \`${destino.ref}\` (no es producción, dominio Supabase reconocido).`,
+      '',
+    ].join('\n')
+  }
+
+  if (decision === 'bloqueado') {
+    return [
+      `### ❌ Harness RLS NO ejecutado — ${motivo.titulo} (PR bloqueado)`,
       '',
       motivo.detalle,
       '',
       `Variables no disponibles: ${faltan.map((v) => `\`${v}\``).join(', ')}`,
       '',
-      'La verificación real corre en los PR internos y en cada push a `main`.',
+      ...COMO_DESBLOQUEAR,
       '',
     ].join('\n')
   }
+
+  if (destino && !destino.ok) {
+    return [
+      '### ❌ Harness RLS abortado — el destino no está declarado',
+      '',
+      destino.motivo,
+      '',
+      'El harness hace `INSERT`, `UPDATE` y `DELETE` de filas de prueba. Apuntarlo a un',
+      'proyecto no declarado no es un CI en rojo: son datos de alguien contaminados. Por eso',
+      'la comprobación corre **antes** de instalar dependencias y antes de abrir ninguna conexión.',
+      '',
+      'Corregí `RLS_SUPABASE_URL` o `RLS_EXPECTED_PROJECT_REF` — uno de los dos está mal.',
+      '',
+    ].join('\n')
+  }
+
   return [
     '### ❌ Harness RLS sin configurar — el job FALLA (fail-closed)',
     '',
@@ -160,8 +249,10 @@ export function resumenMarkdown({ decision, faltan, motivo }) {
     '',
     ...faltan.map((v) => `- \`${v}\``),
     '',
-    'Se exigen **las seis**: con la URL puesta pero una credencial vacía, el harness',
-    'se auto-saltaba y terminaba verde con **cero** pruebas.',
+    'Se exigen **las siete**: con la URL puesta pero una credencial vacía, el harness',
+    'se auto-saltaba y terminaba verde con **cero** pruebas. `RLS_EXPECTED_PROJECT_REF`',
+    'no es una credencial: es la declaración del proyecto contra el que se opera, y sin',
+    'ella cambiar la URL bastaría para escribir en otro sitio.',
     '',
     'Activación: **`docs/ACTIVAR_HARNESS_RLS.md`** → `scripts/seed-rls-sandbox.mjs`.',
     '',
@@ -170,7 +261,7 @@ export function resumenMarkdown({ decision, faltan, motivo }) {
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 function main(env) {
-  const veredicto = decidirPreflight(env)
+  const veredicto = decidirPreflight(env, cargarCobertura())
   const { decision, mensaje } = veredicto
 
   if (env.GITHUB_OUTPUT) {
@@ -184,9 +275,11 @@ function main(env) {
     console.log(mensaje)
     return 0
   }
-  if (decision === 'skip') {
-    console.log(`::notice title=Harness RLS omitido::${mensaje}`)
-    return 0
+  if (decision === 'bloqueado') {
+    // Rojo, no notice: este PR no se puede fusionar sin una ejecución real.
+    console.log(`::error title=Harness RLS no ejecutado — PR bloqueado::${mensaje}`)
+    console.log(COMO_DESBLOQUEAR.join('\n'))
+    return 1
   }
   console.log(`::error title=Harness RLS sin configurar::${mensaje}`)
   return 1
