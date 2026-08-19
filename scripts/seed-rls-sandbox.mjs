@@ -146,41 +146,50 @@ function safeJson(valor) {
 }
 
 /**
+ * Tamaño de página de la consulta FILTRADA.
+ *
+ * No tiene nada que ver con el listado general: ahí el problema es un registro
+ * concreto que revienta la respuesta, y por eso ese camino se abandonó. Aquí el
+ * conjunto ya viene acotado por el filtro, y lo que se busca es no depender de
+ * que quepa en una sola respuesta.
+ */
+export const PAGINA_FILTRO = 50
+
+/**
+ * Tope de páginas filtradas. Un email con más de mil coincidencias parciales no
+ * es un caso a soportar: es un estado que no se entiende, y se aborta.
+ */
+const MAX_PAGINAS_FILTRO = 20
+
+/**
  * Busca un usuario de Auth por email con una consulta FILTRADA al endpoint
- * administrativo, en vez de recorrer el listado general.
+ * administrativo, paginada.
  *
- * ─── POR QUÉ NO SE PAGINA EL LISTADO ────────────────────────────────────────
- * La primera hipótesis —«perPage 1000 es demasiado, con 50 se arregla»— quedó
- * REFUTADA por la evidencia del sandbox. Con sólo 4 usuarios en el proyecto:
+ * ─── POR QUÉ NO SE PAGINA EL LISTADO GENERAL ────────────────────────────────
+ * La hipótesis «perPage 1000 es demasiado, con 50 se arregla» quedó REFUTADA.
+ * Con sólo 4 usuarios en el sandbox:
  *
- *   page=1 per_page=1  → 200
- *   page=1 per_page=2  → 200
+ *   page=1 per_page=1  → 200      page=1 per_page=4  → AuthRetryableFetchError 500
+ *   page=1 per_page=2  → 200      page=4 per_page=1  → AuthRetryableFetchError 500
  *   page=1 per_page=3  → 200
- *   page=1 per_page=4  → AuthRetryableFetchError 500
- *   page=4 per_page=1  → AuthRetryableFetchError 500
  *
- * No hay ningún límite fijo que respetar: lo que rompe es **incluir en la
- * respuesta un registro concreto** del listado general. `per_page=3` cabe
- * porque se queda antes de él; `page=4, per_page=1` falla porque cae justo
- * encima. Bajar el tamaño de página sólo mueve la frontera — con otro orden, o
- * con un usuario más, el mismo registro vuelve a entrar y el seed vuelve a
- * morir. Paginar es tratar el síntoma.
+ * No hay límite de tamaño que respetar: rompe **incluir un registro concreto**
+ * en la respuesta. `per_page=3` cabe porque se detiene antes de él. Bajar el
+ * tamaño sólo movía la frontera. La consulta filtrada no lo materializa.
  *
- * La búsqueda filtrada nunca materializa ese registro:
+ * ─── POR QUÉ NO BASTA UNA SOLA PÁGINA FILTRADA ──────────────────────────────
+ * `filter` es una búsqueda PARCIAL: GoTrue lo aplica aproximadamente como
  *
- *   GET /auth/v1/admin/users?page=1&per_page=1&filter=rls-a%40sandbox.invalid → 200
+ *     email LIKE '%filter%' OR full_name ILIKE '%filter%'
  *
- * y con ella el seed llegó a imprimir «Sandbox listo y VERIFICADO como ambos
- * usuarios».
+ * Con `per_page=1`, una coincidencia parcial más reciente —`otro-rls-a@…`, o un
+ * usuario cuyo `full_name` contenga el texto— puede ocupar el ÚNICO resultado y
+ * dejar fuera al usuario exacto. El seed concluiría que no existe, intentaría
+ * crearlo y rompería la idempotencia: dos identidades para el mismo email.
  *
- * ─── POR QUÉ FETCH DIRECTO Y NO EL SDK ──────────────────────────────────────
- * `admin.auth.admin.listUsers()` no expone el parámetro `filter`, que es justo
- * lo que evita el registro venenoso. Se llama al endpoint REST a mano.
- *
- * `filter` es una búsqueda PARCIAL del lado del servidor: sirve para acotar la
- * consulta, no para decidir identidad. La igualdad final se comprueba aquí,
- * exacta y sin distinguir mayúsculas (los emails no son sensibles a caja), para
- * que "rls-a@sandbox.invalid" jamás case con "otro-rls-a@sandbox.invalid".
+ * Así que se recorren las páginas del conjunto FILTRADO y se recogen TODAS las
+ * coincidencias exactas antes de decidir. La identidad la decide la comparación
+ * exacta e insensible a mayúsculas, nunca la posición en la respuesta.
  *
  * @param {{ url: string, serviceKey: string, fetchImpl?: Function }} destino
  *   Inyectados a propósito: sin esto no habría forma de probar la función.
@@ -189,58 +198,91 @@ function safeJson(valor) {
 export async function buscarUsuarioPorEmail({ url, serviceKey, fetchImpl }, email) {
   const doFetch = fetchImpl ?? globalThis.fetch
   const base = String(url ?? '').replace(/\/+$/, '')
-  const endpoint =
-    `${base}/auth/v1/admin/users?page=1&per_page=1&filter=${encodeURIComponent(email)}`
+  const buscado = String(email ?? '').toLowerCase()
+  const exactas = []
 
-  let respuesta
-  try {
-    respuesta = await doFetch(endpoint, {
-      method: 'GET',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        Accept: 'application/json',
-      },
-    })
-  } catch (e) {
-    // Fallo de red/DNS. Se reporta el mensaje del error, nunca la petición:
-    // la URL lleva el email y las cabeceras llevan la service_role.
-    throw new Error(`buscarUsuario(${email}): la petición falló — ${e?.message ?? e}`)
+  for (let page = 1; page <= MAX_PAGINAS_FILTRO; page++) {
+    const endpoint =
+      `${base}/auth/v1/admin/users` +
+      `?page=${page}&per_page=${PAGINA_FILTRO}&filter=${encodeURIComponent(email)}`
+
+    let respuesta
+    try {
+      respuesta = await doFetch(endpoint, {
+        method: 'GET',
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          Accept: 'application/json',
+        },
+      })
+    } catch (e) {
+      // Fallo de red/DNS. Se reporta el mensaje del error y NUNCA la petición:
+      // la URL lleva el email y las cabeceras llevan la service_role.
+      throw new Error(`buscarUsuario(${email}): la petición falló en la página ${page} — ${e?.message ?? e}`)
+    }
+
+    // Fail-closed: cualquier respuesta que no sea 2xx aborta. NO se imprime el
+    // cuerpo, que puede traer eco de la petición o de las cabeceras.
+    if (!respuesta || respuesta.ok !== true) {
+      throw new Error(
+        `buscarUsuario(${email}): respuesta HTTP ${respuesta?.status ?? 'desconocida'} ` +
+        `${respuesta?.statusText ?? ''}`.trim() +
+        ` en la página ${page}. No se continúa: con el listado filtrado incompleto no se ` +
+        'puede decidir si el usuario existe, y crearlo a ciegas duplicaría la identidad.',
+      )
+    }
+
+    let cuerpo
+    try {
+      cuerpo = await respuesta.json()
+    } catch {
+      throw new Error(
+        `buscarUsuario(${email}): la página ${page} no es JSON válido. Fail-closed: no se ` +
+        'asume que el usuario no existe.',
+      )
+    }
+
+    // Fail-closed también ante una forma inesperada: `users` ausente o no-arreglo
+    // NO significa "no existe", significa "no lo sé".
+    if (!Array.isArray(cuerpo?.users)) {
+      throw new Error(
+        `buscarUsuario(${email}): la página ${page} no trae un arreglo \`users\` ` +
+        `(recibido: ${typeof cuerpo?.users}). Fail-closed: no se asume que el usuario no existe.`,
+      )
+    }
+
+    const usuarios = cuerpo.users
+
+    // Una página con MÁS filas de las pedidas es una respuesta que no se
+    // entiende: no se sabe cuántas faltan ni si la paginación es coherente.
+    if (usuarios.length > PAGINA_FILTRO) {
+      throw new Error(
+        `buscarUsuario(${email}): la página ${page} devolvió ${usuarios.length} filas ` +
+        `habiendo pedido ${PAGINA_FILTRO}. Paginación incoherente: se aborta.`,
+      )
+    }
+
+    for (const u of usuarios) {
+      if (String(u?.email ?? '').toLowerCase() === buscado) exactas.push(u)
+    }
+
+    // Página incompleta (o vacía) ⇒ no hay más resultados filtrados.
+    if (usuarios.length < PAGINA_FILTRO) {
+      if (exactas.length > 1) {
+        throw new Error(
+          `buscarUsuario(${email}): hay ${exactas.length} usuarios con ese email exacto. ` +
+          'Es un estado inconsistente del proyecto: no se elige uno al azar.',
+        )
+      }
+      return exactas[0] ?? null
+    }
   }
 
-  // Fail-closed: cualquier respuesta que no sea 2xx aborta. NO se imprime el
-  // cuerpo, que puede traer eco de la petición o de las cabeceras.
-  if (!respuesta || respuesta.ok !== true) {
-    throw new Error(
-      `buscarUsuario(${email}): respuesta HTTP ${respuesta?.status ?? 'desconocida'} ` +
-      `${respuesta?.statusText ?? ''}`.trim() +
-      '. No se continúa: sin un listado fiable no se puede decidir si el usuario existe, ' +
-      'y crearlo a ciegas duplicaría la identidad.',
-    )
-  }
-
-  let cuerpo
-  try {
-    cuerpo = await respuesta.json()
-  } catch {
-    throw new Error(
-      `buscarUsuario(${email}): la respuesta no es JSON válido. Fail-closed: no se asume ` +
-      'que el usuario no existe.',
-    )
-  }
-
-  // Fail-closed también ante una forma inesperada: `users` ausente o no-arreglo
-  // NO significa "no existe", significa "no lo sé".
-  if (!Array.isArray(cuerpo?.users)) {
-    throw new Error(
-      `buscarUsuario(${email}): la respuesta no trae un arreglo \`users\` ` +
-      `(recibido: ${typeof cuerpo?.users}). Fail-closed: no se asume que el usuario no existe.`,
-    )
-  }
-
-  // `filter` es parcial: la identidad la decide esta comparación, no el servidor.
-  const buscado = email.toLowerCase()
-  return cuerpo.users.find((u) => String(u?.email ?? '').toLowerCase() === buscado) ?? null
+  throw new Error(
+    `buscarUsuario(${email}): el listado filtrado supera ${MAX_PAGINAS_FILTRO} páginas de ` +
+    `${PAGINA_FILTRO}. Resultado ambiguo: se aborta en vez de adivinar.`,
+  )
 }
 
 /**

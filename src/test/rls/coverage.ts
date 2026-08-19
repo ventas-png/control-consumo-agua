@@ -67,16 +67,47 @@ export const TENANT_SCOPED_TABLES: readonly string[] = [
  *   `service_role`: no la puede invocar ningún usuario del navegador (#378/#380).
  *   Tampoco es aislamiento entre tenants.
  *
+ *   `'estructural'` — sólo se acredita el rechazo de `anon`; el harness NO
+ *   ejecuta ninguna prueba autenticada que demuestre aislamiento, y no se cuenta
+ *   como tal. Es el caso de `conta_cierre_anual` (ver `MOTIVO_RPC_ESTRUCTURAL`).
+ *
  * La distinción existe para que ningún informe cuente un rechazo por rol o por
  * privilegio como aislamiento verificado.
  */
-export type GarantiaRpc = 'tenant' | 'rol' | 'privilegio'
+export type GarantiaRpc = 'tenant' | 'rol' | 'privilegio' | 'estructural'
+
+/** Vector de la llamada que acredita una evidencia. */
+export type VectorRpc = 'anon' | 'authenticated' | 'authenticated-cross-tenant'
 
 export interface RpcObligatoria {
   nombre: string
   dominio: string
   porQue: string
   garantia: GarantiaRpc
+  /** Vectores cuyo rechazo hay que acreditar para dar la RPC por cubierta. */
+  evidencias: readonly VectorRpc[]
+}
+
+/**
+ * Identificador ESTABLE de una evidencia, que va incrustado en el nombre de la
+ * prueba y es lo que el verificador busca.
+ *
+ * Existe porque `nombre.includes(rpc)` no distinguía qué se había probado: 23
+ * pruebas de «anon NO puede ejecutar X» daban por cubiertas las 23 RPC,
+ * incluidas las declaradas como aislamiento por tenant. El id lleva la garantía
+ * y el vector, así que una prueba de anon no puede acreditar una evidencia
+ * autenticada ni al revés.
+ */
+export function idEvidencia(nombre: string, vector: VectorRpc): string {
+  const rpc = RPCS_OBLIGATORIAS.find((r) => r.nombre === nombre)
+  if (!rpc) throw new Error(`RPC no declarada en coverage.json: ${nombre}`)
+  if (!rpc.evidencias.includes(vector)) {
+    throw new Error(
+      `${nombre} no declara la evidencia "${vector}" (declara: ${rpc.evidencias.join(', ')}). ` +
+      'O sobra la prueba, o falta la declaración en coverage.json.',
+    )
+  }
+  return `[RLS:rpc:${nombre}:${rpc.garantia}:${vector}]`
 }
 
 export const RPCS_OBLIGATORIAS: readonly RpcObligatoria[] =
@@ -87,3 +118,6 @@ export const MOTIVO_RPC_ROL: string = cobertura.motivoRpcRol
 
 /** Por qué las RPC de notificaciones sólo alcanzan garantía de privilegio. */
 export const MOTIVO_RPC_PRIVILEGIO: string = cobertura.motivoRpcPrivilegio
+
+/** Por qué `conta_cierre_anual` no puede acreditar aislamiento. */
+export const MOTIVO_RPC_ESTRUCTURAL: string = cobertura.motivoRpcEstructural

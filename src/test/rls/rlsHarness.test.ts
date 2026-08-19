@@ -4,6 +4,7 @@ import {
   TENANT_SCOPED_NO_TRIVIALES,
   TENANT_SCOPED_ESTRUCTURALES,
   FIXTURES,
+  idEvidencia,
 } from './coverage'
 // Guard de destino: la MISMA validación que usan el seed y el preflight del
 // workflow, repetida aquí como defensa en profundidad. Vive en su propio módulo
@@ -843,7 +844,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs de notificaciones (#378/#380) — garantía de PRIVILEGIO', () => {
     for (const { name, args } of SENSITIVE_RPCS) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         // Rechazo = error presente (permission denied / función no visible /
         // PGRST). NUNCA debe devolver un resultado exitoso.
@@ -851,7 +852,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
 
-      it(`authenticated (empresa A) NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'authenticated')} authenticated (empresa A) NO puede ejecutar ${name}`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `authenticated no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a authenticated`).toBeNull()
@@ -861,7 +862,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs del ERP financiero (REVOKE anon + pertenencia) — garantía de TENANT', () => {
     for (const { name, args } of ERP_RPCS_ANON) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
@@ -873,7 +874,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // viene del guard de pertenencia. conta_cierre_anual se excluye porque un
     // admin legítimo SÍ puede ejecutarlo sobre lo suyo (sería un falso positivo).
     for (const { name, args } of ERP_RPCS_AUTH_SIN_EFECTOS) {
-      it(`authenticated (A) NO obtiene éxito de ${name} sobre un recurso REAL de B`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO obtiene éxito de ${name} sobre un recurso REAL de B`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre un recurso de otro tenant debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
@@ -883,7 +884,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs de estatus de bóvedas (#611) — garantía de TENANT', () => {
     for (const { name, args } of ESTATUS_RPCS_ANON) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
@@ -895,7 +896,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // claims válidos y aunque el tenant consultado exista de verdad. Esto cubre
     // el bug trivaluado de #611, que un company_id inexistente no ejercitaba.
     for (const { name } of ESTATUS_RPCS_ANON) {
-      it(`authenticated (A) NO obtiene metadata de un tenant ajeno vía ${name}`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO obtiene metadata de un tenant ajeno vía ${name}`, async () => {
         const { data, error } = await userA.rpc(name, { p_company_id: B.companyId })
         const negado = error !== null || (data ?? []).length === 0
         expect(negado, `${name} no debe exponer metadata de otro tenant`).toBe(true)
@@ -905,7 +906,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs del self-service de inquilinos (20260822000000) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ANON) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
@@ -916,16 +917,26 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     // rechazar la escritura sin efectos. El primer gate que actúa es el de rol
     // (`current_user_role() <> 'cliente'`), así que esto NO prueba pertenencia.
     for (const { name, args } of PORTAL_INQUILINO_RPCS_ESCRITURA) {
-      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
 
+    // portal_mis_unidades no recibe argumentos, así que no hay "recurso ajeno"
+    // al que apuntar: la evidencia autenticada consiste en que A —staff, no
+    // cliente del portal— no obtiene NINGUNA unidad. Sin esta prueba, la RPC
+    // sólo estaba acreditada por anon, que no llega al filtro de residencia.
+    it(`${idEvidencia('portal_mis_unidades', 'authenticated')} authenticated (A) NO obtiene unidades del portal`, async () => {
+      const { data, error } = await userA.rpc('portal_mis_unidades', {})
+      const negado = error !== null || (data ?? []).length === 0
+      expect(negado, 'portal_mis_unidades no debe listar unidades a un usuario staff').toBe(true)
+    })
+
     // portal_inquilinos_de_unidad es de lectura: con unidad ajena devuelve 0
     // filas (el predicado "unidad propia" filtra), nunca residentes de otro.
-    it('authenticated (A) NO lista inquilinos de una unidad ajena', async () => {
+    it(`${idEvidencia('portal_inquilinos_de_unidad', 'authenticated-cross-tenant')} authenticated (A) NO lista inquilinos de una unidad ajena`, async () => {
       const { data, error } = await userA.rpc('portal_inquilinos_de_unidad', {
         p_unidad_id: B.unidadId,
       })
@@ -936,13 +947,13 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs de reservas del portal (20260822030000) — garantía de TENANT', () => {
     for (const { name, args } of PORTAL_RESERVAS_RPCS) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
 
-      it(`authenticated (A) NO puede ejecutar ${name} sobre ids ajenos`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre ids ajenos`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre ids ajenos debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
@@ -952,7 +963,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 
   describe('guard RPCs de accesos familiares (20260825000000) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_FAMILIARES_RPCS) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
@@ -964,7 +975,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     for (const { name, args } of PORTAL_FAMILIARES_RPCS.filter((r) =>
       ['portal_registrar_familiar', 'portal_quitar_familiar'].includes(r.name),
     )) {
-      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
@@ -972,7 +983,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
     }
 
     // portal_accesos_de_unidad es de lectura: con unidad ajena devuelve 0 filas.
-    it('authenticated (A) NO lista accesos de una unidad ajena', async () => {
+    it(`${idEvidencia('portal_accesos_de_unidad', 'authenticated-cross-tenant')} authenticated (A) NO lista accesos de una unidad ajena`, async () => {
       const { data, error } = await userA.rpc('portal_accesos_de_unidad', {
         p_unidad_id: B.unidadId,
       })
@@ -992,13 +1003,13 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
   // residentes de OTRO tenant.
   describe('guard RPCs de baja de renta (20260827000000) — garantía de ROL', () => {
     for (const { name, args } of PORTAL_BAJA_RENTA_RPCS) {
-      it(`anon NO puede ejecutar ${name}`, async () => {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
         const { data, error } = await anon.rpc(name, args(B))
         expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
       })
 
-      it(`authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre una unidad ajena`, async () => {
         // La unidad es REAL y pertenece a B, así que el rechazo no puede venir de
         // un id inexistente. Viene del gate de rol (A es staff, no cliente del
         // portal): garantía de ROL, no de tenant — ver el bloque de arriba.

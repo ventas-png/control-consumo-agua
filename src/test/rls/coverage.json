@@ -110,163 +110,266 @@
     "exige el nombre exacto de cada una en alguna prueba pasada."
   ],
   "_garantias": [
-    "Qué demuestra REALMENTE la prueba de cada RPC. La distinción no es cosmética:",
-    "llamar \"aislamiento verificado\" a un rechazo que ocurrió por el privilegio de",
-    "ejecución o por el rol del llamante es contar cobertura que no existe. Cada",
-    "valor se deriva del esquema y lo verifica",
-    "src/test/rls/__tests__/esquemaFixtures.test.ts:",
-    "  tenant     — la RPC es ejecutable por authenticated y su guard compara",
-    "               get_my_company_id() con la empresa del recurso. El usuario A es",
-    "               company_owner, así que pasa rol y permisos: el rechazo sólo",
-    "               puede venir de la PERTENENCIA. Aislamiento demostrado.",
-    "  rol        — ejecutable por authenticated, pero el guard exige ser cliente",
-    "               del portal (current_user_role() o mis_unidades_*_ids()). Los",
-    "               usuarios fixture son staff, así que el rechazo ocurre ahí y NO",
-    "               llega a evaluarse la pertenencia. Demuestra que el guard existe",
-    "               y que la RPC no es anon-ejecutable; NO demuestra aislamiento.",
-    "  privilegio — EXECUTE revocado de PUBLIC y concedido sólo a service_role: no",
-    "               es invocable por ningún usuario del navegador. Demuestra el",
-    "               cierre de #378/#380; tampoco es aislamiento entre tenants."
+    "Qué demuestra REALMENTE la prueba de cada RPC, y con qué EVIDENCIA se acredita.",
+    "",
+    "El nombre de la RPC no basta como prueba de nada. El verificador daba por",
+    "cubierta una RPC en cuanto alguna prueba pasada CONTENÍA su nombre, así que 23",
+    "pruebas de «anon NO puede ejecutar X» satisfacían las 23 RPC, incluidas las",
+    "declaradas como aislamiento por tenant. Verde falso.",
+    "",
+    "Ahora cada RPC declara qué EVIDENCIAS exige, y el harness marca cada prueba con",
+    "un identificador estable e inequívoco:",
+    "",
+    "    [RLS:rpc:<nombre>:<garantia>:<vector>]",
+    "",
+    "Vectores:",
+    "  anon                       — el cliente anónimo es rechazado.",
+    "  authenticated              — un usuario autenticado (A) es rechazado sin",
+    "                               apuntar a un recurso de otro tenant.",
+    "  authenticated-cross-tenant — A es rechazado apuntando a un recurso REAL de B.",
+    "",
+    "Garantías:",
+    "  tenant      — A pasa rol y permisos, así que el rechazo sólo puede venir de la",
+    "                PERTENENCIA. Exige evidencia authenticated-cross-tenant.",
+    "  rol         — el guard exige ser cliente del portal y los fixture son staff:",
+    "                rechaza antes de mirar pertenencia. Exige la evidencia",
+    "                autenticada que LLEGA a ese guard; la de anon no basta.",
+    "  privilegio  — EXECUTE revocado salvo service_role. Exige los dos rechazos.",
+    "  estructural — sólo se acredita el rechazo de anon; el harness NO ejecuta una",
+    "                prueba que demuestre aislamiento. No se cuenta como tal."
   ],
   "motivoRpcRol": "Los usuarios fixture A y B son STAFF (app_users.role = company_owner), no clientes del portal. Las RPC de garantía «rol» abren exigiendo cliente del portal —por current_user_role() o por el filtro mis_unidades_propietario_ids()/mis_unidad_roles()—, así que rechazan a A antes de mirar la pertenencia de la unidad. Para convertirlas en garantía de tenant harían falta usuarios fixture con rol cliente y fila en unidad_residentes, lo que exige dos credenciales más allá de las seis RLS_* que define este PR: queda declarado como limitación, no como cobertura.",
+  "motivoRpcPrivilegio": "REVOKE EXECUTE FROM PUBLIC + GRANT sólo a service_role: ningún usuario autenticado del navegador puede invocarlas, que es exactamente lo que se cerró en #378/#380. El rechazo llega del privilegio de ejecución, no de una comparación de tenant.",
+  "motivoRpcEstructural": "conta_cierre_anual no puede demostrar aislamiento y no se debe declarar como si lo hiciera. La sobrecarga (int) es un wrapper `LANGUAGE sql` que delega en (int, uuid) sin comprobar nada. La sobrecarga (int, uuid) deriva la empresa de get_my_company_id() y acepta p_project_id SIN validar que pertenezca al tenant del llamante: si A la invoca con el project_id de B, el rechazo llega de «Falta la cuenta 3201» (check_violation) porque A no tiene esa cuenta acotada al proyecto de B — no de un guard de pertenencia. Además es DESTRUCTIVA: inserta un asiento de cierre y sus líneas. Probarla contra el proyecto real de B sería a la vez inconcluyente y con efectos. Queda acreditado sólo su REVOKE de anon.",
   "rpcsObligatorias": [
     {
       "nombre": "enqueue_notification",
       "dominio": "notificaciones",
       "porQue": "#378/#380 — quedó anon-ejecutable y encolaba a cualquier tenant",
-      "garantia": "privilegio"
+      "garantia": "privilegio",
+      "evidencias": [
+        "anon",
+        "authenticated"
+      ]
     },
     {
       "nombre": "claim_notifications_batch",
       "dominio": "notificaciones",
       "porQue": "#378/#380 — permitía drenar la cola ajena",
-      "garantia": "privilegio"
+      "garantia": "privilegio",
+      "evidencias": [
+        "anon",
+        "authenticated"
+      ]
     },
     {
       "nombre": "mark_notification_result",
       "dominio": "notificaciones",
       "porQue": "#378/#380 — permitía marcar entregas ajenas",
-      "garantia": "privilegio"
+      "garantia": "privilegio",
+      "evidencias": [
+        "anon",
+        "authenticated"
+      ]
     },
     {
       "nombre": "run_notifications_dispatcher",
       "dominio": "notificaciones",
       "porQue": "#378/#380 — disparaba el orquestador completo",
-      "garantia": "privilegio"
+      "garantia": "privilegio",
+      "evidencias": [
+        "anon",
+        "authenticated"
+      ]
     },
     {
       "nombre": "conta_publicar_asiento",
       "dominio": "erp",
       "porQue": "publicar una póliza ajena altera los estados financieros de otro tenant",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "conta_anular_asiento",
       "dominio": "erp",
       "porQue": "anular una póliza ajena destruye trazabilidad contable",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "conta_cierre_anual",
       "dominio": "erp",
       "porQue": "cerrar el ejercicio de otro tenant bloquea su contabilidad",
-      "garantia": "tenant"
+      "garantia": "estructural",
+      "evidencias": [
+        "anon"
+      ]
     },
     {
       "nombre": "banco_conciliar_movimiento",
       "dominio": "erp",
       "porQue": "conciliar movimientos ajenos falsea el efectivo de otro tenant",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "banco_desconciliar_movimiento",
       "dominio": "erp",
       "porQue": "ídem, en sentido inverso",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "banco_ajuste_conciliacion",
       "dominio": "erp",
       "porQue": "ajustes sobre cuentas ajenas",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "whatsapp_estatus",
       "dominio": "bovedas",
       "porQue": "#611 — el fail-open trivaluado exponía metadata de cualquier tenant",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "payfac_estatus",
       "dominio": "bovedas",
       "porQue": "#611 — mismo patrón sobre la bóveda de pagos",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "fiscal_pac_estatus",
       "dominio": "bovedas",
       "porQue": "#611 — mismo patrón sobre la bóveda del PAC",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_mis_unidades",
       "dominio": "inquilinos",
       "porQue": "listar unidades ajenas revela el padrón de otro condominio",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated"
+      ]
     },
     {
       "nombre": "portal_inquilinos_de_unidad",
       "dominio": "inquilinos",
       "porQue": "expone datos personales de residentes ajenos",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_registrar_inquilino",
       "dominio": "inquilinos",
       "porQue": "da acceso al portal de una unidad ajena",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_quitar_inquilino",
       "dominio": "inquilinos",
       "porQue": "revoca el acceso de un residente ajeno",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_reservar_amenidad",
       "dominio": "reservas",
       "porQue": "reservar sobre una amenidad ajena y cargar a una unidad ajena",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_cancelar_reserva",
       "dominio": "reservas",
       "porQue": "cancelar la reserva de otro residente",
-      "garantia": "tenant"
+      "garantia": "tenant",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_registrar_familiar",
       "dominio": "familiares",
       "porQue": "alta de acceso familiar en unidad ajena",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_quitar_familiar",
       "dominio": "familiares",
       "porQue": "baja de acceso familiar ajeno",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_accesos_de_unidad",
       "dominio": "familiares",
       "porQue": "lista los accesos de una unidad ajena",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     },
     {
       "nombre": "portal_baja_renta",
       "dominio": "baja-renta",
       "porQue": "20260827000000 — dar de baja la autorización de renta de una unidad ajena revoca accesos de residentes de otro tenant",
-      "garantia": "rol"
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     }
   ],
   "_sandbox": [
@@ -279,6 +382,5 @@
     "supabase.co",
     "supabase.in"
   ],
-  "refProduccionProhibido": "nnsqmeigtgewatameexo",
-  "motivoRpcPrivilegio": "REVOKE EXECUTE FROM PUBLIC + GRANT sólo a service_role: ningún usuario autenticado del navegador puede invocarlas, que es exactamente lo que se cerró en #378/#380. El rechazo llega del privilegio de ejecución, no de una comparación de tenant."
+  "refProduccionProhibido": "nnsqmeigtgewatameexo"
 }

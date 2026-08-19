@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { FIXTURES, MOTIVO_RPC_PRIVILEGIO, MOTIVO_RPC_ROL, RPCS_OBLIGATORIAS } from '../coverage'
+import { concedidaA, definicionVigente, firmasDe, parsearFunciones } from '../sqlFunciones'
 
 // ════════════════════════════════════════════════════════════════════════════
 // Prueba CONTRACTUAL: los fixtures del seed/harness contra el esquema real.
@@ -97,104 +98,206 @@ describe('contrato de cobertura — RPCs del portal', () => {
 // ════════════════════════════════════════════════════════════════════════════
 // Contrato de HONESTIDAD: qué demuestra la prueba de cada RPC.
 // ════════════════════════════════════════════════════════════════════════════
-// Un rechazo puede venir de tres sitios distintos y sólo UNO de ellos prueba
-// aislamiento entre tenants:
+// Un rechazo puede venir de tres sitios distintos y sólo UNO prueba aislamiento
+// entre tenants: el privilegio de ejecución, el rol del llamante, o la
+// comparación de empresa. La clasificación se DERIVA del esquema y se contrasta
+// con lo declarado — pero con dos cautelas que antes no estaban:
 //
-//   privilegio — la RPC no está concedida a `authenticated` (sólo service_role).
-//   rol        — el guard exige cliente del portal y los fixture son staff.
-//   tenant     — el llamante pasa privilegio y rol, así que sólo puede rechazar
-//                la comparación de empresa. Aislamiento demostrado.
-//
-// La clasificación no se declara a mano y se cree: se DERIVA de las migraciones
-// y se contrasta con lo declarado en coverage.json. Si mañana alguien concede
-// una RPC de notificaciones a `authenticated`, o añade el gate de cliente a una
-// del ERP, esta prueba obliga a reclasificarla en vez de dejar el informe
-// diciendo algo que ya no es cierto.
-describe('contrato de garantías — qué demuestra cada RPC', () => {
-  const SQL = readdirSync(MIGRACIONES)
+//   · La lectura del esquema se hace con `../sqlFunciones`, que acota el cuerpo
+//     por firma exacta y por su propio dollar-quote. La versión anterior leía
+//     118 KB de migraciones ajenas para `conta_cierre_anual(int)` y concluía
+//     `tenant` por texto que no era suyo.
+//   · Que el cuerpo mencione `get_my_company_id()` NO se acepta como prueba
+//     suficiente: además se exige que el manifiesto declare la evidencia
+//     dinámica correspondiente a esa garantía, porque una comparación de
+//     empresa que ninguna prueba ejercita no demuestra nada.
+const MIGRACIONES_PARSEADAS = parsearFunciones(
+  readdirSync(MIGRACIONES)
     .filter((f) => f.endsWith('.sql'))
-    .map((f) => readFileSync(join(MIGRACIONES, f), 'utf8'))
-    .join('\n')
+    .map((f) => ({ archivo: f, sql: readFileSync(join(MIGRACIONES, f), 'utf8') })),
+)
 
-  /** Cuerpo de la ÚLTIMA definición de la RPC (la que gana tras las migraciones). */
-  function cuerpoDe(nombre: string): string | null {
-    const partes = SQL.split(new RegExp(`CREATE OR REPLACE FUNCTION\\s+public\\.${nombre}\\b`))
-    if (partes.length < 2) return null
-    const resto = partes[partes.length - 1]
-    const fin = resto.indexOf('$fn$;') >= 0 ? resto.indexOf('$fn$;') : resto.indexOf('$$;')
-    return resto.slice(0, fin > 0 ? fin : 4000)
-  }
+const SQL_TODO = readdirSync(MIGRACIONES)
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => readFileSync(join(MIGRACIONES, f), 'utf8'))
+  .join('\n')
 
-  /** ¿Se le concedió EXECUTE a `authenticated`? El GRANT puede partir la línea. */
-  function concedidaAAuthenticated(nombre: string): boolean {
-    return new RegExp(
-      `GRANT EXECUTE ON FUNCTION public\\.${nombre}\\([^)]*\\)\\s*(?:\\n\\s*)?TO [^;]*authenticated`,
-    ).test(SQL)
-  }
+/** Definiciones vigentes de una RPC, una por firma. */
+function definicionesDe(nombre: string) {
+  return firmasDe(MIGRACIONES_PARSEADAS, nombre)
+    .map((firma) => definicionVigente(MIGRACIONES_PARSEADAS, nombre, firma)!)
+    .filter(Boolean)
+}
 
-  /** La garantía que el ESQUEMA sostiene, con los usuarios fixture actuales. */
-  function garantiaDelEsquema(nombre: string): 'tenant' | 'rol' | 'privilegio' | null {
-    const cuerpo = cuerpoDe(nombre)
-    if (cuerpo === null) return null
-    if (!concedidaAAuthenticated(nombre)) return 'privilegio'
-    // A es company_owner: pasa rol y permisos, así que un guard que compare
-    // empresas sólo puede rechazarlo por pertenencia.
-    return cuerpo.includes('get_my_company_id()') ? 'tenant' : 'rol'
-  }
+describe('el parser de funciones acota por firma y por delimitador', () => {
+  it('conta_cierre_anual tiene DOS sobrecargas y se distinguen', () => {
+    expect(firmasDe(MIGRACIONES_PARSEADAS, 'conta_cierre_anual').sort()).toEqual(['int', 'int, uuid'])
+  })
 
+  it('el wrapper (int) termina donde debe y NO arrastra migraciones siguientes', () => {
+    // El fallo medido: cierre real del `$$` en la posición 162, `$fn$;` elegido
+    // en la 118150, "cuerpo" de 118150 caracteres con get_my_company_id() de
+    // otra migración. El wrapper real son tres líneas.
+    const wrapper = definicionVigente(MIGRACIONES_PARSEADAS, 'conta_cierre_anual', 'int')!
+    expect(wrapper.delimitador).toBe('$$')
+    expect(wrapper.cuerpo.length).toBeLessThan(200)
+    expect(wrapper.cuerpo).toContain('SELECT public.conta_cierre_anual(p_anio, NULL)')
+    expect(wrapper.cuerpo).not.toContain('get_my_company_id()')
+    // Nada de otras migraciones: ni CREATE, ni POLICY, ni GRANT.
+    expect(wrapper.cuerpo).not.toMatch(/CREATE\s+(OR REPLACE\s+)?FUNCTION/i)
+    expect(wrapper.cuerpo).not.toMatch(/CREATE\s+POLICY/i)
+  })
+
+  it('la sobrecarga (int, uuid) sí trae su implementación completa', () => {
+    const impl = definicionVigente(MIGRACIONES_PARSEADAS, 'conta_cierre_anual', 'int, uuid')!
+    expect(impl.cuerpo).toContain('get_my_company_id()')
+    expect(impl.cuerpo).toContain('INSERT INTO public.conta_asientos')
+    expect(impl.cuerpo.length).toBeGreaterThan(1000)
+  })
+
+  it('un `$fn$;` posterior NO puede extender un cuerpo abierto con `$$`', () => {
+    const sintetico = [
+      'CREATE OR REPLACE FUNCTION public.f_corta(p_x int)',
+      'RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;',
+      '',
+      'CREATE OR REPLACE FUNCTION public.f_larga(p_y uuid)',
+      'RETURNS void LANGUAGE plpgsql AS $fn$ BEGIN PERFORM get_my_company_id(); END $fn$;',
+    ].join('\n')
+    const defs = parsearFunciones([{ archivo: '0001_x.sql', sql: sintetico }])
+
+    const corta = definicionVigente(defs, 'f_corta', 'int')!
+    expect(corta.delimitador).toBe('$$')
+    expect(corta.cuerpo.trim()).toBe('SELECT 1')
+    expect(corta.cuerpo, 'no debe tragarse la función siguiente').not.toContain('get_my_company_id')
+  })
+
+  it('dos sobrecargas del mismo nombre con delimitadores distintos no se mezclan', () => {
+    const sintetico = [
+      'CREATE OR REPLACE FUNCTION public.dual(p_a int)',
+      'RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;',
+      'CREATE OR REPLACE FUNCTION public.dual(p_a int, p_b uuid)',
+      'RETURNS int LANGUAGE plpgsql AS $body$ BEGIN RETURN 2; END $body$;',
+    ].join('\n')
+    const defs = parsearFunciones([{ archivo: '0001_x.sql', sql: sintetico }])
+
+    expect(firmasDe(defs, 'dual')).toEqual(['int', 'int, uuid'])
+    expect(definicionVigente(defs, 'dual', 'int')!.cuerpo.trim()).toBe('SELECT 1')
+    expect(definicionVigente(defs, 'dual', 'int, uuid')!.delimitador).toBe('$body$')
+    expect(definicionVigente(defs, 'dual', 'int, uuid')!.cuerpo).toContain('RETURN 2')
+  })
+
+  it('gana la definición CRONOLÓGICAMENTE última de esa firma exacta', () => {
+    // Y el orden lo fija el nombre del archivo, no el del `readdir`.
+    const defs = parsearFunciones([
+      { archivo: '0002_despues.sql', sql: 'CREATE OR REPLACE FUNCTION public.v(p_a int) RETURNS int LANGUAGE sql AS $$ SELECT 2 $$;' },
+      { archivo: '0001_antes.sql', sql: 'CREATE OR REPLACE FUNCTION public.v(p_a int) RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;' },
+    ])
+    expect(definicionVigente(defs, 'v', 'int')!.cuerpo.trim()).toBe('SELECT 2')
+    expect(definicionVigente(defs, 'v', 'int')!.archivo).toBe('0002_despues.sql')
+  })
+
+  it('los tipos con paréntesis no rompen la firma', () => {
+    const defs = parsearFunciones([{
+      archivo: '0001_x.sql',
+      sql: 'CREATE FUNCTION public.p(p_monto numeric(14,2), p_txt varchar(50)) RETURNS void LANGUAGE sql AS $$ SELECT 1 $$;',
+    }])
+    expect(firmasDe(defs, 'p')).toEqual(['numeric(14,2), varchar(50)'])
+  })
+
+  it('los GRANT se comprueban por firma exacta, no por nombre', () => {
+    const sql = [
+      'GRANT EXECUTE ON FUNCTION public.g(int) TO authenticated;',
+      'GRANT EXECUTE ON FUNCTION public.g(int, uuid) TO service_role;',
+    ].join('\n')
+    expect(concedidaA(sql, 'g', 'int', 'authenticated')).toBe(true)
+    expect(concedidaA(sql, 'g', 'int, uuid', 'authenticated')).toBe(false)
+    expect(concedidaA(sql, 'g', 'int, uuid', 'service_role')).toBe(true)
+  })
+})
+
+describe('contrato de garantías — qué demuestra cada RPC', () => {
   it('todas las RPC obligatorias existen en las migraciones', () => {
-    const sinDefinir = RPCS_OBLIGATORIAS.filter((r) => cuerpoDe(r.nombre) === null).map((r) => r.nombre)
+    const sinDefinir = RPCS_OBLIGATORIAS
+      .filter((r) => definicionesDe(r.nombre).length === 0)
+      .map((r) => r.nombre)
     expect(sinDefinir, `RPC declaradas que no existen: ${sinDefinir.join(', ')}`).toEqual([])
   })
 
-  it.each(RPCS_OBLIGATORIAS.map((r) => [r.nombre, r.garantia]))(
-    'la garantía declarada de %s (%s) es la que sostiene el esquema',
-    (nombre, declarada) => {
-      expect(garantiaDelEsquema(nombre)).toBe(declarada)
-    },
-  )
-
-  it('las tres garantías están representadas y ninguna se infla', () => {
+  it('las tres garantías con aislamiento o guard están representadas', () => {
     const cuenta = (g: string) => RPCS_OBLIGATORIAS.filter((r) => r.garantia === g).length
     expect(cuenta('tenant')).toBeGreaterThan(0)
     expect(cuenta('rol')).toBeGreaterThan(0)
     expect(cuenta('privilegio')).toBeGreaterThan(0)
-    expect(cuenta('tenant') + cuenta('rol') + cuenta('privilegio')).toBe(RPCS_OBLIGATORIAS.length)
   })
 
   it('las RPC de notificaciones NO se declaran aislamiento (sólo service_role)', () => {
-    // #378/#380 se cerró revocando EXECUTE, no con un check de empresa. Contar
-    // esos rechazos como aislamiento sería inventar cobertura.
     for (const nombre of ['enqueue_notification', 'claim_notifications_batch', 'mark_notification_result']) {
       const r = RPCS_OBLIGATORIAS.find((x) => x.nombre === nombre)
       expect(r?.garantia, `${nombre} no puede declararse garantía de tenant`).toBe('privilegio')
-      expect(concedidaAAuthenticated(nombre)).toBe(false)
+      for (const d of definicionesDe(nombre)) {
+        expect(concedidaA(SQL_TODO, nombre, d.firma, 'authenticated')).toBe(false)
+      }
     }
   })
 
-  it('las portal_* de escritura del propietario son garantía de ROL, no de tenant', () => {
+  it('las portal_* de escritura del propietario son garantía de ROL', () => {
     for (const nombre of [
-      'portal_registrar_inquilino',
-      'portal_quitar_inquilino',
-      'portal_registrar_familiar',
-      'portal_quitar_familiar',
-      'portal_baja_renta',
+      'portal_registrar_inquilino', 'portal_quitar_inquilino',
+      'portal_registrar_familiar', 'portal_quitar_familiar', 'portal_baja_renta',
     ]) {
-      const r = RPCS_OBLIGATORIAS.find((x) => x.nombre === nombre)
-      expect(r?.garantia, `${nombre} rechaza por rol con usuarios staff`).toBe('rol')
-      expect(cuerpoDe(nombre)).toMatch(/current_user_role\(\)\s*<>\s*'cliente'/)
+      expect(RPCS_OBLIGATORIAS.find((x) => x.nombre === nombre)?.garantia).toBe('rol')
+      const cuerpos = definicionesDe(nombre).map((d) => d.cuerpo).join('\n')
+      expect(cuerpos).toMatch(/current_user_role\(\)\s*<>\s*'cliente'/)
     }
   })
 
-  it('las reservas del portal SÍ son garantía de tenant (tienen rama de staff)', () => {
-    // portal_reservar_amenidad / portal_cancelar_reserva aceptan al staff del
-    // tenant y comparan company_id: con A company_owner el único rechazo posible
-    // es la pertenencia. Clasificarlas como "rol" habría INFRAvalorado la
-    // cobertura, que es tan inexacto como inflarla.
+  it('las reservas del portal sí llegan a TENANT: tienen rama de staff', () => {
     for (const nombre of ['portal_reservar_amenidad', 'portal_cancelar_reserva']) {
       expect(RPCS_OBLIGATORIAS.find((x) => x.nombre === nombre)?.garantia).toBe('tenant')
-      expect(cuerpoDe(nombre)).toContain('get_my_company_id()')
+      const cuerpos = definicionesDe(nombre).map((d) => d.cuerpo).join('\n')
+      expect(cuerpos).toContain('get_my_company_id()')
     }
+  })
+
+  it('conta_cierre_anual NO se declara tenant: el esquema no lo sostiene', () => {
+    // (int) es un wrapper que no comprueba nada; (int, uuid) deriva la empresa
+    // de get_my_company_id() pero acepta p_project_id SIN validar que sea del
+    // tenant del llamante, y además es destructiva.
+    const r = RPCS_OBLIGATORIAS.find((x) => x.nombre === 'conta_cierre_anual')!
+    expect(r.garantia).toBe('estructural')
+    expect(r.evidencias).toEqual(['anon'])
+
+    const wrapper = definicionVigente(MIGRACIONES_PARSEADAS, 'conta_cierre_anual', 'int')!
+    expect(wrapper.cuerpo).not.toContain('get_my_company_id()')
+
+    const impl = definicionVigente(MIGRACIONES_PARSEADAS, 'conta_cierre_anual', 'int, uuid')!
+    expect(impl.cuerpo).toContain('get_my_company_id()')
+    // La prueba de que NO valida el proyecto contra la empresa: p_project_id se
+    // usa tal cual, nunca comparado con company_id.
+    expect(impl.cuerpo).not.toMatch(/p_project_id[^\n]*company_id\s*=/)
+    expect(impl.cuerpo).toContain('INSERT INTO public.conta_asientos')
+  })
+
+  it('mencionar get_my_company_id() NO basta: hace falta la evidencia dinámica', () => {
+    // El corazón de la corrección. Un cuerpo puede comparar empresas y aun así
+    // no demostrar nada si ninguna prueba lo ejercita. Por eso toda RPC que
+    // declare `tenant` tiene que exigir además la evidencia cross-tenant.
+    for (const r of RPCS_OBLIGATORIAS.filter((x) => x.garantia === 'tenant')) {
+      const cuerpos = definicionesDe(r.nombre).map((d) => d.cuerpo).join('\n')
+      expect(cuerpos, `${r.nombre} declara tenant sin comparar empresas`).toContain('get_my_company_id()')
+      expect(r.evidencias, `${r.nombre} declara tenant sin evidencia cross-tenant`)
+        .toContain('authenticated-cross-tenant')
+    }
+  })
+
+  it('conta_cierre_anual compara empresas y aun así NO es tenant', () => {
+    // El caso que demuestra que la implicación no vale al revés: su cuerpo sí
+    // menciona get_my_company_id(), pero el harness no ejecuta ninguna prueba
+    // autenticada, así que no se declara aislamiento.
+    const impl = definicionVigente(MIGRACIONES_PARSEADAS, 'conta_cierre_anual', 'int, uuid')!
+    expect(impl.cuerpo).toContain('get_my_company_id()')
+    expect(RPCS_OBLIGATORIAS.find((x) => x.nombre === 'conta_cierre_anual')!.garantia).not.toBe('tenant')
   })
 
   it('los motivos están escritos y dicen qué faltaría para subir de garantía', () => {
@@ -204,8 +307,6 @@ describe('contrato de garantías — qué demuestra cada RPC', () => {
   })
 
   it('el harness declara la garantía en el nombre de cada describe de RPC', () => {
-    // Es lo que se lee en el reporte JSON publicado como evidencia: quien mire
-    // el artefacto ve "garantía de ROL" sin tener que abrir coverage.json.
     const esperado: Array<[string, string]> = [
       ['self-service de inquilinos', 'garantía de ROL'],
       ['accesos familiares', 'garantía de ROL'],

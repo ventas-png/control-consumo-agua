@@ -110,18 +110,53 @@ export function evaluarReporte(reporte, cobertura, { minimo } = {}) {
     )
   }
 
-  // RPC críticas, UNA A UNA. La granularidad por dominio dejaba pasar la
-  // desaparición de una RPC concreta mientras su bloque siguiera existiendo.
+  // RPC críticas, evidencia POR EVIDENCIA.
+  //
+  // Antes bastaba con que alguna prueba pasada CONTUVIERA el nombre de la RPC:
+  //
+  //     pasadas.some((p) => p.nombre.includes(r.nombre))
+  //
+  // Con eso, 23 pruebas de «anon NO puede ejecutar X» daban por cubiertas las 23
+  // RPC —incluidas las declaradas como aislamiento por tenant, que anon no
+  // ejercita en absoluto—. Verde falso, reproducido antes de cambiar nada.
+  //
+  // Ahora cada RPC declara qué vectores hay que acreditar y el harness marca sus
+  // pruebas con un identificador estable, `[RLS:rpc:<nombre>:<garantia>:<vector>]`.
+  // Una prueba de anon no puede acreditar una evidencia autenticada, y si alguien
+  // borra la prueba autenticada dejando la de anon, el nombre de la RPC sigue
+  // apareciendo pero la evidencia desaparece — y el job falla.
   const rpcs = cobertura?.rpcsObligatorias ?? []
-  const rpcsAusentes = rpcs.filter(
-    (r) => !pasadas.some((p) => p.nombre.includes(r.nombre)),
-  )
-  for (const r of rpcsAusentes) {
-    errores.push(
-      `falta la RPC obligatoria "${r.nombre}" (dominio ${r.dominio}): ninguna prueba pasada la nombra. ` +
-      `Por qué importa: ${r.porQue}`,
-    )
+  const evidenciasAusentes = []
+
+  for (const r of rpcs) {
+    const declaradas = Array.isArray(r.evidencias) ? r.evidencias : []
+
+    if (declaradas.length === 0) {
+      // Un manifiesto sin evidencias no es "todo vale": es una RPC sin contrato.
+      errores.push(
+        `la RPC obligatoria "${r.nombre}" no declara ninguna evidencia en coverage.json. ` +
+        'Sin vectores declarados no hay nada que exigir, así que se trata como cobertura ausente.',
+      )
+      evidenciasAusentes.push(`${r.nombre}:(sin declarar)`)
+      continue
+    }
+
+    for (const vector of declaradas) {
+      const id = `[RLS:rpc:${r.nombre}:${r.garantia}:${vector}]`
+      if (pasadas.some((p) => p.nombre.includes(id))) continue
+
+      evidenciasAusentes.push(`${r.nombre}:${vector}`)
+      errores.push(
+        `falta la evidencia "${vector}" de la RPC "${r.nombre}" (garantía ${r.garantia}, ` +
+        `dominio ${r.dominio}): ninguna prueba pasada lleva el marcador ${id}. ` +
+        `Por qué importa: ${r.porQue}`,
+      )
+    }
   }
+
+  const rpcsAusentes = rpcs.filter((r) =>
+    evidenciasAusentes.some((e) => e.startsWith(`${r.nombre}:`)),
+  )
 
   if (pasadas.length > 0 && pasadas.length < pisoMinimo) {
     errores.push(
@@ -143,6 +178,8 @@ export function evaluarReporte(reporte, cobertura, { minimo } = {}) {
       escenariosAusentes: ausentes.map((e) => e.clave),
       rpcsExigidas: rpcs.length,
       rpcsAusentes: rpcsAusentes.map((r) => r.nombre),
+      evidenciasExigidas: rpcs.reduce((n, r) => n + (r.evidencias?.length ?? 0), 0),
+      evidenciasAusentes,
       pisoMinimo,
     },
   }
@@ -157,6 +194,7 @@ export function resumenMarkdown({ ok, errores, resumen }) {
       `- Pruebas pasadas: **${resumen.pasadas}** (total ${resumen.total}, fallos ${resumen.fallidas}, omitidas ${resumen.omitidas})`,
       `- Escenarios obligatorios presentes: **${resumen.escenariosExigidos}/${resumen.escenariosExigidos}**`,
       `- RPC críticas verificadas una a una: **${resumen.rpcsExigidas}/${resumen.rpcsExigidas}**`,
+      `- Evidencias acreditadas (por RPC, garantía y vector): **${resumen.evidenciasExigidas}/${resumen.evidenciasExigidas}**`,
       `- Piso mínimo exigido: ${resumen.pisoMinimo}`,
       '',
       'Las tablas con cobertura real vs. estructural están declaradas en',

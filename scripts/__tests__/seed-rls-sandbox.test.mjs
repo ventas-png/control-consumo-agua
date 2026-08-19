@@ -110,33 +110,66 @@ describe('validarUrlSandbox — contra el manifiesto REAL', () => {
 
 
 // ════════════════════════════════════════════════════════════════════════════
-// Búsqueda de usuarios de Auth: consulta FILTRADA, no listado paginado.
+// Búsqueda de usuarios de Auth: consulta FILTRADA y PAGINADA.
 // ════════════════════════════════════════════════════════════════════════════
 // EVIDENCIA REAL contra el sandbox, con sólo 4 usuarios en el proyecto:
 //
-//   page=1 per_page=1  → 200
-//   page=1 per_page=2  → 200
+//   page=1 per_page=1  → 200      page=1 per_page=4  → AuthRetryableFetchError 500
+//   page=1 per_page=2  → 200      page=4 per_page=1  → AuthRetryableFetchError 500
 //   page=1 per_page=3  → 200
-//   page=1 per_page=4  → AuthRetryableFetchError 500
-//   page=4 per_page=1  → AuthRetryableFetchError 500
 //
-// Esto REFUTA la hipótesis anterior ("perPage 1000 es demasiado; con 50 se
-// arregla"). No hay un límite de tamaño que respetar: lo que rompe es que la
-// respuesta incluya UN REGISTRO CONCRETO del listado general. `per_page=3` cabe
-// porque se detiene antes de él; `page=4, per_page=1` falla porque cae justo
-// encima. Bajar el tamaño de página sólo mueve la frontera — con otro orden, o
-// con un usuario más, el registro vuelve a entrar y el seed vuelve a morir.
+// Refuta la hipótesis "perPage 1000 es demasiado, con 50 se arregla": no hay un
+// límite de tamaño, rompe INCLUIR UN REGISTRO CONCRETO en la respuesta. Por eso
+// el listado general se abandona y se consulta con `filter`.
 //
-// La consulta filtrada nunca lo materializa:
-//   GET /auth/v1/admin/users?page=1&per_page=1&filter=rls-a%40sandbox.invalid → 200
-// y con ella el seed llegó a "Sandbox listo y VERIFICADO como ambos usuarios".
-import { buscarUsuarioPorEmail, detalleErrorAuth, upsertUsuario } from '../seed-rls-sandbox.mjs'
+// Pero una sola página filtrada tampoco bastaba. GoTrue aplica el filtro
+// aproximadamente como
+//
+//     email LIKE '%filter%' OR full_name ILIKE '%filter%'
+//
+// así que con `per_page=1` una coincidencia PARCIAL más reciente puede ocupar el
+// único resultado y ocultar al usuario exacto. El seed concluiría que no existe,
+// lo crearía otra vez y rompería la idempotencia.
+import {
+  PAGINA_FILTRO,
+  buscarUsuarioPorEmail,
+  detalleErrorAuth,
+  upsertUsuario,
+} from '../seed-rls-sandbox.mjs'
 
 const URL_SANDBOX = 'https://jwpmivhvlstslncrtokb.supabase.co'
 const CLAVE = 'service-role-de-juguete'
+const EMAIL = 'rls-a@sandbox.invalid'
 
-/** fetch de mentira que registra la petición y devuelve la respuesta indicada. */
-function fetchFalso(respuesta) {
+const usuario = (n, email) => ({ id: `id-${n}`, email: email ?? `u${n}@sandbox.invalid` })
+
+/**
+ * fetch de mentira que pagina de VERDAD sobre una lista, respetando el
+ * `per_page` pedido. Nunca devuelve más filas de las solicitadas: una respuesta
+ * que no respeta la paginación no representa a ningún servidor real y volvería
+ * vacua la prueba.
+ */
+function fetchPaginado(usuarios, { errorEnPagina = null, transformar = null } = {}) {
+  const peticiones = []
+  const impl = async (url, opciones) => {
+    const u = new URL(url)
+    const page = Number(u.searchParams.get('page'))
+    const perPage = Number(u.searchParams.get('per_page'))
+    peticiones.push({ url, page, perPage, filter: u.searchParams.get('filter'), opciones })
+
+    if (errorEnPagina !== null && page === errorEnPagina) {
+      return { ok: false, status: 500, statusText: 'Internal Server Error' }
+    }
+    const desde = (page - 1) * perPage
+    const lote = usuarios.slice(desde, desde + perPage)
+    return { ok: true, status: 200, json: async () => (transformar ? transformar(lote) : { users: lote }) }
+  }
+  impl.peticiones = peticiones
+  return impl
+}
+
+/** fetch que devuelve una respuesta fija (para los casos de forma inválida). */
+function fetchFijo(respuesta) {
   const peticiones = []
   const impl = async (url, opciones) => {
     peticiones.push({ url, opciones })
@@ -147,131 +180,158 @@ function fetchFalso(respuesta) {
   return impl
 }
 
-const respuestaOk = (users) => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ users }),
-})
-
-const buscar = (fetchImpl, email) =>
+const buscar = (fetchImpl, email = EMAIL) =>
   buscarUsuarioPorEmail({ url: URL_SANDBOX, serviceKey: CLAVE, fetchImpl }, email)
 
 describe('buscarUsuarioPorEmail — consulta filtrada', () => {
   it('encuentra al usuario existente', async () => {
-    const usuario = { id: 'id-a', email: 'rls-a@sandbox.invalid' }
-    const f = fetchFalso(respuestaOk([usuario]))
-
-    expect(await buscar(f, 'rls-a@sandbox.invalid')).toEqual(usuario)
+    const u = usuario('a', EMAIL)
+    expect(await buscar(fetchPaginado([u]))).toEqual(u)
   })
 
-  it('pide el endpoint admin con filter, page=1 y per_page=1', async () => {
-    const f = fetchFalso(respuestaOk([]))
-    await buscar(f, 'rls-a@sandbox.invalid')
-
-    const { url } = f.peticiones[0]
-    expect(url).toContain('/auth/v1/admin/users')
-    expect(url).toContain('page=1')
-    expect(url).toContain('per_page=1')
-    // El email va URL-encoded: la arroba rompería el query string.
-    expect(url).toContain('filter=rls-a%40sandbox.invalid')
+  it('pide el endpoint admin con filter y page desde 1', async () => {
+    const f = fetchPaginado([])
+    await buscar(f)
+    const p = f.peticiones[0]
+    expect(p.url).toContain('/auth/v1/admin/users')
+    expect(p.page).toBe(1)
+    expect(p.filter).toBe(EMAIL)
+    expect(p.url).toContain('filter=rls-a%40sandbox.invalid')
   })
 
-  it('NO pagina el listado general: una sola petición y sin per_page grande', async () => {
-    const f = fetchFalso(respuestaOk([]))
-    await buscar(f, 'nadie@sandbox.invalid')
-
-    expect(f.peticiones).toHaveLength(1)
-    expect(f.peticiones[0].url).not.toMatch(/per_page=(?!1\b)\d+/)
+  it('NO vuelve al listado general: toda petición lleva filter', async () => {
+    const f = fetchPaginado(Array.from({ length: PAGINA_FILTRO * 2 }, (_, i) => usuario(i)))
+    await buscar(f)
+    expect(f.peticiones.length).toBeGreaterThan(1)
+    for (const p of f.peticiones) expect(p.filter).toBe(EMAIL)
   })
 
   it('manda apikey y Authorization Bearer con la service_role', async () => {
-    const f = fetchFalso(respuestaOk([]))
-    await buscar(f, 'rls-a@sandbox.invalid')
-
+    const f = fetchPaginado([])
+    await buscar(f)
     const { headers } = f.peticiones[0].opciones
     expect(headers.apikey).toBe(CLAVE)
     expect(headers.Authorization).toBe(`Bearer ${CLAVE}`)
   })
+})
 
-  it('devuelve null cuando el usuario no existe', async () => {
-    const f = fetchFalso(respuestaOk([]))
-    expect(await buscar(f, 'nadie@sandbox.invalid')).toBeNull()
+describe('buscarUsuarioPorEmail — la exacta no se pierde entre las parciales', () => {
+  it('una coincidencia PARCIAL que aparece ANTES no se acepta ni tapa a la exacta', () => {
+    // El escenario del hallazgo: el filtro es LIKE '%…%', así que `otro-rls-a@…`
+    // casa igual y puede venir primero.
+    const lista = [usuario('otro', `otro-${EMAIL}`), usuario('a', EMAIL)]
+    return expect(buscar(fetchPaginado(lista))).resolves.toMatchObject({ id: 'id-a' })
   })
 
-  it('la comparación final es EXACTA: una coincidencia parcial no se acepta', async () => {
-    // `filter` es una búsqueda parcial del lado del servidor, así que buscar
-    // "rls-a@sandbox.invalid" puede devolver "otro-rls-a@sandbox.invalid".
-    // Aceptarlo sería reutilizar la identidad de otro usuario.
-    const f = fetchFalso(respuestaOk([
-      { id: 'id-otro', email: 'otro-rls-a@sandbox.invalid' },
-      { id: 'id-largo', email: 'rls-a@sandbox.invalid.mx' },
-    ]))
+  it('la exacta se encuentra aunque esté en una página POSTERIOR', async () => {
+    // Con una sola página filtrada, esto devolvía null y el seed duplicaba.
+    const parciales = Array.from({ length: PAGINA_FILTRO }, (_, i) => usuario(i, `p${i}-${EMAIL}`))
+    const f = fetchPaginado([...parciales, usuario('a', EMAIL)])
 
-    expect(await buscar(f, 'rls-a@sandbox.invalid')).toBeNull()
+    expect((await buscar(f))?.id).toBe('id-a')
+    expect(f.peticiones.map((p) => p.page)).toEqual([1, 2])
   })
 
-  it('la comparación NO distingue mayúsculas (los emails no son sensibles a caja)', async () => {
-    const f = fetchFalso(respuestaOk([{ id: 'id-a', email: 'RLS-A@Sandbox.Invalid' }]))
-    expect((await buscar(f, 'rls-a@sandbox.invalid'))?.id).toBe('id-a')
+  it('devuelve null cuando NO hay coincidencia exacta, sólo parciales', async () => {
+    const lista = [usuario('otro', `otro-${EMAIL}`), usuario('largo', `${EMAIL}.mx`)]
+    expect(await buscar(fetchPaginado(lista))).toBeNull()
   })
 
-  it('elige la coincidencia exacta aunque venga acompañada de parciales', async () => {
-    const f = fetchFalso(respuestaOk([
-      { id: 'id-otro', email: 'otro-rls-a@sandbox.invalid' },
-      { id: 'id-a', email: 'rls-a@sandbox.invalid' },
-    ]))
-    expect((await buscar(f, 'rls-a@sandbox.invalid'))?.id).toBe('id-a')
+  it('la comparación NO distingue mayúsculas', async () => {
+    const f = fetchPaginado([{ id: 'id-a', email: 'RLS-A@Sandbox.Invalid' }])
+    expect((await buscar(f))?.id).toBe('id-a')
+  })
+
+  it('DOS coincidencias exactas abortan: es un estado inconsistente', async () => {
+    // No se elige una al azar: dos identidades con el mismo email significan que
+    // el proyecto está en un estado que nadie entiende.
+    const f = fetchPaginado([{ id: 'id-1', email: EMAIL }, { id: 'id-2', email: EMAIL }])
+    await expect(buscar(f)).rejects.toThrow(/2 usuarios con ese email exacto/)
+  })
+
+  it('ninguna respuesta de prueba devuelve más filas que el per_page pedido', async () => {
+    // Si el doble no respeta la paginación, las pruebas de arriba no representan
+    // a ningún servidor real y no prueban nada.
+    const f = fetchPaginado(Array.from({ length: PAGINA_FILTRO * 3 }, (_, i) => usuario(i)))
+    await buscar(f)
+    for (const p of f.peticiones) {
+      expect(p.perPage).toBe(PAGINA_FILTRO)
+    }
+    // Y se comprueba sobre la respuesta real del doble, no sólo sobre la petición.
+    const resp = await f(`${URL_SANDBOX}/auth/v1/admin/users?page=1&per_page=${PAGINA_FILTRO}&filter=x`, {})
+    expect((await resp.json()).users.length).toBeLessThanOrEqual(PAGINA_FILTRO)
   })
 })
 
 describe('buscarUsuarioPorEmail — fail-closed', () => {
-  it('un HTTP no-2xx aborta en vez de asumir que no existe', async () => {
-    // Tratar un 500 como "no existe" haría que el seed CREARA un usuario que ya
-    // estaba: dos identidades para el mismo email.
-    const f = fetchFalso({ ok: false, status: 500, statusText: 'Internal Server Error' })
-    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/HTTP 500/)
+  it('un HTTP no-2xx en la PRIMERA página aborta', async () => {
+    const f = fetchFijo({ ok: false, status: 500, statusText: 'Internal Server Error' })
+    await expect(buscar(f)).rejects.toThrow(/HTTP 500/)
+  })
+
+  it('un HTTP 500 en una página POSTERIOR aborta: el listado queda incompleto', async () => {
+    // Quedarse con lo recogido hasta ahí sería concluir "no existe" con datos a
+    // medias — y crear un duplicado.
+    const parciales = Array.from({ length: PAGINA_FILTRO }, (_, i) => usuario(i, `p${i}-${EMAIL}`))
+    const f = fetchPaginado([...parciales, usuario('a', EMAIL)], { errorEnPagina: 2 })
+    await expect(buscar(f)).rejects.toThrow(/HTTP 500.*página 2/s)
   })
 
   it('el error de HTTP no filtra la clave, las cabeceras ni el cuerpo', async () => {
-    const f = fetchFalso({
-      ok: false,
-      status: 403,
-      statusText: 'Forbidden',
+    const f = fetchFijo({
+      ok: false, status: 403, statusText: 'Forbidden',
       json: async () => ({ eco: `apikey=${CLAVE}` }),
     })
-
-    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(
-      expect.objectContaining({
-        message: expect.not.stringContaining(CLAVE),
-      }),
+    await expect(buscar(f)).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining(CLAVE) }),
     )
   })
 
   it('un cuerpo que no es JSON aborta', async () => {
-    const f = fetchFalso({
-      ok: true,
-      status: 200,
+    const f = fetchFijo({
+      ok: true, status: 200,
       json: async () => { throw new Error('Unexpected token < in JSON') },
     })
-    await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/no es JSON válido/)
+    await expect(buscar(f)).rejects.toThrow(/no es JSON válido/)
   })
 
   it('`users` ausente o de otro tipo aborta: "no lo sé" no es "no existe"', async () => {
     for (const cuerpo of [{}, { users: null }, { users: 'nope' }, { users: { 0: 'x' } }]) {
-      const f = fetchFalso({ ok: true, status: 200, json: async () => cuerpo })
-      await expect(buscar(f, 'rls-a@sandbox.invalid')).rejects.toThrow(/arreglo `users`/)
+      const f = fetchFijo({ ok: true, status: 200, json: async () => cuerpo })
+      await expect(buscar(f)).rejects.toThrow(/arreglo `users`/)
     }
   })
 
-  it('un fallo de red aborta sin exponer la petición', async () => {
-    // La URL lleva el email y las cabeceras la service_role: ni una ni otras
-    // pueden acabar en el log.
-    const f = fetchFalso(() => { throw new Error('ECONNREFUSED') })
-    const promesa = buscar(f, 'rls-a@sandbox.invalid')
+  it('una página con MÁS filas de las pedidas aborta por incoherente', async () => {
+    const f = fetchPaginado([], {
+      transformar: () => ({ users: Array.from({ length: PAGINA_FILTRO + 5 }, (_, i) => usuario(i)) }),
+    })
+    await expect(buscar(f)).rejects.toThrow(/Paginación incoherente/)
+  })
 
-    await expect(promesa).rejects.toThrow(/ECONNREFUSED/)
-    await expect(promesa).rejects.toThrow(
+  it('un listado filtrado interminable aborta en vez de girar para siempre', async () => {
+    // Un backend que devolviera siempre una página llena dejaría el bucle vivo.
+    const f = fetchFijo({
+      ok: true, status: 200,
+      json: async () => ({ users: Array.from({ length: PAGINA_FILTRO }, (_, i) => usuario(i)) }),
+    })
+    await expect(buscar(f)).rejects.toThrow(/Resultado ambiguo/)
+  })
+
+  it('un fallo de red aborta sin exponer la petición', async () => {
+    const f = fetchFijo(() => { throw new Error('ECONNREFUSED') })
+    await expect(buscar(f)).rejects.toThrow(/ECONNREFUSED/)
+    await expect(buscar(f)).rejects.toThrow(
       expect.objectContaining({ message: expect.not.stringContaining(CLAVE) }),
+    )
+  })
+
+  it('ningún mensaje de error incluye la URL completa', async () => {
+    // La URL lleva el email en el query string; el mensaje lo nombra aparte,
+    // pero no debe arrastrar el endpoint ni sus parámetros.
+    const f = fetchFijo({ ok: false, status: 502, statusText: 'Bad Gateway' })
+    await expect(buscar(f)).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining('/auth/v1/admin/users') }),
     )
   })
 })
@@ -283,8 +343,6 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
   })
 
   it('serializa el message cuando no es una cadena', () => {
-    // GoTrue devolvió literalmente `{}` en el fallo del listado: quedarse con
-    // `.message` borraba la única pista útil, el status.
     expect(detalleErrorAuth({ status: 500, message: {} })).toContain('message={}')
     expect(detalleErrorAuth({ status: 500, message: { a: 1 } })).toContain('message={"a":1}')
     expect(detalleErrorAuth({ status: 500, message: null })).toContain('message=null')
@@ -303,9 +361,7 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
 
   it('NO filtra headers, cuerpo crudo ni nada parecido a una credencial', () => {
     const d = detalleErrorAuth({
-      name: 'AuthApiError',
-      status: 500,
-      message: 'fallo',
+      name: 'AuthApiError', status: 500, message: 'fallo',
       headers: { Authorization: 'Bearer sk-secreta' },
       response: { body: 'service_role=clave-secretisima' },
       apiKey: 'clave-que-no-debe-salir',
@@ -323,7 +379,6 @@ describe('detalleErrorAuth — diagnóstico seguro', () => {
 })
 
 describe('upsertUsuario — idempotencia', () => {
-  /** Cliente admin de mentira: registra creaciones y actualizaciones. */
   function adminFalso() {
     const creados = []
     const actualizados = []
@@ -348,8 +403,7 @@ describe('upsertUsuario — idempotencia', () => {
 
   it('actualiza la contraseña si el usuario existe y NO crea otro', async () => {
     const admin = adminFalso()
-    const id = await upsertUsuario(admin, 'a@sandbox.invalid', 'clave', async () => ({ id: 'id-a' }))
-
+    const id = await upsertUsuario(admin, EMAIL, 'clave', async () => ({ id: 'id-a' }))
     expect(id).toBe('id-a')
     expect(admin.actualizados).toEqual(['id-a'])
     expect(admin.creados, 'no debe crearse un usuario duplicado').toEqual([])
@@ -358,22 +412,19 @@ describe('upsertUsuario — idempotencia', () => {
   it('crea el usuario si no existe', async () => {
     const admin = adminFalso()
     const id = await upsertUsuario(admin, 'nuevo@sandbox.invalid', 'clave', async () => null)
-
     expect(id).toBe('nuevo-nuevo@sandbox.invalid')
     expect(admin.creados).toHaveLength(1)
     expect(admin.actualizados).toEqual([])
   })
 
   it('dos corridas seguidas dejan UN solo usuario', async () => {
-    // La definición operativa de idempotente. El buscador de mentira imita al
-    // real: tras crearlo, la siguiente búsqueda ya lo encuentra.
     const admin = adminFalso()
     const registro = new Map()
     const buscarReg = async (email) => registro.get(email) ?? null
 
-    const primera = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-1', buscarReg)
-    registro.set('rls-a@sandbox.invalid', { id: primera })
-    const segunda = await upsertUsuario(admin, 'rls-a@sandbox.invalid', 'clave-2', buscarReg)
+    const primera = await upsertUsuario(admin, EMAIL, 'clave-1', buscarReg)
+    registro.set(EMAIL, { id: primera })
+    const segunda = await upsertUsuario(admin, EMAIL, 'clave-2', buscarReg)
 
     expect(segunda).toBe(primera)
     expect(admin.creados).toHaveLength(1)
@@ -383,8 +434,18 @@ describe('upsertUsuario — idempotencia', () => {
   it('un fallo de la búsqueda ABORTA en vez de crear a ciegas', async () => {
     const admin = adminFalso()
     const buscarRoto = async () => { throw new Error('HTTP 500') }
-
-    await expect(upsertUsuario(admin, 'a@sandbox.invalid', 'clave', buscarRoto)).rejects.toThrow(/500/)
+    await expect(upsertUsuario(admin, EMAIL, 'clave', buscarRoto)).rejects.toThrow(/500/)
     expect(admin.creados, 'no debe crear nada si no sabe si ya existe').toEqual([])
+  })
+
+  it('con la exacta en una página posterior, NO duplica', async () => {
+    // La cadena completa: búsqueda paginada real + upsert.
+    const admin = adminFalso()
+    const parciales = Array.from({ length: PAGINA_FILTRO }, (_, i) => usuario(i, `p${i}-${EMAIL}`))
+    const f = fetchPaginado([...parciales, { id: 'id-a', email: EMAIL }])
+
+    const id = await upsertUsuario(admin, EMAIL, 'clave', (e) => buscar(f, e))
+    expect(id).toBe('id-a')
+    expect(admin.creados).toEqual([])
   })
 })
