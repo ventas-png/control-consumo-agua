@@ -610,6 +610,20 @@ export interface CorrespondenciaCondominio {
   observaciones?: string | null
   unidad_id?: string | null
   created_at: string
+  // Acuse de recibo y evidencia (migración 20260828000000). Mismos nombres que
+  // PaqueteRecibido a propósito: la Fase 1 unifica ambos en un solo motor.
+  fotos?: string[] | null
+  firma_path?: string | null
+  entregado_a_nombre?: string | null
+  entregado_via?: 'portal' | 'porteria' | null
+  hora_entrega?: string | null
+  recibido_por?: string | null
+  entregado_por?: string | null
+  empresa_mensajeria?: string | null
+  /** Plazo legal de la pieza (descargo/respuesta). */
+  fecha_limite?: string | null
+  // joins
+  unidad_nombre?: string
 }
 
 export type TurnoNovedad = 'mañana' | 'tarde' | 'noche'

@@ -38,12 +38,14 @@ async function fetchAllCuotas(pid: string, cid: string) {
 }
 
 /**
- * Fase PANEL del loader (P2 perf): SOLO las 9 colecciones que consume el tab por
+ * Fase PANEL del loader (P2 perf): SOLO las 10 colecciones que consume el tab por
  * defecto (PanelGeneralTab: cuotas, visitantes, amenidades, reservas, tickets,
- * paquetes, pólizas, inspecciones, gastos). Abrir Condominios pasa de ~141
- * queries a 9; el resto se carga al activar el primer tab distinto de Panel
- * (fetchCondominiosSectionData, sin cambios). Cada select ESPEJA 1:1 su entrada
- * del batch grande (mismos filtros/orden/límites) — mantener sincronizados.
+ * paquetes, pólizas, inspecciones, gastos, correspondencia). Abrir Condominios
+ * pasa de ~141 queries a 10; el resto se carga al activar el primer tab distinto
+ * de Panel (fetchCondominiosSectionData, sin cambios). Cada select ESPEJA 1:1 su
+ * entrada del batch grande (mismos filtros/orden/límites) — mantener
+ * sincronizados; si divergieran, abrir Panel y luego la pestaña dejaría dos
+ * conjuntos distintos en el mismo state.
  */
 export async function fetchCondominiosPanelData(pid: string, cid: string) {
   return Promise.all([
@@ -56,6 +58,9 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
     db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
     db.from('inspecciones_normativas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     db.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+    // Correspondencia: el Panel alerta de plazos legales vencidos. Espeja la
+    // entrada del batch grande.
+    db.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(300),
   ])
 }
 

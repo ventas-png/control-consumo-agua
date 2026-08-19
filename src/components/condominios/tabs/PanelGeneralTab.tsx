@@ -1,7 +1,9 @@
 import { hoyLocalISO } from '../../../lib/format'
+import { correspondenciaEnRiesgo } from '../../../domain/condominios/recepcion'
 import type {
   CuotaCondominio, TicketMantenimiento, Visitante, Amenidad,
   ReservaAmenidad, PolizaSeguro, InspeccionNormativa, GastoCondominio, PaqueteRecibido,
+  CorrespondenciaCondominio,
 } from '../../../types'
 
 interface Props {
@@ -14,6 +16,7 @@ interface Props {
   inspecciones: InspeccionNormativa[]
   gastos: GastoCondominio[]
   paquetes: PaqueteRecibido[]
+  correspondencia: CorrespondenciaCondominio[]
   moneda: string
   proyectoNombre?: string
 }
@@ -34,7 +37,7 @@ function mesLabel(periodo: string): string {
   return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m) - 1]
 }
 
-export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, moneda, proyectoNombre }: Props) {
+export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, correspondencia, moneda, proyectoNombre }: Props) {
   const hoy = hoyLocalISO()
 
   // ── KPI base ─────────────────────────────────────────────────────────────────
@@ -91,6 +94,16 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   // Paquetes pendientes en portería
   if (paqEntrantesPend.length > 0) {
     alertas.push({ nivel: 'info', icon: '📦', titulo: `${paqEntrantesPend.length} paquete${paqEntrantesPend.length > 1 ? 's' : ''} por entregar`, desc: 'Pendientes de retiro por el residente en portería' })
+  }
+
+  // Correspondencia con plazo legal: lo que antes solo vivía en la cabeza de
+  // quien recibió el sobre. Vencido es error, por vencer es aviso.
+  const { vencidas: corrVencidas, porVencer: corrPorVencer } = correspondenciaEnRiesgo(correspondencia, hoy)
+  if (corrVencidas.length > 0) {
+    alertas.push({ nivel: 'error', icon: '⚖️', titulo: `${corrVencidas.length} correspondencia${corrVencidas.length > 1 ? 's' : ''} con plazo VENCIDO`, desc: corrVencidas.slice(0, 2).map(c => c.asunto).join(' · ') })
+  }
+  if (corrPorVencer.length > 0) {
+    alertas.push({ nivel: 'warning', icon: '📬', titulo: `${corrPorVencer.length} correspondencia${corrPorVencer.length > 1 ? 's' : ''} por vencer`, desc: corrPorVencer.slice(0, 2).map(c => `${c.asunto} — vence ${c.fecha_limite}`).join(' · ') })
   }
 
   const nivelColor: Record<Alerta['nivel'], { bg: string; border: string; color: string; dot: string }> = {

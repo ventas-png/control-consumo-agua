@@ -5346,13 +5346,22 @@ export type Database = {
           company_id: string
           created_at: string
           destinatario: string | null
+          empresa_mensajeria: string | null
+          entregado_a_nombre: string | null
+          entregado_por: string | null
+          entregado_via: string | null
           estado: string
           fecha: string
+          fecha_limite: string | null
+          firma_path: string | null
+          fotos: string[] | null
+          hora_entrega: string | null
           id: string
           numero_guia: string | null
           observaciones: string | null
           prioridad: string
           project_id: string
+          recibido_por: string | null
           remitente: string | null
           tipo: string
           unidad_id: string | null
@@ -5363,13 +5372,22 @@ export type Database = {
           company_id: string
           created_at?: string
           destinatario?: string | null
+          empresa_mensajeria?: string | null
+          entregado_a_nombre?: string | null
+          entregado_por?: string | null
+          entregado_via?: string | null
           estado?: string
           fecha?: string
+          fecha_limite?: string | null
+          firma_path?: string | null
+          fotos?: string[] | null
+          hora_entrega?: string | null
           id?: string
           numero_guia?: string | null
           observaciones?: string | null
           prioridad?: string
           project_id: string
+          recibido_por?: string | null
           remitente?: string | null
           tipo?: string
           unidad_id?: string | null
@@ -5380,13 +5398,22 @@ export type Database = {
           company_id?: string
           created_at?: string
           destinatario?: string | null
+          empresa_mensajeria?: string | null
+          entregado_a_nombre?: string | null
+          entregado_por?: string | null
+          entregado_via?: string | null
           estado?: string
           fecha?: string
+          fecha_limite?: string | null
+          firma_path?: string | null
+          fotos?: string[] | null
+          hora_entrega?: string | null
           id?: string
           numero_guia?: string | null
           observaciones?: string | null
           prioridad?: string
           project_id?: string
+          recibido_por?: string | null
           remitente?: string | null
           tipo?: string
           unidad_id?: string | null

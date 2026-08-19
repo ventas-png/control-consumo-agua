@@ -14,17 +14,22 @@ import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
 import { SignaturePad } from '../../shared/SignaturePad'
 import { PaqueteriaSalientesTab } from './PaqueteriaSalientesTab'
+import { RecepcionBuscador } from './RecepcionBuscador'
 import { codigoRetiroDesdeURL } from '../../../lib/paquetes'
-import type { PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
+import type { CorrespondenciaCondominio, PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
 
 interface Props {
   paquetes: PaqueteRecibido[]
+  /** Solo para la bandeja unificada: la correspondencia se edita en su propia pestaña. */
+  correspondencia: CorrespondenciaCondominio[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
   userId: string
   canCreate: boolean
   canEdit: boolean
+  puedeVerCorrespondencia: boolean
+  onIrATab?: (tab: 'paqueteria' | 'correspondencia') => void
   onRefresh: () => void
 }
 
@@ -51,10 +56,13 @@ function fechaCorta(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 }
 
-export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function PaqueteriaTab({
+  paquetes, correspondencia, unidades, proyectoId, companyId, userId,
+  canCreate, canEdit, puedeVerCorrespondencia, onIrATab, onRefresh,
+}: Props) {
   // Si venimos del QR de retiro (#retiro=<código>) arrancamos en Salidas: es
   // donde vive la entrega y donde PaqueteriaSalientesTab consume el fragmento.
-  const [vista, setVista] = useState<'entrante' | 'saliente_tercero'>(
+  const [vista, setVista] = useState<'entrante' | 'saliente_tercero' | 'recepcion'>(
     () => (typeof window !== 'undefined' && codigoRetiroDesdeURL(window.location.hash) ? 'saliente_tercero' : 'entrante'),
   )
   const [showForm, setShowForm] = useState(false)
@@ -188,7 +196,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     })
   }
 
-  const SegBtn = ({ id, label }: { id: 'entrante' | 'saliente_tercero'; label: string }) => (
+  const SegBtn = ({ id, label }: { id: 'entrante' | 'saliente_tercero' | 'recepcion'; label: string }) => (
     <button onClick={() => setVista(id)}
       style={{ padding: '8px 16px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
         border: '1.5px solid', borderColor: vista === id ? 'var(--at-primary)' : 'var(--at-line)',
@@ -222,9 +230,19 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
       <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
         <SegBtn id="entrante" label="📥 Entrantes" />
         <SegBtn id="saliente_tercero" label="📤 Salidas (retiro por tercero)" />
+        <SegBtn id="recepcion" label="🔎 Recepción (buscar todo)" />
       </div>
 
-      {vista === 'saliente_tercero' ? (
+      {vista === 'recepcion' ? (
+        <RecepcionBuscador
+          paquetes={paquetes}
+          correspondencia={correspondencia}
+          puedeVerPaqueteria
+          puedeVerCorrespondencia={puedeVerCorrespondencia}
+          origenActual="paqueteria"
+          onIrATab={onIrATab}
+        />
+      ) : vista === 'saliente_tercero' ? (
         <PaqueteriaSalientesTab
           paquetes={salientes}
           unidades={unidades}
