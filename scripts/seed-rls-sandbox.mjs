@@ -105,26 +105,108 @@ async function upsertPorMatch(admin, tabla, match, fila) {
   return data.id
 }
 
+/**
+ * Tamaño de página del listado de usuarios de Auth.
+ *
+ * NO es un número elegido por gusto. Contra el sandbox real, GoTrue devuelve
+ * **500 con un cuerpo vacío** (`AuthApiError`, `message: "{}"`) para
+ * `perPage: 1000`, mientras que `perPage: 1` responde perfectamente. El fallo
+ * es del tamaño de página, no de las credenciales ni de omitir `page`. Un
+ * listado paginado de verdad es además lo correcto con independencia del bug:
+ * "el sandbox tiene pocos usuarios" es una suposición que caduca sola.
+ */
+export const PAGINA_USUARIOS = 50
+
+/**
+ * Detalle de un error de Auth, seguro para imprimir.
+ *
+ * Los errores de GoTrue no siempre traen un `message` legible —en el fallo de
+ * `perPage: 1000` llega literalmente `"{}"`— así que quedarse con `.message`
+ * borra la única pista útil: el `status`. Aquí se conservan `name`, `status`,
+ * `code` y `message`, y se serializa `message` cuando no es una cadena.
+ *
+ * Sólo se leen esos cuatro campos: nunca `headers`, ni el cuerpo crudo de la
+ * respuesta, ni nada que pueda arrastrar la service_role o un token.
+ */
+export function detalleErrorAuth(error) {
+  if (!error) return 'error desconocido (sin objeto)'
+
+  const mensaje =
+    typeof error.message === 'string' && error.message.length > 0
+      ? error.message
+      : safeJson(error.message)
+
+  const partes = [
+    error.name ? `name=${error.name}` : null,
+    error.status !== undefined && error.status !== null ? `status=${error.status}` : null,
+    error.code ? `code=${error.code}` : null,
+    `message=${mensaje}`,
+  ].filter(Boolean)
+
+  return partes.join(' ')
+}
+
+/** JSON.stringify que nunca lanza (referencias cíclicas, getters raros…). */
+function safeJson(valor) {
+  if (valor === undefined) return '(sin mensaje)'
+  try {
+    const texto = JSON.stringify(valor)
+    return texto === undefined ? String(valor) : texto
+  } catch {
+    return String(valor)
+  }
+}
+
+/**
+ * Busca un usuario de Auth por email paginando el listado.
+ *
+ * No hay `getUserByEmail` en la API admin, así que hay que recorrer páginas.
+ * Se para en cuanto lo encuentra, y también cuando una página vuelve incompleta
+ * (`users.length < PAGINA_USUARIOS`), que es la señal de última página.
+ *
+ * @returns el usuario, o null si no existe.
+ */
+export async function buscarUsuarioPorEmail(admin, email) {
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: PAGINA_USUARIOS,
+    })
+
+    if (error) {
+      throw new Error(
+        `listUsers(page=${page}, perPage=${PAGINA_USUARIOS}): ${detalleErrorAuth(error)}`,
+      )
+    }
+
+    const usuarios = data?.users ?? []
+    const encontrado = usuarios.find((u) => u.email === email)
+    if (encontrado) return encontrado
+
+    // Página incompleta (o vacía) ⇒ no hay más. Sin esto, un backend que
+    // devuelva siempre la misma página dejaría el bucle corriendo para siempre.
+    if (usuarios.length < PAGINA_USUARIOS) return null
+  }
+}
+
 /** Usuario de auth por email, creándolo si no existe. Devuelve su id. */
-async function upsertUsuario(admin, email, pass) {
-  // No hay getUserByEmail en la API admin; se pagina el listado. El sandbox
-  // tiene pocos usuarios, así que una página basta y evita depender de filtros.
-  const { data: list, error: eList } = await admin.auth.admin.listUsers({ perPage: 1000 })
-  if (eList) throw new Error(`listUsers: ${eList.message}`)
-  const existing = list.users.find((u) => u.email === email)
+export async function upsertUsuario(admin, email, pass) {
+  const existing = await buscarUsuarioPorEmail(admin, email)
 
   if (existing) {
     // Se reescribe la contraseña para que la impresa al final sea siempre la
-    // válida, aunque el usuario venga de una corrida anterior.
+    // válida, aunque el usuario venga de una corrida anterior. Nunca se crea un
+    // segundo usuario con el mismo email: eso rompería la idempotencia y dejaría
+    // dos identidades compitiendo por la misma fila de app_users.
     const { error } = await admin.auth.admin.updateUserById(existing.id, { password: pass })
-    if (error) throw new Error(`updateUserById: ${error.message}`)
+    if (error) throw new Error(`updateUserById: ${detalleErrorAuth(error)}`)
     return existing.id
   }
 
   const { data, error } = await admin.auth.admin.createUser({
     email, password: pass, email_confirm: true,
   })
-  if (error) throw new Error(`createUser: ${error.message}`)
+  if (error) throw new Error(`createUser: ${detalleErrorAuth(error)}`)
   return data.user.id
 }
 
