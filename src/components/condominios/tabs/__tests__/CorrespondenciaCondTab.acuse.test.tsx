@@ -12,11 +12,16 @@ vi.mock('../../../shared/Dialog', () => ({
   confirm: vi.fn(async () => ({ isConfirmed: false })),
 }))
 
-const createCondominioRow = vi.fn(async () => ({ error: null }))
+const createCondominioRow = vi.fn(async () => ({ data: { id: 'nueva-1' }, error: null }))
 const updateCondominioRow = vi.fn(async () => ({ error: null }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
-  createCondominioRow: (...args: unknown[]) => createCondominioRow(...(args as [])),
+  createCondominioRowReturning: (...args: unknown[]) => createCondominioRow(...(args as [])),
   updateCondominioRow: (...args: unknown[]) => updateCondominioRow(...(args as [])),
+}))
+
+const notificarPieza = vi.fn(async () => ({ success: true }))
+vi.mock('../../../../lib/paquetesNotify', () => ({
+  notificarPieza: (...args: unknown[]) => notificarPieza(...(args as [])),
 }))
 
 vi.mock('../../../../domain/shared/storage', () => ({ uploadCondominiosMedia: vi.fn(async () => ({ error: null })) }))
@@ -40,12 +45,14 @@ const PIEZA: PiezaRecepcion = {
   destinatario: 'Junta Directiva',
 }
 
+const UNIDAD = { id: 'u1', nombre: 'Apto 2A', activo: true } as never
+
 function renderTab(over: Partial<PiezaRecepcion> = {}) {
   return render(
     <CorrespondenciaCondTab
       correspondencia={[{ ...PIEZA, ...over }]}
       paquetes={[]}
-      unidades={[]}
+      unidades={[UNIDAD]}
       proyectoId="proj"
       companyId="comp"
       userId="user-1"
@@ -57,7 +64,9 @@ function renderTab(over: Partial<PiezaRecepcion> = {}) {
   )
 }
 
-beforeEach(() => { createCondominioRow.mockClear(); updateCondominioRow.mockClear() })
+beforeEach(() => {
+  createCondominioRow.mockClear(); updateCondominioRow.mockClear(); notificarPieza.mockClear()
+})
 afterEach(cleanup)
 
 describe('CorrespondenciaCondTab — cierre de la pieza', () => {
@@ -78,6 +87,17 @@ describe('CorrespondenciaCondTab — cierre de la pieza', () => {
     fireEvent.click(screen.getByText('Archivar'))
     const [, , patch] = updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
     expect(patch).toEqual({ estado: 'archivado' })
+  })
+
+  it('devolver sella quién y cuándo la sacó de custodia', () => {
+    // La devolución al remitente es una salida de custodia y, en una
+    // notificación legal, parte del acto: tiene que quedar sellada.
+    renderTab()
+    fireEvent.click(screen.getByText('↩ Devolver'))
+    const [, , patch] = updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
+    expect(patch.estado).toBe('devuelto')
+    expect(patch.entregado_por).toBe('user-1')
+    expect(typeof patch.hora_entrega).toBe('string')
   })
 
   it('abre el acuse con firma precargando a quien iba dirigida la pieza', () => {
@@ -110,7 +130,7 @@ describe('CorrespondenciaCondTab — registro', () => {
     expect(payload.descripcion).toBe('Sobre judicial')
   })
 
-  it('sin unidad, la pieza queda dirigida a la administración', async () => {
+  it('sin unidad, la pieza queda dirigida a la administración y no se avisa a nadie', async () => {
     renderTab()
     fireEvent.click(screen.getByText('+ Registrar'))
     fireEvent.change(screen.getByPlaceholderText('Descripción del documento'), { target: { value: 'Citación' } })
@@ -119,5 +139,19 @@ describe('CorrespondenciaCondTab — registro', () => {
     const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(payload.unidad_id).toBeNull()
     expect(payload.destinatario_tipo).toBe('administracion')
+    // No hay residente destinatario: mandar un aviso sería spam a nadie.
+    expect(notificarPieza).not.toHaveBeenCalled()
+  })
+
+  it('con unidad, avisa al residente igual que paquetería', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText('+ Registrar'))
+    fireEvent.change(screen.getByPlaceholderText('Descripción del documento'), { target: { value: 'Carta certificada' } })
+    fireEvent.change(screen.getByDisplayValue('— Administración —'), { target: { value: 'u1' } })
+    fireEvent.click(screen.getByText('Guardar'))
+    await vi.waitFor(() => expect(notificarPieza).toHaveBeenCalledWith('nueva-1'))
+    const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(payload.unidad_id).toBe('u1')
+    expect(payload.destinatario_tipo).toBe('unidad')
   })
 })

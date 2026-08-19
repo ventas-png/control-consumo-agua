@@ -41,6 +41,15 @@ describe('notify-package/tipoLabel', () => {
 
   it('tipo desconocido cae a "Envío"', () => {
     expect(tipoLabel('caja_gigante')).toBe('Envío')
+  })
+
+  it('con clase=correspondencia usa el vocabulario documental', () => {
+    // El mismo campo `tipo` lleva dos vocabularios desde la unificación; sin la
+    // clase, una notificación legal se anunciaría como "Envío".
+    expect(tipoLabel('notificacion_legal', 'correspondencia')).toBe('Notificación legal')
+    expect(tipoLabel('carta', 'correspondencia')).toBe('Carta')
+    expect(tipoLabel('otro', 'correspondencia')).toBe('Correspondencia')
+    expect(tipoLabel('lo_que_sea', 'correspondencia')).toBe('Correspondencia')
     expect(TIPO_LABEL).toEqual({ paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío' })
   })
 })
@@ -95,6 +104,16 @@ describe('notify-package/renderPaquete', () => {
     expect(renderPaquete(vars, 'https://fallback').html).toContain('href="https://mi.app"')
     expect(renderPaquete({ ...vars, app_url: '' }, 'https://fallback').html).toContain('href="https://fallback"')
   })
+
+  it('el correo de correspondencia no promete firmar desde el portal', () => {
+    // `paquete_firmar_recepcion` está acotada a clase='paquete'
+    // (20260829000000): ofrecer el botón de firma en una carta sería mandar al
+    // residente a hacer algo que la base de datos le va a rechazar.
+    const out = renderPaquete({ ...vars, clase: 'correspondencia', tipo_label: 'Carta' })
+    expect(out.subject).toBe('📬 Carta disponible en administración · A-3')
+    expect(out.html).toContain('Ver mi correspondencia')
+    expect(out.html).not.toContain('firmar la recepción')
+  })
 })
 
 describe('notify-package/buildPaqueteInAppRows', () => {
@@ -118,6 +137,20 @@ describe('notify-package/buildPaqueteInAppRows', () => {
     const rows = buildPaqueteInAppRows(['u1'], { ...vars, remitente: '' }, { companyId: 'c1', paqueteId: 'p1' })
     expect(rows[0].cuerpo).toBe('Caja para A-3. Pasa a recogerlo cuando gustes.')
     expect(buildPaqueteInAppRows([], vars, { companyId: 'c1', paqueteId: 'p1' })).toEqual([])
+  })
+
+  // Motor único (20260829000000): el mismo endpoint avisa las dos clases.
+  it('la correspondencia navega a SU pestaña del portal, no a "Mis paquetes"', () => {
+    const rows = buildPaqueteInAppRows(
+      ['u1'],
+      { ...vars, clase: 'correspondencia', tipo_label: 'Notificación legal' },
+      { companyId: 'c1', paqueteId: 'c9' },
+    )
+    // Un aviso de carta que abriera 'paquetes' dejaría al residente mirando una
+    // lista donde su carta no está.
+    expect(rows[0].seccion).toBe('correspondencia')
+    expect(rows[0].tipo).toBe('correspondencia_pendiente')
+    expect(rows[0].titulo).toBe('📬 Notificación legal en administración')
   })
 })
 

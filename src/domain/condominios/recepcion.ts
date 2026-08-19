@@ -62,7 +62,7 @@ export const SUBTIPOS: Record<ClasePieza, Record<string, { label: string; icono:
 /** Estados por clase. Espeja el CHECK `paquetes_estado_chk`. */
 export const ESTADOS: Record<ClasePieza, Record<string, string>> = {
   paquete:         { pendiente: 'Pendiente', entregado: 'Entregado', devuelto: 'Devuelto' },
-  correspondencia: { pendiente: 'Pendiente', atendido: 'Atendido', archivado: 'Archivado' },
+  correspondencia: { pendiente: 'Pendiente', atendido: 'Atendido', archivado: 'Archivado', devuelto: 'Devuelto' },
 }
 
 /** Subtipo por defecto de cada clase, para formularios y filas incompletas. */
@@ -206,6 +206,21 @@ export function diasParaVencer(fechaLimite: string, hoyISO: string): number {
   const hoy = Date.parse(`${hoyISO}T00:00:00`)
   if (Number.isNaN(limite) || Number.isNaN(hoy)) return Number.NaN
   return Math.round((limite - hoy) / 86_400_000)
+}
+
+/**
+ * Días que la pieza lleva en recepción desde que se registró.
+ *
+ * Es la medida de caducidad: una pieza que nadie reclama en semanas es la
+ * candidata a devolver al remitente. Se cuenta desde `hora_recepcion` (cuándo
+ * entró a custodia), NO desde `fecha_pieza` (la fecha del documento, que puede
+ * ser muy anterior y daría una antigüedad que no es responsabilidad de nadie).
+ */
+export function diasEnCustodia(pieza: Pick<PiezaRecepcion, 'hora_recepcion'>, hoyISO: string): number {
+  const desde = Date.parse(`${pieza.hora_recepcion.slice(0, 10)}T00:00:00`)
+  const hoy = Date.parse(`${hoyISO}T00:00:00`)
+  if (Number.isNaN(desde) || Number.isNaN(hoy)) return 0
+  return Math.max(0, Math.round((hoy - desde) / 86_400_000))
 }
 
 /**

@@ -31,6 +31,13 @@ async function sleep(ms: number): Promise<void> {
 // Dispara el aviso al residente (in-app + correo + WhatsApp) vía la edge function
 // notify-package, autenticando con el JWT del usuario actual.
 //
+// Sirve a las DOS clases del motor de recepción (20260829000000): paquetería y
+// correspondencia. La función resuelve el texto, la sección del portal y la
+// plantilla de correo a partir de `clase`, así que el llamador solo pasa el id.
+// El endpoint conserva el nombre `notify-package` a propósito: renombrarlo
+// significa desplegar una función nueva y dejar la vieja viva en Supabase, sin
+// ganancia para nadie. El nombre de la URL no es el contrato; lo es el payload.
+//
 // Retry policy: por defecto, hasta 3 intentos con backoff exponencial corto
 // (0ms → 800ms → 2000ms). Los reintentos solo se hacen ante errores transitorios
 // (5xx, fetch rejection). Errores 4xx no se reintentan porque indican un
@@ -39,7 +46,7 @@ async function sleep(ms: number): Promise<void> {
 // El llamador puede capturar el throw final con try/catch: el fallo del aviso
 // no debe romper el registro del paquete. Cada intento se traza con `logger`
 // para que Sentry tenga el breadcrumb completo si la sesión termina en crash.
-export async function notifyPackage(
+export async function notificarPieza(
   paqueteId: string,
   opts: NotifyOptions = {},
 ): Promise<NotifyPackageResult> {

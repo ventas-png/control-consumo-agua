@@ -246,6 +246,7 @@ export interface CondominiosPortalData {
   mensajesData: unknown[] | null
   solicitudesRentaData: unknown[] | null
   paquetesData: unknown[] | null
+  correspondenciaData: unknown[] | null
   comunicadosData: unknown[] | null
 }
 
@@ -268,7 +269,7 @@ export async function fetchCondominiosPortalData(
   const [
     projRes, amenidadesRes, cuotasRes, reservasRes, bloqueosRes, ticketsRes,
     anunciosRes, visitantesRes, mensajesRes, solicitudesRentaRes, paquetesRes,
-    comunicadosRes,
+    correspondenciaRes, comunicadosRes,
   ] = await Promise.all([
     db.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
     db.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
@@ -296,6 +297,10 @@ export async function fetchCondominiosPortalData(
     // igual que antes, pero "Mis paquetes" es paquetería; la correspondencia
     // tiene su propio flujo y no se cuela en esta lista.
     db.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(100),
+    // Correspondencia dirigida a la unidad. La RLS ya se la concedía al
+    // residente desde 20260713020000, pero ninguna pantalla la leía: se
+    // enteraba de una notificación solo si alguien se lo decía.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(100),
     // Comunicados formales DIRIGIDOS a la unidad del residente (destinatario
     // 'especifico' → unidad_id). Los de audiencia amplia NO se piden a
     // propósito: para esos la administración usa "Publicar en portal", que los
@@ -318,6 +323,7 @@ export async function fetchCondominiosPortalData(
     mensajesData: mensajesRes.data,
     solicitudesRentaData: solicitudesRentaRes.data,
     paquetesData: paquetesRes.data,
+    correspondenciaData: correspondenciaRes.data,
     comunicadosData: comunicadosRes.data,
   }
 }

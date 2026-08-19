@@ -10,7 +10,7 @@ import { NotificationBell } from '../layout/NotificationBell'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
-  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido,
+  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido, PiezaRecepcion,
   ComunicadoCondominio,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
@@ -22,6 +22,7 @@ import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
 import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
+import { PortalCorrespondenciaTab } from '../condominios/tabs/PortalCorrespondenciaTab'
 import { MediaScopeProvider }  from '../shared/MediaScopeContext'
 // F3.12: Portal residente ampliado (asambleas + transparencia)
 import { PortalAsambleasTab }     from '../condominios/tabs/PortalAsambleasTab'
@@ -49,6 +50,7 @@ type UnidadPortal = Unidad & { rol?: string }
 // parte.
 const SECCION_A_TAB: Record<string, PortalTab> = {
   paquetes: 'paquetes',
+  correspondencia: 'correspondencia',
   anuncios: 'anuncios',
   condominios: 'mi_unidad',
   condominios_dashboard: 'mi_unidad',
@@ -87,6 +89,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
   const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
+  const [correspondencia, setCorrespondencia]     = useState<PiezaRecepcion[]>([])
   const [comunicados, setComunicados]             = useState<ComunicadoCondominio[]>([])
   const [popupOpen, setPopupOpen]                 = useState(false)
 
@@ -112,7 +115,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       const {
         projData, amenidadesData, cuotasData, reservasData, bloqueosData,
         ticketsData, anunciosData, visitantesData, mensajesData,
-        solicitudesRentaData, paquetesData, comunicadosData,
+        solicitudesRentaData, paquetesData, correspondenciaData, comunicadosData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -134,6 +137,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setMensajes((mensajesData as MensajePortal[]) ?? [])
       setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
       setPaquetes(((paquetesData as (PaqueteRecibido & { unidades?: { nombre: string } | null })[]) ?? [])
+        .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
+      setCorrespondencia(((correspondenciaData as (PiezaRecepcion & { unidades?: { nombre: string } | null })[]) ?? [])
         .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
       setComunicados((comunicadosData as ComunicadoCondominio[]) ?? [])
     } finally {
@@ -278,6 +283,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const ticketsU       = tickets.filter(t => t.unidad_id === selectedUnidadId)
   const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
   const paquetesU      = paquetes.filter(p => p.unidad_id === selectedUnidadId)
+  const correspondenciaU = correspondencia.filter(c => c.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
   const comunicadosU   = comunicados.filter(c => c.unidad_id === selectedUnidadId)
   const paquetesPendientes = paquetes.filter(p => p.estado === 'pendiente')
@@ -528,6 +534,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 nombrePrefill={currentUser.name}
                 onRefresh={cargarDatos}
               />
+            )}
+            {tab === 'correspondencia' && (
+              <PortalCorrespondenciaTab correspondencia={correspondenciaU} />
             )}
             {tab === 'anuncios' && (
               anunciosP.length === 0 && comunicadosU.length === 0 ? (

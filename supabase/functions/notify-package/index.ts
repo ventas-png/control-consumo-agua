@@ -12,6 +12,7 @@ import {
   buildMetaWaPayload,
   buildPaqueteInAppRows,
   buildTwilioWaParams,
+  copyPieza,
   renderPaquete,
   resolveWhatsAppProvider,
   tipoLabel,
@@ -234,10 +235,6 @@ Deno.serve(async (req: Request) => {
       .from('paquetes_recibidos')
       .select('*, unidades(nombre, cliente_id), companies(nombre)')
       .eq('id', body.paquete_id)
-      // Motor único (20260829000000): la tabla también guarda correspondencia,
-      // que tiene otro destinatario, otro permiso y otro aviso. Este endpoint
-      // notifica paquetería; una pieza de otra clase no se avisa por aquí.
-      .eq('clase', 'paquete')
       .maybeSingle()
     if (!pkg) return json({ error: 'Paquete no encontrado' }, 404)
 
@@ -253,8 +250,17 @@ Deno.serve(async (req: Request) => {
     const clienteId: string | null = unidad?.cliente_id ?? null
     const unidadNombre: string = unidad?.nombre ?? ''
     const empresaNombre: string = ((pkg as Row).companies as Row | null)?.nombre ?? 'AdministraTodo'
-    const tipo = tipoLabel((pkg as Row).tipo as string)
+    // Motor único (20260829000000): esta tabla guarda paquetería Y
+    // correspondencia. La clase decide el vocabulario, el destino en el portal
+    // y el texto del aviso; el resto del flujo (a quién avisar y por qué
+    // canales) es idéntico, porque el destinatario es el mismo residente.
+    const clase = ((pkg as Row).clase as string | null) ?? 'paquete'
+    const copy = copyPieza(clase)
+    const tipo = tipoLabel((pkg as Row).tipo as string, clase)
 
+    // Correspondencia dirigida a la administración (sin unidad) no tiene
+    // residente a quién avisar; la administradora la ve en su pestaña y el
+    // Panel General le alerta de los plazos.
     if (!clienteId) return json({ success: true, skipped: 'no_cliente' })
 
     // Contacto del residente (clientes) + usuarios de app vinculados.
@@ -277,6 +283,7 @@ Deno.serve(async (req: Request) => {
       empresa_mensajeria: (pkg as Row).empresa_mensajeria ?? '',
       empresa_nombre: empresaNombre,
       tipo_label: tipo,
+      clase,
       app_url: APP_URL,
     }
 
@@ -313,7 +320,7 @@ Deno.serve(async (req: Request) => {
         const { data: customTpl } = await admin
           .from('email_templates')
           .select('subject, html_body')
-          .eq('template_key', 'paquete_recibido')
+          .eq('template_key', copy.templateKey)
           .eq('is_active', true)
           .eq('company_id', (pkg as Row).company_id)
           .maybeSingle()

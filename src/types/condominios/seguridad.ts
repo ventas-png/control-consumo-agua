@@ -17,7 +17,9 @@ export type ClasePieza = 'paquete' | 'correspondencia'
 export type DestinatarioPieza = 'unidad' | 'administracion' | 'junta' | 'proveedor'
 export type PrioridadPieza = 'normal' | 'urgente'
 export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
-export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado'
+// 'devuelto' se añadió en 20260830000000: una carta que vuelve al remitente no
+// es "atendida" (nadie la atendió) ni "archivada" (eso no dice que volvió).
+export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado' | 'devuelto'
 /** Subtipo de la pieza: el vocabulario aplicable depende de `clase`. */
 export type SubtipoPieza = TipoPaquete | CategoriaCorrespondencia
 /** Estado de la pieza: el vocabulario aplicable depende de `clase`. */

@@ -1,9 +1,10 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties } from 'react'
-import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { createCondominioRowReturning, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { diasParaVencer, SUBTIPOS } from '../../../domain/condominios/recepcion'
+import { notificarPieza } from '../../../lib/paquetesNotify'
+import { diasEnCustodia, diasParaVencer, SUBTIPOS } from '../../../domain/condominios/recepcion'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import type { CategoriaCorrespondencia, EstadoCorrespondencia, PiezaRecepcion, Unidad } from '../../../types'
 import { notify } from '../../shared/Dialog'
@@ -42,7 +43,11 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
   pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   atendido:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   archivado: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
+  devuelto:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
+
+/** Días en custodia a partir de los cuales una pieza pendiente se considera estancada. */
+const DIAS_CUSTODIA_ALERTA = 30
 
 const BLANK = {
   direccion: 'entrante' as 'entrante' | 'saliente',
@@ -93,7 +98,7 @@ export function CorrespondenciaCondTab({
   async function handleSave() {
     if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
     setSaving(true)
-    const { error } = await createCondominioRow(TABLA, {
+    const { data, error } = await createCondominioRowReturning(TABLA, {
       company_id: companyId, project_id: proyectoId,
       clase: 'correspondencia',
       // Sin unidad, la pieza va dirigida a la administración del condominio
@@ -116,13 +121,25 @@ export function CorrespondenciaCondTab({
     })
     setSaving(false)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+    // Aviso al residente, igual que paquetería. Solo cuando la pieza va a una
+    // unidad: la dirigida a la administración no tiene a quién avisarle, y su
+    // plazo ya lo vigila la alerta del Panel General.
+    if (form.unidad_id && data?.id) {
+      try { await notificarPieza(data.id as string) } catch { /* best-effort: el registro ya quedó */ }
+    }
+    notify({
+      variant: 'success', title: 'Correspondencia registrada', duration: 1600,
+      text: form.unidad_id ? 'Se avisó al residente.' : 'Dirigida a la administración.',
+    })
     resetForm(); onRefresh()
   }
 
-  /** Cierra la pieza dejando la marca de quién la entregó y cuándo. */
+  /** Cierra la pieza dejando la marca de quién la sacó de custodia y cuándo. */
   async function cambiarEstado(id: string, estado: EstadoCorrespondencia) {
     const patch: Record<string, unknown> = { estado }
-    if (estado === 'atendido') {
+    // 'atendido' y 'devuelto' son salidas de custodia y sellan quién y cuándo.
+    // 'archivado' no: archivar no es entregar ni devolver.
+    if (estado === 'atendido' || estado === 'devuelto') {
       patch.hora_entrega = new Date().toISOString()
       patch.entregado_por = userId
       patch.entregado_via = 'porteria'
@@ -162,6 +179,10 @@ export function CorrespondenciaCondTab({
   const urgentes   = correspondencia.filter(c => c.prioridad === 'urgente' && c.estado === 'pendiente').length
   const vencidos   = correspondencia.filter(c =>
     c.estado === 'pendiente' && c.fecha_limite && diasParaVencer(c.fecha_limite, hoy) < 0).length
+  // Piezas que llevan demasiado en custodia sin que nadie las reclame: el
+  // candidato natural a devolver al remitente.
+  const estancados = correspondencia.filter(c =>
+    c.estado === 'pendiente' && diasEnCustodia(c, hoy) >= DIAS_CUSTODIA_ALERTA).length
 
   const detail = selected ? correspondencia.find(c => c.id === selected) : null
 
@@ -246,6 +267,7 @@ export function CorrespondenciaCondTab({
           { label: 'Pendiente', value: String(pendientes), color: 'var(--at-warning)' },
           { label: 'Urgente',   value: String(urgentes),   color: 'var(--at-danger)' },
           { label: 'Plazo vencido', value: String(vencidos), color: 'var(--at-danger)' },
+          { label: `+${DIAS_CUSTODIA_ALERTA}d en custodia`, value: String(estancados), color: 'var(--at-warning-strong)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -344,7 +366,7 @@ export function CorrespondenciaCondTab({
           ))}
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          {(['todos', 'pendiente', 'atendido', 'archivado'] as const).map(f => (
+          {(['todos', 'pendiente', 'atendido', 'archivado', 'devuelto'] as const).map(f => (
             <button key={f} onClick={() => setFiltroEstado(f)}
               style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
                 borderColor: filtroEstado === f ? 'var(--at-accent)' : 'var(--at-line)', background: filtroEstado === f ? 'var(--at-accent-tint)' : 'var(--at-surface)', color: filtroEstado === f ? 'var(--at-accent-hover)' : 'var(--at-ink-3)', fontWeight: filtroEstado === f ? 700 : 500 }}>
@@ -405,6 +427,22 @@ export function CorrespondenciaCondTab({
               },
               { key: 'fecha_pieza', header: 'Fecha', sortable: true, render: (c) => fechaDocumento(c) },
               {
+                key: 'hora_recepcion',
+                header: 'En custodia',
+                sortable: true,
+                hideOnMobile: true,
+                render: (c) => {
+                  if (c.estado !== 'pendiente') return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+                  const dias = diasEnCustodia(c, hoy)
+                  const alerta = dias >= DIAS_CUSTODIA_ALERTA
+                  return (
+                    <span style={{ fontSize: '11px', fontWeight: alerta ? 700 : 500, color: alerta ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
+                      {dias}d
+                    </span>
+                  )
+                },
+              },
+              {
                 key: 'fecha_limite',
                 header: 'Plazo',
                 sortable: true,
@@ -437,6 +475,11 @@ export function CorrespondenciaCondTab({
                       <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
                         style={{ padding: '2px 7px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
                         Atender
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'devuelto') }}
+                        title="La pieza vuelve al remitente sin haberse entregado"
+                        style={{ padding: '2px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                        ↩ Devolver
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
                         style={{ padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>

@@ -7,7 +7,7 @@ import {
 } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { notifyPackage } from '../../../lib/paquetesNotify'
+import { notificarPieza } from '../../../lib/paquetesNotify'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -123,7 +123,7 @@ export function PaqueteriaTab({
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    try { if (data?.id) await notifyPackage(data.id as string) } catch { /* best-effort */ }
+    try { if (data?.id) await notificarPieza(data.id as string) } catch { /* best-effort */ }
     notify({ variant: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', duration: 1600 })
     resetForm(); onRefresh()
   }

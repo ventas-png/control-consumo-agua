@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   construirBandejaRecepcion, buscarEnRecepcion, duplicadosPorGuia,
-  normalizarGuia, diasParaVencer, piezasEnRiesgo, piezaAItemRecepcion,
+  normalizarGuia, diasParaVencer, diasEnCustodia, piezasEnRiesgo, piezaAItemRecepcion,
   estadoLabel, subtipoDePieza, claseDePieza,
 } from '../recepcion'
 import type { PiezaRecepcion } from '../../../types'
@@ -39,6 +39,8 @@ describe('vocabulario por clase', () => {
     expect(subtipoDePieza(correspondencia({ tipo: 'notificacion_legal' })).label).toBe('Notif. Legal')
     expect(estadoLabel(paquete({ estado: 'devuelto' }))).toBe('Devuelto')
     expect(estadoLabel(correspondencia({ estado: 'archivado' }))).toBe('Archivado')
+    // 'devuelto' es común a las dos clases desde 20260830000000.
+    expect(estadoLabel(correspondencia({ estado: 'devuelto' }))).toBe('Devuelto')
   })
 
   it('cae a paquete cuando la fila llega sin clase (caché anterior a la unificación)', () => {
@@ -177,6 +179,24 @@ describe('diasParaVencer', () => {
   })
   it('devuelve NaN ante una fecha inválida en vez de un número engañoso', () => {
     expect(diasParaVencer('no-es-fecha', '2026-08-18')).toBeNaN()
+  })
+})
+
+describe('diasEnCustodia', () => {
+  it('cuenta desde que la pieza entró a recepción', () => {
+    expect(diasEnCustodia({ hora_recepcion: '2026-08-01T15:00:00Z' }, '2026-08-18')).toBe(17)
+    expect(diasEnCustodia({ hora_recepcion: '2026-08-18T09:00:00Z' }, '2026-08-18')).toBe(0)
+  })
+
+  it('NO usa la fecha del documento: una carta vieja recién entregada lleva 0 días en custodia', () => {
+    // fecha_pieza puede ser de hace meses (el documento se emitió entonces);
+    // la antigüedad en custodia empieza cuando el condominio la recibe.
+    const pieza = { hora_recepcion: '2026-08-18T09:00:00Z' }
+    expect(diasEnCustodia(pieza, '2026-08-18')).toBe(0)
+  })
+
+  it('nunca es negativo aunque el reloj vaya atrás', () => {
+    expect(diasEnCustodia({ hora_recepcion: '2026-08-20T09:00:00Z' }, '2026-08-18')).toBe(0)
   })
 })
 

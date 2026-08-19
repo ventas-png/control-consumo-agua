@@ -27,9 +27,55 @@ export const TIPO_LABEL: Record<string, string> = {
   paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío',
 }
 
-/** Etiqueta del tipo de paquete; cae a 'Envío' si el tipo no está mapeado. */
-export function tipoLabel(tipo: string): string {
-  return TIPO_LABEL[tipo] ?? 'Envío'
+// Correspondencia (clase del motor único, migración 20260829000000): el mismo
+// campo `tipo` lleva otro vocabulario. 'otro' se resuelve por clase, así que no
+// puede vivir en un solo diccionario.
+export const TIPO_LABEL_CORRESPONDENCIA: Record<string, string> = {
+  carta: 'Carta', notificacion_legal: 'Notificación legal',
+  factura: 'Factura', circular: 'Circular', otro: 'Correspondencia',
+}
+
+/**
+ * Etiqueta del subtipo de la pieza. `clase` decide el diccionario; un subtipo
+ * desconocido cae a la etiqueta genérica de su clase.
+ */
+export function tipoLabel(tipo: string, clase = 'paquete'): string {
+  return clase === 'correspondencia'
+    ? TIPO_LABEL_CORRESPONDENCIA[tipo] ?? 'Correspondencia'
+    : TIPO_LABEL[tipo] ?? 'Envío'
+}
+
+/** Textos que cambian entre avisar un paquete y avisar correspondencia. */
+export interface CopyPieza {
+  icono: string
+  /** Dónde se retira: portería vs administración. */
+  lugar: string
+  /** Sección del portal a la que apunta la notificación in-app. */
+  seccion: string
+  /** Clave de plantilla de correo personalizable por empresa. */
+  templateKey: string
+  tipoNotificacion: string
+  /** Qué puede hacer el residente al llegar. La correspondencia NO se firma
+   *  desde el portal: `paquete_firmar_recepcion` está acotada a clase='paquete'
+   *  (20260829000000), así que prometerlo sería mentirle al residente. */
+  cta: string
+  cierre: string
+}
+
+export function copyPieza(clase: string): CopyPieza {
+  return clase === 'correspondencia'
+    ? {
+        icono: '📬', lugar: 'administración', seccion: 'correspondencia',
+        templateKey: 'correspondencia_recibida', tipoNotificacion: 'correspondencia_pendiente',
+        cta: 'Ver mi correspondencia',
+        cierre: 'Puedes retirarla en administración presentando tu identificación.',
+      }
+    : {
+        icono: '📦', lugar: 'portería', seccion: 'paquetes',
+        templateKey: 'paquete_recibido', tipoNotificacion: 'paquete_pendiente',
+        cta: 'Ver y firmar recepción',
+        cierre: 'Al retirarlo podrás firmar la recepción desde tu portal.',
+      }
 }
 
 // ---------------------------------------------------------------------------
@@ -75,8 +121,9 @@ export function renderPaquete(
   fallbackAppUrl = '',
 ): { subject: string; html: string } {
   const empresa = vars.empresa_nombre || 'AdministraTodo'
+  const copy = copyPieza(vars.clase ?? 'paquete')
   const content = `
-    <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">📦 ${escapeHtml(vars.tipo_label)} en portería</h2>
+    <h2 style="margin:0 0 4px;color:#0f172a;font-size:20px;">${copy.icono} ${escapeHtml(vars.tipo_label)} en ${copy.lugar}</h2>
     <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hola <strong>${escapeHtml(vars.to_name || '')}</strong>, recibimos un envío para tu unidad y está disponible para que lo retires.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:24px;">
       <tr style="background:#0d9488;"><td colspan="2" style="padding:12px 18px;color:#fff;font-weight:700;font-size:13px;">DETALLE DEL ENVÍO</td></tr>
@@ -85,10 +132,10 @@ export function renderPaquete(
       ${vars.remitente ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;border-bottom:1px solid #e2e8f0;">Remitente</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;border-bottom:1px solid #e2e8f0;">${escapeHtml(vars.remitente)}</td></tr>` : ''}
       ${vars.empresa_mensajeria ? `<tr><td style="padding:10px 18px;font-size:13px;color:#64748b;">Mensajería</td><td style="padding:10px 18px;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(vars.empresa_mensajeria)}</td></tr>` : ''}
     </table>
-    <div style="text-align:center;margin:28px 0;"><a href="${vars.app_url || fallbackAppUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#fff;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:700;">Ver y firmar recepción</a></div>
-    <p style="margin:0;font-size:13px;color:#64748b;">Al retirarlo podrás firmar la recepción desde tu portal.</p>`
+    <div style="text-align:center;margin:28px 0;"><a href="${vars.app_url || fallbackAppUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#0d9488);color:#fff;text-decoration:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:700;">${copy.cta}</a></div>
+    <p style="margin:0;font-size:13px;color:#64748b;">${copy.cierre}</p>`
   return {
-    subject: `📦 ${vars.tipo_label} disponible en portería · ${vars.unidad || ''}`.trim(),
+    subject: `${copy.icono} ${vars.tipo_label} disponible en ${copy.lugar} · ${vars.unidad || ''}`.trim(),
     html: baseLayout(content, empresa),
   }
 }
@@ -107,13 +154,17 @@ export function buildPaqueteInAppRows(
   vars: Record<string, string>,
   ctx: { companyId: string | null; paqueteId: string },
 ): Row[] {
+  // `seccion` decide a qué pestaña del portal navega el aviso, así que tiene
+  // que seguir a la clase: una carta que abre "Mis paquetes" deja al residente
+  // mirando una lista donde su carta no está.
+  const copy = copyPieza(vars.clase ?? 'paquete')
   return userIds.map(userId => ({
     user_id: userId,
     company_id: ctx.companyId,
-    tipo: 'paquete_pendiente',
-    titulo: `📦 ${vars.tipo_label} en portería`,
+    tipo: copy.tipoNotificacion,
+    titulo: `${copy.icono} ${vars.tipo_label} en ${copy.lugar}`,
     cuerpo: `${vars.descripcion}${vars.remitente ? ` · De: ${vars.remitente}` : ''} para ${vars.unidad}. Pasa a recogerlo cuando gustes.`,
-    seccion: 'paquetes',
+    seccion: copy.seccion,
     paquete_id: ctx.paqueteId,
   }))
 }

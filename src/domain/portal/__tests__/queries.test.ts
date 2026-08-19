@@ -91,22 +91,35 @@ describe('fetchPortalFotoIds', () => {
 })
 
 describe('fetchCondominiosPortalData', () => {
-  it('mapea los 12 datasets en orden', async () => {
+  it('mapea los 13 datasets en orden', async () => {
     h.state.results = [
       { data: ['proj'] }, { data: ['amen'] }, { data: ['cuota'] }, { data: ['reserva'] },
       { data: ['bloqueo'] }, { data: ['ticket'] }, { data: ['anuncio'] }, { data: ['visita'] },
-      { data: ['mensaje'] }, { data: ['solicitud'] }, { data: ['paquete'] }, { data: ['comunicado'] },
+      { data: ['mensaje'] }, { data: ['solicitud'] }, { data: ['paquete'] },
+      { data: ['correspondencia'] }, { data: ['comunicado'] },
     ]
     expect(await fetchCondominiosPortalData(['p1'], ['u1'])).toEqual({
       projData: ['proj'], amenidadesData: ['amen'], cuotasData: ['cuota'], reservasData: ['reserva'],
       bloqueosData: ['bloqueo'], ticketsData: ['ticket'], anunciosData: ['anuncio'], visitantesData: ['visita'],
       mensajesData: ['mensaje'], solicitudesRentaData: ['solicitud'], paquetesData: ['paquete'],
-      comunicadosData: ['comunicado'],
+      correspondenciaData: ['correspondencia'], comunicadosData: ['comunicado'],
     })
   })
 
+  it('separa paquetería de correspondencia por clase, no por tabla', async () => {
+    // Las dos salen de `paquetes_recibidos` desde 20260829000000: sin el filtro
+    // por clase, "Mis paquetes" mostraría también las cartas del residente.
+    h.state.results = Array.from({ length: 13 }, () => ({ data: [] }))
+    await fetchCondominiosPortalData(['p1'], ['u1'])
+    const clases = h.state.calls
+      .filter(([tabla, metodo, args]) =>
+        tabla === 'paquetes_recibidos' && metodo === 'eq' && (args as unknown[])[0] === 'clase')
+      .map(([, , args]) => (args as unknown[])[1])
+    expect(clases).toEqual(['paquete', 'correspondencia'])
+  })
+
   it('pide los comunicados acotados a las unidades del residente', async () => {
-    h.state.results = Array.from({ length: 12 }, () => ({ data: [] }))
+    h.state.results = Array.from({ length: 13 }, () => ({ data: [] }))
     await fetchCondominiosPortalData(['p1'], ['u1'])
     // El filtro es por unidad, NO por proyecto: los comunicados de audiencia
     // amplia llegan al residente vía "Publicar en portal" → anuncios_comunidad,
