@@ -15,10 +15,17 @@
 //   4. TODOS los escenarios obligatorios de `coverage.json` aparecen como
 //      pruebas PASADAS. Sin esto, borrar un `describe` entero seguiría pasando
 //      mientras el total superara el mínimo.
-//   5. TODAS las RPC críticas aparecen NOMBRADAS en alguna prueba pasada, una a
-//      una. Antes bastaba con que sobreviviera el bloque del dominio ("RPCs del
-//      ERP financiero") para dar por cubiertas las seis RPC de ese dominio:
-//      borrar `banco_ajuste_conciliacion` no se notaba. Ahora sí.
+//   5. TODAS las RPC críticas están acreditadas EVIDENCIA POR EVIDENCIA, con el
+//      marcador `[RLS:rpc:<nombre>:<garantia>:<vector>]` que el harness pone en
+//      el nombre de cada prueba.
+//
+//      Dos versiones anteriores fallaban aquí. La primera daba por cubierto un
+//      dominio entero ("RPCs del ERP financiero") y borrar
+//      `banco_ajuste_conciliacion` no se notaba. La segunda exigía el nombre de
+//      cada RPC, pero `nombre.includes(rpc)` no dice QUÉ se probó: un reporte
+//      con las 23 RPC cubiertas SÓLO por pruebas de anon salía verde, incluidas
+//      las declaradas como aislamiento por tenant. Ahora el vector es parte del
+//      marcador, así que una prueba de anon no puede acreditar una autenticada.
 //   6. Se alcanza el piso mínimo de pruebas (red secundaria).
 //
 // POR QUÉ NO SE BUSCA UN MARCADOR DE OMISIÓN
@@ -239,8 +246,10 @@ async function main(argv, env) {
   if (veredicto.ok) {
     console.log(
       `✅ Harness RLS ejecutado de verdad: ${veredicto.resumen.pasadas} pruebas pasadas, ` +
-      `0 fallos, 0 omitidas, ${veredicto.resumen.escenariosExigidos} escenarios y ` +
-      `${veredicto.resumen.rpcsExigidas} RPC obligatorias presentes.`,
+      `0 fallos, 0 omitidas, ${veredicto.resumen.escenariosExigidos} escenarios, ` +
+      `${veredicto.resumen.rpcsExigidas} RPC obligatorias y ` +
+      `${veredicto.resumen.evidenciasExigidas} evidencias acreditadas ` +
+      '(por RPC, garantía y vector).',
     )
   } else {
     console.error('\n❌ El harness RLS NO demostró haber verificado el aislamiento:\n')
