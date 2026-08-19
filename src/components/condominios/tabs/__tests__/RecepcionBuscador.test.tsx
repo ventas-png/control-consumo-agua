@@ -5,31 +5,32 @@
 // el usuario no puede ver, y avisar del registro duplicado entre módulos.
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import type { CorrespondenciaCondominio, PaqueteRecibido } from '../../../../types'
+import type { PiezaRecepcion } from '../../../../types'
 import { RecepcionBuscador } from '../RecepcionBuscador'
 
-const PAQUETE: PaqueteRecibido = {
+const PAQUETE: PiezaRecepcion = {
   id: 'p1', company_id: 'c', project_id: 'p', unidad_id: 'u1',
-  descripcion: 'Caja Amazon', tipo: 'paquete', estado: 'pendiente',
+  clase: 'paquete', destinatario_tipo: 'unidad', prioridad: 'normal',
+  descripcion: 'Caja Amazon', tipo: 'paquete', estado: 'pendiente', direccion: 'entrante',
   num_guia: 'AB-1234', empresa_mensajeria: 'DHL', unidad_nombre: 'Apto 2A',
   hora_recepcion: '2026-08-10T15:00:00Z', created_at: '2026-08-10T15:00:00Z',
 }
 
-const CORRESPONDENCIA: CorrespondenciaCondominio = {
-  id: 'c1', company_id: 'c', project_id: 'p',
-  tipo: 'entrada', categoria: 'notificacion_legal', asunto: 'Citación municipal',
-  fecha: '2026-08-12', prioridad: 'urgente', estado: 'pendiente',
-  created_at: '2026-08-12T09:00:00Z', remitente: 'Municipalidad',
+const CORRESPONDENCIA: PiezaRecepcion = {
+  id: 'c1', company_id: 'c', project_id: 'p', unidad_id: null,
+  clase: 'correspondencia', destinatario_tipo: 'administracion', prioridad: 'urgente',
+  descripcion: 'Citación municipal', tipo: 'notificacion_legal', estado: 'pendiente',
+  direccion: 'entrante', fecha_pieza: '2026-08-12', remitente: 'Municipalidad',
+  hora_recepcion: '2026-08-12T09:00:00Z', created_at: '2026-08-12T09:00:00Z',
 }
 
 function renderBandeja(props: Partial<React.ComponentProps<typeof RecepcionBuscador>> = {}) {
   return render(
     <RecepcionBuscador
-      paquetes={[PAQUETE]}
-      correspondencia={[CORRESPONDENCIA]}
+      piezas={[PAQUETE, CORRESPONDENCIA]}
       puedeVerPaqueteria
       puedeVerCorrespondencia
-      origenActual="paqueteria"
+      origenActual="paquete"
       {...props}
     />,
   )
@@ -52,18 +53,20 @@ describe('RecepcionBuscador', () => {
   })
 
   it('no muestra correspondencia a quien no tiene permiso de verla', () => {
+    // La RLS ya resuelve el permiso por `clase`, pero el contexto de tabs es
+    // compartido: el corte se repite en la UI.
     renderBandeja({ puedeVerCorrespondencia: false })
     expect(screen.getByText('Caja Amazon')).toBeTruthy()
     expect(screen.queryByText('Citación municipal')).toBeNull()
   })
 
-  it('avisa cuando la misma guía quedó registrada en los dos módulos', () => {
-    renderBandeja({ correspondencia: [{ ...CORRESPONDENCIA, numero_guia: 'ab 1234' }] })
+  it('avisa cuando la misma guía quedó registrada en las dos clases', () => {
+    renderBandeja({ piezas: [PAQUETE, { ...CORRESPONDENCIA, num_guia: 'ab 1234' }] })
     expect(screen.getByText(/registrada en los dos módulos/)).toBeTruthy()
   })
 
   it('no ofrece saltar al módulo desde el que ya se está mirando', () => {
-    renderBandeja({ origenActual: 'paqueteria', onIrATab: () => {} })
+    renderBandeja({ origenActual: 'paquete', onIrATab: () => {} })
     expect(screen.queryByText(/Abrir Paquetería/)).toBeNull()
     expect(screen.getByText(/Abrir Correspondencia/)).toBeTruthy()
   })

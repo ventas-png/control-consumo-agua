@@ -49,6 +49,7 @@ const CODIGO = 'RUKJ2BW7'
 function paquete(over: Partial<PaqueteRecibido> = {}): PaqueteRecibido {
   return {
     id: 'p1', company_id: 'c1', project_id: 'pr1', unidad_id: 'u1',
+    clase: 'paquete', destinatario_tipo: 'unidad', prioridad: 'normal',
     descripcion: 'Sobre con documentos', tipo: 'sobre', estado: 'pendiente',
     direccion: 'saliente_tercero', autorizado_nombre: 'Carlos García',
     codigo_retiro: CODIGO, recibido_por: 'guardia-1',

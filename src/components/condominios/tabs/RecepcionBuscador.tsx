@@ -3,12 +3,12 @@ import {
   construirBandejaRecepcion, buscarEnRecepcion, duplicadosPorGuia,
   type ItemRecepcion, type OrigenRecepcion,
 } from '../../../domain/condominios/recepcion'
-import type { CorrespondenciaCondominio, PaqueteRecibido } from '../../../types'
+import type { PiezaRecepcion } from '../../../types'
 
 interface Props {
-  paquetes: PaqueteRecibido[]
-  correspondencia: CorrespondenciaCondominio[]
-  /** Permiso de ver cada módulo: sin él, sus filas no entran a la bandeja. */
+  /** Todas las piezas en custodia: la tabla es una sola, la bandeja también. */
+  piezas: PiezaRecepcion[]
+  /** Permiso de ver cada clase: sin él, sus filas no entran a la bandeja. */
   puedeVerPaqueteria: boolean
   puedeVerCorrespondencia: boolean
   /** Módulo desde el que se abrió la bandeja (no se ofrece "ir" hacia sí mismo). */
@@ -17,7 +17,7 @@ interface Props {
 }
 
 const ORIGEN_LABEL: Record<OrigenRecepcion, string> = {
-  paqueteria: 'Paquetería',
+  paquete: 'Paquetería',
   correspondencia: 'Correspondencia',
 }
 
@@ -58,18 +58,17 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
  * firma y estados. Esta vista busca y manda al lugar correcto.
  */
 export function RecepcionBuscador({
-  paquetes, correspondencia, puedeVerPaqueteria, puedeVerCorrespondencia,
-  origenActual, onIrATab,
+  piezas, puedeVerPaqueteria, puedeVerCorrespondencia, origenActual, onIrATab,
 }: Props) {
   const [consulta, setConsulta] = useState('')
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | OrigenRecepcion>('todos')
   const [soloPendientes, setSoloPendientes] = useState(false)
 
   const bandeja = useMemo(() => construirBandejaRecepcion({
-    paquetes, correspondencia,
+    piezas,
     incluirPaqueteria: puedeVerPaqueteria,
     incluirCorrespondencia: puedeVerCorrespondencia,
-  }), [paquetes, correspondencia, puedeVerPaqueteria, puedeVerCorrespondencia])
+  }), [piezas, puedeVerPaqueteria, puedeVerCorrespondencia])
 
   const duplicados = useMemo(() => duplicadosPorGuia(bandeja), [bandeja])
 
@@ -100,7 +99,7 @@ export function RecepcionBuscador({
         {ambosVisibles && (
           <>
             <Chip activo={filtroOrigen === 'todos'} onClick={() => setFiltroOrigen('todos')}>Todo</Chip>
-            <Chip activo={filtroOrigen === 'paqueteria'} onClick={() => setFiltroOrigen('paqueteria')}>📦 Paquetería</Chip>
+            <Chip activo={filtroOrigen === 'paquete'} onClick={() => setFiltroOrigen('paquete')}>📦 Paquetería</Chip>
             <Chip activo={filtroOrigen === 'correspondencia'} onClick={() => setFiltroOrigen('correspondencia')}>📬 Correspondencia</Chip>
           </>
         )}

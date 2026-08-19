@@ -54,13 +54,15 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
-    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+    // clase='paquete': desde 20260829000000 la tabla es el motor de recepción y
+    // también guarda correspondencia, que tiene su propia entrada más abajo.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
     db.from('inspecciones_normativas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     db.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     // Correspondencia: el Panel alerta de plazos legales vencidos. Espeja la
     // entrada del batch grande.
-    db.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(300),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(300),
   ])
 }
 
@@ -83,7 +85,9 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
     db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+    // clase='paquete': desde 20260829000000 la tabla es el motor de recepción y
+    // también guarda correspondencia, que tiene su propia entrada más abajo.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('infracciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
     db.from('rondas_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('inicio', { ascending: false }).limit(100),
     db.from('novedades_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(200),
@@ -128,7 +132,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     supabase.from('votaciones').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
     db.from('sanciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }).limit(300),
     db.from('planes_mantenimiento').select('*').eq('project_id', pid).eq('company_id', cid).order('proxima_ejecucion'),
-    db.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(300),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(300),
     db.from('libro_novedades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
     db.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
     db.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('placa'),

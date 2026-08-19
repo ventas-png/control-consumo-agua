@@ -5,7 +5,7 @@
 // custodia deje esa marca.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import type { CorrespondenciaCondominio } from '../../../../types'
+import type { PiezaRecepcion } from '../../../../types'
 
 vi.mock('../../../shared/Dialog', () => ({
   notify: vi.fn(),
@@ -31,14 +31,16 @@ vi.mock('../../../shared/EditModal', () => ({
 
 import { CorrespondenciaCondTab } from '../CorrespondenciaCondTab'
 
-const PIEZA: CorrespondenciaCondominio = {
-  id: 'c1', company_id: 'comp', project_id: 'proj',
-  tipo: 'entrada', categoria: 'notificacion_legal', asunto: 'Citación municipal',
-  fecha: '2026-08-12', prioridad: 'urgente', estado: 'pendiente',
-  created_at: '2026-08-12T09:00:00Z', destinatario: 'Junta Directiva',
+const PIEZA: PiezaRecepcion = {
+  id: 'c1', company_id: 'comp', project_id: 'proj', unidad_id: null,
+  clase: 'correspondencia', destinatario_tipo: 'administracion',
+  direccion: 'entrante', tipo: 'notificacion_legal', descripcion: 'Citación municipal',
+  fecha_pieza: '2026-08-12', prioridad: 'urgente', estado: 'pendiente',
+  hora_recepcion: '2026-08-12T09:00:00Z', created_at: '2026-08-12T09:00:00Z',
+  destinatario: 'Junta Directiva',
 }
 
-function renderTab(over: Partial<CorrespondenciaCondominio> = {}) {
+function renderTab(over: Partial<PiezaRecepcion> = {}) {
   return render(
     <CorrespondenciaCondTab
       correspondencia={[{ ...PIEZA, ...over }]}
@@ -63,7 +65,7 @@ describe('CorrespondenciaCondTab — cierre de la pieza', () => {
     renderTab()
     fireEvent.click(screen.getByText('Atender'))
     const [tabla, id, patch] = updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
-    expect(tabla).toBe('correspondencia_condominio')
+    expect(tabla).toBe('paquetes_recibidos')
     expect(id).toBe('c1')
     expect(patch.estado).toBe('atendido')
     expect(patch.entregado_por).toBe('user-1')
@@ -94,15 +96,28 @@ describe('CorrespondenciaCondTab — cierre de la pieza', () => {
 })
 
 describe('CorrespondenciaCondTab — registro', () => {
-  it('guarda quién recibió la pieza en recepción', async () => {
+  it('escribe en el motor único marcando la clase y quién recibió la pieza', async () => {
     renderTab()
     fireEvent.click(screen.getByText('+ Registrar'))
     fireEvent.change(screen.getByPlaceholderText('Descripción del documento'), { target: { value: 'Sobre judicial' } })
     fireEvent.click(screen.getByText('Guardar'))
     await vi.waitFor(() => expect(createCondominioRow).toHaveBeenCalled())
     const [tabla, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
-    expect(tabla).toBe('correspondencia_condominio')
+    expect(tabla).toBe('paquetes_recibidos')
+    // La clase es lo que separa esta fila de un paquete, en la RLS y en la UI.
+    expect(payload.clase).toBe('correspondencia')
     expect(payload.recibido_por).toBe('user-1')
-    expect(payload.asunto).toBe('Sobre judicial')
+    expect(payload.descripcion).toBe('Sobre judicial')
+  })
+
+  it('sin unidad, la pieza queda dirigida a la administración', async () => {
+    renderTab()
+    fireEvent.click(screen.getByText('+ Registrar'))
+    fireEvent.change(screen.getByPlaceholderText('Descripción del documento'), { target: { value: 'Citación' } })
+    fireEvent.click(screen.getByText('Guardar'))
+    await vi.waitFor(() => expect(createCondominioRow).toHaveBeenCalled())
+    const [, payload] = createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(payload.unidad_id).toBeNull()
+    expect(payload.destinatario_tipo).toBe('administracion')
   })
 })

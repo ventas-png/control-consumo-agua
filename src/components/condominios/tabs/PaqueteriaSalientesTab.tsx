@@ -26,7 +26,9 @@ interface Props {
   onRefresh: () => void
 }
 
-const TIPO_CONFIG: Record<TipoPaquete, { label: string; icon: string }> = {
+// Clave `string`: la fila del motor único puede traer el vocabulario de la otra
+// clase. Ver la nota en PaqueteriaTab.
+const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   paquete:   { label: 'Paquete',   icon: '📦' },
   documento: { label: 'Documento', icon: '📄' },
   sobre:     { label: 'Sobre',     icon: '✉️' },
@@ -126,6 +128,8 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     const codigo = generarCodigoRetiro()
     const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
+      // Motor único (20260829000000): clase explícita, no confiada al DEFAULT.
+      clase: 'paquete', destinatario_tipo: 'unidad',
       direccion: 'saliente_tercero', tipo: form.tipo, descripcion: form.descripcion.trim(),
       autorizado_nombre: form.autorizado_nombre.trim(),
       autorizado_documento: form.autorizado_documento.trim() || null,

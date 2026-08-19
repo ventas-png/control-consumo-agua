@@ -591,40 +591,10 @@ export interface EjecucionMantenimiento {
   created_at: string
 }
 
-export type TipoCorrespondencia = 'entrada' | 'salida'
-export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
-export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado'
-export interface CorrespondenciaCondominio {
-  id: string
-  company_id: string
-  project_id: string
-  tipo: TipoCorrespondencia
-  categoria: CategoriaCorrespondencia
-  asunto: string
-  remitente?: string | null
-  destinatario?: string | null
-  fecha: string
-  numero_guia?: string | null
-  prioridad: 'normal' | 'urgente'
-  estado: EstadoCorrespondencia
-  observaciones?: string | null
-  unidad_id?: string | null
-  created_at: string
-  // Acuse de recibo y evidencia (migración 20260828000000). Mismos nombres que
-  // PaqueteRecibido a propósito: la Fase 1 unifica ambos en un solo motor.
-  fotos?: string[] | null
-  firma_path?: string | null
-  entregado_a_nombre?: string | null
-  entregado_via?: 'portal' | 'porteria' | null
-  hora_entrega?: string | null
-  recibido_por?: string | null
-  entregado_por?: string | null
-  empresa_mensajeria?: string | null
-  /** Plazo legal de la pieza (descargo/respuesta). */
-  fecha_limite?: string | null
-  // joins
-  unidad_nombre?: string
-}
+// La correspondencia dejó de tener tabla y tipo propios en la migración
+// 20260829000000: es una CLASE de `PiezaRecepcion` (types/condominios/seguridad).
+// `CategoriaCorrespondencia` y `EstadoCorrespondencia` viven allí, junto al
+// resto del vocabulario del motor de recepción.
 
 export type TurnoNovedad = 'mañana' | 'tarde' | 'noche'
 export interface LibroNovedad {

@@ -1,31 +1,27 @@
-// domain/condominios/recepcion.ts — Modelo común de "algo físico en custodia
-// de recepción", compartido por Paquetería y Correspondencia.
+// domain/condominios/recepcion.ts — Vocabulario del motor único de recepción.
 //
-// POR QUÉ: las dos features modelan el mismo hecho (una pieza que entra o sale
-// de portería a nombre de una unidad) en dos tablas distintas, con dos
-// vocabularios distintos y en dos secciones distintas del menú (Seguridad vs
-// Administración). Para quien busca "¿llegó el sobre con la guía #A1234?" eso
-// significa adivinar en cuál de las dos pestañas quedó registrado — y nada
-// impide que la misma pieza se registre en ambas.
+// Desde la unificación (migración 20260829000000) paquetería y correspondencia
+// son la misma tabla y el mismo tipo (`PiezaRecepcion`), distinguidas por
+// `clase`. Este módulo concentra lo que ambas pestañas necesitan por igual:
+// etiquetas legibles, la bandeja combinada, búsqueda tolerante a cómo la gente
+// teclea una guía, detección de duplicados y el cálculo de plazos.
 //
-// Este módulo NO fusiona las tablas (eso es la Fase 1). Normaliza las dos
-// formas a un `ItemRecepcion` para que la bandeja unificada pueda buscar,
-// ordenar y detectar duplicados sobre un solo arreglo. Es puro y sin I/O: los
-// datos ya vienen cargados en el contexto de tabs.
-import type { CorrespondenciaCondominio, PaqueteRecibido } from '../../types'
+// Es puro y sin I/O: los datos ya vienen cargados en el contexto de tabs.
+import type {
+  ClasePieza, EstadoPieza, PiezaRecepcion, SubtipoPieza,
+} from '../../types'
 
-export type OrigenRecepcion = 'paqueteria' | 'correspondencia'
+export type OrigenRecepcion = ClasePieza
 
-/** Vista canónica de una pieza en recepción, venga de donde venga. */
+/** Vista de una pieza lista para pintar en la bandeja, sin ramas por clase. */
 export interface ItemRecepcion {
   id: string
   origen: OrigenRecepcion
-  /** Tab donde vive el registro (para el deep link "ver en …"). */
+  /** Tab donde se administra la pieza (para el salto "abrir …"). */
   tabId: 'paqueteria' | 'correspondencia'
-  /** Sentido del movimiento, unificado: paquetería dice entrante/saliente_tercero, correspondencia entrada/salida. */
   direccion: 'entrada' | 'salida'
   titulo: string
-  /** Etiqueta legible de la subclase (Paquete, Sobre, Notif. Legal…). */
+  /** Etiqueta legible del subtipo (Paquete, Sobre, Notif. Legal…). */
   clase: string
   icono: string
   unidadNombre: string | null
@@ -35,10 +31,10 @@ export interface ItemRecepcion {
   mensajeria: string | null
   estado: string
   estadoLabel: string
-  /** true cuando la pieza ya salió de custodia (entregada o atendida). */
+  /** true cuando la pieza ya salió de custodia. */
   cerrado: boolean
   urgente: boolean
-  /** Fecha/hora de ingreso, ISO. Criterio único de orden de la bandeja. */
+  /** Instante de ingreso, ISO. Criterio único de orden de la bandeja. */
   fecha: string
   fechaEntrega: string | null
   fechaLimite: string | null
@@ -46,90 +42,88 @@ export interface ItemRecepcion {
   fotos: number
 }
 
-const CLASE_PAQUETE: Record<string, { label: string; icono: string }> = {
-  paquete:   { label: 'Paquete',   icono: '📦' },
-  documento: { label: 'Documento', icono: '📄' },
-  sobre:     { label: 'Sobre',     icono: '✉️' },
-  otro:      { label: 'Otro',      icono: '🎁' },
+/** Subtipos por clase, con su etiqueta e ícono. Espeja el CHECK `paquetes_tipo_chk`. */
+export const SUBTIPOS: Record<ClasePieza, Record<string, { label: string; icono: string }>> = {
+  paquete: {
+    paquete:   { label: 'Paquete',   icono: '📦' },
+    documento: { label: 'Documento', icono: '📄' },
+    sobre:     { label: 'Sobre',     icono: '✉️' },
+    otro:      { label: 'Otro',      icono: '🎁' },
+  },
+  correspondencia: {
+    carta:              { label: 'Carta',        icono: '✉️' },
+    notificacion_legal: { label: 'Notif. Legal', icono: '⚖️' },
+    factura:            { label: 'Factura',      icono: '🧾' },
+    circular:           { label: 'Circular',     icono: '📰' },
+    otro:               { label: 'Otro',         icono: '📨' },
+  },
 }
 
-const CLASE_CORRESPONDENCIA: Record<string, { label: string; icono: string }> = {
-  carta:              { label: 'Carta',       icono: '✉️' },
-  notificacion_legal: { label: 'Notif. Legal', icono: '⚖️' },
-  factura:            { label: 'Factura',     icono: '🧾' },
-  circular:           { label: 'Circular',    icono: '📰' },
-  otro:               { label: 'Otro',        icono: '📨' },
+/** Estados por clase. Espeja el CHECK `paquetes_estado_chk`. */
+export const ESTADOS: Record<ClasePieza, Record<string, string>> = {
+  paquete:         { pendiente: 'Pendiente', entregado: 'Entregado', devuelto: 'Devuelto' },
+  correspondencia: { pendiente: 'Pendiente', atendido: 'Atendido', archivado: 'Archivado' },
 }
 
-const ESTADO_PAQUETE: Record<string, string> = {
-  pendiente: 'Pendiente', entregado: 'Entregado', devuelto: 'Devuelto',
-}
-const ESTADO_CORRESPONDENCIA: Record<string, string> = {
-  pendiente: 'Pendiente', atendido: 'Atendido', archivado: 'Archivado',
+/** Subtipo por defecto de cada clase, para formularios y filas incompletas. */
+export const SUBTIPO_POR_DEFECTO: Record<ClasePieza, SubtipoPieza> = {
+  paquete: 'paquete',
+  correspondencia: 'carta',
 }
 
-export function paqueteAItemRecepcion(p: PaqueteRecibido): ItemRecepcion {
-  const clase = CLASE_PAQUETE[p.tipo] ?? CLASE_PAQUETE.paquete
+export function claseDePieza(p: Pick<PiezaRecepcion, 'clase'>): ClasePieza {
+  // Filas anteriores a la unificación pueden llegar sin `clase` desde un caché
+  // viejo; el default de la columna es 'paquete' y aquí se respeta.
+  return p.clase === 'correspondencia' ? 'correspondencia' : 'paquete'
+}
+
+export function subtipoDePieza(p: PiezaRecepcion): { label: string; icono: string } {
+  const clase = claseDePieza(p)
+  return SUBTIPOS[clase][p.tipo] ?? SUBTIPOS[clase][SUBTIPO_POR_DEFECTO[clase]]
+}
+
+export function estadoLabel(p: PiezaRecepcion): string {
+  return ESTADOS[claseDePieza(p)][p.estado] ?? p.estado
+}
+
+/** Una pieza está cerrada cuando salió de custodia, sea cual sea su clase. */
+export function piezaCerrada(p: Pick<PiezaRecepcion, 'estado'>): boolean {
+  return p.estado !== 'pendiente'
+}
+
+export function piezaAItemRecepcion(p: PiezaRecepcion): ItemRecepcion {
+  const clase = claseDePieza(p)
+  const subtipo = subtipoDePieza(p)
   return {
     id: p.id,
-    origen: 'paqueteria',
-    tabId: 'paqueteria',
-    direccion: p.direccion === 'saliente_tercero' ? 'salida' : 'entrada',
+    origen: clase,
+    tabId: clase === 'correspondencia' ? 'correspondencia' : 'paqueteria',
+    direccion: p.direccion === 'saliente' || p.direccion === 'saliente_tercero' ? 'salida' : 'entrada',
     titulo: p.descripcion,
-    clase: clase.label,
-    icono: clase.icono,
+    clase: subtipo.label,
+    icono: subtipo.icono,
     unidadNombre: p.unidad_nombre ?? null,
     remitente: p.remitente ?? null,
-    // En una salida por tercero el "destinatario" real es el autorizado a retirar.
-    destinatario: p.autorizado_nombre ?? null,
+    // En una salida por tercero el destinatario real es quien está autorizado
+    // a retirar; en correspondencia, a quién va dirigida.
+    destinatario: p.destinatario ?? p.autorizado_nombre ?? null,
     guia: p.num_guia ?? null,
     mensajeria: p.empresa_mensajeria ?? null,
     estado: p.estado,
-    estadoLabel: ESTADO_PAQUETE[p.estado] ?? p.estado,
-    cerrado: p.estado !== 'pendiente',
-    urgente: false, // paquetería no tiene prioridad todavía (llega en la Fase 1)
+    estadoLabel: estadoLabel(p),
+    cerrado: piezaCerrada(p),
+    urgente: p.prioridad === 'urgente',
     fecha: p.hora_recepcion ?? p.created_at,
     fechaEntrega: p.hora_entrega ?? null,
-    fechaLimite: null,
+    fechaLimite: p.fecha_limite ?? null,
     conFirma: Boolean(p.firma_path),
     fotos: p.fotos?.length ?? 0,
   }
 }
 
-export function correspondenciaAItemRecepcion(c: CorrespondenciaCondominio): ItemRecepcion {
-  const clase = CLASE_CORRESPONDENCIA[c.categoria] ?? CLASE_CORRESPONDENCIA.otro
-  return {
-    id: c.id,
-    origen: 'correspondencia',
-    tabId: 'correspondencia',
-    direccion: c.tipo === 'salida' ? 'salida' : 'entrada',
-    titulo: c.asunto,
-    clase: clase.label,
-    icono: clase.icono,
-    unidadNombre: c.unidad_nombre ?? null,
-    remitente: c.remitente ?? null,
-    destinatario: c.destinatario ?? null,
-    guia: c.numero_guia ?? null,
-    mensajeria: c.empresa_mensajeria ?? null,
-    estado: c.estado,
-    estadoLabel: ESTADO_CORRESPONDENCIA[c.estado] ?? c.estado,
-    cerrado: c.estado !== 'pendiente',
-    urgente: c.prioridad === 'urgente',
-    // `fecha` es un date (fecha del documento); created_at da la hora real de
-    // registro. Se usa el date para que el orden coincida con lo que la pestaña
-    // de Correspondencia muestra, con created_at como desempate implícito.
-    fecha: c.fecha,
-    fechaEntrega: c.hora_entrega ?? null,
-    fechaLimite: c.fecha_limite ?? null,
-    conFirma: Boolean(c.firma_path),
-    fotos: c.fotos?.length ?? 0,
-  }
-}
-
 interface BandejaInput {
-  paquetes: PaqueteRecibido[]
-  correspondencia: CorrespondenciaCondominio[]
-  /** Falso cuando el usuario no tiene permiso de ver esa pestaña: sus filas no entran a la bandeja. */
+  piezas: PiezaRecepcion[]
+  /** Falso cuando el usuario no tiene permiso de ver esa clase: sus filas no entran a la bandeja. */
   incluirPaqueteria?: boolean
   incluirCorrespondencia?: boolean
 }
@@ -137,24 +131,29 @@ interface BandejaInput {
 /**
  * Bandeja unificada, más reciente primero.
  *
- * El filtro por permiso es explícito y NO se delega solo a la RLS: aunque un
- * usuario sin permiso de correspondencia recibiría el arreglo vacío del
- * servidor, el contexto de tabs es compartido y puede traer datos cargados por
- * otra pestaña de la misma sesión. Aquí se corta en la frontera de la UI.
+ * El filtro por permiso es explícito y NO se delega solo a la RLS: aunque la
+ * policy resuelve el permiso por `clase` y no devolvería esas filas, el
+ * contexto de tabs es compartido y puede traer datos cargados por otra pestaña
+ * de la misma sesión. Aquí se corta también en la frontera de la UI.
  */
 export function construirBandejaRecepcion({
-  paquetes, correspondencia,
-  incluirPaqueteria = true, incluirCorrespondencia = true,
+  piezas, incluirPaqueteria = true, incluirCorrespondencia = true,
 }: BandejaInput): ItemRecepcion[] {
-  const items: ItemRecepcion[] = []
-  if (incluirPaqueteria) for (const p of paquetes) items.push(paqueteAItemRecepcion(p))
-  if (incluirCorrespondencia) for (const c of correspondencia) items.push(correspondenciaAItemRecepcion(c))
-  return items.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
+  return piezas
+    .filter(p => claseDePieza(p) === 'correspondencia' ? incluirCorrespondencia : incluirPaqueteria)
+    .map(piezaAItemRecepcion)
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
 }
+
+// Marcas de acento que deja `normalize('NFD')` al separar la letra de su tilde.
+// Se usa la propiedad Unicode en vez del rango de codepoints: el rango se
+// escribe con caracteres invisibles en el fuente y cualquier edición lo rompe
+// sin que se note.
+const SIGNOS_DIACRITICOS = /\p{Diacritic}/gu
 
 /** Minúsculas sin acentos: "Notificación" y "notificacion" son la misma búsqueda. */
 function normalizar(texto: string): string {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  return texto.normalize('NFD').replace(SIGNOS_DIACRITICOS, '').toLowerCase().trim()
 }
 
 /**
@@ -163,7 +162,7 @@ function normalizar(texto: string): string {
  * imprime con guiones que nadie teclea igual.
  */
 export function normalizarGuia(guia: string | null | undefined): string {
-  return (guia ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase()
+  return (guia ?? '').normalize('NFD').replace(SIGNOS_DIACRITICOS, '').replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
 /**
@@ -185,10 +184,9 @@ export function buscarEnRecepcion(items: ItemRecepcion[], consulta: string): Ite
 }
 
 /**
- * Posibles duplicados: la misma pieza registrada en las dos pestañas. Se
- * agrupan por guía normalizada cuando hay más de un origen involucrado — la
- * guía es el único identificador que ambos módulos capturan y que viene
- * impreso en el envío.
+ * Posibles duplicados: la misma pieza anotada dos veces con distinta clase. Se
+ * agrupan por guía normalizada cuando hay más de una clase involucrada — la
+ * guía es el único identificador que viene impreso en el envío.
  */
 export function duplicadosPorGuia(items: ItemRecepcion[]): ItemRecepcion[][] {
   const porGuia = new Map<string, ItemRecepcion[]>()
@@ -211,22 +209,28 @@ export function diasParaVencer(fechaLimite: string, hoyISO: string): number {
 }
 
 /**
- * Correspondencia pendiente cuyo plazo legal ya venció o vence dentro de
- * `diasAviso`. Alimenta la alerta del Panel General.
+ * Piezas pendientes cuyo plazo ya venció o vence dentro de `diasAviso`.
+ * Alimenta la alerta del Panel General. Aplica a cualquier clase: hoy solo la
+ * correspondencia captura `fecha_limite`, pero la regla no depende de eso.
  */
-export function correspondenciaEnRiesgo(
-  correspondencia: CorrespondenciaCondominio[],
+export function piezasEnRiesgo(
+  piezas: PiezaRecepcion[],
   hoyISO: string,
   diasAviso = 3,
-): { vencidas: CorrespondenciaCondominio[]; porVencer: CorrespondenciaCondominio[] } {
-  const vencidas: CorrespondenciaCondominio[] = []
-  const porVencer: CorrespondenciaCondominio[] = []
-  for (const c of correspondencia) {
-    if (c.estado !== 'pendiente' || !c.fecha_limite) continue
-    const dias = diasParaVencer(c.fecha_limite, hoyISO)
+): { vencidas: PiezaRecepcion[]; porVencer: PiezaRecepcion[] } {
+  const vencidas: PiezaRecepcion[] = []
+  const porVencer: PiezaRecepcion[] = []
+  for (const p of piezas) {
+    if (piezaCerrada(p) || !p.fecha_limite) continue
+    const dias = diasParaVencer(p.fecha_limite, hoyISO)
     if (Number.isNaN(dias)) continue
-    if (dias < 0) vencidas.push(c)
-    else if (dias <= diasAviso) porVencer.push(c)
+    if (dias < 0) vencidas.push(p)
+    else if (dias <= diasAviso) porVencer.push(p)
   }
   return { vencidas, porVencer }
+}
+
+/** Estados válidos de una clase, para los filtros de cada pestaña. */
+export function estadosDe(clase: ClasePieza): EstadoPieza[] {
+  return Object.keys(ESTADOS[clase]) as EstadoPieza[]
 }

@@ -3,9 +3,9 @@ import { useState, type CSSProperties } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { diasParaVencer } from '../../../domain/condominios/recepcion'
+import { diasParaVencer, SUBTIPOS } from '../../../domain/condominios/recepcion'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
-import type { CorrespondenciaCondominio, PaqueteRecibido, Unidad } from '../../../types'
+import type { CategoriaCorrespondencia, EstadoCorrespondencia, PiezaRecepcion, Unidad } from '../../../types'
 import { notify } from '../../shared/Dialog'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { MultiImageUploader } from '../../shared/ImageUploader'
@@ -15,8 +15,10 @@ import { SignaturePad } from '../../shared/SignaturePad'
 import { RecepcionBuscador } from './RecepcionBuscador'
 
 interface Props {
-  correspondencia: CorrespondenciaCondominio[]
-  paquetes: PaqueteRecibido[]
+  /** Piezas de clase 'correspondencia' (el loader ya filtra por clase). */
+  correspondencia: PiezaRecepcion[]
+  /** Piezas de clase 'paquete', solo para la bandeja unificada. */
+  paquetes: PiezaRecepcion[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
@@ -28,9 +30,14 @@ interface Props {
   onRefresh: () => void
 }
 
-const CAT_LABELS: Record<string, string> = {
-  carta: 'Carta', notificacion_legal: 'Notif. Legal', factura: 'Factura', circular: 'Circular', otro: 'Otro',
-}
+// Motor único (20260829000000): la correspondencia vive en `paquetes_recibidos`
+// con clase='correspondencia'. La categoría documental es la columna `tipo`, el
+// asunto es `descripcion`, la observación es `notas` y entrada/salida es
+// `direccion`. La UI mantiene el vocabulario que entiende la administradora.
+const TABLA = 'paquetes_recibidos'
+const CAT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(SUBTIPOS.correspondencia).map(([k, v]) => [k, v.label]),
+)
 const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
   pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   atendido:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
@@ -38,7 +45,9 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
 }
 
 const BLANK = {
-  tipo: 'entrada', categoria: 'carta', asunto: '', remitente: '', destinatario: '',
+  direccion: 'entrante' as 'entrante' | 'saliente',
+  categoria: 'carta' as CategoriaCorrespondencia,
+  asunto: '', remitente: '', destinatario: '',
   fecha: hoyLocalISO(), numero_guia: '', empresa_mensajeria: '', prioridad: 'normal',
   observaciones: '', unidad_id: '', fecha_limite: '',
 }
@@ -52,6 +61,11 @@ function fechaCorta(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 }
 
+/** Fecha del documento; cae a la de registro en filas sin fecha propia. */
+function fechaDocumento(c: PiezaRecepcion): string {
+  return c.fecha_pieza ?? c.hora_recepcion.slice(0, 10)
+}
+
 export function CorrespondenciaCondTab({
   correspondencia, paquetes, unidades, proyectoId, companyId, userId,
   canCreate, canEdit, puedeVerPaqueteria, onIrATab, onRefresh,
@@ -62,9 +76,9 @@ export function CorrespondenciaCondTab({
   const [fotos, setFotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'salida'>('todos')
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'atendido' | 'archivado'>('todos')
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | EstadoCorrespondencia>('todos')
   const [selected, setSelected] = useState<string | null>(null)
-  const [firmando, setFirmando] = useState<CorrespondenciaCondominio | null>(null)
+  const [firmando, setFirmando] = useState<PiezaRecepcion | null>(null)
   const [firmaNombre, setFirmaNombre] = useState('')
   const [firmaSaving, setFirmaSaving] = useState(false)
 
@@ -79,14 +93,21 @@ export function CorrespondenciaCondTab({
   async function handleSave() {
     if (!form.asunto.trim()) return notify({ variant: 'warning', title: 'Requerido', text: 'El asunto es obligatorio.' })
     setSaving(true)
-    const { error } = await createCondominioRow('correspondencia_condominio', {
+    const { error } = await createCondominioRow(TABLA, {
       company_id: companyId, project_id: proyectoId,
-      tipo: form.tipo, categoria: form.categoria, asunto: form.asunto.trim(),
+      clase: 'correspondencia',
+      // Sin unidad, la pieza va dirigida a la administración del condominio
+      // (citaciones, facturas de proveedor): el motor lo exige explícito.
+      unidad_id: form.unidad_id || null,
+      destinatario_tipo: form.unidad_id ? 'unidad' : 'administracion',
+      direccion: form.direccion,
+      tipo: form.categoria,
+      descripcion: form.asunto.trim(),
       remitente: form.remitente || null, destinatario: form.destinatario || null,
-      fecha: form.fecha, numero_guia: form.numero_guia || null,
+      fecha_pieza: form.fecha, num_guia: form.numero_guia || null,
       empresa_mensajeria: form.empresa_mensajeria.trim() || null,
-      prioridad: form.prioridad, observaciones: form.observaciones || null,
-      unidad_id: form.unidad_id || null, estado: 'pendiente',
+      prioridad: form.prioridad, notas: form.observaciones || null,
+      estado: 'pendiente',
       fecha_limite: form.fecha_limite || null,
       fotos: fotos.length ? fotos : null,
       // Trazabilidad: quién recibió la pieza en recepción. Sin esto, una
@@ -99,14 +120,14 @@ export function CorrespondenciaCondTab({
   }
 
   /** Cierra la pieza dejando la marca de quién la entregó y cuándo. */
-  async function cambiarEstado(id: string, estado: string) {
+  async function cambiarEstado(id: string, estado: EstadoCorrespondencia) {
     const patch: Record<string, unknown> = { estado }
     if (estado === 'atendido') {
       patch.hora_entrega = new Date().toISOString()
       patch.entregado_por = userId
       patch.entregado_via = 'porteria'
     }
-    const { error } = await updateCondominioRow('correspondencia_condominio', id, patch)
+    const { error } = await updateCondominioRow(TABLA, id, patch)
     if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
@@ -118,7 +139,7 @@ export function CorrespondenciaCondTab({
       const path = buildUploadPath(`${proyectoId}/correspondencia-firmas`, 'firma.png', 'png')
       const { error: upErr } = await uploadCondominiosMedia(path, file, { contentType: 'image/png', upsert: false })
       if (upErr) { notify({ variant: 'error', title: 'Error', text: upErr }); return }
-      const { error } = await updateCondominioRow('correspondencia_condominio', firmando.id, {
+      const { error } = await updateCondominioRow(TABLA, firmando.id, {
         estado: 'atendido', hora_entrega: new Date().toISOString(), entregado_por: userId,
         firma_path: path, entregado_a_nombre: firmaNombre.trim() || null, entregado_via: 'porteria',
       })
@@ -129,31 +150,33 @@ export function CorrespondenciaCondTab({
     }
   }
 
+  const esEntrada = (c: PiezaRecepcion) => c.direccion !== 'saliente' && c.direccion !== 'saliente_tercero'
+
   const filtered = correspondencia
-    .filter(c => filtroTipo === 'todos' || c.tipo === filtroTipo)
+    .filter(c => filtroTipo === 'todos' || (filtroTipo === 'entrada') === esEntrada(c))
     .filter(c => filtroEstado === 'todos' || c.estado === filtroEstado)
 
-  const entrada   = correspondencia.filter(c => c.tipo === 'entrada').length
-  const salida    = correspondencia.filter(c => c.tipo === 'salida').length
+  const entrada    = correspondencia.filter(esEntrada).length
+  const salida     = correspondencia.length - entrada
   const pendientes = correspondencia.filter(c => c.estado === 'pendiente').length
-  const urgentes  = correspondencia.filter(c => c.prioridad === 'urgente' && c.estado === 'pendiente').length
-  const vencidos  = correspondencia.filter(c =>
+  const urgentes   = correspondencia.filter(c => c.prioridad === 'urgente' && c.estado === 'pendiente').length
+  const vencidos   = correspondencia.filter(c =>
     c.estado === 'pendiente' && c.fecha_limite && diasParaVencer(c.fecha_limite, hoy) < 0).length
 
   const detail = selected ? correspondencia.find(c => c.id === selected) : null
 
   function buildExportRows(): (string | number)[][] {
     return filtered.map(c => [
-      c.tipo === 'entrada' ? 'Entrada' : 'Salida',
-      CAT_LABELS[c.categoria] ?? c.categoria,
-      c.asunto,
+      esEntrada(c) ? 'Entrada' : 'Salida',
+      CAT_LABELS[c.tipo] ?? c.tipo,
+      c.descripcion,
       c.unidad_nombre ?? '',
       c.remitente ?? '',
       c.destinatario ?? '',
       c.empresa_mensajeria ?? '',
-      c.numero_guia ?? '',
+      c.num_guia ?? '',
       c.prioridad,
-      c.fecha,
+      fechaDocumento(c),
       c.fecha_limite ?? '',
       c.estado,
       c.entregado_a_nombre ?? '',
@@ -199,7 +222,7 @@ export function CorrespondenciaCondTab({
         )}
       </div>
 
-      {/* Segmento: la pieza vive aquí, pero se busca junto con paquetería */}
+      {/* Segmento: la pieza se administra aquí, pero se busca junto con paquetería */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <SegBtn id="correspondencia" label="📬 Correspondencia" />
         <SegBtn id="recepcion" label="🔎 Recepción (buscar todo)" />
@@ -207,8 +230,7 @@ export function CorrespondenciaCondTab({
 
       {vista === 'recepcion' ? (
         <RecepcionBuscador
-          paquetes={paquetes}
-          correspondencia={correspondencia}
+          piezas={[...correspondencia, ...paquetes]}
           puedeVerPaqueteria={puedeVerPaqueteria}
           puedeVerCorrespondencia
           origenActual="correspondencia"
@@ -239,14 +261,14 @@ export function CorrespondenciaCondTab({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Tipo</label>
-              <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
-                <option value="entrada">📥 Entrada</option>
-                <option value="salida">📤 Salida</option>
+              <select style={inputStyle} value={form.direccion} onChange={e => setF('direccion', e.target.value as 'entrante' | 'saliente')}>
+                <option value="entrante">📥 Entrada</option>
+                <option value="saliente">📤 Salida</option>
               </select>
             </div>
             <div>
               <label style={labelStyle}>Categoría</label>
-              <select style={inputStyle} value={form.categoria} onChange={e => setF('categoria', e.target.value)}>
+              <select style={inputStyle} value={form.categoria} onChange={e => setF('categoria', e.target.value as CategoriaCorrespondencia)}>
                 {Object.entries(CAT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -284,7 +306,7 @@ export function CorrespondenciaCondTab({
             <div>
               <label style={labelStyle}>Unidad relacionada</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
-                <option value="">— Ninguna —</option>
+                <option value="">— Administración —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
@@ -342,46 +364,46 @@ export function CorrespondenciaCondTab({
       <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
         {/* List — F3.9: migrado a <DataTable> shared */}
         <div>
-          <DataTable<CorrespondenciaCondominio>
+          <DataTable<PiezaRecepcion>
             data={filtered}
             rowKey="id"
-            searchableKeys={['asunto']}
+            searchableKeys={['descripcion']}
             searchPlaceholder="Buscar asunto..."
             emptyState={{ icon: '📨', title: 'No hay correspondencia' }}
-            defaultSort={{ key: 'fecha', direction: 'desc' }}
+            defaultSort={{ key: 'fecha_pieza', direction: 'desc' }}
             onRowClick={(c) => setSelected(selected === c.id ? null : c.id)}
             rowStyle={(c) => selected === c.id ? { background: 'var(--at-primary-tint)' } : {}}
             columns={[
               {
-                key: 'tipo',
+                key: 'direccion',
                 header: 'Tipo',
                 sortable: true,
                 render: (c) => (
                   <>
-                    <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
+                    <span style={{ fontSize: '13px' }}>{esEntrada(c) ? '📥' : '📤'}</span>
                     {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
                   </>
                 ),
               },
               {
-                key: 'asunto',
+                key: 'descripcion',
                 header: 'Asunto',
                 sortable: true,
                 render: (c) => (
                   <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>
-                    {c.asunto}
+                    {c.descripcion}
                     {(c.fotos?.length ?? 0) > 0 && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '6px' }}>📷 {c.fotos?.length}</span>}
                     {c.firma_path && <span style={{ fontSize: '11px', color: 'var(--at-success)', marginLeft: '6px' }}>✍</span>}
                   </span>
                 ),
               },
               {
-                key: 'categoria',
+                key: 'tipo',
                 header: 'Categoría',
                 hideOnMobile: true,
-                render: (c) => CAT_LABELS[c.categoria],
+                render: (c) => CAT_LABELS[c.tipo] ?? c.tipo,
               },
-              { key: 'fecha', header: 'Fecha', sortable: true },
+              { key: 'fecha_pieza', header: 'Fecha', sortable: true, render: (c) => fechaDocumento(c) },
               {
                 key: 'fecha_limite',
                 header: 'Plazo',
@@ -424,7 +446,7 @@ export function CorrespondenciaCondTab({
                   ) : null
                 ),
               },
-            ] satisfies DataTableColumn<CorrespondenciaCondominio>[]}
+            ] satisfies DataTableColumn<PiezaRecepcion>[]}
           />
         </div>
 
@@ -432,20 +454,22 @@ export function CorrespondenciaCondTab({
         {detail && (
           <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '20px' }}>{detail.tipo === 'entrada' ? '📥' : '📤'}</span>
+              <span style={{ fontSize: '20px' }}>{esEntrada(detail) ? '📥' : '📤'}</span>
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px' }}>✕</button>
             </div>
-            <h3 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>{detail.asunto}</h3>
+            <h3 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>{detail.descripcion}</h3>
             {([
-              ['Categoría', CAT_LABELS[detail.categoria]],
-              ['Fecha', detail.fecha],
+              ['Categoría', CAT_LABELS[detail.tipo] ?? detail.tipo],
+              ['Dirigida a', detail.unidad_nombre ?? (detail.destinatario_tipo === 'unidad' ? '—' : 'Administración')],
+              ['Fecha', fechaDocumento(detail)],
               ['Plazo', detail.fecha_limite ?? '—'],
               ['Remitente', detail.remitente ?? '—'],
               ['Destinatario', detail.destinatario ?? '—'],
               ['Mensajería', detail.empresa_mensajeria ?? '—'],
-              ['N° guía', detail.numero_guia ?? '—'],
+              ['N° guía', detail.num_guia ?? '—'],
               ['Prioridad', detail.prioridad],
-              ['Entregado', detail.hora_entrega ? fechaCorta(detail.hora_entrega) : '—'],
+              ['Registrada', fechaCorta(detail.hora_recepcion)],
+              ['Entregada', detail.hora_entrega ? fechaCorta(detail.hora_entrega) : '—'],
               ['Recibió', detail.entregado_a_nombre ?? '—'],
             ] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--at-chip)', fontSize: '12px' }}>
@@ -466,9 +490,9 @@ export function CorrespondenciaCondTab({
                 <SecureImage src={detail.firma_path} alt="firma" style={{ width: '100%', height: '80px', objectFit: 'contain', background: '#fff', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
               </div>
             )}
-            {detail.observaciones && (
+            {detail.notas && (
               <div style={{ marginTop: '10px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '6px', fontSize: '12px', color: 'var(--at-ink-2)' }}>
-                {detail.observaciones}
+                {detail.notas}
               </div>
             )}
           </div>
@@ -483,7 +507,7 @@ export function CorrespondenciaCondTab({
           maxWidth="460px"
         >
           <div style={{ marginBottom: '14px' }}>
-            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{firmando.asunto}</div>
+            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{firmando.descripcion}</div>
             <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
               Capture la firma de quien recibe. Queda como prueba de entrega con fecha y hora.
             </div>

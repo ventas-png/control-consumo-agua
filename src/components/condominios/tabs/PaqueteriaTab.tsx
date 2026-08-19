@@ -16,12 +16,12 @@ import { SignaturePad } from '../../shared/SignaturePad'
 import { PaqueteriaSalientesTab } from './PaqueteriaSalientesTab'
 import { RecepcionBuscador } from './RecepcionBuscador'
 import { codigoRetiroDesdeURL } from '../../../lib/paquetes'
-import type { CorrespondenciaCondominio, PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
+import type { PiezaRecepcion, PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
 
 interface Props {
   paquetes: PaqueteRecibido[]
-  /** Solo para la bandeja unificada: la correspondencia se edita en su propia pestaña. */
-  correspondencia: CorrespondenciaCondominio[]
+  /** Solo para la bandeja unificada: la correspondencia se administra en su propia pestaña. */
+  correspondencia: PiezaRecepcion[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
@@ -33,13 +33,17 @@ interface Props {
   onRefresh: () => void
 }
 
-const ESTADO_CONFIG: Record<EstadoPaquete, { label: string; bg: string; color: string; icon: string }> = {
+// Clave `string` y no EstadoPaquete/TipoPaquete: desde el motor único
+// (20260829000000) la fila puede llevar el vocabulario de cualquiera de las dos
+// clases. Esta pestaña solo recibe clase='paquete' —el loader filtra— pero los
+// accesos caen a un valor por defecto en vez de romper si llegara otra cosa.
+const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; icon: string }> = {
   pendiente: { label: 'Pendiente', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', icon: '📦' },
   entregado: { label: 'Entregado', bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '✅' },
   devuelto:  { label: 'Devuelto',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '↩️' },
 }
 
-const TIPO_CONFIG: Record<TipoPaquete, { label: string; icon: string }> = {
+const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   paquete:   { label: 'Paquete',   icon: '📦' },
   documento: { label: 'Documento', icon: '📄' },
   sobre:     { label: 'Sobre',     icon: '✉️' },
@@ -105,6 +109,9 @@ export function PaqueteriaTab({
     setSaving(true)
     const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
+      // Motor único (20260829000000): la clase decide el vocabulario y el
+      // permiso RBAC de la fila. Explícita, no confiada al DEFAULT.
+      clase: 'paquete', destinatario_tipo: 'unidad',
       direccion: 'entrante', tipo: form.tipo,
       descripcion: form.descripcion.trim(),
       remitente: form.remitente.trim() || null,
@@ -173,7 +180,7 @@ export function PaqueteriaTab({
       p.remitente ?? '',
       p.empresa_mensajeria ?? '',
       p.num_guia ?? '',
-      ESTADO_CONFIG[p.estado].label,
+      ESTADO_CONFIG[p.estado]?.label ?? p.estado,
       fechaCorta(p.hora_recepcion),
       fechaCorta(p.hora_entrega),
       p.entregado_a_nombre ?? '',
@@ -235,11 +242,10 @@ export function PaqueteriaTab({
 
       {vista === 'recepcion' ? (
         <RecepcionBuscador
-          paquetes={paquetes}
-          correspondencia={correspondencia}
+          piezas={[...paquetes, ...correspondencia]}
           puedeVerPaqueteria
           puedeVerCorrespondencia={puedeVerCorrespondencia}
-          origenActual="paqueteria"
+          origenActual="paquete"
           onIrATab={onIrATab}
         />
       ) : vista === 'saliente_tercero' ? (
@@ -329,7 +335,7 @@ export function PaqueteriaTab({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtrados.map(p => {
-                const cfg = ESTADO_CONFIG[p.estado]
+                const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
                 const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
                 return (
                   <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.estado === 'pendiente' ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>

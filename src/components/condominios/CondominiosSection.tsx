@@ -40,7 +40,7 @@ import type {
   SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
-  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
+  PiezaRecepcion, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
@@ -239,7 +239,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [sanciones, setSanciones] = useState<SancionCondominio[]>([])
   const [planesMantenimiento, setPlanesMantenimiento] = useState<PlanMantenimiento[]>([])
   // Fase 14
-  const [correspondencia, setCorrespondencia] = useState<CorrespondenciaCondominio[]>([])
+  const [correspondencia, setCorrespondencia] = useState<PiezaRecepcion[]>([])
   const [libroNovedades, setLibroNovedades] = useState<LibroNovedad[]>([])
   const [acuerdos, setAcuerdos] = useState<SeguimientoAcuerdo[]>([])
   // Fase 15
@@ -392,7 +392,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
       setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
       setGastos((gastosRes.data ?? []) as GastoCondominio[])
-      setCorrespondencia(mapUnidad<CorrespondenciaCondominio>(correspondenciaPanelRes.data ?? []))
+      setCorrespondencia(mapUnidad<PiezaRecepcion>(correspondenciaPanelRes.data ?? []))
       setLoading(false)
       return
     }
@@ -627,7 +627,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setVotaciones((votacionesRes.data ?? []) as Votacion[])
     setSanciones(mapUnidad<SancionCondominio>(sancionesRes.data ?? []))
     setPlanesMantenimiento((planesRes.data ?? []) as PlanMantenimiento[])
-    setCorrespondencia(mapUnidad<CorrespondenciaCondominio>(correspondenciaRes.data ?? []))
+    setCorrespondencia(mapUnidad<PiezaRecepcion>(correspondenciaRes.data ?? []))
     setLibroNovedades((libroRes.data ?? []) as LibroNovedad[])
     setAcuerdos((acuerdosRes.data ?? []) as SeguimientoAcuerdo[])
     setVehiculos((vehiculosRes.data ?? []) as VehiculoResidente[])

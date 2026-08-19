@@ -28,7 +28,7 @@ import type {
   SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
-  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
+  PiezaRecepcion, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
@@ -197,7 +197,8 @@ export interface CondominiosTabContext {
   votaciones: Votacion[]
   sanciones: SancionCondominio[]
   planesMantenimiento: PlanMantenimiento[]
-  correspondencia: CorrespondenciaCondominio[]
+  /** Piezas de recepción de clase 'correspondencia' (mismo motor que `paquetes`). */
+  correspondencia: PiezaRecepcion[]
   libroNovedades: LibroNovedad[]
   acuerdos: SeguimientoAcuerdo[]
   vehiculos: VehiculoResidente[]

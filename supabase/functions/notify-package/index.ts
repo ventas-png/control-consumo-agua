@@ -234,6 +234,10 @@ Deno.serve(async (req: Request) => {
       .from('paquetes_recibidos')
       .select('*, unidades(nombre, cliente_id), companies(nombre)')
       .eq('id', body.paquete_id)
+      // Motor único (20260829000000): la tabla también guarda correspondencia,
+      // que tiene otro destinatario, otro permiso y otro aviso. Este endpoint
+      // notifica paquetería; una pieza de otra clase no se avisa por aquí.
+      .eq('clase', 'paquete')
       .maybeSingle()
     if (!pkg) return json({ error: 'Paquete no encontrado' }, 404)
 
