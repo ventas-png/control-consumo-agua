@@ -174,22 +174,38 @@ export function sumarDiasCalendario(
 }
 
 /**
- * Día de CALENDARIO local en el que cae un instante (`timestamptz`).
+ * Día de CALENDARIO local en el que cae un INSTANTE (`timestamptz`).
  *
- * Es el puente en el otro sentido: un timestamp SÍ tiene hora y zona, así que
+ * Es el puente en el otro sentido: un timestamp sí tiene hora y zona, así que
  * no puede pasar por `parseFechaCalendario` —que lo rechaza a propósito—, pero
  * a veces hay que compararlo contra un límite `'YYYY-MM-DD'`. Recortar la
  * cadena ISO (`created_at.split('T')[0]`, `inicio.slice(0, 10)`) devuelve el
  * día **UTC**: en America/Guatemala un pago de las 19:00 se contabilizaba en
  * el día siguiente y se caía del filtro «hoy».
  *
- * Devuelve `null` si el valor no es un instante parseable.
+ * Acepta SÓLO instantes: un `Date` válido, o una cadena con hora (y opcional
+ * zona) que el constructor de `Date` sepa leer.
+ *
+ * Rechaza una fecha de calendario pelada `'YYYY-MM-DD'` — misma regla y mismo
+ * patrón que usa `parseFecha` para repartir, sin una segunda fuente de verdad.
+ * El motivo es simétrico al del parser de calendario: `new Date('2026-06-01')`
+ * es medianoche **UTC**, o sea las 18:00 del 31 de mayo en America/Guatemala,
+ * y devolver `'2026-05-31'` para lo que el usuario escribió como 1 de junio
+ * sería reintroducir el desplazamiento por la puerta de atrás. Esas entradas
+ * son de `parseFechaCalendario`.
+ *
+ * Devuelve `null` para null, undefined, cadena vacía, fecha de calendario y
+ * cualquier cosa no parseable.
  */
 export function diaLocalDeInstante(value: string | Date | null | undefined): string | null {
-  if (value === null || value === undefined || value === '') return null
-  const d = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(d.getTime())) return null
-  return dateLocalISO(d)
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : dateLocalISO(value)
+  }
+  if (typeof value !== 'string' || value === '') return null
+  // Una fecha de calendario NO es un instante: va por parseFechaCalendario.
+  if (RE_FECHA_CALENDARIO.test(value)) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : dateLocalISO(d)
 }
 
 // ── Dates ──────────────────────────────────────────────────────────────────

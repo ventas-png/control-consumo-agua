@@ -514,20 +514,78 @@ describe('diaLocalDeInstante', () => {
     })
   })
 
-  it('un date-only sin hora se lee como ese mismo día (medianoche local)', () => {
+  it('RECHAZA una fecha de calendario pelada: no es un instante', () => {
+    for (const tz of ZONAS) {
+      conZona(tz, () => {
+        // `new Date('2026-06-01')` es medianoche UTC, o sea las 18:00 del 31
+        // de mayo en Guatemala. Devolver '2026-05-31' para lo que el usuario
+        // escribió como 1 de junio sería reintroducir el desplazamiento por la
+        // puerta de atrás, así que aquí se rechaza: eso es de
+        // parseFechaCalendario.
+        expect(diaLocalDeInstante('2026-06-01')).toBeNull()
+        expect(diaLocalDeInstante('2026-01-01')).toBeNull()
+        expect(diaLocalDeInstante('2024-02-29')).toBeNull()
+        // Y el parser que sí le corresponde conserva el día.
+        expect(dateLocalISO(parseFechaCalendario('2026-06-01')!)).toBe('2026-06-01')
+      })
+    }
+  })
+
+  it('las dos funciones se reparten el universo sin solaparse', () => {
     conZona('America/Guatemala', () => {
-      // `new Date('2026-06-01')` es medianoche UTC → 18:00 del 31/may local.
-      // Por eso los date-only NO deben pasar por aquí: van a
-      // parseFechaCalendario. Esta prueba fija el contraste.
-      expect(diaLocalDeInstante('2026-06-01')).toBe('2026-05-31')
-      expect(dateLocalISO(parseFechaCalendario('2026-06-01')!)).toBe('2026-06-01')
+      const calendario = '2026-06-01'
+      const instante = '2026-06-01T12:00:00Z'
+      // Cada valor lo acepta exactamente una.
+      expect(parseFechaCalendario(calendario)).not.toBeNull()
+      expect(diaLocalDeInstante(calendario)).toBeNull()
+      expect(parseFechaCalendario(instante)).toBeNull()
+      expect(diaLocalDeInstante(instante)).not.toBeNull()
     })
   })
 
-  it('null para lo no parseable', () => {
-    for (const v of [null, undefined, '', 'no-es-fecha', 'NaN']) {
-      expect(diaLocalDeInstante(v as string)).toBeNull()
+  it('acepta timestamps con offset explícito', () => {
+    conZona('America/Guatemala', () => {
+      // El mismo instante escrito de tres formas → mismo día local.
+      expect(diaLocalDeInstante('2026-06-02T01:00:00Z')).toBe('2026-06-01')
+      expect(diaLocalDeInstante('2026-06-01T19:00:00-06:00')).toBe('2026-06-01')
+      expect(diaLocalDeInstante('2026-06-02T03:00:00+02:00')).toBe('2026-06-01')
+      // Un offset que empuja al día siguiente local.
+      expect(diaLocalDeInstante('2026-06-02T00:00:00-06:00')).toBe('2026-06-02')
+    })
+  })
+
+  it('acepta hora sin zona y la lee como LOCAL (semántica de Date)', () => {
+    conZona('America/Guatemala', () => {
+      expect(diaLocalDeInstante('2026-06-01T23:30:00')).toBe('2026-06-01')
+      expect(diaLocalDeInstante('2026-06-01T00:00:00')).toBe('2026-06-01')
+    })
+  })
+
+  it('no muta el Date que recibe', () => {
+    conZona('America/Guatemala', () => {
+      const d = new Date('2026-06-02T01:00:00Z')
+      const antes = d.getTime()
+      expect(diaLocalDeInstante(d)).toBe('2026-06-01')
+      expect(diaLocalDeInstante(d)).toBe('2026-06-01')
+      expect(diaLocalDeInstante(d)).toBe('2026-06-01')
+      expect(d.getTime()).toBe(antes)
+      expect(d.toISOString()).toBe('2026-06-02T01:00:00.000Z')
+    })
+  })
+
+  it('null para vacíos y no parseables', () => {
+    // Ojo: '01/06/2026' NO va aquí. V8 lo parsea como 6 de enero (M/D/Y), así
+    // que es un instante válido para `Date`; no es date-only estricto y el
+    // contrato no lo rechaza. Ninguna columna timestamptz lo produce.
+    const BASURA: unknown[] = [
+      null, undefined, '', '   ', 'no-es-fecha', 'NaN', 'null', 'undefined',
+      '2026-13-01T00:00:00Z', 'T12:00:00',
+    ]
+    for (const tz of ZONAS) {
+      conZona(tz, () => {
+        for (const v of BASURA) expect(diaLocalDeInstante(v as string)).toBeNull()
+        expect(diaLocalDeInstante(new Date(NaN))).toBeNull()
+      })
     }
-    expect(diaLocalDeInstante(new Date(NaN))).toBeNull()
   })
 })
