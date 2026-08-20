@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
@@ -53,7 +53,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
 
   const porVencer = polizas.filter(p =>
     p.estado === 'vigente' && p.fecha_vencimiento >= hoy &&
-    new Date(p.fecha_vencimiento).getTime() - Date.now() < 60 * 24 * 3600 * 1000
+    (diasHastaFechaCalendario(p.fecha_vencimiento) ?? Infinity) < 60
   )
 
   const filtered = polizas.filter(p => filtroEstado === 'todos' || p.estado === filtroEstado)
@@ -117,7 +117,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
       proyectoNombre,
       headers: ['Póliza', 'Aseguradora', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Inicio', 'Vencimiento', 'Estado'],
       rows: filtered.map(p => {
-        const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+        const dias = diasHastaFechaCalendario(p.fecha_vencimiento)
         return [p.numero_poliza, p.aseguradora, tipoInfo(p.tipo).label, p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—', p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—', p.fecha_inicio, p.fecha_vencimiento, `${ESTADO_CONFIG[p.estado].label}${dias !== null && p.estado === 'vigente' ? ` (${dias}d)` : ''}`]
       }),
       rightAlignCols: [3, 4],
@@ -288,9 +288,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
             render: (p) => <span style={{ fontWeight: 600 }}>{p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—'}</span> },
           { key: 'fecha_vencimiento', header: 'Vigencia', sortable: true,
             render: (p) => {
-              const diasRestantes = p.fecha_vencimiento
-                ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
-                : null
+              const diasRestantes = diasHastaFechaCalendario(p.fecha_vencimiento)
               return (
                 <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                   <div>{p.fecha_inicio}</div>
@@ -324,7 +322,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                   <button title="Notificar por WhatsApp" aria-label="Notificar por WhatsApp"
                     onClick={(e) => {
                       e.stopPropagation()
-                      const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+                      const dias = diasHastaFechaCalendario(p.fecha_vencimiento)
                       const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
                       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                     }}

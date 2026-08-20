@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, GastoCondominio, HistorialSaldoUnidad, RecargoMora, Unidad } from '../../../types'
+import { diasHastaFechaCalendario } from '../../../lib/format'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -40,7 +41,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
   // Aging analysis (días vencidos) — uses cuotas morosas with fecha_vencimiento
   const hoy = new Date()
   const aging = cuotas.filter(c => c.estado === 'moroso' && c.fecha_vencimiento).map(c => {
-    const dias = Math.floor((hoy.getTime() - new Date(c.fecha_vencimiento!).getTime()) / 86400000)
+    const dias = -(diasHastaFechaCalendario(c.fecha_vencimiento, hoy) ?? 0)
     return { ...c, diasVencido: Math.max(0, dias) }
   })
   const aging30 = aging.filter(c => c.diasVencido <= 30)

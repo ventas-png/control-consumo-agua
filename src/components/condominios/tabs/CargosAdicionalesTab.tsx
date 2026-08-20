@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -198,7 +198,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                 {items.map(c => {
                   const cat = CATEGORIAS.find(k => k.value === c.categoria)
                   const est = ESTADOS.find(e => e.value === c.estado)
-                  const vencido = c.fecha_vencimiento && new Date(c.fecha_vencimiento) < new Date() && c.estado === 'pendiente'
+                  const vencido = esFechaCalendarioVencida(c.fecha_vencimiento) && c.estado === 'pendiente'
                   return (
                     <div key={c.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>

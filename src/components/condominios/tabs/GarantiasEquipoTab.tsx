@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { GarantiaEquipo, EstadoGarantia } from '../../../types'
@@ -33,7 +33,7 @@ const ESTADOS = Object.keys(ESTADO_LABEL_KEY) as EstadoGarantia[]
 const BLANK = { equipo: '', area: '', numero_serie: '', proveedor: '', contacto_soporte: '', fecha_compra: '', fecha_vencimiento: '', monto_compra: '', estado: 'vigente' as EstadoGarantia, notas: '' }
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
-function addDays(d: string, days: number) { const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days); return dt.toISOString().slice(0, 10) }
+function addDays(d: string, days: number) { return sumarDiasCalendario(d, days) ?? d }
 
 export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const { t } = useTranslation()

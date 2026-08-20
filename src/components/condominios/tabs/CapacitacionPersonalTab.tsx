@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../shared/Dialog'
@@ -44,8 +44,8 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   // Auto-detect vencidos
   const proxVencer = capacitaciones.filter(c => {
     if (!c.fecha_vencimiento_cert) return false
-    const dias = Math.floor((new Date(c.fecha_vencimiento_cert).getTime() - Date.now()) / 86400000)
-    return dias >= 0 && dias <= 30
+    const dias = diasHastaFechaCalendario(c.fecha_vencimiento_cert)
+    return dias !== null && dias >= 0 && dias <= 30
   }).length
 
   const totalCosto = capacitaciones.reduce((s, c) => s + (c.costo ?? 0), 0)
@@ -206,7 +206,10 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                   {caps.map(c => {
                     const ec = ESTADO_CFG[c.estado]
                     const certVence = c.fecha_vencimiento_cert
-                    const diasCert = certVence ? Math.floor((new Date(certVence).getTime() - Date.now()) / 86400000) : null
+                    // Misma cuenta que el resumen de arriba. Con
+                    // `new Date(certVence) - Date.now()` el badge restaba un
+                    // día en husos negativos y contradecía al KPI.
+                    const diasCert = diasHastaFechaCalendario(certVence)
                     const certAlerta = diasCert !== null && diasCert >= 0 && diasCert <= 30
                     return (
                       <div key={c.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>

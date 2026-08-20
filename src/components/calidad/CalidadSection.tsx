@@ -1,4 +1,4 @@
-import { hoyLocalISO, datetimeLocalISO } from '../../lib/format'
+import { hoyLocalISO, datetimeLocalISO, parseFechaCalendario } from '../../lib/format'
 import { useState, useMemo, type CSSProperties, type ChangeEvent} from 'react'
 import * as RDialog from '@radix-ui/react-dialog'
 import { notify } from '../shared/Dialog'
@@ -219,12 +219,20 @@ export function CalidadSection({
     setReporteNombre(file.name)
   }
 
-  // Historial filtered
+  // Historial filtered.
+  // `registros_calidad.fecha` es timestamptz (un instante), pero los filtros
+  // vienen de <input type="date">: son fechas de CALENDARIO, así que sus
+  // límites son medianoche y fin de día LOCALES. Antes el límite inferior se
+  // parseaba como medianoche UTC y en GMT-6 colaba análisis de las últimas 6
+  // horas del día anterior.
+  const desdeLimite = parseFechaCalendario(filtroDesde)
+  const hastaLimite = parseFechaCalendario(filtroHasta)
+  hastaLimite?.setHours(23, 59, 59, 999)
   const historialFiltrado = registrosCalidad.filter(r => {
     if (filtroFuente && r.fuente_id !== filtroFuente) return false
     if (filtroTipo && r.fuentes_agua?.tipo_agua !== filtroTipo) return false
-    if (filtroDesde && new Date(r.fecha) < new Date(filtroDesde)) return false
-    if (filtroHasta && new Date(r.fecha) > new Date(filtroHasta + 'T23:59:59')) return false
+    if (desdeLimite && new Date(r.fecha) < desdeLimite) return false
+    if (hastaLimite && new Date(r.fecha) > hastaLimite) return false
     if (filtroCumple === 'cumple' && !r.cumple_total) return false
     if (filtroCumple === 'no_cumple' && r.cumple_total) return false
     return true

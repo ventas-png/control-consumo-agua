@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
@@ -297,7 +297,7 @@ export function TareasPersonalTab({
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span style={{ background: tc.bg, color: tc.color, padding: '1px 8px', borderRadius: '20px', fontWeight: 600 }}>{tc.label}</span>
-                      <span>{new Date(bloque.fecha + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span>{formatFechaCalendario(bloque.fecha, { day: '2-digit', month: 'short', year: 'numeric' }, 'es', '—')}</span>
                       <span>📋 {ts.length} tarea{ts.length !== 1 ? 's' : ''}</span>
                       {ts.length > 0 && <span>{progreso}% completado</span>}
                       {bloque.puntaje_completitud !== null && bloque.puntaje_completitud !== undefined && bloque.estado !== 'en_curso' && (

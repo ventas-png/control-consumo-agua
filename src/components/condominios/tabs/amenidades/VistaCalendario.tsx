@@ -4,6 +4,7 @@ import { Fragment } from 'react'
 import { addMinutosToTime, lunesDeSemana, DIAS_ES } from '../../../../lib/amenidadesReglas'
 import { MOTIVO_LABEL, ESTADO_COLORS, RESERVA_CAL_COLORS } from './ui'
 import { EmptyState } from './comunes'
+import { dateLocalISO } from '../../../../lib/format'
 
 export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
   const { reservas, bloqueos, canCreate, canEdit, setSemana, selectedReserva, setSelectedReserva, hoy, amenidadesActivas, dias, abrirReservaDesdeCalendario, cancelarReserva } = ctx
@@ -42,7 +43,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                 <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(7, minmax(120px,1fr))`, gap: 4, marginBottom: 8, minWidth: 980 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', alignSelf: 'end', paddingBottom: 6 }}>Amenidad / Día</div>
                   {dias.map((d, i) => {
-                    const fechaStr = d.toISOString().slice(0, 10)
+                    const fechaStr = dateLocalISO(d)
                     const esHoy = fechaStr === hoy
                     return (
                       <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))' : 'var(--at-surface-2)', color: esHoy ? 'white' : 'var(--at-ink-2)' }}>
@@ -65,7 +66,7 @@ export function VistaCalendario({ ctx }: { ctx: AmenidadesCtx }) {
                         {a.horario_inicio && <div style={{ fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600 }}>⏰ {a.horario_inicio}–{a.horario_fin}</div>}
                       </div>
                       {dias.map((d, di) => {
-                        const fechaStr = d.toISOString().slice(0, 10)
+                        const fechaStr = dateLocalISO(d)
                         const esHoy = fechaStr === hoy
                         const resDia = reservas.filter(r => r.amenidad_id === a.id && r.fecha === fechaStr && r.estado !== 'cancelada')
                         const bloqDia = bloqueos.filter(b => b.amenidad_id === a.id && fechaStr >= b.fecha_inicio && fechaStr <= b.fecha_fin)

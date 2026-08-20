@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../lib/format'
+import { hoyLocalISO, dateLocalISO, sumarDiasCalendario, diaLocalDeInstante } from '../../lib/format'
 import { useState, useMemo } from 'react'
 import type { Pago, Cliente, Registro, FormaPago } from '../../types'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -18,7 +18,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
   const [filtroFecha, setFiltroFecha] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('todos')
 
   const hoy = hoyLocalISO()
-  const inicioSemana = dateLocalISO(new Date(Date.now() - 7 * 86400000))
+  const inicioSemana = sumarDiasCalendario(hoy, -7) ?? hoy
   // PR-24: `new Date(y, m, 1)` construye la medianoche LOCAL del día 1; pasarla
   // por `toISOString()` la reexpresa en UTC y en GMT-6 devuelve el ÚLTIMO DÍA DEL
   // MES ANTERIOR. El filtro "este mes" del historial de pagos arrastraba entonces
@@ -34,7 +34,10 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         (p.referencia ?? '').toLowerCase().includes(busqueda.toLowerCase())
       )
       const matchMetodo = filtroMetodo === 'todos' || p.metodo === filtroMetodo
-      const fechaPago = p.created_at?.split('T')[0] ?? ''
+      // `created_at` es timestamptz: `split('T')[0]` daba el día UTC, así que
+      // un pago de las 19:00 en Guatemala se contaba en el día siguiente y
+      // desaparecía del filtro «Hoy». Se compara por su día LOCAL.
+      const fechaPago = diaLocalDeInstante(p.created_at) ?? ''
       const matchFecha =
         filtroFecha === 'todos' ? true :
         filtroFecha === 'hoy' ? fechaPago === hoy :

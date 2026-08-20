@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GastoCondominio, PresupuestoCondominio, CategoriaGasto } from '../../../types'
+import { parseFechaCalendario } from '../../../lib/format'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -34,7 +35,10 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
     const set = new Set<number>()
     set.add(anioActual)
     presupuestos.forEach(p => set.add(p.anio))
-    gastos.forEach(g => { if (g.fecha) set.add(new Date(g.fecha).getFullYear()) })
+    gastos.forEach(g => {
+      const f = parseFechaCalendario(g.fecha)
+      if (f) set.add(f.getFullYear())
+    })
     return Array.from(set).sort((a, b) => b - a)
   }, [gastos, presupuestos, anioActual])
 

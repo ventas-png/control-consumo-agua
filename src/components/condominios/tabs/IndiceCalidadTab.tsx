@@ -1,4 +1,4 @@
-import { hoyLocalISO, mesLocalISO } from '../../../lib/format'
+import { hoyLocalISO, mesLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, IncidenteSeguridad,
@@ -20,7 +20,7 @@ interface Props {
 }
 
 function mesActual() { return mesLocalISO() }
-function hace30Dias() { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) }
+function hace30Dias() { return sumarDiasCalendario(hoyLocalISO(), -30) ?? hoyLocalISO() }
 function hoy() { return hoyLocalISO() }
 
 function semaforo(score: number): { color: string; bg: string; label: string; emoji: string } {

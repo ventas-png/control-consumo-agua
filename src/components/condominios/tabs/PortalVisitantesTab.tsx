@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { validatedInsert, validatedInsertMany } from '../../../lib/validatedInsert'
 import { visitanteInputSchema } from '../../../domain/condominios/schemas'
@@ -414,7 +414,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                     </div>
                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                       {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      {v.valido_hasta && ` · Válida hasta ${new Date(diaValidez(v.valido_hasta) + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })}`}
+                      {v.valido_hasta && ` · Válida hasta ${formatFechaCalendario(diaValidez(v.valido_hasta), { day: '2-digit', month: 'short' }, 'es', '—')}`}
                     </div>
                   </div>
                   {esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)', flexShrink: 0 }}>Hoy</span>}

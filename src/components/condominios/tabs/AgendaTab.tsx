@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AgendaItem, TipoAgenda, EstadoAgenda } from '../../../types'
@@ -60,7 +60,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   const vencidos = agenda.filter(a => a.fecha < hoy && a.estado === 'pendiente')
   const proximos7 = agenda.filter(a =>
     a.estado === 'pendiente' && a.fecha >= hoy &&
-    new Date(a.fecha).getTime() - Date.now() < 7 * 24 * 3600 * 1000
+    (diasHastaFechaCalendario(a.fecha) ?? Infinity) < 7
   )
 
   function startEdit(a: AgendaItem) {

@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import {
   createCondominioRow,
@@ -45,14 +45,33 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
   const hoy = hoyLocalISO()
 
+  /**
+   * Cuotas que la automatización de morosidad marcaría: pendientes y con MÁS
+   * de `dias` de mora — la semántica que anuncia el disparador («Cuotas con
+   * más de N días sin pagar»).
+   *
+   * El conteo que se muestra y las filas que se modifican salen de ESTA misma
+   * función. Antes divergían en dos puntos: el conteo contaba desde N días
+   * exactos (`>= N`) y sobre todo lo no pagado —morosas incluidas—, mientras
+   * la ejecución sólo tocaba lo pendiente con más de N. El diálogo prometía
+   * más cuotas de las que luego cambiaba.
+   *
+   * El límite se calcula sobre el calendario (`sumarDiasCalendario`), no con
+   * `Date.now() - N * 86400000`: esa resta en milisegundos pierde o gana un
+   * día en los cambios de horario.
+   */
+  function cuotasVencidasMasDe(dias: number): CuotaCondominio[] {
+    const limite = sumarDiasCalendario(hoy, -dias)
+    if (!limite) return []
+    return cuotas.filter(c =>
+      c.estado === 'pendiente' && !!c.fecha_vencimiento && c.fecha_vencimiento < limite,
+    )
+  }
+
   function evaluar(a: AutomatizacionCond): number {
     const dias = a.trigger_valor
     if (a.trigger_tipo === 'cuota_vencida_dias') {
-      return cuotas.filter(c => {
-        if (!c.fecha_vencimiento || c.estado === 'pagado') return false
-        const d = Math.floor((Date.now() - new Date(c.fecha_vencimiento).getTime()) / 86400000)
-        return d >= dias
-      }).length
+      return cuotasVencidasMasDe(dias).length
     }
     if (a.trigger_tipo === 'ticket_sin_resolver_dias') {
       return tickets.filter(t => {
@@ -105,10 +124,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       })
       if (!isConfirmed) return
 
-      const limitDate = dateLocalISO(new Date(Date.now() - a.trigger_valor * 86400000))
-      const afectadas = cuotas.filter(c =>
-        c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < limitDate
-      )
+      const afectadas = cuotasVencidasMasDe(a.trigger_valor)
       const { error } = await marcarCuotasMorosas(afectadas.map(c => c.id))
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
       notify({ variant: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, duration: 1600 })

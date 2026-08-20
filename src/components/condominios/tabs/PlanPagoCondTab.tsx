@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, parseFechaCalendario, dateLocalISO } from '../../../lib/format'
 import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import {
@@ -34,9 +34,10 @@ const BLANK = { unidad_id: '', concepto: '', monto_total: '', num_cuotas: '3', f
 
 function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('es', { minimumFractionDigits: 2 })}` }
 function addMonths(dateStr: string, months: number): string {
-  const d = new Date(dateStr + 'T12:00:00')
+  const d = parseFechaCalendario(dateStr)
+  if (!d) return dateStr
   d.setMonth(d.getMonth() + months)
-  return d.toISOString().slice(0, 10)
+  return dateLocalISO(d)
 }
 
 export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {

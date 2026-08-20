@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
@@ -43,9 +43,7 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
       name: 'Morosos',
       headers: ['Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Días vencido', 'Estado'],
       rows: datos.map(c => {
-        const dias = c.fecha_vencimiento
-          ? Math.floor((Date.now() - new Date(c.fecha_vencimiento).getTime()) / 86400000)
-          : 0
+        const dias = -(diasHastaFechaCalendario(c.fecha_vencimiento) ?? 0)
         return [c.unidad_nombre ?? '', c.concepto, c.monto, c.periodo, c.fecha_vencimiento ?? '', dias, c.estado]
       }),
     }])
@@ -122,9 +120,7 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
       proyectoNombre,
       headers: ['Unidad', 'Concepto', 'Período', `Monto (${moneda})`, 'Días vencido', 'Estado'],
       rows: morosos.map(c => {
-        const dias = c.fecha_vencimiento
-          ? Math.floor((Date.now() - new Date(c.fecha_vencimiento).getTime()) / 86400000)
-          : 0
+        const dias = -(diasHastaFechaCalendario(c.fecha_vencimiento) ?? 0)
         return [c.unidad_nombre ?? '', c.concepto, c.periodo, c.monto.toFixed(2), dias, c.estado]
       }),
       totalesRow: ['', '', 'TOTAL', `${moneda} ${morosos.reduce((s, c) => s + c.monto, 0).toFixed(2)}`, '', `${morosos.length} cuotas`],

@@ -1,4 +1,5 @@
 import type { AnuncioComunidad, ComunicadoCondominio, TipoComunicado } from '../../../types'
+import { formatFechaCalendario } from '../../../lib/format'
 
 interface Props {
   anuncios: AnuncioComunidad[]
@@ -59,7 +60,7 @@ export function PortalAnunciosTab({ anuncios, comunicados = [], unidadNombre }: 
                   </div>
                   <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--at-ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{c.contenido}</p>
                   <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <span>{new Date(c.fecha_envio + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                    <span>{formatFechaCalendario(c.fecha_envio, { day: '2-digit', month: 'long', year: 'numeric' }, 'es', '—')}</span>
                     {c.enviado_por && <span>Emitido por: {c.enviado_por}</span>}
                   </div>
                 </div>
@@ -110,7 +111,7 @@ export function PortalAnunciosTab({ anuncios, comunicados = [], unidadNombre }: 
                     <p style={{ margin: '0 0 6px', fontSize: '13.5px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>{a.contenido}</p>
                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       <span>{new Date(a.created_at).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                      {a.fecha_evento && <span>📅 Evento: {new Date(a.fecha_evento + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'long' })}</span>}
+                      {a.fecha_evento && <span>📅 Evento: {formatFechaCalendario(a.fecha_evento, { day: '2-digit', month: 'long' }, 'es', '—')}</span>}
                     </div>
                   </div>
                 </div>

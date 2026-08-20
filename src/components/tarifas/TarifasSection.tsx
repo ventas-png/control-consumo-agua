@@ -9,6 +9,7 @@ import { validarTramos } from '../../lib/business'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 import { FacturacionConfigSection } from './FacturacionConfigSection'
+import { diasHastaFechaCalendario } from '../../lib/format'
 
 interface Props {
   tarifas: Tarifa[]
@@ -259,11 +260,8 @@ export function TarifasSection({
     TIPOS_AGUA.find(t => t.value === value)?.label ?? value
 
   function getRevisionStatus(t: Tarifa): 'expired' | 'soon' | 'ok' | 'none' {
-    if (!t.fecha_revision) return 'none'
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const rev = new Date(t.fecha_revision + 'T00:00:00')
-    const diff = Math.ceil((rev.getTime() - today.getTime()) / 86400000)
+    const diff = diasHastaFechaCalendario(t.fecha_revision)
+    if (diff === null) return 'none'
     if (diff < 0) return 'expired'
     if (diff <= 30) return 'soon'
     return 'ok'

@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -192,7 +192,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
           {filtered.map(a => {
             const est = ESTADO_STYLE[a.estado]
             const acta = actas.find(ac => ac.id === a.acta_id)
-            const diasRestantes = a.fecha_limite ? Math.ceil((new Date(a.fecha_limite).getTime() - new Date(today).getTime()) / 86400000) : null
+            const diasRestantes = diasEntreFechasCalendario(today, a.fecha_limite)
 
             return (
               <div key={a.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>

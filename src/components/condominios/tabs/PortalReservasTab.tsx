@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -445,7 +445,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, mo
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--at-ink)' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--at-ink-3)', marginTop: 2, textTransform: 'capitalize' }}>
-                    {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio} – {r.hora_fin}
+                    {formatFechaCalendario(r.fecha, { weekday: 'long', day: '2-digit', month: 'long' }, 'es', '—')} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
                   {r.monto_tarifa != null && r.monto_tarifa > 0 && (

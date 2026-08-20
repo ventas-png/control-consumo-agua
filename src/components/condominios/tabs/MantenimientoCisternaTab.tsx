@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, esFechaCalendarioVencida } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
@@ -65,7 +65,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
     return acc
   }, {})
 
-  const proximas = registros.filter(r => r.proxima_revision && new Date(r.proxima_revision) >= new Date()).sort((a, b) => a.proxima_revision!.localeCompare(b.proxima_revision!)).slice(0, 3)
+  const proximas = registros.filter(r => r.proxima_revision && !esFechaCalendarioVencida(r.proxima_revision)).sort((a, b) => a.proxima_revision!.localeCompare(b.proxima_revision!)).slice(0, 3)
 
   async function guardar() {
     if (!form.cisterna.trim()) {

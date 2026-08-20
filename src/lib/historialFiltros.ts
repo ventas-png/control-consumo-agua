@@ -4,6 +4,7 @@
 // que el dropdown de unidad solo liste las del proyecto seleccionado.
 // Sin dependencias de React ni Supabase → testeable en aislamiento.
 import type { Registro, Contador, Unidad } from '../types'
+import { parseFechaCalendario } from '../lib/format'
 
 export interface HistorialFiltros {
   /** Texto libre: coincide con nombre del cliente o # de contador. */
@@ -40,9 +41,16 @@ export function registroCoincide(
 
   const matchEstado = !filtros.estado || registro.estado === filtros.estado
 
+  // `registros.fecha` es timestamptz; los filtros son fechas de calendario de
+  // un <input type="date">, así que sus límites son medianoche y fin de día
+  // LOCALES. El límite inferior se parseaba como medianoche UTC y en GMT-6
+  // dejaba pasar lecturas de las últimas 6 horas del día anterior.
   const fecha = new Date(registro.fecha)
-  const matchFechaInicio = !filtros.fechaInicio || fecha >= new Date(filtros.fechaInicio)
-  const matchFechaFin = !filtros.fechaFin || fecha <= new Date(filtros.fechaFin + 'T23:59:59')
+  const desde = parseFechaCalendario(filtros.fechaInicio)
+  const hasta = parseFechaCalendario(filtros.fechaFin)
+  hasta?.setHours(23, 59, 59, 999)
+  const matchFechaInicio = !desde || fecha >= desde
+  const matchFechaFin = !hasta || fecha <= hasta
 
   const matchProyecto = !filtros.proyecto || registro.project_id === filtros.proyecto
   const matchUnidad = !filtros.unidad || contador?.unidad_id === filtros.unidad

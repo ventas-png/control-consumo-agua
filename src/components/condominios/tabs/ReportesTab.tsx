@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { CuotaCondominio, TicketMantenimiento, Visitante, ContratoProveedor, GastoCondominio, PresupuestoCondominio } from '../../../types'
 
+import { diasHastaFechaCalendario } from '../../../lib/format'
 interface Props {
   cuotas: CuotaCondominio[]
   tickets: TicketMantenimiento[]
@@ -83,8 +84,8 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
   const contratosActivos = contratos.filter(c => c.estado === 'activo').length
   const contratosPorVencer = contratos.filter(c => {
     if (!c.fecha_fin) return false
-    const d = Math.ceil((new Date(c.fecha_fin).getTime() - Date.now()) / 86400000)
-    return d >= 0 && d <= 30
+    const d = diasHastaFechaCalendario(c.fecha_fin)
+    return d !== null && d >= 0 && d <= 30
   }).length
 
   const printDate = now.toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' })

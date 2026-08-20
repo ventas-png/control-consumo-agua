@@ -1,4 +1,5 @@
 import type { RegistroResiduo, TipoResiduo } from '../../../types'
+import { dateLocalISO } from '../../../lib/format'
 import { useConsumoMensualPorProyectoQuery } from '../../../domain/agua/queries'
 
 interface Props {
@@ -37,7 +38,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
   const sixAgo = new Date(); sixAgo.setMonth(sixAgo.getMonth() - 5); sixAgo.setDate(1)
   const residuosPorMes: Record<string, number> = {}
   for (const r of residuos) {
-    if (r.fecha < sixAgo.toISOString().slice(0, 10)) continue
+    if (r.fecha < dateLocalISO(sixAgo)) continue
     const mes = r.fecha.slice(0, 7)
     residuosPorMes[mes] = (residuosPorMes[mes] ?? 0) + (r.cantidad_kg ?? 0)
   }

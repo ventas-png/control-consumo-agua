@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
@@ -49,7 +49,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
 
   const proximasVencer = inspecciones.filter(i =>
     i.fecha_proxima && i.fecha_proxima >= hoy &&
-    new Date(i.fecha_proxima).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+    (diasHastaFechaCalendario(i.fecha_proxima) ?? Infinity) < 30
   )
   const reprobadas = inspecciones.filter(i => i.resultado === 'reprobado')
 
@@ -215,7 +215,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
             const ti = tipoInfo(ins.tipo)
             const res = RESULTADO_CONFIG[ins.resultado]
             const proximaAlerta = ins.fecha_proxima && ins.fecha_proxima >= hoy &&
-              new Date(ins.fecha_proxima).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+              (diasHastaFechaCalendario(ins.fecha_proxima) ?? Infinity) < 30
             return (
               <div key={ins.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${ins.resultado === 'reprobado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>

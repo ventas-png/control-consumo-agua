@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario, diasHastaFechaCalendario } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, GastoCondominio, PresupuestoCondominio,
@@ -34,7 +34,11 @@ export default function ResumenEjecutivoTab({
 }: Props) {
   const hoy = hoyLocalISO()
   const mes = hoy.slice(0, 7)
-  const en30 = dateLocalISO(new Date(Date.now() + 30 * 86400000))
+  // 30 días de CALENDARIO. `Date.now() + 30 * 86400000` suma 720 horas, no 30
+  // días: al cruzar el adelanto de horario el resultado se pasa un día
+  // (desde 2026-02-06 en America/Los_Angeles daba 2026-03-09 en vez de
+  // 2026-03-08) y el panel colaba un vencimiento de más.
+  const en30 = sumarDiasCalendario(hoy, 30) ?? hoy
   const fechaLarga = new Date().toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
 
   const financiero = useMemo(() => {
@@ -140,7 +144,7 @@ ${venc30.length > 0 ? `
   <thead><tr><th>Descripción</th><th>Fecha vencimiento</th><th>Días restantes</th></tr></thead>
   <tbody>
     ${venc30.map(v => {
-      const dias = Math.ceil((new Date(v.fecha).getTime() - Date.now()) / 86400000)
+      const dias = diasHastaFechaCalendario(v.fecha) ?? 0
       return `<tr>
         <td>${escapeHtml(v.titulo)}</td>
         <td>${v.fecha}</td>
@@ -232,7 +236,7 @@ ${venc30.length > 0 ? `
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--at-warning)' }}>⏳ Vencimientos próximos 30 días ({venc30.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {venc30.map((v, i) => {
-              const dias = Math.ceil((new Date(v.fecha).getTime() - Date.now()) / 86400000)
+              const dias = diasHastaFechaCalendario(v.fecha) ?? 0
               return (
                 <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: `1px solid ${dias <= 7 ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, fontSize: 11 }}>
                   <strong>{v.titulo}</strong>

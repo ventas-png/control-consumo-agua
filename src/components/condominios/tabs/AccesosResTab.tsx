@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -85,7 +85,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
   const vencidos  = accesos.filter(a => a.activo && a.fecha_vencimiento && a.fecha_vencimiento < today)
 
   function addDays(d: string, days: number) {
-    const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days); return dt.toISOString().slice(0, 10)
+    return sumarDiasCalendario(d, days) ?? d
   }
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }

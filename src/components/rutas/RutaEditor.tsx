@@ -5,6 +5,7 @@ import type { RutasCtx } from './ctx'
 import { DIAS_NOMBRE } from '../../lib/rutasReglas'
 import { ANTICIPACION_OPCIONES, DIAS_SEMANA, FRECUENCIAS, inputStyle, labelStyle } from './ui'
 import type { FrecuenciaRuta } from '../../types'
+import { formatFechaCalendario } from '../../lib/format'
 
 export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
   const {
@@ -158,7 +159,7 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
               {form.fechas_especificas.map(f => (
                 <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--at-chip)', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
-                  {new Date(f + 'T12:00:00').toLocaleDateString('es-GT')}
+                  {formatFechaCalendario(f, {}, 'es-GT', '—')}
                   <button type="button" onClick={() => quitarFecha(f)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--at-danger)', fontWeight: 700 }}>×</button>
                 </span>
               ))}

@@ -3,6 +3,7 @@
 // descripción de recurrencia y estado de la ruta. Sin dependencias de React ni
 // Supabase para que sea testeable de forma aislada.
 import type { Cliente, Contador, FrecuenciaRuta, Ruta, Unidad } from '../types'
+import { formatFechaCalendario } from './format'
 
 export type TipoRuta = 'clientes' | 'contadores' | 'unidades'
 
@@ -175,7 +176,7 @@ export function construirWhatsAppRuta(ruta: Ruta, countryCode: string): { tel: s
   let tel = ruta.asignado_telefono.replace(/[^0-9]/g, '')
   if (tel.length === 8) tel = countryCode + tel
   const fecha = ruta.fecha_programada
-    ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')
+    ? formatFechaCalendario(ruta.fecha_programada, {}, 'es-GT', '—')
     : 'Por confirmar'
   const totalItems = ruta.tipo_ruta === 'contadores'
     ? ruta.contador_ids.length

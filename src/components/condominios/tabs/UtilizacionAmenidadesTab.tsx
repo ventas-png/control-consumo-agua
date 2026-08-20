@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Amenidad, ReservaAmenidad } from '../../../types'
+import { parseFechaCalendario } from '../../../lib/format'
 
 interface Props {
   amenidades: Amenidad[]
@@ -20,7 +21,10 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
 
       // Frecuencia por día de semana
       const porDia = Array(7).fill(0)
-      rs.forEach(r => { porDia[new Date(r.fecha + 'T12:00:00').getDay()]++ })
+      rs.forEach(r => {
+        const f = parseFechaCalendario(r.fecha)
+        if (f) porDia[f.getDay()]++
+      })
 
       // Frecuencia por hora (de hora_inicio)
       const porHora: Record<number, number> = {}

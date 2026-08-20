@@ -1,4 +1,4 @@
-import { hoyLocalISO } from '../../../lib/format'
+import { hoyLocalISO, diasEntreFechasCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -48,8 +48,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   // Alert for overdue vaccines (>1 year)
   const vencidasVacuna = mascotas.filter(m => {
     if (!m.fecha_ultima_vacuna || !m.activo) return false
-    const diff = (new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24)
-    return diff > 365
+    return (diasEntreFechasCalendario(m.fecha_ultima_vacuna, hoy) ?? 0) > 365
   })
 
   function resetForm() {
@@ -196,8 +195,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
         searchPlaceholder={t('condominios.mascotas.search_placeholder')}
         searchableKeys={['nombre', m => m.raza ?? '', m => m.unidad_nombre ?? '']}
         rowStyle={m => {
-          const vencida = m.fecha_ultima_vacuna
-            && (new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24) > 365
+          const vencida = (diasEntreFechasCalendario(m.fecha_ultima_vacuna, hoy) ?? 0) > 365
           return vencida ? { background: 'var(--at-warning-tint)' } : {}
         }}
         filters={[{
@@ -244,7 +242,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
             accessor: m => m.fecha_ultima_vacuna ?? '',
             render: m => {
               if (!m.fecha_ultima_vacuna) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
-              const vencida = (new Date(hoy).getTime() - new Date(m.fecha_ultima_vacuna).getTime()) / (1000 * 60 * 60 * 24) > 365
+              const vencida = (diasEntreFechasCalendario(m.fecha_ultima_vacuna, hoy) ?? 0) > 365
               return (
                 <span style={{ color: vencida ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: vencida ? 700 : 400 }}>
                   {t('condominios.mascotas.vaccine_label', { fecha: m.fecha_ultima_vacuna })} {vencida ? t('condominios.mascotas.vaccine_overdue') : ''}
