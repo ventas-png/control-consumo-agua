@@ -1,18 +1,31 @@
 # Activar el harness de RLS
 
-> **Estado hoy:** el job `RLS harness (server-side)` **falla** en PRs internos y
-> en push a `main` mientras no existan las siete variables `RLS_*`. Eso es
-> deliberado: antes quedaba **verde sin ejecutar nada**, y un verde por omisión
-> es indistinguible de un verde por verificación. Un job que miente sobre
-> cobertura es peor que uno rojo.
+> **Estado hoy (2026-08-20): el sandbox está montado y el harness corre de
+> verdad.** El job `RLS harness (server-side)` se ejecuta con las siete variables
+> `RLS_*` cargadas, en PRs internos y en push a `main`. Evidencia de la corrida
+> sobre `ec150b7` ([run 32382213772](https://github.com/ventas-png/control-consumo-agua/actions/runs/32382213772)):
 >
-> **El harness todavía no se ha ejecutado contra un sandbox real.** Todo lo de
-> aquí abajo está implementado y probado en local (verificador, preflight,
-> contratos de esquema y de workflow), pero para poder afirmar que el
-> aislamiento quedó verificado faltan cuatro pasos que exigen infraestructura:
-> crear el sandbox, correr el seed contra él, cargar las siete variables y obtener
-> un job RLS verde con más de cero pruebas. Hasta entonces, nada de este
-> documento debe citarse como «aislamiento demostrado en CI».
+> ```
+> ✓ src/test/rls/rlsHarness.test.ts (128 tests) 9961ms
+> ✅ Harness RLS ejecutado de verdad: 128 pruebas pasadas, 0 fallos, 0 omitidas,
+>    7 escenarios, 23 RPC obligatorias y 45 evidencias acreditadas
+> ```
+>
+> Desde esa corrida, «aislamiento verificado en CI» **sí** se puede citar — pero
+> con el alcance exacto de [Qué cubre exactamente](#qué-cubre-exactamente) y no
+> más: cuatro tablas con aislamiento real, diez con cobertura sólo estructural y
+> once de las 23 RPC con garantía de tenant. Las
+> [Limitaciones](#limitaciones-lo-que-este-harness-no-demuestra) no se movieron
+> por estar el job en verde; estar verde no las borra.
+>
+> El gate sigue siendo **fail-closed**: si faltara cualquiera de las siete
+> variables, el job **falla** en vez de quedar verde. Antes quedaba **verde sin
+> ejecutar nada**, y un verde por omisión es indistinguible de un verde por
+> verificación. Un job que miente sobre cobertura es peor que uno rojo.
+>
+> Los **pasos 1–4** de abajo ya se ejecutaron una vez: quedan como el
+> procedimiento para **rehacer** el sandbox —o montar otro—, no como trabajo
+> pendiente.
 
 ## Por qué importa más de lo que parece
 
@@ -83,6 +96,12 @@ variables **también** como *Dependabot secrets*, con los mismos nombres:
 **Settings → Secrets and variables → Dependabot**. El preflight las ve igual y no
 hay nada que diferir.
 
+> **Pendiente hoy.** Esa segunda copia todavía no está cargada, y los PR de
+> Dependabot abiertos traen checks **anteriores** al fail-closed (el último corrió
+> el 2026-08-17, dos días antes de que se fusionara #775). En cuanto se
+> re-ejecuten, su job RLS pasará a rojo: es el desenlace previsto, y se desbloquea
+> con los Dependabot secrets o con el rebote a rama interna descrito arriba.
+
 En ningún caso se recurre a **`pull_request_target`**, que sí expondría los
 secretos al código del PR: sería un problema peor que el que resuelve.
 
@@ -138,9 +157,23 @@ forma de declarar cobertura real es tenerla.
 
 ## Qué cubre exactamente
 
-**El harness declara 125 aserciones.** Sin credenciales las 125 salen como
-*skipped* y el verificador lo detecta (cero pasadas); con credenciales deben
-pasar las 125, sin ninguna omitida.
+**El harness declara 128 aserciones**, y en la corrida verde pasaron las 128 sin
+ninguna omitida. Sin credenciales el bloque queda bajo `describe.skipIf` y el
+verificador lo detecta (cero pasadas); en CI no se llega a ese punto, porque el
+preflight falla antes.
+
+Para contarlas sin sandbox hay que **declarar el destino** —`vitest list` no
+lista lo que está bajo `skipIf`—, pero no hace falta ni red ni credenciales
+válidas: el guard sólo mira la forma de la URL y el ref declarado.
+
+```bash
+RLS_SUPABASE_URL=https://noexiste1234.supabase.co \
+RLS_EXPECTED_PROJECT_REF=noexiste1234 \
+RLS_SUPABASE_ANON_KEY=x \
+RLS_USER_A_EMAIL=a@x RLS_USER_A_PASSWORD=x \
+RLS_USER_B_EMAIL=b@x RLS_USER_B_PASSWORD=x \
+npx vitest list src/test/rls/rlsHarness.test.ts | wc -l   # → 128
+```
 
 ### Tablas con aislamiento REAL demostrado (`noTriviales`)
 
@@ -219,7 +252,8 @@ esquema y verificada por `src/test/rls/__tests__/esquemaFixtures.test.ts`:
 Las ocho de garantía `rol` son las `portal_*` del self-service del propietario.
 Para subirlas a `tenant` harían falta usuarios fixture con rol `cliente` y fila
 en `unidad_residentes`, lo que exige dos credenciales más allá de las siete
-`RLS_*` que define este PR. Queda declarado como limitación, no como cobertura.
+`RLS_*` que define el harness. Queda declarado como limitación, no como
+cobertura.
 Las de reservas (`portal_reservar_amenidad`, `portal_cancelar_reserva`) sí llegan
 a `tenant` porque aceptan al staff del tenant y comparan `company_id`.
 
@@ -410,19 +444,21 @@ llama ni una vez** cuando el destino se rechaza.
 ## Paso 5 — Comprobar que ahora sí corre
 
 Ya no hace falta leer el log a ojo: el job **falla solo** si no verificó nada.
-Aun así, la señal positiva está en el resumen de la corrida:
+Aun así, la señal positiva está en el resumen de la corrida — así salió en
+[la corrida sobre `ec150b7`](https://github.com/ventas-png/control-consumo-agua/actions/runs/32382213772):
 
 ```
 ✅ Harness RLS ejecutado (aislamiento multi-tenant verificado)
-- Pruebas pasadas: 127 (total 127, fallos 0, omitidas 0)
+- Pruebas pasadas: 128 (total 128, fallos 0, omitidas 0)
 - Escenarios obligatorios presentes: 7/7
 - RPC críticas verificadas una a una: 23/23
+- Evidencias acreditadas (por RPC, garantía y vector): 45/45
 - Piso mínimo exigido: 100
 ```
 
-El harness declara **127 pruebas** (comprobable sin sandbox con
-`npx vitest list src/test/rls/rlsHarness.test.ts`). Cualquier número por debajo
-del piso, cualquier `skip` inesperado o cualquier escenario o RPC ausente hace
+El harness declara **128 pruebas** (contarlas sin sandbox: ver el bloque de
+`vitest list` en «Qué cubre exactamente»). Cualquier número por debajo del piso,
+cualquier `skip` inesperado o cualquier escenario, RPC o evidencia ausente hace
 fallar el job.
 
 Y el artefacto `rls-report-<run_id>` guarda el reporte JSON. **No contiene
@@ -452,8 +488,11 @@ secretos**: sólo nombres de prueba (literales del repo) y recuentos.
    usuario con `app_users.role = 'cliente'` y fila en `unidad_residentes` por
    tenant convertiría las ocho RPC de garantía `rol` en garantía `tenant`; exige
    dos credenciales más y va en un PR aparte.
-7. **Los E2E siguen siendo no-op verdes.** Se abordan en un PR aparte; su gate
-   por `E2E_BASE_URL` no se ha tocado aquí.
+7. **Los E2E siguen siendo no-op verdes.** En la misma corrida en que el harness
+   RLS verificó 128 aserciones, el job `E2E (caminos de dinero/auth)` pasó su
+   gate y **salteó todos los pasos** por falta del secreto `E2E_BASE_URL`: sigue
+   siendo un verde que no ejecutó nada. Se aborda en un PR aparte; su gate no se
+   ha tocado aquí. Los secretos que necesita están en `e2e/README.md`.
 
 ---
 
