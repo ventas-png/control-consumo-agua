@@ -6,7 +6,7 @@ name: Coverage gate & E2E
 #   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
 #   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
 # `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
-# `rls-harness` YA NO: exige las 6 variables RLS_* y falla si falta cualquiera,
+# `rls-harness` YA NO: exige las 15 variables RLS_* y falla si falta cualquiera,
 # salvo cuando GitHub no entrega secretos por diseño (PR de fork o ejecución de
 # Dependabot), donde se omite explícitamente. Sin `pull_request_target`.
 
@@ -270,10 +270,14 @@ jobs:
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
       # Gate por CLASE de paquetes_recibidos: cuatro usuarios de la MISMA
-      # empresa (ver src/test/rls/README.md). Mientras estos secretos no
-      # existan, ese bloque se SKIPEA — y los omitidos del reporte son
-      # exactamente esos. Se declaran aquí para que empiecen a correr en cuanto
-      # se configuren, sin tocar el workflow otra vez.
+      # empresa (ver src/test/rls/README.md). Son OBLIGATORIOS: el preflight los
+      # exige junto a los otros siete y deja el job en ROJO si falta cualquiera.
+      #
+      # Antes eran opcionales y su bloque se auto-saltaba: el job terminaba
+      # verde con 13 pruebas omitidas y el reporte lo contaba como cobertura
+      # completa. Los crea `scripts/seed-rls-sandbox.mjs`, que además verifica
+      # el login de cada uno y comprueba que sus permisos efectivos son los que
+      # la suite supone.
       RLS_USER_PAQ_EMAIL: ${{ secrets.RLS_USER_PAQ_EMAIL }}
       RLS_USER_PAQ_PASSWORD: ${{ secrets.RLS_USER_PAQ_PASSWORD }}
       RLS_USER_CORR_EMAIL: ${{ secrets.RLS_USER_CORR_EMAIL }}

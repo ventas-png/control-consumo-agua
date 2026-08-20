@@ -11,24 +11,40 @@ import {
   buildMetaWaPayload,
   buildPaqueteInAppRows,
   buildTwilioWaParams,
-  type PerfilLlamante,
   copyPieza,
   motivoOmision,
-  puedeNotificar,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
   tipoLabel,
 } from './logic.ts'
+// La decisión de autorización vive aparte y se hace preguntando a los helpers
+// de la base con el JWT del usuario, no reimplementando el RBAC aquí.
+import { autorizarAviso, type ClienteRpc } from './autorizacion.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+// Necesaria para abrir un cliente CON EL JWT DEL USUARIO: es el que hace que
+// PostgREST entre como `authenticated` y que `auth.uid()` sea él, que es la
+// única forma de que los helpers de RBAC respondan sobre el llamante real.
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
 // Ventana durante la que una ejecución conserva el envío en exclusiva. Cubre de
 // sobra los tres canales (Gmail + Meta/Twilio); pasada, otra puede reintentar.
 const LEASE_AVISO_SEGUNDOS = 120
+// Techo por llamada a un proveedor externo. Sin él, un Gmail o un Twilio que no
+// responden dejan la ejecución colgada MÁS ALLÁ del lease: otra ejecución
+// reclama legítimamente y aparecen dos avisos. Cuatro llamadas como mucho
+// (refresh + Gmail + WhatsApp) × 15 s = 45 s, holgadamente por debajo de los
+// 120 s del lease, así que quien reclamó sigue siendo el dueño al finalizar.
+const TIMEOUT_PROVEEDOR_MS = 15_000
+
+/** `fetch` con plazo. Aborta en vez de esperar indefinidamente. */
+function fetchConPlazo(url: string, init: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_PROVEEDOR_MS) })
+}
 
 // WhatsApp (opcional). Si no hay credenciales el canal se omite silenciosamente.
 // Proveedores soportados: 'meta' (WhatsApp Cloud API) o 'twilio'.
@@ -84,7 +100,7 @@ interface EmailConfig {
 }
 
 async function refreshAccessToken(refreshToken: string, supabase: Client, configId: string): Promise<string | null> {
-  const res = await fetch('https://oauth2.googleapis.com/token', {
+  const res = await fetchConPlazo('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -138,7 +154,7 @@ async function sendViaGmail(config: EmailConfig, to: string, subject: string, ht
     if (newToken) accessToken = newToken
   }
   const raw = buildRawMessage(config.email, to, subject, htmlBody)
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+  const res = await fetchConPlazo('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ raw }),
@@ -157,7 +173,7 @@ async function sendWhatsAppMeta(to: string, vars: Record<string, string>, planti
   const url = `https://graph.facebook.com/v19.0/${WA_META_PHONE_ID}/messages`
   // Mensaje iniciado por la empresa => requiere plantilla aprobada.
   const body = buildMetaWaPayload(to, vars, plantilla, WA_META_LANG)
-  const res = await fetch(url, {
+  const res = await fetchConPlazo(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${WA_META_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -169,7 +185,7 @@ async function sendWhatsAppTwilio(to: string, vars: Record<string, string>): Pro
   const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`
   const params = new URLSearchParams(buildTwilioWaParams(to, vars, TWILIO_FROM))
   const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)
-  const res = await fetch(url, {
+  const res = await fetchConPlazo(url, {
     method: 'POST',
     headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params,
@@ -233,40 +249,29 @@ Deno.serve(async (req: Request) => {
     // La identidad sale SIEMPRE del JWT que valida GoTrue. Nada de lo que manda
     // el navegador en el cuerpo participa en la decisión.
     let internal = false
-    let perfil: PerfilLlamante | null = null
+    let usuario: ClienteRpc | null = null
 
     if (token && await timingSafeEqualSecret(token, SERVICE_ROLE_KEY)) {
       internal = true
     } else if (token) {
+      // 1) El JWT primero. Sin una identidad que GoTrue reconozca no hay a quién
+      //    preguntarle nada: un token caducado o forjado muere aquí.
       const { data: { user }, error } = await admin.auth.getUser(token)
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
-      const { data: au } = await admin.from('app_users').select('company_id, role').eq('id', user.id).maybeSingle()
-      if (!au) return json({ error: 'Forbidden' }, 403)
 
-      // Esta función corre con service_role, que salta la RLS entera: aquí
-      // dentro la tabla no protege nada. Hay que rehacer a mano los dos gates
-      // que la RLS habría aplicado — el permiso de la clase y el alcance por
-      // proyecto—, así que se cargan los permisos efectivos y las asignaciones.
-      const [{ data: roles }, { data: asignaciones }] = await Promise.all([
-        admin.from('user_roles')
-          .select('role_id, expires_at, role_permissions(permission_key, effect)')
-          .eq('user_id', user.id),
-        admin.from('user_project_assignments').select('project_id').eq('user_id', user.id),
-      ])
-      const ahora = Date.now()
-      const permisos: string[] = []
-      for (const ur of (roles ?? []) as Row[]) {
-        if (ur.expires_at && new Date(ur.expires_at as string).getTime() <= ahora) continue
-        for (const rp of (ur.role_permissions ?? []) as Row[]) {
-          if (rp.effect === 'allow' && rp.permission_key) permisos.push(rp.permission_key as string)
-        }
+      // 2) Cliente LIMITADO A ESE JWT. PostgREST hará `SET LOCAL ROLE
+      //    authenticated` y `auth.uid()` será este usuario, así que
+      //    `is_super_admin`, `get_my_company_id`, `can_access_project` y
+      //    `user_has_permission` responden sobre ÉL — con la misma semántica
+      //    que aplica la RLS, incluido el deny explícito.
+      if (!ANON_KEY) {
+        console.error('[notify-package] falta SUPABASE_ANON_KEY: no se puede autorizar')
+        return json({ error: 'Servicio mal configurado' }, 503)
       }
-      perfil = {
-        role: (au.role as string | null) ?? null,
-        companyId: (au.company_id as string | null) ?? null,
-        permisos,
-        proyectos: ((asignaciones ?? []) as Row[]).map(a => a.project_id as string),
-      }
+      usuario = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      }) as unknown as ClienteRpc
     } else {
       return json({ error: 'Unauthorized' }, 401)
     }
@@ -282,17 +287,29 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
     if (!pkg) return json({ error: 'Paquete no encontrado' }, 404)
 
-    // Autorización REAL: empresa + proyecto + permiso de la clase. Antes solo
-    // se comparaba company_id, así que un operador de paquetería podía disparar
-    // el aviso de una notificación legal ajena con solo conocer su id.
-    const permitido = puedeNotificar({ internal, perfil }, {
-      company_id: (pkg as Row).company_id ?? null,
-      project_id: (pkg as Row).project_id ?? null,
-      clase: ((pkg as Row).clase as string | null) ?? 'paquete',
-    })
-    if (!permitido.ok) {
-      console.warn('[notify-package] denegado', permitido.motivo)
-      return json({ error: 'Forbidden' }, 403)
+    // Autorización REAL: empresa + proyecto + permiso de la clase, resueltos
+    // por la BASE. Antes sólo se comparaba company_id, así que un operador de
+    // paquetería podía disparar el aviso de una notificación legal ajena con
+    // sólo conocer su id.
+    //
+    // Una llamada interna con la service key (cron, otra edge function) ya es
+    // de casa y no tiene JWT de usuario que consultar.
+    if (!internal) {
+      const permitido = await autorizarAviso(usuario, {
+        company_id: ((pkg as Row).company_id as string | null) ?? null,
+        project_id: ((pkg as Row).project_id as string | null) ?? null,
+        clase: ((pkg as Row).clase as string | null) ?? 'paquete',
+      })
+      if (!permitido.ok) {
+        console.warn('[notify-package] denegado', permitido.motivo, permitido.detalle)
+        // Un fallo AL CONSULTAR la autorización no es un "no tenés permiso":
+        // es que no se pudo decidir. Se responde 503 para que el operador
+        // reintente en vez de creer que le falta un permiso que sí tiene — y,
+        // sobre todo, para que nunca se confunda con un permiso vacío.
+        return permitido.motivo === 'error_autorizacion'
+          ? json({ error: 'No se pudo verificar la autorización' }, 503)
+          : json({ error: 'Forbidden' }, 403)
+      }
     }
 
     // Las tres razones para no avisar, resueltas en un solo sitio (logic.ts).
@@ -314,8 +331,18 @@ Deno.serve(async (req: Request) => {
     // condicional en una sola sentencia: el row lock serializa a las dos y solo
     // una encuentra la fila libre. El lease evita que una ejecución que muere a
     // mitad deje la pieza bloqueada para siempre.
+    //
+    // El claim lleva DUEÑO: un UUID impredecible generado por ESTA ejecución.
+    // Sin él, una ejecución cuyo lease caducó podía llamar a finalizar y borrar
+    // el claim de la que sí estaba enviando —o sellar `notificado_at` sobre su
+    // envío—. `paquete_finalizar_aviso` exige el mismo token para tocar la fila.
+    const claimId = crypto.randomUUID()
     const { data: reclamado, error: errClaim } = await admin
-      .rpc('paquete_reclamar_aviso', { p_pieza_id: (pkg as Row).id, p_lease_segundos: LEASE_AVISO_SEGUNDOS })
+      .rpc('paquete_reclamar_aviso', {
+        p_pieza_id: (pkg as Row).id,
+        p_claim_id: claimId,
+        p_lease_segundos: LEASE_AVISO_SEGUNDOS,
+      })
     if (errClaim) {
       console.error('[notify-package] claim failed', errClaim.message)
       return json({ error: 'No se pudo reservar el envío' }, 503)
@@ -436,11 +463,21 @@ Deno.serve(async (req: Request) => {
     //     estado incierto: duplicar un aviso es peor que pedir un clic.
     const entregado = notified > 0 || emailed > 0 || whatsapp === 'sent'
     const { data: finalizado, error: errFin } = await admin
-      .rpc('paquete_finalizar_aviso', { p_pieza_id: (pkg as Row).id, p_entregado: entregado })
+      .rpc('paquete_finalizar_aviso', {
+        p_pieza_id: (pkg as Row).id,
+        p_claim_id: claimId,
+        p_entregado: entregado,
+      })
     if (errFin || finalizado !== true) {
       // Antes este error se ignoraba: la pieza quedaba sin sellar y la pantalla
       // decía "avisado". Ahora se dice la verdad, con lo que sí salió.
-      console.error('[notify-package] finalize failed', errFin?.message ?? 'fila no encontrada')
+      // `false` aquí significa una de dos cosas, y ninguna es "todo bien": o la
+      // fila desapareció, o ESTA ejecución perdió el claim (tardó más que el
+      // lease y otra lo tomó). En el segundo caso la dueña actual sigue
+      // enviando y esta no debe sellar nada — que es exactamente lo que la
+      // comprobación de dueño impide.
+      console.error('[notify-package] finalize failed',
+        errFin?.message ?? 'claim perdido o fila no encontrada')
       return json({
         success: false, notified, emailed, whatsapp, delivered: entregado,
         error: 'El aviso salió pero no se pudo registrar; puede repetirse en un reintento',

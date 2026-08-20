@@ -449,3 +449,123 @@ describe('upsertUsuario — idempotencia', () => {
     expect(admin.creados).toEqual([])
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// Gate por CLASE: el fixture de cuatro usuarios de la MISMA empresa.
+// ════════════════════════════════════════════════════════════════════════════
+// Estas pruebas no siembran nada (no hay Supabase que sembrar): fijan el
+// CONTRATO del fixture y las propiedades del script que no se pueden comprobar
+// corriéndolo — que no imprima la service_role, que rote las contraseñas y que
+// los ocho secretos que emite sean exactamente los que el preflight exige.
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { CLASE_USUARIOS } from '../seed-rls-sandbox.mjs'
+import { VARIABLES_CLASE } from '../rls-preflight.mjs'
+
+const RAIZ_SEED = join(dirname(fileURLToPath(import.meta.url)), '..')
+const FUENTE_SEED = readFileSync(join(RAIZ_SEED, 'seed-rls-sandbox.mjs'), 'utf8')
+
+describe('fixture del gate por clase', () => {
+  it('son CUATRO usuarios y cubren los ocho secretos que exige el preflight', () => {
+    expect(CLASE_USUARIOS).toHaveLength(4)
+    const emitidos = CLASE_USUARIOS.flatMap((u) => [
+      `RLS_USER_${u.key}_EMAIL`, `RLS_USER_${u.key}_PASSWORD`,
+    ])
+    // Si el seed emitiera unos nombres y el preflight esperara otros, el
+    // operador configuraría ocho secretos y el job seguiría en rojo sin decir
+    // por qué.
+    expect(emitidos.sort()).toEqual([...VARIABLES_CLASE].sort())
+  })
+
+  it('los dos granulares NO son administrativos', () => {
+    // `user_has_permission` le dice true a TODO a super_admin/company_owner/
+    // admin (20260518000008). Con un admin como "operador de paquetería", el
+    // gate de SELECT/INSERT/UPDATE por clase sencillamente no se vería y la
+    // suite pasaría sin comprobar nada.
+    const administrativos = ['admin', 'company_owner', 'super_admin', 'superadmin']
+    for (const key of ['PAQ', 'CORR']) {
+      const u = CLASE_USUARIOS.find((x) => x.key === key)
+      expect(administrativos, `${key} no puede tener un rol administrativo`).not.toContain(u.role)
+      expect(u.rbac, `${key} necesita un rol RBAC granular`).toBeTruthy()
+    }
+  })
+
+  it('admin y owner llevan exactamente los roles que el DELETE por clase necesita', () => {
+    // DELETE de correspondencia sólo lo puede company_owner; el admin es el
+    // control negativo y el owner el positivo. Sin ambos, la prueba central
+    // ("un admin no borra una notificación legal") no se puede montar.
+    expect(CLASE_USUARIOS.find((u) => u.key === 'ADMIN').role).toBe('admin')
+    expect(CLASE_USUARIOS.find((u) => u.key === 'OWNER').role).toBe('company_owner')
+    // Y ninguno de los dos lleva rol RBAC granular: su poder viene del rol.
+    expect(CLASE_USUARIOS.find((u) => u.key === 'ADMIN').rbac).toBeNull()
+    expect(CLASE_USUARIOS.find((u) => u.key === 'OWNER').rbac).toBeNull()
+  })
+
+  it('los permisos de los granulares son disjuntos y de la clase que dicen', () => {
+    const paq = CLASE_USUARIOS.find((u) => u.key === 'PAQ')
+    const corr = CLASE_USUARIOS.find((u) => u.key === 'CORR')
+    expect(paq.rbac).toBe('paq')
+    expect(corr.rbac).toBe('corr')
+    expect(paq.rbac).not.toBe(corr.rbac)
+  })
+
+  it('los seis emails son distintos entre sí y del dominio reservado', () => {
+    const emails = CLASE_USUARIOS.map((u) => u.email)
+    expect(new Set(emails).size).toBe(emails.length)
+    // `.invalid` está reservado por RFC 2606: ninguna de estas cuentas puede
+    // recibir correo de verdad ni colisionar con una persona.
+    for (const e of emails) expect(e).toMatch(/@sandbox\.invalid$/)
+  })
+})
+
+describe('el seed no filtra la service_role ni deja contraseñas viejas', () => {
+  it('la service_role entra por variable de entorno y nunca se imprime', () => {
+    expect(FUENTE_SEED).toContain('env.SEED_SERVICE_ROLE_KEY')
+    // Ninguna línea que imprima puede llevar la clave. Se mira el código, no
+    // los comentarios: la cabecera habla de ella a propósito.
+    const codigo = FUENTE_SEED.split('\n').filter((l) => !/^\s*\/\//.test(l))
+    const impresiones = codigo.filter((l) => /console\.(log|error)|\blog\(/.test(l))
+    for (const l of impresiones) {
+      expect(l, `esta línea podría imprimir la service_role:\n${l}`).not.toMatch(/\bKEY\b|serviceKey/)
+    }
+  })
+
+  it('no se escribe ningún archivo: nada queda en disco', () => {
+    const codigo = FUENTE_SEED.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    expect(codigo).not.toMatch(/writeFileSync|appendFileSync|createWriteStream/)
+  })
+
+  it('las contraseñas se ROTAN también para los usuarios que ya existían', () => {
+    // Si no se reescribieran, las impresas al final no serían las válidas y el
+    // operador configuraría secretos que no dejan iniciar sesión.
+    expect(FUENTE_SEED).toMatch(/updateUserById\(existing\.id, \{ password: pass \}\)/)
+    // Y cada usuario del gate recibe una contraseña nueva por corrida.
+    expect(FUENTE_SEED).toMatch(/for \(const u of CLASE_USUARIOS\)[\s\S]{0,120}const pass = password\(\)/)
+  })
+
+  it('el fixture CONVERGE: no acumula permisos ni roles de corridas anteriores', () => {
+    // Un rol al que una corrida vieja le dejó la otra clave concedería las dos
+    // clases, y "no ve la otra" pasaría a ser imposible de fallar.
+    expect(FUENTE_SEED).toMatch(/from\('role_permissions'\)\s*\n?\s*\.delete\(\)\.eq\('role_id', roleId\)\.neq\('permission_key', permiso\)/)
+    expect(FUENTE_SEED).toMatch(/from\('user_roles'\)\.delete\(\)\.eq\('user_id', userId\)/)
+  })
+
+  it('verifica el login de CADA usuario antes de emitir los secretos', () => {
+    expect(FUENTE_SEED).toMatch(/signInWithPassword\(\{ email: u\.email, password: u\.pass \}\)/)
+    // Y no basta con entrar: se comprueba que los permisos efectivos son los
+    // que la suite supone, o el fixture podría estar probando lo contrario.
+    expect(FUENTE_SEED).toMatch(/rpc\('user_has_permission', \{ perm_key: clave \}\)/)
+    expect(FUENTE_SEED).toMatch(/rpc\('get_my_company_id'\)/)
+  })
+
+  it('cualquier fallo de la verificación impide el mensaje de "listo"', () => {
+    const iFallos = FUENTE_SEED.indexOf('fallos.push(...await verificarGateDeClase')
+    const iCorte = FUENTE_SEED.indexOf('if (fallos.length > 0) {', iFallos)
+    const iListo = FUENTE_SEED.indexOf('Sandbox listo y VERIFICADO')
+    expect(iFallos).toBeGreaterThan(0)
+    // El corte tiene que estar ENTRE la verificación y la emisión de secretos.
+    expect(iCorte).toBeGreaterThan(iFallos)
+    expect(iListo).toBeGreaterThan(iCorte)
+  })
+})

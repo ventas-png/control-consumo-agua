@@ -1,7 +1,7 @@
 // Tests de la lógica pura de notify-package (infra:I22 · Track T8). Como el
 // resto de tests de edge fns, corre bajo vitest (no Deno) tratando el módulo
 // como TS normal. Cubre: sanitización HTML (escapeHtml aplicado en la plantilla),
-// etiqueta de tipo de envío, gate de autorización por empresa, filas in-app,
+// etiqueta de tipo de envío, mapa clase → permiso, filas in-app,
 // normalización de teléfono y payloads/selección de proveedor de WhatsApp.
 
 import { describe, it, expect } from 'vitest'
@@ -14,13 +14,9 @@ import {
   buildTwilioWaParams,
   digits,
   escapeHtml,
-  type PerfilLlamante,
-  accedeAlProyecto,
   esPiezaSaliente,
   motivoOmision,
   permisoDeClase,
-  puedeNotificar,
-  tienePermiso,
   plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
@@ -385,94 +381,30 @@ describe('notify-package/canales según la dirección', () => {
 })
 
 // ── RBAC del aviso ──────────────────────────────────────────────────────────
-// El hallazgo: la función corre con service_role —que salta la RLS entera— y
-// solo comparaba `company_id`. Cualquier usuario del tenant con un JWT válido
-// podía enumerar ids y provocar correo, WhatsApp y notificación in-app por
-// correspondencia que no le compete.
-describe('notify-package/puedeNotificar', () => {
-  const CORR = { company_id: 'emp', project_id: 'proy', clase: 'correspondencia' }
-  const PAQ  = { company_id: 'emp', project_id: 'proy', clase: 'paquete' }
-
-  function perfil(over: Partial<PerfilLlamante> = {}): PerfilLlamante {
-    return { role: 'operator', companyId: 'emp', permisos: [], proyectos: ['proy'], ...over }
-  }
-  const jwt = (p: PerfilLlamante) => ({ internal: false, perfil: p })
-
-  const OP_PAQ  = perfil({ permisos: ['condominios.tab.paqueteria'] })
-  const OP_CORR = perfil({ permisos: ['condominios.tab.correspondencia'] })
-
-  it('el operador de paquetería NO notifica correspondencia', () => {
-    expect(puedeNotificar(jwt(OP_PAQ), CORR)).toEqual({ ok: false, motivo: 'sin_permiso_de_clase' })
-  })
-
-  it('el operador de correspondencia NO notifica paquetes', () => {
-    expect(puedeNotificar(jwt(OP_CORR), PAQ)).toEqual({ ok: false, motivo: 'sin_permiso_de_clase' })
-  })
-
-  it('CONTROL POSITIVO: cada uno sí notifica lo suyo', () => {
-    expect(puedeNotificar(jwt(OP_PAQ), PAQ)).toEqual({ ok: true })
-    expect(puedeNotificar(jwt(OP_CORR), CORR)).toEqual({ ok: true })
-  })
-
-  it('mismo permiso pero proyecto NO asignado: rechazado', () => {
-    const otraTorre = perfil({ permisos: ['condominios.tab.correspondencia'], proyectos: ['otra-torre'] })
-    expect(puedeNotificar(jwt(otraTorre), CORR)).toEqual({ ok: false, motivo: 'proyecto_no_asignado' })
-  })
-
-  it('otra empresa: rechazado antes de mirar nada más', () => {
-    const ajeno = perfil({ role: 'admin', companyId: 'otra' })
-    expect(puedeNotificar(jwt(ajeno), CORR)).toEqual({ ok: false, motivo: 'otra_empresa' })
-  })
-
-  it('admin y company_owner de la empresa sí pasan', () => {
-    expect(puedeNotificar(jwt(perfil({ role: 'admin', proyectos: [] })), CORR)).toEqual({ ok: true })
-    expect(puedeNotificar(jwt(perfil({ role: 'company_owner', proyectos: [] })), CORR)).toEqual({ ok: true })
-  })
-
-  it('un admin CON asignaciones ya no es exento de proyecto', () => {
-    // Espeja user_is_project_exempt (20260815000000): el admin ve todo mientras
-    // no tenga asignaciones explícitas; en cuanto las tiene, se acota a ellas.
-    const admin = perfil({ role: 'admin', proyectos: ['otra-torre'] })
-    expect(puedeNotificar(jwt(admin), CORR)).toEqual({ ok: false, motivo: 'proyecto_no_asignado' })
-  })
-
-  it('super_admin pasa aunque sea de otra empresa (soporte)', () => {
-    expect(puedeNotificar(jwt(perfil({ role: 'super_admin', companyId: 'otra' })), CORR)).toEqual({ ok: true })
-  })
-
-  it('la llamada interna con la service key pasa sin perfil', () => {
-    expect(puedeNotificar({ internal: true, perfil: null }, CORR)).toEqual({ ok: true })
-  })
-
-  it('sin perfil y sin ser interna, no pasa', () => {
-    expect(puedeNotificar({ internal: false, perfil: null }, CORR)).toEqual({ ok: false, motivo: 'sin_perfil' })
-  })
-
-  it('una pieza sin empresa no autoriza a nadie', () => {
-    expect(puedeNotificar(jwt(OP_CORR), { ...CORR, company_id: null }))
-      .toEqual({ ok: false, motivo: 'otra_empresa' })
-  })
-})
-
-describe('notify-package/helpers de RBAC', () => {
+// El bloque que espejaba `user_has_permission`/`can_access_project` en
+// TypeScript se retiró junto con las funciones que probaba: la autorización ya
+// no se reimplementa, se le pregunta a la base. Lo que queda aquí es el único
+// pedazo que sigue siendo del lado de la aplicación —el mapa clase → clave— y
+// la decisión completa se prueba en:
+//
+//   · __tests__/autorizacion.test.ts  — la capa, con el cliente doblado a nivel
+//     de `.rpc()`, incluidos los fallos de consulta que ningún objeto en
+//     memoria puede representar.
+//   · __tests__/handler.test.ts       — el handler entero, comprobando que
+//     pregunta CON EL JWT DEL USUARIO y no con el service_role.
+//   · scripts/rls-evidencias-asserts.sql (bloque 9) — que la base hace ganar al
+//     deny explícito, contra Postgres real.
+describe('notify-package/permisoDeClase', () => {
   it('la clave de permiso la decide la clase', () => {
     expect(permisoDeClase('correspondencia')).toBe('condominios.tab.correspondencia')
     expect(permisoDeClase('paquete')).toBe('condominios.tab.paqueteria')
     expect(permisoDeClase(null)).toBe('condominios.tab.paqueteria')
   })
 
-  it('tienePermiso espeja el helper de la base (admin dice true a todo)', () => {
-    const admin = { role: 'admin', companyId: 'e', permisos: [], proyectos: [] }
-    expect(tienePermiso(admin, 'lo.que.sea')).toBe(true)
-    const granular = { role: 'operator', companyId: 'e', permisos: ['a'], proyectos: [] }
-    expect(tienePermiso(granular, 'a')).toBe(true)
-    expect(tienePermiso(granular, 'b')).toBe(false)
-  })
-
-  it('accedeAlProyecto: una fila sin proyecto sellado es ambigua, no ajena', () => {
-    const granular = { role: 'operator', companyId: 'e', permisos: [], proyectos: [] }
-    expect(accedeAlProyecto(granular, null)).toBe(true)
-    expect(accedeAlProyecto(granular, 'p1')).toBe(false)
-    expect(accedeAlProyecto({ ...granular, proyectos: ['p1'] }, 'p1')).toBe(true)
+  it('una clase desconocida NO cae en correspondencia', () => {
+    // Elegir mal el lado por defecto abriría el aviso de correspondencia a
+    // quien sólo tiene paquetería.
+    expect(permisoDeClase('inventada')).toBe('condominios.tab.paqueteria')
+    expect(permisoDeClase(undefined)).toBe('condominios.tab.paqueteria')
   })
 })

@@ -73,19 +73,6 @@ const A_PASS = process.env.RLS_USER_A_PASSWORD
 const B_EMAIL = process.env.RLS_USER_B_EMAIL
 const B_PASS = process.env.RLS_USER_B_PASSWORD
 
-// Se evalúa en tiempo de módulo, así que ocurre antes que cualquier
-// `createClient`: con un destino rechazado esto LANZA y no se abre ni una
-// conexión. Ver `./destino.ts` y `./__tests__/destinoHarness.test.ts`.
-const { habilitado: ENABLED } = exigirDestinoDeclarado({
-  RLS_SUPABASE_URL: URL,
-  RLS_SUPABASE_ANON_KEY: ANON,
-  RLS_EXPECTED_PROJECT_REF: EXPECTED_REF,
-  RLS_USER_A_EMAIL: A_EMAIL,
-  RLS_USER_A_PASSWORD: A_PASS,
-  RLS_USER_B_EMAIL: B_EMAIL,
-  RLS_USER_B_PASSWORD: B_PASS,
-})
-
 // ── Gate por CLASE en paquetes_recibidos (motor único, 20260829000000) ───────
 // Hacen falta CUATRO usuarios de la MISMA empresa, porque hay dos gates
 // distintos que comprobar y ninguno se expresa con A/B (empresas distintas):
@@ -109,10 +96,34 @@ const ADMIN_EMAIL = process.env.RLS_USER_ADMIN_EMAIL
 const ADMIN_PASS = process.env.RLS_USER_ADMIN_PASSWORD
 const OWNER_EMAIL = process.env.RLS_USER_OWNER_EMAIL
 const OWNER_PASS = process.env.RLS_USER_OWNER_PASSWORD
-const CLASE_ENABLED = Boolean(
-  URL && ANON && PAQ_EMAIL && PAQ_PASS && CORR_EMAIL && CORR_PASS &&
-  ADMIN_EMAIL && ADMIN_PASS && OWNER_EMAIL && OWNER_PASS,
-)
+// NO hay un `CLASE_ENABLED` aparte. Lo hubo, y con él un
+// `describe.skipIf(!CLASE_ENABLED)` que dejaba el job VERDE con 13 pruebas
+// omitidas mientras los ocho secretos no existieran: el mismo falso verde por
+// omisión que el resto de este archivo eliminó, sólo que un nivel más abajo.
+// Las ocho variables son ahora parte del conjunto que exige
+// `exigirDestinoDeclarado`, así que o están las quince y corre TODO, o el
+// preflight deja el job en rojo antes de instalar nada.
+
+// Se evalúa en tiempo de módulo, así que ocurre antes que cualquier
+// `createClient`: con un destino rechazado esto LANZA y no se abre ni una
+// conexión. Ver `./destino.ts` y `./__tests__/destinoHarness.test.ts`.
+const { habilitado: ENABLED } = exigirDestinoDeclarado({
+  RLS_SUPABASE_URL: URL,
+  RLS_SUPABASE_ANON_KEY: ANON,
+  RLS_EXPECTED_PROJECT_REF: EXPECTED_REF,
+  RLS_USER_A_EMAIL: A_EMAIL,
+  RLS_USER_A_PASSWORD: A_PASS,
+  RLS_USER_B_EMAIL: B_EMAIL,
+  RLS_USER_B_PASSWORD: B_PASS,
+  RLS_USER_PAQ_EMAIL: PAQ_EMAIL,
+  RLS_USER_PAQ_PASSWORD: PAQ_PASS,
+  RLS_USER_CORR_EMAIL: CORR_EMAIL,
+  RLS_USER_CORR_PASSWORD: CORR_PASS,
+  RLS_USER_ADMIN_EMAIL: ADMIN_EMAIL,
+  RLS_USER_ADMIN_PASSWORD: ADMIN_PASS,
+  RLS_USER_OWNER_EMAIL: OWNER_EMAIL,
+  RLS_USER_OWNER_PASSWORD: OWNER_PASS,
+})
 
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
 // hace fallar el WITH CHECK de RLS, así que sirve como "company_id ajeno" para los
@@ -1064,7 +1075,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 //
 // NO DESTRUCTIVO: cada escenario siembra su propia fila desechable con quien sí
 // tiene permiso y la limpia al final. Nunca toca datos preexistentes.
-describe.skipIf(!CLASE_ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox)', () => {
+describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox)', () => {
   let paqUser: SupabaseClient    // rol granular, permiso de paquetería
   let corrUser: SupabaseClient   // rol granular, permiso de correspondencia
   let adminUser: SupabaseClient  // rol admin de la misma empresa
@@ -1121,13 +1132,31 @@ describe.skipIf(!CLASE_ENABLED)('gate por clase en paquetes_recibidos (preview/s
       signedInClient(OWNER_EMAIL!, OWNER_PASS!),
     ])
 
-    const { data: proy } = await corrUser.from('projects').select('id, company_id').limit(1)
-    const p = proy?.[0] as { id: string; company_id: string } | undefined
-    if (p) scopeCorr = { company_id: p.company_id, project_id: p.id }
-
-    const { data: uni } = await paqUser.from('unidades').select('id, project_id, company_id').limit(1)
+    // El scope se resuelve con el OWNER, no con los granulares. `projects` y
+    // `unidades` tienen su propia RLS y no hay ninguna garantía de que un
+    // `operator` las lea; si no las leyera, el scope quedaría nulo y los
+    // escenarios reventarían con un error que no habla del gate. El owner sí
+    // las ve, y las filas son de la misma empresa que los cuatro — cosa que las
+    // precondiciones comprueban justo debajo.
+    const { data: uni, error: eUni } = await ownerUser
+      .from('unidades').select('id, project_id, company_id').limit(1)
+    if (eUni) throw new Error(`no se pudo resolver la unidad del sandbox: ${eUni.message}`)
     const u = uni?.[0] as { id: string; project_id: string; company_id: string } | undefined
-    if (u) scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+    if (!u) {
+      // Fail-closed: sin unidad no se puede sembrar la clase 'paquete'
+      // (`paquetes_unidad_por_clase_chk` la exige) y media suite no probaría
+      // nada. Antes esto dejaba `scopePaq` en null y el fallo aparecía después,
+      // disfrazado de otra cosa.
+      throw new Error(
+        'el sandbox no tiene ninguna unidad visible para el company_owner. ' +
+        'Corré scripts/seed-rls-sandbox.mjs: crea el proyecto y la unidad del gate por clase.',
+      )
+    }
+    scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+    // La correspondencia va dirigida a la administración, así que le basta el
+    // proyecto — pero tiene que ser el MISMO, o el gate se confundiría con el
+    // alcance por proyecto.
+    scopeCorr = { company_id: u.company_id, project_id: u.project_id }
   })
 
   afterAll(async () => {

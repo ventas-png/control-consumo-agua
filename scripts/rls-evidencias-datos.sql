@@ -22,6 +22,7 @@
 \set gcorr '''a0000000-0000-0000-0000-000000000003'''
 \set gpaq  '''a0000000-0000-0000-0000-000000000004'''
 \set gotro '''a0000000-0000-0000-0000-000000000005'''
+\set gdeny '''a0000000-0000-0000-0000-000000000006'''
 \set resa  '''a0000000-0000-0000-0000-00000000000a'''
 \set resb  '''a0000000-0000-0000-0000-00000000000b'''
 \set super '''a0000000-0000-0000-0000-000000000009'''
@@ -33,6 +34,7 @@ INSERT INTO public.app_users (id, company_id, role, full_name) VALUES
   (:gcorr, :emp,  'operator',      'Recepción (correspondencia)'),
   (:gpaq,  :emp,  'operator',      'Guardia (paquetería)'),
   (:gotro, :emp,  'operator',      'Recepción de la otra torre'),
+  (:gdeny, :emp,  'operator',      'Recepción con veto explícito'),
   (:resa,  :emp,  'cliente',       'Residente A-1'),
   (:resb,  :emp,  'cliente',       'Residente A-2'),
   (:super, :otra, 'super_admin',   'Soporte'),
@@ -40,11 +42,16 @@ INSERT INTO public.app_users (id, company_id, role, full_name) VALUES
 
 \set rolcorr '''b0000000-0000-0000-0000-000000000001'''
 \set rolpaq  '''b0000000-0000-0000-0000-000000000002'''
+\set rolveto '''b0000000-0000-0000-0000-000000000003'''
 INSERT INTO public.user_roles (user_id, role_id) VALUES
-  (:gcorr, :rolcorr), (:gpaq, :rolpaq), (:gotro, :rolcorr);
+  (:gcorr, :rolcorr), (:gpaq, :rolpaq), (:gotro, :rolcorr),
+  -- `gdeny` acumula el rol que CONCEDE correspondencia y otro que la NIEGA.
+  -- Es el caso que distingue "deny vence a allow" de "basta un allow".
+  (:gdeny, :rolcorr), (:gdeny, :rolveto);
 INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   (:rolcorr, 'condominios.tab.correspondencia', 'allow'),
-  (:rolpaq,  'condominios.tab.paqueteria',      'allow');
+  (:rolpaq,  'condominios.tab.paqueteria',      'allow'),
+  (:rolveto, 'condominios.tab.correspondencia', 'deny');
 
 INSERT INTO public.projects (id, company_id, nombre) VALUES
   (:proy, :emp, 'Torre Norte'), (:proyc, :emp, 'Torre Sur'), (:proyb, :otra, 'Proyecto ajeno');
@@ -52,7 +59,7 @@ INSERT INTO public.projects (id, company_id, nombre) VALUES
 -- El alcance por proyecto es parte del gate: `gotro` tiene el MISMO permiso que
 -- `gcorr` pero otra torre.
 INSERT INTO public.user_project_assignments (user_id, project_id) VALUES
-  (:gcorr, :proy), (:gpaq, :proy), (:gotro, :proyc);
+  (:gcorr, :proy), (:gpaq, :proy), (:gotro, :proyc), (:gdeny, :proy);
 
 \set unia  '''d0000000-0000-0000-0000-00000000000a'''
 \set unib  '''d0000000-0000-0000-0000-00000000000b'''
@@ -129,3 +136,33 @@ INSERT INTO storage.objects (bucket_id, name, owner, metadata) VALUES
   ('recepcion-evidencias',
    '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/firma-de-otro.png',
    :gpaq, '{"mimetype":"image/png"}'::jsonb);
+
+-- ── Firmas para los casos de MIME (hallazgo C) ──────────────────────────────
+-- Todas cuelgan de la ruta CORRECTA de `corr_b`, las sube el operador de
+-- correspondencia y llevan extensión de imagen: lo ÚNICO que las distingue es
+-- el `mimetype` que Storage guardó en `metadata`. Así, si alguna pasa, el
+-- motivo no puede ser otro que el predicado del MIME.
+INSERT INTO storage.objects (bucket_id, name, owner, metadata) VALUES
+  -- metadata ausente por completo. El COALESCE anterior la daba por PNG.
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/mime-nulo.png',
+   :gcorr, NULL),
+  -- metadata presente pero SIN la clave `mimetype`.
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/mime-sin-clave.png',
+   :gcorr, '{"size":2048,"cacheControl":"3600"}'::jsonb),
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/mime-octeto.png',
+   :gcorr, '{"mimetype":"application/octet-stream"}'::jsonb),
+  -- SVG: pasaba el LIKE 'image/%' y no es una imagen inerte.
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/mime-svg.png',
+   :gcorr, '{"mimetype":"image/svg+xml"}'::jsonb),
+  -- Extensión de imagen y MIME prohibido: la extensión la elige quien sube.
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/enganosa.jpg',
+   :gcorr, '{"mimetype":"text/html"}'::jsonb),
+  -- Control POSITIVO: sin él, "todo rechazado" también pasaría el bloque.
+  ('recepcion-evidencias',
+   '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/firma-b.webp',
+   :gcorr, '{"mimetype":"image/webp"}'::jsonb);

@@ -16,13 +16,28 @@ const MIGRACION = '20260831000000_recepcion_evidencias_y_acuse.sql'
 // versiones anteriores de las otras dos, y el bot solo empuja archivos nuevos.
 // Los guards de policies y RPC miran ESTA, que es la que manda al final.
 const FINAL = '20260901000000_recepcion_integridad_final.sql'
+// Y la ÚLTIMA vuelve a declarar la RPC del acuse y las dos del aviso: el
+// preview ya tenía aplicada la anterior, así que el MIME estricto y el dueño
+// del claim sólo llegan a la base si viajan en un archivo nuevo.
+const CLAIM_MIME = '20260902000000_recepcion_claim_owner_y_mime.sql'
 const BUCKET = 'recepcion-evidencias'
 const sql = readFileSync(join(MIGRATIONS_DIR, FINAL), 'utf8')
 const sqlEvidencias = readFileSync(join(MIGRATIONS_DIR, MIGRACION), 'utf8')
+const sqlUltima = readFileSync(join(MIGRATIONS_DIR, CLAIM_MIME), 'utf8')
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 function soloCodigo(texto: string): string {
   return texto.replace(/--[^\n]*/g, '')
+}
+
+/**
+ * TypeScript sin sus líneas de comentario. Hace falta porque estos guards
+ * afirman que cierto código YA NO ESTÁ, y las cabeceras de los archivos CITAN
+ * literalmente lo que se eliminó para explicar por qué. Sin quitarlas, la cita
+ * haría fallar la prueba — o, peor, obligaría a no documentar el fallo.
+ */
+function soloCodigoTs(texto: string): string {
+  return texto.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
 }
 
 /** Cuerpo de una policy de storage.objects por nombre, o null si no existe. */
@@ -147,21 +162,44 @@ describe('acuse de entrega', () => {
   })
 
   it('la firma se verifica contra storage.objects, no se cree el texto', () => {
-    const cuerpo = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'))
+    // La definición VIGENTE es la de la última migración, no la de FINAL.
+    const cuerpo = sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    )
     expect(cuerpo).toMatch(/FROM storage\.objects o/)
     expect(cuerpo).toMatch(/o\.bucket_id = 'recepcion-evidencias'/)
     // Ruta exacta proyecto/pieza/archivo, con los ids de ESTA pieza.
     expect(cuerpo).toMatch(/array_length\(v_partes, 1\) IS DISTINCT FROM 3/)
     expect(cuerpo).toMatch(/v_partes\[1\] IS DISTINCT FROM v_pieza\.project_id::text/)
     expect(cuerpo).toMatch(/v_partes\[2\] IS DISTINCT FROM p_pieza_id::text/)
-    // La subió quien firma, y es una imagen.
+    // La subió quien firma.
     expect(cuerpo).toMatch(/o\.owner = auth\.uid\(\)/)
-    expect(cuerpo).toMatch(/mimetype[\s\S]{0,40}image\//)
     expect(cuerpo).toMatch(/png\|jpg\|jpeg\|webp/)
   })
 
+  it('el MIME de la firma es una lista blanca, no un COALESCE optimista', () => {
+    const cuerpo = soloCodigo(sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    ))
+    expect(cuerpo).toMatch(
+      /o\.metadata->>'mimetype' IN \('image\/jpeg', 'image\/png', 'image\/webp'\)/,
+    )
+    // Lo que se elimina, nombrado: una metadata ausente NO se da por PNG, y
+    // `LIKE 'image/%'` dejaba pasar image/svg+xml, que lleva scripts.
+    expect(cuerpo).not.toMatch(/COALESCE\(o\.metadata->>'mimetype'/)
+    expect(cuerpo).not.toMatch(/mimetype[^\n]*LIKE 'image\/%'/)
+  })
+
+  it('el bucket declara la misma lista blanca', () => {
+    expect(soloCodigo(sqlUltima)).toMatch(
+      /allowed_mime_types = ARRAY\['image\/jpeg', 'image\/png', 'image\/webp'\]/,
+    )
+  })
+
   it('la vía siempre es presencial: portal rechazado y sellado en el servidor', () => {
-    const cuerpo = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'))
+    const cuerpo = sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    )
     expect(cuerpo).toMatch(/p_via IS DISTINCT FROM 'porteria'/)
     // No se guarda p_via: se guarda la constante.
     expect(cuerpo).toMatch(/entregado_via\s*=\s*'porteria'/)
@@ -201,7 +239,7 @@ describe('la migración es nueva, no una edición', () => {
     // El preview ya aplicó versiones anteriores de 20260829 y 20260831; el bot
     // solo empuja archivos NUEVOS, así que el estado final tiene que declararse
     // en el último, no editando aquellos.
-    expect(versiones[versiones.length - 1]).toBe('20260901000000')
+    expect(versiones[versiones.length - 1]).toBe('20260902000000')
   })
 })
 
@@ -280,44 +318,110 @@ describe('el acuse no se puede escribir a mano', () => {
   })
 })
 
-// ── El aviso: claim con lease ───────────────────────────────────────────────
+// ── El aviso: claim con DUEÑO ───────────────────────────────────────────────
 describe('carrera de notificado_at', () => {
-  it('hay un claim atómico con lease, y solo lo usa service_role', () => {
-    const codigo = soloCodigo(sql)
-    expect(codigo).toMatch(/ADD COLUMN IF NOT EXISTS notificacion_claim_at timestamptz/)
-    expect(codigo).toMatch(/FUNCTION public\.paquete_reclamar_aviso/)
+  it('el claim guarda QUIÉN lo tiene, no sólo cuándo se tomó', () => {
+    const codigo = soloCodigo(sqlUltima)
+    expect(codigo).toMatch(/ADD COLUMN IF NOT EXISTS notificacion_claim_id uuid/)
     // Un solo UPDATE condicional: el row lock serializa las dos llamadas.
-    expect(codigo).toMatch(/UPDATE public\.paquetes_recibidos[\s\S]*notificado_at IS NULL[\s\S]*notificacion_claim_at < now\(\) - make_interval/)
-    expect(codigo).toMatch(/REVOKE ALL ON FUNCTION public\.paquete_reclamar_aviso\(uuid, integer\) FROM authenticated/)
-    expect(codigo).toMatch(/GRANT EXECUTE ON FUNCTION public\.paquete_reclamar_aviso\(uuid, integer\) TO service_role/)
+    expect(codigo).toMatch(
+      /UPDATE public\.paquetes_recibidos[\s\S]*notificacion_claim_id = p_claim_id[\s\S]*notificado_at IS NULL[\s\S]*notificacion_claim_at < now\(\) - make_interval/,
+    )
+  })
+
+  it('finalizar EXIGE el token: una ejecución zombi no pisa el claim vivo', () => {
+    const cuerpo = soloCodigo(
+      sqlUltima.slice(sqlUltima.indexOf('FUNCTION public.paquete_finalizar_aviso')),
+    )
+    // La cláusula que lo cambia todo. Sin ella, filtrar sólo por id permitía a
+    // una ejecución caducada liberar —o sellar— el aviso de la que sí enviaba.
+    expect(cuerpo).toMatch(/WHERE id = p_pieza_id[\s\S]*AND notificacion_claim_id = p_claim_id/)
+    expect(cuerpo).toMatch(/notificacion_claim_id = NULL/)
+  })
+
+  it('las firmas VIEJAS de dos argumentos se eliminan, no conviven', () => {
+    // Mientras existieran, quien las llamara seguiría pudiendo liberar un claim
+    // ajeno: una puerta cerrada al lado de otra abierta no cierra nada.
+    const codigo = soloCodigo(sqlUltima)
+    expect(codigo).toMatch(/DROP FUNCTION IF EXISTS public\.paquete_reclamar_aviso\(uuid, integer\)/)
+    expect(codigo).toMatch(/DROP FUNCTION IF EXISTS public\.paquete_finalizar_aviso\(uuid, boolean\)/)
+  })
+
+  it('sólo service_role puede reclamar o finalizar', () => {
+    const codigo = soloCodigo(sqlUltima)
+    for (const firma of ['paquete_reclamar_aviso(uuid, uuid, integer)', 'paquete_finalizar_aviso(uuid, uuid, boolean)']) {
+      for (const quien of ['PUBLIC', 'anon', 'authenticated']) {
+        expect(codigo).toContain(`REVOKE ALL ON FUNCTION public.${firma} FROM ${quien}`)
+      }
+      expect(codigo).toContain(`GRANT EXECUTE ON FUNCTION public.${firma} TO service_role`)
+    }
   })
 
   it('un fallo transitorio NO se sella como notificado', () => {
-    const cuerpo = sql.slice(sql.indexOf('FUNCTION public.paquete_finalizar_aviso'))
+    const cuerpo = sqlUltima.slice(sqlUltima.indexOf('FUNCTION public.paquete_finalizar_aviso'))
     expect(cuerpo).toMatch(/CASE WHEN p_entregado THEN COALESCE\(notificado_at, now\(\)\)/)
     expect(cuerpo).toMatch(/ELSE notificado_at END/)
   })
 
-  it('la edge function reclama, comprueba el cierre y documenta los reintentos', () => {
+  it('la edge function genera su token, lo pasa a las dos RPC y acota al proveedor', () => {
     const fn = readFileSync(resolve('supabase/functions/notify-package/index.ts'), 'utf8')
+    expect(fn).toMatch(/const claimId = crypto\.randomUUID\(\)/)
     expect(fn).toContain("rpc('paquete_reclamar_aviso'")
     expect(fn).toContain("rpc('paquete_finalizar_aviso'")
+    expect(fn).toMatch(/p_claim_id: claimId/)
     // El resultado del cierre ya no se ignora.
     expect(fn).toMatch(/errFin \|\| finalizado !== true/)
+    // Sin plazo, una llamada colgada sobreviviría al lease y otra ejecución
+    // reclamaría legítimamente: dos avisos.
+    expect(fn).toMatch(/AbortSignal\.timeout\(TIMEOUT_PROVEEDOR_MS\)/)
+    expect(fn).not.toMatch(/\bawait fetch\(/)
     // Y no se promete exactly-once, que el proveedor externo no da.
     expect(fn).toMatch(/at-least-once/)
   })
 })
 
 // ── RBAC del aviso ──────────────────────────────────────────────────────────
-describe('notify-package exige más que la empresa', () => {
-  it('comprueba proyecto y permiso de la clase, con la identidad del JWT', () => {
-    const fn = readFileSync(resolve('supabase/functions/notify-package/index.ts'), 'utf8')
-    expect(fn).toContain('puedeNotificar')
+describe('notify-package delega el RBAC en la base', () => {
+  const fn = readFileSync(resolve('supabase/functions/notify-package/index.ts'), 'utf8')
+  const auth = readFileSync(resolve('supabase/functions/notify-package/autorizacion.ts'), 'utf8')
+  const logic = readFileSync(resolve('supabase/functions/notify-package/logic.ts'), 'utf8')
+
+  it('valida el JWT antes de nada', () => {
     expect(fn).toContain('admin.auth.getUser(token)')
-    expect(fn).toContain('user_project_assignments')
-    expect(fn).toContain('role_permissions')
-    // El gate viejo, que solo miraba company_id, ya no decide nada.
-    expect(fn).not.toMatch(/autorizadoParaEmpresa\(\{ internal/)
+  })
+
+  it('abre un cliente LIMITADO al JWT del usuario', () => {
+    // Preguntar con el service_role haría que los helpers respondieran sobre un
+    // auth.uid() nulo: la comprobación parecería hecha y no valdría nada.
+    expect(fn).toMatch(/createClient\(SUPABASE_URL, ANON_KEY, \{[\s\S]*Authorization: `Bearer \$\{token\}`/)
+    expect(fn).toContain('autorizarAviso(usuario,')
+  })
+
+  it('consulta los helpers server-side, no tablas de permisos', () => {
+    for (const helper of ['is_super_admin', 'get_my_company_id', 'can_access_project', 'user_has_permission']) {
+      expect(auth).toContain(helper)
+    }
+    // La incrustación imposible que devolvía error y se ignoraba.
+    expect(fn).not.toContain('role_permissions')
+    expect(fn).not.toContain('user_project_assignments')
+    // Sin los comentarios: la cabecera CITA la consulta que se eliminó, y esa
+    // cita no puede contarse como código vivo.
+    expect(soloCodigoTs(auth)).not.toContain('.from(')
+  })
+
+  it('el espejo del RBAC en TypeScript ya no existe', () => {
+    // Mantener una copia de user_has_permission aquí fue el origen del fallo:
+    // divergió y se quedó sin la rama del deny explícito.
+    for (const muerto of ['puedeNotificar', 'tienePermiso', 'accedeAlProyecto', 'ROLES_TODO_PERMISO']) {
+      expect(soloCodigoTs(logic), `${muerto} debería haberse retirado de logic.ts`)
+        .not.toMatch(new RegExp(`(export function|const) ${muerto}\\b`))
+    }
+  })
+
+  it('un error de autorización falla CERRADO y con su propio código', () => {
+    expect(auth).toMatch(/typeof res\?\.data !== 'boolean'/)
+    expect(auth).toMatch(/motivo: 'error_autorizacion'/)
+    // 503, no 403: "no se pudo decidir" no es "no tenés permiso".
+    expect(fn).toMatch(/permitido\.motivo === 'error_autorizacion'[\s\S]{0,140}503/)
   })
 })

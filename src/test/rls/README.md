@@ -63,7 +63,7 @@ export RLS_USER_A_PASSWORD="********"
 export RLS_USER_B_EMAIL="qa-b@example.com"
 export RLS_USER_B_PASSWORD="********"
 
-# OPCIONAL — gate por CLASE de paquetes_recibidos (motor único, 20260829000000).
+# OBLIGATORIO — gate por CLASE de paquetes_recibidos (motor único, 20260829000000).
 # CUATRO usuarios de la MISMA empresa, porque hay dos gates distintos:
 #   · SELECT/INSERT/UPDATE van por PERMISO de la clase. Solo se ve con usuarios
 #     SIN rol admin: `user_has_permission` le dice true a TODO a
@@ -71,7 +71,13 @@ export RLS_USER_B_PASSWORD="********"
 #   · DELETE va por ROL: la correspondencia solo la borra company_owner. Ahí sí
 #     hace falta un admin, para comprobar que NO puede.
 # A/B tampoco sirven: son de empresas distintas y lo que se vería es el
-# aislamiento de tenant. Sin estas vars el bloque se skipea con su marcador.
+# aislamiento de tenant.
+#
+# Sin estas ocho, el harness ENTERO no corre: forman parte del mismo conjunto
+# que exige `exigirDestinoDeclarado`, y en CI el preflight deja el job en rojo
+# antes de instalar nada. Antes eran opcionales y el bloque se auto-saltaba con
+# un `describe.skipIf`: el job terminaba verde con 13 pruebas omitidas y el
+# reporte las contaba como cobertura. Las crea `scripts/seed-rls-sandbox.mjs`.
 export RLS_USER_PAQ_EMAIL="qa-paqueteria@example.com"      # rol granular (operator) + condominios.tab.paqueteria
 export RLS_USER_PAQ_PASSWORD="********"
 export RLS_USER_CORR_EMAIL="qa-correspondencia@example.com" # rol granular + condominios.tab.correspondencia

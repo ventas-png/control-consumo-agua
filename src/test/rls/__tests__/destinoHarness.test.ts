@@ -30,7 +30,19 @@ const FUENTE_GUARD = leer('src/test/rls/destino.ts')
 const REF_PROD = cobertura.refProduccionProhibido
 const SANDBOX = 'refdesandbox'
 
-/** Entorno completo (las siete) con el destino que se le indique. */
+/** Las ocho credenciales del gate por clase, que también son obligatorias. */
+const CREDENCIALES_CLASE = {
+  RLS_USER_PAQ_EMAIL: 'paq@sandbox.invalid',
+  RLS_USER_PAQ_PASSWORD: 'clave-paq',
+  RLS_USER_CORR_EMAIL: 'corr@sandbox.invalid',
+  RLS_USER_CORR_PASSWORD: 'clave-corr',
+  RLS_USER_ADMIN_EMAIL: 'admin@sandbox.invalid',
+  RLS_USER_ADMIN_PASSWORD: 'clave-admin',
+  RLS_USER_OWNER_EMAIL: 'owner@sandbox.invalid',
+  RLS_USER_OWNER_PASSWORD: 'clave-owner',
+}
+
+/** Entorno completo (las quince) con el destino que se le indique. */
 const entorno = (url: string, esperado: string) => ({
   RLS_SUPABASE_URL: url,
   RLS_EXPECTED_PROJECT_REF: esperado,
@@ -39,6 +51,7 @@ const entorno = (url: string, esperado: string) => ({
   RLS_USER_A_PASSWORD: 'clave-a',
   RLS_USER_B_EMAIL: 'b@sandbox.invalid',
   RLS_USER_B_PASSWORD: 'clave-b',
+  ...CREDENCIALES_CLASE,
 })
 
 describe('el harness aborta ante un destino no declarado', () => {
@@ -182,10 +195,26 @@ describe('ninguna limpieza puede tocar fixtures preexistentes', () => {
   })
 
   it('cada DELETE se acota por el marcador efímero o por ids concretos', () => {
+    // `.eq('id', …)` vale igual que `.in('id', […])`: apunta a UNA fila, que es
+    // aún más estrecho. Lo usa la limpieza del gate por clase, que borra
+    // exactamente las filas desechables que ella misma sembró.
     const sospechosos = borrados.filter(
-      (l) => !l.includes('MARCADOR_EFIMERO') && !/\.in\('id',/.test(l),
+      (l) => !l.includes('MARCADOR_EFIMERO')
+          && !/\.in\('id',/.test(l)
+          && !/\.eq\('id',/.test(l),
     )
     expect(sospechosos, `DELETE sin acotar:\n${sospechosos.join('\n')}`).toEqual([])
+  })
+
+  it('el acotado por id apunta a UNA fila, no a un filtro de negocio', () => {
+    // Que la prueba de arriba acepte `.eq('id', …)` no puede convertirse en una
+    // puerta para `.eq('estado', …)`: sólo se admite la columna `id`.
+    const porEq = borrados.filter((l) => /\.eq\(/.test(l) && !l.includes('MARCADOR_EFIMERO'))
+    expect(porEq.length, 'si no hubiera ninguno, esta prueba sería vacua').toBeGreaterThan(0)
+    for (const l of porEq) {
+      const columnas = [...l.matchAll(/\.eq\('([^']+)'/g)].map((m) => m[1])
+      expect(columnas, `DELETE acotado por algo que no es el id:\n${l}`).toEqual(['id'])
+    }
   })
 
   it('el marcador es único por corrida (dos ejecuciones no se pisan)', () => {

@@ -6,8 +6,9 @@
 // harness puede verificar el aislamiento multi-tenant. Tres desenlaces, y sólo
 // UNO deja el check en verde:
 //
-//   run       — están las SIETE variables RLS_* y el destino está declarado y
-//               validado: el harness se ejecuta. Exit 0.
+//   run       — están las QUINCE variables RLS_* (siete de aislamiento por
+//               tenant + ocho del gate por clase) y el destino está declarado y
+//               validado: el harness se ejecuta entero. Exit 0.
 //   bloqueado — GitHub no entrega los Actions secrets por diseño (PR de fork o
 //               de dependabot[bot]). Exit 1: el check queda ROJO.
 //   fail      — TODO lo demás: faltan variables, o la URL apunta a un destino
@@ -48,7 +49,7 @@ export function cargarCobertura(ruta = join(AQUI, '..', 'src', 'test', 'rls', 'c
 }
 
 /**
- * Las SIETE variables que el harness necesita. Sus NOMBRES no son secretos.
+ * Las SIETE variables del aislamiento multi-tenant. Sus NOMBRES no son secretos.
  *
  * `RLS_EXPECTED_PROJECT_REF` no es una credencial: es la DECLARACIÓN de contra
  * qué proyecto se va a operar. Sin ella, cambiar el secreto `RLS_SUPABASE_URL`
@@ -56,7 +57,7 @@ export function cargarCobertura(ruta = join(AQUI, '..', 'src', 'test', 'rls', 'c
  * otro proyecto sin que nada lo notara. Con ella, la URL y la declaración tienen
  * que coincidir o el job aborta.
  */
-export const VARIABLES_RLS = [
+export const VARIABLES_TENANT = [
   'RLS_SUPABASE_URL',
   'RLS_SUPABASE_ANON_KEY',
   'RLS_EXPECTED_PROJECT_REF',
@@ -65,6 +66,35 @@ export const VARIABLES_RLS = [
   'RLS_USER_B_EMAIL',
   'RLS_USER_B_PASSWORD',
 ]
+
+/**
+ * Las OCHO del gate por CLASE de `paquetes_recibidos` (motor único,
+ * 20260829000000): cuatro usuarios de la MISMA empresa.
+ *
+ * POR QUÉ SON OBLIGATORIAS Y NO "OPCIONALES SI ESTÁN".
+ * Mientras no existieron, la suite del gate se auto-saltaba con un
+ * `describe.skipIf` y el job terminaba VERDE con 13 pruebas omitidas. Ese es
+ * exactamente el falso verde por omisión que este preflight existe para
+ * eliminar, sólo que un nivel más abajo: no ya "el harness no corrió", sino
+ * "corrió pero sin el bloque que verifica que un operador de paquetería no
+ * puede tocar una notificación legal".
+ *
+ * Se siembran con `scripts/seed-rls-sandbox.mjs`, que las crea, verifica el
+ * login de cada una y las imprime.
+ */
+export const VARIABLES_CLASE = [
+  'RLS_USER_PAQ_EMAIL',
+  'RLS_USER_PAQ_PASSWORD',
+  'RLS_USER_CORR_EMAIL',
+  'RLS_USER_CORR_PASSWORD',
+  'RLS_USER_ADMIN_EMAIL',
+  'RLS_USER_ADMIN_PASSWORD',
+  'RLS_USER_OWNER_EMAIL',
+  'RLS_USER_OWNER_PASSWORD',
+]
+
+/** Las quince: sin TODAS, el job falla. */
+export const VARIABLES_RLS = [...VARIABLES_TENANT, ...VARIABLES_CLASE]
 
 /**
  * Contextos en los que GitHub NO entrega los Actions secrets al ejecutor, así
@@ -160,7 +190,8 @@ export function decidirPreflight(env = {}, cobertura = {}) {
       motivo: null,
       destino: null,
       mensaje:
-        `Faltan variables RLS_* (${faltan.join(' ')}). El job falla en vez de quedar verde: ` +
+        `Faltan ${faltan.length} de ${VARIABLES_RLS.length} variables RLS_* (${faltan.join(' ')}). ` +
+        'El job falla en vez de quedar verde: ' +
         'un verde sin ejecutar se contabiliza como cobertura que no existe. ' +
         (env.GITHUB_EVENT_NAME === 'push' && env.GITHUB_ACTOR === 'dependabot[bot]'
           ? 'Este push a main lo inició Dependabot: aquí no hay omisión posible. '
@@ -197,8 +228,8 @@ export function decidirPreflight(env = {}, cobertura = {}) {
     motivo: null,
     destino,
     mensaje:
-      `Las 7 variables RLS_* están presentes y el destino está declarado (ref ${destino.ref}): ` +
-      'el harness se ejecuta.',
+      `Las ${VARIABLES_RLS.length} variables RLS_* están presentes y el destino está declarado ` +
+      `(ref ${destino.ref}): el harness se ejecuta entero, gate por clase incluido.`,
   }
 }
 
@@ -206,7 +237,7 @@ export function decidirPreflight(env = {}, cobertura = {}) {
 export function resumenMarkdown({ decision, faltan, motivo, destino }) {
   if (decision === 'run') {
     return [
-      `### ▶️ Harness RLS: las 7 variables \`RLS_*\` están presentes, se ejecuta.`,
+      `### ▶️ Harness RLS: las ${VARIABLES_RLS.length} variables \`RLS_*\` están presentes, se ejecuta.`,
       '',
       `Destino declarado y validado: ref \`${destino.ref}\` (no es producción, dominio Supabase reconocido).`,
       '',
@@ -241,20 +272,36 @@ export function resumenMarkdown({ decision, faltan, motivo, destino }) {
     ].join('\n')
   }
 
+  const faltanTenant = faltan.filter((v) => VARIABLES_TENANT.includes(v))
+  const faltanClase = faltan.filter((v) => VARIABLES_CLASE.includes(v))
+
   return [
     '### ❌ Harness RLS sin configurar — el job FALLA (fail-closed)',
     '',
     'El aislamiento multi-tenant **no se verificó** y este job ya no se queda verde',
     'por ello. Faltan estas variables de repositorio:',
     '',
-    ...faltan.map((v) => `- \`${v}\``),
-    '',
-    'Se exigen **las siete**: con la URL puesta pero una credencial vacía, el harness',
+    ...(faltanTenant.length > 0
+      ? ['**Aislamiento por tenant:**', ...faltanTenant.map((v) => `- \`${v}\``), '']
+      : []),
+    ...(faltanClase.length > 0
+      ? [
+          '**Gate por clase de `paquetes_recibidos`** (cuatro usuarios de la MISMA empresa):',
+          ...faltanClase.map((v) => `- \`${v}\``),
+          '',
+          'Sin estos ocho, el bloque que comprueba que un operador de paquetería NO puede',
+          'leer ni borrar una notificación legal **no se ejecuta**. Antes se auto-saltaba y',
+          'el job quedaba verde con 13 pruebas omitidas; ahora falla, que es lo honesto.',
+          '',
+        ]
+      : []),
+    'Se exigen **las quince**: con la URL puesta pero una credencial vacía, el harness',
     'se auto-saltaba y terminaba verde con **cero** pruebas. `RLS_EXPECTED_PROJECT_REF`',
     'no es una credencial: es la declaración del proyecto contra el que se opera, y sin',
     'ella cambiar la URL bastaría para escribir en otro sitio.',
     '',
-    'Activación: **`docs/ACTIVAR_HARNESS_RLS.md`** → `scripts/seed-rls-sandbox.mjs`.',
+    'Activación: **`docs/ACTIVAR_HARNESS_RLS.md`** → `scripts/seed-rls-sandbox.mjs`,',
+    'que crea las seis cuentas, verifica el login de cada una e imprime los quince valores.',
     '',
   ].join('\n')
 }

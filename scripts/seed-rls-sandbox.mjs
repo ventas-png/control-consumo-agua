@@ -310,13 +310,170 @@ export async function upsertUsuario(admin, email, pass, buscar) {
   return data.user.id
 }
 
-/** Fila de app_users que ata el usuario a su empresa (lo que lee get_my_company_id). */
-async function upsertAppUser(admin, userId, companyId, nombre) {
+/**
+ * Fila de app_users que ata el usuario a su empresa (lo que lee
+ * get_my_company_id) y le fija el ROL, que es lo que resuelven
+ * `current_user_role()` y el atajo de `user_has_permission` para
+ * admin/company_owner.
+ */
+async function upsertAppUser(admin, userId, companyId, nombre, role = 'company_owner') {
   const { error } = await admin.from('app_users').upsert({
-    id: userId, company_id: companyId, role: 'company_owner',
+    id: userId, company_id: companyId, role,
     full_name: nombre, activo: true,
   }, { onConflict: 'id' })
   if (error) throw new Error(`app_users upsert: ${error.message}`)
+}
+
+// ── Gate por CLASE de paquetes_recibidos ────────────────────────────────────
+// El motor único (20260829000000) resuelve el permiso POR FILA con un CASE
+// sobre `clase`, y su suite de comportamiento necesita CUATRO usuarios de la
+// MISMA empresa. No sirven A y B: son de empresas distintas, así que cualquier
+// "no ve la otra clase" podría estar pasando por aislamiento de tenant y no por
+// el gate que se quiere comprobar.
+//
+//   · paq / corr — rol NO administrativo (`operator`) con UN permiso granular
+//     cada uno. Tienen que ser no administrativos porque `user_has_permission`
+//     le dice true a TODO a admin/company_owner (20260518000008): con un admin,
+//     el gate de SELECT/INSERT/UPDATE sencillamente no se vería.
+//   · admin      — para el caso central de DELETE: mismo tenant, permiso
+//     efectivo sobre todo, y aun así NO puede borrar correspondencia.
+//   · owner      — control positivo de ese mismo DELETE.
+const CLASE_EMPRESA = 'RLS Sandbox — Gate por clase'
+const CLASE_ROLES = {
+  paq: { nombre: 'RLS Paquetería', permiso: 'condominios.tab.paqueteria' },
+  corr: { nombre: 'RLS Correspondencia', permiso: 'condominios.tab.correspondencia' },
+}
+export const CLASE_USUARIOS = [
+  { key: 'PAQ', email: 'rls-paq@sandbox.invalid', role: 'operator', rbac: 'paq', nombre: 'Operador de paquetería' },
+  { key: 'CORR', email: 'rls-corr@sandbox.invalid', role: 'operator', rbac: 'corr', nombre: 'Operador de correspondencia' },
+  { key: 'ADMIN', email: 'rls-admin@sandbox.invalid', role: 'admin', rbac: null, nombre: 'Administrador' },
+  { key: 'OWNER', email: 'rls-owner@sandbox.invalid', role: 'company_owner', rbac: null, nombre: 'Dueña' },
+]
+
+/**
+ * Crea (idempotentemente) el rol de empresa con SU ÚNICO permiso.
+ *
+ * El permiso se fija con delete+insert en vez de con un upsert ciego: si una
+ * corrida anterior dejó al rol una clave de más, el rol concedería dos clases y
+ * la prueba de "no ve la otra" pasaría a ser imposible de fallar. El fixture
+ * tiene que converger al estado declarado, no acumular.
+ */
+async function upsertRolDeClase(admin, companyId, { nombre, permiso }) {
+  const roleId = await upsertPorMatch(
+    admin, 'roles',
+    { company_id: companyId, name: nombre },
+    { company_id: companyId, name: nombre, description: 'Fixture del harness RLS', is_system: false },
+  )
+
+  const { error: eDel } = await admin.from('role_permissions')
+    .delete().eq('role_id', roleId).neq('permission_key', permiso)
+  if (eDel) throw new Error(`role_permissions limpieza: ${eDel.message}`)
+
+  const { error: eIns } = await admin.from('role_permissions')
+    .upsert({ role_id: roleId, permission_key: permiso, effect: 'allow' },
+            { onConflict: 'role_id,permission_key' })
+  if (eIns) throw new Error(`role_permissions upsert: ${eIns.message}`)
+  return roleId
+}
+
+/**
+ * Siembra la empresa del gate por clase con sus cuatro usuarios, un proyecto y
+ * una unidad. Devuelve lo necesario para verificarlo e imprimir los secretos.
+ */
+async function seedGateDeClase(admin, buscarUsuario) {
+  const companyId = await upsertPorMatch(
+    admin, 'companies', { nombre: CLASE_EMPRESA }, { nombre: CLASE_EMPRESA },
+  )
+
+  // El harness siembra sus propias filas desechables y necesita un proyecto y
+  // una unidad VÁLIDOS: `paquetes_unidad_por_clase_chk` exige unidad para la
+  // clase 'paquete', así que sin unidad la mitad de los escenarios no se puede
+  // ni montar.
+  const projectId = await upsertPorMatch(
+    admin, 'projects',
+    { company_id: companyId, nombre: 'Proyecto sandbox CLASE' },
+    { company_id: companyId, nombre: 'Proyecto sandbox CLASE', estado: 'activo' },
+  )
+  const unidadId = await upsertPorMatch(
+    admin, 'unidades',
+    { company_id: companyId, project_id: projectId, nombre: 'Unidad sandbox CLASE' },
+    { company_id: companyId, project_id: projectId, nombre: 'Unidad sandbox CLASE' },
+  )
+
+  const roles = {}
+  for (const [k, def] of Object.entries(CLASE_ROLES)) {
+    roles[k] = await upsertRolDeClase(admin, companyId, def)
+  }
+
+  const usuarios = []
+  for (const u of CLASE_USUARIOS) {
+    const pass = password()
+    const userId = await upsertUsuario(admin, u.email, pass, buscarUsuario)
+    await upsertAppUser(admin, userId, companyId, `RLS ${u.nombre}`, u.role)
+
+    // Las asignaciones de rol también CONVERGEN: se borra cualquier otra para
+    // que un fixture de una corrida anterior no le regale permisos de más.
+    const rolEsperado = u.rbac ? roles[u.rbac] : null
+    let q = admin.from('user_roles').delete().eq('user_id', userId)
+    if (rolEsperado) q = q.neq('role_id', rolEsperado)
+    const { error: eDel } = await q
+    if (eDel) throw new Error(`user_roles limpieza: ${eDel.message}`)
+
+    if (rolEsperado) {
+      const { error } = await admin.from('user_roles')
+        .upsert({ user_id: userId, role_id: rolEsperado }, { onConflict: 'user_id,role_id' })
+      if (error) throw new Error(`user_roles upsert: ${error.message}`)
+    }
+    usuarios.push({ ...u, userId, pass })
+  }
+
+  return { companyId, projectId, unidadId, usuarios }
+}
+
+/**
+ * Entra como cada uno de los cuatro y comprueba que el fixture ES el que el
+ * harness supone. No basta con que el login funcione: si `corr` acabara con el
+ * permiso de paquetería, la suite seguiría verde probando lo contrario de lo
+ * que dice probar.
+ *
+ * @returns {Promise<string[]>} lista de fallos (vacía = todo correcto).
+ */
+async function verificarGateDeClase(url, anon, clase) {
+  const fallos = []
+  const esperado = {
+    PAQ: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': false },
+    CORR: { 'condominios.tab.paqueteria': false, 'condominios.tab.correspondencia': true },
+    // Para admin y owner el helper dice true a todo: es el rasgo por el que el
+    // reparto de DELETE va por ROL y no por permiso, así que se afirma.
+    ADMIN: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+    OWNER: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+  }
+
+  for (const u of clase.usuarios) {
+    const cli = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } })
+    const { error: eLogin } = await cli.auth.signInWithPassword({ email: u.email, password: u.pass })
+    if (eLogin) {
+      fallos.push(`${u.key} (${u.email}): no se pudo iniciar sesión — ${eLogin.message}`)
+      continue
+    }
+
+    const { data: empresa, error: eEmp } = await cli.rpc('get_my_company_id')
+    if (eEmp) fallos.push(`${u.key}: get_my_company_id falló (${eEmp.message})`)
+    else if (empresa !== clase.companyId) {
+      fallos.push(`${u.key}: está en la empresa ${empresa}, no en la del gate (${clase.companyId})`)
+    }
+
+    for (const [clave, quiero] of Object.entries(esperado[u.key])) {
+      const { data, error } = await cli.rpc('user_has_permission', { perm_key: clave })
+      if (error) fallos.push(`${u.key}: user_has_permission(${clave}) falló (${error.message})`)
+      else if (data !== quiero) {
+        fallos.push(`${u.key}: user_has_permission(${clave}) = ${data}, se esperaba ${quiero}`)
+      }
+    }
+    await cli.auth.signOut()
+    log(`✔ ${u.key} (${u.role}): login OK y permisos efectivos como se esperaba`)
+  }
+  return fallos
 }
 
 /**
@@ -499,7 +656,7 @@ async function main(env) {
   if (env.SEED_CONFIRM !== 'si') {
     return abortar(`⚠️  Confirmación requerida.
 
-   Vas a crear 2 empresas, 2 usuarios y datos de prueba en el sandbox
+   Vas a crear 3 empresas, 6 usuarios y datos de prueba en el sandbox
    "${destino.ref}":
      ${URL}
 
@@ -538,6 +695,12 @@ async function main(env) {
         `asiento ${recursos.asientoId} · movimiento ${recursos.movimientoId} · ` +
         `amenidad ${recursos.amenidadId} · reserva ${recursos.reservaId} · cliente ${recursos.clienteId}`)
   }
+
+  // ── Empresa del gate por clase (cuatro usuarios, MISMA empresa) ──────────
+  console.log('\n🌱 Empresa del gate por clase de paquetes_recibidos\n')
+  const clase = await seedGateDeClase(admin, buscarUsuario)
+  log(`✔ empresa ${clase.companyId}  proyecto ${clase.projectId}  unidad ${clase.unidadId}`)
+  for (const u of clase.usuarios) log(`   ${u.key.padEnd(5)} ${u.role.padEnd(14)} ${u.email}`)
 
   // ── Verificación: que el sandbox NO produzca un verde vacío ───────────────
   // Se entra como CADA usuario con la anon key y se comprueba, TABLA POR TABLA,
@@ -583,6 +746,9 @@ async function main(env) {
     await cli.auth.signOut()
   }
 
+  console.log('\n🔍 Verificando los cuatro usuarios del gate por clase\n')
+  fallos.push(...await verificarGateDeClase(URL, ANON, clase))
+
   if (fallos.length > 0) {
     console.error('\n❌ El sandbox NO está en condiciones. El harness daría un verde sin significado:\n')
     for (const f of fallos) console.error(`   • ${f}`)
@@ -627,7 +793,7 @@ async function main(env) {
   console.log(`
 ✅ Sandbox listo y VERIFICADO como ambos usuarios.
 
-Pegá estos 7 secretos en el repo
+Pegá estos 15 secretos en el repo
 (Settings → Secrets and variables → Actions → New repository secret):
 
   RLS_SUPABASE_URL          ${URL}
@@ -638,16 +804,33 @@ Pegá estos 7 secretos en el repo
   RLS_USER_B_EMAIL          ${creado[1].email}
   RLS_USER_B_PASSWORD       ${creado[1].pass}
 
+Y estos OCHO, del gate por clase (los cuatro son de la MISMA empresa
+"${CLASE_EMPRESA}"):
+
+${clase.usuarios.map((u) =>
+  `  RLS_USER_${u.key}_EMAIL${' '.repeat(Math.max(1, 15 - u.key.length))}${u.email}\n` +
+  `  RLS_USER_${u.key}_PASSWORD${' '.repeat(Math.max(1, 12 - u.key.length))}${u.pass}`,
+).join('\n')}
+
+Los ocho son OBLIGATORIOS: sin ellos el preflight del workflow falla y el job
+queda en rojo. No hay ruta verde sin ejecutar — la suite del gate por clase no
+se auto-salta.
+
 RLS_EXPECTED_PROJECT_REF no es una credencial: es la DECLARACIÓN del proyecto
 contra el que puede operar el harness. Sin ella, cambiar RLS_SUPABASE_URL
 bastaría para que las escrituras de prueba fueran a parar a otro proyecto.
 El preflight exige que ambas coincidan y aborta si no.
 
-⚠️  La service_role NO va a GitHub. CI sólo recibe la anon key y estas dos
-   cuentas de bajo privilegio.
+⚠️  La service_role NO va a GitHub, ni se imprime aquí, ni se guarda en ningún
+   archivo: entra por SEED_SERVICE_ROLE_KEY y se queda en esta máquina. CI sólo
+   recibe la anon key y estas SEIS cuentas de bajo privilegio (usuarios de dos
+   empresas de juguete y de una tercera para el gate, en un proyecto
+   desechable).
 
-Las contraseñas se generan nuevas en cada corrida y NO se guardan en ningún
-sitio: si las perdés, volvé a correr el script y usá las nuevas.
+Las contraseñas de las SEIS cuentas se generan nuevas en cada corrida (se rotan
+también para los usuarios que ya existían) y NO se guardan en ningún sitio: si
+las perdés, volvé a correr el script y usá las nuevas. Después de cada corrida
+hay que actualizar los secretos y relanzar el job.
 `)
   return 0
 }

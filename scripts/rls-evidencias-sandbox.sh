@@ -35,7 +35,8 @@ echo "→ Del motor: $(grep -c 'ADD CONSTRAINT' "$TMP/motor-esquema.sql") constr
 
 for m in 20260830000000_correspondencia_devolucion \
          20260831000000_recepcion_evidencias_y_acuse \
-         20260901000000_recepcion_integridad_final; do
+         20260901000000_recepcion_integridad_final \
+         20260902000000_recepcion_claim_owner_y_mime; do
   [[ -f "$MIGR/$m.sql" ]] || { echo "✗ Falta la migración $m.sql" >&2; exit 1; }
 done
 
@@ -74,6 +75,8 @@ echo "→ 20260831000000 · evidencias y acuse"
 aplicar "$MIGR/20260831000000_recepcion_evidencias_y_acuse.sql"
 echo "→ 20260901000000 · integridad final"
 aplicar "$MIGR/20260901000000_recepcion_integridad_final.sql"
+echo "→ 20260902000000 · dueño del claim y MIME estricto"
+aplicar "$MIGR/20260902000000_recepcion_claim_owner_y_mime.sql"
 
 echo "→ Fixtures"
 aplicar "$RAIZ/scripts/rls-evidencias-datos.sql"

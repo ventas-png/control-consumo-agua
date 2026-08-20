@@ -86,14 +86,28 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
                   IN ('super_admin','superadmin'), false)
 $$;
 
--- COPIA FIEL de 20260518000008: para company_owner/admin dice true a CUALQUIER
--- clave. Por eso el reparto de borrado va por rol y no por permiso.
+-- COPIA FIEL de 20260518000008. Dos rasgos suyos son parte del contrato y no
+-- se pueden simplificar aquí sin que el sandbox deje de probar lo que dice:
+--
+--   · para super_admin/company_owner/admin dice true a CUALQUIER clave. Por eso
+--     el reparto de borrado va por rol y no por permiso.
+--   · el DENY explícito vence a cualquier allow, y se evalúa ANTES. Una versión
+--     anterior de este andamiaje se saltaba esa rama, así que un `deny` no se
+--     notaba: el sandbox habría dado por buena una autorización más laxa que la
+--     de producción. Es justo la semántica que notify-package delega en la base
+--     en vez de reimplementar.
 CREATE OR REPLACE FUNCTION public.user_has_permission(perm_key text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH me AS (SELECT role FROM public.app_users WHERE id = auth.uid())
   SELECT CASE
     WHEN auth.uid() IS NULL THEN false
     WHEN (SELECT role FROM me) IN ('super_admin','superadmin','company_owner','admin') THEN true
+    WHEN EXISTS (
+      SELECT 1 FROM public.user_roles ur
+      JOIN public.role_permissions rp ON rp.role_id = ur.role_id
+      WHERE ur.user_id = auth.uid() AND rp.permission_key = perm_key
+        AND rp.effect = 'deny' AND (ur.expires_at IS NULL OR ur.expires_at > now())
+    ) THEN false
     ELSE EXISTS (
       SELECT 1 FROM public.user_roles ur
       JOIN public.role_permissions rp ON rp.role_id = ur.role_id
@@ -166,9 +180,22 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.paquetes_recibidos TO authenticat
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.paquetes_recibidos TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 GRANT SELECT ON storage.buckets, public.app_users, public.unidades, public.projects TO authenticated;
+-- service_role tiene BYPASSRLS, pero eso no es un GRANT: sigue necesitando
+-- permiso de tabla para leer el catálogo de buckets.
+GRANT SELECT, UPDATE ON storage.buckets TO service_role;
+GRANT SELECT ON storage.objects TO service_role;
 -- `unidades` va sin RLS aquí a propósito: lo que se prueba de ella es la
 -- INTEGRIDAD REFERENCIAL (el FK), no quién la ve.
 GRANT SELECT, UPDATE, DELETE ON public.unidades TO authenticated;
+
+-- Cuenta REAL de objetos del bucket, sin pasar por RLS. La usa la aserción de
+-- super_admin: "las ve todas" es lo que se quiere afirmar, y una constante a
+-- mano se desactualiza cada vez que se añade un fixture — convirtiendo una
+-- prueba de privilegio en una prueba de aritmética.
+CREATE OR REPLACE FUNCTION public.total_evidencias() RETURNS bigint
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = storage, public AS $$
+  SELECT count(*) FROM storage.objects WHERE bucket_id = 'recepcion-evidencias'
+$$;
 
 -- ── Aserciones ──────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.assert_eq(actual bigint, esperado bigint, mensaje text)

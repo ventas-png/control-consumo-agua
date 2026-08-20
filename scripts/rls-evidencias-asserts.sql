@@ -196,7 +196,8 @@ DO $$
 DECLARE n bigint;
 BEGIN
   SELECT count(*) INTO n FROM storage.objects;
-  PERFORM public.assert_eq(n, 8, 'super_admin conserva su llave (ve las 8)');
+  PERFORM public.assert_eq(n, public.total_evidencias(),
+    'super_admin conserva su llave: ve TODAS las evidencias del bucket');
 END $$;
 ROLLBACK;
 
@@ -544,63 +545,240 @@ END $$;
 ROLLBACK;
 
 \echo ''
-\echo '── 7 · Aviso al residente: claim con lease ──'
+\echo '── 7 · Aviso al residente: el claim tiene DUEÑO ──'
 
 BEGIN;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000003';
 DO $$ BEGIN
-  PERFORM public.assert_falla(
-    $sql$ SELECT public.paquete_reclamar_aviso('c0000000-0000-0000-0000-00000000000a'::uuid) $sql$,
-    'el navegador NO puede reclamar el aviso (solo service_role)');
+  -- Las dos RPC internas están REVOKEadas de authenticated y de anon: el
+  -- navegador pide el aviso a través de notify-package, que es quien decide.
+  PERFORM public.assert_falla_con(
+    $sql$ SELECT public.paquete_reclamar_aviso(
+            'c0000000-0000-0000-0000-00000000000a'::uuid,
+            'f0000000-0000-0000-0000-000000000001'::uuid) $sql$,
+    '42501', 'el navegador NO puede reclamar el aviso (solo service_role)');
+
+  PERFORM public.assert_falla_con(
+    $sql$ SELECT public.paquete_finalizar_aviso(
+            'c0000000-0000-0000-0000-00000000000a'::uuid,
+            'f0000000-0000-0000-0000-000000000001'::uuid, true) $sql$,
+    '42501', 'el navegador NO puede finalizar el aviso (solo service_role)');
 END $$;
 ROLLBACK;
 
 BEGIN;
 SET LOCAL ROLE service_role;
 DO $$
-DECLARE v_pieza uuid := 'c0000000-0000-0000-0000-00000000000a';
+DECLARE
+  v_pieza uuid := 'c0000000-0000-0000-0000-00000000000a';
+  -- Dos tokens de dos ejecuciones distintas. En producción los genera
+  -- crypto.randomUUID() en cada invocación de la edge function; aquí se fijan
+  -- para poder afirmar sobre ellos.
+  v_a     uuid := 'aaaaaaaa-0000-0000-0000-00000000000a';
+  v_b     uuid := 'bbbbbbbb-0000-0000-0000-00000000000b';
 BEGIN
-  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza),
-    'la primera ejecución reclama el envío');
-  PERFORM public.assert_true(NOT public.paquete_reclamar_aviso(v_pieza),
-    'la segunda, simultánea, NO: el lease sigue vivo');
+  -- (1) A reclama.
+  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza, v_a),
+    '(1) A reclama el envío');
+  PERFORM public.assert_true(
+    (SELECT notificacion_claim_id = v_a FROM public.paquetes_recibidos WHERE id = v_pieza),
+    '    y la fila guarda SU token, no uno cualquiera');
+
+  PERFORM public.assert_true(NOT public.paquete_reclamar_aviso(v_pieza, v_b),
+    '    B no puede reclamar mientras el lease de A siga vivo');
+  PERFORM public.assert_true(
+    (SELECT notificacion_claim_id = v_a FROM public.paquetes_recibidos WHERE id = v_pieza),
+    '    y el intento fallido de B NO pisa el token de A');
 END $$;
 
--- Se envejece el claim como el dueño de la tabla para simular una ejecución que
--- murió a mitad. Es lo único que este sandbox no puede provocar de verdad: no
--- hay dos sesiones. La exclusión mutua sí es real — la da el row lock del
--- UPDATE, que serializa las dos llamadas de arriba.
+-- (2) El claim de A caduca. Es lo único que este sandbox no puede provocar de
+-- verdad —no hay dos sesiones ni reloj que avanzar—, así que se envejece la
+-- marca como dueño de la tabla. La exclusión mutua sí es real: la da el row
+-- lock del UPDATE, que serializa las llamadas de arriba.
 UPDATE public.paquetes_recibidos
    SET notificacion_claim_at = now() - interval '10 minutes'
  WHERE id = 'c0000000-0000-0000-0000-00000000000a';
 
 DO $$
-DECLARE v_pieza uuid := 'c0000000-0000-0000-0000-00000000000a';
+DECLARE
+  v_pieza uuid := 'c0000000-0000-0000-0000-00000000000a';
+  v_a     uuid := 'aaaaaaaa-0000-0000-0000-00000000000a';
+  v_b     uuid := 'bbbbbbbb-0000-0000-0000-00000000000b';
 BEGIN
-  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza),
-    'un claim abandonado caduca: otra ejecución puede reintentar');
-
-  -- Ningún canal entregó: se libera el claim y NO se sella nada.
-  PERFORM public.assert_true(public.paquete_finalizar_aviso(v_pieza, false),
-    'finalizar sin entrega devuelve true (la fila existe)');
+  -- (3) B reclama legítimamente.
+  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza, v_b),
+    '(3) con el lease vencido, B reclama');
   PERFORM public.assert_true(
-    (SELECT notificado_at IS NULL AND notificacion_claim_at IS NULL
+    (SELECT notificacion_claim_id = v_b FROM public.paquetes_recibidos WHERE id = v_pieza),
+    '    y el token pasa a ser el de B');
+
+  -- (4) A despierta y trata de finalizar. ESTE es el caso que el diseño
+  -- anterior no cubría: filtrando sólo por id, A borraba el claim de B y —si
+  -- creía haber entregado— sellaba notificado_at sobre el envío de B.
+  PERFORM public.assert_true(NOT public.paquete_finalizar_aviso(v_pieza, v_a, true),
+    '(4) A, con el token caducado, NO puede finalizar');
+
+  -- (5) B sigue siendo el dueño y nada se selló.
+  PERFORM public.assert_true(
+    (SELECT notificacion_claim_id = v_b
+        AND notificacion_claim_at IS NOT NULL
+        AND notificado_at IS NULL
        FROM public.paquetes_recibidos WHERE id = v_pieza),
-    'un fallo transitorio NO se sella como notificado');
+    '(5) B sigue siendo el dueño y A no selló nada');
 
-  -- Ahora sí entregó.
-  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza), 'se vuelve a reclamar');
-  PERFORM public.assert_true(public.paquete_finalizar_aviso(v_pieza, true), 'y se sella');
+  -- (6) B finaliza. Primero un fallo transitorio: libera y no sella.
+  PERFORM public.assert_true(public.paquete_finalizar_aviso(v_pieza, v_b, false),
+    '(6) B finaliza sin entrega: devuelve true');
   PERFORM public.assert_true(
-    (SELECT notificado_at IS NOT NULL AND notificacion_claim_at IS NULL
+    (SELECT notificado_at IS NULL
+        AND notificacion_claim_at IS NULL
+        AND notificacion_claim_id IS NULL
        FROM public.paquetes_recibidos WHERE id = v_pieza),
-    'notificado_at queda puesto y el claim liberado');
-  PERFORM public.assert_true(NOT public.paquete_reclamar_aviso(v_pieza),
-    'y ya no se puede reclamar: no se avisa dos veces');
+    '    un fallo transitorio NO se sella como notificado, y el claim queda libre');
+
+  -- Ahora sí entregó algún canal.
+  PERFORM public.assert_true(public.paquete_reclamar_aviso(v_pieza, v_b), '    B vuelve a reclamar');
+  PERFORM public.assert_true(public.paquete_finalizar_aviso(v_pieza, v_b, true), '    y sella');
+  PERFORM public.assert_true(
+    (SELECT notificado_at IS NOT NULL
+        AND notificacion_claim_at IS NULL
+        AND notificacion_claim_id IS NULL
+       FROM public.paquetes_recibidos WHERE id = v_pieza),
+    '    notificado_at queda puesto y el claim liberado');
+  PERFORM public.assert_true(NOT public.paquete_reclamar_aviso(v_pieza, v_a),
+    '    y ya no se puede reclamar: no se avisa dos veces');
 
   PERFORM public.assert_true(
-    NOT public.paquete_finalizar_aviso('00000000-0000-0000-0000-000000000000'::uuid, true),
+    NOT public.paquete_finalizar_aviso(
+      '00000000-0000-0000-0000-000000000000'::uuid, v_b, true),
     'finalizar una pieza inexistente devuelve false, no un éxito silencioso');
+
+  PERFORM public.assert_true(
+    NOT public.paquete_reclamar_aviso('c0000000-0000-0000-0000-00000000000d'::uuid, NULL),
+    'reclamar sin token no concede el claim');
+END $$;
+ROLLBACK;
+
+-- Las firmas viejas de dos argumentos tienen que haber DESAPARECIDO: mientras
+-- existieran, quien las llamara seguiría pudiendo liberar el claim de otro.
+BEGIN;
+SET LOCAL ROLE service_role;
+DO $$ BEGIN
+  PERFORM public.assert_eq(
+    (SELECT count(*) FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname IN ('paquete_reclamar_aviso', 'paquete_finalizar_aviso')),
+    2::bigint,
+    'queda UNA sola firma de cada RPC de aviso (las de 2 argumentos se eliminaron)');
+END $$;
+ROLLBACK;
+
+\echo ''
+\echo '── 8 · La firma: MIME en lista blanca, sin suponer nada ──'
+-- Las seis rutas de este bloque son idénticas salvo el `mimetype`: mismo
+-- bucket, misma pieza, mismo proyecto, mismo dueño y extensión de imagen. Si
+-- una negativa pasara, no podría ser por ninguna otra razón.
+
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000003';
+DO $$
+DECLARE
+  v_pieza uuid := 'c0000000-0000-0000-0000-00000000000b';
+  v_base  text := '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/';
+BEGIN
+  PERFORM public.assert_falla_con(
+    format($sql$ SELECT public.correspondencia_registrar_acuse(%L::uuid,'Bruno',%L) $sql$,
+           v_pieza, v_base || 'mime-nulo.png'),
+    '23514', 'metadata NULL: rechazada (antes se daba por PNG)');
+
+  PERFORM public.assert_falla_con(
+    format($sql$ SELECT public.correspondencia_registrar_acuse(%L::uuid,'Bruno',%L) $sql$,
+           v_pieza, v_base || 'mime-sin-clave.png'),
+    '23514', 'metadata sin la clave mimetype: rechazada');
+
+  PERFORM public.assert_falla_con(
+    format($sql$ SELECT public.correspondencia_registrar_acuse(%L::uuid,'Bruno',%L) $sql$,
+           v_pieza, v_base || 'mime-octeto.png'),
+    '23514', 'application/octet-stream: rechazada');
+
+  PERFORM public.assert_falla_con(
+    format($sql$ SELECT public.correspondencia_registrar_acuse(%L::uuid,'Bruno',%L) $sql$,
+           v_pieza, v_base || 'mime-svg.png'),
+    '23514', 'image/svg+xml: rechazada (pasaba el LIKE image/%, y lleva scripts)');
+
+  PERFORM public.assert_falla_con(
+    format($sql$ SELECT public.correspondencia_registrar_acuse(%L::uuid,'Bruno',%L) $sql$,
+           v_pieza, v_base || 'enganosa.jpg'),
+    '23514', 'extensión .jpg con MIME text/html: rechazada (la extensión la elige quien sube)');
+END $$;
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000003';
+DO $$
+DECLARE r public.paquetes_recibidos;
+BEGIN
+  -- CONTROL POSITIVO. Sin él, una condición que rechazara TODO también dejaría
+  -- verde el bloque de arriba.
+  r := public.correspondencia_registrar_acuse(
+         'c0000000-0000-0000-0000-00000000000b'::uuid, 'Bruno Díaz',
+         '33333333-3333-3333-3333-333333333333/c0000000-0000-0000-0000-00000000000b/firma-b.webp');
+  PERFORM public.assert_true(r.estado = 'atendido',
+    'CONTROL POSITIVO: image/webp sí se acepta');
+END $$;
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE service_role;
+DO $$ BEGIN
+  PERFORM public.assert_true(
+    (SELECT allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp']
+       FROM storage.buckets WHERE id = 'recepcion-evidencias'),
+    'y el bucket declara la MISMA lista blanca');
+END $$;
+ROLLBACK;
+
+\echo ''
+\echo '── 9 · Deny explícito: lo que notify-package delega en la base ──'
+-- `gdeny` tiene el rol que CONCEDE correspondencia y otro que la NIEGA. Este
+-- bloque fija la semántica que la edge function ya no reimplementa: en vez de
+-- recolectar los `effect='allow'` a mano —que es lo que hacía, y por eso un
+-- deny no se notaba— llama a `user_has_permission` con el JWT del usuario.
+
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000006';   -- gdeny
+DO $$
+DECLARE n bigint;
+BEGIN
+  PERFORM public.assert_true(
+    NOT public.user_has_permission('condominios.tab.correspondencia'),
+    'el DENY explícito vence al allow del otro rol');
+
+  -- Y el veto se nota en todo lo que cuelga del permiso, no sólo en el helper.
+  SELECT count(*) INTO n FROM storage.objects
+   WHERE name LIKE '%/c0000000-0000-0000-0000-00000000000c/%';
+  PERFORM public.assert_eq(n, 0, 'con el permiso vetado no ve la evidencia de correspondencia');
+
+  PERFORM public.assert_falla(
+    $sql$ SELECT public.correspondencia_registrar_acuse(
+            'c0000000-0000-0000-0000-00000000000a'::uuid, 'Quien sea') $sql$,
+    'ni puede registrar el acuse');
+END $$;
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000003';   -- gcorr
+DO $$ BEGIN
+  -- CONTROL POSITIVO: mismo rol `rolcorr`, misma empresa, mismo proyecto. Lo
+  -- único que los separa es el rol de veto.
+  PERFORM public.assert_true(
+    public.user_has_permission('condominios.tab.correspondencia'),
+    'CONTROL POSITIVO: sin veto, el mismo rol sí concede');
 END $$;
 ROLLBACK;
