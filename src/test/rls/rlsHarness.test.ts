@@ -1105,6 +1105,13 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
   async function sembrar(
     c: SupabaseClient, clase: 'paquete' | 'correspondencia',
   ): Promise<string> {
+    // Sin scope no se puede sembrar nada. Se dice; el `!` de antes convertía
+    // esto en un `TypeError: Cannot read properties of null`, que no explica
+    // nada — y así fue como una edición que borró la asignación de `scopeCorr`
+    // pasó por un fallo del sandbox durante una corrida entera.
+    const alcance = clase === 'correspondencia' ? scopeCorr : scopePaq
+    expect(alcance, `no se resolvió el scope para sembrar ${clase} (ver beforeAll)`).not.toBeNull()
+
     const fila: Record<string, unknown> = clase === 'correspondencia'
       ? {
           company_id: scopeCorr!.company_id, project_id: scopeCorr!.project_id,
@@ -1158,6 +1165,10 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
       )
     }
     scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+    // La correspondencia va dirigida a la administración, así que le basta el
+    // proyecto — pero tiene que ser el MISMO que el de la unidad, o el gate por
+    // clase se confundiría con el alcance por proyecto.
+    scopeCorr = { company_id: u.company_id, project_id: u.project_id }
 
     // ── El sandbox tiene que traer el ESQUEMA del motor único ─────────────
     // Se ANOTA, no se lanza. Lanzar aquí dejaba las once pruebas de abajo como
