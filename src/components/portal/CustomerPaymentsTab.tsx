@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { notify } from '../shared/Dialog'
 import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
@@ -49,11 +49,10 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
   const [pagoModal, setPagoModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
 
-  useEffect(() => {
-    cargarConfig()
-  }, [companyId])
-
-  async function cargarConfig() {
+  // `cargarConfig` como useCallback: el efecto declara su dependencia real en
+  // vez de una lista paralela. `estaCancelado` evita que la config de una
+  // empresa anterior pise la actual si las respuestas llegan fuera de orden.
+  const cargarConfig = useCallback(async (estaCancelado: () => boolean = () => false) => {
     // Sin empresa resuelta no hay config que leer: salimos del loading igual
     // (no colgar). Llega vacío solo mientras el portal termina el bootstrap.
     if (!companyId) { setLoading(false); return }
@@ -61,6 +60,7 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
       fetchPortalPaymentConfig(companyId),
       fetchPortalRecargoTarjeta(companyId),
     ])
+    if (estaCancelado()) return
     setRecargoRows(recargos)
     if (data) {
       setPaymentConfig({
@@ -73,7 +73,13 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
       })
     }
     setLoading(false)
-  }
+  }, [companyId])
+
+  useEffect(() => {
+    let cancelado = false
+    void cargarConfig(() => cancelado)
+    return () => { cancelado = true }
+  }, [cargarConfig])
 
   // ¿El tenant tiene un payfac pluggable (sandbox/qpaypro)? Entonces ofrecemos el
   // pago en línea con conciliación server-side (create-charge → confirm-charge).

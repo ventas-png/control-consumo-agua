@@ -3,7 +3,8 @@ import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { StatTile } from '../../shared/StatTile'
 import { UsuarioChip } from '../../shared/UsuarioChip'
 import { useActividadEquipo, type ActividadUsuario } from '../../../domain/condominios/actividad'
-import { dateLocalISO, hoyLocalISO } from '../../../lib/format'
+import { dateLocalISO } from '../../../lib/format'
+import { useHoyLocalISO } from '../../../hooks/useHoy'
 
 // ============================================================================
 // ActividadEquipoTab — qué hizo cada persona del equipo en el período.
@@ -27,19 +28,29 @@ const RANGOS = [
 
 // dateLocalISO y no toISOString(): en husos negativos (todo LATAM) el ISO
 // devuelve la fecha UTC y después de las 18:00 locales el rango se corre un día.
-function isoHaceDias(dias: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - dias)
-  return dateLocalISO(d)
+//
+// El ancla es el extremo SUPERIOR del rango ('YYYY-MM-DD'), no `new Date()`:
+// leer el reloj aquí dentro dejaba `desde` congelado en el día del primer
+// render (el memo que lo llama solo depende de `dias`), así que al cruzar la
+// medianoche el rango se estiraba a 31 días en vez de desplazarse.
+function isoHaceDias(hastaISO: string, dias: number): string {
+  const [y, m, d] = hastaISO.split('-').map(Number)
+  return dateLocalISO(new Date(y, m - 1, d - dias))
 }
 
 export default function ActividadEquipoTab({ proyectoId, companyId }: Props) {
   const [dias, setDias] = useState<number>(30)
-  const hasta = useMemo(() => hoyLocalISO(), [])
-  const desde = useMemo(() => isoHaceDias(dias), [dias])
+  // `useMemo(() => hoyLocalISO(), [])` congelaba el extremo del rango: una
+  // pantalla abierta de madrugada seguía consultando hasta ayer. useHoyLocalISO
+  // mantiene la identidad estable dentro del día y la refresca a medianoche.
+  const hasta = useHoyLocalISO()
+  // Derivado de `hasta`: ambos extremos del rango avanzan juntos a medianoche.
+  const desde = useMemo(() => isoHaceDias(hasta, dias), [hasta, dias])
 
   const { data, isLoading, isError, error } = useActividadEquipo(proyectoId, desde, hasta)
-  const filas = data ?? []
+  // `data ?? []` creaba un array nuevo en cada render, así que los dos memos de
+  // abajo se recalculaban siempre (memoización inútil). Estabilizado aquí.
+  const filas = useMemo(() => data ?? [], [data])
 
   const totales = useMemo(() => filas.reduce(
     (acc, f) => ({

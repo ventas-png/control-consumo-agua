@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createCondominioRow } from '../../../domain/condominios/tabMutations'
 import { fetchAsambleasDigital, fetchPuntosByAsambleaIds, fetchVotosUnidad } from '../../../domain/condominios/tabQueries'
 import { EmptyState } from '../../shared/EmptyState'
@@ -59,18 +59,20 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
   const [voting, setVoting] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  useEffect(() => {
-    void cargar()
-  }, [proyectoId, unidadId])
-
-  async function cargar() {
+  // `cargar` como useCallback (antes función suelta, recreada por render): el
+  // efecto declara su dependencia real en vez de una lista paralela que había
+  // que mantener a mano. `cancelado` evita que una respuesta de un proyecto ya
+  // abandonado pise el estado del actual.
+  const cargar = useCallback(async (estaCancelado: () => boolean = () => false) => {
     setLoading(true)
     const list = await fetchAsambleasDigital<AsambleaDigital>(proyectoId)
+    if (estaCancelado()) return
     setAsambleas(list)
 
     if (list.length > 0) {
       const ids = list.map(a => a.id)
       const pts = await fetchPuntosByAsambleaIds<PuntoAsamblea2>(ids)
+      if (estaCancelado()) return
       const byAsamblea: Record<string, PuntoAsamblea2[]> = {}
       pts.forEach(p => {
         if (!byAsamblea[p.asamblea_id]) byAsamblea[p.asamblea_id] = []
@@ -80,12 +82,19 @@ export function PortalAsambleasTab({ unidadId, proyectoId }: Props) {
 
       // Cargar votos previos del residente
       const votos = await fetchVotosUnidad<VotoUnidad>(unidadId)
+      if (estaCancelado()) return
       const votosMap: Record<string, VotoUnidad['voto']> = {}
       votos.forEach(v => { votosMap[v.punto_id] = v.voto })
       setMisVotos(votosMap)
     }
     setLoading(false)
-  }
+  }, [proyectoId, unidadId])
+
+  useEffect(() => {
+    let cancelado = false
+    void cargar(() => cancelado)
+    return () => { cancelado = true }
+  }, [cargar])
 
   async function votar(punto: PuntoAsamblea2, voto: VotoUnidad['voto']) {
     if (misVotos[punto.id]) {

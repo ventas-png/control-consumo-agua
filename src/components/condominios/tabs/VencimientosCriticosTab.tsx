@@ -1,4 +1,5 @@
-import { useState, useMemo, type CSSProperties} from 'react'
+import { useState, useMemo, useCallback, type CSSProperties} from 'react'
+import { useHoyDate } from '../../../hooks/useHoy'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { notify } from '../../shared/Dialog'
 import {
@@ -60,8 +61,26 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
   const [filtroPlazo, setFiltroPlazo] = useState<'todos' | 'vencido' | '30' | '60' | '90'>('todos')
   const [form, setForm] = useState(BLANK)
 
-  const hoy = new Date()
-  const diffDias = (fechaStr: string) => diasHastaFechaCalendario(fechaStr, hoy) ?? 0
+  // Dos correcciones que se cruzaron aquí y se conservan las dos:
+  //
+  //   · de #772 — `diasHastaFechaCalendario` cuenta días de CALENDARIO. El
+  //     `Math.floor((new Date(fechaStr) - hoy) / 86400000)` de antes mezclaba
+  //     una fecha parseada en UTC con un instante local, así que la cuenta se
+  //     desplazaba un día según la hora y el huso.
+  //   · de este PR — `useHoyDate()` da un `hoy` con identidad ESTABLE dentro
+  //     del día que se renueva al cruzar la medianoche local. Antes era
+  //     `new Date()` por render: el memo de `items` no podía declarar
+  //     `diffDias` en deps sin recalcularse siempre, y la cuenta regresiva no
+  //     avanzaba nunca.
+  //
+  // Juntas: el cálculo es de calendario y además se actualiza solo a
+  // medianoche. `diffDias` es un useCallback sobre `hoy`, así que el memo puede
+  // declarar su dependencia real en vez de esconderla.
+  const hoy = useHoyDate()
+  const diffDias = useCallback(
+    (fechaStr: string) => diasHastaFechaCalendario(fechaStr, hoy) ?? 0,
+    [hoy],
+  )
 
   const items: ItemVenc[] = useMemo(() => {
     const list: ItemVenc[] = []
@@ -95,7 +114,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
     }))
 
     return list.sort((a, b) => a.dias - b.dias)
-  }, [polizas, contratosProveedores, inspecciones, vencimientosExtra])
+  }, [polizas, contratosProveedores, inspecciones, vencimientosExtra, diffDias])
 
   const filtrados = items.filter(i => {
     if (filtroOrigen !== 'todos' && i.origen !== filtroOrigen) return false

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useHoyDate } from '../../../hooks/useHoy'
 import { notify } from '../../shared/Dialog'
 import { createCondominioRow, updateCondominioRow, updateCondominioRowsByIds } from '../../../domain/condominios/tabMutations'
 import { fetchHuespedesByReservas } from '../../../domain/condominios/tabQueries'
@@ -67,7 +68,11 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
   const [acompForm, setAcompForm] = useState(defaultAcompForm())
   const [salidaConAcomp, setSalidaConAcomp] = useState(true)
 
-  const rangos = rangosDeFecha()
+  // `rangosDeFecha()` sin argumento devolvía un objeto nuevo por render, así
+  // que `hoy` no podía declararse como dependencia del efecto de abajo sin
+  // dispararlo en cada render. Anclado al día (estable hasta la medianoche).
+  const ahora = useHoyDate()
+  const rangos = useMemo(() => rangosDeFecha(ahora), [ahora])
   const { hoy, inicioSemana } = rangos
 
   // Fetch pre-registered guests when STR modal opens
@@ -75,15 +80,20 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     if (!showStrModal) return
     const activas = reservasSTR.filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
     if (activas.length === 0) return
+    // Respuesta fuera de orden: si el modal se cierra (o cambian las reservas)
+    // antes de que resuelva el fetch, el resultado viejo no pisa el estado.
+    let cancelado = false
     void fetchHuespedesByReservas<HuespedSTR>(activas.map(r => r.id)).then(data => {
       const grouped: Record<string, HuespedSTR[]> = {}
       data.forEach(h => {
         if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
         grouped[h.reserva_str_id].push(h)
       })
+      if (cancelado) return
       setStrHuespedes(grouped)
     })
-  }, [showStrModal, reservasSTR])
+    return () => { cancelado = true }
+  }, [showStrModal, reservasSTR, hoy])
 
   // Derivados puros (lib/visitantesFiltros, con tests): KPIs sin doble conteo
   // de acompañantes, sugerencias dedup, filtro combinado y agrupación.

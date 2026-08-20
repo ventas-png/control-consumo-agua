@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import { fetchContratosByUnidades, fetchReservasByUnidades } from '../../domain/clientes/queries'
 import {
@@ -79,25 +79,43 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, canD
   const [strForm, setStrForm] = useState(EMPTY_STR)
   const [savingSTR, setSavingSTR] = useState(false)
 
-  // Filter units that belong to this client
-  const clienteUnidades = unidades.filter(u => u.cliente_id === cliente.id && u.activo)
+  // Filter units that belong to this client. useMemo: sin él el array cambia de
+  // identidad por render y `fetchData` no puede declararlo como dependencia.
+  const clienteUnidades = useMemo(
+    () => unidades.filter(u => u.cliente_id === cliente.id && u.activo),
+    [unidades, cliente.id],
+  )
 
-  useEffect(() => {
-    fetchData()
-  }, [cliente.id])
-
-  async function fetchData() {
-    if (clienteUnidades.length === 0) { setLoading(false); return }
+  // Antes el efecto solo miraba `cliente.id`: si las unidades llegaban después
+  // (carga asíncrona del padre) la lista seguía vacía y no se recargaba nunca.
+  const fetchData = useCallback(async (estaCancelado: () => boolean = () => false) => {
+    // Sin unidades no hay nada que consultar, PERO tampoco puede quedarse en
+    // pantalla lo del cliente/unidades anteriores: el early-return se limitaba a
+    // apagar el loading y dejaba visibles contratos y reservas de la carga
+    // previa. Se limpia el estado antes de salir.
+    if (clienteUnidades.length === 0) {
+      setContratos([])
+      setReservas([])
+      setLoading(false)
+      return
+    }
     const unidadIds = clienteUnidades.map(u => u.id)
     setLoading(true)
     const [contratosData, reservasData] = await Promise.all([
       fetchContratosByUnidades(unidadIds),
       fetchReservasByUnidades(unidadIds),
     ])
+    if (estaCancelado()) return
     setContratos(contratosData)
     setReservas(reservasData)
     setLoading(false)
-  }
+  }, [clienteUnidades])
+
+  useEffect(() => {
+    let cancelado = false
+    void fetchData(() => cancelado)
+    return () => { cancelado = true }
+  }, [fetchData])
 
   // ── Arrendamiento CRUD ──────────────────────────────────────────────────────
 

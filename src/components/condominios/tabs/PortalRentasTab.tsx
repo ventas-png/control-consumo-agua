@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { confirm, notify } from '../../shared/Dialog'
 import {
@@ -246,11 +246,16 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
     ? (solicitudRenta.tipo_aprobado ?? solicitudRenta.tipo_renta)
     : null
 
-  const allowedSubTabs: SubTab[] = tipoAprobado === 'ambas'
-    ? ['arrendamiento', 'str']
-    : tipoAprobado === 'arrendamiento' ? ['arrendamiento']
-    : tipoAprobado === 'str'           ? ['str']
-    : []
+  // Array literal: sin useMemo cambiaba de identidad en cada render y el efecto
+  // que corrige `subTab` se re-ejecutaba siempre (y no podía declararlo en deps
+  // sin arriesgar un ciclo). Solo depende de `tipoAprobado`.
+  const allowedSubTabs: SubTab[] = useMemo(() => (
+    tipoAprobado === 'ambas'
+      ? ['arrendamiento', 'str']
+      : tipoAprobado === 'arrendamiento' ? ['arrendamiento']
+      : tipoAprobado === 'str'           ? ['str']
+      : []
+  ), [tipoAprobado])
 
   const [subTab, setSubTab]       = useState<SubTab>('arrendamiento')
   const [loading, setLoading]     = useState(false)

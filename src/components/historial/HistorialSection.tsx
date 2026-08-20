@@ -1,4 +1,4 @@
-import { useState, useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useState, useMemo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { updateRegistro, deleteRegistro } from '../../domain/agua/mutations'
@@ -140,7 +140,13 @@ export function HistorialSection({
     }
   }, [filtrados])
 
-  function enviarWhatsApp(registro: Registro) {
+  // useCallback: `columns` es un useMemo y necesita declarar estas dos como
+  // dependencias reales. Como funciones sueltas se recreaban en cada render, así
+  // que el memo se habría recalculado siempre — y sin declararlas se quedaba con
+  // una closure vieja: `clientes` NO estaba en las deps de `columns`, de modo
+  // que si el listado de clientes terminaba de cargar después del primer render,
+  // el botón de WhatsApp seguía diciendo "este cliente no tiene teléfono".
+  const enviarWhatsApp = useCallback((registro: Registro) => {
     const cliente = clientes.find(c => c.id === registro.cliente_id)
     const rawTel = cliente?.whatsapp ?? cliente?.telefono ?? ''
     if (!rawTel) {
@@ -159,7 +165,7 @@ export function HistorialSection({
       : ''
     const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${formatDate(registro.fecha)}${periodoStr}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${formatNumber(registro.consumo)} m³\n💰 Total a Pagar: ${formatCurrency(total, moneda)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
-  }
+  }, [clientes, moneda])
 
   async function updateEstado() {
     if (!editModal) return
@@ -175,7 +181,7 @@ export function HistorialSection({
     setSavingEstado(false)
   }
 
-  async function eliminarRegistro(registro: Registro) {
+  const eliminarRegistro = useCallback(async (registro: Registro) => {
     const result = await confirm({
       icon: 'warning',
       title: '¿Eliminar lectura?',
@@ -195,7 +201,7 @@ export function HistorialSection({
     }
     onRegistroDeleted?.(registro.id)
     notify({ variant: 'success', title: 'Lectura eliminada', duration: 1500 })
-  }
+  }, [onRegistroDeleted])
 
   function resetFiltros() {
     setFiltroTexto(''); setFiltroEstado(''); setFiltroProyecto('')
@@ -313,7 +319,7 @@ export function HistorialSection({
         </div>
       ),
     },
-  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, expandidas])
+  ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, expandidas, enviarWhatsApp, eliminarRegistro])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
