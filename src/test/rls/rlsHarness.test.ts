@@ -1153,6 +1153,28 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
       )
     }
     scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+
+    // ── El sandbox tiene que traer el ESQUEMA del motor único ─────────────
+    // Sin esto, los seis escenarios que siembran una pieza fallan uno a uno con
+    // `PGRST204 — Could not find the 'clase' column`, que suena a prueba rota y
+    // no lo es: es el sandbox con el esquema atrasado. Se comprueba una vez y se
+    // falla con la instrucción, en vez de seis veces con un código de PostgREST.
+    //
+    // Este caso apareció en cuanto el gate dejó de auto-saltarse: mientras las
+    // 13 pruebas se omitían, el desajuste entre el esquema del sandbox y el del
+    // repositorio era invisible.
+    const { error: eEsquema } = await ownerUser
+      .from('paquetes_recibidos').select('clase, destinatario_tipo').limit(1)
+    if (eEsquema) {
+      throw new Error(
+        `El sandbox RLS no tiene el esquema del motor único de recepción: ${eEsquema.message}\n` +
+        'Le faltan las migraciones 20260829000000 … 20260902000000, que son las que crean ' +
+        '`clase`, `destinatario_tipo` y las policies por clase.\n' +
+        'Aplicalas al proyecto del harness (el de RLS_EXPECTED_PROJECT_REF, que NO es la rama ' +
+        'de preview del PR) y, si PostgREST sigue sin verlas, recargá su caché con ' +
+        "NOTIFY pgrst, 'reload schema'.",
+      )
+    }
     // La correspondencia va dirigida a la administración, así que le basta el
     // proyecto — pero tiene que ser el MISMO, o el gate se confundiría con el
     // alcance por proyecto.
