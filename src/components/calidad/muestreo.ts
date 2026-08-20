@@ -1,4 +1,4 @@
-import { dateLocalISO } from '../../lib/format'
+import { diasEntreFechasCalendario, esFechaCalendario, sumarDiasCalendario } from '../../lib/format'
 // serv:S26 — Programa de muestreo de calidad. Lógica pura y testeable: deriva el
 // estado de muestreo de cada fuente a partir de su frecuencia (días) y la fecha
 // de su última muestra registrada (registros_calidad). Sin React/DOM.
@@ -13,9 +13,14 @@ export interface MuestreoInfo {
   dias: number | null
 }
 
-const MS_DIA = 86_400_000
+// Las fechas de este módulo son fechas de CALENDARIO ('YYYY-MM-DD'): un día del
+// almanaque, no un instante. Toda la aritmética se delega en src/lib/format.ts
+// —`sumarDiasCalendario` y `diasEntreFechasCalendario`— para no mantener una
+// segunda implementación de fechas. El defecto que esto corrige era justamente
+// el round-trip prohibido: se parseaba el día como medianoche UTC y luego se
+// formateaba como día LOCAL, así que en cualquier huso negativo la próxima
+// fecha retrocedía un día (America/Guatemala: '2026-05-31' → '2026-05-30').
 const aFecha = (iso: string): string => iso.slice(0, 10)
-const parseUTC = (fecha: string): number => Date.parse(fecha + 'T00:00:00Z')
 
 /**
  * Última fecha de muestra (registro de calidad) por fuente. Acepta fechas con o
@@ -48,9 +53,17 @@ export function estadoMuestreo(
   if (!ultimaFecha) {
     return { estado: 'sin_muestras', proximaFecha: null, dias: null }
   }
-  const proxMs = parseUTC(aFecha(ultimaFecha)) + frecuenciaDias * MS_DIA
-  const proximaFecha = dateLocalISO(new Date(proxMs))
-  const dias = Math.round((proxMs - parseUTC(aFecha(hoy))) / MS_DIA)
+  const proximaFecha = sumarDiasCalendario(aFecha(ultimaFecha), frecuenciaDias)
+  const dias = esFechaCalendario(proximaFecha)
+    ? diasEntreFechasCalendario(aFecha(hoy), proximaFecha)
+    : null
+  // Una fecha ilegible (o un desborde del calendario) deja el programa sin
+  // ancla evaluable: se degrada a 'sin_muestras' —el mismo estado que cuando no
+  // hay muestra alguna— en lugar de propagar 'NaN-NaN-NaN' y un `dias` NaN, que
+  // además se clasificaban como 'al_dia' y pintaban el chip en verde.
+  if (proximaFecha === null || dias === null) {
+    return { estado: 'sin_muestras', proximaFecha: null, dias: null }
+  }
   const ventana = Math.max(2, Math.ceil(frecuenciaDias * 0.2))
   const estado: EstadoMuestreo = dias < 0 ? 'vencido' : dias <= ventana ? 'proximo' : 'al_dia'
   return { estado, proximaFecha, dias }
