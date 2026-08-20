@@ -39,23 +39,36 @@ export function getDefaultLocale(): string {
 // notificaciones, registros.fecha del módulo de agua) NO usar esto: ahí el
 // instante y su conversión a la zona del usuario son justamente el
 // comportamiento correcto.
+//
+// Por eso el parser es ESTRICTO: sólo 'YYYY-MM-DD', sin sufijo de hora, sin
+// zona y sin espacios. Un timestamp que se colara por aquí perdería su hora y
+// su zona y se reinterpretaría como día local: '2026-01-01T03:00:00Z' es el
+// 31 de diciembre en America/Guatemala, y tratarlo como fecha de calendario
+// lo movería al 1 de enero — exactamente el desplazamiento que este módulo
+// existe para evitar, sólo que en el otro sentido.
 
-/** 'YYYY-MM-DD', tolerando un sufijo de hora que Postgres nunca manda en `date`. */
-const RE_FECHA_CALENDARIO = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
+/** 'YYYY-MM-DD' y nada más: ni hora, ni zona, ni espacios, ni texto extra. */
+const RE_FECHA_CALENDARIO = /^(\d{4})-(\d{2})-(\d{2})$/
 
 /**
  * Parsea una fecha de calendario 'YYYY-MM-DD' como medianoche LOCAL, de modo
  * que año, mes y día se conservan en cualquier zona horaria.
  *
  * Devuelve `null` —nunca un Invalid Date— para null, undefined, cadena vacía,
- * formato no reconocido o fecha inexistente (2026-02-29, 2026-13-01).
+ * formato no reconocido (incluido cualquier timestamp con hora) o fecha
+ * inexistente (2026-02-29, 2026-13-01).
+ *
+ * Un `Date` de entrada se normaliza a la medianoche de su día LOCAL en una
+ * instancia NUEVA: el argumento nunca se modifica ni se devuelve tal cual, así
+ * que quien reciba el resultado puede mutarlo sin afectar a quien lo pasó.
  */
 export function parseFechaCalendario(value: string | Date | null | undefined): Date | null {
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value
+    if (Number.isNaN(value.getTime())) return null
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate())
   }
   if (typeof value !== 'string') return null
-  const m = RE_FECHA_CALENDARIO.exec(value.trim())
+  const m = RE_FECHA_CALENDARIO.exec(value)
   if (!m) return null
   const [, ys, ms, ds] = m
   const y = Number(ys)
@@ -146,6 +159,9 @@ export function esFechaCalendarioVencida(
  * Suma días a una fecha de calendario y devuelve 'YYYY-MM-DD' (`null` si la
  * entrada es inválida). Puro sobre el calendario: sin round-trip por UTC, así
  * que no se desplaza en husos negativos ni en cambios de horario.
+ *
+ * No muta el argumento: opera sobre la instancia nueva que devuelve
+ * `parseFechaCalendario`.
  */
 export function sumarDiasCalendario(
   value: string | Date | null | undefined,
@@ -160,14 +176,18 @@ export function sumarDiasCalendario(
 // ── Dates ──────────────────────────────────────────────────────────────────
 
 /**
- * Parsea una fecha que puede venir como 'YYYY-MM-DD' o ISO completo.
- * Las fechas de calendario van por `parseFechaCalendario` (medianoche local);
- * los ISO con hora conservan su semántica de instante.
+ * Parsea una fecha que puede venir como 'YYYY-MM-DD' o como timestamp ISO.
+ *
+ * El reparto se decide por el patrón ESTRICTO de fecha de calendario, no por
+ * la presencia de una 'T': sólo 'YYYY-MM-DD' va por `parseFechaCalendario`
+ * (medianoche local). Cualquier otra cadena —incluido '2026-01-01 03:00:00',
+ * que no lleva 'T'— pasa al constructor de `Date` y conserva su semántica de
+ * instante. Lo no parseable sigue devolviendo Invalid Date (contrato previo).
  */
 export function parseFecha(value: string | Date | null | undefined): Date {
   if (!value) return new Date(NaN)
   if (value instanceof Date) return value
-  if (!value.includes('T')) return parseFechaCalendario(value) ?? new Date(NaN)
+  if (RE_FECHA_CALENDARIO.test(value)) return parseFechaCalendario(value) ?? new Date(NaN)
   return new Date(value)
 }
 

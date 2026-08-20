@@ -29,6 +29,22 @@ const TZ_ORIGINAL = process.env.TZ
 /** Husos exigidos por el PR: UTC, GMT-6, GMT-8 y GMT+9. */
 const ZONAS = ['UTC', 'America/Guatemala', 'America/Los_Angeles', 'Asia/Tokyo'] as const
 
+/**
+ * Cadenas que NO son fechas de calendario. El parser debe rechazarlas todas:
+ * llevan hora (y a veces zona), así que aplanarlas a un día local perdería el
+ * instante y desplazaría la fecha en husos negativos.
+ */
+const TIMESTAMPS = [
+  '2026-01-01T00:00:00',
+  '2026-01-01T03:00:00Z',
+  '2026-01-01T03:00:00-06:00',
+  '2026-01-01T00:00:00.000Z',
+  '2026-01-01 00:00:00',
+  '2026-01-01 cualquier-cosa',
+  '2026-01-01T',
+  '2026-01-01 ',
+] as const
+
 function conZona(tz: string, fn: () => void): void {
   process.env.TZ = tz
   try {
@@ -182,6 +198,7 @@ describe('valores nulos, vacíos e inválidos', () => {
     null, undefined, '', '   ', 'null', 'undefined', 'no-es-fecha',
     '2026-13-01', '2026-00-10', '2026-01-32', '2026-01-00', '2026-02-30',
     '01/01/2026', '2026/01/01', '26-01-01', '2026-1-1', 'NaN', '2026-01-0a',
+    ...TIMESTAMPS,
   ]
 
   it('parseFechaCalendario devuelve null (nunca Invalid Date)', () => {
@@ -219,9 +236,131 @@ describe('valores nulos, vacíos e inválidos', () => {
     expect(Number.isNaN(parseFecha('no-es-fecha').getTime())).toBe(true)
   })
 
-  it('tolera un sufijo de hora en una columna date (por si el backend lo agrega)', () => {
-    const d = parseFechaCalendario('2026-01-01T00:00:00')!
-    expect(d.getDate()).toBe(1)
-    expect(parseFechaCalendario('2026-01-01 00:00:00')!.getDate()).toBe(1)
+  it('rechaza timestamps y sufijos: una fecha de calendario es SOLO YYYY-MM-DD', () => {
+    // Un timestamp que se colara aquí perdería hora y zona y se reinterpretaría
+    // como día local. '2026-01-01T03:00:00Z' es el 31 de diciembre en GT: darlo
+    // por fecha de calendario lo movería al 1 de enero.
+    for (const v of TIMESTAMPS) {
+      expect(parseFechaCalendario(v)).toBeNull()
+      expect(esFechaCalendario(v)).toBe(false)
+      expect(formatFechaCalendario(v)).toBe('')
+      expect(formatFechaCalendario(v, {}, 'es-GT', '—')).toBe('—')
+      expect(diasHastaFechaCalendario(v)).toBeNull()
+      expect(sumarDiasCalendario(v, 1)).toBeNull()
+    }
+  })
+
+  it('rechaza espacios alrededor: no se recorta la entrada', () => {
+    expect(parseFechaCalendario(' 2026-01-01')).toBeNull()
+    expect(parseFechaCalendario('2026-01-01 ')).toBeNull()
+  })
+})
+
+describe('separación fecha de calendario / timestamp', () => {
+  it('parseFecha conserva EXACTAMENTE el instante de un ISO con hora', () => {
+    expect(parseFecha('2026-01-01T03:00:00Z').toISOString()).toBe('2026-01-01T03:00:00.000Z')
+    expect(parseFecha('2026-01-01T03:00:00.123Z').toISOString()).toBe('2026-01-01T03:00:00.123Z')
+    // Sin 'T' pero con hora: NO es fecha de calendario, va al parser de Date.
+    const sinT = parseFecha('2026-01-01 03:00:00')
+    expect(Number.isNaN(sinT.getTime())).toBe(false)
+    expect(sinT.getHours()).toBe(3)
+  })
+
+  it('bajo America/Guatemala, 2026-01-01T03:00:00Z cae el 31 de diciembre', () => {
+    conZona('America/Guatemala', () => {
+      const d = parseFecha('2026-01-01T03:00:00Z')
+      expect(d.getFullYear()).toBe(2025)
+      expect(d.getMonth()).toBe(11)
+      expect(d.getDate()).toBe(31)
+      expect(d.getHours()).toBe(21)
+      // Y el parser de calendario NO lo asciende al 1 de enero: lo rechaza.
+      expect(parseFechaCalendario('2026-01-01T03:00:00Z')).toBeNull()
+    })
+  })
+
+  it('sólo el patrón estricto se desvía al parser de calendario', () => {
+    conZona('America/Guatemala', () => {
+      // date-only → componentes LOCALES (día 1, no 31).
+      expect(parseFecha('2026-01-01').getDate()).toBe(1)
+      expect(parseFecha('2026-01-01').getHours()).toBe(0)
+    })
+  })
+})
+
+describe('parseFechaCalendario no muta el Date recibido', () => {
+  it('devuelve una instancia nueva normalizada al día local', () => {
+    const original = new Date(2026, 0, 1, 13, 45, 30, 250)
+    const copia = new Date(original.getTime())
+    const out = parseFechaCalendario(original)!
+    expect(out).not.toBe(original)
+    expect(out.getFullYear()).toBe(2026)
+    expect(out.getMonth()).toBe(0)
+    expect(out.getDate()).toBe(1)
+    expect(out.getHours()).toBe(0)
+    expect(out.getMinutes()).toBe(0)
+    expect(out.getSeconds()).toBe(0)
+    expect(out.getMilliseconds()).toBe(0)
+    expect(original.getTime()).toBe(copia.getTime())
+  })
+
+  it('sumarDiasCalendario(Date, n) suma bien y deja intacto el argumento', () => {
+    const original = new Date(2026, 0, 1, 13, 45, 30, 250)
+    const antes = original.getTime()
+    expect(sumarDiasCalendario(original, 1)).toBe('2026-01-02')
+    expect(original.getTime()).toBe(antes)
+
+    const finDeMes = new Date(2026, 0, 31, 23, 59, 59)
+    const antesFinDeMes = finDeMes.getTime()
+    expect(sumarDiasCalendario(finDeMes, 1)).toBe('2026-02-01')
+    expect(finDeMes.getTime()).toBe(antesFinDeMes)
+
+    // Llamadas repetidas sobre el MISMO Date dan siempre el mismo resultado:
+    // si mutara, la segunda saldría desplazada.
+    const repetido = new Date(2026, 5, 10, 8, 0, 0)
+    expect(sumarDiasCalendario(repetido, 5)).toBe('2026-06-15')
+    expect(sumarDiasCalendario(repetido, 5)).toBe('2026-06-15')
+    expect(sumarDiasCalendario(repetido, 5)).toBe('2026-06-15')
+  })
+
+  it('diasHastaFechaCalendario no desplaza la referencia que recibe', () => {
+    const ref = new Date(2026, 0, 1, 23, 30, 0)
+    const antes = ref.getTime()
+    expect(diasHastaFechaCalendario('2026-01-08', ref)).toBe(7)
+    expect(diasHastaFechaCalendario('2026-01-08', ref)).toBe(7)
+    expect(ref.getTime()).toBe(antes)
+  })
+})
+
+describe('cambios de horario (DST) en America/Los_Angeles', () => {
+  // 2026: adelanto el 8 de marzo, atraso el 1 de noviembre. Un día "corto" de
+  // 23 h y uno "largo" de 25 h rompen cualquier aritmética hecha con
+  // milisegundos; la de calendario debe contar días exactos.
+  it('cruza el adelanto de marzo sin perder un día', () => {
+    conZona('America/Los_Angeles', () => {
+      expect(sumarDiasCalendario('2026-03-07', 1)).toBe('2026-03-08')
+      expect(sumarDiasCalendario('2026-03-08', 1)).toBe('2026-03-09')
+      expect(sumarDiasCalendario('2026-03-07', 3)).toBe('2026-03-10')
+      expect(diasEntreFechasCalendario('2026-03-07', '2026-03-09')).toBe(2)
+      expect(diasEntreFechasCalendario('2026-03-01', '2026-03-31')).toBe(30)
+    })
+  })
+
+  it('cruza el atraso de noviembre sin duplicar un día', () => {
+    conZona('America/Los_Angeles', () => {
+      expect(sumarDiasCalendario('2026-10-31', 1)).toBe('2026-11-01')
+      expect(sumarDiasCalendario('2026-11-01', 1)).toBe('2026-11-02')
+      expect(sumarDiasCalendario('2026-10-31', 3)).toBe('2026-11-03')
+      expect(diasEntreFechasCalendario('2026-10-31', '2026-11-02')).toBe(2)
+      expect(diasEntreFechasCalendario('2026-11-01', '2026-12-01')).toBe(30)
+    })
+  })
+
+  it('un año entero día a día conserva la cuenta a través de ambos saltos', () => {
+    conZona('America/Los_Angeles', () => {
+      let iso = '2026-01-01'
+      for (let i = 0; i < 365; i++) iso = sumarDiasCalendario(iso, 1)!
+      expect(iso).toBe('2027-01-01')
+      expect(diasEntreFechasCalendario('2026-01-01', iso)).toBe(365)
+    })
   })
 })
