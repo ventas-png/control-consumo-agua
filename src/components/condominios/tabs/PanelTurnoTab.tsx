@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useMemo, type ReactNode} from 'react'
 import {
   Visitante, TicketMantenimiento, TareaCondominio,
@@ -24,7 +24,7 @@ function semaforo(val: number, verde: number, amarillo: number): string {
 
 export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reservas, polizas, contratosProveedores, inspecciones, vencimientosExtra, cuotas }: Props) {
   const hoy = hoyLocalISO()
-  const en7 = dateLocalISO(new Date(Date.now() + 7 * 86400000))
+  const en7 = sumarDiasCalendario(hoy, 7) ?? hoy
   const hora = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
 
   const activos = visitantes.filter(v => !v.hora_salida)

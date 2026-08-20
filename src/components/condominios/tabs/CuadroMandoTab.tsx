@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, Visitante, GastoCondominio,
@@ -52,7 +52,9 @@ function KpiBox({ k }: { k: KpiCard }) {
 
 export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, presupuestos, incidentes, sugerencias, polizas, contratosProveedores, inspecciones, vencimientosExtra, encuestas, moneda, proyectoNombre = 'Condominio' }: Props) {
   const hoy = hoyLocalISO()
-  const en30 = dateLocalISO(new Date(Date.now() + 30 * 86400000))
+  // 30 días de calendario: los límites que se comparan contra columnas
+  // `date` no se calculan sumando milisegundos (ver ResumenEjecutivoTab).
+  const en30 = sumarDiasCalendario(hoyLocalISO(), 30) ?? hoyLocalISO()
   const mes = hoy.slice(0, 7)
 
   const kpisFinanciero: KpiCard[] = useMemo(() => {

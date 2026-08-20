@@ -206,7 +206,10 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                   {caps.map(c => {
                     const ec = ESTADO_CFG[c.estado]
                     const certVence = c.fecha_vencimiento_cert
-                    const diasCert = certVence ? Math.floor((new Date(certVence).getTime() - Date.now()) / 86400000) : null
+                    // Misma cuenta que el resumen de arriba. Con
+                    // `new Date(certVence) - Date.now()` el badge restaba un
+                    // día en husos negativos y contradecía al KPI.
+                    const diasCert = diasHastaFechaCalendario(certVence)
                     const certAlerta = diasCert !== null && diasCert >= 0 && diasCert <= 30
                     return (
                       <div key={c.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>

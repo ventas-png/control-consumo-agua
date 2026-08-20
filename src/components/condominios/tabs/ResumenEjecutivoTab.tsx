@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario, diasHastaFechaCalendario } from '../../../lib/format'
 import { useMemo } from 'react'
 import {
   CuotaCondominio, TicketMantenimiento, GastoCondominio, PresupuestoCondominio,
@@ -34,7 +34,11 @@ export default function ResumenEjecutivoTab({
 }: Props) {
   const hoy = hoyLocalISO()
   const mes = hoy.slice(0, 7)
-  const en30 = dateLocalISO(new Date(Date.now() + 30 * 86400000))
+  // 30 días de CALENDARIO. `Date.now() + 30 * 86400000` suma 720 horas, no 30
+  // días: al cruzar el adelanto de horario el resultado se pasa un día
+  // (desde 2026-02-06 en America/Los_Angeles daba 2026-03-09 en vez de
+  // 2026-03-08) y el panel colaba un vencimiento de más.
+  const en30 = sumarDiasCalendario(hoy, 30) ?? hoy
   const fechaLarga = new Date().toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
 
   const financiero = useMemo(() => {

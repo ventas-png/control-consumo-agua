@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../lib/format'
+import { hoyLocalISO, dateLocalISO, sumarDiasCalendario } from '../../lib/format'
 import { useState, useMemo } from 'react'
 import type { Pago, Cliente, Registro, FormaPago } from '../../types'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -18,7 +18,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
   const [filtroFecha, setFiltroFecha] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('todos')
 
   const hoy = hoyLocalISO()
-  const inicioSemana = dateLocalISO(new Date(Date.now() - 7 * 86400000))
+  const inicioSemana = sumarDiasCalendario(hoy, -7) ?? hoy
   // PR-24: `new Date(y, m, 1)` construye la medianoche LOCAL del día 1; pasarla
   // por `toISOString()` la reexpresa en UTC y en GMT-6 devuelve el ÚLTIMO DÍA DEL
   // MES ANTERIOR. El filtro "este mes" del historial de pagos arrastraba entonces

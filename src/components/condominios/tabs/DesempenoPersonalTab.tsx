@@ -3,6 +3,7 @@ import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   RondaSeguridad, VisitaControl, PersonalCondominio,
 } from '../../../types'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 
 interface Props {
   bloques:       BloqueTurno[]
@@ -38,11 +39,13 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
   const [periodo, setPeriodo] = useState<Periodo>('30')
   const [filtroCargo, setFiltroCargo] = useState('')
 
-  const cutoff = useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - parseInt(periodo))
-    return d.toISOString().slice(0, 10)
-  }, [periodo])
+  // Corte de calendario: `bloques.fecha` es una columna `date`, así que el
+  // límite debe ser un día LOCAL. Con `toISOString().slice(0,10)` era el día
+  // UTC y en GMT-6 recortaba el período por una punta.
+  const cutoff = useMemo(
+    () => sumarDiasCalendario(hoyLocalISO(), -parseInt(periodo)) ?? hoyLocalISO(),
+    [periodo],
+  )
 
   const bloquesEnPeriodo = useMemo(() =>
     bloques.filter(b => b.fecha >= cutoff), [bloques, cutoff])

@@ -18,6 +18,7 @@ import {
   diasHastaFechaCalendario,
   esFechaCalendarioVencida,
   sumarDiasCalendario,
+  dateLocalISO,
   parseFecha,
   formatDate,
   formatDateShort,
@@ -362,5 +363,94 @@ describe('cambios de horario (DST) en America/Los_Angeles', () => {
       expect(iso).toBe('2027-01-01')
       expect(diasEntreFechasCalendario('2026-01-01', iso)).toBe(365)
     })
+  })
+})
+
+// ── Regresiones de los límites de calendario en la UI ──────────────────────
+//
+// Los cuatro hallazgos de la segunda revisión eran variantes del mismo error:
+// un límite de días calculado con `Date.now() ± N * 86400000` o con
+// `toISOString().slice(0,10)` en vez de sobre el calendario local. Aquí se
+// fija el comportamiento de `sumarDiasCalendario`, que es lo que ahora usan
+// AutomatizacionesTab, VistaRecordatorios, CapacitacionPersonalTab,
+// ResumenEjecutivoTab y el resto de los límites barridos.
+
+describe('límites de días usados por la UI', () => {
+  it('AutomatizacionesTab: el corte de mora es «más de N días», no «N o más»', () => {
+    conZona('America/Guatemala', () => {
+      const hoy = '2026-06-30'
+      const limite = sumarDiasCalendario(hoy, -30)!
+      expect(limite).toBe('2026-05-31')
+      // Con 31 días de mora entra; con exactamente 30, no («más de 30»).
+      expect('2026-05-30' < limite).toBe(true)
+      expect('2026-05-31' < limite).toBe(false)
+      // Y es la MISMA comparación que ejecuta la acción, así que el conteo
+      // mostrado y las filas modificadas no pueden divergir.
+      const cuotas = ['2026-05-29', '2026-05-30', '2026-05-31', '2026-06-15']
+      expect(cuotas.filter(f => f < limite)).toEqual(['2026-05-29', '2026-05-30'])
+    })
+  })
+
+  it('VistaRecordatorios: a las 19:00 en Guatemala el límite sigue siendo +2 días', () => {
+    conZona('America/Guatemala', () => {
+      // 19:00 local del 1 de junio ya es el 2 de junio en UTC: el patrón viejo
+      // `new Date(); +2d; toISOString().slice(0,10)` daba 2026-06-04 y colaba
+      // un TERCER día de reservas.
+      const tarde = new Date(2026, 5, 1, 19, 0, 0)
+      expect(tarde.toISOString().slice(0, 10)).toBe('2026-06-02')  // el bug de origen
+      const hoy = dateLocalISO(tarde)
+      expect(hoy).toBe('2026-06-01')
+      expect(sumarDiasCalendario(hoy, 2)).toBe('2026-06-03')
+    })
+  })
+
+  it('CapacitacionPersonalTab: un certificado a 30 días muestra exactamente 30', () => {
+    conZona('America/Guatemala', () => {
+      // Referencia a media tarde y también de noche: en ambos casos 30.
+      for (const ref of [new Date(2026, 5, 1, 15, 0, 0), new Date(2026, 5, 1, 23, 30, 0)]) {
+        expect(diasHastaFechaCalendario('2026-07-01', ref)).toBe(30)
+      }
+      // El resumen usa el mismo helper, así que badge y KPI coinciden.
+      const ref = new Date(2026, 5, 1, 23, 30, 0)
+      const dias = diasHastaFechaCalendario('2026-07-01', ref)!
+      expect(dias >= 0 && dias <= 30).toBe(true)
+    })
+  })
+
+  it('ResumenEjecutivoTab: +30 días cruzando el DST de Los Ángeles da 2026-03-08', () => {
+    conZona('America/Los_Angeles', () => {
+      // Desde el 6 de febrero, +30 días de calendario es el 8 de marzo, sea
+      // cual sea la hora del día.
+      expect(sumarDiasCalendario('2026-02-06', 30)).toBe('2026-03-08')
+
+      // El patrón viejo, `dateLocalISO(new Date(Date.now() + 30 * 86400000))`,
+      // suma 720 HORAS. El 8 de marzo se adelanta el reloj a las 02:00, así
+      // que a partir de esa fecha 720 h caen una hora más tarde en el reloj de
+      // pared: si la consulta ocurre en la última hora del día, el límite se
+      // pasa al 9 y el panel cuela un vencimiento de más.
+      const msDesde = (d: Date) => dateLocalISO(new Date(d.getTime() + 30 * 86400000))
+      expect(msDesde(new Date(2026, 1, 6, 12, 30))).toBe('2026-03-08')  // aún coincide
+      expect(msDesde(new Date(2026, 1, 6, 23, 30))).toBe('2026-03-09')  // el bug de origen
+
+      // `sumarDiasCalendario` no depende de la hora: mismo día en los dos casos.
+      for (const h of [0, 12, 23]) {
+        const hoy = dateLocalISO(new Date(2026, 1, 6, h, 30))
+        expect(sumarDiasCalendario(hoy, 30)).toBe('2026-03-08')
+      }
+      // Y en sentido inverso, cruzando el atraso de noviembre.
+      expect(sumarDiasCalendario('2026-10-11', 30)).toBe('2026-11-10')
+      expect(sumarDiasCalendario('2026-12-01', -30)).toBe('2026-11-01')
+    })
+  })
+
+  it('los límites de +7 / +30 / −30 son estables en los cuatro husos', () => {
+    for (const tz of ZONAS) {
+      conZona(tz, () => {
+        expect(sumarDiasCalendario('2026-02-06', 30)).toBe('2026-03-08')
+        expect(sumarDiasCalendario('2026-06-01', 7)).toBe('2026-06-08')
+        expect(sumarDiasCalendario('2026-06-30', -30)).toBe('2026-05-31')
+        expect(sumarDiasCalendario('2024-02-01', 30)).toBe('2024-03-02')  // bisiesto
+      })
+    }
   })
 })

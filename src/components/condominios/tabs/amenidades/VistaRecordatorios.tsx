@@ -1,13 +1,15 @@
 // Vista extraída de AmenidadesTab (fase B): JSX idéntico al original.
 import type { AmenidadesCtx } from './ctx'
 import { EmptyState } from './comunes'
-import { formatFechaCalendario } from '../../../../lib/format'
+import { formatFechaCalendario, sumarDiasCalendario } from '../../../../lib/format'
 
 export function VistaRecordatorios({ ctx }: { ctx: AmenidadesCtx }) {
   const { reservas, unidades, hoy, enviarRecordatorio } = ctx
-        const limite = new Date()
-        limite.setDate(limite.getDate() + 2)
-        const limiteStr = limite.toISOString().slice(0, 10)
+        // El límite es una fecha de CALENDARIO: «hoy y los próximos 2 días».
+        // Con `toISOString().slice(0,10)` se tomaba el día UTC, así que en
+        // Guatemala (GMT-6) a partir de las 18:00 el límite saltaba al día
+        // siguiente y la vista colaba un TERCER día de reservas.
+        const limiteStr = sumarDiasCalendario(hoy, 2) ?? hoy
         const proximas = reservas
           .filter(r => r.estado !== 'cancelada' && r.fecha >= hoy && r.fecha <= limiteStr)
           .sort((a, b) => (a.fecha + a.hora_inicio).localeCompare(b.fecha + b.hora_inicio))

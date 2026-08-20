@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
 import { useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
@@ -45,10 +45,15 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
     return matchEstado && matchBusqueda
   })
 
+  // Límite de 30 días de CALENDARIO, compartido por el KPI y los badges de
+  // fila: antes cada uno recalculaba `Date.now() + 30 * 86400000`, que suma
+  // 720 horas y se pasa un día al cruzar un cambio de horario.
+  const en30 = sumarDiasCalendario(hoyLocalISO(), 30) ?? hoyLocalISO()
+
   const activos = contratos.filter(c => c.estado === 'activo')
   const rentaTotal = activos.reduce((s, c) => s + c.monto_renta, 0)
 
-  const porVencer = contratos.filter(c => c.estado === 'activo' && c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)))
+  const porVencer = contratos.filter(c => c.estado === 'activo' && c.fecha_fin && c.fecha_fin <= en30)
 
   function resetForm() {
     setForm({ unidad_id: '', arrendatario_nombre: '', arrendatario_identificacion: '', arrendatario_telefono: '', arrendatario_email: '', monto_renta: '', dia_pago: '5', fecha_inicio: '', fecha_fin: '', deposito: '', notas: '' })
@@ -267,7 +272,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             render: (c) => <span style={{ color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</span> },
           { key: 'fecha_inicio', header: 'Período', sortable: true,
             render: (c) => {
-              const vence30 = c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)) && c.estado === 'activo'
+              const vence30 = c.fecha_fin && c.fecha_fin <= en30 && c.estado === 'activo'
               return (
                 <span style={{ color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
                   {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
@@ -293,7 +298,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             } },
           { key: 'actions', header: '', align: 'right',
             render: (c) => {
-              const vence30 = c.fecha_fin && c.fecha_fin <= dateLocalISO(new Date(Date.now() + 30 * 86400000)) && c.estado === 'activo'
+              const vence30 = c.fecha_fin && c.fecha_fin <= en30 && c.estado === 'activo'
               return (
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
                   {vence30 && (
