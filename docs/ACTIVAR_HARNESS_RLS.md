@@ -367,6 +367,39 @@ no pueda sumarlas todas como aislamiento.
 Es idempotente y **regenera las contraseñas en cada corrida**: si las perdés,
 volvé a correrlo y usá las nuevas.
 
+### ⚠️ Rota las SEIS cuentas, no sólo las cuatro nuevas
+
+Desde que el seed crea también los cuatro usuarios del gate por clase, una
+corrida rota **las seis contraseñas**: las de A y B (aislamiento por tenant) y
+las de PAQ/CORR/ADMIN/OWNER. Correrlo «sólo para sacar los ocho del gate» deja
+`RLS_USER_A_PASSWORD` y `RLS_USER_B_PASSWORD` apuntando a contraseñas que ya no
+existen, y el harness pasa de estar rojo por ocho secretos a estarlo por dos
+logins fallidos.
+
+**Después de cada corrida hay que actualizar los QUINCE secretos**, no ocho. El
+propio script los imprime todos juntos, en orden, listos para pegar.
+
+### El comando, con el sandbox actual
+
+`jwpmivhvlstslncrtokb` es el sandbox que ya usa el harness (el de #775). Las dos
+claves salen de **Dashboard → Project Settings → API** de ESE proyecto:
+
+```bash
+SEED_SUPABASE_URL="https://jwpmivhvlstslncrtokb.supabase.co" \
+SEED_EXPECTED_REF="jwpmivhvlstslncrtokb" \
+SEED_SERVICE_ROLE_KEY="<service_role del sandbox>" \
+SEED_ANON_KEY="<anon public del sandbox>" \
+SEED_CONFIRM=si \
+node scripts/seed-rls-sandbox.mjs
+```
+
+Corré esto **en tu máquina**, nunca en CI: la `service_role` es BYPASSRLS y no
+debe existir como secreto de GitHub. El script no la imprime ni la escribe en
+ningún archivo.
+
+Al terminar, pegá los quince en **Settings → Secrets and variables → Actions** y
+relanzá el job `RLS harness (server-side)`.
+
 ## Paso 4 — Pegar los secretos
 
 **Settings → Secrets and variables → Actions → New repository secret.**

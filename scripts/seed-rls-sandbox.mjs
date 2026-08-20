@@ -827,10 +827,16 @@ El preflight exige que ambas coincidan y aborta si no.
    empresas de juguete y de una tercera para el gate, en un proyecto
    desechable).
 
-Las contraseñas de las SEIS cuentas se generan nuevas en cada corrida (se rotan
-también para los usuarios que ya existían) y NO se guardan en ningún sitio: si
-las perdés, volvé a correr el script y usá las nuevas. Después de cada corrida
-hay que actualizar los secretos y relanzar el job.
+⚠️  ACTUALIZÁ LOS QUINCE, NO SÓLO LOS OCHO DEL GATE.
+
+Esta corrida rotó las SEIS contraseñas —A y B incluidas, aunque ya existieran—,
+así que RLS_USER_A_PASSWORD y RLS_USER_B_PASSWORD también quedaron obsoletas.
+Pegar sólo los ocho nuevos cambia el motivo del rojo: el harness pasaría de
+faltarle secretos a fallar el login de A y B.
+
+Las contraseñas no se guardan en ningún sitio: si las perdés, volvé a correr el
+script y usá las nuevas. Después de actualizar los quince, relanzá el job
+"RLS harness (server-side)".
 `)
   return 0
 }

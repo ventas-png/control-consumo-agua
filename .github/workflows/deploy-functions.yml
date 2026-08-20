@@ -2,12 +2,26 @@ name: Deploy Supabase Edge Functions
 
 on:
   workflow_dispatch:
+    inputs:
+      migraciones_ya_aplicadas:
+        description: 'Sólo para redesplegar un commit ANTIGUO cuyas migraciones ya están en producción. Salta la compuerta; queda registrado en el resumen.'
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [main]
     paths:
       - 'supabase/functions/**'
       - 'supabase/config.toml'
       - '.github/workflows/deploy-functions.yml'
+
+# Dos despliegues simultáneos de las mismas funciones se pisan: el segundo puede
+# publicar un bundle más viejo encima del primero. Se encolan, no se cancelan —
+# cancelar a medias dejaría la mitad de las funciones en una versión y la otra
+# mitad en otra.
+concurrency:
+  group: deploy-functions-prod
+  cancel-in-progress: false
 
 # Permisos mínimos del GITHUB_TOKEN (auditoría 2026-07-28, PR-20). Sin bloque
 # `permissions` se heredan los del repositorio, que por defecto pueden ser de
@@ -16,6 +30,9 @@ on:
 # estos workflows escribe en el repo.
 permissions:
   contents: read
+  # La compuerta de migraciones consulta el estado de las corridas de
+  # `apply-migrations-prod.yml` para ESTE commit. Sólo lectura.
+  actions: read
 
 jobs:
   check-secrets:
@@ -52,8 +69,105 @@ jobs:
         run: deno lint supabase/functions/
         continue-on-error: true
 
+  # ══════════════════════════════════════════════════════════════════════════
+  # COMPUERTA: las migraciones de ESTE commit, antes que las funciones.
+  # ══════════════════════════════════════════════════════════════════════════
+  # `apply-migrations-prod.yml` y este workflow se disparan los dos con el push
+  # a `main`, por `paths` distintos y sin relación entre sí: GitHub los arranca
+  # EN PARALELO. Para un commit que cambia las dos cosas, el orden lo decide el
+  # azar — y a veces ni eso:
+  #
+  #   · `20260902000000` hace DROP de `paquete_reclamar_aviso(uuid, integer)` y
+  #     `paquete_finalizar_aviso(uuid, boolean)`, y crea las de TRES argumentos.
+  #   · La `notify-package` de ese mismo commit llama a las de tres argumentos.
+  #
+  #   Función primero → llama a una firma que aún no existe y todo aviso falla.
+  #   Y si el Environment `production-db` pide aprobación humana, no hay carrera
+  #   que valga: la función sale en dos minutos y el SQL espera a que alguien
+  #   apruebe. La ventana de rotura no se mide en segundos.
+  #
+  # La compuerta espera al ESTADO REAL de esa corrida, nunca al reloj: sale en
+  # cuanto concluye, y si vence el plazo ABORTA el despliegue en vez de
+  # autorizarlo. La lógica vive en Node —no inline en el YAML— para poder
+  # probarla: `scripts/__tests__/esperar-migraciones.test.mjs`.
+  esperar-migraciones:
+    runs-on: ubuntu-latest
+    outputs:
+      requiere: ${{ steps.diff.outputs.requiere }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: ¿Este commit toca supabase/migrations/**?
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+          OMITIR: ${{ github.event.inputs.migraciones_ya_aplicadas }}
+        run: |
+          set -uo pipefail
+
+          # Override manual y explícito, sólo por workflow_dispatch. Existe para
+          # redesplegar un commit viejo cuyas migraciones llevan meses en
+          # producción; no es un atajo para saltarse la compuerta en un push.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "${OMITIR:-false}" = "true" ]; then
+            echo "::warning::Compuerta OMITIDA a mano (migraciones_ya_aplicadas=true). Quien lo lanzó afirma que las migraciones de este commit ya están aplicadas."
+            echo "### ⚠️ Compuerta de migraciones omitida a mano" >> "$GITHUB_STEP_SUMMARY"
+            echo "requiere=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # FAIL-CLOSED en todo lo que no sea un push con rango verificable.
+          # Un `before` inalcanzable (force-push a main) o un evento sin rango no
+          # permiten afirmar que NO hay migraciones, y «no lo sé» tiene que caer
+          # del lado de esperar. Mismo criterio que el cortafuegos append-only
+          # de apply-migrations-prod.yml.
+          if [ "$EVENT_NAME" != "push" ]; then
+            echo "Evento $EVENT_NAME: sin rango que mirar, se asume que hay migraciones (fail-closed)."
+            echo "requiere=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${PUSH_BEFORE:-}" ] \
+             || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null; then
+            echo "::warning::El rango del push no es verificable; se asume que hay migraciones (fail-closed)."
+            echo "requiere=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # `--no-renames` por la misma razón que en apply-migrations-prod: un
+          # renombre aparece como una sola entrada R y se escaparía del filtro,
+          # haciendo creer que no hay migraciones cuando sí las hay.
+          cambios=$(git diff --name-only --no-renames "$PUSH_BEFORE" "$PUSH_AFTER" -- 'supabase/migrations' | grep '\.sql$' || true)
+          if [ -n "$cambios" ]; then
+            echo "Este commit toca migraciones:"; printf '  %s\n' $cambios
+            echo "requiere=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Sin cambios en supabase/migrations/**: no hay nada que esperar."
+            echo "requiere=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Esperar a que las migraciones de este commit terminen bien
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUIERE_MIGRACIONES: ${{ steps.diff.outputs.requiere }}
+          WORKFLOW_MIGRACIONES: apply-migrations-prod.yml
+          # Sólo cuenta la corrida del PUSH. Un `workflow_dispatch` con
+          # `migration_file` aplica UN archivo y termina en success, y eso no
+          # acredita que estén todas las de este commit.
+          EVENTO_ESPERADO: ${{ github.event_name == 'push' && 'push' || '' }}
+          # Techo de espera, NO una espera fija: el paso sale en cuanto la
+          # corrida concluye. Vencerlo ABORTA el despliegue; nunca lo autoriza.
+          # Si la aprobación del Environment tarda más que esto, se aprueba y se
+          # relanza este workflow.
+          ESPERA_MAX_SEGUNDOS: '3600'
+          INTERVALO_SEGUNDOS: '20'
+        run: node scripts/esperar-migraciones.mjs
+
   deploy:
-    needs: [check-secrets, lint-functions]
+    needs: [check-secrets, lint-functions, esperar-migraciones]
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
