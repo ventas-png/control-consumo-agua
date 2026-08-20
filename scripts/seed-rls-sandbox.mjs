@@ -476,6 +476,83 @@ async function verificarGateDeClase(url, anon, clase) {
   return fallos
 }
 
+// ── Esquema del motor único de recepción ────────────────────────────────────
+// POR QUÉ ESTE CHEQUEO EXISTE.
+// El seed crea empresas, proyectos, unidades, roles y usuarios. NINGUNA de esas
+// cosas toca `paquetes_recibidos`, así que un sandbox al que le falten las
+// migraciones de recepción pasa el seed ENTERO sin un solo fallo — y el script
+// remataba con su banner final de éxito. Verificado a medias: los usuarios sí,
+// el esquema que el harness necesita no.
+//
+// Pasó de verdad. Con los quince secretos ya puestos, el harness falló ocho
+// veces con `column paquetes_recibidos.clase does not exist` mientras el seed
+// daba el sandbox por bueno. El seed es quien tiene que detectarlo ANTES, y
+// decirlo con el remedio.
+//
+// Se comprueban las DOS columnas que introduce 20260829000000 y sin las cuales
+// el gate por clase no existe: `clase` (gobierna las cuatro policies vía CASE) y
+// `destinatario_tipo` (distingue pieza de unidad de pieza de administración).
+export const COLUMNAS_RECEPCION = ['clase', 'destinatario_tipo']
+
+/** Primera y última de la cadena que hay que aplicar entera. */
+export const CADENA_RECEPCION = { desde: '20260828000000', hasta: '20260902000000' }
+
+/**
+ * Traduce el error de PostgREST a algo accionable. Se mira el CÓDIGO, no sólo
+ * el texto: un mensaje puede cambiar de redacción entre versiones.
+ *
+ * `42703` lo devuelve Postgres cuando la columna no existe de verdad.
+ * `PGRST204`/`PGRST205` los devuelve PostgREST cuando no la encuentra en su
+ * caché de esquema. Los dos se tratan igual —falta aplicar la cadena— porque
+ * desde fuera no se distinguen con certeza, y el remedio de la caché sólo
+ * aplica si las migraciones YA constan aplicadas.
+ *
+ * @returns {'ausente'|'otro'}
+ */
+export function clasificarErrorEsquema(error) {
+  const code = String(error?.code ?? '')
+  if (code === '42703' || code === 'PGRST204' || code === 'PGRST205') return 'ausente'
+  if (/does not exist|schema cache/i.test(String(error?.message ?? ''))) return 'ausente'
+  return 'otro'
+}
+
+/** El texto que hay que leer cuando falta el esquema. Se prueba tal cual. */
+export function mensajeEsquemaAusente(columnas, ref) {
+  const { desde, hasta } = CADENA_RECEPCION
+  return [
+    `a \`paquetes_recibidos\` le faltan columnas del motor único (${columnas.join(', ')}).`,
+    `   Aplicá la cadena COMPLETA ${desde}…${hasta} al proyecto ${ref || 'de SEED_EXPECTED_REF'},`,
+    '   en orden y entera: son seis migraciones y las de en medio no son opcionales.',
+    '   Sin ellas el harness no puede probar el gate por clase, que es justo lo que viene a probar.',
+    "   Sólo si esas migraciones YA constan aplicadas y el error persiste, la caché de PostgREST",
+    "   está desactualizada: recargala con  NOTIFY pgrst, 'reload schema'.",
+  ].join('\n')
+}
+
+/**
+ * Comprueba que el esquema de recepción está en el sandbox. Se consulta CADA
+ * columna por separado —con el cliente admin, para que un 0 filas por RLS no se
+ * confunda con una columna ausente— y se mira el error, no el conteo: una tabla
+ * vacía es perfectamente válida y no dice nada del esquema.
+ *
+ * @returns {Promise<string[]>} lista de fallos (vacía = esquema correcto).
+ */
+export async function verificarEsquemaRecepcion(admin, ref) {
+  const ausentes = []
+  for (const col of COLUMNAS_RECEPCION) {
+    const { error } = await admin.from('paquetes_recibidos').select(col).limit(1)
+    if (!error) continue
+    if (clasificarErrorEsquema(error) === 'ausente') {
+      ausentes.push(col)
+      continue
+    }
+    // Un error que NO es de columna ausente tampoco se traga: no saber si el
+    // esquema está bien es motivo suficiente para no decir «listo».
+    return [`no se pudo verificar la columna \`${col}\` de paquetes_recibidos: ${error.message ?? 'error sin mensaje'}`]
+  }
+  return ausentes.length > 0 ? [mensajeEsquemaAusente(ausentes, ref)] : []
+}
+
 /**
  * Siembra las tablas de cobertura no trivial MÁS los recursos reales que el
  * harness necesita para sus pruebas negativas.
@@ -748,6 +825,15 @@ async function main(env) {
 
   console.log('\n🔍 Verificando los cuatro usuarios del gate por clase\n')
   fallos.push(...await verificarGateDeClase(URL, ANON, clase))
+
+  // El esquema, al final y SIEMPRE: es lo único que el resto del seed no toca,
+  // y por tanto lo único que podía faltar sin que nada fallara antes.
+  console.log('\n🔍 Verificando el esquema del motor único de recepción\n')
+  const fallosEsquema = await verificarEsquemaRecepcion(admin, destino.ref)
+  if (fallosEsquema.length === 0) {
+    log(`✔ paquetes_recibidos expone ${COLUMNAS_RECEPCION.join(' y ')}`)
+  }
+  fallos.push(...fallosEsquema)
 
   if (fallos.length > 0) {
     console.error('\n❌ El sandbox NO está en condiciones. El harness daría un verde sin significado:\n')

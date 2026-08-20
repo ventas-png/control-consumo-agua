@@ -569,3 +569,197 @@ describe('el seed no filtra la service_role ni deja contraseñas viejas', () => 
     expect(iListo).toBeGreaterThan(iCorte)
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// El esquema del motor único: sin él, «Sandbox listo» es mentira.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO QUE ESTO CIERRA. El seed crea empresas, proyectos, unidades, roles y
+// usuarios; nada de eso toca `paquetes_recibidos`. Un sandbox sin las
+// migraciones de recepción pasaba el seed entero sin un fallo y el script
+// remataba con «✅ Sandbox listo y VERIFICADO». Con los quince secretos ya
+// puestos, el harness falló ocho veces con
+// `column paquetes_recibidos.clase does not exist` mientras el seed afirmaba
+// que todo estaba en orden.
+import {
+  CADENA_RECEPCION,
+  COLUMNAS_RECEPCION,
+  clasificarErrorEsquema,
+  mensajeEsquemaAusente,
+  verificarEsquemaRecepcion,
+} from '../seed-rls-sandbox.mjs'
+
+/** Doble del cliente admin: responde por columna, no por conteo. */
+function adminFalso(porColumna) {
+  const pedidas = []
+  return {
+    pedidas,
+    from() {
+      return {
+        select(col) {
+          pedidas.push(col)
+          const r = porColumna[col]
+          return { limit: async () => (r ?? { data: [], error: null }) }
+        },
+      }
+    },
+  }
+}
+
+const ERR_COLUMNA = { code: '42703', message: 'column paquetes_recibidos.clase does not exist' }
+const ERR_CACHE = { code: 'PGRST204', message: "Could not find the 'clase' column of 'paquetes_recibidos' in the schema cache" }
+
+describe('clasificarErrorEsquema', () => {
+  it('la columna inexistente de Postgres es "ausente"', () => {
+    expect(clasificarErrorEsquema(ERR_COLUMNA)).toBe('ausente')
+  })
+
+  it('la caché desactualizada de PostgREST también', () => {
+    // No se distinguen con certeza desde fuera, así que comparten remedio: la
+    // recarga de caché sólo aplica si las migraciones ya constan aplicadas.
+    expect(clasificarErrorEsquema(ERR_CACHE)).toBe('ausente')
+    expect(clasificarErrorEsquema({ code: 'PGRST205', message: 'not found in schema cache' })).toBe('ausente')
+  })
+
+  it('se clasifica por CÓDIGO, no sólo por el texto', () => {
+    // Un mensaje puede cambiar de redacción entre versiones; el código no.
+    expect(clasificarErrorEsquema({ code: '42703', message: 'texto raro sin palabras clave' })).toBe('ausente')
+  })
+
+  it('cualquier otro error NO se disfraza de "ausente"', () => {
+    // Un 500, un token muerto o un timeout no son «falta la migración»: son
+    // «no lo sé», y el llamador tiene que tratarlos distinto.
+    expect(clasificarErrorEsquema({ code: '08006', message: 'connection failure' })).toBe('otro')
+    expect(clasificarErrorEsquema({ code: '42501', message: 'permission denied' })).toBe('otro')
+  })
+})
+
+describe('verificarEsquemaRecepcion', () => {
+  it('ESQUEMA COMPLETO → sin fallos, y consultó las dos columnas', async () => {
+    const admin = adminFalso({})
+    expect(await verificarEsquemaRecepcion(admin, 'refx')).toEqual([])
+    expect(admin.pedidas).toEqual(COLUMNAS_RECEPCION)
+  })
+
+  it('una tabla VACÍA no es un fallo de esquema', async () => {
+    // Comprobar conteos en vez de errores confundiría «no hay piezas todavía»
+    // con «falta la migración». El sandbox recién sembrado está vacío.
+    const admin = adminFalso({
+      clase: { data: [], error: null },
+      destinatario_tipo: { data: [], error: null },
+    })
+    expect(await verificarEsquemaRecepcion(admin, 'refx')).toEqual([])
+  })
+
+  it('falta `clase` → falla y lo nombra', async () => {
+    const fallos = await verificarEsquemaRecepcion(adminFalso({ clase: { error: ERR_COLUMNA } }), 'refx')
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('clase')
+  })
+
+  it('falta `destinatario_tipo` → falla y lo nombra', async () => {
+    const fallos = await verificarEsquemaRecepcion(
+      adminFalso({ destinatario_tipo: { error: { code: '42703', message: 'column ... does not exist' } } }), 'refx')
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('destinatario_tipo')
+  })
+
+  it('faltan las dos → las nombra a las dos', async () => {
+    const fallos = await verificarEsquemaRecepcion(
+      adminFalso({ clase: { error: ERR_COLUMNA }, destinatario_tipo: { error: ERR_COLUMNA } }), 'refx')
+    expect(fallos[0]).toContain('clase')
+    expect(fallos[0]).toContain('destinatario_tipo')
+  })
+
+  it('CACHÉ DESACTUALIZADA → falla con el remedio de la recarga', async () => {
+    const fallos = await verificarEsquemaRecepcion(adminFalso({ clase: { error: ERR_CACHE } }), 'refx')
+    expect(fallos[0]).toContain("NOTIFY pgrst, 'reload schema'")
+  })
+
+  it('un error de PostgREST que NO es de columna NO se oculta', async () => {
+    // El fallo original fue exactamente éste un nivel más arriba: leer `data` y
+    // no mirar `error`. Aquí un error desconocido tiene que salir a la luz con
+    // su mensaje, no convertirse en un silencioso «todo bien».
+    const fallos = await verificarEsquemaRecepcion(
+      adminFalso({ clase: { error: { code: '08006', message: 'connection failure' } } }), 'refx')
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('no se pudo verificar')
+    expect(fallos[0]).toContain('connection failure')
+  })
+
+  it('un error desconocido corta: no sigue preguntando a ciegas', async () => {
+    const admin = adminFalso({ clase: { error: { code: '08006', message: 'boom' } } })
+    await verificarEsquemaRecepcion(admin, 'refx')
+    expect(admin.pedidas).toEqual(['clase'])
+  })
+})
+
+describe('mensajeEsquemaAusente', () => {
+  it('manda aplicar la cadena COMPLETA, con sus extremos', () => {
+    const m = mensajeEsquemaAusente(['clase'], 'refx')
+    expect(m).toContain(CADENA_RECEPCION.desde)
+    expect(m).toContain(CADENA_RECEPCION.hasta)
+    expect(m).toMatch(/COMPLETA|entera/)
+  })
+
+  it('nombra el proyecto destino, y cae a SEED_EXPECTED_REF si no lo hay', () => {
+    expect(mensajeEsquemaAusente(['clase'], 'refx')).toContain('refx')
+    expect(mensajeEsquemaAusente(['clase'], '')).toContain('SEED_EXPECTED_REF')
+  })
+
+  it('la recarga de caché aparece SÓLO como remedio condicionado', () => {
+    // Ofrecerla como primera opción mandaría a recargar una caché que no tiene
+    // nada que cachear todavía.
+    const m = mensajeEsquemaAusente(['clase'], 'refx')
+    const iCadena = m.indexOf(CADENA_RECEPCION.desde)
+    const iNotify = m.indexOf('NOTIFY pgrst')
+    expect(iCadena).toBeGreaterThanOrEqual(0)
+    expect(iNotify).toBeGreaterThan(iCadena)
+    expect(m).toMatch(/Sólo si esas migraciones YA constan aplicadas/)
+  })
+})
+
+describe('«Sandbox listo» no puede salir con el esquema incompleto', () => {
+  // Los mensajes de fallo y el de éxito viven en `main`, que no se puede correr
+  // sin un Supabase. Se afirma sobre la ESTRUCTURA del script: que el chequeo
+  // alimenta la misma lista `fallos` que ya bloquea el mensaje final.
+  const iChequeo = FUENTE_SEED.indexOf('await verificarEsquemaRecepcion(admin')
+  const iCorte = FUENTE_SEED.indexOf('if (fallos.length > 0) {', iChequeo)
+  const iListo = FUENTE_SEED.indexOf('Sandbox listo y VERIFICADO')
+
+  it('el chequeo de esquema corre ANTES del corte y del mensaje final', () => {
+    expect(iChequeo).toBeGreaterThan(0)
+    expect(iCorte).toBeGreaterThan(iChequeo)
+    expect(iListo).toBeGreaterThan(iCorte)
+  })
+
+  it('sus fallos entran en la MISMA lista que bloquea el mensaje', () => {
+    expect(FUENTE_SEED).toContain('fallos.push(...fallosEsquema)')
+  })
+
+  it('el corte devuelve un exit distinto de cero', () => {
+    const bloque = FUENTE_SEED.slice(iCorte, iListo)
+    expect(bloque).toMatch(/return 1/)
+  })
+
+  it('el banner de éxito se emite en UN solo sitio, después del corte', () => {
+    // Si hubiera un segundo sitio que lo imprimiera, el corte no lo cubriría.
+    // Se cuenta el BANNER COMPLETO, no la frase suelta: el mensaje de aborto
+    // dice «no se emite "Sandbox listo"», y esa mención es prosa, no una
+    // emisión — confundirlas haría fallar la prueba por la razón equivocada.
+    const veces = (FUENTE_SEED.match(/Sandbox listo y VERIFICADO/g) ?? []).length
+    expect(veces).toBe(1)
+  })
+
+  it('el chequeo usa el cliente admin, no uno con RLS encima', () => {
+    // Con un cliente sujeto a RLS, 0 filas y «columna ausente» se parecen
+    // demasiado. service_role separa esquema de permisos.
+    expect(FUENTE_SEED).toContain('verificarEsquemaRecepcion(admin')
+  })
+
+  it('ningún mensaje de fallo del esquema puede contener la service_role', () => {
+    const codigo = FUENTE_SEED.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    const iFn = codigo.indexOf('export async function verificarEsquemaRecepcion')
+    const cuerpo = codigo.slice(iFn, iFn + 1200)
+    expect(cuerpo).not.toMatch(/\bKEY\b|serviceKey|SERVICE_ROLE/)
+  })
+})
