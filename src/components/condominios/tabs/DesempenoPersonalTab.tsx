@@ -3,7 +3,7 @@ import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   RondaSeguridad, VisitaControl, PersonalCondominio,
 } from '../../../types'
-import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
+import { hoyLocalISO, sumarDiasCalendario, diaLocalDeInstante } from '../../../lib/format'
 
 interface Props {
   bloques:       BloqueTurno[]
@@ -50,8 +50,14 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
   const bloquesEnPeriodo = useMemo(() =>
     bloques.filter(b => b.fecha >= cutoff), [bloques, cutoff])
 
-  const rondasEnPeriodo = useMemo(() =>
-    rondas.filter(r => r.inicio.slice(0, 10) >= cutoff), [rondas, cutoff])
+  // `rondas_seguridad.inicio` es timestamptz, no una fecha de calendario:
+  // `slice(0, 10)` tomaba su día UTC y en GMT-6 una ronda de la noche entraba
+  // en el período por el día equivocado. Se compara por su día LOCAL.
+  // (`bloques.fecha` sí es `date` y se compara tal cual, arriba.)
+  const rondasEnPeriodo = useMemo(
+    () => rondas.filter(r => (diaLocalDeInstante(r.inicio) ?? '') >= cutoff),
+    [rondas, cutoff],
+  )
 
   const cargos = useMemo(() => {
     const set = new Set(personal.map(p => p.cargo))

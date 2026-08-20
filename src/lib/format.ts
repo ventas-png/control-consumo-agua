@@ -173,6 +173,25 @@ export function sumarDiasCalendario(
   return dateLocalISO(d)
 }
 
+/**
+ * Día de CALENDARIO local en el que cae un instante (`timestamptz`).
+ *
+ * Es el puente en el otro sentido: un timestamp SÍ tiene hora y zona, así que
+ * no puede pasar por `parseFechaCalendario` —que lo rechaza a propósito—, pero
+ * a veces hay que compararlo contra un límite `'YYYY-MM-DD'`. Recortar la
+ * cadena ISO (`created_at.split('T')[0]`, `inicio.slice(0, 10)`) devuelve el
+ * día **UTC**: en America/Guatemala un pago de las 19:00 se contabilizaba en
+ * el día siguiente y se caía del filtro «hoy».
+ *
+ * Devuelve `null` si el valor no es un instante parseable.
+ */
+export function diaLocalDeInstante(value: string | Date | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return dateLocalISO(d)
+}
+
 // ── Dates ──────────────────────────────────────────────────────────────────
 
 /**

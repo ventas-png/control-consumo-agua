@@ -19,6 +19,7 @@ import {
   esFechaCalendarioVencida,
   sumarDiasCalendario,
   dateLocalISO,
+  diaLocalDeInstante,
   parseFecha,
   formatDate,
   formatDateShort,
@@ -452,5 +453,81 @@ describe('límites de días usados por la UI', () => {
         expect(sumarDiasCalendario('2024-02-01', 30)).toBe('2024-03-02')  // bisiesto
       })
     }
+  })
+})
+
+// ── El otro sentido: un instante y el día local en el que cae ──────────────
+//
+// `created_at` (pagos) e `inicio` (rondas_seguridad) son timestamptz. No pasan
+// por parseFechaCalendario —que rechaza timestamps a propósito— pero a veces
+// hay que compararlos contra un límite 'YYYY-MM-DD'. Recortar la cadena ISO
+// da el día UTC; lo correcto es convertir el instante a su día LOCAL.
+
+describe('diaLocalDeInstante', () => {
+  it('bajo America/Guatemala, 2026-06-02T01:00:00Z pertenece al 2026-06-01', () => {
+    conZona('America/Guatemala', () => {
+      const iso = '2026-06-02T01:00:00Z'
+      expect(iso.split('T')[0]).toBe('2026-06-02')       // el bug de origen
+      expect(iso.slice(0, 10)).toBe('2026-06-02')        // ídem
+      expect(diaLocalDeInstante(iso)).toBe('2026-06-01') // 19:00 del día 1
+
+      // El filtro «Hoy» de PagosHistorial: con el día UTC el pago se caía.
+      const hoy = '2026-06-01'
+      expect(diaLocalDeInstante(iso) === hoy).toBe(true)
+      expect(iso.split('T')[0] === hoy).toBe(false)
+    })
+  })
+
+  it('bajo America/Guatemala, 2026-05-25T01:00:00Z cae el 2026-05-24 y queda fuera de un cutoff 2026-05-25', () => {
+    conZona('America/Guatemala', () => {
+      const iso = '2026-05-25T01:00:00Z'
+      expect(diaLocalDeInstante(iso)).toBe('2026-05-24')
+      const cutoff = '2026-05-25'
+      expect((diaLocalDeInstante(iso) ?? '') >= cutoff).toBe(false)
+      // Con el recorte de la cadena entraba indebidamente en el período.
+      expect(iso.slice(0, 10) >= cutoff).toBe(true)      // el bug de origen
+    })
+  })
+
+  it('el mismo instante cae en días distintos según la zona', () => {
+    const iso = '2026-06-02T01:00:00Z'
+    const esperado: Record<string, string> = {
+      'UTC': '2026-06-02',
+      'America/Guatemala': '2026-06-01',
+      'America/Los_Angeles': '2026-06-01',
+      'Asia/Tokyo': '2026-06-02',
+    }
+    for (const tz of ZONAS) {
+      conZona(tz, () => {
+        expect(diaLocalDeInstante(iso)).toBe(esperado[tz])
+      })
+    }
+  })
+
+  it('acepta un Date y conserva su instante (no lo trata como fecha de calendario)', () => {
+    conZona('America/Guatemala', () => {
+      const d = new Date('2026-06-02T01:00:00Z')
+      expect(diaLocalDeInstante(d)).toBe('2026-06-01')
+      expect(d.toISOString()).toBe('2026-06-02T01:00:00.000Z')  // intacto
+      // Y el parser de calendario sigue rechazando la cadena del timestamp.
+      expect(parseFechaCalendario('2026-06-02T01:00:00Z')).toBeNull()
+    })
+  })
+
+  it('un date-only sin hora se lee como ese mismo día (medianoche local)', () => {
+    conZona('America/Guatemala', () => {
+      // `new Date('2026-06-01')` es medianoche UTC → 18:00 del 31/may local.
+      // Por eso los date-only NO deben pasar por aquí: van a
+      // parseFechaCalendario. Esta prueba fija el contraste.
+      expect(diaLocalDeInstante('2026-06-01')).toBe('2026-05-31')
+      expect(dateLocalISO(parseFechaCalendario('2026-06-01')!)).toBe('2026-06-01')
+    })
+  })
+
+  it('null para lo no parseable', () => {
+    for (const v of [null, undefined, '', 'no-es-fecha', 'NaN']) {
+      expect(diaLocalDeInstante(v as string)).toBeNull()
+    }
+    expect(diaLocalDeInstante(new Date(NaN))).toBeNull()
   })
 })

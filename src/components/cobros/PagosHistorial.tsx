@@ -1,4 +1,4 @@
-import { hoyLocalISO, dateLocalISO, sumarDiasCalendario } from '../../lib/format'
+import { hoyLocalISO, dateLocalISO, sumarDiasCalendario, diaLocalDeInstante } from '../../lib/format'
 import { useState, useMemo } from 'react'
 import type { Pago, Cliente, Registro, FormaPago } from '../../types'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -34,7 +34,10 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         (p.referencia ?? '').toLowerCase().includes(busqueda.toLowerCase())
       )
       const matchMetodo = filtroMetodo === 'todos' || p.metodo === filtroMetodo
-      const fechaPago = p.created_at?.split('T')[0] ?? ''
+      // `created_at` es timestamptz: `split('T')[0]` daba el día UTC, así que
+      // un pago de las 19:00 en Guatemala se contaba en el día siguiente y
+      // desaparecía del filtro «Hoy». Se compara por su día LOCAL.
+      const fechaPago = diaLocalDeInstante(p.created_at) ?? ''
       const matchFecha =
         filtroFecha === 'todos' ? true :
         filtroFecha === 'hoy' ? fechaPago === hoy :
