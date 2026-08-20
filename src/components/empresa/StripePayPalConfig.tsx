@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties} from 'react'
+import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import { notify } from '../shared/Dialog'
 import {
   fetchCompanyPaymentConfig,
@@ -147,13 +147,12 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
   const [showStripeForm, setShowStripeForm] = useState(false)
   const [showPaypalForm, setShowPaypalForm] = useState(false)
 
-  useEffect(() => {
-    cargarConfig()
-  }, [companyId])
-
-  async function cargarConfig() {
+  // `cargarConfig` como useCallback: el efecto declara su dependencia real.
+  // `estaCancelado` descarta la respuesta de una empresa ya abandonada.
+  const cargarConfig = useCallback(async (estaCancelado: () => boolean = () => false) => {
     setLoading(true)
     const { data } = await fetchCompanyPaymentConfig(companyId)
+    if (estaCancelado()) return
 
     if (data) {
       setConfig({
@@ -166,7 +165,13 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
       })
     }
     setLoading(false)
-  }
+  }, [companyId])
+
+  useEffect(() => {
+    let cancelado = false
+    void cargarConfig(() => cancelado)
+    return () => { cancelado = true }
+  }, [cargarConfig])
 
   async function toggleStripe() {
     if (!config.stripe_configured) {

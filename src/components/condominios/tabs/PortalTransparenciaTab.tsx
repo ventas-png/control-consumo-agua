@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   fetchFondoReservaAprobado,
   fetchFondoReservaMovimientos,
@@ -45,11 +45,10 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     ultimoAporte: null, presupuestoAnual: 0, ejecutado: 0,
   })
 
-  useEffect(() => {
-    void cargar()
-  }, [proyectoId])
-
-  async function cargar() {
+  // `cargar` como useCallback: el efecto declara su dependencia real en vez de
+  // una lista paralela. `estaCancelado` descarta respuestas de un proyecto ya
+  // abandonado (o de un componente desmontado).
+  const cargar = useCallback(async (estaCancelado: () => boolean = () => false) => {
     setLoading(true)
 
     // Fondo de reserva (legacy approvals model)
@@ -64,6 +63,7 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
 
     // Modern movimientos (fondo_reserva_movimientos table) — más reciente
     const movsList = await fetchFondoReservaMovimientos<FondoReservaMovimiento>(proyectoId)
+    if (estaCancelado()) return
     setMovimientos(movsList)
 
     let saldoModern = 0
@@ -76,11 +76,13 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     // Presupuestos
     const yearActual = new Date().getFullYear()
     const presList = await fetchPresupuestosAnio<PresupuestoCondominio>(proyectoId, yearActual)
+    if (estaCancelado()) return
     setPresupuestos(presList)
 
     const presupuestoAnual = presList.reduce((s, p) => s + (p.monto_presupuestado ?? 0), 0)
     // Ejecutado: sumar gastos del año por categoría (cuando exista la tabla)
     const gastos = await fetchGastosAnioMontos(proyectoId, yearActual)
+    if (estaCancelado()) return
     const ejecutado = gastos.reduce((s, g) => s + (g.monto ?? 0), 0)
 
     setKpis({
@@ -93,7 +95,13 @@ export function PortalTransparenciaTab({ proyectoId, moneda }: Props) {
     })
 
     setLoading(false)
-  }
+  }, [proyectoId])
+
+  useEffect(() => {
+    let cancelado = false
+    void cargar(() => cancelado)
+    return () => { cancelado = true }
+  }, [cargar])
 
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando finanzas…</div>

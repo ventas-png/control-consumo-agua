@@ -197,7 +197,12 @@ function AppShell() {
     // automáticamente, así no hay que pasarlos en cada track() del código.
     registerSuperProperties({ company_id: currentUser.company_id, role: currentUser.role })
     setMonitoringUser({ id: currentUser.user_id, companyId: currentUser.company_id, role: currentUser.role })
-  }, [currentUser?.user_id])
+    // `currentUser` entero: el efecto lee user_id, company_id Y role. Con solo
+    // user_id en deps, un cambio de rol (o de empresa) dejaba analytics y
+    // Sentry etiquetando cada evento con el rol anterior. El objeto viene de
+    // useState, así que su identidad solo cambia cuando la sesión cambia de
+    // verdad: no hay re-ejecución por render.
+  }, [currentUser])
 
   const handleLogout = useCallback(() => {
     resetAnalytics()

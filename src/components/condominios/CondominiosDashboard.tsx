@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type CSSProperties} from 'react'
+import { useState, useEffect, useCallback, useMemo, type CSSProperties} from 'react'
 import type { UserSession, Proyecto, Unidad, AppSection } from '../../types'
 import { fetchCondominioStatsForProject, fetchCondominioStatsRows } from '../../domain/condominios/queries'
 import { DataTable, type DataTableColumn } from '../shared/DataTable'
@@ -29,21 +29,40 @@ const EMPTY_STATS = (): ProjectStats => ({
 
 export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavigateSection }: Props) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
-  const [projectInitialized, setProjectInitialized] = useState(false)
   const [stats, setStats] = useState<ProjectStats>(EMPTY_STATS())
   const [perProject, setPerProject] = useState<Record<string, ProjectStats>>({})
   const companyId = currentUser.company_id
 
-  const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
+  // useMemo: el `.filter()` suelto devolvía un array nuevo por render, así que
+  // el efecto no podía declararlo en deps sin re-ejecutarse siempre — de ahí el
+  // `.length`, que no detecta un cambio de proyectos con el mismo conteo.
+  const proyectosActivos = useMemo(
+    () => proyectos.filter(p => p.estado === 'activo'),
+    [proyectos],
+  )
 
+  // Reconcilia la selección con los proyectos activos VIGENTES. El enfoque
+  // anterior (`projectInitialized`) solo miraba la lista una vez: si el
+  // proyecto seleccionado se archivaba, o si la lista cambiaba de composición
+  // manteniendo el conteo, el dashboard seguía pidiendo stats de un proyecto
+  // que ya no está en el selector.
+  //
+  // Reglas, en orden:
+  //   1. selección todavía válida  → se conserva tal cual;
+  //   2. inválida y hay UN activo  → se elige ese;
+  //   3. inválida en cualquier otro caso (cero o varios) → '' (vista agregada).
+  //
+  // Actualización funcional: la decisión se toma sobre el valor ACTUAL del
+  // estado, así que `selectedProjectId` no entra en las dependencias y el
+  // efecto no se re-dispara por su propio setState. Devolver `actual` cuando no
+  // hay cambio evita además el render extra (React descarta el update).
   useEffect(() => {
-    if (proyectosActivos.length > 0 && !projectInitialized) {
-      if (proyectosActivos.length === 1) {
-        setSelectedProjectId(proyectosActivos[0].id)
-      }
-      setProjectInitialized(true)
-    }
-  }, [proyectosActivos.length, projectInitialized])
+    setSelectedProjectId(actual => {
+      if (actual && proyectosActivos.some(p => p.id === actual)) return actual
+      if (proyectosActivos.length === 1) return proyectosActivos[0].id
+      return actual === '' ? actual : ''
+    })
+  }, [proyectosActivos])
 
   const cargarStats = useCallback(async () => {
     if (!companyId) return
