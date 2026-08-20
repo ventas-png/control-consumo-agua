@@ -1085,6 +1085,8 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
   let scopeCorr: { company_id: string; project_id: string } | null = null
   let scopePaq: { company_id: string; project_id: string; unidad_id: string } | null = null
   const basura: Array<{ cliente: () => SupabaseClient; id: string }> = []
+  /** Motivo por el que el sandbox no sirve, o null. Ver el probe de beforeAll. */
+  let faltaEsquema: string | null = null
 
   /** Fila `app_users` del usuario autenticado (rol + empresa). */
   async function perfil(c: SupabaseClient): Promise<{ role: string; company_id: string }> {
@@ -1116,6 +1118,9 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
           tipo: 'paquete', descripcion: 'RLS harness — desechable',
           estado: 'pendiente', direccion: 'entrante',
         }
+    // Sin esquema no tiene sentido intentarlo: el INSERT devolvería un
+    // PGRST204 que parece una prueba rota y no lo es.
+    if (faltaEsquema) throw new Error(faltaEsquema)
     const { data, error } = await c.from('paquetes_recibidos').insert(fila).select('id')
     expect(error, `quien tiene el permiso de ${clase} debe poder crearla`).toBeNull()
     const id = (data?.[0] as { id: string } | undefined)?.id
@@ -1155,30 +1160,21 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
     scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
 
     // ── El sandbox tiene que traer el ESQUEMA del motor único ─────────────
-    // Sin esto, los seis escenarios que siembran una pieza fallan uno a uno con
-    // `PGRST204 — Could not find the 'clase' column`, que suena a prueba rota y
-    // no lo es: es el sandbox con el esquema atrasado. Se comprueba una vez y se
-    // falla con la instrucción, en vez de seis veces con un código de PostgREST.
-    //
-    // Este caso apareció en cuanto el gate dejó de auto-saltarse: mientras las
-    // 13 pruebas se omitían, el desajuste entre el esquema del sandbox y el del
-    // repositorio era invisible.
+    // Se ANOTA, no se lanza. Lanzar aquí dejaba las once pruebas de abajo como
+    // OMITIDAS —`128 passed | 11 skipped`—, que es justo la señal que este
+    // harness existe para eliminar: el verificador trata cualquier skip como
+    // cobertura perdida, y un reporte con omitidas no distingue "no se pudo
+    // ejecutar" de "no se quiso". Anotándolo, cada prueba FALLA con la causa y
+    // el recuento de omitidas sigue en cero.
     const { error: eEsquema } = await ownerUser
       .from('paquetes_recibidos').select('clase, destinatario_tipo').limit(1)
-    if (eEsquema) {
-      throw new Error(
-        `El sandbox RLS no tiene el esquema del motor único de recepción: ${eEsquema.message}\n` +
+    faltaEsquema = eEsquema
+      ? `El sandbox RLS no tiene el esquema del motor único de recepción: ${eEsquema.message}. ` +
         'Le faltan las migraciones 20260829000000 … 20260902000000, que son las que crean ' +
-        '`clase`, `destinatario_tipo` y las policies por clase.\n' +
-        'Aplicalas al proyecto del harness (el de RLS_EXPECTED_PROJECT_REF, que NO es la rama ' +
-        'de preview del PR) y, si PostgREST sigue sin verlas, recargá su caché con ' +
-        "NOTIFY pgrst, 'reload schema'.",
-      )
-    }
-    // La correspondencia va dirigida a la administración, así que le basta el
-    // proyecto — pero tiene que ser el MISMO, o el gate se confundiría con el
-    // alcance por proyecto.
-    scopeCorr = { company_id: u.company_id, project_id: u.project_id }
+        '`clase`, `destinatario_tipo` y las policies por clase. Aplicalas al proyecto del ' +
+        'harness (el de RLS_EXPECTED_PROJECT_REF, que NO es la rama de preview del PR) y, si ' +
+        "PostgREST sigue sin verlas, recargá su caché con NOTIFY pgrst, 'reload schema'."
+      : null
   })
 
   afterAll(async () => {
@@ -1193,6 +1189,12 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
   })
 
   describe('precondiciones (sin esto, el resto no prueba lo que dice)', () => {
+    it('el sandbox trae el esquema del motor único', () => {
+      // La primera que se lee cuando el job se pone rojo. Dice qué falta y
+      // dónde, en vez de dejar seis PGRST204 que parecen pruebas rotas.
+      expect(faltaEsquema ?? null, faltaEsquema ?? '').toBeNull()
+    })
+
     it('los cuatro usuarios son de la MISMA empresa', async () => {
       const perfiles = await Promise.all([paqUser, corrUser, adminUser, ownerUser].map(perfil))
       const empresas = new Set(perfiles.map(p => p.company_id))
