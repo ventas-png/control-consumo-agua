@@ -763,3 +763,266 @@ describe('«Sandbox listo» no puede salir con el esquema incompleto', () => {
     expect(cuerpo).not.toMatch(/\bKEY\b|serviceKey|SERVICE_ROLE/)
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// Alcance por proyecto: el fixture que iniciaba sesión y no podía trabajar.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO. `seedGateDeClase` creaba el proyecto y la unidad, y convergía
+// `app_users`, `user_roles` y `role_permissions` — pero NUNCA escribía en
+// `user_project_assignments`. El seed terminaba en 0 diciendo «Sandbox listo y
+// VERIFICADO», PAQ iniciaba sesión sin problemas, y la app le respondía «No
+// tienes ningún proyecto asignado».
+//
+// La causa está en `projects_select` (20260815000000): deja ver un proyecto a
+// quien es `user_is_project_exempt()` O tiene `user_has_project_access()`. Un
+// `operator` no es exento, así que sin asignación no ve NINGUNO. Login, empresa
+// y permisos correctos; imposible trabajar.
+import { seedGateDeClase, verificarGateDeClase } from '../seed-rls-sandbox.mjs'
+
+/**
+ * Base en memoria con lo que usa el seed: la cadena de `upsertPorMatch`
+ * (select→eq→maybeSingle, insert→select→single), `upsert` con onConflict y
+ * `delete` con eq/neq. Se guarda el estado de VERDAD para poder afirmar sobre
+ * la convergencia entre dos corridas, no sobre las llamadas.
+ */
+function baseFalsa(inicial = {}) {
+  const tablas = { ...inicial }
+  let seq = 0
+  const t = (n) => (tablas[n] ??= [])
+  const casa = (fila, filtros) => filtros.every(([op, k, v]) =>
+    op === 'eq' ? fila[k] === v : fila[k] !== v)
+
+  return {
+    tablas,
+    auth: {
+      admin: {
+        createUser: async ({ email }) => ({ data: { user: { id: `u-${email}` } }, error: null }),
+        updateUserById: async () => ({ error: null }),
+      },
+    },
+    from(nombre) {
+      const filtros = []
+      let modo = 'read'
+      let payload = null
+      const api = {
+        select() { return api },
+        eq(k, v) { filtros.push(['eq', k, v]); return api },
+        neq(k, v) { filtros.push(['neq', k, v]); return api },
+        insert(fila) { modo = 'insert'; payload = fila; return api },
+        upsert(fila) { modo = 'upsert'; payload = fila; return api },
+        delete() { modo = 'delete'; return api },
+        async maybeSingle() {
+          const f = t(nombre).filter((r) => casa(r, filtros))
+          return { data: f[0] ?? null, error: null }
+        },
+        async single() {
+          if (modo === 'insert') {
+            const fila = { id: `id-${++seq}`, ...payload }
+            t(nombre).push(fila)
+            return { data: fila, error: null }
+          }
+          const f = t(nombre).filter((r) => casa(r, filtros))
+          return { data: f[0] ?? null, error: null }
+        },
+        then(res) {
+          if (modo === 'delete') {
+            tablas[nombre] = t(nombre).filter((r) => !casa(r, filtros))
+            return Promise.resolve({ data: null, error: null }).then(res)
+          }
+          if (modo === 'upsert') {
+            const iguales = (a, b) => Object.keys(payload).every((k) => a[k] === b[k])
+            if (!t(nombre).some((r) => iguales(r, payload))) t(nombre).push({ id: `id-${++seq}`, ...payload })
+            return Promise.resolve({ data: null, error: null }).then(res)
+          }
+          const f = t(nombre).filter((r) => casa(r, filtros))
+          return Promise.resolve({ data: f, error: null }).then(res)
+        },
+      }
+      return api
+    },
+  }
+}
+
+const buscarNulo = async () => null
+const asigsDe = (base, email) =>
+  (base.tablas['user_project_assignments'] ?? [])
+    .filter((a) => a.user_id === `u-${email}`).map((a) => a.project_id)
+
+describe('seedGateDeClase — alcance por proyecto', () => {
+  it('PRIMERA corrida: PAQ y CORR quedan asignados al proyecto del fixture', async () => {
+    const base = baseFalsa()
+    const r = await seedGateDeClase(base, buscarNulo)
+
+    expect(asigsDe(base, 'rls-paq@sandbox.invalid')).toEqual([r.projectId])
+    expect(asigsDe(base, 'rls-corr@sandbox.invalid')).toEqual([r.projectId])
+  })
+
+  it('PRIMERA corrida: ADMIN y OWNER quedan SIN asignaciones explícitas', async () => {
+    // Con una sola, `user_is_project_exempt` deja de aplicarles y pasan de ver
+    // toda la empresa a ver sólo lo asignado — justo lo contrario del fixture.
+    const base = baseFalsa()
+    await seedGateDeClase(base, buscarNulo)
+
+    expect(asigsDe(base, 'rls-admin@sandbox.invalid')).toEqual([])
+    expect(asigsDe(base, 'rls-owner@sandbox.invalid')).toEqual([])
+  })
+
+  it('SEGUNDA corrida: converge y borra la asignación a un proyecto viejo', async () => {
+    const base = baseFalsa()
+    const r1 = await seedGateDeClase(base, buscarNulo)
+
+    // Una corrida anterior (o una mano humana) dejó a PAQ en otro proyecto y al
+    // ADMIN con una explícita. Sin converger, PAQ vería dos proyectos y el
+    // ADMIN perdería la vista de empresa.
+    base.tablas['user_project_assignments'].push(
+      { id: 'x1', user_id: 'u-rls-paq@sandbox.invalid', project_id: 'proyecto-viejo' },
+      { id: 'x2', user_id: 'u-rls-admin@sandbox.invalid', project_id: 'proyecto-viejo' },
+    )
+
+    const r2 = await seedGateDeClase(base, buscarNulo)
+    expect(r2.projectId, 'el fixture es idempotente: mismo proyecto').toBe(r1.projectId)
+    expect(asigsDe(base, 'rls-paq@sandbox.invalid')).toEqual([r1.projectId])
+    expect(asigsDe(base, 'rls-admin@sandbox.invalid')).toEqual([])
+  })
+
+  it('SEGUNDA corrida: no duplica la asignación que ya era correcta', async () => {
+    const base = baseFalsa()
+    const r = await seedGateDeClase(base, buscarNulo)
+    await seedGateDeClase(base, buscarNulo)
+    expect(asigsDe(base, 'rls-corr@sandbox.invalid')).toEqual([r.projectId])
+  })
+
+  it('un fallo al converger el alcance ABORTA con un error que dice por qué', async () => {
+    const base = baseFalsa()
+    const original = base.from.bind(base)
+    base.from = (n) => {
+      if (n !== 'user_project_assignments') return original(n)
+      const api = { select: () => api, eq: () => api, neq: () => api, delete: () => api, upsert: () => api,
+        then: (res) => Promise.resolve({ data: null, error: { message: 'permission denied' } }).then(res) }
+      return api
+    }
+    await expect(seedGateDeClase(base, buscarNulo)).rejects.toThrow(/user_project_assignments|alcance por proyecto/)
+  })
+})
+
+describe('verificarGateDeClase — el fixture tiene que poder trabajar', () => {
+  /** Cliente de usuario doblado: decide qué proyectos ve cada quien. */
+  function clienteUsuario({ ve = [], empresa, permisos = {} }) {
+    return () => ({
+      auth: {
+        signInWithPassword: async () => ({ error: null }),
+        signOut: async () => ({}),
+      },
+      rpc: async (fn, args) => {
+        if (fn === 'get_my_company_id') return { data: empresa, error: null }
+        return { data: permisos[args?.perm_key] ?? false, error: null }
+      },
+      from: () => {
+        const api = {
+          select: () => api,
+          eq: (_k, v) => { api._id = v; return api },
+          then: (res) => Promise.resolve({
+            data: ve.includes(api._id) ? [{ id: api._id }] : [], error: null,
+          }).then(res),
+        }
+        return api
+      },
+    })
+  }
+
+  const PERMISOS_OK = {
+    PAQ: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': false },
+    CORR: { 'condominios.tab.paqueteria': false, 'condominios.tab.correspondencia': true },
+    ADMIN: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+    OWNER: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+  }
+
+  async function verificar({ base, clase, ve }) {
+    return verificarGateDeClase('https://x.supabase.co', 'anon', clase, base,
+      clienteUsuario({ ve, empresa: clase.companyId, permisos: PERMISOS_OK[claseActual] }))
+  }
+  let claseActual = 'PAQ'
+
+  /** Siembra de verdad y devuelve {base, clase}. */
+  async function sembrado() {
+    const base = baseFalsa()
+    const clase = await seedGateDeClase(base, buscarNulo)
+    return { base, clase }
+  }
+
+  it('un fixture BIEN sembrado no produce fallos de alcance', async () => {
+    const { base, clase } = await sembrado()
+    const fallos = []
+    for (const u of clase.usuarios) {
+      claseActual = u.key
+      fallos.push(...await verificar({ base, clase: { ...clase, usuarios: [u] }, ve: [clase.projectId] }))
+    }
+    expect(fallos).toEqual([])
+  })
+
+  it('RECHAZA a un usuario que NO ve el proyecto (el síntoma de la UI)', async () => {
+    const { base, clase } = await sembrado()
+    claseActual = 'PAQ'
+    const paq = clase.usuarios.find((u) => u.key === 'PAQ')
+    const fallos = await verificar({ base, clase: { ...clase, usuarios: [paq] }, ve: [] })
+    expect(fallos.some((f) => /No tienes ningún proyecto asignado/.test(f))).toBe(true)
+  })
+
+  it('RECHAZA a quien ve OTRO proyecto pero no el del fixture', async () => {
+    const { base, clase } = await sembrado()
+    claseActual = 'CORR'
+    const corr = clase.usuarios.find((u) => u.key === 'CORR')
+    const fallos = await verificar({ base, clase: { ...clase, usuarios: [corr] }, ve: ['otro-proyecto'] })
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain(clase.projectId)
+  })
+
+  it('RECHAZA una asignación de MÁS aunque vea el proyecto correcto', async () => {
+    // Ver el del fixture no basta: una asignación extra le daría acceso a un
+    // proyecto que el fixture no declara, y ninguna prueba lo notaría.
+    const { base, clase } = await sembrado()
+    base.tablas['user_project_assignments'].push(
+      { id: 'x', user_id: 'u-rls-paq@sandbox.invalid', project_id: 'proyecto-de-mas' })
+    claseActual = 'PAQ'
+    const paq = clase.usuarios.find((u) => u.key === 'PAQ')
+    const fallos = await verificar({ base, clase: { ...clase, usuarios: [paq] }, ve: [clase.projectId] })
+    expect(fallos.some((f) => /proyecto-de-mas/.test(f))).toBe(true)
+  })
+
+  it('RECHAZA una asignación explícita en el ADMIN (le quita la exención)', async () => {
+    const { base, clase } = await sembrado()
+    base.tablas['user_project_assignments'].push(
+      { id: 'y', user_id: 'u-rls-admin@sandbox.invalid', project_id: clase.projectId })
+    claseActual = 'ADMIN'
+    const admin = clase.usuarios.find((u) => u.key === 'ADMIN')
+    const fallos = await verificar({ base, clase: { ...clase, usuarios: [admin] }, ve: [clase.projectId] })
+    expect(fallos.some((f) => /exención/.test(f))).toBe(true)
+  })
+
+  it('RECHAZA si le FALTA la asignación, aunque el login y los permisos estén bien', async () => {
+    const { base, clase } = await sembrado()
+    base.tablas['user_project_assignments'] = base.tablas['user_project_assignments']
+      .filter((a) => a.user_id !== 'u-rls-corr@sandbox.invalid')
+    claseActual = 'CORR'
+    const corr = clase.usuarios.find((u) => u.key === 'CORR')
+    const fallos = await verificar({ base, clase: { ...clase, usuarios: [corr] }, ve: [] })
+    expect(fallos.some((f) => /user_project_assignments/.test(f))).toBe(true)
+  })
+})
+
+describe('el banner no puede salir con la UI sin proyecto', () => {
+  it('el verificador del gate alimenta la misma lista que bloquea el banner', () => {
+    expect(FUENTE_SEED).toContain('fallos.push(...await verificarGateDeClase(URL, ANON, clase, admin))')
+  })
+
+  it('el verificador recibe el cliente admin para leer las asignaciones', () => {
+    // Sin él sólo podría mirar lo que el propio usuario ve, y una asignación de
+    // más es invisible desde ahí.
+    expect(FUENTE_SEED).toMatch(/verificarGateDeClase\(url, anon, clase, admin/)
+  })
+
+  it('el seed converge las asignaciones, no sólo roles y permisos', () => {
+    expect(FUENTE_SEED).toMatch(/from\('user_project_assignments'\)\s*\n?\s*\.delete\(\)/)
+    expect(FUENTE_SEED).toMatch(/from\('user_project_assignments'\)\s*\n?\s*\.upsert\(/)
+  })
+})

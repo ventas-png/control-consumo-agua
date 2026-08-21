@@ -343,11 +343,22 @@ const CLASE_ROLES = {
   paq: { nombre: 'RLS Paquetería', permiso: 'condominios.tab.paqueteria' },
   corr: { nombre: 'RLS Correspondencia', permiso: 'condominios.tab.correspondencia' },
 }
+//
+// `asignado` decide quién lleva fila en `user_project_assignments`, y NO es un
+// detalle: la policy `projects_select` (20260815000000) deja ver un proyecto a
+// quien sea `user_is_project_exempt()` O tenga `user_has_project_access()`. Un
+// `operator` no es exento, así que SIN asignación no ve NINGÚN proyecto y la
+// app le muestra «No tienes ningún proyecto asignado» — aunque su login, su
+// empresa y sus permisos sean correctos.
+//
+// Al revés también importa: `user_is_project_exempt` deja de aplicar al `admin`
+// en cuanto tiene UNA asignación explícita (pasa de ver toda la empresa a ver
+// sólo lo asignado). Por eso ADMIN y OWNER tienen que quedarse SIN filas.
 export const CLASE_USUARIOS = [
-  { key: 'PAQ', email: 'rls-paq@sandbox.invalid', role: 'operator', rbac: 'paq', nombre: 'Operador de paquetería' },
-  { key: 'CORR', email: 'rls-corr@sandbox.invalid', role: 'operator', rbac: 'corr', nombre: 'Operador de correspondencia' },
-  { key: 'ADMIN', email: 'rls-admin@sandbox.invalid', role: 'admin', rbac: null, nombre: 'Administrador' },
-  { key: 'OWNER', email: 'rls-owner@sandbox.invalid', role: 'company_owner', rbac: null, nombre: 'Dueña' },
+  { key: 'PAQ', email: 'rls-paq@sandbox.invalid', role: 'operator', rbac: 'paq', asignado: true, nombre: 'Operador de paquetería' },
+  { key: 'CORR', email: 'rls-corr@sandbox.invalid', role: 'operator', rbac: 'corr', asignado: true, nombre: 'Operador de correspondencia' },
+  { key: 'ADMIN', email: 'rls-admin@sandbox.invalid', role: 'admin', rbac: null, asignado: false, nombre: 'Administrador' },
+  { key: 'OWNER', email: 'rls-owner@sandbox.invalid', role: 'company_owner', rbac: null, asignado: false, nombre: 'Dueña' },
 ]
 
 /**
@@ -380,7 +391,7 @@ async function upsertRolDeClase(admin, companyId, { nombre, permiso }) {
  * Siembra la empresa del gate por clase con sus cuatro usuarios, un proyecto y
  * una unidad. Devuelve lo necesario para verificarlo e imprimir los secretos.
  */
-async function seedGateDeClase(admin, buscarUsuario) {
+export async function seedGateDeClase(admin, buscarUsuario) {
   const companyId = await upsertPorMatch(
     admin, 'companies', { nombre: CLASE_EMPRESA }, { nombre: CLASE_EMPRESA },
   )
@@ -424,6 +435,41 @@ async function seedGateDeClase(admin, buscarUsuario) {
         .upsert({ user_id: userId, role_id: rolEsperado }, { onConflict: 'user_id,role_id' })
       if (error) throw new Error(`user_roles upsert: ${error.message}`)
     }
+
+    // ── Alcance por proyecto ──
+    // Faltaba, y el síntoma no se parecía a la causa: el seed decía «Sandbox
+    // listo», PAQ entraba sin problemas, y la app le respondía «No tienes
+    // ningún proyecto asignado». Login, empresa y permisos estaban bien; lo que
+    // faltaba era la fila de `user_project_assignments` que `projects_select`
+    // exige a quien no es exento.
+    //
+    // Converge igual que los roles: primero se BORRA lo que sobra —una
+    // asignación a un proyecto viejo dejaría al usuario viendo dos, o el
+    // proyecto equivocado— y después se inserta la que toca.
+    const { error: eDelProy } = u.asignado
+      ? await admin.from('user_project_assignments')
+          .delete().eq('user_id', userId).neq('project_id', projectId)
+      // ADMIN y OWNER se quedan SIN ninguna: en cuanto un admin tiene una
+      // asignación explícita deja de ser exento y pierde la vista de empresa.
+      : await admin.from('user_project_assignments').delete().eq('user_id', userId)
+    if (eDelProy) {
+      throw new Error(
+        `user_project_assignments limpieza de ${u.key} (${u.email}): ${eDelProy.message}. ` +
+        'Sin poder converger el alcance por proyecto, el fixture quedaría mintiendo.',
+      )
+    }
+
+    if (u.asignado) {
+      const { error: eProy } = await admin.from('user_project_assignments')
+        .upsert({ user_id: userId, project_id: projectId }, { onConflict: 'user_id,project_id' })
+      if (eProy) {
+        throw new Error(
+          `user_project_assignments upsert de ${u.key} (${u.email}) al proyecto ${projectId}: ${eProy.message}. ` +
+          'Sin esta fila, la app le dirá «No tienes ningún proyecto asignado».',
+        )
+      }
+    }
+
     usuarios.push({ ...u, userId, pass })
   }
 
@@ -436,9 +482,21 @@ async function seedGateDeClase(admin, buscarUsuario) {
  * permiso de paquetería, la suite seguiría verde probando lo contrario de lo
  * que dice probar.
  *
+ * Se comprueba TAMBIÉN el alcance por proyecto, en sus dos caras:
+ *
+ *   · como el usuario: que VEA el proyecto del fixture. Es la misma consulta de
+ *     la que depende la app (`projects_select`), así que es lo único que
+ *     distingue «tiene permisos» de «puede trabajar». Sin esto, el seed daba el
+ *     sandbox por bueno y PAQ se encontraba con «No tienes ningún proyecto
+ *     asignado».
+ *   · como admin: que el CONJUNTO de filas de `user_project_assignments` sea
+ *     exactamente el declarado. Ver el proyecto correcto no basta: una
+ *     asignación de más le daría acceso a otro proyecto sin que nada fallara,
+ *     y una explícita en el ADMIN le quitaría la exención de empresa.
+ *
  * @returns {Promise<string[]>} lista de fallos (vacía = todo correcto).
  */
-async function verificarGateDeClase(url, anon, clase) {
+export async function verificarGateDeClase(url, anon, clase, admin, crearCliente = createClient) {
   const fallos = []
   const esperado = {
     PAQ: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': false },
@@ -450,7 +508,7 @@ async function verificarGateDeClase(url, anon, clase) {
   }
 
   for (const u of clase.usuarios) {
-    const cli = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } })
+    const cli = crearCliente(url, anon, { auth: { persistSession: false, autoRefreshToken: false } })
     const { error: eLogin } = await cli.auth.signInWithPassword({ email: u.email, password: u.pass })
     if (eLogin) {
       fallos.push(`${u.key} (${u.email}): no se pudo iniciar sesión — ${eLogin.message}`)
@@ -470,8 +528,46 @@ async function verificarGateDeClase(url, anon, clase) {
         fallos.push(`${u.key}: user_has_permission(${clave}) = ${data}, se esperaba ${quiero}`)
       }
     }
+    // ── Alcance por proyecto, como el usuario ──
+    // La app resuelve los proyectos disponibles con esta misma lectura. Si
+    // devuelve 0 filas, el operador ve «No tienes ningún proyecto asignado»
+    // por mucho que su login y sus permisos estén bien.
+    const { data: visibles, error: eProy } = await cli
+      .from('projects').select('id').eq('id', clase.projectId)
+    if (eProy) {
+      fallos.push(`${u.key}: no pudo consultar el proyecto del fixture (${eProy.message})`)
+    } else if ((visibles ?? []).length !== 1) {
+      fallos.push(
+        `${u.key}: NO ve el proyecto del fixture (${clase.projectId}). ` +
+        'La app le mostraría «No tienes ningún proyecto asignado». ' +
+        (u.asignado
+          ? 'Le falta su fila en user_project_assignments.'
+          : 'Debería verlo por exención de rol; revisá user_is_project_exempt.'),
+      )
+    }
+
     await cli.auth.signOut()
-    log(`✔ ${u.key} (${u.role}): login OK y permisos efectivos como se esperaba`)
+
+    // ── Alcance por proyecto, como admin: el CONJUNTO exacto ──
+    const { data: asigs, error: eAsig } = await admin
+      .from('user_project_assignments').select('project_id').eq('user_id', u.userId)
+    if (eAsig) {
+      fallos.push(`${u.key}: no se pudieron leer sus asignaciones (${eAsig.message})`)
+    } else {
+      const tiene = (asigs ?? []).map((a) => a.project_id).sort()
+      const quiero = u.asignado ? [clase.projectId] : []
+      if (tiene.join('|') !== quiero.join('|')) {
+        fallos.push(
+          `${u.key}: asignaciones de proyecto [${tiene.join(', ') || '(ninguna)'}], ` +
+          `se esperaba [${quiero.join(', ') || '(ninguna)'}]. ` +
+          (u.asignado
+            ? 'Una de más le daría acceso a un proyecto que el fixture no declara.'
+            : 'Una asignación explícita le quita la exención y deja de ver toda la empresa.'),
+        )
+      }
+    }
+
+    log(`✔ ${u.key} (${u.role}): login, empresa, permisos y alcance por proyecto como se esperaba`)
   }
   return fallos
 }
@@ -824,7 +920,7 @@ async function main(env) {
   }
 
   console.log('\n🔍 Verificando los cuatro usuarios del gate por clase\n')
-  fallos.push(...await verificarGateDeClase(URL, ANON, clase))
+  fallos.push(...await verificarGateDeClase(URL, ANON, clase, admin))
 
   // El esquema, al final y SIEMPRE: es lo único que el resto del seed no toca,
   // y por tanto lo único que podía faltar sin que nada fallara antes.
