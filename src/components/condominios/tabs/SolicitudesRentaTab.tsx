@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { notify } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { aprobarSolicitudRenta } from '../../../domain/condominios/solicitudRenta'
+import {
+  DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe, tieneDatosContrato,
+} from '../SolicitudRentaDetalle'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
 
 interface Props {
@@ -9,6 +13,7 @@ interface Props {
   unidades: Unidad[]
   proyectoId: string
   companyId: string
+  moneda?: string
   autorNombre: string
   canEdit: boolean
   onRefresh: () => void
@@ -29,7 +34,7 @@ const ESTADO_CFG: Record<EstadoSolicitudRenta, { label: string; color: string; b
   baja:      { label: 'Dada de baja', color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', icon: '🚫' },
 }
 
-export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdit, onRefresh }: Props) {
+export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autorNombre, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoSolicitudRenta | 'all'>('pendiente')
   const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [tipoAprobado, setTipoAprobado] = useState<TipoRenta>('arrendamiento')
@@ -49,39 +54,71 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
 
   async function resolver(s: SolicitudRentaUnidad, nuevoEstado: 'aprobada' | 'rechazada') {
     if (!canEdit) return
+    const aprobando = nuevoEstado === 'aprobada'
+
+    // El contrato solo se puede generar si la autorización cubre arrendamiento y
+    // el propietario mandó los tres datos que `contratos_arrendamiento` exige
+    // NOT NULL. El RPC vuelve a verificarlo server-side.
+    const puedeCrearContrato = aprobando
+      && (tipoAprobado === 'arrendamiento' || tipoAprobado === 'ambas')
+      && tieneDatosContrato(s)
+      && !s.contrato_id
+
     const result = await openPromptDialog({
-      title: nuevoEstado === 'aprobada' ? '¿Aprobar solicitud?' : '¿Rechazar solicitud?',
-      fields: [{
-        name: 'comentario',
-        label: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo (recomendado)',
-        control: 'textarea',
-        rows: 4,
-        placeholder: 'Escriba un comentario…',
-        autoFocus: true,
-      }],
-      submitText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
+      title: aprobando ? '¿Aprobar solicitud?' : '¿Rechazar solicitud?',
+      fields: [
+        {
+          name: 'comentario',
+          label: aprobando ? 'Comentario (opcional)' : 'Motivo del rechazo (recomendado)',
+          control: 'textarea',
+          rows: 4,
+          placeholder: 'Escriba un comentario…',
+          autoFocus: true,
+        },
+        ...(puedeCrearContrato ? [{
+          name: 'crear_contrato',
+          label: 'Crear el contrato de arrendamiento con estos datos',
+          control: 'checkbox' as const,
+          initialValue: 'true',
+        }] : []),
+      ],
+      submitText: aprobando ? 'Aprobar' : 'Rechazar',
     })
     if (!result) return
     const comentario = result.comentario
 
     setSaving(true)
-    const payload: Partial<SolicitudRentaUnidad> & { estado: string } = {
-      estado: nuevoEstado,
-      comentario_admin: comentario || null,
-      aprobado_por: autorNombre || null,
-      fecha_resolucion: new Date().toISOString(),
+
+    if (aprobando) {
+      // Aprobar va por RPC: además de resolver la solicitud puede crear el
+      // contrato, y eso cruza dos permisos RBAC distintos (20260828000200).
+      const { contratoCreado, error } = await aprobarSolicitudRenta({
+        solicitudId: s.id,
+        tipoAprobado,
+        comentario: comentario || null,
+        aprobadoPor: autorNombre || null,
+        crearContrato: puedeCrearContrato && result.crear_contrato === 'true',
+      })
+      setSaving(false)
+      if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
+      notify({
+        variant: 'success',
+        title: 'Solicitud aprobada',
+        text: contratoCreado ? 'Se creó el contrato de arrendamiento con los datos enviados.' : undefined,
+        duration: contratoCreado ? 2600 : 1400,
+      })
+    } else {
+      const { error } = await updateCondominioRow('solicitud_renta_unidad', s.id, {
+        estado: 'rechazada',
+        comentario_admin: comentario || null,
+        aprobado_por: autorNombre || null,
+        fecha_resolucion: new Date().toISOString(),
+      })
+      setSaving(false)
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+      notify({ variant: 'success', title: 'Solicitud rechazada', duration: 1400 })
     }
-    if (nuevoEstado === 'aprobada') {
-      payload.tipo_aprobado = tipoAprobado
-    }
-    const { error } = await updateCondominioRow('solicitud_renta_unidad', s.id, payload)
-    setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    notify({
-      variant: 'success',
-      title: nuevoEstado === 'aprobada' ? 'Solicitud aprobada' : 'Solicitud rechazada',
-      duration: 1400,
-    })
+
     setExpandedId(null)
     onRefresh()
   }
@@ -140,6 +177,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
         const cfg       = ESTADO_CFG[s.estado]
         const expanded  = expandedId === s.id
         const fecha     = s.created_at ? new Date(s.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
+        const docs      = documentosDe(s)
 
         return (
           <div key={s.id} style={{
@@ -159,6 +197,8 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                 </div>
                 <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                   {TIPO_LABEL[s.tipo_renta]} · {fecha}
+                  {s.arrendatario_nombre && <> · 👤 {s.arrendatario_nombre}</>}
+                  {docs.length > 0 && <> · 📎 {docs.length}</>}
                 </div>
               </div>
               <span style={{
@@ -176,6 +216,15 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                 {s.motivo && (
                   <div style={{ marginTop: '12px', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--at-ink-2)' }}>
                     <strong>Motivo del cliente:</strong><br />{s.motivo}
+                  </div>
+                )}
+
+                <DatosContratoSolicitud solicitud={s} moneda={moneda} />
+                <DocumentosSolicitudRenta documentos={docs} />
+
+                {s.contrato_id && (
+                  <div style={{ marginTop: '10px', fontSize: '12.5px', color: 'var(--at-success)', fontWeight: 600 }}>
+                    ✅ Contrato de arrendamiento ya creado desde esta solicitud — se administra en la pestaña Arrendamientos.
                   </div>
                 )}
 

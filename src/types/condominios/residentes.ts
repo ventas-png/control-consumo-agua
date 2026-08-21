@@ -29,6 +29,19 @@ export interface UnidadResidente {
 export type TipoRenta = 'arrendamiento' | 'str' | 'ambas'
 export type EstadoSolicitudRenta = 'pendiente' | 'aprobada' | 'rechazada' | 'baja'
 
+/**
+ * Adjunto que el propietario anexa a su solicitud de renta para que la
+ * administración evalúe y archive. `path` es el path BARE del bucket privado
+ * `renta-docs` (20260828000100); la lectura firma con useSignedUrl.
+ */
+export interface DocumentoSolicitudRenta {
+  path: string
+  nombre: string
+  etiqueta?: string | null
+  mime?: string | null
+  size?: number | null
+}
+
 export interface SolicitudRentaUnidad {
   id: string
   company_id: string
@@ -43,6 +56,21 @@ export interface SolicitudRentaUnidad {
   aprobado_por?: string | null
   fecha_resolucion?: string | null
   created_at: string
+  // Datos del contrato propuestos por el propietario (20260828000000). Espejan
+  // a ContratoArrendamiento; nulos cuando la solicitud es solo STR.
+  arrendatario_nombre?: string | null
+  arrendatario_identificacion?: string | null
+  arrendatario_telefono?: string | null
+  arrendatario_email?: string | null
+  monto_renta?: number | null
+  deposito?: number | null
+  dia_pago?: number | null
+  fecha_inicio?: string | null
+  fecha_fin?: string | null
+  notas_contrato?: string | null
+  documentos?: DocumentoSolicitudRenta[] | null
+  /** Contrato creado al aprobar (lo escribe solo el RPC aprobar_solicitud_renta). */
+  contrato_id?: string | null
   // joined
   unidad_nombre?: string
 }

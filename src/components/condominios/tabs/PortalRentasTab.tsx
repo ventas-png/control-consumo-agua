@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { confirm, notify } from '../../shared/Dialog'
 import {
@@ -21,10 +21,14 @@ import {
   type InquilinoDeUnidad,
 } from '../../../domain/portal/inquilinos'
 import { ImageUploader } from '../../shared/ImageUploader'
+import { fileIcon } from '../../shared/FileUploader'
+import { uploadRentaDoc, removeRentaDocs } from '../../../domain/shared/storage'
+import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../../lib/fileValidation'
+import { DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe } from '../SolicitudRentaDetalle'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
-  SolicitudRentaUnidad, TipoRenta, HuespedSTR,
+  SolicitudRentaUnidad, TipoRenta, HuespedSTR, DocumentoSolicitudRenta,
 } from '../../../types'
 import { ModalPortal } from '../../shared/ModalPortal'
 
@@ -129,6 +133,50 @@ function blankReserva(): Partial<ReservaSTR> {
 
 // ── Authorization request form ────────────────────────────────────────────────
 
+// Topes de los adjuntos: espejan el CHECK de `solicitud_renta_unidad`
+// (20260828000000) y el file_size_limit del bucket `renta-docs` (20260828000100).
+const MAX_DOCS = 8
+const MAX_DOC_BYTES = 10 * 1024 * 1024
+const ACCEPT_DOCS = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg', 'image/png', 'image/webp',
+].join(',')
+
+/** Archivo elegido pero todavía no subido: se sube al enviar la solicitud. */
+interface DocPendiente {
+  file: File
+  etiqueta: string
+}
+
+/**
+ * Datos del contrato que el propietario propone. Mismos campos que el formulario
+ * "Nuevo contrato de arrendamiento" del admin (ArrendamientosTab) menos la
+ * unidad, que aquí es implícita. Se guardan como strings y se castean al enviar.
+ */
+interface DatosContratoForm {
+  arrendatario_nombre: string
+  arrendatario_identificacion: string
+  arrendatario_telefono: string
+  arrendatario_email: string
+  monto_renta: string
+  deposito: string
+  dia_pago: string
+  fecha_inicio: string
+  fecha_fin: string
+  notas_contrato: string
+}
+
+const blankDatosContrato = (): DatosContratoForm => ({
+  arrendatario_nombre: '', arrendatario_identificacion: '',
+  arrendatario_telefono: '', arrendatario_email: '',
+  monto_renta: '', deposito: '', dia_pago: '5',
+  fecha_inicio: '', fecha_fin: '', notas_contrato: '',
+})
+
 function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada, prevBaja }: {
   unidadId: string; proyectoId: string; companyId: string; clienteId: string
   onSolicitudChange: () => void; prevRechazada: SolicitudRentaUnidad | null
@@ -136,32 +184,133 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 }) {
   const [tipo, setTipo]       = useState<TipoRenta>('arrendamiento')
   const [motivo, setMotivo]   = useState('')
+  const [datos, setDatos]     = useState<DatosContratoForm>(blankDatosContrato())
+  const [docs, setDocs]       = useState<DocPendiente[]>([])
   const [saving, setSaving]   = useState(false)
+  const fileRef               = useRef<HTMLInputElement>(null)
+
+  // Con STR el contrato de arrendamiento no aplica: cada reserva trae sus
+  // propios datos de huésped y se captura después de la autorización.
+  const pideDatosContrato = tipo === 'arrendamiento' || tipo === 'ambas'
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
     border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
+  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px', display: 'block' }
+  const rowStyle: React.CSSProperties   = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }
+
+  function setDato<K extends keyof DatosContratoForm>(k: K, v: string) {
+    setDatos(p => ({ ...p, [k]: v }))
+  }
+
+  function agregarArchivos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const nuevos: DocPendiente[] = []
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_DOC_BYTES) {
+        notify({ variant: 'error', title: 'Archivo muy grande', text: `${file.name} excede el límite de 10 MB.` })
+        continue
+      }
+      nuevos.push({ file, etiqueta: '' })
+    }
+    setDocs(prev => {
+      const combinados = [...prev, ...nuevos]
+      if (combinados.length > MAX_DOCS) {
+        notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
+      }
+      return combinados.slice(0, MAX_DOCS)
+    })
+    // Permite volver a elegir el mismo archivo después de quitarlo.
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  function quitarArchivo(index: number) {
+    setDocs(prev => prev.filter((_, i) => i !== index))
+  }
+
+  /**
+   * Sube los adjuntos a `renta-docs` y devuelve las entradas para la columna
+   * jsonb. El primer segmento del path DEBE ser la unidad: la RLS del bucket
+   * autoriza por ahí (20260828000100).
+   */
+  async function subirDocumentos(): Promise<{ documentos: DocumentoSolicitudRenta[]; error: string | null }> {
+    const documentos: DocumentoSolicitudRenta[] = []
+    for (const d of docs) {
+      // Magic-byte check: defiende contra payloads renombrados (.html → .pdf).
+      const magic = await validateFileMagic(d.file, 'document')
+      if (!magic.ok) return { documentos, error: `${d.file.name}: ${magic.reason}` }
+      const contentType = resolveUploadContentType(magic.detected, d.file.name)
+      const path = buildUploadPath(unidadId, d.file.name)
+      const { error } = await uploadRentaDoc(path, d.file, { contentType })
+      if (error) return { documentos, error: `No se pudo subir ${d.file.name}: ${error}` }
+      // S6 fase 2: se persiste el path bare; la lectura firma con useSignedUrl.
+      documentos.push({
+        path,
+        nombre: d.file.name,
+        etiqueta: d.etiqueta.trim() || null,
+        mime: contentType,
+        size: d.file.size,
+      })
+    }
+    return { documentos, error: null }
+  }
 
   async function submit() {
+    if (pideDatosContrato) {
+      if (!datos.arrendatario_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del arrendatario es requerido.' }); return }
+      if (!datos.monto_renta || isNaN(Number(datos.monto_renta))) { notify({ variant: 'error', title: 'Error', text: 'Ingresa el monto de renta.' }); return }
+      if (!datos.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'La fecha de inicio es requerida.' }); return }
+      if (datos.fecha_fin && datos.fecha_fin < datos.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'La fecha fin no puede ser anterior a la de inicio.' }); return }
+    }
+
     setSaving(true)
-    const { error } = await createCondominioRow('solicitud_renta_unidad', {
+    const { documentos, error: upErr } = await subirDocumentos()
+    if (upErr) {
+      // Sin solicitud no hay a qué colgar lo ya subido: se limpia.
+      await removeRentaDocs(documentos.map(d => d.path))
+      setSaving(false)
+      notify({ variant: 'error', title: 'Error', text: upErr })
+      return
+    }
+
+    const payload: Record<string, unknown> = {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: unidadId,
       cliente_id: clienteId || null,
       tipo_renta: tipo,
       motivo: motivo.trim() || null,
-    })
+      documentos,
+    }
+    if (pideDatosContrato) {
+      payload.arrendatario_nombre         = datos.arrendatario_nombre.trim()
+      payload.arrendatario_identificacion = datos.arrendatario_identificacion.trim() || null
+      payload.arrendatario_telefono       = datos.arrendatario_telefono.trim() || null
+      payload.arrendatario_email          = datos.arrendatario_email.trim() || null
+      payload.monto_renta   = Number(datos.monto_renta)
+      payload.deposito      = datos.deposito ? Number(datos.deposito) : null
+      payload.dia_pago      = Number(datos.dia_pago) || 1
+      payload.fecha_inicio  = datos.fecha_inicio
+      payload.fecha_fin     = datos.fecha_fin || null
+      payload.notas_contrato = datos.notas_contrato.trim() || null
+    }
+
+    const { error } = await createCondominioRow('solicitud_renta_unidad', payload)
+    if (error) {
+      await removeRentaDocs(documentos.map(d => d.path))
+      setSaving(false)
+      notify({ variant: 'error', title: 'Error', text: error.message })
+      return
+    }
     setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     onSolicitudChange()
   }
 
   return (
-    <div style={{ maxWidth: '520px' }}>
+    <div style={{ maxWidth: '620px' }}>
       <div style={{ marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>
           🔑 Solicitar autorización de renta
@@ -222,6 +371,128 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           onChange={e => setMotivo(e.target.value)}
           placeholder="Describe brevemente cómo planeas operar la renta…"
         />
+      </div>
+
+      {/* Datos del contrato: viajan con la solicitud para que la administración
+        * evalúe con información real y, al aprobar, cree el contrato sin
+        * re-teclear nada (RPC aprobar_solicitud_renta). */}
+      {pideDatosContrato && (
+        <div style={{
+          border: '1.5px solid var(--at-line)', borderRadius: '12px',
+          padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+            📄 Datos del arrendamiento
+          </div>
+          <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '14px' }}>
+            Con estos datos la administración evalúa la solicitud y, al aprobarla, genera el contrato de tu unidad.
+          </div>
+
+          <div style={rowStyle}>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Nombre del arrendatario *</label>
+              <input style={fieldStyle} aria-label="Nombre del arrendatario *" value={datos.arrendatario_nombre} onChange={e => setDato('arrendatario_nombre', e.target.value)} placeholder="Nombre completo" />
+            </div>
+            <div>
+              <label style={labelStyle}>DPI / Identificación</label>
+              <input style={fieldStyle} aria-label="DPI / Identificación" value={datos.arrendatario_identificacion} onChange={e => setDato('arrendatario_identificacion', e.target.value)} placeholder="Número de documento" />
+            </div>
+            <div>
+              <label style={labelStyle}>Teléfono</label>
+              <input style={fieldStyle} aria-label="Teléfono del arrendatario" value={datos.arrendatario_telefono} onChange={e => setDato('arrendatario_telefono', e.target.value)} placeholder="+502…" />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Email</label>
+              <input style={fieldStyle} type="email" aria-label="Email del arrendatario" value={datos.arrendatario_email} onChange={e => setDato('arrendatario_email', e.target.value)} placeholder="correo@ejemplo.com" />
+            </div>
+            <div>
+              <label style={labelStyle}>Monto de renta *</label>
+              <input style={fieldStyle} type="number" min={0} step="0.01" aria-label="Monto de renta *" value={datos.monto_renta} onChange={e => setDato('monto_renta', e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={labelStyle}>Depósito</label>
+              <input style={fieldStyle} type="number" min={0} step="0.01" aria-label="Depósito" value={datos.deposito} onChange={e => setDato('deposito', e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={labelStyle}>Día de pago (1-28)</label>
+              <input style={fieldStyle} type="number" min={1} max={28} aria-label="Día de pago (1-28)" value={datos.dia_pago} onChange={e => setDato('dia_pago', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha inicio *</label>
+              <input style={fieldStyle} type="date" aria-label="Fecha inicio *" value={datos.fecha_inicio} onChange={e => setDato('fecha_inicio', e.target.value)} />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Fecha fin (opcional)</label>
+              <input style={fieldStyle} type="date" aria-label="Fecha fin (opcional)" value={datos.fecha_fin} onChange={e => setDato('fecha_fin', e.target.value)} />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Notas</label>
+              <input style={fieldStyle} aria-label="Notas del contrato" value={datos.notas_contrato} onChange={e => setDato('notas_contrato', e.target.value)} placeholder="Condiciones especiales, observaciones…" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Documentos de respaldo para evaluación y archivo de la administración. */}
+      <div style={{
+        border: '1.5px solid var(--at-line)', borderRadius: '12px',
+        padding: '16px', marginBottom: '18px',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+          📎 Documentos para la administración
+        </div>
+        <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '12px' }}>
+          Anexa el respaldo que la administración necesita para evaluar y archivar tu solicitud
+          (DPI del arrendatario, contrato firmado, carta de responsabilidad…).
+          Hasta {MAX_DOCS} archivos PDF, Word, Excel o imagen de 10 MB cada uno.
+        </div>
+
+        {docs.map((d, idx) => (
+          <div key={`${d.file.name}-${idx}`} style={{
+            display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+            padding: '10px 12px', marginBottom: '8px',
+            background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '17px' }}>{fileIcon(d.file.name)}</span>
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{(d.file.size / 1024).toFixed(0)} KB</div>
+            </div>
+            <input
+              style={{ ...fieldStyle, flex: '1 1 180px', width: 'auto', padding: '7px 10px', fontSize: '12.5px' }}
+              value={d.etiqueta}
+              onChange={e => setDocs(prev => prev.map((x, i) => i === idx ? { ...x, etiqueta: e.target.value } : x))}
+              placeholder="Etiqueta (ej. DPI del arrendatario)"
+              aria-label={`Etiqueta de ${d.file.name}`}
+            />
+            <button
+              type="button"
+              onClick={() => quitarArchivo(idx)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px', color: 'var(--at-danger)' }}
+              title="Quitar"
+            >🗑️</button>
+          </div>
+        ))}
+
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept={ACCEPT_DOCS}
+          onChange={e => agregarArchivos(e.target.files)}
+          style={{ display: 'none' }}
+        />
+        {docs.length < MAX_DOCS && (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            style={{
+              padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)',
+              border: '1.5px dashed var(--at-line)', borderRadius: '8px',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            }}
+          >+ Agregar documento</button>
+        )}
       </div>
 
       <button
@@ -678,6 +949,13 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             }}
           >{dandoBaja ? 'Retirando…' : 'Retirar solicitud'}</button>
         </div>
+
+        {/* Lo que se envió, en modo lectura: el propietario debe poder revisar
+          * los datos y adjuntos que la administración está evaluando. */}
+        <div style={{ maxWidth: '520px' }}>
+          <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+          <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
+        </div>
       </div>
     )
   }
@@ -709,6 +987,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             opacity: dandoBaja ? 0.6 : 1,
           }}
         >{dandoBaja ? 'Dando de baja…' : 'Dar de baja la autorización'}</button>
+      </div>
+
+      {/* Respaldo de la solicitud aprobada — queda a la vista de ambas partes. */}
+      <div style={{ maxWidth: '620px', marginBottom: '18px' }}>
+        <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+        <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
       </div>
 
       {/* Sub-tabs */}
