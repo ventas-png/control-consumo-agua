@@ -5,6 +5,7 @@ import { updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { aprobarSolicitudRenta } from '../../../domain/condominios/solicitudRenta'
 import {
   DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe, tieneDatosContrato,
+  ResponsablesServiciosDetalle, EstadoContratoSolicitud,
 } from '../SolicitudRentaDetalle'
 import type { SolicitudRentaUnidad, TipoRenta, EstadoSolicitudRenta, Unidad } from '../../../types'
 
@@ -26,6 +27,9 @@ const TIPO_LABEL: Record<TipoRenta, string> = {
 }
 
 const ESTADO_CFG: Record<EstadoSolicitudRenta, { label: string; color: string; bg: string; icon: string }> = {
+  // El propietario todavía la está llenando en el portal: `sectionData` no la
+  // trae, pero el Record debe cubrir el estado.
+  borrador:  { label: 'Borrador',  color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', icon: '📝' },
   pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⏳' },
   aprobada:  { label: 'Aprobada',  color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
   rechazada: { label: 'Rechazada', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '❌' },
@@ -55,17 +59,23 @@ export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autor
   async function resolver(s: SolicitudRentaUnidad, nuevoEstado: 'aprobada' | 'rechazada') {
     if (!canEdit) return
     const aprobando = nuevoEstado === 'aprobada'
+    const esArrendamiento = tipoAprobado === 'arrendamiento' || tipoAprobado === 'ambas'
 
-    // El contrato solo se puede generar si la autorización cubre arrendamiento y
-    // el propietario mandó los tres datos que `contratos_arrendamiento` exige
-    // NOT NULL. El RPC vuelve a verificarlo server-side.
-    const puedeCrearContrato = aprobando
-      && (tipoAprobado === 'arrendamiento' || tipoAprobado === 'ambas')
-      && tieneDatosContrato(s)
-      && !s.contrato_id
+    // Con arrendamiento el contrato se crea SIEMPRE: es el punto de la feature.
+    // La única excepción son las solicitudes heredadas —las que se enviaron
+    // antes de que se pidieran los datos— que no traen con qué crearlo. Ahí, y
+    // solo ahí, se puede aprobar sin contrato dejando por escrito el porqué.
+    const datosCompletos = tieneDatosContrato(s)
+    const contratoObligatorio = aprobando && esArrendamiento && datosCompletos && !s.contrato_id
+    const puedeOmitirContrato = aprobando && esArrendamiento && !datosCompletos
 
     const result = await openPromptDialog({
       title: aprobando ? '¿Aprobar solicitud?' : '¿Rechazar solicitud?',
+      description: contratoObligatorio
+        ? 'Al aprobar se creará el contrato de arrendamiento con los datos enviados. Si la unidad ya tiene un contrato activo, se dará por terminado.'
+        : puedeOmitirContrato
+          ? 'Esta solicitud no trae los datos del contrato, así que no se puede generar. Indique por qué se autoriza igualmente.'
+          : undefined,
       fields: [
         {
           name: 'comentario',
@@ -75,11 +85,13 @@ export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autor
           placeholder: 'Escriba un comentario…',
           autoFocus: true,
         },
-        ...(puedeCrearContrato ? [{
-          name: 'crear_contrato',
-          label: 'Crear el contrato de arrendamiento con estos datos',
-          control: 'checkbox' as const,
-          initialValue: 'true',
+        ...(puedeOmitirContrato ? [{
+          name: 'motivo_sin_contrato',
+          label: 'Justificación para aprobar sin crear el contrato',
+          control: 'textarea' as const,
+          rows: 3,
+          required: true,
+          placeholder: 'Ej. solicitud antigua; el contrato se registrará a mano.',
         }] : []),
       ],
       submitText: aprobando ? 'Aprobar' : 'Rechazar',
@@ -90,22 +102,28 @@ export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autor
     setSaving(true)
 
     if (aprobando) {
-      // Aprobar va por RPC: además de resolver la solicitud puede crear el
-      // contrato, y eso cruza dos permisos RBAC distintos (20260828000200).
-      const { contratoCreado, error } = await aprobarSolicitudRenta({
+      // Aprobar va por RPC: crea el contrato, copia los seis responsables y
+      // cierra el anterior en una sola transacción, cruzando dos permisos RBAC
+      // distintos (20260829000300). La identidad de auditoría la toma el
+      // servidor de auth.uid(), no se manda desde aquí.
+      const { contratoCreado, contratoAnteriorTerminado, error } = await aprobarSolicitudRenta({
         solicitudId: s.id,
         tipoAprobado,
         comentario: comentario || null,
-        aprobadoPor: autorNombre || null,
-        crearContrato: puedeCrearContrato && result.crear_contrato === 'true',
+        crearContrato: !puedeOmitirContrato,
+        motivoSinContrato: puedeOmitirContrato ? (result.motivo_sin_contrato || null) : null,
       })
       setSaving(false)
-      if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
+      if (error) { notify({ variant: 'error', title: 'No se pudo aprobar', text: error }); return }
       notify({
         variant: 'success',
         title: 'Solicitud aprobada',
-        text: contratoCreado ? 'Se creó el contrato de arrendamiento con los datos enviados.' : undefined,
-        duration: contratoCreado ? 2600 : 1400,
+        text: contratoCreado
+          ? contratoAnteriorTerminado
+            ? 'Se creó el contrato y se dio por terminado el anterior de la unidad.'
+            : 'Se creó el contrato de arrendamiento con los datos enviados.'
+          : 'Se autorizó sin crear contrato; la justificación quedó registrada.',
+        duration: 2800,
       })
     } else {
       const { error } = await updateCondominioRow('solicitud_renta_unidad', s.id, {
@@ -220,13 +238,9 @@ export function SolicitudesRentaTab({ solicitudes, unidades, moneda = 'Q', autor
                 )}
 
                 <DatosContratoSolicitud solicitud={s} moneda={moneda} />
+                <ResponsablesServiciosDetalle fuente={s} />
                 <DocumentosSolicitudRenta documentos={docs} />
-
-                {s.contrato_id && (
-                  <div style={{ marginTop: '10px', fontSize: '12.5px', color: 'var(--at-success)', fontWeight: 600 }}>
-                    ✅ Contrato de arrendamiento ya creado desde esta solicitud — se administra en la pestaña Arrendamientos.
-                  </div>
-                )}
+                <EstadoContratoSolicitud solicitud={s} />
 
                 {s.comentario_admin && (
                   <div style={{ marginTop: '10px', background: cfg.bg, borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: cfg.color }}>

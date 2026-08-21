@@ -2,7 +2,9 @@
 // autorización de renta: el portal del propietario (PortalRentasTab, que muestra
 // lo que envió) y el panel de la administración (SolicitudesRentaTab, que lo
 // evalúa). Viven aquí para que ambas rindan exactamente los mismos datos.
-import type { DocumentoSolicitudRenta, SolicitudRentaUnidad } from '../../types'
+import type {
+  ContratoArrendamiento, DocumentoSolicitudRenta, ResponsableServicio, SolicitudRentaUnidad,
+} from '../../types'
 import { SecureFileLink } from '../shared/SecureFileLink'
 import { fileIcon, nombreDeArchivo } from '../shared/FileUploader'
 
@@ -101,6 +103,110 @@ export function DocumentosSolicitudRenta({ documentos, titulo = '📎 Documentos
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ── Responsables del pago de servicios ───────────────────────────────────────
+
+/** Los seis servicios, en el orden en que se capturan y se leen. */
+export const SERVICIOS: Array<{ key: keyof ResponsablesPorServicio; label: string; icon: string }> = [
+  { key: 'resp_mantenimiento', label: 'Mantenimiento',      icon: '🔧' },
+  { key: 'resp_agua',          label: 'Agua',               icon: '💧' },
+  { key: 'resp_electricidad',  label: 'Electricidad',       icon: '⚡' },
+  { key: 'resp_basura',        label: 'Extracción de basura', icon: '🗑️' },
+  { key: 'resp_telefonia',     label: 'Telefonía',          icon: '📞' },
+  { key: 'resp_internet',      label: 'Internet',           icon: '🌐' },
+]
+
+/** Las seis columnas, tal como viven en la solicitud y en el contrato. */
+export type ResponsablesPorServicio = Pick<
+  SolicitudRentaUnidad,
+  'resp_mantenimiento' | 'resp_agua' | 'resp_electricidad' | 'resp_basura' | 'resp_telefonia' | 'resp_internet'
+>
+
+const RESP_LABEL: Record<ResponsableServicio, string> = {
+  propietario: 'Propietario',
+  inquilino:   'Inquilino',
+}
+
+/** `true` si la fila trae los seis responsables (STR y filas viejas no). */
+export function tieneResponsables(r: ResponsablesPorServicio): boolean {
+  return SERVICIOS.every(s => r[s.key] != null)
+}
+
+/**
+ * Quién paga cada servicio. Se rinde igual desde la solicitud y desde el
+ * contrato: son las mismas seis columnas, copiadas al aprobar.
+ */
+export function ResponsablesServiciosDetalle({ fuente, titulo = '🧾 Responsable del pago de servicios', compacto = false }: {
+  fuente: ResponsablesPorServicio
+  titulo?: string
+  compacto?: boolean
+}) {
+  if (!tieneResponsables(fuente)) return null
+  return (
+    <div style={{
+      marginTop: compacto ? '8px' : '12px',
+      background: 'var(--at-surface-2)', border: '1px solid var(--at-line)',
+      borderRadius: '10px', padding: compacto ? '10px 12px' : '12px 14px',
+    }}>
+      <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>{titulo}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px 16px' }}>
+        {SERVICIOS.map(s => {
+          const valor = fuente[s.key] as ResponsableServicio | null | undefined
+          if (!valor) return null
+          const esInquilino = valor === 'inquilino'
+          return (
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>{s.icon} {s.label}</span>
+              <span style={{
+                padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap',
+                background: esInquilino ? 'var(--at-primary-tint)' : 'var(--at-surface)',
+                color: esInquilino ? 'var(--at-primary)' : 'var(--at-ink-3)',
+                border: esInquilino ? 'none' : '1px solid var(--at-line)',
+              }}>{RESP_LABEL[valor]}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Resultado de la resolución ───────────────────────────────────────────────
+
+/**
+ * Si la solicitud generó contrato, lo dice y lo referencia. Si se aprobó un
+ * arrendamiento SIN contrato, muestra la justificación que quedó registrada —
+ * en rojo, porque es la excepción, no el camino normal.
+ */
+export function EstadoContratoSolicitud({ solicitud, contrato }: {
+  solicitud: SolicitudRentaUnidad
+  contrato?: ContratoArrendamiento | null
+}) {
+  if (solicitud.motivo_sin_contrato) {
+    return (
+      <div style={{
+        marginTop: '10px', background: 'var(--at-warning-tint)',
+        border: '1px solid var(--at-warning-border)', borderRadius: '8px',
+        padding: '10px 12px', fontSize: '12.5px', color: 'var(--at-warning-strong)',
+      }}>
+        <strong>⚠️ Aprobada sin crear el contrato.</strong> {solicitud.motivo_sin_contrato}
+      </div>
+    )
+  }
+  if (!solicitud.contrato_id) return null
+  return (
+    <div style={{
+      marginTop: '10px', background: 'var(--at-success-tint)',
+      border: '1px solid var(--at-success-border)', borderRadius: '8px',
+      padding: '10px 12px', fontSize: '12.5px', color: 'var(--at-success)',
+    }}>
+      <strong>✅ Contrato de arrendamiento creado</strong>
+      {contrato
+        ? <> — {contrato.arrendatario_nombre}, {contrato.fecha_inicio} → {contrato.fecha_fin ?? 'indefinido'}</>
+        : <> — se administra en la pestaña Arrendamientos.</>}
     </div>
   )
 }

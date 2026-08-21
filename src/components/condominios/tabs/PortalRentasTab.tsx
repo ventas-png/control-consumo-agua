@@ -24,11 +24,16 @@ import { ImageUploader } from '../../shared/ImageUploader'
 import { fileIcon } from '../../shared/FileUploader'
 import { uploadRentaDoc, removeRentaDocs } from '../../../domain/shared/storage'
 import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../../lib/fileValidation'
-import { DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe } from '../SolicitudRentaDetalle'
+import {
+  DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe,
+  ResponsablesServiciosDetalle, EstadoContratoSolicitud, SERVICIOS,
+} from '../SolicitudRentaDetalle'
+import { reservarSolicitudRenta, enviarSolicitudRenta } from '../../../domain/portal/solicitudRenta'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
   SolicitudRentaUnidad, TipoRenta, HuespedSTR, DocumentoSolicitudRenta,
+  ResponsableServicio, ResponsablesServicios,
 } from '../../../types'
 import { ModalPortal } from '../../shared/ModalPortal'
 
@@ -68,7 +73,6 @@ interface Props {
   unidadNombre: string
   proyectoId: string
   companyId: string
-  clienteId: string
   solicitudRenta: SolicitudRentaUnidad | null
   onSolicitudChange: () => void
 }
@@ -146,11 +150,20 @@ const ACCEPT_DOCS = [
   'image/jpeg', 'image/png', 'image/webp',
 ].join(',')
 
-/** Archivo elegido pero todavía no subido: se sube al enviar la solicitud. */
-interface DocPendiente {
-  file: File
-  etiqueta: string
+/**
+ * Adjunto YA subido al bucket. Se sube al elegirlo (no al enviar) porque su path
+ * cuelga del borrador, y la policy de `renta-docs` solo autoriza escrituras
+ * mientras la solicitud sigue en 'borrador' (20260829000400).
+ */
+interface DocSubido extends DocumentoSolicitudRenta {
+  subiendo?: boolean
 }
+
+/** Estado inicial: todos los servicios los paga el propietario. */
+const blankResponsables = (): ResponsablesServicios => ({
+  mantenimiento: 'propietario', agua: 'propietario', electricidad: 'propietario',
+  basura: 'propietario', telefonia: 'propietario', internet: 'propietario',
+})
 
 /**
  * Datos del contrato que el propietario propone. Mismos campos que el formulario
@@ -177,17 +190,39 @@ const blankDatosContrato = (): DatosContratoForm => ({
   fecha_inicio: '', fecha_fin: '', notas_contrato: '',
 })
 
-function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada, prevBaja }: {
-  unidadId: string; proyectoId: string; companyId: string; clienteId: string
-  onSolicitudChange: () => void; prevRechazada: SolicitudRentaUnidad | null
+function SolicitudForm({ unidadId, borrador, onSolicitudChange, prevRechazada, prevBaja }: {
+  unidadId: string
+  /** Borrador ya reservado (si el propietario volvió), con sus adjuntos. */
+  borrador: SolicitudRentaUnidad | null
+  onSolicitudChange: () => void
+  prevRechazada: SolicitudRentaUnidad | null
   prevBaja: SolicitudRentaUnidad | null
 }) {
-  const [tipo, setTipo]       = useState<TipoRenta>('arrendamiento')
-  const [motivo, setMotivo]   = useState('')
+  const [tipo, setTipo]       = useState<TipoRenta>(borrador?.tipo_renta ?? 'arrendamiento')
+  const [motivo, setMotivo]   = useState(borrador?.motivo ?? '')
   const [datos, setDatos]     = useState<DatosContratoForm>(blankDatosContrato())
-  const [docs, setDocs]       = useState<DocPendiente[]>([])
+  const [resp, setResp]       = useState<ResponsablesServicios>(blankResponsables())
+  const [docs, setDocs]       = useState<DocSubido[]>(documentosDe(borrador ?? { documentos: null }))
   const [saving, setSaving]   = useState(false)
+  const [subiendo, setSubiendo] = useState(false)
   const fileRef               = useRef<HTMLInputElement>(null)
+
+  // Id del borrador: es la carpeta de los adjuntos en `renta-docs`, así que hay
+  // que tenerlo ANTES de subir nada. Se reserva al montar; si el propietario ya
+  // tenía uno, el RPC devuelve ese mismo con lo que había subido.
+  const [solicitudId, setSolicitudId] = useState<string | null>(borrador?.id ?? null)
+  const [errorReserva, setErrorReserva] = useState<string | null>(null)
+
+  useEffect(() => {
+    let vigente = true
+    if (solicitudId) return
+    reservarSolicitudRenta(unidadId).then(({ solicitudId: id, error }) => {
+      if (!vigente) return
+      if (error) { setErrorReserva(error); return }
+      setSolicitudId(id)
+    })
+    return () => { vigente = false }
+  }, [unidadId, solicitudId])
 
   // Con STR el contrato de arrendamiento no aplica: cada reserva trae sus
   // propios datos de huésped y se captura después de la autorización.
@@ -205,59 +240,52 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
     setDatos(p => ({ ...p, [k]: v }))
   }
 
-  function agregarArchivos(files: FileList | null) {
+  /**
+   * Sube cada archivo elegido al borrador. El primer segmento del path debe ser
+   * la unidad y el segundo la solicitud: así lo exige la policy del bucket.
+   */
+  async function agregarArchivos(files: FileList | null) {
     if (!files || files.length === 0) return
-    const nuevos: DocPendiente[] = []
-    for (const file of Array.from(files)) {
+    if (!solicitudId) { notify({ variant: 'error', title: 'Error', text: 'Todavía se está preparando la solicitud. Intentá de nuevo en un momento.' }); return }
+    const elegidos = Array.from(files)
+    if (fileRef.current) fileRef.current.value = ''
+
+    setSubiendo(true)
+    for (const file of elegidos) {
+      if (docs.length >= MAX_DOCS) {
+        notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
+        break
+      }
       if (file.size > MAX_DOC_BYTES) {
         notify({ variant: 'error', title: 'Archivo muy grande', text: `${file.name} excede el límite de 10 MB.` })
         continue
       }
-      nuevos.push({ file, etiqueta: '' })
-    }
-    setDocs(prev => {
-      const combinados = [...prev, ...nuevos]
-      if (combinados.length > MAX_DOCS) {
-        notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
-      }
-      return combinados.slice(0, MAX_DOCS)
-    })
-    // Permite volver a elegir el mismo archivo después de quitarlo.
-    if (fileRef.current) fileRef.current.value = ''
-  }
-
-  function quitarArchivo(index: number) {
-    setDocs(prev => prev.filter((_, i) => i !== index))
-  }
-
-  /**
-   * Sube los adjuntos a `renta-docs` y devuelve las entradas para la columna
-   * jsonb. El primer segmento del path DEBE ser la unidad: la RLS del bucket
-   * autoriza por ahí (20260828000100).
-   */
-  async function subirDocumentos(): Promise<{ documentos: DocumentoSolicitudRenta[]; error: string | null }> {
-    const documentos: DocumentoSolicitudRenta[] = []
-    for (const d of docs) {
       // Magic-byte check: defiende contra payloads renombrados (.html → .pdf).
-      const magic = await validateFileMagic(d.file, 'document')
-      if (!magic.ok) return { documentos, error: `${d.file.name}: ${magic.reason}` }
-      const contentType = resolveUploadContentType(magic.detected, d.file.name)
-      const path = buildUploadPath(unidadId, d.file.name)
-      const { error } = await uploadRentaDoc(path, d.file, { contentType })
-      if (error) return { documentos, error: `No se pudo subir ${d.file.name}: ${error}` }
+      const magic = await validateFileMagic(file, 'document')
+      if (!magic.ok) { notify({ variant: 'error', title: 'Error', text: `${file.name}: ${magic.reason}` }); continue }
+
+      const contentType = resolveUploadContentType(magic.detected, file.name)
+      const path = buildUploadPath(`${unidadId}/${solicitudId}`, file.name)
+      const { error } = await uploadRentaDoc(path, file, { contentType })
+      if (error) { notify({ variant: 'error', title: 'Error', text: `No se pudo subir ${file.name}: ${error}` }); continue }
+
       // S6 fase 2: se persiste el path bare; la lectura firma con useSignedUrl.
-      documentos.push({
-        path,
-        nombre: d.file.name,
-        etiqueta: d.etiqueta.trim() || null,
-        mime: contentType,
-        size: d.file.size,
-      })
+      setDocs(prev => [...prev, {
+        path, nombre: file.name, etiqueta: null, mime: contentType, size: file.size,
+      }])
     }
-    return { documentos, error: null }
+    setSubiendo(false)
+  }
+
+  async function quitarArchivo(path: string) {
+    // Mientras la solicitud es borrador el propietario puede borrar del bucket;
+    // al enviarla, la policy lo impide (y por eso no hay este botón después).
+    await removeRentaDocs([path])
+    setDocs(prev => prev.filter(d => d.path !== path))
   }
 
   async function submit() {
+    if (!solicitudId) { notify({ variant: 'error', title: 'Error', text: 'La solicitud no está lista todavía.' }); return }
     if (pideDatosContrato) {
       if (!datos.arrendatario_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del arrendatario es requerido.' }); return }
       if (!datos.monto_renta || isNaN(Number(datos.monto_renta))) { notify({ variant: 'error', title: 'Error', text: 'Ingresa el monto de renta.' }); return }
@@ -266,45 +294,27 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
     }
 
     setSaving(true)
-    const { documentos, error: upErr } = await subirDocumentos()
-    if (upErr) {
-      // Sin solicitud no hay a qué colgar lo ya subido: se limpia.
-      await removeRentaDocs(documentos.map(d => d.path))
-      setSaving(false)
-      notify({ variant: 'error', title: 'Error', text: upErr })
-      return
-    }
-
-    const payload: Record<string, unknown> = {
-      company_id: companyId,
-      project_id: proyectoId,
-      unidad_id: unidadId,
-      cliente_id: clienteId || null,
-      tipo_renta: tipo,
+    const { error } = await enviarSolicitudRenta({
+      solicitudId,
+      tipoRenta: tipo,
       motivo: motivo.trim() || null,
-      documentos,
-    }
-    if (pideDatosContrato) {
-      payload.arrendatario_nombre         = datos.arrendatario_nombre.trim()
-      payload.arrendatario_identificacion = datos.arrendatario_identificacion.trim() || null
-      payload.arrendatario_telefono       = datos.arrendatario_telefono.trim() || null
-      payload.arrendatario_email          = datos.arrendatario_email.trim() || null
-      payload.monto_renta   = Number(datos.monto_renta)
-      payload.deposito      = datos.deposito ? Number(datos.deposito) : null
-      payload.dia_pago      = Number(datos.dia_pago) || 1
-      payload.fecha_inicio  = datos.fecha_inicio
-      payload.fecha_fin     = datos.fecha_fin || null
-      payload.notas_contrato = datos.notas_contrato.trim() || null
-    }
-
-    const { error } = await createCondominioRow('solicitud_renta_unidad', payload)
-    if (error) {
-      await removeRentaDocs(documentos.map(d => d.path))
-      setSaving(false)
-      notify({ variant: 'error', title: 'Error', text: error.message })
-      return
-    }
+      documentos: docs.map(({ path, nombre, etiqueta, mime, size }) => ({ path, nombre, etiqueta, mime, size })),
+      ...(pideDatosContrato ? {
+        arrendatarioNombre: datos.arrendatario_nombre.trim(),
+        arrendatarioIdentificacion: datos.arrendatario_identificacion.trim() || null,
+        arrendatarioTelefono: datos.arrendatario_telefono.trim() || null,
+        arrendatarioEmail: datos.arrendatario_email.trim() || null,
+        montoRenta: Number(datos.monto_renta),
+        deposito: datos.deposito ? Number(datos.deposito) : null,
+        diaPago: Number(datos.dia_pago) || 1,
+        fechaInicio: datos.fecha_inicio,
+        fechaFin: datos.fecha_fin || null,
+        notas: datos.notas_contrato.trim() || null,
+        responsables: resp,
+      } : {}),
+    })
     setSaving(false)
+    if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     onSolicitudChange()
   }
@@ -319,6 +329,16 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           Para gestionar contratos o reservas en tu unidad, primero debes solicitar autorización a la administración.
         </p>
       </div>
+
+      {errorReserva && (
+        <div style={{
+          background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '16px',
+          fontSize: '13px', color: 'var(--at-danger)',
+        }}>
+          No se pudo preparar la solicitud: {errorReserva}
+        </div>
+      )}
 
       {prevBaja && (
         <div style={{
@@ -433,6 +453,41 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
         </div>
       )}
 
+      {/* Quién paga qué. Es la fuente más común de conflicto entre propietario e
+        * inquilino, así que se pacta ANTES de autorizar y queda en el contrato. */}
+      {pideDatosContrato && (
+        <div style={{
+          border: '1.5px solid var(--at-line)', borderRadius: '12px',
+          padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+            🧾 Responsable del pago de servicios
+          </div>
+          <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '14px' }}>
+            Indica quién cubre cada servicio durante el arrendamiento. Queda registrado en el contrato.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+            {SERVICIOS.map(sv => {
+              const clave = sv.key.replace('resp_', '') as keyof ResponsablesServicios
+              return (
+                <div key={sv.key}>
+                  <label style={labelStyle}>{sv.icon} {sv.label}</label>
+                  <select
+                    style={{ ...fieldStyle, cursor: 'pointer' }}
+                    aria-label={`Responsable de ${sv.label}`}
+                    value={resp[clave]}
+                    onChange={e => setResp(p => ({ ...p, [clave]: e.target.value as ResponsableServicio }))}
+                  >
+                    <option value="propietario">Propietario</option>
+                    <option value="inquilino">Inquilino</option>
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Documentos de respaldo para evaluación y archivo de la administración. */}
       <div style={{
         border: '1.5px solid var(--at-line)', borderRadius: '12px',
@@ -445,29 +500,30 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           Anexa el respaldo que la administración necesita para evaluar y archivar tu solicitud
           (DPI del arrendatario, contrato firmado, carta de responsabilidad…).
           Hasta {MAX_DOCS} archivos PDF, Word, Excel o imagen de 10 MB cada uno.
+          Una vez enviada la solicitud ya no podrás cambiarlos.
         </div>
 
-        {docs.map((d, idx) => (
-          <div key={`${d.file.name}-${idx}`} style={{
+        {docs.map(d => (
+          <div key={d.path} style={{
             display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
             padding: '10px 12px', marginBottom: '8px',
             background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px',
           }}>
-            <span style={{ fontSize: '17px' }}>{fileIcon(d.file.name)}</span>
+            <span style={{ fontSize: '17px' }}>{fileIcon(d.nombre)}</span>
             <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file.name}</div>
-              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{(d.file.size / 1024).toFixed(0)} KB</div>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.nombre}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{d.size != null ? `${(d.size / 1024).toFixed(0)} KB` : 'Subido'}</div>
             </div>
             <input
               style={{ ...fieldStyle, flex: '1 1 180px', width: 'auto', padding: '7px 10px', fontSize: '12.5px' }}
-              value={d.etiqueta}
-              onChange={e => setDocs(prev => prev.map((x, i) => i === idx ? { ...x, etiqueta: e.target.value } : x))}
+              value={d.etiqueta ?? ''}
+              onChange={e => setDocs(prev => prev.map(x => x.path === d.path ? { ...x, etiqueta: e.target.value } : x))}
               placeholder="Etiqueta (ej. DPI del arrendatario)"
-              aria-label={`Etiqueta de ${d.file.name}`}
+              aria-label={`Etiqueta de ${d.nombre}`}
             />
             <button
               type="button"
-              onClick={() => quitarArchivo(idx)}
+              onClick={() => quitarArchivo(d.path)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px', color: 'var(--at-danger)' }}
               title="Quitar"
             >🗑️</button>
@@ -485,23 +541,27 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
         {docs.length < MAX_DOCS && (
           <button
             type="button"
+            disabled={subiendo || !solicitudId}
             onClick={() => fileRef.current?.click()}
             style={{
               padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)',
               border: '1.5px dashed var(--at-line)', borderRadius: '8px',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              fontSize: '13px', fontWeight: 600,
+              cursor: subiendo || !solicitudId ? 'not-allowed' : 'pointer',
+              opacity: subiendo || !solicitudId ? 0.6 : 1,
             }}
-          >+ Agregar documento</button>
+          >{subiendo ? 'Subiendo…' : '+ Agregar documento'}</button>
         )}
       </div>
 
       <button
         onClick={submit}
-        disabled={saving}
+        disabled={saving || subiendo || !solicitudId}
         style={{
           padding: '10px 24px', background: 'var(--at-accent-hover)', color: 'white',
           border: 'none', borderRadius: '9px', fontWeight: 600, fontSize: '14px',
-          cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+          cursor: saving || subiendo || !solicitudId ? 'not-allowed' : 'pointer',
+          opacity: saving || subiendo || !solicitudId ? 0.7 : 1,
         }}
       >{saving ? 'Enviando…' : 'Enviar solicitud'}</button>
     </div>
@@ -510,7 +570,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId, clienteId, solicitudRenta, onSolicitudChange }: Props) {
+export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId, solicitudRenta, onSolicitudChange }: Props) {
 
   // Determine allowed sub-tabs based on authorization
   const tipoAprobado = solicitudRenta?.estado === 'aprobada'
@@ -900,15 +960,16 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   // ── State: no authorization or rejected ─────────────────────────────────────
 
-  if (!solicitudRenta || solicitudRenta.estado === 'rechazada' || solicitudRenta.estado === 'baja') {
+  // El borrador es una solicitud a medio llenar que el propietario reservó para
+  // poder adjuntar: se retoma en el formulario, no se muestra como enviada.
+  if (!solicitudRenta || solicitudRenta.estado === 'borrador'
+      || solicitudRenta.estado === 'rechazada' || solicitudRenta.estado === 'baja') {
     return (
       <div>
         {header}
         <SolicitudForm
           unidadId={unidadId}
-          proyectoId={proyectoId}
-          companyId={companyId}
-          clienteId={clienteId}
+          borrador={solicitudRenta?.estado === 'borrador' ? solicitudRenta : null}
           onSolicitudChange={onSolicitudChange}
           prevRechazada={solicitudRenta?.estado === 'rechazada' ? solicitudRenta : null}
           prevBaja={solicitudRenta?.estado === 'baja' ? solicitudRenta : null}
@@ -954,6 +1015,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           * los datos y adjuntos que la administración está evaluando. */}
         <div style={{ maxWidth: '520px' }}>
           <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+          <ResponsablesServiciosDetalle fuente={solicitudRenta} />
           <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
         </div>
       </div>
@@ -992,7 +1054,9 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       {/* Respaldo de la solicitud aprobada — queda a la vista de ambas partes. */}
       <div style={{ maxWidth: '620px', marginBottom: '18px' }}>
         <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+        <ResponsablesServiciosDetalle fuente={solicitudRenta} />
         <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
+        <EstadoContratoSolicitud solicitud={solicitudRenta} />
       </div>
 
       {/* Sub-tabs */}
@@ -1096,6 +1160,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <button onClick={() => deleteCA(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
+                <ResponsablesServiciosDetalle fuente={c} compacto />
                 {c.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--at-ink-3)', background: 'var(--at-surface-2)', borderRadius: '6px', padding: '8px' }}>{c.notas}</div>}
               </div>
             )

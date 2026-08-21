@@ -12,15 +12,18 @@
 # adentro. Ninguna de las dos cosas —la fidelidad de la copia, ni el gate— se
 # comprueba leyendo el SQL: dependen de cómo se comporta al escribir.
 #
-# QUÉ COMPRUEBA (17 invariantes)
-#   1-5    las columnas nuevas, el array vacío por defecto y los tres CHECK
-#          (tope de 8 adjuntos, día de pago 1-28, período no invertido)
-#   6-7    la policy de insert del portal exige contrato_id IS NULL y conserva
-#          el gate de estado pendiente
-#   8-11   aprobar copia los datos 1:1 al contrato, lo enlaza, deja la
-#          solicitud resuelta, y respeta p_crear_contrato = false
-#   12-14  no crea contrato con STR ni con datos incompletos, y no re-resuelve
-#   15-17  la ACL: ni el propietario ni otra empresa resuelven; anon no ejecuta
+# QUÉ COMPRUEBA (33 invariantes)
+#   1-9    columnas y CHECK de los seis responsables; la completitud del
+#          arrendamiento exigida por la BASE (no por React) y el caso STR
+#  10-15   el portal ya no escribe la tabla —no puede autoaprobarse— y los RPC
+#          validan propiedad, idempotencia del borrador, responsables y que
+#          cada documento cuelgue de la carpeta de SU solicitud
+#  16-22   storage: el propietario sube dentro de {unidad}/{solicitud}/, el
+#          inquilino ni lee ni borra, otra empresa tampoco, la administración
+#          sí, y al ENVIAR los documentos quedan inmutables
+#  23-33   aprobación: contrato con los seis responsables copiados, fallo
+#          atómico si faltan datos, justificación obligatoria para omitirlo,
+#          histórico de contratos con un solo activo, y la ACL
 #
 # USO
 #   supabase/tests/solicitud_renta_contrato/run.sh
@@ -31,8 +34,16 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIG_COLS="$RAIZ/supabase/migrations/20260828000000_solicitud_renta_datos_contrato.sql"
-MIG_RPC="$RAIZ/supabase/migrations/20260828000200_aprobar_solicitud_renta_rpc.sql"
+MIGRACIONES=(
+  20260828000000_solicitud_renta_datos_contrato
+  20260828000100_storage_renta_docs
+  20260828000200_aprobar_solicitud_renta_rpc
+  20260829000000_renta_responsables_y_borrador
+  20260829000100_renta_rls_portal_solo_por_rpc
+  20260829000200_rpc_solicitud_renta_portal
+  20260829000300_aprobar_solicitud_renta_v2
+  20260829000400_storage_renta_docs_por_solicitud
+)
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -76,13 +87,14 @@ aplicar() {
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d renta -f "$1" >/dev/null
 }
 
-echo "── 1/3 · fixture: esquema, unidades y cuentas ──────────────────────────"
+echo "── 1/3 · fixture: esquema, unidades, cuentas y policies REALES ────────"
 aplicar "$AQUI/fixture.sql"
-echo "  OK    stubs + 3 unidades + 3 cuentas + policy previa del portal"
+echo "  OK    stubs + storage + las policies vigentes de 20260713100000"
 
-echo "── 2/3 · migraciones 20260828000000/200, aplicadas DOS veces ───────────"
-aplicar "$MIG_COLS"; aplicar "$MIG_RPC"
-aplicar "$MIG_COLS"; aplicar "$MIG_RPC"
+echo "── 2/3 · ${#MIGRACIONES[@]} migraciones, aplicadas DOS veces ─────────────────────"
+for _ in 1 2; do
+  for m in "${MIGRACIONES[@]}"; do aplicar "$RAIZ/supabase/migrations/$m.sql"; done
+done
 echo "  OK    re-aplicar no falla (idempotentes)"
 
 echo "── 3/3 · invariantes ───────────────────────────────────────────────────"
@@ -101,4 +113,4 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ solicitud_renta_contrato: la solicitud viaja con datos y adjuntos, aprobar copia el contrato 1:1, y solo lo dispara quien tiene el permiso del tab en su propia empresa."
+echo "✅ solicitud_renta_contrato: la solicitud viaja con datos, responsables y documentos; el portal no puede autoaprobarse; el expediente queda inmutable al enviarse; y aprobar crea el contrato copiando todo y cerrando el anterior."
