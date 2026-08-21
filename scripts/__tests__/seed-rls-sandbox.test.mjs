@@ -547,7 +547,9 @@ describe('el seed no filtra la service_role ni deja contraseñas viejas', () => 
   it('el fixture CONVERGE: no acumula permisos ni roles de corridas anteriores', () => {
     // Un rol al que una corrida vieja le dejó la otra clave concedería las dos
     // clases, y "no ve la otra" pasaría a ser imposible de fallar.
-    expect(FUENTE_SEED).toMatch(/from\('role_permissions'\)\s*\n?\s*\.delete\(\)\.eq\('role_id', roleId\)\.neq\('permission_key', permiso\)/)
+    // Ahora el conjunto declarado tiene varias claves, así que la limpieza es
+    // `not.in(...)` en vez de un `neq` a una sola.
+    expect(FUENTE_SEED).toMatch(/from\('role_permissions'\)\s*\n?\s*\.delete\(\)\.eq\('role_id', roleId\)\.not\('permission_key', 'in', lista\)/)
     expect(FUENTE_SEED).toMatch(/from\('user_roles'\)\.delete\(\)\.eq\('user_id', userId\)/)
   })
 
@@ -789,8 +791,17 @@ function baseFalsa(inicial = {}) {
   const tablas = { ...inicial }
   let seq = 0
   const t = (n) => (tablas[n] ??= [])
-  const casa = (fila, filtros) => filtros.every(([op, k, v]) =>
-    op === 'eq' ? fila[k] === v : fila[k] !== v)
+  // `notIn` reproduce el filtro de PostgREST `not.in.("a","b")`, que es como el
+  // seed borra los permisos sobrantes de un rol.
+  const casa = (fila, filtros) => filtros.every(([op, k, v]) => {
+    if (op === 'eq') return fila[k] === v
+    if (op === 'neq') return fila[k] !== v
+    if (op === 'notIn') {
+      const vals = String(v).replace(/^\(|\)$/g, '').split(',').map((x) => x.replace(/^"|"$/g, ''))
+      return !vals.includes(fila[k])
+    }
+    return true
+  })
 
   return {
     tablas,
@@ -808,6 +819,10 @@ function baseFalsa(inicial = {}) {
         select() { return api },
         eq(k, v) { filtros.push(['eq', k, v]); return api },
         neq(k, v) { filtros.push(['neq', k, v]); return api },
+        not(k, op, v) {
+          if (op !== 'in') throw new Error(`el doble sólo implementa not.in, no not.${op}`)
+          filtros.push(['notIn', k, v]); return api
+        },
         insert(fila) { modo = 'insert'; payload = fila; return api },
         upsert(fila) { modo = 'upsert'; payload = fila; return api },
         delete() { modo = 'delete'; return api },
@@ -930,11 +945,20 @@ describe('verificarGateDeClase — el fixture tiene que poder trabajar', () => {
     })
   }
 
+  // El conjunto COMPLETO que espera el verificador: base + acciones. Con sólo
+  // las bases, estas pruebas fallarían por permisos y no por lo que quieren
+  // medir (el alcance por proyecto).
+  const PAQ_TAB = 'condominios.tab.paqueteria'
+  const CORR_TAB = 'condominios.tab.correspondencia'
+  const conAcciones = (propia, ajena) => ({
+    [propia]: true, [`${propia}.create`]: true, [`${propia}.edit`]: true, [`${propia}.delete`]: false,
+    [ajena]: false, [`${ajena}.create`]: false, [`${ajena}.edit`]: false, [`${ajena}.delete`]: false,
+  })
   const PERMISOS_OK = {
-    PAQ: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': false },
-    CORR: { 'condominios.tab.paqueteria': false, 'condominios.tab.correspondencia': true },
-    ADMIN: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
-    OWNER: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+    PAQ: conAcciones(PAQ_TAB, CORR_TAB),
+    CORR: conAcciones(CORR_TAB, PAQ_TAB),
+    ADMIN: { [PAQ_TAB]: true, [CORR_TAB]: true, [`${PAQ_TAB}.create`]: true, [`${CORR_TAB}.create`]: true },
+    OWNER: { [PAQ_TAB]: true, [CORR_TAB]: true, [`${PAQ_TAB}.create`]: true, [`${CORR_TAB}.create`]: true },
   }
 
   async function verificar({ base, clase, ve }) {
@@ -1024,5 +1048,232 @@ describe('el banner no puede salir con la UI sin proyecto', () => {
   it('el seed converge las asignaciones, no sólo roles y permisos', () => {
     expect(FUENTE_SEED).toMatch(/from\('user_project_assignments'\)\s*\n?\s*\.delete\(\)/)
     expect(FUENTE_SEED).toMatch(/from\('user_project_assignments'\)\s*\n?\s*\.upsert\(/)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Permisos OPERACIONALES: ver la pestaña no es poder trabajar en ella.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO, encontrado en la validación visual. PAQ iniciaba sesión, veía
+// «Proyecto sandbox CLASE», veía Paquetería y no Correspondencia… y no le
+// aparecía «Registrar paquete».
+//
+// `canActInCondominiosTab` exige DOS permisos para dejar actuar: la clave base
+// de la tab Y la de la acción (`condominios.tab.<tab>.<accion>`, derivadas en
+// 20260703000000). El seed concedía sólo la base, y el verificador sólo miraba
+// visibilidad — así que el fixture volvía a decir «Sandbox listo y VERIFICADO»
+// sobre usuarios que no podían hacer su trabajo.
+//
+// Tercera vez la misma forma: comprobar lo escrito en vez de lo necesario.
+import { CLASE_ROLES, upsertRolDeClase } from '../seed-rls-sandbox.mjs'
+
+const PAQ_TAB = 'condominios.tab.paqueteria'
+const CORR_TAB = 'condominios.tab.correspondencia'
+const permisosDelRol = (base, roleId) =>
+  (base.tablas['role_permissions'] ?? []).filter((r) => r.role_id === roleId)
+    .map((r) => r.permission_key).sort()
+
+describe('CLASE_ROLES — el conjunto declarado', () => {
+  it('PAQ declara base + create + edit de paquetería, y nada más', () => {
+    expect([...CLASE_ROLES.paq.permisos].sort()).toEqual(
+      [PAQ_TAB, `${PAQ_TAB}.create`, `${PAQ_TAB}.edit`].sort())
+  })
+
+  it('CORR declara el inverso', () => {
+    expect([...CLASE_ROLES.corr.permisos].sort()).toEqual(
+      [CORR_TAB, `${CORR_TAB}.create`, `${CORR_TAB}.edit`].sort())
+  })
+
+  it('NINGUNO declara delete', () => {
+    // El borrado de correspondencia va por ROL (sólo company_owner). Concederlo
+    // a un granular volvería vacuos los escenarios de DELETE del harness.
+    for (const rol of Object.values(CLASE_ROLES)) {
+      expect(rol.permisos.some((k) => k.endsWith('.delete'))).toBe(false)
+    }
+  })
+
+  it('NINGUNO declara permisos globales de plataforma', () => {
+    // `canActInCondominiosTab` tiene un fallback a
+    // platform.condominios.view + platform.condominios.<accion>. Concederlos
+    // abriría TODAS las tabs de condominios de golpe y el gate por clase dejaría
+    // de significar nada.
+    for (const rol of Object.values(CLASE_ROLES)) {
+      for (const k of rol.permisos) expect(k.startsWith('platform.')).toBe(false)
+    }
+  })
+
+  it('ningún rol declara claves de la clase contraria', () => {
+    expect(CLASE_ROLES.paq.permisos.some((k) => k.includes('correspondencia'))).toBe(false)
+    expect(CLASE_ROLES.corr.permisos.some((k) => k.includes('paqueteria'))).toBe(false)
+  })
+})
+
+describe('upsertRolDeClase — converge al conjunto exacto', () => {
+  it('deja EXACTAMENTE las tres claves declaradas', async () => {
+    const base = baseFalsa()
+    const roleId = await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    expect(permisosDelRol(base, roleId)).toEqual(
+      [PAQ_TAB, `${PAQ_TAB}.create`, `${PAQ_TAB}.edit`].sort())
+  })
+
+  it('una SEGUNDA corrida es idempotente: no duplica', async () => {
+    const base = baseFalsa()
+    const roleId = await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    expect(permisosDelRol(base, roleId)).toHaveLength(3)
+  })
+
+  it('ELIMINA los permisos sobrantes de una corrida anterior', async () => {
+    const base = baseFalsa()
+    const roleId = await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    // Restos plausibles: un delete que alguien probó a mano, la clave de la
+    // otra clase, y un global de plataforma que abriría todo.
+    base.tablas['role_permissions'].push(
+      { id: 'z1', role_id: roleId, permission_key: `${PAQ_TAB}.delete`, effect: 'allow' },
+      { id: 'z2', role_id: roleId, permission_key: CORR_TAB, effect: 'allow' },
+      { id: 'z3', role_id: roleId, permission_key: 'platform.condominios.view', effect: 'allow' },
+    )
+    await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    expect(permisosDelRol(base, roleId)).toEqual(
+      [PAQ_TAB, `${PAQ_TAB}.create`, `${PAQ_TAB}.edit`].sort())
+  })
+
+  it('no toca los permisos de OTRO rol', async () => {
+    const base = baseFalsa()
+    const rPaq = await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq)
+    const rCorr = await upsertRolDeClase(base, 'emp-1', CLASE_ROLES.corr)
+    expect(permisosDelRol(base, rPaq)).toHaveLength(3)
+    expect(permisosDelRol(base, rCorr)).toEqual(
+      [CORR_TAB, `${CORR_TAB}.create`, `${CORR_TAB}.edit`].sort())
+  })
+
+  it('un fallo de LIMPIEZA aborta y dice que concedería de más', async () => {
+    const base = baseFalsa()
+    const original = base.from.bind(base)
+    base.from = (n) => {
+      if (n !== 'role_permissions') return original(n)
+      const api = { select: () => api, eq: () => api, neq: () => api, not: () => api,
+        delete: () => api, upsert: () => api,
+        then: (res) => Promise.resolve({ data: null, error: { message: 'permission denied' } }).then(res) }
+      return api
+    }
+    await expect(upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq))
+      .rejects.toThrow(/limpieza[\s\S]*concedería de más/)
+  })
+
+  it('un fallo al INSERTAR una acción aborta nombrando la clave', async () => {
+    const base = baseFalsa()
+    const original = base.from.bind(base)
+    base.from = (n) => {
+      const api = original(n)
+      if (n !== 'role_permissions') return api
+      const upsertReal = api.upsert.bind(api)
+      api.upsert = (fila) => {
+        if (String(fila.permission_key).endsWith('.create')) {
+          return { then: (res) => Promise.resolve({ data: null, error: { message: 'fk violation' } }).then(res) }
+        }
+        return upsertReal(fila)
+      }
+      return api
+    }
+    await expect(upsertRolDeClase(base, 'emp-1', CLASE_ROLES.paq))
+      .rejects.toThrow(/\.create[\s\S]*botones de crear\/editar/)
+  })
+})
+
+describe('el seed completo concede las acciones a quien toca', () => {
+  it('PAQ y CORR acaban con sus tres claves, sin cruzarse', async () => {
+    const base = baseFalsa()
+    await seedGateDeClase(base, buscarNulo)
+    const roles = base.tablas['roles'] ?? []
+    const idPaq = roles.find((r) => r.name === CLASE_ROLES.paq.nombre).id
+    const idCorr = roles.find((r) => r.name === CLASE_ROLES.corr.nombre).id
+
+    expect(permisosDelRol(base, idPaq)).toEqual([PAQ_TAB, `${PAQ_TAB}.create`, `${PAQ_TAB}.edit`].sort())
+    expect(permisosDelRol(base, idCorr)).toEqual([CORR_TAB, `${CORR_TAB}.create`, `${CORR_TAB}.edit`].sort())
+  })
+
+  it('el conjunto TOTAL de role_permissions es exacto: seis filas, ni una más', async () => {
+    const base = baseFalsa()
+    await seedGateDeClase(base, buscarNulo)
+    expect(base.tablas['role_permissions']).toHaveLength(6)
+  })
+})
+
+describe('verificarGateDeClase — exige los permisos operacionales', () => {
+  /** Cliente de usuario que responde el mapa de permisos que se le dé. */
+  const clienteCon = (permisos, empresa, proyecto) => () => ({
+    auth: { signInWithPassword: async () => ({ error: null }), signOut: async () => ({}) },
+    rpc: async (fn, args) => fn === 'get_my_company_id'
+      ? { data: empresa, error: null }
+      : { data: permisos[args?.perm_key] ?? false, error: null },
+    from: () => {
+      const api = { select: () => api, eq: (_k, v) => { api._id = v; return api },
+        then: (res) => Promise.resolve({ data: api._id === proyecto ? [{ id: proyecto }] : [], error: null }).then(res) }
+      return api
+    },
+  })
+
+  const completo = (propia, ajena) => ({
+    [propia]: true, [`${propia}.create`]: true, [`${propia}.edit`]: true, [`${propia}.delete`]: false,
+    [ajena]: false, [`${ajena}.create`]: false, [`${ajena}.edit`]: false, [`${ajena}.delete`]: false,
+  })
+
+  async function fallosDe(permisos, key = 'PAQ') {
+    const base = baseFalsa()
+    const clase = await seedGateDeClase(base, buscarNulo)
+    const u = clase.usuarios.find((x) => x.key === key)
+    return verificarGateDeClase('https://x.supabase.co', 'anon', { ...clase, usuarios: [u] }, base,
+      clienteCon(permisos, clase.companyId, clase.projectId))
+  }
+
+  it('con el conjunto completo no hay fallos', async () => {
+    expect(await fallosDe(completo(PAQ_TAB, CORR_TAB))).toEqual([])
+  })
+
+  it('FALLA si falta .create — el caso exacto del botón que no aparecía', async () => {
+    const p = completo(PAQ_TAB, CORR_TAB)
+    p[`${PAQ_TAB}.create`] = false
+    const fallos = await fallosDe(p)
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('.create')
+    expect(fallos[0]).toMatch(/NO muestra el botón/)
+  })
+
+  it('FALLA si falta .edit', async () => {
+    const p = completo(PAQ_TAB, CORR_TAB)
+    p[`${PAQ_TAB}.edit`] = false
+    const fallos = await fallosDe(p)
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('.edit')
+  })
+
+  it('FALLA si tiene una acción de la clase CONTRARIA', async () => {
+    const p = completo(PAQ_TAB, CORR_TAB)
+    p[`${CORR_TAB}.create`] = true
+    const fallos = await fallosDe(p)
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toMatch(/clase ajena|rompe el gate/)
+  })
+
+  it('FALLA si le concedieron delete', async () => {
+    const p = completo(PAQ_TAB, CORR_TAB)
+    p[`${PAQ_TAB}.delete`] = true
+    expect(await fallosDe(p)).toHaveLength(1)
+  })
+
+  it('el inverso vale para CORR', async () => {
+    expect(await fallosDe(completo(CORR_TAB, PAQ_TAB), 'CORR')).toEqual([])
+    const p = completo(CORR_TAB, PAQ_TAB)
+    p[`${CORR_TAB}.create`] = false
+    expect(await fallosDe(p, 'CORR')).toHaveLength(1)
+  })
+
+  it('con la clave BASE pero sin acciones falla: es el falso positivo original', async () => {
+    // Exactamente el estado que producía el seed viejo.
+    const fallos = await fallosDe({ [PAQ_TAB]: true })
+    expect(fallos.length).toBeGreaterThanOrEqual(2)
+    expect(fallos.some((f) => f.includes('.create'))).toBe(true)
+    expect(fallos.some((f) => f.includes('.edit'))).toBe(true)
   })
 })

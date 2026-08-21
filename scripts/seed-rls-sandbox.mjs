@@ -339,9 +339,27 @@ async function upsertAppUser(admin, userId, companyId, nombre, role = 'company_o
 //     efectivo sobre todo, y aun así NO puede borrar correspondencia.
 //   · owner      — control positivo de ese mismo DELETE.
 const CLASE_EMPRESA = 'RLS Sandbox — Gate por clase'
-const CLASE_ROLES = {
-  paq: { nombre: 'RLS Paquetería', permiso: 'condominios.tab.paqueteria' },
-  corr: { nombre: 'RLS Correspondencia', permiso: 'condominios.tab.correspondencia' },
+//
+// LAS ACCIONES NO SON OPCIONALES. `canActInCondominiosTab` exige DOS permisos
+// para dejar actuar: la clave base de la tab y la de la acción concreta
+// (`condominios.tab.<tab>.<accion>`, derivadas en 20260703000000). Con sólo la
+// base, PAQ inicia sesión, ve su proyecto, ve la pestaña Paquetería… y no le
+// aparece «Registrar paquete», porque `canCreate` es false.
+//
+// Ese fue el tercer falso «Sandbox listo» de este fixture, y los tres comparten
+// forma: el seed comprobaba lo que había escrito, no lo que hace falta para
+// trabajar. Por eso aquí se declara el conjunto EXACTO y el verificador lo
+// contrasta contra `user_has_permission`, que es lo que mira la app.
+//
+// `delete` queda FUERA a propósito: el borrado de correspondencia va por ROL
+// (sólo company_owner) y el fixture necesita que los granulares NO puedan, que
+// es justo lo que prueban los escenarios de DELETE del harness.
+const ACCIONES_CLASE = ['create', 'edit']
+const permisosDeTab = (tab) => [tab, ...ACCIONES_CLASE.map((a) => `${tab}.${a}`)]
+
+export const CLASE_ROLES = {
+  paq: { nombre: 'RLS Paquetería', permisos: permisosDeTab('condominios.tab.paqueteria') },
+  corr: { nombre: 'RLS Correspondencia', permisos: permisosDeTab('condominios.tab.correspondencia') },
 }
 //
 // `asignado` decide quién lleva fila en `user_project_assignments`, y NO es un
@@ -369,21 +387,39 @@ export const CLASE_USUARIOS = [
  * la prueba de "no ve la otra" pasaría a ser imposible de fallar. El fixture
  * tiene que converger al estado declarado, no acumular.
  */
-async function upsertRolDeClase(admin, companyId, { nombre, permiso }) {
+export async function upsertRolDeClase(admin, companyId, { nombre, permisos }) {
   const roleId = await upsertPorMatch(
     admin, 'roles',
     { company_id: companyId, name: nombre },
     { company_id: companyId, name: nombre, description: 'Fixture del harness RLS', is_system: false },
   )
 
+  // Primero se BORRA todo lo que no esté declarado. Un permiso que sobrevive de
+  // una corrida anterior —la clave de la otra clase, un `delete` que alguien
+  // probó a mano— haría que «no puede tocar la clase ajena» pasara a ser
+  // imposible de fallar. El fixture converge al conjunto declarado; no lo
+  // acumula.
+  const lista = `(${permisos.map((k) => `"${k}"`).join(',')})`
   const { error: eDel } = await admin.from('role_permissions')
-    .delete().eq('role_id', roleId).neq('permission_key', permiso)
-  if (eDel) throw new Error(`role_permissions limpieza: ${eDel.message}`)
+    .delete().eq('role_id', roleId).not('permission_key', 'in', lista)
+  if (eDel) {
+    throw new Error(
+      `role_permissions limpieza del rol "${nombre}": ${eDel.message}. ` +
+      'Sin poder quitar los permisos sobrantes, el fixture concedería de más.',
+    )
+  }
 
-  const { error: eIns } = await admin.from('role_permissions')
-    .upsert({ role_id: roleId, permission_key: permiso, effect: 'allow' },
-            { onConflict: 'role_id,permission_key' })
-  if (eIns) throw new Error(`role_permissions upsert: ${eIns.message}`)
+  for (const permission_key of permisos) {
+    const { error: eIns } = await admin.from('role_permissions')
+      .upsert({ role_id: roleId, permission_key, effect: 'allow' },
+              { onConflict: 'role_id,permission_key' })
+    if (eIns) {
+      throw new Error(
+        `role_permissions upsert de "${permission_key}" en el rol "${nombre}": ${eIns.message}. ` +
+        'Sin la clave de acción, la app no muestra los botones de crear/editar.',
+      )
+    }
+  }
   return roleId
 }
 
@@ -498,13 +534,30 @@ export async function seedGateDeClase(admin, buscarUsuario) {
  */
 export async function verificarGateDeClase(url, anon, clase, admin, crearCliente = createClient) {
   const fallos = []
+  // Se comprueba la clave BASE y las de ACCIÓN, porque
+  // `canActInCondominiosTab` exige las dos: con sólo la base, el operador ve la
+  // pestaña y no le aparece «Registrar». Verificar únicamente la visibilidad
+  // fue lo que dejó pasar ese falso positivo hasta la validación visual.
+  const suya = (tab) => ({
+    [tab]: true, [`${tab}.create`]: true, [`${tab}.edit`]: true,
+    // `delete` NO: el borrado va por rol, y los escenarios del harness exigen
+    // que el granular no pueda. Concederlo los volvería vacuos.
+    [`${tab}.delete`]: false,
+  })
+  const ajena = (tab) => ({
+    [tab]: false, [`${tab}.create`]: false, [`${tab}.edit`]: false, [`${tab}.delete`]: false,
+  })
+  const PAQ_TAB = 'condominios.tab.paqueteria'
+  const CORR_TAB = 'condominios.tab.correspondencia'
+  // Para admin y owner el helper dice true a todo: es el rasgo por el que el
+  // reparto de DELETE va por ROL y no por permiso, así que se afirma.
+  const todoTrue = { [PAQ_TAB]: true, [CORR_TAB]: true, [`${PAQ_TAB}.create`]: true, [`${CORR_TAB}.create`]: true }
+
   const esperado = {
-    PAQ: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': false },
-    CORR: { 'condominios.tab.paqueteria': false, 'condominios.tab.correspondencia': true },
-    // Para admin y owner el helper dice true a todo: es el rasgo por el que el
-    // reparto de DELETE va por ROL y no por permiso, así que se afirma.
-    ADMIN: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
-    OWNER: { 'condominios.tab.paqueteria': true, 'condominios.tab.correspondencia': true },
+    PAQ: { ...suya(PAQ_TAB), ...ajena(CORR_TAB) },
+    CORR: { ...suya(CORR_TAB), ...ajena(PAQ_TAB) },
+    ADMIN: todoTrue,
+    OWNER: todoTrue,
   }
 
   for (const u of clase.usuarios) {
@@ -525,7 +578,12 @@ export async function verificarGateDeClase(url, anon, clase, admin, crearCliente
       const { data, error } = await cli.rpc('user_has_permission', { perm_key: clave })
       if (error) fallos.push(`${u.key}: user_has_permission(${clave}) falló (${error.message})`)
       else if (data !== quiero) {
-        fallos.push(`${u.key}: user_has_permission(${clave}) = ${data}, se esperaba ${quiero}`)
+        const porQue = clave.endsWith('.create') || clave.endsWith('.edit')
+          ? (quiero
+              ? ' — sin esta clave la app NO muestra el botón de crear/editar aunque vea la pestaña'
+              : ' — es una acción de la clase ajena; concederla rompe el gate')
+          : ''
+        fallos.push(`${u.key}: user_has_permission(${clave}) = ${data}, se esperaba ${quiero}${porQue}`)
       }
     }
     // ── Alcance por proyecto, como el usuario ──
@@ -567,7 +625,7 @@ export async function verificarGateDeClase(url, anon, clase, admin, crearCliente
       }
     }
 
-    log(`✔ ${u.key} (${u.role}): login, empresa, permisos y alcance por proyecto como se esperaba`)
+    log(`✔ ${u.key} (${u.role}): login, empresa, permisos operacionales y alcance por proyecto como se esperaba`)
   }
   return fallos
 }
