@@ -196,15 +196,14 @@ afirma "el CHECK queda VALIDADO"                   "$(validada)" "t"
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# 8 · Recuperación: reparar y volver a aplicar converge
+# 8 · Recuperación: reparar datos y reintentar
 # ════════════════════════════════════════════════════════════════════════════
-# POR QUÉ ESTE ESCENARIO. Bajo `psql` cada sentencia va en su propia transacción
-# implícita, así que un aborto en la sección 4 deja el VALIDATE de la 2 ya
-# aplicado; bajo la Management API —que manda el archivo como UNA consulta— no
-# se aplica nada. La migración no puede depender de cuál de las dos la ejecute,
-# y lo que la hace inmune es que reaplicarla converja: la auditoría vuelve a
-# pasar, VALIDATE sobre una constraint ya validada es un no-op, y la
-# verificación del respaldo se rehace entera.
+# El primer intento debe abortar SIN CAMBIOS gracias a la unidad atómica: la
+# migración entera es una sola sentencia DO, así que el aborto revierte
+# VALIDATE, COMMENT y DROP por igual, sea quien sea el aplicador. Después de
+# reparar la fila faltante, la MISMA migración debe completar las tres
+# escrituras en un único intento exitoso. Este escenario prueba
+# recuperabilidad sin depender de estados parcialmente aplicados.
 monta respaldo-incompleto-recuperado
 afirma "primer intento: ABORTA"                    "$([[ $RC -ne 0 ]] && echo si || echo no)" "si"
 afirma "el respaldo sobrevive al primer intento"   "$(hay_respaldo)" "t"
