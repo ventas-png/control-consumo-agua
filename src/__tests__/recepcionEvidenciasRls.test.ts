@@ -231,15 +231,23 @@ describe('funciones nuevas: SECURITY DEFINER cerradas', () => {
 })
 
 describe('la migración es nueva, no una edición', () => {
-  it('su versión es posterior a todo lo ya aplicado en el preview', () => {
-    const versiones = readdirSync(MIGRATIONS_DIR)
-      .filter(f => f.endsWith('.sql'))
-      .map(f => f.slice(0, 14))
-      .sort()
+  it('su versión es posterior a todas las que reemite', () => {
     // El preview ya aplicó versiones anteriores de 20260829 y 20260831; el bot
     // solo empuja archivos NUEVOS, así que el estado final tiene que declararse
-    // en el último, no editando aquellos.
-    expect(versiones[versiones.length - 1]).toBe('20260902000000')
+    // en una migración posterior, no editando aquellas.
+    //
+    // Se compara contra las que ESTA reemite, no contra el máximo global del
+    // repositorio: anclarlo al máximo hacía que cualquier migración futura
+    // —de recepción o no— rompiera esta prueba sin que nada estuviera mal.
+    const reemitidas = [MIGRACION, FINAL, '20260829000600_recepcion_motor_unico.sql']
+    for (const previa of reemitidas) {
+      expect(CLAIM_MIME.slice(0, 14) > previa.slice(0, 14), `${CLAIM_MIME} debe ir después de ${previa}`).toBe(true)
+    }
+  })
+
+  it('y sigue existiendo en el repositorio con ese nombre', () => {
+    const archivos = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql'))
+    expect(archivos).toContain(CLAIM_MIME)
   })
 })
 

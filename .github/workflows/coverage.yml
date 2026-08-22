@@ -254,6 +254,15 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: scripts/rls-evidencias-sandbox.sh
 
+      # La migración de mantenimiento valida una constraint y BORRA la única
+      # copia de las filas originales de correspondencia. Su valor está en
+      # abortar cuando algo no cuadra, así que se ejercita con datos que no
+      # cuadran, no sólo con el camino feliz.
+      - name: Cierre posfusión — validar el CHECK y retirar el respaldo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/cierre-posfusion-sandbox.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
