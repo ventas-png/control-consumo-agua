@@ -18,7 +18,9 @@ const h = vi.hoisted(() => ({
     async () => ({ solicitudId: 'sol-1', error: null }),
   ),
   enviarSolicitudRenta: vi.fn(async () => ({ error: null as string | null })),
-  uploadRentaDoc: vi.fn(async () => ({ error: null as string | null })),
+  uploadRentaDoc: vi.fn<(path: string, file: File, opts?: unknown) => Promise<{ error: string | null }>>(
+    async () => ({ error: null }),
+  ),
   removeRentaDocs: vi.fn(async () => ({ error: null as string | null })),
   notify: vi.fn(),
 }))
@@ -77,6 +79,24 @@ async function renderForm() {
     />,
   )
   await act(async () => {})   // deja resolver la reserva del borrador
+  return r
+}
+
+/** Igual que renderForm, pero retomando un borrador que ya trae adjuntos. */
+async function renderConAdjuntos(cuantos: number) {
+  const borrador = {
+    id: 'sol-1', estado: 'borrador', tipo_renta: 'arrendamiento',
+    documentos: Array.from({ length: cuantos }, (_, i) => ({
+      path: `u1/sol-1/previo-${i}.pdf`, nombre: `previo-${i}.pdf`, etiqueta: null,
+    })),
+  } as unknown as SolicitudRentaUnidad
+  const r = render(
+    <PortalRentasTab
+      unidadId="u1" unidadNombre="Apto. 1D" proyectoId="p1" companyId="c1"
+      solicitudRenta={borrador} onSolicitudChange={() => {}}
+    />,
+  )
+  await act(async () => {})
   return r
 }
 
@@ -192,6 +212,44 @@ describe('PortalRentasTab — solicitud con responsables y adjuntos', () => {
         etiqueta: 'Contrato firmado',
       })],
     }))
+  })
+
+  it('con 6 adjuntos ya subidos, seleccionar 5 solo sube los 2 que caben', async () => {
+    // `docs` queda congelado durante el ciclo de subida (setDocs es asíncrono),
+    // así que comprobar el tope dentro del bucle dejaba pasar la selección
+    // entera: 6 + 5 = 11 adjuntos con MAX_DOCS = 8.
+    await renderConAdjuntos(6)
+
+    const nuevos = ['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf', 'e.pdf'].map(
+      n => new File(['%PDF-1.4'], n, { type: 'application/pdf' }),
+    )
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: nuevos },
+    })
+    await act(async () => {})
+
+    expect(h.uploadRentaDoc).toHaveBeenCalledTimes(2)
+    expect(h.uploadRentaDoc.mock.calls.map(c => c[0])).toEqual([
+      'u1/sol-1/1700000000000-abc123-a.pdf',
+      'u1/sol-1/1700000000000-abc123-b.pdf',
+    ])
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      variant: 'warning',
+      text: 'Puedes anexar hasta 8 documentos: se tomarán 2 de los 5 seleccionados.',
+    }))
+  })
+
+  it('con el cupo lleno no sube nada', async () => {
+    await renderConAdjuntos(8)
+    // Con 8 adjuntos el botón ni se rinde; la guarda igual protege la ruta.
+    expect(screen.queryByText('+ Agregar documento')).toBeNull()
+
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['%PDF-1.4'], 'extra.pdf', { type: 'application/pdf' })] },
+    })
+    await act(async () => {})
+
+    expect(h.uploadRentaDoc).not.toHaveBeenCalled()
   })
 
   it('quitar un adjunto lo borra del bucket', async () => {

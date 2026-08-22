@@ -12,7 +12,7 @@
 # adentro. Ninguna de las dos cosas —la fidelidad de la copia, ni el gate— se
 # comprueba leyendo el SQL: dependen de cómo se comporta al escribir.
 #
-# QUÉ COMPRUEBA (33 invariantes)
+# QUÉ COMPRUEBA (36 invariantes)
 #   1-9    columnas y CHECK de los seis responsables; la completitud del
 #          arrendamiento exigida por la BASE (no por React) y el caso STR
 #  10-15   el portal ya no escribe la tabla —no puede autoaprobarse— y los RPC
@@ -21,9 +21,11 @@
 #  16-22   storage: el propietario sube dentro de {unidad}/{solicitud}/, el
 #          inquilino ni lee ni borra, otra empresa tampoco, la administración
 #          sí, y al ENVIAR los documentos quedan inmutables
-#  23-33   aprobación: contrato con los seis responsables copiados, fallo
+#  23-32   aprobación: contrato con los seis responsables copiados, fallo
 #          atómico si faltan datos, justificación obligatoria para omitirlo,
 #          histórico de contratos con un solo activo, y la ACL
+#  33-36   salida anticipada: el plazo del contrato saliente se RECORTA para no
+#          solaparse con el entrante, sin pisar al que ya terminaba antes
 #
 # USO
 #   supabase/tests/solicitud_renta_contrato/run.sh
@@ -43,6 +45,7 @@ MIGRACIONES=(
   20260829000200_rpc_solicitud_renta_portal
   20260829000300_aprobar_solicitud_renta_v2
   20260829000400_storage_renta_docs_por_solicitud
+  20260829000500_aprobar_renta_sin_traslape
 )
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).

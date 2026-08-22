@@ -247,15 +247,29 @@ function SolicitudForm({ unidadId, borrador, onSolicitudChange, prevRechazada, p
   async function agregarArchivos(files: FileList | null) {
     if (!files || files.length === 0) return
     if (!solicitudId) { notify({ variant: 'error', title: 'Error', text: 'Todavía se está preparando la solicitud. Intentá de nuevo en un momento.' }); return }
-    const elegidos = Array.from(files)
     if (fileRef.current) fileRef.current.value = ''
+
+    // Los cupos se calculan ANTES del ciclo: `docs` es el estado capturado en
+    // este render y no se actualiza mientras subimos (setDocs es asíncrono), así
+    // que comprobar `docs.length` dentro del bucle lee siempre el mismo número y
+    // deja pasar toda una selección múltiple por encima del tope.
+    const disponibles = MAX_DOCS - docs.length
+    if (disponibles <= 0) {
+      notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
+      return
+    }
+    const todos = Array.from(files)
+    const elegidos = todos.slice(0, disponibles)
+    if (todos.length > elegidos.length) {
+      notify({
+        variant: 'warning',
+        title: 'Máximo alcanzado',
+        text: `Puedes anexar hasta ${MAX_DOCS} documentos: se tomarán ${elegidos.length} de los ${todos.length} seleccionados.`,
+      })
+    }
 
     setSubiendo(true)
     for (const file of elegidos) {
-      if (docs.length >= MAX_DOCS) {
-        notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
-        break
-      }
       if (file.size > MAX_DOC_BYTES) {
         notify({ variant: 'error', title: 'Archivo muy grande', text: `${file.name} excede el límite de 10 MB.` })
         continue

@@ -311,6 +311,7 @@ DECLARE
   ADMIN uuid := 'e0000000-0000-0000-0000-00000000000a';
   AJENO uuid := 'e0000000-0000-0000-0000-00000000000b';
   v_sol uuid;
+  v_ant_id uuid;
   v_res jsonb;
   v_con public.contratos_arrendamiento%ROWTYPE;
   v_vie public.contratos_arrendamiento%ROWTYPE;
@@ -446,6 +447,76 @@ BEGIN
     IF SQLERRM LIKE '32:%' THEN RAISE; END IF;
   END;
   RAISE NOTICE '32 OK    el propietario tampoco se aprueba vía RPC';
+
+  -- ── 33: salida anticipada — el plazo viejo se RECORTA, no se conserva ─────
+  -- El contrato vigente termina en 2030 y el inquilino nuevo entra en 2028. Con
+  -- COALESCE (20260829000300) la fecha_fin de 2030 sobrevivía y la unidad
+  -- quedaba con dos plazos solapados; con LEAST (20260829000500) se recorta.
+  PERFORM set_config('app.uid', ADMIN::text, true);
+  UPDATE public.solicitud_renta_unidad SET estado = 'baja' WHERE unidad_id = U2;
+  INSERT INTO public.contratos_arrendamiento (
+    company_id, project_id, unidad_id, arrendatario_nombre, monto_renta,
+    fecha_inicio, fecha_fin, estado
+  ) VALUES (
+    CO_A, P1, U2, 'Inquilino Saliente', 3000, '2026-01-01', '2030-01-01', 'activo'
+  ) RETURNING id INTO v_ant_id;
+
+  INSERT INTO public.solicitud_renta_unidad (
+    company_id, project_id, unidad_id, cliente_id, tipo_renta, estado,
+    arrendatario_nombre, monto_renta, dia_pago, fecha_inicio,
+    resp_mantenimiento, resp_agua, resp_electricidad, resp_basura, resp_telefonia, resp_internet
+  ) VALUES (
+    CO_A, P1, U2, CLI, 'arrendamiento', 'pendiente',
+    'Inquilino Entrante', 4000, 1, '2028-01-01',
+    'propietario','propietario','propietario','propietario','propietario','propietario'
+  ) RETURNING id INTO v_sol;
+
+  v_res := public.aprobar_solicitud_renta(v_sol, 'arrendamiento', NULL, true, NULL);
+
+  SELECT * INTO v_vie FROM public.contratos_arrendamiento WHERE id = v_ant_id;
+  SELECT * INTO v_con FROM public.contratos_arrendamiento WHERE id = (v_res->>'contrato_id')::uuid;
+
+  IF v_vie.fecha_fin <> DATE '2027-12-31' THEN
+    RAISE EXCEPTION '33: el plazo viejo no se recortó (fecha_fin = %)', v_vie.fecha_fin;
+  END IF;
+  IF v_vie.fecha_fin >= v_con.fecha_inicio THEN
+    RAISE EXCEPTION '33: los plazos se solapan (viejo hasta %, nuevo desde %)',
+      v_vie.fecha_fin, v_con.fecha_inicio;
+  END IF;
+  -- Y no al revés: el recorte no puede adelantar la fecha por debajo del inicio
+  -- del propio contrato viejo.
+  IF v_vie.fecha_fin < v_vie.fecha_inicio THEN
+    RAISE EXCEPTION '33: el recorte dejó un plazo invertido (% → %)', v_vie.fecha_inicio, v_vie.fecha_fin;
+  END IF;
+  RAISE NOTICE '33 OK    con salida anticipada el plazo viejo se recorta y no hay traslape';
+
+  -- Un contrato que YA terminaba antes conserva su fecha: el recorte es un
+  -- techo, no una reescritura.
+  UPDATE public.solicitud_renta_unidad SET estado = 'baja' WHERE unidad_id = U2;
+  UPDATE public.contratos_arrendamiento
+     SET estado = 'activo', fecha_fin = '2028-06-30'
+   WHERE id = v_con.id;
+  INSERT INTO public.solicitud_renta_unidad (
+    company_id, project_id, unidad_id, cliente_id, tipo_renta, estado,
+    arrendatario_nombre, monto_renta, dia_pago, fecha_inicio,
+    resp_mantenimiento, resp_agua, resp_electricidad, resp_basura, resp_telefonia, resp_internet
+  ) VALUES (
+    CO_A, P1, U2, CLI, 'arrendamiento', 'pendiente',
+    'Tercer Inquilino', 4500, 1, '2029-01-01',
+    'propietario','propietario','propietario','propietario','propietario','propietario'
+  ) RETURNING id INTO v_sol;
+
+  v_res := public.aprobar_solicitud_renta(v_sol, 'arrendamiento', NULL, true, NULL);
+  SELECT * INTO v_vie FROM public.contratos_arrendamiento WHERE id = v_con.id;
+  IF v_vie.fecha_fin <> DATE '2028-06-30' THEN
+    RAISE EXCEPTION '34: pisó la fecha_fin de un contrato que ya terminaba antes (%)', v_vie.fecha_fin;
+  END IF;
+  RAISE NOTICE '34 OK    si ya terminaba antes, su fecha se respeta';
+
+  SELECT count(*) INTO v_n FROM public.contratos_arrendamiento
+   WHERE unidad_id = U2 AND estado = 'activo';
+  IF v_n <> 1 THEN RAISE EXCEPTION '35: la unidad quedó con % contratos activos', v_n; END IF;
+  RAISE NOTICE '35 OK    tras tres contratos sucesivos sigue habiendo uno solo activo';
 END $$;
 
 -- ── 33: la ACL de las funciones ────────────────────────────────────────────
@@ -458,11 +529,11 @@ BEGIN
     'public.portal_descartar_solicitud_renta(uuid)'
   ] LOOP
     IF has_function_privilege('anon', f, 'EXECUTE') THEN
-      RAISE EXCEPTION '33: anon puede ejecutar %', f;
+      RAISE EXCEPTION '36: anon puede ejecutar %', f;
     END IF;
     IF NOT has_function_privilege('authenticated', f, 'EXECUTE') THEN
-      RAISE EXCEPTION '33: authenticated no puede ejecutar %', f;
+      RAISE EXCEPTION '36: authenticated no puede ejecutar %', f;
     END IF;
   END LOOP;
-  RAISE NOTICE '33 OK    anon revocado y authenticated habilitado en los RPC';
+  RAISE NOTICE '36 OK    anon revocado y authenticated habilitado en los RPC';
 END $$;
