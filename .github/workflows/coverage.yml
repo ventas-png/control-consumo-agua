@@ -3,12 +3,12 @@ name: Coverage gate & E2E
 # ADITIVO a ci.yml (no lo toca). ci.yml corre tsc/test/build + coverage ADVISORY
 # (sin umbral). Este workflow agrega lo que falta para el Track T8:
 #   • coverage-gate: umbral DURO sobre la lógica de negocio crítica (money/auth).
-#   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
+#   • e2e:           Playwright de los caminos de dinero/auth, FAIL-CLOSED.
 #   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
-# `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
-# `rls-harness` YA NO: exige las 15 variables RLS_* y falla si falta cualquiera,
-# salvo cuando GitHub no entrega secretos por diseño (PR de fork o ejecución de
-# Dependabot), donde se omite explícitamente. Sin `pull_request_target`.
+# Ninguno de los dos admite ya el verde sin ejecutar: cada uno exige sus
+# variables (5 obligatorias E2E_*, 15 RLS_*) y falla si falta cualquiera. Los
+# contextos sin secretos por diseño (PR de fork, Dependabot) también quedan en
+# ROJO, con la explicación estructural. Sin `pull_request_target`.
 
 on:
   pull_request:
@@ -146,6 +146,16 @@ jobs:
   e2e:
     name: E2E (caminos de dinero/auth)
     runs-on: ubuntu-latest
+    # FAIL-CLOSED desde 2026-08 (mismo criterio que rls-harness): este job salía
+    # VERDE SIN EJECUTAR cuando faltaba E2E_BASE_URL, y ese verde se contabilizó
+    # como cobertura E2E durante semanas. Ahora:
+    #   · faltan variables obligatorias → preflight ROJO con instrucciones;
+    #   · PR de fork / Dependabot (sin secretos por diseño) → ROJO con la
+    #     explicación estructural y cómo desbloquear (rama interna);
+    #   · la suite corre y DESPUÉS se verifica que ejecutó pruebas de verdad:
+    #     cero descubiertas o todas skipped → ROJO aunque Playwright saliera 0.
+    # La única omisión admitida es por spec CONDICIONAL (invite token efímero,
+    # PAC sandbox) y queda DECLARADA en el resumen, nunca silenciosa.
     env:
       E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
       E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
@@ -157,67 +167,56 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde,
-      # pero VISIBLE: warning annotation + step summary, para que el "verde" no
-      # oculte que la suite Playwright no se ejecutó (auditoría 2026-07-10:
-      # "E2E/RLS verdes no-op").
-      - name: Gate por E2E_BASE_URL
-        id: gate
-        run: |
-          if [ -n "$E2E_BASE_URL" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=E2E omitido::E2E_BASE_URL no configurado — la suite Playwright NO se ejecutó (no-op verde). Configurá los secretos E2E_* del repo para activarla. Ver e2e/README.md."
-            {
-              echo "### ⚠️ E2E omitido — la suite Playwright no se ejecutó"
-              echo ""
-              echo "Este job quedó **verde sin correr** por falta del secreto \`E2E_BASE_URL\`."
-              echo "Para activar los E2E, configurá en *Settings → Secrets and variables → Actions*:"
-              echo ""
-              echo "- \`E2E_BASE_URL\` — URL del preview/staging contra el que correr"
-              echo "- \`E2E_LOGIN_EMAIL\` / \`E2E_LOGIN_PASSWORD\` — cuenta de prueba"
-              echo "- \`E2E_INVITE_TOKEN\` — flujo de aceptar invitación"
-              echo "- \`E2E_RESTRICTED_EMAIL\` / \`E2E_RESTRICTED_PASSWORD\` — flujo de rol restringido"
-              echo ""
-              echo "Referencia: \`e2e/README.md\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Preflight fail-closed de los secretos E2E_*
+        env:
+          # `head.repo.fork` sólo existe en eventos pull_request; en push a main
+          # queda vacío → se trata como interno → fail-closed. Correcto.
+          ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/e2e-preflight.mjs
 
       - uses: actions/setup-node@v7
-        if: steps.gate.outputs.run == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        if: steps.gate.outputs.run == 'true'
         run: npm ci
 
       # Playwright se instala ON-DEMAND (no está en package.json a propósito: evita
       # que el npm ci de ci.yml dispare la descarga de browsers).
       - name: Install Playwright (on-demand)
-        if: steps.gate.outputs.run == 'true'
         run: |
           npm i -D --no-save @playwright/test@^1.48.0 @types/node@^20
           npx playwright install --with-deps chromium
 
       - name: Type-check e2e
-        if: steps.gate.outputs.run == 'true'
         run: npx tsc -p e2e/tsconfig.json
 
       - name: Run E2E
-        if: steps.gate.outputs.run == 'true'
         run: npx playwright test --config e2e/playwright.config.ts
 
+      # Playwright pone el job en rojo si una prueba FALLA; esto lo pone en rojo
+      # si la suite NO CORRIÓ: cero descubiertas, todas skipped, un spec
+      # obligatorio enteramente omitido, o un condicional omitido con su
+      # variable presente. Lee playwright-results.json (reporter json del
+      # config). Ver scripts/e2e-verificar.mjs.
+      - name: Verificar que la suite ejecutó pruebas de verdad
+        run: node scripts/e2e-verificar.mjs
+
+      # `always()`: el reporte es MÁS valioso cuando algo falló. `ignore` cubre
+      # el único caso sin artefactos posibles: el preflight abortó antes de
+      # instalar nada.
       - name: Upload Playwright report
-        if: ${{ steps.gate.outputs.run == 'true' && always() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: |
             playwright-report/
             test-results/
+            playwright-results.json
           retention-days: 14
           if-no-files-found: ignore
 
