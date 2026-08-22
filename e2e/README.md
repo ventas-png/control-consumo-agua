@@ -22,7 +22,7 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 
 En CI el verde de este job significa «la suite corrió», no «no se opuso»:
 
-- **Preflight** (`scripts/e2e-preflight.mjs`): sin cualquiera de las CINCO
+- **Preflight** (`scripts/e2e-preflight.mjs`): sin cualquiera de las SEIS
   variables obligatorias, el job **falla ANTES de instalar nada ni ejecutar
   Playwright** — no existe ningún camino en el que la falta de variables
   produzca un verde. PR de fork y Dependabot —que no reciben Actions secrets
@@ -45,6 +45,15 @@ En CI el verde de este job significa «la suite corrió», no «no se opuso»:
 - **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
   `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
   corridas se encolan, ninguna muere a medias.
+- **Vercel Deployment Protection, fail-closed**: un Preview protegido devuelve
+  401 a cualquier visitante sin sesión de Vercel. El job usa el mecanismo
+  oficial —**Protection Bypass for Automation**—: `E2E_VERCEL_BYPASS_TOKEN` es
+  **obligatorio** y viaja como header `x-vercel-protection-bypass` (con
+  `x-vercel-set-bypass-cookie: true` para que Vercel siembre la cookie) tanto
+  en el fetch de `/e2e-meta.json` del preflight como en el navegador de
+  Playwright (`extraHTTPHeaders` en `playwright.config.ts`). Un 401/403 se
+  diagnostica nombrando la variable — el **valor** del token no se imprime
+  nunca.
 - **Sin `service_role`**: el job no la recibe ni la necesita; el despliegue de
   pruebas usa la anon key de su sandbox, como cualquier cliente.
 - **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`): lee el reporte
@@ -68,6 +77,7 @@ En *Settings → Secrets and variables → Actions*:
 | `E2E_BASE_URL` | opcional | Candidato ESTÁTICO de URL, sometido a la misma validación positiva (marcador + ref + sha). Normalmente innecesario: el preflight resuelve el despliegue del commit por la API de Deployments. |
 | `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | ✅ | Cuenta admin/operadora del tenant sembrado en ese sandbox. |
 | `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | ✅ | Usuario del MISMO tenant con rol restringido (viewer/operator, no admin ni owner). |
+| `E2E_VERCEL_BYPASS_TOKEN` | ✅ | **Protection Bypass for Automation** del proyecto de Vercel (Settings → Deployment Protection). Sin él, un Preview protegido respondería 401 al preflight y al navegador. Nunca se imprime. |
 | `E2E_INVITE_TOKEN` | condicional | Token de invitación **fresco y de un solo uso** (insert en `user_invitations` + edge `invite-user`). No puede vivir como secreto estático: se genera justo antes de la corrida que deba ejercitar ese flujo. Ausente → `invitation-accept` queda como **omitido declarado**. |
 | `E2E_FISCAL_SANDBOX_READY` | condicional | `1` cuando el despliegue de pruebas tiene PAC **sandbox** y configuración fiscal cargada. Ausente → `fiscal-timbrar` queda como **omitido declarado**. |
 
@@ -87,7 +97,9 @@ que ajustar el selector — está aislado en `e2e/fixtures/`.
 Contra un dev server o un preview ya levantado:
 
 ```bash
-npm i -D @playwright/test @types/node
+# @playwright/test y @types/node ya están FIJADOS en package.json (versión
+# exacta): npm ci los instala; sólo falta el binario del navegador.
+npm ci
 npx playwright install chromium
 
 export E2E_BASE_URL="https://<preview-ref>.vercel.app"   # o http://localhost:5173
@@ -106,20 +118,45 @@ npx playwright test --config e2e/playwright.config.ts
 
 ## Variables de entorno
 
-| Var | Para | Obligatoria |
+| Var | Para | En CI |
 |---|---|---|
-| `E2E_BASE_URL` | base URL del preview/sandbox | sí (sin ella, todo skip) |
-| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | login/agua/condominios/fiscal |
-| `E2E_INVITE_TOKEN` | token fresco de invitación | sólo invitation-accept |
-| `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | sólo fiscal-timbrar |
-| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | sólo role-restricted-access |
+| `E2E_BASE_URL` | base URL del preview/sandbox. En CI es **opcional**: el preflight resuelve la URL del despliegue del SHA por la API de Deployments; si se define, entra como un candidato más bajo la misma validación positiva. En local es la forma normal de apuntar la suite. | opcional |
+| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | obligatoria |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | obligatoria |
+| `E2E_EXPECTED_SUPABASE_REF` | declaración del proyecto Supabase sandbox esperado | obligatoria |
+| `E2E_VERCEL_BYPASS_TOKEN` | bypass oficial de la Deployment Protection de Vercel | obligatoria |
+| `E2E_INVITE_TOKEN` | token fresco de invitación | condicional (sólo invitation-accept) |
+| `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | condicional (sólo fiscal-timbrar) |
 
 ## CI
 
-Job `e2e` en `.github/workflows/coverage.yml`: sólo instala Playwright y corre los
-specs cuando el secreto `E2E_BASE_URL` del repo está presente; si no, es no-op
-verde. No se agrega `@playwright/test` a `package.json` (evita que el `npm ci` de
-`ci.yml` dispare la descarga de browsers): el job lo instala on-demand.
+Workflow **dedicado** `.github/workflows/e2e.yml` (job `E2E (caminos de
+dinero/auth)`), disparado en `pull_request` y `workflow_dispatch` — **no** en
+push a `main`: el build de `main` es el de producción y nunca lleva el marcador
+`e2e-sandbox`, así que un run automático ahí sólo podría quedar rojo por
+ausencia de destino. Cuando exista un despliegue de pruebas del SHA exacto de
+`main`, se lanza a mano con `workflow_dispatch`.
+
+La secuencia del job:
+
+1. **Preflight fail-closed** (`scripts/e2e-preflight.mjs`): exige las SEIS
+   variables obligatorias y **descubre el despliegue por la API de Deployments
+   de GitHub** para el SHA exacto que el job prueba (en PRs, el HEAD de la
+   rama). Cada candidato tiene que demostrar `environment=e2e-sandbox`, el
+   `supabase_project_ref` igual a `E2E_EXPECTED_SUPABASE_REF` y el
+   `commit_sha` exacto, leyendo `/e2e-meta.json` con el header de bypass de
+   Vercel. Sin destino válido, el job falla **antes de instalar nada**.
+2. `npm ci` (dependencias fijadas en el lockfile — no hay instalación bajo
+   demanda de Playwright) + el binario de Chromium + type-check de `e2e/`.
+3. `npx playwright test` contra la URL validada, con el bypass en
+   `extraHTTPHeaders`.
+4. **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`) sobre el
+   reporte JSON: cero ejecutadas, todas skipped o un spec obligatorio omitido
+   → rojo. El reporte se sube como artifact incluso en fallo.
+
+Las corridas se **encolan** (`concurrency: e2e-shared-sandbox`,
+`cancel-in-progress: false`): el sandbox es compartido y una corrida cancelada
+a medias dejaría datos a medio sembrar.
 
 ## Type-check
 

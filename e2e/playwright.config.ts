@@ -11,8 +11,23 @@ import { defineConfig, devices } from '@playwright/test'
 // LOCAL: en CI un spec obligatorio enteramente skipped pone el job en rojo.
 //
 // Local:  E2E_BASE_URL=http://localhost:5173 npx playwright test --config e2e/playwright.config.ts
-// CI:     job `e2e` de .github/workflows/coverage.yml.
+// CI:     .github/workflows/e2e.yml (workflow dedicado; ver su header).
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:5173'
+
+// Vercel Protection Bypass for Automation: si el Preview está protegido,
+// TODA petición del navegador necesita el header x-vercel-protection-bypass.
+// x-vercel-set-bypass-cookie: true hace que Vercel siembre además la cookie de
+// bypass en la primera respuesta, así las navegaciones y assets subsecuentes
+// pasan aunque algún fetch interno no lleve el header. El token NUNCA se
+// imprime; sólo viaja en los headers. Local sin token → sin headers extra
+// (un dev server no tiene protección).
+const bypassToken = process.env.E2E_VERCEL_BYPASS_TOKEN || ''
+const extraHTTPHeaders = bypassToken
+  ? {
+      'x-vercel-protection-bypass': bypassToken,
+      'x-vercel-set-bypass-cookie': 'true',
+    }
+  : undefined
 
 export default defineConfig({
   testDir: '.',
@@ -38,6 +53,7 @@ export default defineConfig({
     : [['list']],
   use: {
     baseURL,
+    extraHTTPHeaders,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

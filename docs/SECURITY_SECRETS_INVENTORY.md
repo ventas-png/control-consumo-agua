@@ -82,11 +82,14 @@ workflow indicadas por archivo.
 | `SENTRY_AUTH_TOKEN` | **Secreto** | build (`vite.config.ts` → `sentryVitePlugin`) en CI | Subir source maps a Sentry. Solo activa el plugin si están los 3 (`_TOKEN`/`_ORG`/`_PROJECT`). |
 | `SENTRY_ORG` | Sensible (id) | build CI | Org de Sentry para subir source maps. |
 | `SENTRY_PROJECT` | Sensible (id) | build CI | Proyecto de Sentry para subir source maps. |
-| `E2E_BASE_URL` | Sensible (config) | `coverage.yml` (job E2E) | URL contra la que corre Playwright. Si falta, el job se *skipea*. |
-| `E2E_LOGIN_EMAIL` | **Secreto** | `coverage.yml` (E2E) | Credenciales de la cuenta de prueba E2E. |
-| `E2E_LOGIN_PASSWORD` | **Secreto** | `coverage.yml` (E2E) | Password de la cuenta de prueba E2E. |
-| `E2E_INVITE_TOKEN` | **Secreto** | `coverage.yml` (E2E) | Token de invitación para el flujo de aceptar invitación. |
-| `E2E_FISCAL_SANDBOX_READY` | Flag | `coverage.yml` (E2E) | Habilita los caminos fiscales contra Sandbox. No es secreto. |
+| `E2E_BASE_URL` | Sensible (config) | `e2e.yml` | Candidato ESTÁTICO opcional de URL para Playwright; el preflight resuelve normalmente el despliegue por SHA y lo somete a validación positiva. Si falta, el job NO se skipea (fail-closed; ver e2e/README.md). |
+| `E2E_LOGIN_EMAIL` | **Secreto** | `e2e.yml` | Credenciales de la cuenta de prueba E2E. Obligatoria: sin ella el job queda ROJO. |
+| `E2E_LOGIN_PASSWORD` | **Secreto** | `e2e.yml` | Password de la cuenta de prueba E2E. Obligatoria. |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | **Secreto** | `e2e.yml` | Usuario de rol restringido (viewer/operator) del mismo tenant. Obligatorias. |
+| `E2E_EXPECTED_SUPABASE_REF` | Sensible (id) | `e2e.yml` | Declaración del proyecto Supabase sandbox contra el que corre la suite. Obligatoria. |
+| `E2E_VERCEL_BYPASS_TOKEN` | **Secreto** | `e2e.yml` | Protection Bypass for Automation de Vercel (header `x-vercel-protection-bypass`). Obligatoria; nunca se imprime. |
+| `E2E_INVITE_TOKEN` | **Secreto** | `e2e.yml` | Token de invitación para el flujo de aceptar invitación (efímero, condicional). |
+| `E2E_FISCAL_SANDBOX_READY` | Flag | `e2e.yml` | Habilita los caminos fiscales contra Sandbox. No es secreto (condicional). |
 | `RLS_SUPABASE_URL` | Sensible (config) | `coverage.yml` (harness RLS) | Proyecto contra el que corre el harness de RLS. |
 | `RLS_SUPABASE_ANON_KEY` | Público por diseño | `coverage.yml` (harness RLS) | Anon key del proyecto de pruebas RLS. |
 | `RLS_USER_A_EMAIL` / `RLS_USER_A_PASSWORD` | **Secreto** | `coverage.yml` (harness RLS) | Usuario A para probar aislamiento entre tenants. |

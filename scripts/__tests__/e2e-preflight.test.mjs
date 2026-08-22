@@ -7,7 +7,7 @@
 // viejo. El contrato fijado aquí: falta variable → rojo; fork/Dependabot →
 // rojo explicado; y el destino se demuestra a sí mismo — marcador
 // environment=e2e-sandbox, ref de Supabase declarado y el MISMO sha del job.
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -17,6 +17,7 @@ import {
   VARIABLES_OBLIGATORIAS,
   decidirDestino,
   decidirPreflight,
+  leerMeta,
   main,
   resolverUrlsPorSha,
   validarBaseUrl,
@@ -24,12 +25,17 @@ import {
 } from '../e2e-preflight.mjs'
 import { construirMeta, refDeSupabaseUrl } from '../generar-e2e-meta.mjs'
 
+// El VALOR del token jamás debe aparecer en un log ni en un motivo de rechazo;
+// se elige una cadena inconfundible para poder afirmarlo por búsqueda.
+const TOKEN_BYPASS = 'token-bypass-jamas-impreso-9f3a'
+
 const COMPLETAS = {
   E2E_LOGIN_EMAIL: 'e2e@sandbox.invalid',
   E2E_LOGIN_PASSWORD: 'x',
   E2E_RESTRICTED_EMAIL: 'e2e-restricted@sandbox.invalid',
   E2E_RESTRICTED_PASSWORD: 'y',
   E2E_EXPECTED_SUPABASE_REF: 'sandboxref',
+  E2E_VERCEL_BYPASS_TOKEN: TOKEN_BYPASS,
   SHA_ESPERADO: 'a'.repeat(40),
 }
 const ESPERADO = { sha: COMPLETAS.SHA_ESPERADO, ref: 'sandboxref' }
@@ -40,13 +46,14 @@ const META_OK = {
 }
 
 describe('inventario de variables', () => {
-  it('las obligatorias: credenciales + la DECLARACIÓN del ref (la URL ya no, se resuelve por SHA)', () => {
+  it('las obligatorias: credenciales + la DECLARACIÓN del ref + el bypass de Vercel (la URL ya no, se resuelve por SHA)', () => {
     expect([...VARIABLES_OBLIGATORIAS].sort()).toEqual([
       'E2E_EXPECTED_SUPABASE_REF',
       'E2E_LOGIN_EMAIL',
       'E2E_LOGIN_PASSWORD',
       'E2E_RESTRICTED_EMAIL',
       'E2E_RESTRICTED_PASSWORD',
+      'E2E_VERCEL_BYPASS_TOKEN',
     ])
   })
 
@@ -324,9 +331,126 @@ describe('dependencias FIJADAS, no instalación dinámica', () => {
   })
 })
 
+describe('Vercel Deployment Protection — bypass fail-closed, token jamás impreso', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  const espiarConsola = () => {
+    const impreso = []
+    vi.spyOn(console, 'log').mockImplementation((...a) => impreso.push(a.join(' ')))
+    vi.spyOn(console, 'error').mockImplementation((...a) => impreso.push(a.join(' ')))
+    return impreso
+  }
+
+  it('leerMeta envía los DOS headers del bypass al pedir /e2e-meta.json', async () => {
+    let headersVistos = null
+    const f = async (_url, init) => {
+      headersVistos = init.headers
+      return { ok: true, status: 200, json: async () => META_OK }
+    }
+    const { meta } = await leerMeta('https://protegido.vercel.app', f, TOKEN_BYPASS)
+    expect(meta).toEqual(META_OK)
+    expect(headersVistos['x-vercel-protection-bypass']).toBe(TOKEN_BYPASS)
+    expect(headersVistos['x-vercel-set-bypass-cookie']).toBe('true')
+  })
+
+  it('sin token no envía headers de bypass (local contra un dev server sin protección)', async () => {
+    let headersVistos = null
+    const f = async (_url, init) => {
+      headersVistos = init.headers
+      return { ok: true, status: 200, json: async () => META_OK }
+    }
+    await leerMeta('http://localhost:5173', f, '')
+    expect(headersVistos['x-vercel-protection-bypass']).toBeUndefined()
+    expect(headersVistos['x-vercel-set-bypass-cookie']).toBeUndefined()
+  })
+
+  it('token INVÁLIDO (la protección responde 401) → diagnóstico accionable que nombra la VARIABLE, no el valor', async () => {
+    const f = async () => ({ ok: false, status: 401 })
+    const { meta, errorFetch } = await leerMeta('https://protegido.vercel.app', f, TOKEN_BYPASS)
+    expect(meta).toBeNull()
+    expect(errorFetch).toContain('401')
+    expect(errorFetch).toMatch(/Deployment Protection/)
+    expect(errorFetch).toContain('E2E_VERCEL_BYPASS_TOKEN')
+    expect(errorFetch).not.toContain(TOKEN_BYPASS)
+  })
+
+  it('un 403 recibe el mismo trato que el 401', async () => {
+    const f = async () => ({ ok: false, status: 403 })
+    const { errorFetch } = await leerMeta('https://protegido.vercel.app', f, TOKEN_BYPASS)
+    expect(errorFetch).toMatch(/Deployment Protection/)
+    expect(errorFetch).not.toContain(TOKEN_BYPASS)
+  })
+
+  it('Preview PROTEGIDO pero accesible con el token → main valida y sale 0, sin imprimir el token', async () => {
+    const impreso = espiarConsola()
+    const f = async (url, init) => {
+      const s = String(url)
+      if (s.includes('e2e-meta.json')) {
+        // El "Preview protegido": sin el header correcto, 401.
+        if (init?.headers?.['x-vercel-protection-bypass'] !== TOKEN_BYPASS) return { ok: false, status: 401 }
+        return { ok: true, status: 200, json: async () => META_OK }
+      }
+      return { ok: false, status: 404 }
+    }
+    const code = await main({ ...COMPLETAS, E2E_BASE_URL: 'https://protegido.vercel.app' }, f)
+    expect(code).toBe(0)
+    expect(impreso.join('\n')).not.toContain(TOKEN_BYPASS)
+  })
+
+  it('token inválido de punta a punta → main sale 1 con el diagnóstico y nada impreso contiene el token', async () => {
+    const impreso = espiarConsola()
+    const f = async (url) => {
+      if (String(url).includes('e2e-meta.json')) return { ok: false, status: 401 }
+      return { ok: false, status: 404 }
+    }
+    const code = await main({ ...COMPLETAS, E2E_BASE_URL: 'https://protegido.vercel.app' }, f)
+    expect(code).toBe(1)
+    const todo = impreso.join('\n')
+    expect(todo).toMatch(/Deployment Protection/)
+    expect(todo).not.toContain(TOKEN_BYPASS)
+  })
+
+  it('playwright.config.ts lleva el bypass al NAVEGADOR vía extraHTTPHeaders', () => {
+    const config = readFileSync(resolve('e2e/playwright.config.ts'), 'utf8')
+    expect(config).toContain("process.env.E2E_VERCEL_BYPASS_TOKEN")
+    expect(config).toContain("'x-vercel-protection-bypass': bypassToken")
+    expect(config).toContain("'x-vercel-set-bypass-cookie': 'true'")
+    expect(config).toContain('extraHTTPHeaders')
+  })
+})
+
 describe('el YAML invoca el contrato (no una copia)', () => {
-  const yml = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
-  const jobE2e = yml.slice(yml.indexOf('  e2e:'), yml.indexOf('  rls-sandbox:'))
+  const jobE2e = readFileSync(resolve('.github/workflows/e2e.yml'), 'utf8')
+
+  it('vive en su PROPIO workflow: coverage.yml ya no tiene job e2e', () => {
+    const cov = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
+    // Fuera de comentarios (el header de coverage.yml SEÑALA a e2e.yml, y eso
+    // está bien): ni job e2e, ni pasos de Playwright, ni el grupo del sandbox.
+    const sinComentarios = cov
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('#'))
+      .join('\n')
+    expect(sinComentarios).not.toMatch(/^ {2}e2e:/m)
+    expect(sinComentarios.toLowerCase()).not.toContain('playwright')
+    expect(sinComentarios).not.toContain('e2e-shared-sandbox')
+  })
+
+  it('se dispara en pull_request y workflow_dispatch — y NO en push a main (no hay deployment e2e-sandbox del SHA de main)', () => {
+    const lineas = jobE2e.split('\n')
+    const iOn = lineas.findIndex((l) => /^on:\s*$/.test(l))
+    expect(iOn).toBeGreaterThanOrEqual(0)
+    const seccionOn = []
+    for (const l of lineas.slice(iOn + 1)) {
+      if (/^\S/.test(l)) break
+      seccionOn.push(l)
+    }
+    const texto = seccionOn.join('\n')
+    expect(texto).toMatch(/^ {2}pull_request:/m)
+    expect(texto).toMatch(/^ {2}workflow_dispatch:/m)
+    expect(texto).not.toMatch(/^ {2}push:/m)
+    // Como clave en TODO el workflow, no sólo en la sección on:
+    expect(lineas.some((l) => /^\s*pull_request_target\s*:/.test(l))).toBe(false)
+  })
 
   it('preflight con contexto de fork, SHA del HEAD del PR (no el merge commit) y token', () => {
     expect(jobE2e).toContain('run: node scripts/e2e-preflight.mjs')
@@ -362,8 +486,9 @@ describe('el YAML invoca el contrato (no una copia)', () => {
     expect(jobE2e).not.toMatch(/::warning title=E2E omitido/)
   })
 
-  it('E2E_EXPECTED_SUPABASE_REF llega desde secrets', () => {
+  it('E2E_EXPECTED_SUPABASE_REF y E2E_VERCEL_BYPASS_TOKEN llegan desde secrets', () => {
     expect(jobE2e).toContain('E2E_EXPECTED_SUPABASE_REF: ${{ secrets.E2E_EXPECTED_SUPABASE_REF }}')
+    expect(jobE2e).toContain('E2E_VERCEL_BYPASS_TOKEN: ${{ secrets.E2E_VERCEL_BYPASS_TOKEN }}')
   })
 
   it('el verificador corre DESPUÉS de Run E2E y el reporte se sube con always()', () => {

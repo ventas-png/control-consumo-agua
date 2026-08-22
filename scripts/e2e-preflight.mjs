@@ -6,7 +6,7 @@
 // Playwright puede correr y CONTRA QUÉ. Tres desenlaces, y sólo UNO deja el
 // check en verde:
 //
-//   run       — están las CINCO variables obligatorias y algún candidato de
+//   run       — están las SEIS variables obligatorias y algún candidato de
 //               URL pasó la validación POSITIVA: su /e2e-meta.json declara
 //               environment=e2e-sandbox, el supabase_project_ref esperado y el
 //               MISMO commit que este job está probando. Exit 0, publicando la
@@ -38,6 +38,16 @@
 // SIN service_role. Este job no la recibe, no la valida y no la necesita: el
 // despliegue de pruebas usa la anon key de su sandbox, como cualquier cliente.
 //
+// VERCEL DEPLOYMENT PROTECTION, FAIL-CLOSED. Un Preview protegido devuelve 401
+// a cualquier visitante sin sesión de Vercel — el fetch de /e2e-meta.json y el
+// navegador de Playwright incluidos. El bypass oficial (Protection Bypass for
+// Automation) es un token que viaja en el header x-vercel-protection-bypass;
+// x-vercel-set-bypass-cookie: true hace que Vercel siembre además la cookie,
+// para que las navegaciones y assets subsecuentes pasen sin repetir el header.
+// E2E_VERCEL_BYPASS_TOKEN es OBLIGATORIO (sin él, la suite contra un Preview
+// protegido fallaría con un 401 indistinguible de un bug) y NUNCA se imprime:
+// ni en logs, ni en motivos de rechazo, ni en el step summary.
+//
 // Vive en Node y no inline en el YAML para poder probarlo:
 // `scripts/__tests__/e2e-preflight.test.mjs` cubre la tabla de decisión.
 // ════════════════════════════════════════════════════════════════════════════
@@ -47,13 +57,17 @@ import { appendFileSync } from 'node:fs'
 import { motivoSinSecretos } from './rls-preflight.mjs'
 
 /**
- * Las CINCO obligatorias. Sus NOMBRES no son secretos.
+ * Las SEIS obligatorias. Sus NOMBRES no son secretos.
  *
  * E2E_BASE_URL ya no está entre ellas: la URL puede resolverse del despliegue
  * del propio SHA. E2E_EXPECTED_SUPABASE_REF sí lo está, y por la misma razón
  * que RLS_EXPECTED_PROJECT_REF en el harness: es la DECLARACIÓN de contra qué
  * proyecto se opera; sin ella, cambiar un secreto bastaría para apuntar la
  * suite a otro proyecto sin que nada lo note.
+ *
+ * E2E_VERCEL_BYPASS_TOKEN es el Protection Bypass for Automation de Vercel:
+ * sin él, un Preview protegido devuelve 401 al preflight y al navegador, y el
+ * fallo sería indistinguible de un bug de la app. Su VALOR jamás se imprime.
  */
 export const VARIABLES_OBLIGATORIAS = [
   'E2E_LOGIN_EMAIL',
@@ -61,6 +75,7 @@ export const VARIABLES_OBLIGATORIAS = [
   'E2E_RESTRICTED_EMAIL',
   'E2E_RESTRICTED_PASSWORD',
   'E2E_EXPECTED_SUPABASE_REF',
+  'E2E_VERCEL_BYPASS_TOKEN',
 ]
 
 /**
@@ -317,12 +332,33 @@ export async function resolverUrlsPorSha({ repo, sha, token, fetchImpl = fetch }
   return [...new Set(urls)]
 }
 
-async function leerMeta(url, fetchImpl = fetch) {
+/**
+ * Descarga /e2e-meta.json del candidato. Si hay bypass de Vercel, viaja como
+ * header (x-vercel-protection-bypass) — el VALOR del token no aparece en
+ * ningún mensaje: un 401/403 se reporta como "la protección rechazó el
+ * acceso", nombrando la VARIABLE, nunca su contenido.
+ */
+export async function leerMeta(url, fetchImpl = fetch, bypassToken = '') {
+  const headers = { accept: 'application/json' }
+  if (bypassToken) {
+    headers['x-vercel-protection-bypass'] = bypassToken
+    headers['x-vercel-set-bypass-cookie'] = 'true'
+  }
   try {
     const r = await fetchImpl(new URL('/e2e-meta.json', url), {
       signal: AbortSignal.timeout(15_000),
-      headers: { accept: 'application/json' },
+      headers,
     })
+    if (r.status === 401 || r.status === 403) {
+      return {
+        meta: null,
+        errorFetch:
+          `HTTP ${r.status} — la Deployment Protection de Vercel rechazó el acceso. ` +
+          'El header x-vercel-protection-bypass se envió: E2E_VERCEL_BYPASS_TOKEN está ' +
+          'vencido, fue rotado o no corresponde a este proyecto de Vercel. Regeneralo en ' +
+          'Vercel → Settings → Deployment Protection y actualizá el secreto.',
+      }
+    }
     if (!r.ok) return { meta: null, errorFetch: `HTTP ${r.status}` }
     return { meta: await r.json(), errorFetch: null }
   } catch (e) {
@@ -367,7 +403,7 @@ export async function main(env = process.env, fetchImpl = fetch) {
       candidatos.push({ url, meta: null, errorFetch: null })
       continue
     }
-    const { meta, errorFetch } = await leerMeta(url, fetchImpl)
+    const { meta, errorFetch } = await leerMeta(url, fetchImpl, env.E2E_VERCEL_BYPASS_TOKEN)
     candidatos.push({ url, meta, errorFetch })
   }
 
