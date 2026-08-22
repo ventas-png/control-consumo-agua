@@ -663,6 +663,7 @@ export const CADENA_RECEPCION_ARCHIVOS = [
   '20260831000000_recepcion_evidencias_y_acuse',
   '20260901000000_recepcion_integridad_final',
   '20260902000000_recepcion_claim_owner_y_mime',
+  '20260903000000_recepcion_cierre_posfusion',
 ]
 
 /** Primera y última de la cadena que hay que aplicar entera. */
@@ -696,7 +697,7 @@ export function mensajeEsquemaAusente(columnas, ref) {
   return [
     `a \`paquetes_recibidos\` le faltan columnas del motor único (${columnas.join(', ')}).`,
     `   Aplicá la cadena COMPLETA ${desde}…${hasta} al proyecto ${ref || 'de SEED_EXPECTED_REF'},`,
-    '   en orden y entera: son estas seis, y las de en medio no son opcionales.',
+    '   en orden y entera: son estas siete, y las de en medio no son opcionales.',
     ...CADENA_RECEPCION_ARCHIVOS.map((a) => `     · ${a}.sql`),
     '   Son SÓLO esas: entre la primera y la última hay migraciones de Renta que no van aquí.',
     '   Sin ellas el harness no puede probar el gate por clase, que es justo lo que viene a probar.',

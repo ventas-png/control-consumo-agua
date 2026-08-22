@@ -715,8 +715,12 @@ describe('CADENA_RECEPCION_ARCHIVOS espeja los archivos reales', () => {
     }
   })
 
-  it('son seis y están en orden de versión', () => {
-    expect(CADENA_RECEPCION_ARCHIVOS).toHaveLength(6)
+  it('son siete y están en orden de versión', () => {
+    // Seis de la unificación más la de cierre posfusión (20260903000000), que
+    // valida el CHECK de estados y retira el respaldo: un sandbox que aplique
+    // sólo las seis queda con una constraint sin validar y una tabla de más,
+    // es decir, con un esquema que ya no es el de producción.
+    expect(CADENA_RECEPCION_ARCHIVOS).toHaveLength(7)
     const versiones = CADENA_RECEPCION_ARCHIVOS.map((a) => a.slice(0, 14))
     expect(versiones).toEqual([...versiones].sort())
     expect(new Set(versiones).size).toBe(versiones.length)
@@ -724,7 +728,7 @@ describe('CADENA_RECEPCION_ARCHIVOS espeja los archivos reales', () => {
 
   it('los extremos salen de la lista, no de dos constantes sueltas', () => {
     expect(CADENA_RECEPCION.desde).toBe(CADENA_RECEPCION_ARCHIVOS[0].slice(0, 14))
-    expect(CADENA_RECEPCION.hasta).toBe(CADENA_RECEPCION_ARCHIVOS[5].slice(0, 14))
+    expect(CADENA_RECEPCION.hasta).toBe(CADENA_RECEPCION_ARCHIVOS.at(-1).slice(0, 14))
   })
 
   it('ninguna migración de recepción se quedó fuera de la lista', () => {
