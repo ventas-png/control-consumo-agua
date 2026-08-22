@@ -591,7 +591,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'solicitudes', label: 'Solicitudes', icon: '📥', render: (ctx) =>
     <SolicitudesTab solicitudes={ctx.solicitudes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('solicitudes')} canEdit={ctx.canEdit('solicitudes')} canApprove={ctx.canApprove('solicitudes')} canDelete={ctx.canDelete('solicitudes')} onRefresh={ctx.onRefresh} /> },
   { id: 'solicitudes_renta', label: 'Autorizac. Renta', icon: '🔑', render: (ctx) =>
-    <SolicitudesRentaTab solicitudes={ctx.solicitudesRenta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} autorNombre={ctx.currentUser.name ?? ''} canEdit={ctx.canEdit('solicitudes_renta')} onRefresh={ctx.onRefresh} /> },
+    <SolicitudesRentaTab solicitudes={ctx.solicitudesRenta} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} autorNombre={ctx.currentUser.name ?? ''} canEdit={ctx.canEdit('solicitudes_renta')} onRefresh={ctx.onRefresh} /> },
   { id: 'solicitudes_mudanza', label: 'Autorizac. Mudanza', icon: '🚛', render: (ctx) =>
     <SolicitudesMudanzaTab solicitudes={ctx.solicitudesMudanza} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} autorNombre={ctx.currentUser.name ?? ''} canEdit={ctx.canEdit('solicitudes_mudanza')} onRefresh={ctx.onRefresh} /> },
   { id: 'mensajes_portal', label: 'Mensajes Portal', icon: '📨', render: (ctx) =>

@@ -234,7 +234,9 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     // Fase 43
     db.from('fondo_reserva').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     db.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
-    db.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
+    // Los borradores son solicitudes que el propietario todavía está llenando en
+    // el portal (20260829000200): no son trabajo para la administración.
+    db.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).neq('estado', 'borrador').order('created_at', { ascending: false }).limit(300),
     db.from('solicitud_mudanza_unidad').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
     // Mensajes que los residentes envían desde su portal ("Mensajes a la
     // administración"). Los escribe PortalMiUnidadTab y hasta ahora el único

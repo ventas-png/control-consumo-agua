@@ -59,3 +59,25 @@ export async function uploadMudanzaDoc(
   const { error } = await supabase.storage.from('mudanza-docs').upload(path, body, options)
   return { error: error?.message ?? null }
 }
+
+/**
+ * Sube un documento de la solicitud de renta al bucket privado `renta-docs`.
+ * Devuelve `{ error }` (mensaje legible). El path lo arma la UI con
+ * `buildUploadPath(unidadId, …)`: el primer segmento DEBE ser la unidad para que
+ * la RLS del bucket (20260828000100) autorice la subida.
+ */
+export async function uploadRentaDoc(
+  path: string,
+  body: Blob | File,
+  options?: UploadMediaOptions,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.storage.from('renta-docs').upload(path, body, options)
+  return { error: error?.message ?? null }
+}
+
+/** Elimina documentos del bucket `renta-docs` por path (limpieza de huérfanos). */
+export async function removeRentaDocs(paths: string[]): Promise<{ error: string | null }> {
+  if (paths.length === 0) return { error: null }
+  const { error } = await supabase.storage.from('renta-docs').remove(paths)
+  return { error: error?.message ?? null }
+}

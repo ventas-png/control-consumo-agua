@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { EmptyState } from '../../shared/EmptyState'
 import { confirm, notify } from '../../shared/Dialog'
 import {
@@ -21,10 +21,19 @@ import {
   type InquilinoDeUnidad,
 } from '../../../domain/portal/inquilinos'
 import { ImageUploader } from '../../shared/ImageUploader'
+import { fileIcon } from '../../shared/FileUploader'
+import { uploadRentaDoc, removeRentaDocs } from '../../../domain/shared/storage'
+import { validateFileMagic, buildUploadPath, resolveUploadContentType } from '../../../lib/fileValidation'
+import {
+  DatosContratoSolicitud, DocumentosSolicitudRenta, documentosDe,
+  ResponsablesServiciosDetalle, EstadoContratoSolicitud, SERVICIOS,
+} from '../SolicitudRentaDetalle'
+import { reservarSolicitudRenta, enviarSolicitudRenta } from '../../../domain/portal/solicitudRenta'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
-  SolicitudRentaUnidad, TipoRenta, HuespedSTR,
+  SolicitudRentaUnidad, TipoRenta, HuespedSTR, DocumentoSolicitudRenta,
+  ResponsableServicio, ResponsablesServicios,
 } from '../../../types'
 import { ModalPortal } from '../../shared/ModalPortal'
 
@@ -64,7 +73,6 @@ interface Props {
   unidadNombre: string
   proyectoId: string
   companyId: string
-  clienteId: string
   solicitudRenta: SolicitudRentaUnidad | null
   onSolicitudChange: () => void
 }
@@ -129,39 +137,204 @@ function blankReserva(): Partial<ReservaSTR> {
 
 // ── Authorization request form ────────────────────────────────────────────────
 
-function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada, prevBaja }: {
-  unidadId: string; proyectoId: string; companyId: string; clienteId: string
-  onSolicitudChange: () => void; prevRechazada: SolicitudRentaUnidad | null
+// Topes de los adjuntos: espejan el CHECK de `solicitud_renta_unidad`
+// (20260828000000) y el file_size_limit del bucket `renta-docs` (20260828000100).
+const MAX_DOCS = 8
+const MAX_DOC_BYTES = 10 * 1024 * 1024
+const ACCEPT_DOCS = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg', 'image/png', 'image/webp',
+].join(',')
+
+/**
+ * Adjunto YA subido al bucket. Se sube al elegirlo (no al enviar) porque su path
+ * cuelga del borrador, y la policy de `renta-docs` solo autoriza escrituras
+ * mientras la solicitud sigue en 'borrador' (20260829000400).
+ */
+interface DocSubido extends DocumentoSolicitudRenta {
+  subiendo?: boolean
+}
+
+/** Estado inicial: todos los servicios los paga el propietario. */
+const blankResponsables = (): ResponsablesServicios => ({
+  mantenimiento: 'propietario', agua: 'propietario', electricidad: 'propietario',
+  basura: 'propietario', telefonia: 'propietario', internet: 'propietario',
+})
+
+/**
+ * Datos del contrato que el propietario propone. Mismos campos que el formulario
+ * "Nuevo contrato de arrendamiento" del admin (ArrendamientosTab) menos la
+ * unidad, que aquí es implícita. Se guardan como strings y se castean al enviar.
+ */
+interface DatosContratoForm {
+  arrendatario_nombre: string
+  arrendatario_identificacion: string
+  arrendatario_telefono: string
+  arrendatario_email: string
+  monto_renta: string
+  deposito: string
+  dia_pago: string
+  fecha_inicio: string
+  fecha_fin: string
+  notas_contrato: string
+}
+
+const blankDatosContrato = (): DatosContratoForm => ({
+  arrendatario_nombre: '', arrendatario_identificacion: '',
+  arrendatario_telefono: '', arrendatario_email: '',
+  monto_renta: '', deposito: '', dia_pago: '5',
+  fecha_inicio: '', fecha_fin: '', notas_contrato: '',
+})
+
+function SolicitudForm({ unidadId, borrador, onSolicitudChange, prevRechazada, prevBaja }: {
+  unidadId: string
+  /** Borrador ya reservado (si el propietario volvió), con sus adjuntos. */
+  borrador: SolicitudRentaUnidad | null
+  onSolicitudChange: () => void
+  prevRechazada: SolicitudRentaUnidad | null
   prevBaja: SolicitudRentaUnidad | null
 }) {
-  const [tipo, setTipo]       = useState<TipoRenta>('arrendamiento')
-  const [motivo, setMotivo]   = useState('')
+  const [tipo, setTipo]       = useState<TipoRenta>(borrador?.tipo_renta ?? 'arrendamiento')
+  const [motivo, setMotivo]   = useState(borrador?.motivo ?? '')
+  const [datos, setDatos]     = useState<DatosContratoForm>(blankDatosContrato())
+  const [resp, setResp]       = useState<ResponsablesServicios>(blankResponsables())
+  const [docs, setDocs]       = useState<DocSubido[]>(documentosDe(borrador ?? { documentos: null }))
   const [saving, setSaving]   = useState(false)
+  const [subiendo, setSubiendo] = useState(false)
+  const fileRef               = useRef<HTMLInputElement>(null)
+
+  // Id del borrador: es la carpeta de los adjuntos en `renta-docs`, así que hay
+  // que tenerlo ANTES de subir nada. Se reserva al montar; si el propietario ya
+  // tenía uno, el RPC devuelve ese mismo con lo que había subido.
+  const [solicitudId, setSolicitudId] = useState<string | null>(borrador?.id ?? null)
+  const [errorReserva, setErrorReserva] = useState<string | null>(null)
+
+  useEffect(() => {
+    let vigente = true
+    if (solicitudId) return
+    reservarSolicitudRenta(unidadId).then(({ solicitudId: id, error }) => {
+      if (!vigente) return
+      if (error) { setErrorReserva(error); return }
+      setSolicitudId(id)
+    })
+    return () => { vigente = false }
+  }, [unidadId, solicitudId])
+
+  // Con STR el contrato de arrendamiento no aplica: cada reserva trae sus
+  // propios datos de huésped y se captura después de la autorización.
+  const pideDatosContrato = tipo === 'arrendamiento' || tipo === 'ambas'
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
     border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
+  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px', display: 'block' }
+  const rowStyle: React.CSSProperties   = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }
+
+  function setDato<K extends keyof DatosContratoForm>(k: K, v: string) {
+    setDatos(p => ({ ...p, [k]: v }))
+  }
+
+  /**
+   * Sube cada archivo elegido al borrador. El primer segmento del path debe ser
+   * la unidad y el segundo la solicitud: así lo exige la policy del bucket.
+   */
+  async function agregarArchivos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    if (!solicitudId) { notify({ variant: 'error', title: 'Error', text: 'Todavía se está preparando la solicitud. Intentá de nuevo en un momento.' }); return }
+    if (fileRef.current) fileRef.current.value = ''
+
+    // Los cupos se calculan ANTES del ciclo: `docs` es el estado capturado en
+    // este render y no se actualiza mientras subimos (setDocs es asíncrono), así
+    // que comprobar `docs.length` dentro del bucle lee siempre el mismo número y
+    // deja pasar toda una selección múltiple por encima del tope.
+    const disponibles = MAX_DOCS - docs.length
+    if (disponibles <= 0) {
+      notify({ variant: 'warning', title: 'Máximo alcanzado', text: `Puedes anexar hasta ${MAX_DOCS} documentos.` })
+      return
+    }
+    const todos = Array.from(files)
+    const elegidos = todos.slice(0, disponibles)
+    if (todos.length > elegidos.length) {
+      notify({
+        variant: 'warning',
+        title: 'Máximo alcanzado',
+        text: `Puedes anexar hasta ${MAX_DOCS} documentos: se tomarán ${elegidos.length} de los ${todos.length} seleccionados.`,
+      })
+    }
+
+    setSubiendo(true)
+    for (const file of elegidos) {
+      if (file.size > MAX_DOC_BYTES) {
+        notify({ variant: 'error', title: 'Archivo muy grande', text: `${file.name} excede el límite de 10 MB.` })
+        continue
+      }
+      // Magic-byte check: defiende contra payloads renombrados (.html → .pdf).
+      const magic = await validateFileMagic(file, 'document')
+      if (!magic.ok) { notify({ variant: 'error', title: 'Error', text: `${file.name}: ${magic.reason}` }); continue }
+
+      const contentType = resolveUploadContentType(magic.detected, file.name)
+      const path = buildUploadPath(`${unidadId}/${solicitudId}`, file.name)
+      const { error } = await uploadRentaDoc(path, file, { contentType })
+      if (error) { notify({ variant: 'error', title: 'Error', text: `No se pudo subir ${file.name}: ${error}` }); continue }
+
+      // S6 fase 2: se persiste el path bare; la lectura firma con useSignedUrl.
+      setDocs(prev => [...prev, {
+        path, nombre: file.name, etiqueta: null, mime: contentType, size: file.size,
+      }])
+    }
+    setSubiendo(false)
+  }
+
+  async function quitarArchivo(path: string) {
+    // Mientras la solicitud es borrador el propietario puede borrar del bucket;
+    // al enviarla, la policy lo impide (y por eso no hay este botón después).
+    await removeRentaDocs([path])
+    setDocs(prev => prev.filter(d => d.path !== path))
+  }
 
   async function submit() {
+    if (!solicitudId) { notify({ variant: 'error', title: 'Error', text: 'La solicitud no está lista todavía.' }); return }
+    if (pideDatosContrato) {
+      if (!datos.arrendatario_nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'El nombre del arrendatario es requerido.' }); return }
+      if (!datos.monto_renta || isNaN(Number(datos.monto_renta))) { notify({ variant: 'error', title: 'Error', text: 'Ingresa el monto de renta.' }); return }
+      if (!datos.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'La fecha de inicio es requerida.' }); return }
+      if (datos.fecha_fin && datos.fecha_fin < datos.fecha_inicio) { notify({ variant: 'error', title: 'Error', text: 'La fecha fin no puede ser anterior a la de inicio.' }); return }
+    }
+
     setSaving(true)
-    const { error } = await createCondominioRow('solicitud_renta_unidad', {
-      company_id: companyId,
-      project_id: proyectoId,
-      unidad_id: unidadId,
-      cliente_id: clienteId || null,
-      tipo_renta: tipo,
+    const { error } = await enviarSolicitudRenta({
+      solicitudId,
+      tipoRenta: tipo,
       motivo: motivo.trim() || null,
+      documentos: docs.map(({ path, nombre, etiqueta, mime, size }) => ({ path, nombre, etiqueta, mime, size })),
+      ...(pideDatosContrato ? {
+        arrendatarioNombre: datos.arrendatario_nombre.trim(),
+        arrendatarioIdentificacion: datos.arrendatario_identificacion.trim() || null,
+        arrendatarioTelefono: datos.arrendatario_telefono.trim() || null,
+        arrendatarioEmail: datos.arrendatario_email.trim() || null,
+        montoRenta: Number(datos.monto_renta),
+        deposito: datos.deposito ? Number(datos.deposito) : null,
+        diaPago: Number(datos.dia_pago) || 1,
+        fechaInicio: datos.fecha_inicio,
+        fechaFin: datos.fecha_fin || null,
+        notas: datos.notas_contrato.trim() || null,
+        responsables: resp,
+      } : {}),
     })
     setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    if (error) { notify({ variant: 'error', title: 'Error', text: error }); return }
     notify({ variant: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', duration: 2000 })
     onSolicitudChange()
   }
 
   return (
-    <div style={{ maxWidth: '520px' }}>
+    <div style={{ maxWidth: '620px' }}>
       <div style={{ marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>
           🔑 Solicitar autorización de renta
@@ -170,6 +343,16 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           Para gestionar contratos o reservas en tu unidad, primero debes solicitar autorización a la administración.
         </p>
       </div>
+
+      {errorReserva && (
+        <div style={{
+          background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '16px',
+          fontSize: '13px', color: 'var(--at-danger)',
+        }}>
+          No se pudo preparar la solicitud: {errorReserva}
+        </div>
+      )}
 
       {prevBaja && (
         <div style={{
@@ -224,13 +407,175 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
         />
       </div>
 
+      {/* Datos del contrato: viajan con la solicitud para que la administración
+        * evalúe con información real y, al aprobar, cree el contrato sin
+        * re-teclear nada (RPC aprobar_solicitud_renta). */}
+      {pideDatosContrato && (
+        <div style={{
+          border: '1.5px solid var(--at-line)', borderRadius: '12px',
+          padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+            📄 Datos del arrendamiento
+          </div>
+          <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '14px' }}>
+            Con estos datos la administración evalúa la solicitud y, al aprobarla, genera el contrato de tu unidad.
+          </div>
+
+          <div style={rowStyle}>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Nombre del arrendatario *</label>
+              <input style={fieldStyle} aria-label="Nombre del arrendatario *" value={datos.arrendatario_nombre} onChange={e => setDato('arrendatario_nombre', e.target.value)} placeholder="Nombre completo" />
+            </div>
+            <div>
+              <label style={labelStyle}>DPI / Identificación</label>
+              <input style={fieldStyle} aria-label="DPI / Identificación" value={datos.arrendatario_identificacion} onChange={e => setDato('arrendatario_identificacion', e.target.value)} placeholder="Número de documento" />
+            </div>
+            <div>
+              <label style={labelStyle}>Teléfono</label>
+              <input style={fieldStyle} aria-label="Teléfono del arrendatario" value={datos.arrendatario_telefono} onChange={e => setDato('arrendatario_telefono', e.target.value)} placeholder="+502…" />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Email</label>
+              <input style={fieldStyle} type="email" aria-label="Email del arrendatario" value={datos.arrendatario_email} onChange={e => setDato('arrendatario_email', e.target.value)} placeholder="correo@ejemplo.com" />
+            </div>
+            <div>
+              <label style={labelStyle}>Monto de renta *</label>
+              <input style={fieldStyle} type="number" min={0} step="0.01" aria-label="Monto de renta *" value={datos.monto_renta} onChange={e => setDato('monto_renta', e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={labelStyle}>Depósito</label>
+              <input style={fieldStyle} type="number" min={0} step="0.01" aria-label="Depósito" value={datos.deposito} onChange={e => setDato('deposito', e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={labelStyle}>Día de pago (1-28)</label>
+              <input style={fieldStyle} type="number" min={1} max={28} aria-label="Día de pago (1-28)" value={datos.dia_pago} onChange={e => setDato('dia_pago', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha inicio *</label>
+              <input style={fieldStyle} type="date" aria-label="Fecha inicio *" value={datos.fecha_inicio} onChange={e => setDato('fecha_inicio', e.target.value)} />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Fecha fin (opcional)</label>
+              <input style={fieldStyle} type="date" aria-label="Fecha fin (opcional)" value={datos.fecha_fin} onChange={e => setDato('fecha_fin', e.target.value)} />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>Notas</label>
+              <input style={fieldStyle} aria-label="Notas del contrato" value={datos.notas_contrato} onChange={e => setDato('notas_contrato', e.target.value)} placeholder="Condiciones especiales, observaciones…" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quién paga qué. Es la fuente más común de conflicto entre propietario e
+        * inquilino, así que se pacta ANTES de autorizar y queda en el contrato. */}
+      {pideDatosContrato && (
+        <div style={{
+          border: '1.5px solid var(--at-line)', borderRadius: '12px',
+          padding: '16px', marginBottom: '18px', background: 'var(--at-surface-2)',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+            🧾 Responsable del pago de servicios
+          </div>
+          <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '14px' }}>
+            Indica quién cubre cada servicio durante el arrendamiento. Queda registrado en el contrato.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+            {SERVICIOS.map(sv => {
+              const clave = sv.key.replace('resp_', '') as keyof ResponsablesServicios
+              return (
+                <div key={sv.key}>
+                  <label style={labelStyle}>{sv.icon} {sv.label}</label>
+                  <select
+                    style={{ ...fieldStyle, cursor: 'pointer' }}
+                    aria-label={`Responsable de ${sv.label}`}
+                    value={resp[clave]}
+                    onChange={e => setResp(p => ({ ...p, [clave]: e.target.value as ResponsableServicio }))}
+                  >
+                    <option value="propietario">Propietario</option>
+                    <option value="inquilino">Inquilino</option>
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Documentos de respaldo para evaluación y archivo de la administración. */}
+      <div style={{
+        border: '1.5px solid var(--at-line)', borderRadius: '12px',
+        padding: '16px', marginBottom: '18px',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '2px' }}>
+          📎 Documentos para la administración
+        </div>
+        <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '12px' }}>
+          Anexa el respaldo que la administración necesita para evaluar y archivar tu solicitud
+          (DPI del arrendatario, contrato firmado, carta de responsabilidad…).
+          Hasta {MAX_DOCS} archivos PDF, Word, Excel o imagen de 10 MB cada uno.
+          Una vez enviada la solicitud ya no podrás cambiarlos.
+        </div>
+
+        {docs.map(d => (
+          <div key={d.path} style={{
+            display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+            padding: '10px 12px', marginBottom: '8px',
+            background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px',
+          }}>
+            <span style={{ fontSize: '17px' }}>{fileIcon(d.nombre)}</span>
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.nombre}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{d.size != null ? `${(d.size / 1024).toFixed(0)} KB` : 'Subido'}</div>
+            </div>
+            <input
+              style={{ ...fieldStyle, flex: '1 1 180px', width: 'auto', padding: '7px 10px', fontSize: '12.5px' }}
+              value={d.etiqueta ?? ''}
+              onChange={e => setDocs(prev => prev.map(x => x.path === d.path ? { ...x, etiqueta: e.target.value } : x))}
+              placeholder="Etiqueta (ej. DPI del arrendatario)"
+              aria-label={`Etiqueta de ${d.nombre}`}
+            />
+            <button
+              type="button"
+              onClick={() => quitarArchivo(d.path)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px', color: 'var(--at-danger)' }}
+              title="Quitar"
+            >🗑️</button>
+          </div>
+        ))}
+
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept={ACCEPT_DOCS}
+          onChange={e => agregarArchivos(e.target.files)}
+          style={{ display: 'none' }}
+        />
+        {docs.length < MAX_DOCS && (
+          <button
+            type="button"
+            disabled={subiendo || !solicitudId}
+            onClick={() => fileRef.current?.click()}
+            style={{
+              padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)',
+              border: '1.5px dashed var(--at-line)', borderRadius: '8px',
+              fontSize: '13px', fontWeight: 600,
+              cursor: subiendo || !solicitudId ? 'not-allowed' : 'pointer',
+              opacity: subiendo || !solicitudId ? 0.6 : 1,
+            }}
+          >{subiendo ? 'Subiendo…' : '+ Agregar documento'}</button>
+        )}
+      </div>
+
       <button
         onClick={submit}
-        disabled={saving}
+        disabled={saving || subiendo || !solicitudId}
         style={{
           padding: '10px 24px', background: 'var(--at-accent-hover)', color: 'white',
           border: 'none', borderRadius: '9px', fontWeight: 600, fontSize: '14px',
-          cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+          cursor: saving || subiendo || !solicitudId ? 'not-allowed' : 'pointer',
+          opacity: saving || subiendo || !solicitudId ? 0.7 : 1,
         }}
       >{saving ? 'Enviando…' : 'Enviar solicitud'}</button>
     </div>
@@ -239,7 +584,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId, clienteId, solicitudRenta, onSolicitudChange }: Props) {
+export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId, solicitudRenta, onSolicitudChange }: Props) {
 
   // Determine allowed sub-tabs based on authorization
   const tipoAprobado = solicitudRenta?.estado === 'aprobada'
@@ -629,15 +974,16 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   // ── State: no authorization or rejected ─────────────────────────────────────
 
-  if (!solicitudRenta || solicitudRenta.estado === 'rechazada' || solicitudRenta.estado === 'baja') {
+  // El borrador es una solicitud a medio llenar que el propietario reservó para
+  // poder adjuntar: se retoma en el formulario, no se muestra como enviada.
+  if (!solicitudRenta || solicitudRenta.estado === 'borrador'
+      || solicitudRenta.estado === 'rechazada' || solicitudRenta.estado === 'baja') {
     return (
       <div>
         {header}
         <SolicitudForm
           unidadId={unidadId}
-          proyectoId={proyectoId}
-          companyId={companyId}
-          clienteId={clienteId}
+          borrador={solicitudRenta?.estado === 'borrador' ? solicitudRenta : null}
           onSolicitudChange={onSolicitudChange}
           prevRechazada={solicitudRenta?.estado === 'rechazada' ? solicitudRenta : null}
           prevBaja={solicitudRenta?.estado === 'baja' ? solicitudRenta : null}
@@ -678,6 +1024,14 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             }}
           >{dandoBaja ? 'Retirando…' : 'Retirar solicitud'}</button>
         </div>
+
+        {/* Lo que se envió, en modo lectura: el propietario debe poder revisar
+          * los datos y adjuntos que la administración está evaluando. */}
+        <div style={{ maxWidth: '520px' }}>
+          <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+          <ResponsablesServiciosDetalle fuente={solicitudRenta} />
+          <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
+        </div>
       </div>
     )
   }
@@ -709,6 +1063,14 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             opacity: dandoBaja ? 0.6 : 1,
           }}
         >{dandoBaja ? 'Dando de baja…' : 'Dar de baja la autorización'}</button>
+      </div>
+
+      {/* Respaldo de la solicitud aprobada — queda a la vista de ambas partes. */}
+      <div style={{ maxWidth: '620px', marginBottom: '18px' }}>
+        <DatosContratoSolicitud solicitud={solicitudRenta} titulo="📄 Datos del arrendamiento enviados" />
+        <ResponsablesServiciosDetalle fuente={solicitudRenta} />
+        <DocumentosSolicitudRenta documentos={documentosDe(solicitudRenta)} titulo="📎 Documentos enviados" />
+        <EstadoContratoSolicitud solicitud={solicitudRenta} />
       </div>
 
       {/* Sub-tabs */}
@@ -812,6 +1174,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <button onClick={() => deleteCA(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
+                <ResponsablesServiciosDetalle fuente={c} compacto />
                 {c.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--at-ink-3)', background: 'var(--at-surface-2)', borderRadius: '6px', padding: '8px' }}>{c.notas}</div>}
               </div>
             )

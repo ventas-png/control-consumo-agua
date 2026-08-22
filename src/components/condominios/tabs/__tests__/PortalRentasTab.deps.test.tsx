@@ -38,6 +38,11 @@ vi.mock('../../../../domain/portal/inquilinos', () => ({
   quitarInquilino: vi.fn(),
 }))
 vi.mock('../../../shared/ImageUploader', () => ({ ImageUploader: () => null }))
+vi.mock('../../../../domain/portal/solicitudRenta', () => ({
+  reservarSolicitudRenta: vi.fn(async () => ({ solicitudId: 'sol-1', error: null })),
+  enviarSolicitudRenta: vi.fn(async () => ({ error: null })),
+  descartarSolicitudRenta: vi.fn(async () => ({ error: null })),
+}))
 
 const { PortalRentasTab } = await import('../PortalRentasTab')
 
@@ -49,7 +54,7 @@ function solicitud(tipo: string | null): SolicitudRentaUnidad | null {
 function tab(tipo: string | null) {
   return (
     <PortalRentasTab
-      unidadId="u1" unidadNombre="Apto. 2A" proyectoId="p1" companyId="c1" clienteId="cli-1"
+      unidadId="u1" unidadNombre="Apto. 2A" proyectoId="p1" companyId="c1"
       solicitudRenta={solicitud(tipo)} onSolicitudChange={() => {}}
     />
   )
