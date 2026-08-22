@@ -21,7 +21,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  VARIABLES_CLASE,
   VARIABLES_RLS,
+  VARIABLES_TENANT,
   cargarCobertura,
   decidirPreflight,
   motivoSinSecretos,
@@ -32,7 +34,7 @@ const COBERTURA = cargarCobertura()
 const REF_SANDBOX = 'sandboxdeprueba'
 const REF_PRODUCCION = COBERTURA.refProduccionProhibido
 
-/** Entorno con las SIETE variables presentes y un destino coherente. */
+/** Entorno con las QUINCE variables presentes y un destino coherente. */
 const CON_SECRETOS = {
   RLS_SUPABASE_URL: `https://${REF_SANDBOX}.supabase.co`,
   RLS_SUPABASE_ANON_KEY: 'anon-de-juguete',
@@ -41,26 +43,70 @@ const CON_SECRETOS = {
   RLS_USER_A_PASSWORD: 'clave-a',
   RLS_USER_B_EMAIL: 'b@sandbox.invalid',
   RLS_USER_B_PASSWORD: 'clave-b',
+  RLS_USER_PAQ_EMAIL: 'paq@sandbox.invalid',
+  RLS_USER_PAQ_PASSWORD: 'clave-paq',
+  RLS_USER_CORR_EMAIL: 'corr@sandbox.invalid',
+  RLS_USER_CORR_PASSWORD: 'clave-corr',
+  RLS_USER_ADMIN_EMAIL: 'admin@sandbox.invalid',
+  RLS_USER_ADMIN_PASSWORD: 'clave-admin',
+  RLS_USER_OWNER_EMAIL: 'owner@sandbox.invalid',
+  RLS_USER_OWNER_PASSWORD: 'clave-owner',
 }
 
 /** Azúcar: `decidirPreflight` con la cobertura real siempre enchufada. */
 const decidir = (env) => decidirPreflight(env, COBERTURA)
 
 describe('el contrato de variables', () => {
-  it('son SIETE, y RLS_EXPECTED_PROJECT_REF es una de ellas', () => {
+  it('son SIETE de tenant, y RLS_EXPECTED_PROJECT_REF es una de ellas', () => {
     // No es una credencial: es la DECLARACIÓN del proyecto. Sin ella, cambiar el
     // secreto de la URL bastaría para que el harness —que hace INSERT, UPDATE y
     // DELETE— escribiera en otro proyecto sin que nada lo notara.
-    expect(VARIABLES_RLS).toHaveLength(7)
-    expect(VARIABLES_RLS).toContain('RLS_EXPECTED_PROJECT_REF')
+    expect(VARIABLES_TENANT).toHaveLength(7)
+    expect(VARIABLES_TENANT).toContain('RLS_EXPECTED_PROJECT_REF')
   })
 
-  it('el fixture de prueba cubre exactamente las siete', () => {
+  it('son OCHO del gate por clase: cuatro usuarios × email y contraseña', () => {
+    expect(VARIABLES_CLASE).toHaveLength(8)
+    for (const quien of ['PAQ', 'CORR', 'ADMIN', 'OWNER']) {
+      expect(VARIABLES_CLASE).toContain(`RLS_USER_${quien}_EMAIL`)
+      expect(VARIABLES_CLASE).toContain(`RLS_USER_${quien}_PASSWORD`)
+    }
+  })
+
+  it('las quince son EXIGIBLES: ninguna es opcional', () => {
+    // El punto entero del hallazgo: mientras las ocho del gate fueron
+    // opcionales, su suite se auto-saltaba y el job quedaba verde con 13
+    // pruebas omitidas.
+    expect(VARIABLES_RLS).toHaveLength(15)
+    expect(VARIABLES_RLS).toEqual([...VARIABLES_TENANT, ...VARIABLES_CLASE])
+  })
+
+  it('el fixture de prueba cubre exactamente las quince', () => {
     expect(Object.keys(CON_SECRETOS).sort()).toEqual([...VARIABLES_RLS].sort())
+  })
+
+  it('falta CUALQUIERA de las quince → el job falla', () => {
+    for (const v of VARIABLES_RLS) {
+      const env = { ...CON_SECRETOS, GITHUB_ACTOR: 'ventas-png', ES_FORK: 'false' }
+      delete env[v]
+      const veredicto = decidirPreflight(env, COBERTURA)
+      expect(veredicto.decision, `sin ${v} el job debería fallar`).toBe('fail')
+      expect(veredicto.faltan).toContain(v)
+    }
+  })
+
+  it('el resumen de una falta del gate explica QUÉ deja de verificarse', () => {
+    const env = { ...CON_SECRETOS, GITHUB_ACTOR: 'ventas-png', ES_FORK: 'false' }
+    delete env.RLS_USER_CORR_PASSWORD
+    const md = resumenMarkdown(decidirPreflight(env, COBERTURA))
+    expect(md).toContain('RLS_USER_CORR_PASSWORD')
+    expect(md).toContain('Gate por clase')
+    // Un mensaje que sólo lista nombres de variable no dice por qué importa.
+    expect(md).toContain('notificación legal')
   })
 })
 
-describe('decidirPreflight — con las siete variables y destino declarado', () => {
+describe('decidirPreflight — con las quince variables y destino declarado', () => {
   it('ejecuta el harness en un PR interno', () => {
     const v = decidir({ ...CON_SECRETOS, ES_FORK: 'false', GITHUB_ACTOR: 'ventas-png' })
     expect(v.decision).toBe('run')

@@ -73,6 +73,37 @@ const A_PASS = process.env.RLS_USER_A_PASSWORD
 const B_EMAIL = process.env.RLS_USER_B_EMAIL
 const B_PASS = process.env.RLS_USER_B_PASSWORD
 
+// ── Gate por CLASE en paquetes_recibidos (motor único, 20260829000600) ───────
+// Hacen falta CUATRO usuarios de la MISMA empresa, porque hay dos gates
+// distintos que comprobar y ninguno se expresa con A/B (empresas distintas):
+//
+//   · SELECT/INSERT/UPDATE se gobiernan por PERMISO de la clase. Solo distingue
+//     a usuarios SIN rol admin: `user_has_permission` devuelve true a todo para
+//     super_admin/company_owner/admin (20260518000008), así que un admin no
+//     sirve para probarlo.
+//   · DELETE se gobierna por ROL: correspondencia solo la borra company_owner.
+//     Aquí sí hace falta un admin, para ver que NO puede.
+//
+//   RLS_USER_PAQ_*    rol granular (operator o similar) con condominios.tab.paqueteria
+//   RLS_USER_CORR_*   rol granular con condominios.tab.correspondencia
+//   RLS_USER_ADMIN_*  rol admin de esa misma empresa
+//   RLS_USER_OWNER_*  rol company_owner de esa misma empresa
+const PAQ_EMAIL = process.env.RLS_USER_PAQ_EMAIL
+const PAQ_PASS = process.env.RLS_USER_PAQ_PASSWORD
+const CORR_EMAIL = process.env.RLS_USER_CORR_EMAIL
+const CORR_PASS = process.env.RLS_USER_CORR_PASSWORD
+const ADMIN_EMAIL = process.env.RLS_USER_ADMIN_EMAIL
+const ADMIN_PASS = process.env.RLS_USER_ADMIN_PASSWORD
+const OWNER_EMAIL = process.env.RLS_USER_OWNER_EMAIL
+const OWNER_PASS = process.env.RLS_USER_OWNER_PASSWORD
+// NO hay un `CLASE_ENABLED` aparte. Lo hubo, y con él un
+// `describe.skipIf(!CLASE_ENABLED)` que dejaba el job VERDE con 13 pruebas
+// omitidas mientras los ocho secretos no existieran: el mismo falso verde por
+// omisión que el resto de este archivo eliminó, sólo que un nivel más abajo.
+// Las ocho variables son ahora parte del conjunto que exige
+// `exigirDestinoDeclarado`, así que o están las quince y corre TODO, o el
+// preflight deja el job en rojo antes de instalar nada.
+
 // Se evalúa en tiempo de módulo, así que ocurre antes que cualquier
 // `createClient`: con un destino rechazado esto LANZA y no se abre ni una
 // conexión. Ver `./destino.ts` y `./__tests__/destinoHarness.test.ts`.
@@ -84,6 +115,14 @@ const { habilitado: ENABLED } = exigirDestinoDeclarado({
   RLS_USER_A_PASSWORD: A_PASS,
   RLS_USER_B_EMAIL: B_EMAIL,
   RLS_USER_B_PASSWORD: B_PASS,
+  RLS_USER_PAQ_EMAIL: PAQ_EMAIL,
+  RLS_USER_PAQ_PASSWORD: PAQ_PASS,
+  RLS_USER_CORR_EMAIL: CORR_EMAIL,
+  RLS_USER_CORR_PASSWORD: CORR_PASS,
+  RLS_USER_ADMIN_EMAIL: ADMIN_EMAIL,
+  RLS_USER_ADMIN_PASSWORD: ADMIN_PASS,
+  RLS_USER_OWNER_EMAIL: OWNER_EMAIL,
+  RLS_USER_OWNER_PASSWORD: OWNER_PASS,
 })
 
 // UUID que NO pertenece a ninguna empresa: cualquier company_id ≠ get_my_company_id()
@@ -1078,6 +1117,267 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Gate por CLASE en paquetes_recibidos (motor único, 20260829000600)
+// ════════════════════════════════════════════════════════════════════════════
+// Que las policies estén ESCRITAS como deben lo verifica
+// src/__tests__/recepcionMotorUnicoRls.test.ts; que se COMPORTEN así se prueba
+// aquí (Supabase real) y en scripts/rls-recepcion-sandbox.sh (Postgres
+// desechable, sin secretos).
+//
+// LAS PRECONDICIONES SON PARTE DE LA PRUEBA. Los cuatro usuarios tienen que
+// pertenecer a la MISMA empresa y tener los roles esperados; si no, un "no ve
+// la otra clase" podría estar pasando por aislamiento de tenant o por falta del
+// rol, y no por el gate que se quiere comprobar. Por eso se afirman antes.
+//
+// NO DESTRUCTIVO: cada escenario siembra su propia fila desechable con quien sí
+// tiene permiso y la limpia al final. Nunca toca datos preexistentes.
+describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox)', () => {
+  let paqUser: SupabaseClient    // rol granular, permiso de paquetería
+  let corrUser: SupabaseClient   // rol granular, permiso de correspondencia
+  let adminUser: SupabaseClient  // rol admin de la misma empresa
+  let ownerUser: SupabaseClient  // rol company_owner de la misma empresa
+
+  /** Scope para sembrar (empresa/proyecto/unidad). */
+  let scopeCorr: { company_id: string; project_id: string } | null = null
+  let scopePaq: { company_id: string; project_id: string; unidad_id: string } | null = null
+  const basura: Array<{ cliente: () => SupabaseClient; id: string }> = []
+  /** Motivo por el que el sandbox no sirve, o null. Ver el probe de beforeAll. */
+  let faltaEsquema: string | null = null
+
+  /** Fila `app_users` del usuario autenticado (rol + empresa). */
+  async function perfil(c: SupabaseClient): Promise<{ role: string; company_id: string }> {
+    const { data } = await c.from('app_users').select('role, company_id').eq('id', await userId(c)).maybeSingle()
+    const p = data as { role: string; company_id: string } | null
+    if (!p) throw new Error('el usuario no se ve a sí mismo en app_users')
+    return p
+  }
+
+  async function tienePermiso(c: SupabaseClient, key: string): Promise<boolean> {
+    const { data } = await c.rpc('user_has_permission', { perm_key: key })
+    return data === true
+  }
+
+  /** Siembra una fila de la clase indicada y la deja anotada para limpiar. */
+  async function sembrar(
+    c: SupabaseClient, clase: 'paquete' | 'correspondencia',
+  ): Promise<string> {
+    // Sin scope no se puede sembrar nada. Se dice; el `!` de antes convertía
+    // esto en un `TypeError: Cannot read properties of null`, que no explica
+    // nada — y así fue como una edición que borró la asignación de `scopeCorr`
+    // pasó por un fallo del sandbox durante una corrida entera.
+    const alcance = clase === 'correspondencia' ? scopeCorr : scopePaq
+    expect(alcance, `no se resolvió el scope para sembrar ${clase} (ver beforeAll)`).not.toBeNull()
+
+    const fila: Record<string, unknown> = clase === 'correspondencia'
+      ? {
+          company_id: scopeCorr!.company_id, project_id: scopeCorr!.project_id,
+          clase, destinatario_tipo: 'administracion', unidad_id: null,
+          tipo: 'carta', descripcion: 'RLS harness — desechable',
+          estado: 'pendiente', direccion: 'entrante',
+        }
+      : {
+          company_id: scopePaq!.company_id, project_id: scopePaq!.project_id,
+          clase, destinatario_tipo: 'unidad', unidad_id: scopePaq!.unidad_id,
+          tipo: 'paquete', descripcion: 'RLS harness — desechable',
+          estado: 'pendiente', direccion: 'entrante',
+        }
+    // Sin esquema no tiene sentido intentarlo: el INSERT devolvería un
+    // PGRST204 que parece una prueba rota y no lo es.
+    if (faltaEsquema) throw new Error(faltaEsquema)
+    const { data, error } = await c.from('paquetes_recibidos').insert(fila).select('id')
+    expect(error, `quien tiene el permiso de ${clase} debe poder crearla`).toBeNull()
+    const id = (data?.[0] as { id: string } | undefined)?.id
+    expect(id, 'la siembra debe devolver el id').toBeTruthy()
+    basura.push({ cliente: () => ownerUser, id: id! })
+    return id!
+  }
+
+  beforeAll(async () => {
+    ;[paqUser, corrUser, adminUser, ownerUser] = await Promise.all([
+      signedInClient(PAQ_EMAIL!, PAQ_PASS!),
+      signedInClient(CORR_EMAIL!, CORR_PASS!),
+      signedInClient(ADMIN_EMAIL!, ADMIN_PASS!),
+      signedInClient(OWNER_EMAIL!, OWNER_PASS!),
+    ])
+
+    // El scope se resuelve con el OWNER, no con los granulares. `projects` y
+    // `unidades` tienen su propia RLS y no hay ninguna garantía de que un
+    // `operator` las lea; si no las leyera, el scope quedaría nulo y los
+    // escenarios reventarían con un error que no habla del gate. El owner sí
+    // las ve, y las filas son de la misma empresa que los cuatro — cosa que las
+    // precondiciones comprueban justo debajo.
+    const { data: uni, error: eUni } = await ownerUser
+      .from('unidades').select('id, project_id, company_id').limit(1)
+    if (eUni) throw new Error(`no se pudo resolver la unidad del sandbox: ${eUni.message}`)
+    const u = uni?.[0] as { id: string; project_id: string; company_id: string } | undefined
+    if (!u) {
+      // Fail-closed: sin unidad no se puede sembrar la clase 'paquete'
+      // (`paquetes_unidad_por_clase_chk` la exige) y media suite no probaría
+      // nada. Antes esto dejaba `scopePaq` en null y el fallo aparecía después,
+      // disfrazado de otra cosa.
+      throw new Error(
+        'el sandbox no tiene ninguna unidad visible para el company_owner. ' +
+        'Corré scripts/seed-rls-sandbox.mjs: crea el proyecto y la unidad del gate por clase.',
+      )
+    }
+    scopePaq = { company_id: u.company_id, project_id: u.project_id, unidad_id: u.id }
+    // La correspondencia va dirigida a la administración, así que le basta el
+    // proyecto — pero tiene que ser el MISMO que el de la unidad, o el gate por
+    // clase se confundiría con el alcance por proyecto.
+    scopeCorr = { company_id: u.company_id, project_id: u.project_id }
+
+    // ── El sandbox tiene que traer el ESQUEMA del motor único ─────────────
+    // Se ANOTA, no se lanza. Lanzar aquí dejaba las once pruebas de abajo como
+    // OMITIDAS —`128 passed | 11 skipped`—, que es justo la señal que este
+    // harness existe para eliminar: el verificador trata cualquier skip como
+    // cobertura perdida, y un reporte con omitidas no distingue "no se pudo
+    // ejecutar" de "no se quiso". Anotándolo, cada prueba FALLA con la causa y
+    // el recuento de omitidas sigue en cero.
+    const { error: eEsquema } = await ownerUser
+      .from('paquetes_recibidos').select('clase, destinatario_tipo').limit(1)
+    faltaEsquema = eEsquema
+      ? `El sandbox RLS no tiene el esquema del motor único de recepción: ${eEsquema.message}. ` +
+        'Le faltan las seis migraciones del motor de recepción (20260828000300, ' +
+        '20260829000600, 20260830000000, 20260831000000, 20260901000000 y 20260902000000 — ' +
+        'no un rango: entre ellas se intercalan las de Renta), que son las que crean ' +
+        '`clase`, `destinatario_tipo` y las policies por clase. Aplicalas al proyecto del ' +
+        'harness (el de RLS_EXPECTED_PROJECT_REF, que NO es la rama de preview del PR) y, si ' +
+        "PostgREST sigue sin verlas, recargá su caché con NOTIFY pgrst, 'reload schema'."
+      : null
+  })
+
+  afterAll(async () => {
+    // Limpieza con el owner, que es quien puede borrar las dos clases.
+    for (const { cliente, id } of basura) {
+      await cliente().from('paquetes_recibidos').delete().eq('id', id)
+    }
+    await Promise.allSettled([
+      paqUser?.auth.signOut(), corrUser?.auth.signOut(),
+      adminUser?.auth.signOut(), ownerUser?.auth.signOut(),
+    ])
+  })
+
+  describe('precondiciones (sin esto, el resto no prueba lo que dice)', () => {
+    it('el sandbox trae el esquema del motor único', () => {
+      // La primera que se lee cuando el job se pone rojo. Dice qué falta y
+      // dónde, en vez de dejar seis PGRST204 que parecen pruebas rotas.
+      expect(faltaEsquema ?? null, faltaEsquema ?? '').toBeNull()
+    })
+
+    it('los cuatro usuarios son de la MISMA empresa', async () => {
+      const perfiles = await Promise.all([paqUser, corrUser, adminUser, ownerUser].map(perfil))
+      const empresas = new Set(perfiles.map(p => p.company_id))
+      expect(empresas.size, 'si fueran de empresas distintas, el aislamiento observado sería el de tenant').toBe(1)
+    })
+
+    it('los roles son los que cada gate necesita', async () => {
+      const [paq, corr, admin, owner] = await Promise.all(
+        [paqUser, corrUser, adminUser, ownerUser].map(perfil),
+      )
+      expect(admin.role).toBe('admin')
+      expect(owner.role).toBe('company_owner')
+      // Los granulares NO pueden ser admin: para un admin el helper de permisos
+      // dice true a todo y el gate de clase de SELECT/INSERT/UPDATE no se vería.
+      for (const g of [paq, corr]) {
+        expect(['admin', 'company_owner', 'super_admin', 'superadmin']).not.toContain(g.role)
+      }
+    })
+
+    it('los permisos efectivos son disjuntos entre los dos granulares', async () => {
+      expect(await tienePermiso(paqUser, 'condominios.tab.paqueteria')).toBe(true)
+      expect(await tienePermiso(paqUser, 'condominios.tab.correspondencia')).toBe(false)
+      expect(await tienePermiso(corrUser, 'condominios.tab.correspondencia')).toBe(true)
+      expect(await tienePermiso(corrUser, 'condominios.tab.paqueteria')).toBe(false)
+    })
+
+    it('el helper de permisos le dice true a TODO al admin (por eso DELETE va por rol)', async () => {
+      expect(await tienePermiso(adminUser, 'condominios.tab.correspondencia')).toBe(true)
+      expect(await tienePermiso(adminUser, 'permiso.que.no.existe')).toBe(true)
+    })
+  })
+
+  describe('SELECT / INSERT / UPDATE: gate por permiso de clase', () => {
+    it('cada granular ve SU clase y no la otra', async () => {
+      await sembrar(corrUser, 'correspondencia')
+      await sembrar(paqUser, 'paquete')
+
+      const { data: paqVeCorr } = await paqUser.from('paquetes_recibidos').select('id').eq('clase', 'correspondencia')
+      expect(paqVeCorr ?? []).toHaveLength(0)
+      const { data: paqVePaq } = await paqUser.from('paquetes_recibidos').select('id').eq('clase', 'paquete')
+      expect((paqVePaq ?? []).length, 'control positivo: sí ve la suya').toBeGreaterThan(0)
+
+      const { data: corrVePaq } = await corrUser.from('paquetes_recibidos').select('id').eq('clase', 'paquete')
+      expect(corrVePaq ?? []).toHaveLength(0)
+      const { data: corrVeCorr } = await corrUser.from('paquetes_recibidos').select('id').eq('clase', 'correspondencia')
+      expect((corrVeCorr ?? []).length, 'control positivo: sí ve la suya').toBeGreaterThan(0)
+    })
+
+    it('ninguno puede CREAR en la clase ajena', async () => {
+      const { error: e1 } = await paqUser.from('paquetes_recibidos').insert({
+        company_id: scopeCorr!.company_id, project_id: scopeCorr!.project_id,
+        clase: 'correspondencia', destinatario_tipo: 'administracion',
+        tipo: 'carta', descripcion: 'no debería entrar', estado: 'pendiente', direccion: 'entrante',
+      }).select('id')
+      expect(e1, 'el INSERT cross-clase debe ser rechazado').not.toBeNull()
+
+      const { error: e2 } = await corrUser.from('paquetes_recibidos').insert({
+        company_id: scopePaq!.company_id, project_id: scopePaq!.project_id,
+        unidad_id: scopePaq!.unidad_id, clase: 'paquete', destinatario_tipo: 'unidad',
+        tipo: 'paquete', descripcion: 'no debería entrar', estado: 'pendiente', direccion: 'entrante',
+      }).select('id')
+      expect(e2, 'el INSERT cross-clase debe ser rechazado').not.toBeNull()
+    })
+
+    it('reclasificar está bloqueado en LAS DOS direcciones', async () => {
+      // USING mira la fila vieja y WITH CHECK la nueva: mover de clase exige
+      // ambos permisos, y ninguno de los dos granulares los tiene.
+      const idCorr = await sembrar(corrUser, 'correspondencia')
+      const idPaq = await sembrar(paqUser, 'paquete')
+
+      const { data: aPaquete } = await corrUser
+        .from('paquetes_recibidos').update({ clase: 'paquete' }).eq('id', idCorr).select('id')
+      expect(aPaquete ?? [], 'correspondencia→paquetería debe quedar en 0 filas').toHaveLength(0)
+
+      const { data: aCorr } = await paqUser
+        .from('paquetes_recibidos').update({ clase: 'correspondencia' }).eq('id', idPaq).select('id')
+      expect(aCorr ?? [], 'paquetería→correspondencia debe quedar en 0 filas').toHaveLength(0)
+    })
+  })
+
+  describe('DELETE: quién puede destruir cada clase', () => {
+    it('admin SÍ borra paquetería (control positivo: nada cambió para paquetes)', async () => {
+      const id = await sembrar(paqUser, 'paquete')
+      const { data } = await adminUser.from('paquetes_recibidos').delete().eq('id', id).select('id')
+      expect(data ?? [], 'el admin conserva su capacidad de siempre').toHaveLength(1)
+    })
+
+    it('admin NO borra correspondencia', async () => {
+      // El caso central: mismo tenant, rol admin, y el helper de permisos
+      // diciéndole true a todo. Lo único que lo detiene es el gate por rol.
+      const id = await sembrar(corrUser, 'correspondencia')
+      const { data: borradas } = await adminUser.from('paquetes_recibidos').delete().eq('id', id).select('id')
+      expect(borradas ?? [], 'una notificación legal no la borra un admin').toHaveLength(0)
+
+      const { data: viva } = await corrUser.from('paquetes_recibidos').select('id').eq('id', id)
+      expect(viva ?? [], 'y la pieza sigue ahí').toHaveLength(1)
+    })
+
+    it('company_owner SÍ borra correspondencia (control positivo)', async () => {
+      const id = await sembrar(corrUser, 'correspondencia')
+      const { data } = await ownerUser.from('paquetes_recibidos').delete().eq('id', id).select('id')
+      expect(data ?? [], 'alguien tiene que poder corregir un registro errado').toHaveLength(1)
+    })
+
+    it('el granular no borra ni siquiera su propia clase', async () => {
+      // Borrar es competencia del rol, no del permiso de módulo.
+      const id = await sembrar(paqUser, 'paquete')
+      const { data } = await paqUser.from('paquetes_recibidos').delete().eq('id', id).select('id')
+      expect(data ?? []).toHaveLength(0)
+    })
   })
 })
 

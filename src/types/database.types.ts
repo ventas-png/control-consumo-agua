@@ -5339,96 +5339,6 @@ export type Database = {
         }
         Relationships: []
       }
-      correspondencia_condominio: {
-        Row: {
-          asunto: string
-          categoria: string
-          company_id: string
-          created_at: string
-          destinatario: string | null
-          estado: string
-          fecha: string
-          id: string
-          numero_guia: string | null
-          observaciones: string | null
-          prioridad: string
-          project_id: string
-          remitente: string | null
-          tipo: string
-          unidad_id: string | null
-        }
-        Insert: {
-          asunto: string
-          categoria?: string
-          company_id: string
-          created_at?: string
-          destinatario?: string | null
-          estado?: string
-          fecha?: string
-          id?: string
-          numero_guia?: string | null
-          observaciones?: string | null
-          prioridad?: string
-          project_id: string
-          remitente?: string | null
-          tipo?: string
-          unidad_id?: string | null
-        }
-        Update: {
-          asunto?: string
-          categoria?: string
-          company_id?: string
-          created_at?: string
-          destinatario?: string | null
-          estado?: string
-          fecha?: string
-          id?: string
-          numero_guia?: string | null
-          observaciones?: string | null
-          prioridad?: string
-          project_id?: string
-          remitente?: string | null
-          tipo?: string
-          unidad_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "correspondencia_condominio_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "correspondencia_condominio_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies_safe"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "correspondencia_condominio_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "mv_superadmin_empresa_counts"
-            referencedColumns: ["company_id"]
-          },
-          {
-            foreignKeyName: "correspondencia_condominio_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "correspondencia_condominio_unidad_id_fkey"
-            columns: ["unidad_id"]
-            isOneToOne: false
-            referencedRelation: "unidades"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       cuentas_bancarias: {
         Row: {
           activa: boolean
@@ -11114,16 +11024,21 @@ export type Database = {
           autorizado_documento: string | null
           autorizado_nombre: string | null
           autorizado_telefono: string | null
+          clase: string
           codigo_retiro: string | null
           company_id: string
           created_at: string
           descripcion: string
+          destinatario: string | null
+          destinatario_tipo: string
           direccion: string
           empresa_mensajeria: string | null
           entregado_a_nombre: string | null
           entregado_por: string | null
           entregado_via: string | null
           estado: string
+          fecha_limite: string | null
+          fecha_pieza: string | null
           firma_path: string | null
           fotos: string[] | null
           hora_entrega: string | null
@@ -11132,26 +11047,32 @@ export type Database = {
           notas: string | null
           notificado_at: string | null
           num_guia: string | null
+          prioridad: string
           project_id: string
           recibido_por: string | null
           remitente: string | null
           tipo: string
-          unidad_id: string
+          unidad_id: string | null
         }
         Insert: {
           autorizado_documento?: string | null
           autorizado_nombre?: string | null
           autorizado_telefono?: string | null
+          clase?: string
           codigo_retiro?: string | null
           company_id: string
           created_at?: string
           descripcion: string
+          destinatario?: string | null
+          destinatario_tipo?: string
           direccion?: string
           empresa_mensajeria?: string | null
           entregado_a_nombre?: string | null
           entregado_por?: string | null
           entregado_via?: string | null
           estado?: string
+          fecha_limite?: string | null
+          fecha_pieza?: string | null
           firma_path?: string | null
           fotos?: string[] | null
           hora_entrega?: string | null
@@ -11160,26 +11081,32 @@ export type Database = {
           notas?: string | null
           notificado_at?: string | null
           num_guia?: string | null
+          prioridad?: string
           project_id: string
           recibido_por?: string | null
           remitente?: string | null
           tipo?: string
-          unidad_id: string
+          unidad_id?: string | null
         }
         Update: {
           autorizado_documento?: string | null
           autorizado_nombre?: string | null
           autorizado_telefono?: string | null
+          clase?: string
           codigo_retiro?: string | null
           company_id?: string
           created_at?: string
           descripcion?: string
+          destinatario?: string | null
+          destinatario_tipo?: string
           direccion?: string
           empresa_mensajeria?: string | null
           entregado_a_nombre?: string | null
           entregado_por?: string | null
           entregado_via?: string | null
           estado?: string
+          fecha_limite?: string | null
+          fecha_pieza?: string | null
           firma_path?: string | null
           fotos?: string[] | null
           hora_entrega?: string | null
@@ -11188,11 +11115,12 @@ export type Database = {
           notas?: string | null
           notificado_at?: string | null
           num_guia?: string | null
+          prioridad?: string
           project_id?: string
           recibido_por?: string | null
           remitente?: string | null
           tipo?: string
-          unidad_id?: string
+          unidad_id?: string | null
         }
         Relationships: [
           {
@@ -18264,6 +18192,39 @@ export type Database = {
       }
     }
     Views: {
+      // Compatibilidad de SOLO LECTURA tras la unificación en paquetes_recibidos
+      // (migración 20260829000600). Las escrituras van a paquetes_recibidos con
+      // clase='correspondencia'; por eso aquí no hay Insert ni Update.
+      correspondencia_condominio: {
+        Row: {
+          asunto: string | null
+          categoria: string | null
+          company_id: string | null
+          created_at: string | null
+          creado_por: string | null
+          destinatario: string | null
+          empresa_mensajeria: string | null
+          entregado_a_nombre: string | null
+          entregado_por: string | null
+          entregado_via: string | null
+          estado: string | null
+          fecha: string | null
+          fecha_limite: string | null
+          firma_path: string | null
+          fotos: string[] | null
+          hora_entrega: string | null
+          id: string | null
+          numero_guia: string | null
+          observaciones: string | null
+          prioridad: string | null
+          project_id: string | null
+          recibido_por: string | null
+          remitente: string | null
+          tipo: string | null
+          unidad_id: string | null
+        }
+        Relationships: []
+      }
       companies_safe: {
         Row: {
           activa: boolean | null

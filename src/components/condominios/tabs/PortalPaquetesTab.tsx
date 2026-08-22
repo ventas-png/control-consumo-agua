@@ -10,7 +10,7 @@ import { useMediaScope } from '../../shared/MediaScopeContext'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
 import { SignaturePad } from '../../shared/SignaturePad'
-import type { PaqueteRecibido, EstadoPaquete, TipoPaquete } from '../../../types'
+import type { PaqueteRecibido, TipoPaquete } from '../../../types'
 
 interface Props {
   paquetes: PaqueteRecibido[]
@@ -19,13 +19,15 @@ interface Props {
   onRefresh: () => void
 }
 
-const ESTADO_CONFIG: Record<EstadoPaquete, { label: string; bg: string; color: string }> = {
+// Clave `string`: la fila del motor único puede traer el vocabulario de la otra
+// clase. Ver la nota en PaqueteriaTab.
+const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   pendiente: { label: 'Pendiente de retiro', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   entregado: { label: 'Recibido', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   devuelto:  { label: 'Devuelto', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
-const TIPO_CONFIG: Record<TipoPaquete, { label: string; icon: string }> = {
+const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   paquete:   { label: 'Paquete',   icon: '📦' },
   documento: { label: 'Documento', icon: '📄' },
   sobre:     { label: 'Sobre',     icon: '✉️' },
@@ -242,7 +244,7 @@ export function PortalPaquetesTab({ paquetes, unidadId, nombrePrefill = '', onRe
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {salidasOrden.map(p => {
-                const cfg = ESTADO_CONFIG[p.estado]
+                const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
                 const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
                 return (
                   <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.estado === 'pendiente' ? 'var(--at-accent-soft, var(--at-line))' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>

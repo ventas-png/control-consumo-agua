@@ -644,26 +644,10 @@ export interface EjecucionMantenimiento {
   created_at: string
 }
 
-export type TipoCorrespondencia = 'entrada' | 'salida'
-export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
-export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado'
-export interface CorrespondenciaCondominio {
-  id: string
-  company_id: string
-  project_id: string
-  tipo: TipoCorrespondencia
-  categoria: CategoriaCorrespondencia
-  asunto: string
-  remitente?: string | null
-  destinatario?: string | null
-  fecha: string
-  numero_guia?: string | null
-  prioridad: 'normal' | 'urgente'
-  estado: EstadoCorrespondencia
-  observaciones?: string | null
-  unidad_id?: string | null
-  created_at: string
-}
+// La correspondencia dejó de tener tabla y tipo propios en la migración
+// 20260829000600: es una CLASE de `PiezaRecepcion` (types/condominios/seguridad).
+// `CategoriaCorrespondencia` y `EstadoCorrespondencia` viven allí, junto al
+// resto del vocabulario del motor de recepción.
 
 export type TurnoNovedad = 'mañana' | 'tarde' | 'noche'
 export interface LibroNovedad {

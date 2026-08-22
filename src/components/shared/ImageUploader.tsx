@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent} from 'react'
 import { isNative } from '../../lib/platform'
-import { uploadCondominiosMedia, removeCondominiosMedia } from '../../domain/shared/storage'
+import { uploadCondominiosMedia, removeCondominiosMedia, uploadMedia, removeMedia } from '../../domain/shared/storage'
+import { BUCKET_MEDIA } from '../../domain/shared/buckets'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 import { SecureImage } from './SecureImage'
 import { useMediaScope } from './MediaScopeContext'
@@ -159,9 +160,15 @@ interface MultiProps {
   maxFiles?: number
   maxSizeMB?: number
   capture?: boolean
+  /**
+   * Bucket destino. Por defecto `condominios-media`, que autoriza por proyecto.
+   * Las evidencias de recepción pasan `recepcion-evidencias`, cuyo aislamiento
+   * es por pieza/unidad (20260831000000).
+   */
+  bucket?: string
 }
 
-export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false }: MultiProps) {
+export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA }: MultiProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -185,7 +192,10 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       for (const file of toUpload) {
         const blob = await compressImage(file)
         const path = buildUploadPath(`${projectId}/${folder}`, file.name, 'jpg')
-        const { error: upErr } = await uploadCondominiosMedia(path, blob, { contentType: 'image/jpeg' })
+        // upsert:false explícito: en `recepcion-evidencias` no hay policy de
+        // UPDATE (sustituir una prueba no es una operación que exista), así que
+        // un upsert fallaría en vez de sobrescribir.
+        const { error: upErr } = await uploadMedia(bucket, path, blob, { contentType: 'image/jpeg', upsert: false })
         if (upErr) { setError(upErr); break }
         // S6 phase 2: persist the bare path; SecureImage signs at render time.
         newUrls.push(path)
@@ -200,7 +210,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
 
   async function handleRemove(url: string) {
     const path = url.startsWith('http') ? url.match(/condominios-media\/(.+)$/)?.[1] : url
-    if (path) await removeCondominiosMedia([path])
+    if (path) await removeMedia(bucket, [path])
     onChange(values.filter(u => u !== url))
   }
 
@@ -229,7 +239,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
         {values.map(url => (
           <div key={url} style={{ position: 'relative', paddingBottom: '75%' }}>
-            <SecureImage src={url} alt=""
+            <SecureImage src={url} bucket={bucket} alt=""
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--at-line)', display: 'block' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button

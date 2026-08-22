@@ -6,7 +6,12 @@
 //     resolución sale de `state.byTable[tabla]` (lecturas) o `state.writes[tabla]`
 //     (insert/update/delete), y REGISTRA cada escritura en `state.calls` para que
 //     los tests asserten payloads (p. ej. el cliente_id del payment_request).
-//   • caller (anon + Authorization): solo `auth.getUser()` → `state.auth`.
+//   • caller (anon + Authorization): `auth.getUser()` → `state.auth` y `.rpc()`
+//     → `state.rpcsUsuario` (cayendo a `state.rpcs`). El `.rpc()` del caller
+//     existe porque notify-package autoriza preguntando a los helpers de RBAC
+//     CON EL JWT DEL USUARIO; sin poder responder distinto según quién pregunta,
+//     un test no puede distinguir "lo decidió la base sobre el llamante" de
+//     "lo decidió el service_role sobre nadie".
 //
 // El shape que espera cada lectura lo fija el test (lista u objeto), igual que el
 // patrón `byTable` de src/domain/condominios/__tests__/tabQueries.test.ts.
@@ -20,6 +25,8 @@ export interface FakeWriteCall {
 export interface FakeRpcCall {
   fn: string
   args: unknown
+  /** true si la llamada salió del cliente con el JWT del usuario, no del admin. */
+  comoUsuario?: boolean
 }
 
 export interface FakeSupabaseState {
@@ -40,6 +47,8 @@ export interface FakeSupabaseState {
   rpcCalls: FakeRpcCall[]
   /** Resolución de RPCs por nombre: `{ data, error }`. */
   rpcs: Record<string, unknown>
+  /** Resolución de RPCs llamadas POR EL CLIENTE DEL USUARIO (JWT). */
+  rpcsUsuario: Record<string, unknown>
   /** Resultado de caller.auth.getUser(). */
   auth: unknown
 }
@@ -47,7 +56,7 @@ export interface FakeSupabaseState {
 export function emptyState(): FakeSupabaseState {
   return {
     byTable: {}, readQueues: {}, writes: {}, calls: [],
-    rpcCalls: [], rpcs: {},
+    rpcCalls: [], rpcs: {}, rpcsUsuario: {},
     auth: { data: { user: null }, error: null },
   }
 }
@@ -89,9 +98,24 @@ function makeBuilder(state: FakeSupabaseState, table: string) {
 export function makeCreateClient(state: FakeSupabaseState) {
   return (_url: string, _key: string, opts?: { global?: unknown }) => {
     if (opts?.global) {
-      return { auth: { getUser: async () => state.auth } }
+      return {
+        auth: { getUser: async () => state.auth },
+        rpc: (fn: string, args?: unknown) => {
+          state.rpcCalls.push({ fn, args, comoUsuario: true })
+          const r = state.rpcsUsuario[fn] ?? state.rpcs[fn]
+          // Sin resolución declarada se DEVUELVE UN ERROR, no `{data:null}`:
+          // un helper de autorización que "no contesta" no puede parecerse a
+          // uno que contesta que no. Los tests declaran lo que quieren probar.
+          return Promise.resolve(r ?? { data: null, error: { message: `rpc ${fn} sin declarar en rpcsUsuario` } })
+        },
+      }
     }
     return {
+      // El admin también valida JWTs: notify-package hace
+      // `admin.auth.getUser(token)` para que GoTrue reconozca al llamante ANTES
+      // de abrirle un cliente propio. Comparte `state.auth` con el caller: es
+      // el mismo usuario visto por el mismo GoTrue.
+      auth: { getUser: async (_token?: string) => state.auth },
       from: (table: string) => makeBuilder(state, table),
       rpc: (fn: string, args?: unknown) => {
         state.rpcCalls.push({ fn, args })

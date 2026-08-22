@@ -28,7 +28,7 @@ import type {
   SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
-  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
+  PiezaRecepcion, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
@@ -113,10 +113,15 @@ export interface CondominiosTabContext {
   // condominios.tab.<tab>.<action> con fallback a platform.condominios.<action>.
   canCreate: (tabId: string) => boolean
   canEdit: (tabId: string) => boolean
+  /** Visibilidad del tab para el usuario. Un tab que muestra datos de OTRO tab
+   *  (bandeja unificada de recepción) tiene que preguntarlo antes de mezclarlos. */
+  canView: (tabId: string) => boolean
   canChangeStatus: (tabId: string) => boolean
   canApprove: (tabId: string) => boolean
   canDelete: (tabId: string) => boolean
   onRefresh: () => void | Promise<void>
+  /** Navega a otro tab (la URL es la fuente única del tab activo). */
+  irATab: (tabId: CondominioTab) => void
   // Contexto de proyecto / usuario
   proyectoId: string
   proyectoActual: Proyecto | undefined
@@ -192,7 +197,8 @@ export interface CondominiosTabContext {
   votaciones: Votacion[]
   sanciones: SancionCondominio[]
   planesMantenimiento: PlanMantenimiento[]
-  correspondencia: CorrespondenciaCondominio[]
+  /** Piezas de recepción de clase 'correspondencia' (mismo motor que `paquetes`). */
+  correspondencia: PiezaRecepcion[]
   libroNovedades: LibroNovedad[]
   acuerdos: SeguimientoAcuerdo[]
   vehiculos: VehiculoResidente[]
@@ -475,7 +481,7 @@ const DirectorioComunidadTab = lazy(() => import('./tabs/DirectorioComunidadTab'
 // Tipo `TabDef` garantiza coherencia; agregar/quitar tab no toca el monolito.
 export const TAB_REGISTRY: TabDef[] = [
   { id: 'panel', label: 'Panel', icon: '📊', render: (ctx) =>
-    <PanelGeneralTab cuotas={ctx.cuotas} tickets={ctx.tickets} visitantes={ctx.visitantes} amenidades={ctx.amenidades} reservas={ctx.reservas} polizas={ctx.polizas} inspecciones={ctx.inspecciones} gastos={ctx.gastos} paquetes={ctx.paquetes} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
+    <PanelGeneralTab cuotas={ctx.cuotas} tickets={ctx.tickets} visitantes={ctx.visitantes} amenidades={ctx.amenidades} reservas={ctx.reservas} polizas={ctx.polizas} inspecciones={ctx.inspecciones} gastos={ctx.gastos} paquetes={ctx.paquetes} correspondencia={ctx.correspondencia} moneda={ctx.moneda} proyectoNombre={ctx.proyectoActual?.nombre} /> },
   { id: 'cuotas', label: 'Cuotas', icon: '💳', render: (ctx) =>
     <CuotasTab cuotas={ctx.cuotas} unidades={ctx.unidadesProyecto} proyectos={ctx.proyectosActivos} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('cuotas')} canEdit={ctx.canEdit('cuotas')} onRefresh={ctx.onRefresh} /> },
   { id: 'visitantes', label: 'Visitantes', icon: '🚪', render: (ctx) =>
@@ -491,7 +497,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'mascotas', label: 'Mascotas', icon: '🐾', render: (ctx) =>
     <MascotasTab mascotas={ctx.mascotas} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('mascotas')} canEdit={ctx.canEdit('mascotas')} onRefresh={ctx.onRefresh} /> },
   { id: 'paqueteria', label: 'Paquetería', icon: '📦', render: (ctx) =>
-    <PaqueteriaTab paquetes={ctx.paquetes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('paqueteria')} canEdit={ctx.canEdit('paqueteria')} onRefresh={ctx.onRefresh} /> },
+    <PaqueteriaTab paquetes={ctx.paquetes} correspondencia={ctx.correspondencia} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('paqueteria')} canEdit={ctx.canEdit('paqueteria')} puedeVerCorrespondencia={ctx.canView('correspondencia')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'infracciones', label: 'Infracciones', icon: '⚖️', render: (ctx) =>
     <InfraccionesTab infracciones={ctx.infracciones} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} moneda={ctx.moneda} canCreate={ctx.canCreate('infracciones')} canEdit={ctx.canEdit('infracciones')} onRefresh={ctx.onRefresh} /> },
   { id: 'seguridad', label: 'Seguridad', icon: '🛡️', render: (ctx) =>
@@ -615,7 +621,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'portal', label: 'Portal Resid.', icon: '👤', render: (ctx) =>
     <PortalResidenteTab unidades={ctx.unidadesProyecto} cuotas={ctx.cuotas} tickets={ctx.tickets} amenidades={ctx.amenidades} reservas={ctx.reservas} bloqueosAmenidades={ctx.bloqueosAmenidades} visitantes={ctx.visitantes} anuncios={ctx.anuncios} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canEdit={ctx.canEdit('portal')} autorNombre={ctx.currentUser.name ?? ''} autorUserId={ctx.uid} onRefresh={ctx.onRefresh} /> },
   { id: 'correspondencia', label: 'Correspondencia', icon: '📬', render: (ctx) =>
-    <CorrespondenciaCondTab correspondencia={ctx.correspondencia} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('correspondencia')} canEdit={ctx.canEdit('correspondencia')} onRefresh={ctx.onRefresh} /> },
+    <CorrespondenciaCondTab correspondencia={ctx.correspondencia} paquetes={ctx.paquetes} unidades={ctx.unidadesProyecto} proyectoId={ctx.proyectoId} companyId={ctx.cid} userId={ctx.uid} canCreate={ctx.canCreate('correspondencia')} canEdit={ctx.canEdit('correspondencia')} puedeVerPaqueteria={ctx.canView('paqueteria')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'libro_novedades', label: 'Libro Novedades', icon: '📖', render: (ctx) =>
     <LibroNovedadesTab novedades={ctx.libroNovedades} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('libro_novedades')} canEdit={ctx.canEdit('libro_novedades')} onRefresh={ctx.onRefresh} /> },
   { id: 'acuerdos', label: 'Acuerdos', icon: '✅', render: (ctx) =>

@@ -39,6 +39,9 @@ describe('groupOf', () => {
   it('agrupa por prefijo las familias de tipos', () => {
     expect(groupOf('paquete_pendiente')).toBe('paquetes')
     expect(groupOf('paquete_retirado')).toBe('paquetes')
+    // La correspondencia es su propio grupo: un aviso de notificación legal no
+    // se lee igual que "llegó una caja".
+    expect(groupOf('correspondencia_pendiente')).toBe('correspondencia')
     expect(groupOf('cuota_emitida')).toBe('cobros')
     expect(groupOf('cuota_recordatorio')).toBe('cobros')
     expect(groupOf('recibo_agua_emitido')).toBe('cobros')

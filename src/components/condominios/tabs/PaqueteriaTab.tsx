@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import {
   createCondominioRowReturning,
@@ -7,34 +7,44 @@ import {
 } from '../../../domain/condominios/tabMutations'
 import { uploadCondominiosMedia } from '../../../domain/shared/storage'
 import { buildUploadPath } from '../../../lib/fileValidation'
-import { notifyPackage } from '../../../lib/paquetesNotify'
+import { avisarConReintento } from '../avisoRecepcion'
+import { crearRegistrador } from '../../../domain/condominios/registroPieza'
 import { exportarExcel, exportarPDFTabla } from '../exportUtils'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { EditModal } from '../../shared/EditModal'
 import { SignaturePad } from '../../shared/SignaturePad'
 import { PaqueteriaSalientesTab } from './PaqueteriaSalientesTab'
+import { RecepcionBuscador } from './RecepcionBuscador'
 import { codigoRetiroDesdeURL } from '../../../lib/paquetes'
-import type { PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
+import type { PiezaRecepcion, PaqueteRecibido, Unidad, EstadoPaquete, TipoPaquete } from '../../../types'
 
 interface Props {
   paquetes: PaqueteRecibido[]
+  /** Solo para la bandeja unificada: la correspondencia se administra en su propia pestaña. */
+  correspondencia: PiezaRecepcion[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
   userId: string
   canCreate: boolean
   canEdit: boolean
+  puedeVerCorrespondencia: boolean
+  onIrATab?: (tab: 'paqueteria' | 'correspondencia') => void
   onRefresh: () => void
 }
 
-const ESTADO_CONFIG: Record<EstadoPaquete, { label: string; bg: string; color: string; icon: string }> = {
+// Clave `string` y no EstadoPaquete/TipoPaquete: desde el motor único
+// (20260829000600) la fila puede llevar el vocabulario de cualquiera de las dos
+// clases. Esta pestaña solo recibe clase='paquete' —el loader filtra— pero los
+// accesos caen a un valor por defecto en vez de romper si llegara otra cosa.
+const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; icon: string }> = {
   pendiente: { label: 'Pendiente', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', icon: '📦' },
   entregado: { label: 'Entregado', bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '✅' },
   devuelto:  { label: 'Devuelto',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '↩️' },
 }
 
-const TIPO_CONFIG: Record<TipoPaquete, { label: string; icon: string }> = {
+const TIPO_CONFIG: Record<string, { label: string; icon: string }> = {
   paquete:   { label: 'Paquete',   icon: '📦' },
   documento: { label: 'Documento', icon: '📄' },
   sobre:     { label: 'Sobre',     icon: '✉️' },
@@ -51,14 +61,18 @@ function fechaCorta(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 }
 
-export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function PaqueteriaTab({
+  paquetes, correspondencia, unidades, proyectoId, companyId, userId,
+  canCreate, canEdit, puedeVerCorrespondencia, onIrATab, onRefresh,
+}: Props) {
   // Si venimos del QR de retiro (#retiro=<código>) arrancamos en Salidas: es
   // donde vive la entrega y donde PaqueteriaSalientesTab consume el fragmento.
-  const [vista, setVista] = useState<'entrante' | 'saliente_tercero'>(
+  const [vista, setVista] = useState<'entrante' | 'saliente_tercero' | 'recepcion'>(
     () => (typeof window !== 'undefined' && codigoRetiroDesdeURL(window.location.hash) ? 'saliente_tercero' : 'entrante'),
   )
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const registrar = useRef(crearRegistrador()).current
   const [filtroEstado, setFiltroEstado] = useState<EstadoPaquete | 'todos'>('todos')
   const [busqueda, setBusqueda] = useState('')
   const [form, setForm] = useState({
@@ -95,22 +109,38 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     if (!form.descripcion.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese una descripción del paquete.' }); return }
     if (!form.unidad_id) { notify({ variant: 'error', title: 'Error', text: 'Seleccione la unidad destinataria.' }); return }
     setSaving(true)
-    const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
-      company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
-      direccion: 'entrante', tipo: form.tipo,
-      descripcion: form.descripcion.trim(),
-      remitente: form.remitente.trim() || null,
-      num_guia: form.num_guia.trim() || null,
-      empresa_mensajeria: form.empresa_mensajeria.trim() || null,
-      notas: form.notas.trim() || null,
-      fotos: fotos.length ? fotos : null,
-      estado: 'pendiente', recibido_por: userId,
-    })
-    setSaving(false)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    try { if (data?.id) await notifyPackage(data.id as string) } catch { /* best-effort */ }
-    notify({ variant: 'success', title: 'Paquete registrado', text: 'Se avisó al residente.', duration: 1600 })
-    resetForm(); onRefresh()
+    try {
+      // Mismo cerrojo que en correspondencia: `avisarConReintento` puede tardar
+      // segundos y hasta abrir un diálogo, y mientras tanto el formulario seguía
+      // en pantalla con Guardar habilitado. Ahora se cierra en cuanto el INSERT
+      // está confirmado, y el segundo clic no llega a insertar.
+      await registrar({
+        crear: async () => {
+          const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
+            company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
+            // Motor único (20260829000600): la clase decide el vocabulario y el
+            // permiso RBAC de la fila. Explícita, no confiada al DEFAULT.
+            clase: 'paquete', destinatario_tipo: 'unidad',
+            direccion: 'entrante', tipo: form.tipo,
+            descripcion: form.descripcion.trim(),
+            remitente: form.remitente.trim() || null,
+            num_guia: form.num_guia.trim() || null,
+            empresa_mensajeria: form.empresa_mensajeria.trim() || null,
+            notas: form.notas.trim() || null,
+            fotos: fotos.length ? fotos : null,
+            estado: 'pendiente', recibido_por: userId,
+          })
+          return { id: (data?.id as string | undefined) ?? null, error: error?.message ?? null }
+        },
+        cerrar: () => { resetForm(); onRefresh() },
+        // El aviso puede fallar sin que el registro falle. La pantalla dice cuál
+        // de las dos cosas pasó, en vez de anunciar un aviso que quizá no salió.
+        avisar: id => avisarConReintento(id),
+        onError: mensaje => notify({ variant: 'error', title: 'Error', text: mensaje }),
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function marcarEntregado(id: string) {
@@ -165,7 +195,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
       p.remitente ?? '',
       p.empresa_mensajeria ?? '',
       p.num_guia ?? '',
-      ESTADO_CONFIG[p.estado].label,
+      ESTADO_CONFIG[p.estado]?.label ?? p.estado,
       fechaCorta(p.hora_recepcion),
       fechaCorta(p.hora_entrega),
       p.entregado_a_nombre ?? '',
@@ -188,7 +218,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
     })
   }
 
-  const SegBtn = ({ id, label }: { id: 'entrante' | 'saliente_tercero'; label: string }) => (
+  const SegBtn = ({ id, label }: { id: 'entrante' | 'saliente_tercero' | 'recepcion'; label: string }) => (
     <button onClick={() => setVista(id)}
       style={{ padding: '8px 16px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
         border: '1.5px solid', borderColor: vista === id ? 'var(--at-primary)' : 'var(--at-line)',
@@ -222,9 +252,18 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
       <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
         <SegBtn id="entrante" label="📥 Entrantes" />
         <SegBtn id="saliente_tercero" label="📤 Salidas (retiro por tercero)" />
+        <SegBtn id="recepcion" label="🔎 Recepción (buscar todo)" />
       </div>
 
-      {vista === 'saliente_tercero' ? (
+      {vista === 'recepcion' ? (
+        <RecepcionBuscador
+          piezas={[...paquetes, ...correspondencia]}
+          puedeVerPaqueteria
+          puedeVerCorrespondencia={puedeVerCorrespondencia}
+          origenActual="paquete"
+          onIrATab={onIrATab}
+        />
+      ) : vista === 'saliente_tercero' ? (
         <PaqueteriaSalientesTab
           paquetes={salientes}
           unidades={unidades}
@@ -311,7 +350,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtrados.map(p => {
-                const cfg = ESTADO_CONFIG[p.estado]
+                const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente
                 const tcfg = TIPO_CONFIG[p.tipo] ?? TIPO_CONFIG.paquete
                 return (
                   <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.estado === 'pendiente' ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>

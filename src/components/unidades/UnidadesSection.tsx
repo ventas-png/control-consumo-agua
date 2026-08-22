@@ -312,7 +312,16 @@ export function UnidadesSection({
       onUnidadDeleted(u.id)
       notify({ variant: 'success', title: 'Unidad eliminada', duration: 1500 })
     } else {
-      notify({ variant: 'error', title: 'Error', text: error ?? 'No se pudo eliminar la unidad.' })
+      // El caso frecuente no es un error del sistema: es una unidad con
+      // historial de recepción, que a propósito no se puede borrar. El mensaje
+      // ya viene traducido (mensajeBorradoUnidad) y dice qué hacer en su lugar.
+      const conHistorial = /historial|Desactívala/i.test(error ?? '')
+      notify({
+        variant: conHistorial ? 'warning' : 'error',
+        title: conHistorial ? 'La unidad no se puede borrar' : 'Error',
+        duration: conHistorial ? 6000 : undefined,
+        text: error ?? 'No se pudo eliminar la unidad.',
+      })
     }
   }
 
