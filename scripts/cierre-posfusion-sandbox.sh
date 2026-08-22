@@ -78,6 +78,11 @@ monta() {
 }
 
 validada()      { consulta "SELECT convalidated FROM pg_constraint WHERE conname='paquetes_estado_chk'"; }
+comentario()    { consulta "SELECT obj_description('public.correspondencia_condominio'::regclass, 'pg_class')"; }
+# Huella del CONTENIDO del respaldo, no sólo de su conteo: una fila alterada en
+# sitio no cambia el número de filas.
+huella()        { consulta "SELECT md5(coalesce(string_agg(r::text, '|' ORDER BY r.id), '∅')) FROM public.correspondencia_condominio_respaldo r"; }
+COMENTARIO_PREVIO='COMENTARIO ANTERIOR DEL SANDBOX — no debe cambiar si la migración aborta'
 hay_respaldo()  { consulta "SELECT to_regclass('public.correspondencia_condominio_respaldo') IS NOT NULL"; }
 filas_respaldo(){ consulta "SELECT count(*) FROM public.correspondencia_condominio_respaldo"; }
 id_de()         { consulta "SELECT sandbox.id('$1')"; }
@@ -102,6 +107,7 @@ contiene "enumera la clase inventada"              "$ERR" "clase='sobre' estado=
 contiene "agrupa: dos filas con la misma combinación" "$ERR" "→ 2 fila(s)"
 contiene "el HINT dice el vocabulario admitido"    "$ERR" "pendiente|entregado|devuelto"
 afirma "el CHECK NO se validó"                     "$(validada)" "f"
+afirma "el comentario de la vista NO cambió"       "$(comentario)" "$COMENTARIO_PREVIO"
 
 # ════════════════════════════════════════════════════════════════════════════
 # 3 · Respaldo vacío: se retira sin ceremonia
@@ -137,17 +143,48 @@ contiene "dice que hay filas sin equivalente"      "$ERR" "SIN equivalente en pa
 contiene "nombra la pieza que falta"               "$ERR" "$(id_de r2)"
 afirma "el respaldo SIGUE existiendo"              "$(hay_respaldo)" "t"
 afirma "y conserva sus tres filas"                 "$(filas_respaldo)" "3"
+afirma "el CHECK NO se validó"                     "$(validada)" "f"
+afirma "el comentario de la vista NO cambió"       "$(comentario)" "$COMENTARIO_PREVIO"
 
 # ════════════════════════════════════════════════════════════════════════════
-# 6 · Respaldo alterado: existe pero un campo no coincide → aborta y CONSERVA
+# 6 · Respaldo alterado: ROLLBACK COMPLETO, y después reparación
 # ════════════════════════════════════════════════════════════════════════════
+# El escenario que justifica el bloque DO único. La migración escribe tres
+# cosas —valida la constraint, reemplaza el comentario de la vista y borra el
+# respaldo— y la tercera es la que puede abortar. Si las tres no van en la misma
+# unidad atómica, un aborto deja las dos primeras aplicadas: un estado que no es
+# ni el anterior ni el posterior.
+#
+# Se comprueba el estado ANTERIOR pieza por pieza, no «que no explotó»: la
+# constraint sigue sin validar, el comentario sigue siendo el de antes, la tabla
+# sigue ahí, y su CONTENIDO —no sólo su conteo— es idéntico.
 monta respaldo-alterado
+HUELLA_PREVIA="$(huella)"
+afirma "de partida el CHECK está NOT VALID"        "$(validada)" "f"
+afirma "de partida la vista tiene el comentario anterior" "$(comentario)" "$COMENTARIO_PREVIO"
+
 afirma "la migración ABORTA"                       "$([[ $RC -ne 0 ]] && echo si || echo no)" "si"
 contiene "dice que el respaldo no coincide"        "$ERR" "El respaldo NO coincide con lo migrado"
 contiene "nombra la fila divergente"               "$ERR" "$(id_de r1)"
 contiene "y nombra el CAMPO divergente"            "$ERR" "descripcion"
-afirma "el respaldo SIGUE existiendo"              "$(hay_respaldo)" "t"
-afirma "y conserva sus tres filas"                 "$(filas_respaldo)" "3"
+contiene "y afirma no haber tocado nada"           "$ERR" "No se tocó nada"
+
+# ── Evidencia del rollback: las TRES escrituras quedaron sin efecto ─────────
+afirma "ROLLBACK · convalidated sigue en false"    "$(validada)" "f"
+afirma "ROLLBACK · el comentario de la vista es el anterior" "$(comentario)" "$COMENTARIO_PREVIO"
+afirma "ROLLBACK · el respaldo existe"             "$(hay_respaldo)" "t"
+afirma "ROLLBACK · conserva sus tres filas"        "$(filas_respaldo)" "3"
+afirma "ROLLBACK · y su contenido es byte a byte el mismo" "$(huella)" "$HUELLA_PREVIA"
+
+# ── Reparada la divergencia, la misma migración completa las tres ──────────
+"${PSQL[@]}" -q -v ON_ERROR_STOP=1 -c "CALL sandbox.reparar_r1()" >/dev/null
+
+aplica respaldo-alterado-reintento
+afirma "reparado: la migración aplica"             "$RC" "0"
+afirma "ahora sí el CHECK queda VALIDADO"          "$(validada)" "t"
+afirma "ahora sí el comentario se actualiza"       \
+  "$([[ "$(comentario)" == *'RETENIDA A PROPÓSITO (20260903000000)'* ]] && echo si || echo no)" "si"
+afirma "ahora sí el respaldo se retira"            "$(hay_respaldo)" "f"
 
 # ════════════════════════════════════════════════════════════════════════════
 # 7 · Sin respaldo: ausencia previa = no-op seguro, no un fallo

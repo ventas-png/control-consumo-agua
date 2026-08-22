@@ -23,6 +23,13 @@ const INTEGRIDAD = '20260901000000_recepcion_integridad_final.sql'
 const sql = (f: string) => readFileSync(join(MIGRATIONS, f), 'utf8')
 const cierre = sql(CIERRE)
 
+/** El archivo sin comentarios: lo que Postgres realmente ejecuta. */
+const ejecutable = cierre
+  .split('\n')
+  .filter(l => !l.trimStart().startsWith('--'))
+  .join('\n')
+  .trim()
+
 /** El bloque `array_remove(ARRAY[…], NULL)` que enumera los campos comparados. */
 function bloqueDeComparacion(): string {
   const i = cierre.indexOf('array_remove(ARRAY[')
@@ -88,18 +95,14 @@ describe('sección 1 · la auditoría no puede divergir de la constraint', () =>
 
 describe('sección 2 · el CHECK se valida', () => {
   it('ejecuta VALIDATE CONSTRAINT sobre paquetes_estado_chk', () => {
-    expect(cierre).toMatch(
-      /ALTER TABLE public\.paquetes_recibidos\s+VALIDATE CONSTRAINT paquetes_estado_chk;/,
+    expect(ejecutable).toMatch(
+      /EXECUTE 'ALTER TABLE public\.paquetes_recibidos VALIDATE CONSTRAINT paquetes_estado_chk'/,
     )
   })
 
   it('la validación va DESPUÉS de la auditoría', () => {
-    // Sobre las SENTENCIAS, no sobre el texto: los comentarios de la sección 1
-    // nombran `VALIDATE CONSTRAINT` para explicar por qué la auditoría existe.
-    const ejecutable = cierre
-      .split('\n')
-      .filter(l => !l.trimStart().startsWith('--'))
-      .join('\n')
+    // Sobre las SENTENCIAS, no sobre el texto: los comentarios nombran
+    // `VALIDATE CONSTRAINT` para explicar por qué la auditoría existe.
     expect(ejecutable.indexOf('fuera del vocabulario'))
       .toBeLessThan(ejecutable.indexOf('VALIDATE CONSTRAINT'))
   })
@@ -111,7 +114,9 @@ describe('sección 3 · la vista de compatibilidad se conserva', () => {
   })
 
   it('deja escrito por qué se queda', () => {
-    expect(cierre).toMatch(/COMMENT ON VIEW public\.correspondencia_condominio IS/)
+    expect(ejecutable).toMatch(
+      /EXECUTE format\('COMMENT ON VIEW public\.correspondencia_condominio IS %L'/,
+    )
     expect(cierre).toMatch(/RETENIDA A PROPÓSITO/)
   })
 })
@@ -172,16 +177,15 @@ describe('sección 4 · la retirada del respaldo compara TODO lo que se migró',
 })
 
 describe('la migración es fail-closed', () => {
-  const sinComentarios = cierre
-    .split('\n')
-    .filter(l => !l.trimStart().startsWith('--'))
-    .join('\n')
+  const sinComentarios = ejecutable
 
   it('el DROP del respaldo no lleva IF EXISTS', () => {
     // Con IF EXISTS, un DROP que no encuentra la tabla —porque alguien la
     // renombró, o porque se está mirando el esquema equivocado— pasaría por
     // éxito.
-    expect(sinComentarios).toMatch(/DROP TABLE public\.correspondencia_condominio_respaldo;/)
+    expect(sinComentarios).toMatch(
+      /EXECUTE 'DROP TABLE public\.correspondencia_condominio_respaldo'/,
+    )
     expect(sinComentarios).not.toMatch(/DROP TABLE IF EXISTS/i)
   })
 
@@ -193,11 +197,88 @@ describe('la migración es fail-closed', () => {
   it('la única rama silenciosa es la tabla ya retirada', () => {
     const notices = sinComentarios.match(/RAISE NOTICE/g) ?? []
     const excepciones = sinComentarios.match(/RAISE EXCEPTION/g) ?? []
-    expect(sinComentarios).toMatch(/to_regclass\('public\.correspondencia_condominio_respaldo'\) IS NULL/)
+    expect(sinComentarios).toMatch(
+      /to_regclass\('public\.correspondencia_condominio_respaldo'\) IS NOT NULL/,
+    )
     expect(sinComentarios).toMatch(/ya fue retirada/)
-    // Tres avisos informativos y tres abortos: vocabulario, faltantes y
-    // divergentes.
+    // Avisos informativos y tres abortos: vocabulario, faltantes y divergentes.
     expect(notices.length).toBeGreaterThanOrEqual(3)
     expect(excepciones).toHaveLength(3)
+  })
+})
+
+// ── La propiedad que motivó reescribir la migración ─────────────────────────
+describe('todo o nada: una sola unidad atómica', () => {
+  // EL FALLO QUE ESTO CIERRA. La primera versión ponía el VALIDATE y el COMMENT
+  // como sentencias sueltas ANTES del bloque que todavía podía abortar por una
+  // divergencia del respaldo. Bajo `psql -f`, que va en autocommit, un aborto
+  // dejaba las dos primeras escrituras aplicadas — un estado que no es ni el
+  // anterior ni el posterior— mientras el encabezado prometía «aborta sin tocar
+  // nada». La verificación conductual está en el escenario 6 de
+  // scripts/cierre-posfusion-sandbox.sh; esto impide que la forma se pierda.
+
+  it('el archivo ejecutable es EXACTAMENTE un bloque DO', () => {
+    // Una sola sentencia para Postgres ⇒ una sola unidad atómica, sin depender
+    // de que el aplicador abra una transacción por su cuenta.
+    expect(ejecutable.startsWith('DO $cierre$')).toBe(true)
+    expect(ejecutable.endsWith('$cierre$;')).toBe(true)
+    expect((ejecutable.match(/^DO \$cierre\$/gm) ?? [])).toHaveLength(1)
+    expect((ejecutable.match(/^\$cierre\$;/gm) ?? [])).toHaveLength(1)
+  })
+
+  it('ninguna de las tres escrituras queda fuera del bloque', () => {
+    const cuerpo = ejecutable
+      .slice('DO $cierre$'.length, ejecutable.length - '$cierre$;'.length)
+    for (const escritura of [
+      'VALIDATE CONSTRAINT paquetes_estado_chk',
+      'COMMENT ON VIEW public.correspondencia_condominio',
+      'DROP TABLE public.correspondencia_condominio_respaldo',
+    ]) {
+      expect(ejecutable, `${escritura} no aparece`).toContain(escritura)
+      expect(cuerpo, `${escritura} está fuera del bloque DO`).toContain(escritura)
+    }
+  })
+
+  it('no se abre ni se cierra una transacción a mano', () => {
+    // Un COMMIT de más cerraría antes de tiempo la transacción del aplicador.
+    expect(ejecutable).not.toMatch(/^\s*(BEGIN|COMMIT|ROLLBACK|START TRANSACTION)\s*;/im)
+  })
+
+  it('comprueba TODO antes de escribir nada', () => {
+    // La atomicidad ya lo garantiza; el orden es para que se lea sin razonar
+    // sobre rollbacks. Los tres abortos posibles van antes de la primera
+    // escritura.
+    const primeraEscritura = ejecutable.indexOf('VALIDATE CONSTRAINT paquetes_estado_chk')
+    for (const aborto of [
+      'fuera del vocabulario',
+      'SIN equivalente en paquetes_recibidos',
+      'El respaldo NO coincide con lo migrado',
+    ]) {
+      expect(ejecutable.indexOf(aborto), aborto).toBeLessThan(primeraEscritura)
+    }
+  })
+})
+
+// ── La documentación tiene que ser verdad ───────────────────────────────────
+describe('el encabezado no afirma cosas falsas', () => {
+  it('no dice que NOT VALID deje de aplicarse a lo que se escribe', () => {
+    // Una constraint NOT VALID SÍ se comprueba en cada INSERT y en cada UPDATE
+    // desde el primer día; lo que se posterga es el escaneo inicial de las filas
+    // que ya estaban. La versión anterior de este encabezado afirmaba lo
+    // contrario, que es justo el malentendido que lleva a creer que validar es
+    // opcional.
+    expect(cierre).toMatch(/Se aplica a cada INSERT y a\s*--\s*cada UPDATE/)
+    expect(cierre).toMatch(/ESCANEO INICIAL/)
+    expect(cierre).not.toMatch(/valida sólo lo que se escribe, no lo que ya estaba/)
+    expect(cierre).not.toMatch(/no protege de un `?UPDATE`? sobre una fila que ya lo incumplía/)
+  })
+
+  it('no ofrece un estado parcialmente aplicado como aceptable', () => {
+    // «Reaplicar converge» describía un remedio, no una garantía, y servía de
+    // excusa para no tener rollback. Ya no aplica: la migración es atómica.
+    expect(cierre).not.toMatch(/reaplicar converge/i)
+    expect(cierre).not.toMatch(/deja ya cometido el VALIDATE/i)
+    expect(cierre).toMatch(/TODO O NADA/)
+    expect(cierre).toMatch(/NO depende de cómo se aplique el archivo/)
   })
 })

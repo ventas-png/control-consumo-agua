@@ -71,6 +71,12 @@ SELECT id, company_id, project_id,
   FROM public.paquetes_recibidos
  WHERE clase = 'correspondencia';
 
+-- Un comentario ANTERIOR y reconocible. La migración lo reemplaza por el suyo;
+-- si aborta, tiene que seguir siendo exactamente éste. Es la sonda que
+-- distingue «no escribió» de «escribió y luego falló otra cosa».
+COMMENT ON VIEW public.correspondencia_condominio IS
+  'COMENTARIO ANTERIOR DEL SANDBOX — no debe cambiar si la migración aborta';
+
 -- El respaldo, con la forma que tenía `correspondencia_condominio` cuando
 -- 20260829000600 hizo `CREATE TABLE ... AS TABLE`: las columnas originales de
 -- 20260420000014, más las de acuse que añadió 20260828000300, más el
@@ -270,4 +276,19 @@ CREATE PROCEDURE sandbox.reponer_r2() LANGUAGE sql AS $$
      'atendido', 'saliente', 'urgente', '2026-07-02', NULL,
      'No registrado (acuse anterior a 2026-08-31)',
      '2026-07-02 09:30+00', '2026-07-02 09:30+00', '2026-07-02 09:30+00');
+$$;
+
+
+/**
+ * Deshace la alteración que `respaldo-alterado` introdujo en el destino: le
+ * devuelve a R1 la descripción que la cadena de migraciones había dejado.
+ *
+ * Sirve al escenario de divergencia: primero se comprueba que la migración
+ * abortó SIN tocar nada, y después que, reparado el dato, la misma migración
+ * completa las tres escrituras.
+ */
+CREATE PROCEDURE sandbox.reparar_r1() LANGUAGE sql AS $$
+  UPDATE public.paquetes_recibidos
+     SET descripcion = 'Recibo de luz'
+   WHERE id = sandbox.id('r1');
 $$;
