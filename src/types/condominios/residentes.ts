@@ -27,7 +27,33 @@ export interface UnidadResidente {
 // ── Autorización de Renta por Unidad ──────────────────────────────────────
 
 export type TipoRenta = 'arrendamiento' | 'str' | 'ambas'
-export type EstadoSolicitudRenta = 'pendiente' | 'aprobada' | 'rechazada' | 'baja'
+export type EstadoSolicitudRenta = 'borrador' | 'pendiente' | 'aprobada' | 'rechazada' | 'baja'
+
+/**
+ * Adjunto que el propietario anexa a su solicitud de renta para que la
+ * administración evalúe y archive. `path` es el path BARE del bucket privado
+ * `renta-docs` (20260828000100); la lectura firma con useSignedUrl.
+ */
+export interface DocumentoSolicitudRenta {
+  path: string
+  nombre: string
+  etiqueta?: string | null
+  mime?: string | null
+  size?: number | null
+}
+
+/** Quién paga un servicio del inmueble. Espeja el CHECK de 20260829000000. */
+export type ResponsableServicio = 'propietario' | 'inquilino'
+
+/** Los seis servicios cuyo pagador se pacta al autorizar la renta. */
+export interface ResponsablesServicios {
+  mantenimiento: ResponsableServicio
+  agua:          ResponsableServicio
+  electricidad:  ResponsableServicio
+  basura:        ResponsableServicio
+  telefonia:     ResponsableServicio
+  internet:      ResponsableServicio
+}
 
 export interface SolicitudRentaUnidad {
   id: string
@@ -43,6 +69,33 @@ export interface SolicitudRentaUnidad {
   aprobado_por?: string | null
   fecha_resolucion?: string | null
   created_at: string
+  // Datos del contrato propuestos por el propietario (20260828000000). Espejan
+  // a ContratoArrendamiento; nulos cuando la solicitud es solo STR.
+  arrendatario_nombre?: string | null
+  arrendatario_identificacion?: string | null
+  arrendatario_telefono?: string | null
+  arrendatario_email?: string | null
+  monto_renta?: number | null
+  deposito?: number | null
+  dia_pago?: number | null
+  fecha_inicio?: string | null
+  fecha_fin?: string | null
+  notas_contrato?: string | null
+  documentos?: DocumentoSolicitudRenta[] | null
+  // Responsables del pago de cada servicio (20260829000000). Nulos en STR y en
+  // las solicitudes anteriores a la feature.
+  resp_mantenimiento?: ResponsableServicio | null
+  resp_agua?:          ResponsableServicio | null
+  resp_electricidad?:  ResponsableServicio | null
+  resp_basura?:        ResponsableServicio | null
+  resp_telefonia?:     ResponsableServicio | null
+  resp_internet?:      ResponsableServicio | null
+  /** Contrato creado al aprobar (lo escribe solo el RPC aprobar_solicitud_renta). */
+  contrato_id?: string | null
+  /** Identidad de auditoría de quien resolvió: auth.uid(), no texto del cliente. */
+  aprobado_por_user_id?: string | null
+  /** Justificación obligatoria al aprobar un arrendamiento sin crear el contrato. */
+  motivo_sin_contrato?: string | null
   // joined
   unidad_nombre?: string
 }

@@ -542,7 +542,6 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 unidadNombre={unidad.nombre}
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
-                clienteId={clienteId}
                 solicitudRenta={solicitudRentaU}
                 onSolicitudChange={cargarDatos}
               />

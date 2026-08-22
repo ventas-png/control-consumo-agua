@@ -3,6 +3,7 @@
 // ./index.ts re-exporta todo, así que la superficie pública no cambia.
 
 import type { EstadoContrato, PrioridadNovedad, TipoNovedad } from './seguridad'
+import type { ResponsableServicio } from './residentes'
 
 // ━━ Tareas operativas: turnos, bloques, revisiones ━━
 // ── Tareas operativas ─────────────────────────────────────────────────────
@@ -256,6 +257,15 @@ export interface ContratoArrendamiento {
   deposito?: number | null
   estado: EstadoContrato
   notas?: string | null
+  // Responsables del pago de cada servicio, copiados de la solicitud al aprobar
+  // (20260829000300). Cada contrato conserva LOS SUYOS: el histórico se lee por
+  // contrato, no por unidad.
+  resp_mantenimiento?: ResponsableServicio | null
+  resp_agua?:          ResponsableServicio | null
+  resp_electricidad?:  ResponsableServicio | null
+  resp_basura?:        ResponsableServicio | null
+  resp_telefonia?:     ResponsableServicio | null
+  resp_internet?:      ResponsableServicio | null
   created_at: string
   // joins
   unidad_nombre?: string

@@ -370,6 +370,36 @@
         "anon",
         "authenticated-cross-tenant"
       ]
+    },
+    {
+      "nombre": "portal_reservar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — abre el borrador cuyo id es la carpeta de los adjuntos en renta-docs; sobre una unidad ajena sembraría un expediente en el tenant de otro",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_enviar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — única vía de escritura del portal desde que 20260829000100 le quitó la policy de INSERT que permitía autoaprobarse; escribe los datos del contrato y los responsables de una unidad",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_descartar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — borra el borrador de una unidad; sobre una ajena destruiría el expediente en curso de otro tenant",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     }
   ],
   "_sandbox": [

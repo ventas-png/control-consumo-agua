@@ -375,6 +375,43 @@ const PORTAL_BAJA_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
   { name: 'portal_baja_renta', args: (b) => ({ p_unidad_id: b.unidadId }) },
 ]
 
+// RPCs de la solicitud de autorización de renta (20260829000200). Son la ÚNICA
+// vía de escritura del portal sobre `solicitud_renta_unidad` desde que
+// 20260829000100 le quitó la policy de INSERT —que permitía insertar
+// estado='aprobada' y autoaprobarse—, así que su gate de rol es lo que sostiene
+// esa puerta cerrada. Las tres se acotan a mis_unidades_propietario_ids().
+//
+// `portal_enviar_solicitud_renta` y `portal_descartar_solicitud_renta` reciben
+// un id de solicitud inexistente a propósito: el gate de ROL debe rechazar a un
+// usuario de staff ANTES de mirar la fila, así que un uuid cualquiera basta y
+// evita sembrar una solicitud de B solo para esta prueba.
+const SOLICITUD_ID_INEXISTENTE = '00000000-0000-0000-0000-0000000000f0'
+
+const PORTAL_SOLICITUD_RENTA_RPCS: ReadonlyArray<{ name: string; args: ArgsRpc }> = [
+  { name: 'portal_reservar_solicitud_renta', args: (b) => ({ p_unidad_id: b.unidadId }) },
+  {
+    name: 'portal_enviar_solicitud_renta',
+    args: () => ({
+      p_solicitud_id: SOLICITUD_ID_INEXISTENTE,
+      p_tipo_renta: 'arrendamiento',
+      p_motivo: 'Intento RLS',
+      p_arrendatario_nombre: 'Intruso RLS',
+      p_monto_renta: 1,
+      p_dia_pago: 1,
+      p_fecha_inicio: '2026-09-01',
+      p_responsables: {
+        mantenimiento: 'propietario', agua: 'propietario', electricidad: 'propietario',
+        basura: 'propietario', telefonia: 'propietario', internet: 'propietario',
+      },
+      p_documentos: [],
+    }),
+  },
+  {
+    name: 'portal_descartar_solicitud_renta',
+    args: () => ({ p_solicitud_id: SOLICITUD_ID_INEXISTENTE }),
+  },
+]
+
 function freshClient(): SupabaseClient {
   return createClient(URL!, ANON!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -1015,6 +1052,29 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
         // portal): garantía de ROL, no de tenant — ver el bloque de arriba.
         const { data, error } = await userA.rpc(name, args(B))
         expect(error, `${name} sobre unidad ajena debe fallar`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
+      })
+    }
+  })
+
+  // ────────────────────────────────────────────────────────────────────────
+  // guard RPCs de la solicitud de renta (20260829000200)
+  // ────────────────────────────────────────────────────────────────────────
+  // Desde 20260829000100 el portal NO tiene policy de INSERT sobre
+  // `solicitud_renta_unidad`: estas tres RPC son su única vía de escritura. Si
+  // su gate de rol cediera, volvería el agujero que esa migración cerró — un
+  // residente insertando su propia solicitud ya 'aprobada'.
+  describe('guard RPCs de solicitud de renta (20260829000200) — garantía de ROL', () => {
+    for (const { name, args } of PORTAL_SOLICITUD_RENTA_RPCS) {
+      it(`${idEvidencia(name, 'anon')} anon NO puede ejecutar ${name}`, async () => {
+        const { data, error } = await anon.rpc(name, args(B))
+        expect(error, `anon no debe poder invocar ${name}`).not.toBeNull()
+        expect(data ?? null, `${name} no debe devolver datos a anon`).toBeNull()
+      })
+
+      it(`${idEvidencia(name, 'authenticated-cross-tenant')} authenticated (A) NO puede ejecutar ${name} sobre datos ajenos`, async () => {
+        const { data, error } = await userA.rpc(name, args(B))
+        expect(error, `${name} sobre datos ajenos debe fallar`).not.toBeNull()
         expect(data ?? null, `${name} no debe devolver datos`).toBeNull()
       })
     }
