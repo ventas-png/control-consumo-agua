@@ -23,10 +23,30 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 En CI el verde de este job significa «la suite corrió», no «no se opuso»:
 
 - **Preflight** (`scripts/e2e-preflight.mjs`): sin cualquiera de las CINCO
-  variables obligatorias, el job **falla** con instrucciones. PR de fork y
-  Dependabot —que no reciben Actions secrets por diseño— también quedan en
-  **rojo**, con la explicación estructural y cómo desbloquear (rama interna).
-  Además rechaza un `E2E_BASE_URL` que apunte a producción o que no sea https.
+  variables obligatorias, el job **falla ANTES de instalar nada ni ejecutar
+  Playwright** — no existe ningún camino en el que la falta de variables
+  produzca un verde. PR de fork y Dependabot —que no reciben Actions secrets
+  por diseño— también quedan en **rojo**, con la explicación estructural y cómo
+  desbloquear (rama interna).
+- **El destino se valida POSITIVAMENTE, no por denylist**: el despliegue
+  publica `/e2e-meta.json` (lo genera `scripts/generar-e2e-meta.mjs`, colgado
+  del build) y tiene que demostrar TRES cosas: `environment=e2e-sandbox` (el
+  marcador que sólo lleva un build con `VITE_E2E_ENVIRONMENT=e2e-sandbox`),
+  `supabase_project_ref` igual a `E2E_EXPECTED_SUPABASE_REF`, y `commit_sha`
+  igual al commit que el job está probando (en PRs, el HEAD de la rama). Un
+  despliegue viejo, producción o un alias desconocido fallan aunque no estén
+  en ninguna lista. La denylist de hosts de producción (de `vercel.json`)
+  queda como segunda defensa: a esos ni se les consulta la metadata.
+- **La URL se RESUELVE por SHA**: el preflight busca en la API de Deployments
+  de GitHub los despliegues registrados para el commit (Vercel los publica con
+  su `environment_url`) y los valida; `E2E_BASE_URL` es opcional y entra como
+  un candidato más, sometido a las mismas comprobaciones. La URL elegida es la
+  que corre la suite.
+- **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
+  `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
+  corridas se encolan, ninguna muere a medias.
+- **Sin `service_role`**: el job no la recibe ni la necesita; el despliegue de
+  pruebas usa la anon key de su sandbox, como cualquier cliente.
 - **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`): lee el reporte
   JSON y **falla** si se descubrieron cero pruebas, si todas quedaron skipped,
   si un spec obligatorio no ejecutó ninguna, o si un condicional se omitió con
@@ -44,16 +64,19 @@ En *Settings → Secrets and variables → Actions*:
 
 | Secreto | Obligatorio | Qué es y de dónde sale |
 |---|---|---|
-| `E2E_BASE_URL` | ✅ | URL **https** del despliegue ESTABLE de pruebas — un deploy de Vercel (Preview) de una rama estable dedicada, conectado al **Supabase sandbox**. **Nunca** producción: el preflight rechaza los hosts de `vercel.json`. |
+| `E2E_EXPECTED_SUPABASE_REF` | ✅ | La DECLARACIÓN del proyecto Supabase sandbox contra el que corre la suite (el ref, no una credencial). El despliegue tiene que apuntar exactamente ahí. |
+| `E2E_BASE_URL` | opcional | Candidato ESTÁTICO de URL, sometido a la misma validación positiva (marcador + ref + sha). Normalmente innecesario: el preflight resuelve el despliegue del commit por la API de Deployments. |
 | `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | ✅ | Cuenta admin/operadora del tenant sembrado en ese sandbox. |
 | `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | ✅ | Usuario del MISMO tenant con rol restringido (viewer/operator, no admin ni owner). |
 | `E2E_INVITE_TOKEN` | condicional | Token de invitación **fresco y de un solo uso** (insert en `user_invitations` + edge `invite-user`). No puede vivir como secreto estático: se genera justo antes de la corrida que deba ejercitar ese flujo. Ausente → `invitation-accept` queda como **omitido declarado**. |
 | `E2E_FISCAL_SANDBOX_READY` | condicional | `1` cuando el despliegue de pruebas tiene PAC **sandbox** y configuración fiscal cargada. Ausente → `fiscal-timbrar` queda como **omitido declarado**. |
 
-El entorno de referencia: **Vercel Preview** (rama estable de pruebas, no el
-alias de producción) apuntando con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`
-al proyecto **Supabase sandbox** — el mismo criterio que el harness RLS, que
-jamás apunta a producción.
+El entorno de referencia: **Vercel Preview** de esta rama (no el alias de
+producción), construido con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` del
+proyecto **Supabase sandbox** y `VITE_E2E_ENVIRONMENT=e2e-sandbox` — las tres
+como variables de entorno *Preview* en Vercel (idealmente restringidas a las
+ramas de prueba). Sin el marcador, ningún despliegue pasa la validación
+positiva; con él pero apuntando a otro Supabase, tampoco.
 
 No hay `data-testid` en la app (confirmado), así que los selectores son
 **semánticos** (placeholder, label, rol+texto). Si la UI cambia esos textos, hay
