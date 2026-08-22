@@ -3,11 +3,36 @@
 -- ============================================================
 -- Fase 1 de la convergencia (la Fase 0 fue 20260828000300).
 --
--- RENUMERADA. Nació como 20260829000000 y se aplicó al Supabase Preview con ese
--- nombre. #779 (Renta) aterrizó en `main` con una migración del mismo número,
--- y `scripts/migrations-guard.mjs` (regla (d)) no admite versiones duplicadas:
--- se movió a 20260829000600 SIN tocar una línea de SQL. Idempotente, así que
--- reaplicarla donde ya corrió no cambia nada.
+-- RENUMERADA — Y NO REAPLICABLE.
+--
+-- Nació como 20260829000000. #779 (Renta) aterrizó en `main` con una migración
+-- que usaba exactamente ese número, y `scripts/migrations-guard.mjs` (regla (d))
+-- no admite versiones duplicadas, así que se movió a 20260829000600.
+--
+-- El renombre es lo ÚNICO que cambió: el SQL ejecutable no se tocó.
+--
+-- Lo que NO se debe deducir de eso: esta migración no es idempotente ni
+-- reaplicable. Forma parte de una cadena de SEIS que corre UNA sola vez y EN
+-- ORDEN. Esta es la Fase 1: migra las filas de
+-- `correspondencia_condominio` a `paquetes_recibidos`, respalda el original y
+-- sustituye la tabla por una vista. Reaplicarla sobre una base que ya la corrió
+-- aborta en su primera sentencia —el `CREATE TABLE … _respaldo` sin
+-- `IF NOT EXISTS`— y así está pensado: si ya hay un respaldo, es el resto de un
+-- intento anterior y nadie sabe qué contiene.
+--
+-- Además, su guard de integridad (aborta si el respaldo no cubre todas las
+-- filas de origen) sólo tiene sentido en una ejecución única.
+--
+-- En concreto: una base que ya recibió esta migración bajo su timestamp
+-- anterior (20260829000000) NO puede recibirla otra vez bajo el nuevo. El
+-- Supabase Preview de este PR está en ese estado, y por eso su check sale en
+-- rojo: el bot sólo empuja archivos NUEVOS, el nombre nuevo se lo parece, y
+-- reaplicarla ahí falla. La salida correcta es reconstruir esa base desde cero
+-- aplicando la cadena completa en orden — no debilitar esta migración.
+--
+-- Que falle ruidosamente es el comportamiento buscado. No se le añaden
+-- `IF EXISTS`, `DO NOTHING` ni excepciones tragadas para que "pase": eso la
+-- volvería fail-open y convertiría un estado inesperado en un verde falso.
 --
 -- QUÉ SE UNIFICA Y POR QUÉ. `paquetes_recibidos` y `correspondencia_condominio`
 -- guardaban el mismo hecho —una pieza física en custodia de recepción a nombre

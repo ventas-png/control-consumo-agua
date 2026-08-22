@@ -3,11 +3,35 @@
 -- ============================================================
 -- Fase 0 de la convergencia Correspondencia ↔ Paquetería.
 --
--- RENUMERADA. Nació como 20260828000000 y se aplicó al Supabase Preview con ese
--- nombre. #779 (Renta) aterrizó en `main` con una migración del mismo número,
--- y `scripts/migrations-guard.mjs` (regla (d)) no admite versiones duplicadas:
--- se movió a 20260828000300 SIN tocar una línea de SQL. Idempotente, así que
--- reaplicarla donde ya corrió no cambia nada.
+-- RENUMERADA — Y NO REAPLICABLE.
+--
+-- Nació como 20260828000000. #779 (Renta) aterrizó en `main` con una migración
+-- que usaba exactamente ese número, y `scripts/migrations-guard.mjs` (regla (d))
+-- no admite versiones duplicadas, así que se movió a 20260828000300.
+--
+-- El renombre es lo ÚNICO que cambió: el SQL ejecutable no se tocó.
+--
+-- Lo que NO se debe deducir de eso: esta migración no es idempotente ni
+-- reaplicable. Forma parte de una cadena de SEIS que corre UNA sola vez y EN
+-- ORDEN:
+--   1. 20260828000300_correspondencia_acuse_trazabilidad  ← esta
+--        añade columnas a la TABLA `correspondencia_condominio`.
+--   2. 20260829000600_recepcion_motor_unico
+--        migra sus filas y sustituye la tabla por una VISTA.
+-- Después del paso 2, el `ALTER TABLE … ADD COLUMN` de abajo ya no tiene una
+-- tabla contra la cual correr: `correspondencia_condominio` es una vista, y
+-- Postgres lo rechaza con SQLSTATE 42809.
+--
+-- En concreto: una base que ya recibió esta migración bajo su timestamp
+-- anterior (20260828000000) NO puede recibirla otra vez bajo el nuevo. El
+-- Supabase Preview de este PR está en ese estado, y por eso su check sale en
+-- rojo: el bot sólo empuja archivos NUEVOS, el nombre nuevo se lo parece, y
+-- reaplicarla ahí falla. La salida correcta es reconstruir esa base desde cero
+-- aplicando la cadena completa en orden — no debilitar esta migración.
+--
+-- Que falle ruidosamente es el comportamiento buscado. No se le añaden
+-- `IF EXISTS`, `DO NOTHING` ni excepciones tragadas para que "pase": eso la
+-- volvería fail-open y convertiría un estado inesperado en un verde falso.
 --
 -- POR QUÉ: `correspondencia_condominio` y `paquetes_recibidos` modelan lo
 -- mismo (algo físico que entra o sale de recepción a nombre de una unidad),
