@@ -6,7 +6,7 @@
 --
 -- POR QUÉ ES UNA MIGRACIÓN NUEVA Y POR QUÉ RE-DECLARA COSAS YA ESCRITAS.
 -- El preview branch de Supabase tiene aplicadas las versiones ANTERIORES de
--- 20260829000000 y 20260831000000: el bot solo empuja archivos nuevos, así que
+-- 20260829000600 y 20260831000000: el bot solo empuja archivos nuevos, así que
 -- editar aquellos no cambiaría nada allí. Este archivo declara el ESTADO FINAL
 -- —policies incluidas— y es idempotente: sirve igual sobre un preview a medio
 -- camino que sobre una producción que aún no ha visto ninguna de las cuatro.
@@ -84,7 +84,7 @@ BEGIN
   END IF;
 END $$;
 
--- Estado final del vocabulario de estados (20260829000000 + 20260830000000).
+-- Estado final del vocabulario de estados (20260829000600 + 20260830000000).
 ALTER TABLE public.paquetes_recibidos DROP CONSTRAINT IF EXISTS paquetes_estado_chk;
 ALTER TABLE public.paquetes_recibidos
   ADD CONSTRAINT paquetes_estado_chk CHECK (
@@ -96,7 +96,7 @@ ALTER TABLE public.paquetes_recibidos
   ) NOT VALID;
 
 -- ── 2) Policies de la tabla: estado final ───────────────────────────────────
--- Idénticas a la versión corregida de 20260829000000. Se re-emiten porque el
+-- Idénticas a la versión corregida de 20260829000600. Se re-emiten porque el
 -- preview conserva la anterior, en la que el DELETE se resolvía con
 -- `user_has_permission` — un helper que dice true a cualquier clave para
 -- super_admin/company_owner/admin (20260518000008) y que, colocado detrás de un

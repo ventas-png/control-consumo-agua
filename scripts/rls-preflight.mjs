@@ -69,7 +69,7 @@ export const VARIABLES_TENANT = [
 
 /**
  * Las OCHO del gate por CLASE de `paquetes_recibidos` (motor único,
- * 20260829000000): cuatro usuarios de la MISMA empresa.
+ * 20260829000600): cuatro usuarios de la MISMA empresa.
  *
  * POR QUÉ SON OBLIGATORIAS Y NO "OPCIONALES SI ESTÁN".
  * Mientras no existieron, la suite del gate se auto-saltaba con un

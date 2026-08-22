@@ -358,7 +358,7 @@ Deno.serve(async (req: Request) => {
     const clienteId: string | null = unidad?.cliente_id ?? null
     const unidadNombre: string = unidad?.nombre ?? ''
     const empresaNombre: string = ((pkg as Row).companies as Row | null)?.nombre ?? 'AdministraTodo'
-    // Motor único (20260829000000): esta tabla guarda paquetería Y
+    // Motor único (20260829000600): esta tabla guarda paquetería Y
     // correspondencia. La clase decide el vocabulario, el destino en el portal
     // y el texto del aviso; el resto del flujo (a quién avisar y por qué
     // canales) es idéntico, porque el destinatario es el mismo residente.

@@ -54,7 +54,7 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
-    // clase='paquete': desde 20260829000000 la tabla es el motor de recepción y
+    // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
     // también guarda correspondencia, que tiene su propia entrada más abajo.
     db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
@@ -85,7 +85,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
     db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    // clase='paquete': desde 20260829000000 la tabla es el motor de recepción y
+    // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
     // también guarda correspondencia, que tiene su propia entrada más abajo.
     db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('infracciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),

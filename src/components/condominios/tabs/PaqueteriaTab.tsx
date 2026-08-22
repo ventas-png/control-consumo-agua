@@ -35,7 +35,7 @@ interface Props {
 }
 
 // Clave `string` y no EstadoPaquete/TipoPaquete: desde el motor único
-// (20260829000000) la fila puede llevar el vocabulario de cualquiera de las dos
+// (20260829000600) la fila puede llevar el vocabulario de cualquiera de las dos
 // clases. Esta pestaña solo recibe clase='paquete' —el loader filtra— pero los
 // accesos caen a un valor por defecto en vez de romper si llegara otra cosa.
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string; icon: string }> = {
@@ -118,7 +118,7 @@ export function PaqueteriaTab({
         crear: async () => {
           const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
             company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
-            // Motor único (20260829000000): la clase decide el vocabulario y el
+            // Motor único (20260829000600): la clase decide el vocabulario y el
             // permiso RBAC de la fila. Explícita, no confiada al DEFAULT.
             clase: 'paquete', destinatario_tipo: 'unidad',
             direccion: 'entrante', tipo: form.tipo,

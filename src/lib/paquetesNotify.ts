@@ -104,7 +104,7 @@ async function sleep(ms: number): Promise<void> {
 // Dispara el aviso al residente (in-app + correo + WhatsApp) vía la edge function
 // notify-package, autenticando con el JWT del usuario actual.
 //
-// Sirve a las DOS clases del motor de recepción (20260829000000): paquetería y
+// Sirve a las DOS clases del motor de recepción (20260829000600): paquetería y
 // correspondencia. La función resuelve el texto, la sección del portal y la
 // plantilla de correo a partir de `clase`, así que el llamador solo pasa el id.
 // El endpoint conserva el nombre `notify-package` a propósito: renombrarlo

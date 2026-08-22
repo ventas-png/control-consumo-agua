@@ -38,7 +38,7 @@ interface Props {
   onRefresh: () => void
 }
 
-// Motor único (20260829000000): la correspondencia vive en `paquetes_recibidos`
+// Motor único (20260829000600): la correspondencia vive en `paquetes_recibidos`
 // con clase='correspondencia'. La categoría documental es la columna `tipo`, el
 // asunto es `descripcion`, la observación es `notas` y entrada/salida es
 // `direccion`. La UI mantiene el vocabulario que entiende la administradora.

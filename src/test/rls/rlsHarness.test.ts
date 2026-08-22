@@ -73,7 +73,7 @@ const A_PASS = process.env.RLS_USER_A_PASSWORD
 const B_EMAIL = process.env.RLS_USER_B_EMAIL
 const B_PASS = process.env.RLS_USER_B_PASSWORD
 
-// ── Gate por CLASE en paquetes_recibidos (motor único, 20260829000000) ───────
+// ── Gate por CLASE en paquetes_recibidos (motor único, 20260829000600) ───────
 // Hacen falta CUATRO usuarios de la MISMA empresa, porque hay dos gates
 // distintos que comprobar y ninguno se expresa con A/B (empresas distintas):
 //
@@ -1121,7 +1121,7 @@ describe.skipIf(!ENABLED)('RLS harness (server-side, preview/sandbox)', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// Gate por CLASE en paquetes_recibidos (motor único, 20260829000000)
+// Gate por CLASE en paquetes_recibidos (motor único, 20260829000600)
 // ════════════════════════════════════════════════════════════════════════════
 // Que las policies estén ESCRITAS como deben lo verifica
 // src/__tests__/recepcionMotorUnicoRls.test.ts; que se COMPORTEN así se prueba
@@ -1241,7 +1241,9 @@ describe.skipIf(!ENABLED)('gate por clase en paquetes_recibidos (preview/sandbox
       .from('paquetes_recibidos').select('clase, destinatario_tipo').limit(1)
     faltaEsquema = eEsquema
       ? `El sandbox RLS no tiene el esquema del motor único de recepción: ${eEsquema.message}. ` +
-        'Le faltan las migraciones 20260829000000 … 20260902000000, que son las que crean ' +
+        'Le faltan las seis migraciones del motor de recepción (20260828000300, ' +
+        '20260829000600, 20260830000000, 20260831000000, 20260901000000 y 20260902000000 — ' +
+        'no un rango: entre ellas se intercalan las de Renta), que son las que crean ' +
         '`clase`, `destinatario_tipo` y las policies por clase. Aplicalas al proyecto del ' +
         'harness (el de RLS_EXPECTED_PROJECT_REF, que NO es la rama de preview del PR) y, si ' +
         "PostgREST sigue sin verlas, recargá su caché con NOTIFY pgrst, 'reload schema'."

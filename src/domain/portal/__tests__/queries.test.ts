@@ -107,7 +107,7 @@ describe('fetchCondominiosPortalData', () => {
   })
 
   it('separa paquetería de correspondencia por clase, no por tabla', async () => {
-    // Las dos salen de `paquetes_recibidos` desde 20260829000000: sin el filtro
+    // Las dos salen de `paquetes_recibidos` desde 20260829000600: sin el filtro
     // por clase, "Mis paquetes" mostraría también las cartas del residente.
     h.state.results = Array.from({ length: 13 }, () => ({ data: [] }))
     await fetchCondominiosPortalData(['p1'], ['u1'])

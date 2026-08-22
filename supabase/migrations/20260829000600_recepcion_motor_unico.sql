@@ -1,7 +1,13 @@
 -- ============================================================
 -- Recepción: un solo motor para Paquetería y Correspondencia
 -- ============================================================
--- Fase 1 de la convergencia (la Fase 0 fue 20260828000000).
+-- Fase 1 de la convergencia (la Fase 0 fue 20260828000300).
+--
+-- RENUMERADA. Nació como 20260829000000 y se aplicó al Supabase Preview con ese
+-- nombre. #779 (Renta) aterrizó en `main` con una migración del mismo número,
+-- y `scripts/migrations-guard.mjs` (regla (d)) no admite versiones duplicadas:
+-- se movió a 20260829000600 SIN tocar una línea de SQL. Idempotente, así que
+-- reaplicarla donde ya corrió no cambia nada.
 --
 -- QUÉ SE UNIFICA Y POR QUÉ. `paquetes_recibidos` y `correspondencia_condominio`
 -- guardaban el mismo hecho —una pieza física en custodia de recepción a nombre
@@ -52,7 +58,7 @@ CREATE POLICY correspondencia_respaldo_delete ON public.correspondencia_condomin
   FOR DELETE TO authenticated USING (public.is_super_admin());
 
 COMMENT ON TABLE public.correspondencia_condominio_respaldo IS
-  'Copia de correspondencia_condominio previa a la unificación en paquetes_recibidos (20260829000000). Eliminar tras verificar en producción.';
+  'Copia de correspondencia_condominio previa a la unificación en paquetes_recibidos (20260829000600). Eliminar tras verificar en producción.';
 
 -- ── 2) Generalizar paquetes_recibidos ───────────────────────────────────────
 ALTER TABLE public.paquetes_recibidos
@@ -182,7 +188,7 @@ SELECT
   CASE WHEN c.prioridad = 'urgente' THEN 'urgente' ELSE 'normal' END,
   c.fecha_limite, c.fecha, c.observaciones, c.fotos, c.firma_path,
   c.entregado_a_nombre, c.entregado_via,
-  -- hora_recepcion := created_at, como se anunció en 20260828000000: es el
+  -- hora_recepcion := created_at, como se anunció en 20260828000300: es el
   -- único instante real que la tabla vieja guardaba. `fecha` (la del documento)
   -- se preserva aparte en fecha_pieza, sin inventar una hora.
   c.created_at, c.hora_entrega,
@@ -279,7 +285,7 @@ REVOKE ALL ON public.correspondencia_condominio FROM PUBLIC, anon;
 GRANT SELECT ON public.correspondencia_condominio TO authenticated;
 
 COMMENT ON VIEW public.correspondencia_condominio IS
-  'Compatibilidad de SOLO LECTURA tras la unificación (20260829000000). Las escrituras van a paquetes_recibidos con clase=''correspondencia''.';
+  'Compatibilidad de SOLO LECTURA tras la unificación (20260829000600). Las escrituras van a paquetes_recibidos con clase=''correspondencia''.';
 
 -- ── 5) Policies por clase ───────────────────────────────────────────────────
 -- El permiso deja de depender de la tabla y pasa a depender de la fila.
@@ -686,7 +692,7 @@ BEGIN
 
   -- ── NUEVO: módulo por fila ───────────────────────────────────────────────
   -- Una tabla puede albergar más de una clase de registro (paquetes_recibidos
-  -- guarda paquetería y correspondencia desde 20260829000000). Sin esto, el
+  -- guarda paquetería y correspondencia desde 20260829000600). Sin esto, el
   -- módulo fijo del trigger mandaría ambas al mismo cajón de la bitácora.
   IF v_col_mod IS NOT NULL AND v_map_mod IS NOT NULL
      AND v_map_mod ? COALESCE(v_row->>v_col_mod, '') THEN

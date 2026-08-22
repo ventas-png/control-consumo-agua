@@ -14,11 +14,11 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MIGR="$RAIZ/supabase/migrations"
-MOTOR="$MIGR/20260829000000_recepcion_motor_unico.sql"
+MOTOR="$MIGR/20260829000600_recepcion_motor_unico.sql"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# De 20260829000000 solo se pueden ejecutar dos tramos: el resto migra filas
+# De 20260829000600 solo se pueden ejecutar dos tramos: el resto migra filas
 # desde `correspondencia_condominio`, que aquí no existe. Se extraen por sus
 # encabezados de sección; si cambian, el archivo sale vacío y esto aborta.
 awk '/^-- ── 2\) Generalizar paquetes_recibidos/{f=1} /^-- ── 3\) Migrar las filas/{f=0} f' \
@@ -65,9 +65,9 @@ aplicar() { "${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$1" >/dev/null; }
 echo "→ Andamiaje: la tabla como estaba ANTES del motor"
 aplicar "$RAIZ/scripts/rls-evidencias-sandbox.sql"
 
-echo "→ 20260829000000 · esquema (columnas, FK y CHECKs reales)"
+echo "→ 20260829000600 · esquema (columnas, FK y CHECKs reales)"
 aplicar "$TMP/motor-esquema.sql"
-echo "→ 20260829000000 · policies por clase"
+echo "→ 20260829000600 · policies por clase"
 aplicar "$TMP/motor-policies.sql"
 echo "→ 20260830000000 · devolución"
 aplicar "$MIGR/20260830000000_correspondencia_devolucion.sql"

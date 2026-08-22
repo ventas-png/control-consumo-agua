@@ -128,7 +128,7 @@ export function PaqueteriaSalientesTab({ paquetes, unidades, proyectoId, company
     const codigo = generarCodigoRetiro()
     const { data, error } = await createCondominioRowReturning('paquetes_recibidos', {
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
-      // Motor único (20260829000000): clase explícita, no confiada al DEFAULT.
+      // Motor único (20260829000600): clase explícita, no confiada al DEFAULT.
       clase: 'paquete', destinatario_tipo: 'unidad',
       direccion: 'saliente_tercero', tipo: form.tipo, descripcion: form.descripcion.trim(),
       autorizado_nombre: form.autorizado_nombre.trim(),

@@ -2,7 +2,11 @@
 -- Recepción — propiedad del claim de aviso y MIME estricto de la firma
 -- ════════════════════════════════════════════════════════════════════════════
 -- POR QUÉ UNA MIGRACIÓN NUEVA Y NO UNA EDICIÓN.
--- Las migraciones 20260828000000–20260901000000 YA SE APLICARON al Supabase
+-- Las cinco migraciones anteriores del motor de recepción (20260828000300,
+-- 20260829000600, 20260830000000, 20260831000000 y 20260901000000) YA SE
+-- APLICARON al Supabase Preview. Las dos primeras se aplicaron allí con sus
+-- números originales (20260828000000 y 20260829000000); se renumeraron después,
+-- sin tocar su SQL, porque #779 (Renta) ocupó esos dos números en `main`.
 -- Preview. Las ramas de preview sólo empujan archivos NUEVOS: editar uno
 -- existente no lo vuelve a ejecutar, así que una corrección hecha ahí quedaría
 -- en el repositorio y no en la base. Todo lo que sigue va aquí, y se escribe de

@@ -292,7 +292,7 @@ export async function fetchCondominiosPortalData(
       .order('created_at', { ascending: false })
       .limit(100),
     db.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
-    // clase='paquete': el motor único (20260829000000) también guarda
+    // clase='paquete': el motor único (20260829000600) también guarda
     // correspondencia dirigida a la unidad. La RLS se la concede al residente
     // igual que antes, pero "Mis paquetes" es paquetería; la correspondencia
     // tiene su propio flujo y no se cuela en esta lista.

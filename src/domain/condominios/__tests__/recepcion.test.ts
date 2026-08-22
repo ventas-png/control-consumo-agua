@@ -1,5 +1,5 @@
 // Contrato del motor único de recepción (paquetería + correspondencia en una
-// sola tabla desde 20260829000000). Lo que se protege aquí: que cada clase
+// sola tabla desde 20260829000600). Lo que se protege aquí: que cada clase
 // conserve su vocabulario, que una sola búsqueda encuentre la pieza sin saber
 // de qué clase es, que la guía se compare como la teclea la gente, y que un
 // registro duplicado entre clases se detecte en vez de pasar inadvertido.

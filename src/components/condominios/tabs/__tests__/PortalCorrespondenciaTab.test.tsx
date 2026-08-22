@@ -54,7 +54,7 @@ describe('PortalCorrespondenciaTab', () => {
   })
 
   it('es de solo lectura: no ofrece firmar el acuse desde el portal', () => {
-    // `paquete_firmar_recepcion` está acotada a clase='paquete' (20260829000000).
+    // `paquete_firmar_recepcion` está acotada a clase='paquete' (20260829000600).
     render(<PortalCorrespondenciaTab correspondencia={[pieza()]} />)
     expect(screen.queryByText(/[Ff]irmar/)).toBeNull()
   })

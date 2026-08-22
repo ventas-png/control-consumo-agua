@@ -12,7 +12,7 @@ export type TipoPaquete = 'paquete' | 'documento' | 'sobre' | 'otro'
 // 'saliente'         = la administración despacha correspondencia hacia afuera.
 // 'saliente_tercero' = el residente deja algo para que un tercero lo retire con código.
 export type DireccionPaquete = 'entrante' | 'saliente' | 'saliente_tercero'
-// ── Motor único de recepción (migración 20260829000000) ──────────────────────
+// ── Motor único de recepción (migración 20260829000600) ──────────────────────
 export type ClasePieza = 'paquete' | 'correspondencia'
 export type DestinatarioPieza = 'unidad' | 'administracion' | 'junta' | 'proveedor'
 export type PrioridadPieza = 'normal' | 'urgente'
@@ -69,7 +69,7 @@ export interface Mascota {
 
 /**
  * Fila de `paquetes_recibidos`, el motor único de recepción (migración
- * 20260829000000). Guarda las dos clases de pieza en custodia de portería:
+ * 20260829000600). Guarda las dos clases de pieza en custodia de portería:
  * paquetería y correspondencia. `clase` decide qué vocabulario de `tipo` y
  * `estado` aplica, y qué permiso RBAC gobierna la fila.
  */

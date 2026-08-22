@@ -1,7 +1,7 @@
 -- ============================================================
 -- Correspondencia: devolución al remitente
 -- ============================================================
--- Fase 2 de la convergencia (20260828000000 → 20260829000000 → esta).
+-- Fase 2 de la convergencia (20260828000300 → 20260829000600 → esta).
 --
 -- Paquetería siempre tuvo 'devuelto' para la pieza que sale de custodia sin
 -- llegar a su destinatario. Correspondencia no: una carta cuyo destinatario ya
@@ -11,7 +11,7 @@
 -- legal esa diferencia importa — la devolución es parte del acto.
 --
 -- Se amplía el vocabulario de estados de la clase 'correspondencia'. El resto
--- del CHECK queda idéntico a 20260829000000, incluido el NOT VALID: la tabla
+-- del CHECK queda idéntico a 20260829000600, incluido el NOT VALID: la tabla
 -- arrastra doce meses de filas anteriores a cualquier CHECK de estado y
 -- validarlas es un paso aparte, después de auditarlas en producción.
 ALTER TABLE public.paquetes_recibidos DROP CONSTRAINT IF EXISTS paquetes_estado_chk;

@@ -325,7 +325,7 @@ async function upsertAppUser(admin, userId, companyId, nombre, role = 'company_o
 }
 
 // ── Gate por CLASE de paquetes_recibidos ────────────────────────────────────
-// El motor único (20260829000000) resuelve el permiso POR FILA con un CASE
+// El motor único (20260829000600) resuelve el permiso POR FILA con un CASE
 // sobre `clase`, y su suite de comportamiento necesita CUATRO usuarios de la
 // MISMA empresa. No sirven A y B: son de empresas distintas, así que cualquier
 // "no ve la otra clase" podría estar pasando por aislamiento de tenant y no por
@@ -643,13 +643,33 @@ export async function verificarGateDeClase(url, anon, clase, admin, crearCliente
 // daba el sandbox por bueno. El seed es quien tiene que detectarlo ANTES, y
 // decirlo con el remedio.
 //
-// Se comprueban las DOS columnas que introduce 20260829000000 y sin las cuales
+// Se comprueban las DOS columnas que introduce 20260829000600 y sin las cuales
 // el gate por clase no existe: `clase` (gobierna las cuatro policies vía CASE) y
 // `destinatario_tipo` (distingue pieza de unidad de pieza de administración).
 export const COLUMNAS_RECEPCION = ['clase', 'destinatario_tipo']
 
+/**
+ * Las SEIS migraciones del motor de recepción, en orden.
+ *
+ * Se enumeran una por una y NO como rango. #779 (Renta) ocupó
+ * `20260829000000`…`20260829000500`, así que entre la primera y la última de
+ * esta cadena hay ahora migraciones que no son de recepción: un «aplicá de X a
+ * Y» arrastraría trabajo ajeno.
+ */
+export const CADENA_RECEPCION_ARCHIVOS = [
+  '20260828000300_correspondencia_acuse_trazabilidad',
+  '20260829000600_recepcion_motor_unico',
+  '20260830000000_correspondencia_devolucion',
+  '20260831000000_recepcion_evidencias_y_acuse',
+  '20260901000000_recepcion_integridad_final',
+  '20260902000000_recepcion_claim_owner_y_mime',
+]
+
 /** Primera y última de la cadena que hay que aplicar entera. */
-export const CADENA_RECEPCION = { desde: '20260828000000', hasta: '20260902000000' }
+export const CADENA_RECEPCION = {
+  desde: CADENA_RECEPCION_ARCHIVOS[0].slice(0, 14),
+  hasta: CADENA_RECEPCION_ARCHIVOS[CADENA_RECEPCION_ARCHIVOS.length - 1].slice(0, 14),
+}
 
 /**
  * Traduce el error de PostgREST a algo accionable. Se mira el CÓDIGO, no sólo
@@ -676,7 +696,9 @@ export function mensajeEsquemaAusente(columnas, ref) {
   return [
     `a \`paquetes_recibidos\` le faltan columnas del motor único (${columnas.join(', ')}).`,
     `   Aplicá la cadena COMPLETA ${desde}…${hasta} al proyecto ${ref || 'de SEED_EXPECTED_REF'},`,
-    '   en orden y entera: son seis migraciones y las de en medio no son opcionales.',
+    '   en orden y entera: son estas seis, y las de en medio no son opcionales.',
+    ...CADENA_RECEPCION_ARCHIVOS.map((a) => `     · ${a}.sql`),
+    '   Son SÓLO esas: entre la primera y la última hay migraciones de Renta que no van aquí.',
     '   Sin ellas el harness no puede probar el gate por clase, que es justo lo que viene a probar.',
     "   Sólo si esas migraciones YA constan aplicadas y el error persiste, la caché de PostgREST",
     "   está desactualizada: recargala con  NOTIFY pgrst, 'reload schema'.",

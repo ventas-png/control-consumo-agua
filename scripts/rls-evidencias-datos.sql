@@ -1,7 +1,7 @@
 -- Fixtures del sandbox de recepción.
 --
 -- Van DESPUÉS de las migraciones, no antes: las columnas que usan (`clase`,
--- `destinatario_tipo`, `prioridad`) las añade 20260829000000. Sembrar primero
+-- `destinatario_tipo`, `prioridad`) las añade 20260829000600. Sembrar primero
 -- obligaría a inventarse la tabla ya generalizada, que es justo lo que este
 -- sandbox dejó de hacer para no ocultar la contradicción del FK.
 --

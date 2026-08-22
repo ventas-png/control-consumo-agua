@@ -645,7 +645,7 @@ export interface EjecucionMantenimiento {
 }
 
 // La correspondencia dejó de tener tabla y tipo propios en la migración
-// 20260829000000: es una CLASE de `PiezaRecepcion` (types/condominios/seguridad).
+// 20260829000600: es una CLASE de `PiezaRecepcion` (types/condominios/seguridad).
 // `CategoriaCorrespondencia` y `EstadoCorrespondencia` viven allí, junto al
 // resto del vocabulario del motor de recepción.
 

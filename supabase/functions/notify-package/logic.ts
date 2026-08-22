@@ -27,7 +27,7 @@ export const TIPO_LABEL: Record<string, string> = {
   paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío',
 }
 
-// Correspondencia (clase del motor único, migración 20260829000000): el mismo
+// Correspondencia (clase del motor único, migración 20260829000600): el mismo
 // campo `tipo` lleva otro vocabulario. 'otro' se resuelve por clase, así que no
 // puede vivir en un solo diccionario.
 export const TIPO_LABEL_CORRESPONDENCIA: Record<string, string> = {
@@ -57,7 +57,7 @@ export interface CopyPieza {
   tipoNotificacion: string
   /** Qué puede hacer el residente al llegar. La correspondencia NO se firma
    *  desde el portal: `paquete_firmar_recepcion` está acotada a clase='paquete'
-   *  (20260829000000), así que prometerlo sería mentirle al residente. */
+   *  (20260829000600), así que prometerlo sería mentirle al residente. */
   cta: string
   cierre: string
   /** Cierre corto para el cuerpo de WhatsApp (Twilio, texto libre). */

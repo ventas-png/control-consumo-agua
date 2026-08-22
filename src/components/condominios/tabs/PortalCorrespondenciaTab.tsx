@@ -20,7 +20,7 @@ interface Props {
  *
  * Es de SOLO LECTURA a propósito. La correspondencia no se firma desde el
  * portal —`paquete_firmar_recepcion` está acotada a clase='paquete'
- * (20260829000000)— porque se entrega en administración con identificación de
+ * (20260829000600)— porque se entrega en administración con identificación de
  * por medio; un acuse a distancia no probaría nada.
  *
  * ENTRADAS Y SALIDAS NO SE CUENTAN IGUAL. Una pieza `direccion='saliente'` es

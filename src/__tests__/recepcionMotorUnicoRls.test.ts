@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
-// Guards ESTÁTICOS del motor único de recepción (20260829000000).
+// Guards ESTÁTICOS del motor único de recepción (20260829000600).
 //
 // ALCANCE Y LÍMITE. Esto lee el SQL del repo; no ejecuta nada contra una base.
 // Comprueba que las reglas siguen ESCRITAS como deben, que es la regresión
@@ -18,7 +18,7 @@ const MIGRATIONS_DIR = resolve('supabase/migrations')
 const TABLA = 'paquetes_recibidos'
 const PERM_PAQUETERIA = 'condominios.tab.paqueteria'
 const PERM_CORRESPONDENCIA = 'condominios.tab.correspondencia'
-const MIGRACION_UNIFICACION = '20260829000000_recepcion_motor_unico.sql'
+const MIGRACION_UNIFICACION = '20260829000600_recepcion_motor_unico.sql'
 
 interface Policy { nombre: string; cuerpo: string; archivo: string }
 

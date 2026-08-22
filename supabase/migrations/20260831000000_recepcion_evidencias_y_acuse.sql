@@ -58,11 +58,11 @@
 --     venga el UPDATE de donde venga.
 --
 -- La constraint se añade VALIDADA tras rellenar las filas históricas: son las
--- que migró 20260829000000 desde `correspondencia_condominio`, donde "atender"
+-- que migró 20260829000600 desde `correspondencia_condominio`, donde "atender"
 -- nunca guardó un acuse. Se marcan como lo que son —un acuse anterior a este
 -- cambio— en vez de inventarles un receptor.
 --
--- MIGRACIÓN NUEVA, NO EDICIÓN. 20260829000000 ya está aplicada en el preview
+-- MIGRACIÓN NUEVA, NO EDICIÓN. 20260829000600 ya está aplicada en el preview
 -- branch y el bot solo empuja archivos nuevos; además 20260822020000 es
 -- historia fusionada y no se toca.
 -- ════════════════════════════════════════════════════════════════════════════
@@ -287,7 +287,7 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- Mismo vocabulario que el CHECK de entregado_via (20260828000000).
+  -- Mismo vocabulario que el CHECK de entregado_via (20260828000300).
   IF p_via IS NULL OR p_via NOT IN ('porteria', 'portal') THEN
     RAISE EXCEPTION 'Vía de entrega inválida: %', p_via
       USING ERRCODE = 'check_violation';

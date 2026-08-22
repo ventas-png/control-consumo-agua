@@ -584,11 +584,14 @@ describe('el seed no filtra la service_role ni deja contraseñas viejas', () => 
 // que todo estaba en orden.
 import {
   CADENA_RECEPCION,
+  CADENA_RECEPCION_ARCHIVOS,
   COLUMNAS_RECEPCION,
   clasificarErrorEsquema,
   mensajeEsquemaAusente,
   verificarEsquemaRecepcion,
 } from '../seed-rls-sandbox.mjs'
+import { readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 /** Doble del cliente admin: responde por columna, no por conteo. */
 function adminFalso(porColumna) {
@@ -692,6 +695,54 @@ describe('verificarEsquemaRecepcion', () => {
     const admin = adminFalso({ clase: { error: { code: '08006', message: 'boom' } } })
     await verificarEsquemaRecepcion(admin, 'refx')
     expect(admin.pedidas).toEqual(['clase'])
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// La cadena declarada tiene que ser la cadena que existe.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO QUE ESTO CIERRA. Dos de estas migraciones se renumeraron porque #779
+// (Renta) ocupó sus números en `main`. El mensaje del seed las nombra una por
+// una: si alguien vuelve a renombrar y no toca esta lista, el seed mandará
+// aplicar archivos que no existen — y lo hará justo cuando el sandbox está roto
+// y nadie tiene ganas de dudar del mensaje de error.
+describe('CADENA_RECEPCION_ARCHIVOS espeja los archivos reales', () => {
+  const enDisco = readdirSync(resolve('supabase/migrations')).filter((f) => f.endsWith('.sql'))
+
+  it('cada archivo declarado existe en supabase/migrations', () => {
+    for (const base of CADENA_RECEPCION_ARCHIVOS) {
+      expect(enDisco, `declarada pero ausente: ${base}.sql`).toContain(`${base}.sql`)
+    }
+  })
+
+  it('son seis y están en orden de versión', () => {
+    expect(CADENA_RECEPCION_ARCHIVOS).toHaveLength(6)
+    const versiones = CADENA_RECEPCION_ARCHIVOS.map((a) => a.slice(0, 14))
+    expect(versiones).toEqual([...versiones].sort())
+    expect(new Set(versiones).size).toBe(versiones.length)
+  })
+
+  it('los extremos salen de la lista, no de dos constantes sueltas', () => {
+    expect(CADENA_RECEPCION.desde).toBe(CADENA_RECEPCION_ARCHIVOS[0].slice(0, 14))
+    expect(CADENA_RECEPCION.hasta).toBe(CADENA_RECEPCION_ARCHIVOS[5].slice(0, 14))
+  })
+
+  it('ninguna migración de recepción se quedó fuera de la lista', () => {
+    // El complemento del chequeo anterior: que exista lo declarado no impide
+    // olvidarse de declarar algo. Toda migración cuyo nombre hable de recepción
+    // o correspondencia y sea posterior a la primera de la cadena tiene que
+    // estar en la lista.
+    const desde = CADENA_RECEPCION.desde
+    const candidatas = enDisco
+      .filter((f) => /_(recepcion|correspondencia)_/.test(f))
+      .filter((f) => f.slice(0, 14) >= desde)
+      .map((f) => f.replace(/\.sql$/, ''))
+    expect([...candidatas].sort()).toEqual([...CADENA_RECEPCION_ARCHIVOS].sort())
+  })
+
+  it('el mensaje de esquema ausente nombra las seis', () => {
+    const m = mensajeEsquemaAusente(['clase'], 'refx')
+    for (const base of CADENA_RECEPCION_ARCHIVOS) expect(m).toContain(`${base}.sql`)
   })
 })
 

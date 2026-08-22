@@ -1,6 +1,6 @@
 // domain/condominios/recepcion.ts — Vocabulario del motor único de recepción.
 //
-// Desde la unificación (migración 20260829000000) paquetería y correspondencia
+// Desde la unificación (migración 20260829000600) paquetería y correspondencia
 // son la misma tabla y el mismo tipo (`PiezaRecepcion`), distinguidas por
 // `clase`. Este módulo concentra lo que ambas pestañas necesitan por igual:
 // etiquetas legibles, la bandeja combinada, búsqueda tolerante a cómo la gente

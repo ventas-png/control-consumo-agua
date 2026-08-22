@@ -18193,7 +18193,7 @@ export type Database = {
     }
     Views: {
       // Compatibilidad de SOLO LECTURA tras la unificación en paquetes_recibidos
-      // (migración 20260829000000). Las escrituras van a paquetes_recibidos con
+      // (migración 20260829000600). Las escrituras van a paquetes_recibidos con
       // clase='correspondencia'; por eso aquí no hay Insert ni Update.
       correspondencia_condominio: {
         Row: {

@@ -98,7 +98,7 @@ describe('notify-package/renderPaquete', () => {
 
   it('el correo de correspondencia no promete firmar desde el portal', () => {
     // `paquete_firmar_recepcion` está acotada a clase='paquete'
-    // (20260829000000): ofrecer el botón de firma en una carta sería mandar al
+    // (20260829000600): ofrecer el botón de firma en una carta sería mandar al
     // residente a hacer algo que la base de datos le va a rechazar.
     const out = renderPaquete({ ...vars, clase: 'correspondencia', tipo_label: 'Carta' })
     expect(out.subject).toBe('📬 Carta disponible en administración · A-3')
@@ -130,7 +130,7 @@ describe('notify-package/buildPaqueteInAppRows', () => {
     expect(buildPaqueteInAppRows([], vars, { companyId: 'c1', paqueteId: 'p1' })).toEqual([])
   })
 
-  // Motor único (20260829000000): el mismo endpoint avisa las dos clases.
+  // Motor único (20260829000600): el mismo endpoint avisa las dos clases.
   it('la correspondencia navega a SU pestaña del portal, no a "Mis paquetes"', () => {
     const rows = buildPaqueteInAppRows(
       ['u1'],
@@ -145,7 +145,7 @@ describe('notify-package/buildPaqueteInAppRows', () => {
   })
 })
 
-// ── WhatsApp por clase (motor único, 20260829000000) ────────────────────────
+// ── WhatsApp por clase (motor único, 20260829000600) ────────────────────────
 // Meta manda PLANTILLAS APROBADAS: su texto es fijo y no lo escribimos nosotros.
 // Reutilizar la de paquetería para anunciar correspondencia le mandaría al
 // residente un mensaje falso ("tienes un paquete en portería") por un canal que

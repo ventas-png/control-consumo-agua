@@ -3,6 +3,12 @@
 -- ============================================================
 -- Fase 0 de la convergencia Correspondencia ↔ Paquetería.
 --
+-- RENUMERADA. Nació como 20260828000000 y se aplicó al Supabase Preview con ese
+-- nombre. #779 (Renta) aterrizó en `main` con una migración del mismo número,
+-- y `scripts/migrations-guard.mjs` (regla (d)) no admite versiones duplicadas:
+-- se movió a 20260828000300 SIN tocar una línea de SQL. Idempotente, así que
+-- reaplicarla donde ya corrió no cambia nada.
+--
 -- POR QUÉ: `correspondencia_condominio` y `paquetes_recibidos` modelan lo
 -- mismo (algo físico que entra o sale de recepción a nombre de una unidad),
 -- pero correspondencia nació sin nada de lo que hace robusta a paquetería.

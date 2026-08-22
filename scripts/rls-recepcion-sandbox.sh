@@ -12,7 +12,7 @@
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MIGRACION="$RAIZ/supabase/migrations/20260829000000_recepcion_motor_unico.sql"
+MIGRACION="$RAIZ/supabase/migrations/20260829000600_recepcion_motor_unico.sql"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

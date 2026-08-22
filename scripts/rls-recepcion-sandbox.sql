@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Sandbox de RLS para el motor único de recepción (20260829000000)
+-- Sandbox de RLS para el motor único de recepción (20260829000600)
 -- ════════════════════════════════════════════════════════════════════════════
 -- QUÉ ES. Un banco de pruebas CONDUCTUAL de las policies de
 -- `paquetes_recibidos`: monta el andamiaje mínimo (auth.uid, app_users, los
