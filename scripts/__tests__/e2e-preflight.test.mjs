@@ -415,7 +415,9 @@ describe('Vercel Deployment Protection — bypass fail-closed, token jamás impr
     expect(config).toContain("process.env.E2E_VERCEL_BYPASS_TOKEN")
     expect(config).toContain("'x-vercel-protection-bypass': bypassToken")
     expect(config).toContain("'x-vercel-set-bypass-cookie': 'true'")
-    expect(config).toContain('extraHTTPHeaders')
+    // No basta con que la constante exista: tiene que estar CONECTADA al
+    // bloque use{} — si se cae de ahí, el navegador navega sin bypass.
+    expect(config).toMatch(/use:\s*\{\s*\n\s*baseURL,\s*\n\s*extraHTTPHeaders,/)
   })
 })
 
