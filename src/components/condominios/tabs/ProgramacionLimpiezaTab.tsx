@@ -1,18 +1,22 @@
-// Tab Limpieza — tres vistas sobre el mismo dato:
+// Tab Limpieza — cuatro vistas sobre el mismo dato:
 //
-//   Áreas       catálogo general + a quién le toca cada área (persona, o perfil
-//               turno+cargo), con asignación en bloque.
+//   Áreas       programaciones + a quién le toca cada área (persona, o perfil
+//               turno+cargo), con asignación en bloque. Desde 20260904000000
+//               el área se elige del catálogo canónico (`areas_condominio`).
+//   Catálogo    el catálogo compartido de áreas (el mismo CRUD que usa Rondas
+//               en seguridad), para dar de alta/baja áreas sin salir del tab.
 //   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
 //               cierre área por área.
 //   Novedades   lo que se encontró de paso y necesita mantenimiento.
 //
 // Antes el tab era solo el catálogo, con `responsable` como texto libre: se
 // programaba la limpieza pero no se podía repartir entre la plantilla ya
-// cargada en Personal, ni verificar que se hizo. Las tres vistas cubren el
-// ciclo completo — programar, ejecutar con evidencia, escalar el hallazgo.
+// cargada en Personal, ni verificar que se hizo. Las vistas cubren el ciclo
+// completo — programar, ejecutar con evidencia, escalar el hallazgo.
 import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../lib/format'
-import type { ProgramacionLimpieza, EjecucionLimpieza, PersonalCondominio } from '../../../types'
+import type { AreaCondominio, ProgramacionLimpieza, EjecucionLimpieza, PersonalCondominio } from '../../../types'
+import { AreasCatalog } from '../AreasCatalog'
 import { VistaAreas } from './limpieza/VistaAreas'
 import { VistaRuta } from './limpieza/VistaRuta'
 import { VistaNovedades } from './limpieza/VistaNovedades'
@@ -22,6 +26,7 @@ interface Props {
   programaciones: ProgramacionLimpieza[]
   ejecuciones: EjecucionLimpieza[]
   personal: PersonalCondominio[]
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -29,16 +34,17 @@ interface Props {
   onRefresh: () => void
 }
 
-type Vista = 'areas' | 'ruta' | 'novedades'
+type Vista = 'areas' | 'catalogo' | 'ruta' | 'novedades'
 
 const VISTAS: { id: Vista; label: string; icon: string }[] = [
   { id: 'areas',     label: 'Áreas',     icon: '🧹' },
+  { id: 'catalogo',  label: 'Catálogo de áreas', icon: '📍' },
   { id: 'ruta',      label: 'Ruta del día', icon: '🗓️' },
   { id: 'novedades', label: 'Novedades', icon: '⚠️' },
 ]
 
 export function ProgramacionLimpiezaTab({
-  programaciones, ejecuciones, personal, proyectoId, companyId, canCreate, canEdit, onRefresh,
+  programaciones, ejecuciones, personal, areas, proyectoId, companyId, canCreate, canEdit, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<Vista>('areas')
 
@@ -100,6 +106,20 @@ export function ProgramacionLimpiezaTab({
         <VistaAreas
           programaciones={programaciones}
           personal={personal}
+          areas={areas}
+          proyectoId={proyectoId}
+          companyId={companyId}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          onRefresh={onRefresh}
+        />
+      )}
+      {vista === 'catalogo' && (
+        // El mismo componente que usa Rondas: un solo catálogo, un solo CRUD.
+        // Los permisos son los del tab anfitrión (prog_limpieza); la BD acepta
+        // la escritura desde este tab desde 20260904000000.
+        <AreasCatalog
+          areas={areas}
           proyectoId={proyectoId}
           companyId={companyId}
           canCreate={canCreate}

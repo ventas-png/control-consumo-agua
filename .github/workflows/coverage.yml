@@ -263,6 +263,16 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: scripts/cierre-posfusion-sandbox.sh
 
+      # La serie 20260904* migra DATOS (backfill de áreas por nombre
+      # normalizado) y cambia una FK de CASCADE a RESTRICT: si el backfill ata
+      # mal, corrompe en silencio; si la FK no queda, borrar una programación
+      # sigue arrastrando el historial. Se ejercita contra un Postgres real,
+      # incluida la re-aplicación completa (idempotencia).
+      - name: Catálogos de limpieza — backfill, historial y puentes de recursos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/limpieza_catalogos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

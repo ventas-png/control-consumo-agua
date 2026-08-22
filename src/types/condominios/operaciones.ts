@@ -8,6 +8,18 @@ import type { ResponsableServicio } from './residentes'
 // ━━ Tareas operativas: turnos, bloques, revisiones ━━
 // ── Tareas operativas ─────────────────────────────────────────────────────
 
+/**
+ * Familia operativa de una ACTIVIDAD (20260904000100). No confundir con
+ * `cargo`, que es el puesto del personal que puede desempeñarla.
+ */
+export type ServicioOperativo =
+  | 'limpieza'
+  | 'mantenimiento'
+  | 'seguridad'
+  | 'jardineria'
+  | 'administracion'
+  | 'otro'
+
 export interface PlantillaTareaCargo {
   id: string
   company_id: string
@@ -21,8 +33,55 @@ export interface PlantillaTareaCargo {
   requiere_foto: boolean
   activo: boolean
   created_at: string
+  // ── Catálogo de actividades (20260904000100) ─────────────────────────────
+  // Opcionales porque las filas creadas antes de la migración no las traen.
+  /** NULL = fila legada pendiente de clasificar. */
+  servicio?: ServicioOperativo | null
+  /** Minutos (> 0). NULL = sin estimación. */
+  duracion_estimada_min?: number | null
+  /** Pasos esperados, en orden. En BD es jsonb; el loader lo castea a string[]. */
+  checklist?: string[]
+  instrucciones_seguridad?: string | null
+  requiere_comentario?: boolean
+  requiere_checklist?: boolean
   // joins
   area_nombre?: string
+}
+
+// ── Recursos planificados por actividad (20260904000200) ─────────────────────
+
+/** Insumo planificado de una actividad. La unidad se deriva del suministro. */
+export interface PlantillaTareaSuministro {
+  id: string
+  company_id: string
+  project_id: string
+  plantilla_tarea_id: string
+  suministro_id: string
+  cantidad: number
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+  // joins (embed suministros_condominio(nombre, unidad_medida, activo))
+  suministro_nombre?: string
+  unidad_medida?: string
+  suministro_activo?: boolean
+}
+
+/** Herramienta/equipo planificado de una actividad. */
+export interface PlantillaTareaHerramienta {
+  id: string
+  company_id: string
+  project_id: string
+  plantilla_tarea_id: string
+  inventario_id: string
+  cantidad: number
+  obligatoria: boolean
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+  // joins (embed inventario_condominio(nombre, estado))
+  inventario_nombre?: string
+  inventario_estado?: string
 }
 
 export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'
@@ -481,6 +540,12 @@ export interface ProgramacionLimpieza {
   orden?: number
   /** Si es true, la ejecución del día no se cierra sin al menos una foto. */
   requiere_foto?: boolean
+  // ── Normalización de áreas (20260904000000) ──────────────────────────────
+  /**
+   * Área del catálogo (areas_condominio). NULL = registro legado pendiente de
+   * vincular (o ambiguo en el backfill). `area` queda como snapshot del texto.
+   */
+  area_id?: string | null
 }
 
 // ── Ejecución diaria de limpieza (rutas) — 20260807130000 ────────────────────
