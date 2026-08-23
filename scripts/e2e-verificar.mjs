@@ -15,6 +15,16 @@
 //   · un spec CONDICIONAL skipped CON su variable presente  → rojo
 //   · un spec CONDICIONAL skipped SIN su variable           → omitido DECLARADO
 //     (visible en el resumen, nunca silencioso)
+//   · CUALQUIER otro skip                                   → rojo: es un skip
+//     INESPERADO (un test individual de un spec obligatorio, o de un archivo
+//     fuera de las listas), aunque el resto del archivo haya corrido
+//
+// EL CRITERIO DEL VERDE, en tres condiciones (las mismas que documentan el PR
+// y e2e/README.md):
+//   1. 0 fallos — eso lo reporta Playwright;
+//   2. 0 skips INESPERADOS — el ÚNICO skip admitido es el de un spec
+//      condicional cuya variable está ausente, y queda DECLARADO;
+//   3. todos los specs obligatorios con al menos una prueba ejecutada.
 //
 // El mismo criterio que el paso "Verificar que el harness ejecutó los
 // escenarios obligatorios" del job RLS: el verde tiene que significar
@@ -156,7 +166,7 @@ export function verificar(porArchivo, env = {}) {
           'Una variable presente con su spec omitido es un falso verde parcial.',
       )
     }
-    if (!habilitado && c.ejecutadas === 0) {
+    if (!habilitado && c.skipped > 0) {
       declarados.push(
         `${archivo}: omitido DECLARADO — falta ${variable} ` +
           (variable === 'E2E_INVITE_TOKEN'
@@ -164,6 +174,29 @@ export function verificar(porArchivo, env = {}) {
             : '(el despliegue de pruebas no declara PAC sandbox listo)'),
       )
     }
+  }
+
+  // ── 0 skips INESPERADOS ────────────────────────────────────────────────────
+  // Un skip individual dentro de un spec que sí ejecutó otras pruebas pasaba
+  // desapercibido: el archivo cumplía "al menos una ejecutada" y el conteo se
+  // leía como cobertura completa. El único skip admitido es el de un spec
+  // condicional SIN su variable (declarado arriba); todo lo demás — un test
+  // suelto de un spec obligatorio, un archivo fuera de las listas — es un skip
+  // INESPERADO y pone el job en rojo con sus razones.
+  const variablePorCondicional = new Map(SPECS_CONDICIONALES.map((c) => [c.archivo, c.variable]))
+  for (const [archivo, c] of porArchivo) {
+    if (c.skipped === 0) continue
+    const variable = variablePorCondicional.get(archivo)
+    if (variable && !env[variable]) continue // omisión condicional declarada
+    // Un archivo con CERO ejecutadas de las listas ya tiene su fallo específico
+    // arriba; no se duplica el mensaje.
+    if (c.ejecutadas === 0 && (SPECS_OBLIGATORIOS.includes(archivo) || variable)) continue
+    const razones = unicas(c.razonesSkip)
+    fallos.push(
+      `${c.skipped} skip(s) INESPERADO(s) en ${archivo} (${c.ejecutadas} ejecutadas). ` +
+        (razones.length > 0 ? `Razones que dejó: ${razones.join(' · ')}. ` : 'Sin razón registrada. ') +
+        'El único skip admitido es el de un spec condicional sin su variable.',
+    )
   }
 
   return { fallos, declarados, totales: { total, ejecutadas } }

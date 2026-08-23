@@ -110,6 +110,52 @@ describe('condicionales: omisión declarada, jamás silenciosa', () => {
   }
 })
 
+describe('0 skips INESPERADOS: el único skip admitido es el condicional declarado', () => {
+  it('un test suelto skipped dentro de un spec obligatorio que sí corrió → rojo con la razón', () => {
+    const rep = reporteCompleto()
+    rep.suites.push(spec('agua-lectura-cobro.e2e.ts', [t('skipped', 'sin unidad sembrada')]))
+    const { fallos } = verificar(resumir(rep), {})
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toMatch(/INESPERADO/)
+    expect(fallos[0]).toContain('agua-lectura-cobro.e2e.ts')
+    expect(fallos[0]).toContain('sin unidad sembrada')
+  })
+
+  it('un skip en un archivo FUERA de las listas (p. ej. el setup del bypass) → rojo', () => {
+    const rep = reporteCompleto()
+    rep.suites.push(spec('bypass.setup.ts', [t('skipped', 'saltado')]))
+    const { fallos } = verificar(resumir(rep), {})
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toContain('bypass.setup.ts')
+    expect(fallos[0]).toMatch(/INESPERADO/)
+  })
+
+  it('un archivo fuera de las listas con todo EJECUTADO (el setup normal) no molesta', () => {
+    const rep = reporteCompleto()
+    rep.suites.push(spec('bypass.setup.ts', [t('expected')]))
+    const { fallos, declarados } = verificar(resumir(rep), {})
+    expect(fallos).toEqual([])
+    expect(declarados).toEqual([])
+  })
+
+  it('skip parcial de un condicional SIN su variable → declarado, no fallo', () => {
+    const rep = reporteCompleto()
+    rep.suites.push(spec('invitation-accept.e2e.ts', [t('skipped', 'sin token')]))
+    const { fallos, declarados } = verificar(resumir(rep), {})
+    expect(fallos).toEqual([])
+    expect(declarados.some((d) => d.includes('invitation-accept.e2e.ts'))).toBe(true)
+  })
+
+  it('skip parcial de un condicional CON su variable presente → rojo inesperado', () => {
+    const rep = reporteCompleto()
+    rep.suites.push(spec('fiscal-timbrar.e2e.ts', [t('skipped', 'PAC caído')]))
+    const { fallos } = verificar(resumir(rep), { E2E_FISCAL_SANDBOX_READY: '1' })
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toMatch(/INESPERADO/)
+    expect(fallos[0]).toContain('fiscal-timbrar.e2e.ts')
+  })
+})
+
 describe('resumir: la forma real del reporter JSON', () => {
   it('camina suites anidadas (describe dentro de describe)', () => {
     const rep = {

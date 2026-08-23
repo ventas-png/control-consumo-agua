@@ -45,21 +45,37 @@ En CI el verde de este job significa «la suite corrió», no «no se opuso»:
 - **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
   `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
   corridas se encolan, ninguna muere a medias.
-- **Vercel Deployment Protection, fail-closed**: un Preview protegido devuelve
-  401 a cualquier visitante sin sesión de Vercel. El job usa el mecanismo
-  oficial —**Protection Bypass for Automation**—: `E2E_VERCEL_BYPASS_TOKEN` es
-  **obligatorio** y viaja como header `x-vercel-protection-bypass` (con
-  `x-vercel-set-bypass-cookie: true` para que Vercel siembre la cookie) tanto
-  en el fetch de `/e2e-meta.json` del preflight como en el navegador de
-  Playwright (`extraHTTPHeaders` en `playwright.config.ts`). Un 401/403 se
-  diagnostica nombrando la variable — el **valor** del token no se imprime
-  nunca.
+- **Vercel Deployment Protection, fail-closed y limitada al origen**: un
+  Preview protegido devuelve 401 a cualquier visitante sin sesión de Vercel.
+  El job usa el mecanismo oficial —**Protection Bypass for Automation**—:
+  `E2E_VERCEL_BYPASS_TOKEN` es **obligatorio** y viaja como header
+  `x-vercel-protection-bypass` (con `x-vercel-set-bypass-cookie: true`)
+  **únicamente hacia el origen del Preview**: en el fetch de `/e2e-meta.json`
+  del preflight y en la única petición de siembra del proyecto `setup` de
+  Playwright (`e2e/bypass.setup.ts`), que guarda la **cookie** de bypass en un
+  `storageState` que el proyecto `chromium` carga. El navegador navega con la
+  cookie — que sólo se envía a su propio origen — y el token **jamás** entra
+  como header global (`use.extraHTTPHeaders` acompañaría TODAS las solicitudes
+  del contexto, también hacia otros orígenes, filtrando el secreto; una prueba
+  con dos orígenes locales lo impide: `scripts/__tests__/e2e-bypass.test.mjs`).
+  Un 401/403 se diagnostica nombrando la variable — el **valor** del token no
+  aparece en URLs, logs, reportes, traces ni artifacts.
 - **Sin `service_role`**: el job no la recibe ni la necesita; el despliegue de
   pruebas usa la anon key de su sandbox, como cualquier cliente.
 - **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`): lee el reporte
   JSON y **falla** si se descubrieron cero pruebas, si todas quedaron skipped,
-  si un spec obligatorio no ejecutó ninguna, o si un condicional se omitió con
-  su variable presente.
+  si un spec obligatorio no ejecutó ninguna, si un condicional se omitió con
+  su variable presente, o si quedó **cualquier skip inesperado** (un test
+  suelto de un spec obligatorio, o de un archivo fuera de las listas), aunque
+  el resto del archivo haya corrido.
+
+  **El criterio del verde**, explícito: **0 fallos**, **0 skips inesperados**
+  (el único skip admitido es el de un spec condicional sin su variable, y
+  queda **declarado** en el resumen) y **todos los specs obligatorios con al
+  menos una prueba ejecutada**. No es "0 skips literal": `invitation-accept`
+  y `fiscal-timbrar` pueden quedar en omisión declarada sin sus variables —
+  si algún día se quiere el 100 %, basta configurar `E2E_INVITE_TOKEN` fresco
+  y `E2E_FISCAL_SANDBOX_READY=1` y el verificador los exigirá.
 - El auto-skip de `fixtures/env.ts` sigue existiendo como **comodidad local**
   (correr sin variables no revienta tu terminal); en CI esos skips son
   precisamente lo que el verificador convierte en rojo.
@@ -148,11 +164,14 @@ La secuencia del job:
    Vercel. Sin destino válido, el job falla **antes de instalar nada**.
 2. `npm ci` (dependencias fijadas en el lockfile — no hay instalación bajo
    demanda de Playwright) + el binario de Chromium + type-check de `e2e/`.
-3. `npx playwright test` contra la URL validada, con el bypass en
-   `extraHTTPHeaders`.
+3. `npx playwright test` contra la URL validada: primero el proyecto `setup`
+   siembra la cookie de bypass con una petición al origen exacto del Preview,
+   después `chromium` navega con esa cookie (`storageState`).
 4. **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`) sobre el
-   reporte JSON: cero ejecutadas, todas skipped o un spec obligatorio omitido
-   → rojo. El reporte se sube como artifact incluso en fallo.
+   reporte JSON: cero ejecutadas, todas skipped, un spec obligatorio omitido
+   o cualquier **skip inesperado** → rojo. El reporte se sube como artifact
+   incluso en fallo (el `storageState` con la cookie de bypass no está entre
+   los paths subidos).
 
 Las corridas se **encolan** (`concurrency: e2e-shared-sandbox`,
 `cancel-in-progress: false`): el sandbox es compartido y una corrida cancelada

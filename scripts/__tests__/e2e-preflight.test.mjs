@@ -410,14 +410,20 @@ describe('Vercel Deployment Protection — bypass fail-closed, token jamás impr
     expect(todo).not.toContain(TOKEN_BYPASS)
   })
 
-  it('playwright.config.ts lleva el bypass al NAVEGADOR vía extraHTTPHeaders', () => {
+  it('el navegador recibe el bypass como COOKIE de origen, nunca como header global', () => {
+    // El contrato completo (dos orígenes locales, cookie scope-ada, setup sin
+    // trace) vive en scripts/__tests__/e2e-bypass.test.mjs. Aquí queda el
+    // candado mínimo: extraHTTPHeaders con el token NO puede volver al config.
     const config = readFileSync(resolve('e2e/playwright.config.ts'), 'utf8')
-    expect(config).toContain("process.env.E2E_VERCEL_BYPASS_TOKEN")
-    expect(config).toContain("'x-vercel-protection-bypass': bypassToken")
-    expect(config).toContain("'x-vercel-set-bypass-cookie': 'true'")
-    // No basta con que la constante exista: tiene que estar CONECTADA al
-    // bloque use{} — si se cae de ahí, el navegador navega sin bypass.
-    expect(config).toMatch(/use:\s*\{\s*\n\s*baseURL,\s*\n\s*extraHTTPHeaders,/)
+    // Fuera de comentarios: el config EXPLICA por qué no usa extraHTTPHeaders,
+    // y esa mención documental está bien — la ejecutable no.
+    const sinComentarios = config
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('//'))
+      .join('\n')
+    expect(sinComentarios).not.toContain('extraHTTPHeaders')
+    expect(sinComentarios).toContain('storageState: RUTA_ESTADO')
+    expect(sinComentarios).toMatch(/dependencies:\s*\['setup'\]/)
   })
 })
 

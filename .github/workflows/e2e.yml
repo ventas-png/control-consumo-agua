@@ -70,10 +70,13 @@ jobs:
       # Vercel Protection Bypass for Automation: los Previews protegidos
       # devuelven 401 a un visitante sin sesión; este token —generado en
       # Vercel → Settings → Deployment Protection— viaja como header
-      # x-vercel-protection-bypass tanto en el preflight (al leer
-      # /e2e-meta.json) como en el navegador de Playwright. Es OBLIGATORIO:
-      # sin él, un Preview protegido haría fallar la suite con un 401
-      # indistinguible de un bug. Nunca se imprime.
+      # x-vercel-protection-bypass SOLO hacia el origen del Preview: en el
+      # preflight (al leer /e2e-meta.json) y en la única petición de siembra
+      # del proyecto `setup` de Playwright, que convierte el bypass en una
+      # COOKIE de ese origen (e2e/bypass.setup.ts). El navegador jamás lleva
+      # el token como header. Es OBLIGATORIO: sin él, un Preview protegido
+      # haría fallar la suite con un 401 indistinguible de un bug. Nunca se
+      # imprime.
       E2E_VERCEL_BYPASS_TOKEN: ${{ secrets.E2E_VERCEL_BYPASS_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -116,7 +119,8 @@ jobs:
           # La URL VALIDADA por el preflight (metadata + sha + ref), no el
           # secreto en crudo: si la resolución eligió el despliegue del SHA,
           # es ésa la que se prueba. El bypass de Vercel ya está en el env del
-          # job; playwright.config.ts lo convierte en extraHTTPHeaders.
+          # job; el proyecto `setup` de Playwright lo convierte en una cookie
+          # del origen exacto del Preview (nunca en headers globales).
           E2E_BASE_URL: ${{ steps.preflight.outputs.url }}
         run: npx playwright test --config e2e/playwright.config.ts
 

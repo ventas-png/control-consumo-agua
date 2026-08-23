@@ -45,3 +45,7 @@ supabase/.temp/
 
 # infra:I14 condominios-media migration runtime artifact (rollback manifest)
 condominios-media-manifest-*.json
+
+# Estado de cookies del bypass E2E de Vercel (lo escribe e2e/bypass.setup.ts;
+# contiene la cookie de sesión del Preview — jamás se versiona ni se sube)
+e2e/.estado/
