@@ -8,7 +8,7 @@
 // rojo explicado; y el destino se demuestra a sí mismo — marcador
 // environment=e2e-sandbox, ref de Supabase declarado y el MISMO sha del job.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import {
@@ -593,18 +593,68 @@ describe('el helper de login no puede volver a chocar con el botón del nav', ()
     const iLogin = auth.indexOf('export async function login(')
     expect(iLogin).toBeGreaterThan(0)
     const cuerpo = auth.slice(iLogin)
-    expect(cuerpo).toContain("dialogoDeLogin(page).getByRole('button', { name: /iniciar sesión/i }).click()")
+    expect(cuerpo).toContain('await botonEnviarLogin(page).click()')
     // Sin ningún clic al botón SIN acotar dentro de login().
     expect(cuerpo).not.toMatch(/^\s*await page\s*\n?\s*\.?getByRole\('button', \{ name: \/iniciar sesión\/i \}\)\.click\(\)/m)
   })
 
   it('el acotador usa el rol del diálogo, no el título (que cambia con el idioma)', () => {
     expect(auth).toContain("const dialogoDeLogin = (page: Page) => page.getByRole('dialog')")
+    expect(auth).toMatch(
+      /export function botonEnviarLogin\(page: Page\) \{\s*\n\s*return dialogoDeLogin\(page\)\.getByRole\('button', \{ name: \/iniciar sesión\/i \}\)/,
+    )
+  })
+
+  it('NINGÚN spec envía el formulario con un clic sin acotar: todos pasan por botonEnviarLogin', () => {
+    // auth-login.e2e.ts conservaba su propio clic a page.getByRole(...) y siguió
+    // reventando por strict mode cuando login() ya estaba arreglado.
+    for (const archivo of readdirSync(resolve('e2e')).filter((f) => f.endsWith('.e2e.ts'))) {
+      const texto = readFileSync(resolve('e2e', archivo), 'utf8')
+      const clicsSinAcotar = texto
+        .split('\n')
+        .filter((l) => /getByRole\('button', \{ name: \/iniciar sesión\/i \}\)/.test(l))
+        // El trigger del NAV (modal cerrado) sí es page-wide y usa .first().
+        .filter((l) => !l.includes('.first()'))
+      expect(clicsSinAcotar, `${archivo} envía el formulario sin acotar al diálogo`).toEqual([])
+    }
+  })
+
+  it('el fallo de login dice POR QUÉ, no sólo que el campo sigue visible', () => {
+    const auth = readFileSync(resolve('e2e/fixtures/auth.ts'), 'utf8')
+    // Lee el mensaje que la app deja en el modal…
+    expect(auth).toMatch(/\[role="alert"\], \.login-error/)
+    // …y distingue "el backend rechazó" de "el submit no produjo respuesta".
+    expect(auth).toContain('La app mostró:')
+    expect(auth).toContain('La app NO mostró ningún mensaje de error')
+    // La causa original no se tira: el stack de Playwright sigue disponible.
+    expect(auth).toContain('{ cause: e }')
   })
 
   it('el modal de Nav.tsx sigue siendo un role="dialog": el selector no puede quedar huérfano', () => {
     const nav = readFileSync(resolve('src/components/landing/Nav.tsx'), 'utf8')
     expect(nav).toMatch(/role="dialog"/)
+  })
+})
+
+// El verificador leyó playwright-results.json desde la raíz y no estaba: con
+// una ruta relativa, Playwright lo dejó en otro sitio y el paso murió con
+// ENOENT aunque la suite había corrido entera (run 32753812314).
+describe('el reporte JSON aterriza donde el verificador lo busca', () => {
+  const config = readFileSync(resolve('e2e/playwright.config.ts'), 'utf8')
+
+  it('el reporter json usa una ruta ABSOLUTA anclada a la raíz del repo', () => {
+    expect(config).toContain("['json', { outputFile: RUTA_REPORTE_JSON }]")
+    expect(config).toMatch(/const RAIZ_DEL_REPO = join\(dirname\(fileURLToPath\(import\.meta\.url\)\), '\.\.'\)/)
+    expect(config).toMatch(/RUTA_REPORTE_JSON = join\(RAIZ_DEL_REPO, 'playwright-results\.json'\)/)
+    // La relativa suelta no puede volver.
+    expect(config).not.toContain("outputFile: 'playwright-results.json'")
+  })
+
+  it('el verificador y el workflow apuntan a ese mismo nombre', () => {
+    const verificador = readFileSync(resolve('scripts/e2e-verificar.mjs'), 'utf8')
+    expect(verificador).toContain("ruta = 'playwright-results.json'")
+    const yml = readFileSync(resolve('.github/workflows/e2e.yml'), 'utf8')
+    expect(yml).toContain('playwright-results.json')
   })
 })
 

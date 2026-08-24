@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, openLoginModal } from './fixtures/auth'
+import { botonEnviarLogin, login, openLoginModal } from './fixtures/auth'
 import { hasBaseUrl, hasLoginCreds, LOGIN, reasons } from './fixtures/env'
 
 // CAMINO DE AUTH #1 — Login email/password (Supabase) desde el modal del landing.
@@ -10,7 +10,7 @@ test.describe('AUTH · login', () => {
     await openLoginModal(page)
     await page.getByPlaceholder('nombre@empresa.com').fill('no-existe@example.com')
     await page.getByPlaceholder('••••••••').fill('contraseña-incorrecta')
-    await page.getByRole('button', { name: /iniciar sesión/i }).click()
+    await botonEnviarLogin(page).click()
 
     // El modal sigue presente (no entró al shell). Es la afirmación robusta:
     // no dependemos del texto exacto del error de Supabase.
