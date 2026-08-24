@@ -228,8 +228,10 @@ export function decidirDestino(candidatos, esperado) {
   }
   if (candidatos.length === 0) {
     motivos.push(
-      'no hay ningún candidato de URL: la API de Deployments no registró un despliegue ' +
-        'para este SHA y E2E_BASE_URL no está configurada.',
+      'no hay ningún candidato de URL: la API de Deployments no registró NINGÚN despliegue ' +
+        'con status success para este SHA dentro de la ventana de espera, y E2E_BASE_URL no ' +
+        'está configurada. Revisá en Vercel si el build de este commit falló o quedó en cola ' +
+        'más tiempo del que el preflight espera.',
     )
   }
   return { ok: false, motivos }
@@ -333,6 +335,59 @@ export async function resolverUrlsPorSha({ repo, sha, token, fetchImpl = fetch }
 }
 
 /**
+ * Cuánto espera el preflight a que Vercel registre el despliegue del SHA.
+ * El workflow arranca con el `pull_request` del push, y Vercel tarda ~1 min en
+ * construir: consultar la API UNA sola vez pierde esa carrera SIEMPRE (el job
+ * fallaba a los 40 s con "no hay ningún candidato" mientras el Preview quedaba
+ * Ready segundos después). Esperar no afloja el fail-closed: al agotarse la
+ * ventana el job sigue rojo — sólo deja de confundir "todavía no está" con
+ * "no existe".
+ */
+export const ESPERA_DESPLIEGUE_MS = 900_000
+export const INTERVALO_SONDEO_MS = 15_000
+
+/**
+ * Sondea `resolverUrlsPorSha` hasta que aparezca un despliegue con status
+ * success para el SHA, o hasta agotar `tiempoMaxMs` (entonces devuelve []).
+ * El reloj, la espera y el log entran por parámetro para poder probarla sin
+ * dormir de verdad.
+ */
+export async function esperarUrlsPorSha({
+  repo,
+  sha,
+  token,
+  fetchImpl = fetch,
+  tiempoMaxMs = ESPERA_DESPLIEGUE_MS,
+  intervaloMs = INTERVALO_SONDEO_MS,
+  dormir = (ms) => new Promise((r) => setTimeout(r, ms)),
+  ahora = () => Date.now(),
+  registrar = console.log,
+}) {
+  // Sin repo o sin token `resolverUrlsPorSha` no puede consultar nada: sondear
+  // sería quemar la ventana entera para obtener el mismo [] del primer intento.
+  if (!repo || !token) return []
+
+  const inicio = ahora()
+  const seg = (ms) => Math.round(ms / 1000)
+  for (let intento = 1; ; intento += 1) {
+    const urls = await resolverUrlsPorSha({ repo, sha, token, fetchImpl })
+    if (urls.length > 0) {
+      if (intento > 1) {
+        registrar(`✅ Despliegue registrado para ${sha.slice(0, 8)} tras ${seg(ahora() - inicio)}s de espera.`)
+      }
+      return urls
+    }
+    const transcurrido = ahora() - inicio
+    if (transcurrido + intervaloMs > tiempoMaxMs) return []
+    registrar(
+      `⏳ Todavía no hay despliegue con status success para ${sha.slice(0, 8)} ` +
+        `(${seg(transcurrido)}s de ${seg(tiempoMaxMs)}s). Reintento en ${seg(intervaloMs)}s.`,
+    )
+    await dormir(intervaloMs)
+  }
+}
+
+/**
  * Descarga /e2e-meta.json del candidato. Si hay bypass de Vercel, viaja como
  * header (x-vercel-protection-bypass) — el VALOR del token no aparece en
  * ningún mensaje: un 401/403 se reporta como "la protección rechazó el
@@ -425,11 +480,14 @@ export async function main(env = process.env, fetchImpl = fetch) {
   // Candidatos: primero los despliegues registrados para ESTE sha, después la
   // URL estática si existe — sometida exactamente a las mismas comprobaciones.
   const esperado = { sha: env.SHA_ESPERADO, ref: env.E2E_EXPECTED_SUPABASE_REF }
-  const resueltas = await resolverUrlsPorSha({
+  const resueltas = await esperarUrlsPorSha({
     repo: env.GITHUB_REPOSITORY,
     sha: env.SHA_ESPERADO,
     token: env.GITHUB_TOKEN,
     fetchImpl,
+    // Con E2E_BASE_URL explícita ya hay un candidato que evaluar: una sola
+    // consulta y adelante, sin quemar la ventana esperando a Vercel.
+    tiempoMaxMs: env.E2E_BASE_URL ? 0 : ESPERA_DESPLIEGUE_MS,
   })
   const urls = [...resueltas]
   if (env.E2E_BASE_URL && !urls.includes(env.E2E_BASE_URL)) urls.push(env.E2E_BASE_URL)

@@ -16,7 +16,9 @@ import {
   VARIABLES_CONDICIONALES,
   VARIABLES_OBLIGATORIAS,
   decidirDestino,
+  INTERVALO_SONDEO_MS,
   decidirPreflight,
+  esperarUrlsPorSha,
   leerMeta,
   main,
   resolverUrlsPorSha,
@@ -244,6 +246,142 @@ describe('resolverUrlsPorSha (fetch inyectado)', () => {
   it('una API caída no revienta el preflight: devuelve lo que tenga', async () => {
     const f = async () => { throw new Error('red rota') }
     expect(await resolverUrlsPorSha({ repo: 'o/r', sha: 'x', token: 't', fetchImpl: f })).toEqual([])
+  })
+})
+
+// ── La carrera contra el build de Vercel ─────────────────────────────────────
+// El workflow arranca con el push y Vercel tarda ~1 min: consultar la API una
+// sola vez perdía la carrera SIEMPRE (run 32750004367 murió a los 40 s con "no
+// hay ningún candidato" y el Preview quedó Ready 12 s después). Esperar no
+// afloja nada: agotada la ventana, [] y el job rojo igual.
+describe('esperarUrlsPorSha (sondeo con reloj y espera inyectados)', () => {
+  /** Reloj falso: cada dormida adelanta el tiempo, nadie duerme de verdad. */
+  const relojFalso = () => {
+    let t = 0
+    return { ahora: () => t, dormir: async (ms) => { t += ms }, get transcurrido() { return t } }
+  }
+
+  /** fetch que devuelve [] las primeras `fallos` veces y luego una URL. */
+  const listoTrasIntentos = (fallos) => {
+    let n = 0
+    return async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) {
+        n += 1
+        return { ok: true, json: async () => (n > fallos ? [{ id: 1 }] : []) }
+      }
+      return { ok: true, json: async () => [{ state: 'success', environment_url: 'https://tarde.vercel.app' }] }
+    }
+  }
+
+  const base = (extra) => ({ repo: 'o/r', sha: 'abcdef1234567890', token: 't', registrar: () => {}, ...extra })
+
+  it('devuelve la URL en el primer intento sin dormir cuando ya está desplegado', async () => {
+    const reloj = relojFalso()
+    const urls = await esperarUrlsPorSha(base({ fetchImpl: listoTrasIntentos(0), ...reloj }))
+    expect(urls).toEqual(['https://tarde.vercel.app'])
+    expect(reloj.transcurrido).toBe(0)
+  })
+
+  it('sigue sondeando mientras Vercel construye y devuelve la URL cuando aparece', async () => {
+    const reloj = relojFalso()
+    const urls = await esperarUrlsPorSha(base({ fetchImpl: listoTrasIntentos(3), ...reloj }))
+    expect(urls).toEqual(['https://tarde.vercel.app'])
+    expect(reloj.transcurrido).toBe(3 * INTERVALO_SONDEO_MS)
+  })
+
+  it('agotada la ventana devuelve vacío: el fail-closed se mantiene', async () => {
+    const reloj = relojFalso()
+    const urls = await esperarUrlsPorSha(
+      base({ fetchImpl: listoTrasIntentos(Number.POSITIVE_INFINITY), tiempoMaxMs: 60_000, ...reloj }),
+    )
+    expect(urls).toEqual([])
+    expect(reloj.transcurrido).toBeLessThanOrEqual(60_000)
+  })
+
+  it('con tiempoMaxMs 0 hace UN intento y no duerme (caso E2E_BASE_URL explícita)', async () => {
+    const reloj = relojFalso()
+    let consultas = 0
+    const f = async (url) => {
+      if (String(url).includes('/deployments?')) consultas += 1
+      return { ok: true, json: async () => [] }
+    }
+    expect(await esperarUrlsPorSha(base({ fetchImpl: f, tiempoMaxMs: 0, ...reloj }))).toEqual([])
+    expect(consultas).toBe(1)
+    expect(reloj.transcurrido).toBe(0)
+  })
+
+  it('sin repo o sin token no sondea: devolvería siempre lo mismo', async () => {
+    const reloj = relojFalso()
+    const f = () => { throw new Error('no debía consultar') }
+    expect(await esperarUrlsPorSha(base({ repo: '', fetchImpl: f, ...reloj }))).toEqual([])
+    expect(await esperarUrlsPorSha(base({ token: '', fetchImpl: f, ...reloj }))).toEqual([])
+    expect(reloj.transcurrido).toBe(0)
+  })
+
+  it('el log de espera no imprime tokens ni URLs de API, sólo el sha corto y los segundos', async () => {
+    const reloj = relojFalso()
+    const lineas = []
+    await esperarUrlsPorSha(
+      base({ fetchImpl: listoTrasIntentos(1), registrar: (l) => lineas.push(l), ...reloj }),
+    )
+    const texto = lineas.join('\n')
+    expect(texto).toContain('abcdef12')
+    expect(texto).not.toContain('abcdef1234567890')
+    expect(texto).not.toContain('api.github.com')
+  })
+
+  it('con E2E_BASE_URL explícita main NO espera a Vercel: una consulta y a evaluar', async () => {
+    let consultas = 0
+    const f = async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) {
+        consultas += 1
+        return { ok: true, json: async () => [] }
+      }
+      if (s.includes('e2e-meta.json')) return { ok: true, status: 200, json: async () => META_OK }
+      return { ok: false, status: 404 }
+    }
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.useFakeTimers()
+    try {
+      // Sin avanzar el reloj: si main esperase, esta promesa no resolvería.
+      const code = await main(
+        { ...COMPLETAS, GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't', E2E_BASE_URL: 'https://estable.vercel.app' },
+        f,
+      )
+      expect(code).toBe(0)
+    } finally {
+      vi.useRealTimers()
+      log.mockRestore()
+    }
+    expect(consultas).toBe(1)
+  })
+
+  it('main espera al despliegue tardío en vez de fallar en el primer intento', async () => {
+    let consultas = 0
+    const f = async (url) => {
+      const s = String(url)
+      if (s.includes('/deployments?')) {
+        consultas += 1
+        return { ok: true, json: async () => (consultas > 2 ? [{ id: 7 }] : []) }
+      }
+      if (s.includes('/statuses')) {
+        return { ok: true, json: async () => [{ state: 'success', environment_url: 'https://tarde.vercel.app' }] }
+      }
+      return { ok: true, status: 200, json: async () => META_OK }
+    }
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.useFakeTimers()
+    try {
+      const corriendo = main({ ...COMPLETAS, GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' }, f)
+      await vi.advanceTimersByTimeAsync(INTERVALO_SONDEO_MS * 3)
+      expect(await corriendo).toBe(0)
+    } finally {
+      vi.useRealTimers()
+      log.mockRestore()
+    }
+    expect(consultas).toBe(3)
   })
 })
 
