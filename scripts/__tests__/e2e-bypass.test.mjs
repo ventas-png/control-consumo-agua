@@ -26,6 +26,7 @@ import {
 import {
   HEADER_BYPASS as HEADER_BYPASS_PREFLIGHT,
   HEADER_SIEMBRA_COOKIE as HEADER_COOKIE_PREFLIGHT,
+  MAX_SALTOS_MISMO_ORIGEN,
   leerMeta,
 } from '../e2e-preflight.mjs'
 
@@ -241,6 +242,87 @@ describe('leerMeta clasifica el rechazo de la protección en vez de esconderlo',
     expect(errorFetch).toContain('fetch failed')
     expect(errorFetch).toContain('ENOTFOUND')
     expect(errorFetch).not.toContain(TOKEN)
+  })
+
+  // ── Las DOS clases de 3xx ──────────────────────────────────────────────────
+  // Tratarlas igual costó la corrida 32751852528: el Preview respondió
+  // «HTTP 307 → /e2e-meta.json» —Vercel sembrando la cookie de bypass, con el
+  // token ACEPTADO— y el preflight lo reportó como token rechazado.
+  const conSetCookie = (status, location, setCookie) => ({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get: (k) => (k.toLowerCase() === 'location' ? location : null),
+      getSetCookie: () => (setCookie ? [setCookie] : []),
+    },
+    json: async () => ({}),
+  })
+
+  /** fetch que responde con la secuencia dada, uno por llamada, y registra todo. */
+  const secuencia = (...respuestas) => {
+    const visto = []
+    let i = 0
+    const f = async (u, init) => {
+      // Tope duro: si el corte de saltos desapareciera, esto falla en el acto
+      // en vez de dejar la suite girando hasta el timeout.
+      if (visto.length > MAX_SALTOS_MISMO_ORIGEN + 1) throw new Error('siguió redirects sin fin')
+      visto.push({ url: String(u), headers: { ...init.headers } })
+      return respuestas[Math.min(i++, respuestas.length - 1)]
+    }
+    return { f, visto }
+  }
+
+  it('un 307 al MISMO origen es la siembra de la cookie: se sigue y la metadata se lee', async () => {
+    const META = { commit_sha: 'abc', environment: 'e2e-sandbox', supabase_project_ref: 'r' }
+    const ok = { status: 200, ok: true, headers: { get: () => null, getSetCookie: () => [] }, json: async () => META }
+    const { f, visto } = secuencia(conSetCookie(307, '/e2e-meta.json', '_vercel_jwt=JWT123; Path=/; HttpOnly'), ok)
+    const { meta, errorFetch } = await leerMeta('https://p.vercel.app', f, TOKEN)
+    expect(errorFetch).toBeNull()
+    expect(meta).toEqual(META)
+    expect(visto).toHaveLength(2)
+  })
+
+  it('la cookie sembrada viaja en el salto siguiente, junto con el header del bypass', async () => {
+    const ok = { status: 200, ok: true, headers: { get: () => null, getSetCookie: () => [] }, json: async () => ({}) }
+    const { f, visto } = secuencia(conSetCookie(307, '/e2e-meta.json', '_vercel_jwt=JWT123; Path=/; HttpOnly'), ok)
+    await leerMeta('https://p.vercel.app', f, TOKEN)
+    expect(visto[0].headers.cookie).toBeUndefined()
+    expect(visto[1].headers.cookie).toBe('_vercel_jwt=JWT123')
+    expect(visto[1].headers[HEADER_BYPASS]).toBe(TOKEN)
+    // El header sigue yendo al MISMO origen y a ningún otro.
+    expect(visto.every((v) => v.url.startsWith('https://p.vercel.app/'))).toBe(true)
+  })
+
+  it('un Location RELATIVO se resuelve contra la URL actual, no contra la raíz del proceso', async () => {
+    const ok = { status: 200, ok: true, headers: { get: () => null, getSetCookie: () => [] }, json: async () => ({}) }
+    const { f, visto } = secuencia(conSetCookie(307, '/e2e-meta.json?ok=1'), ok)
+    await leerMeta('https://p.vercel.app', f, TOKEN)
+    expect(visto[1].url).toBe('https://p.vercel.app/e2e-meta.json?ok=1')
+  })
+
+  it('un 3xx que CRUZA de origen corta ahí: el token nunca se manda al segundo origen', async () => {
+    const { f, visto } = secuencia(conSetCookie(302, SSO))
+    const { meta, errorFetch } = await leerMeta('https://p.vercel.app', f, TOKEN)
+    expect(meta).toBeNull()
+    expect(errorFetch).toContain('E2E_VERCEL_BYPASS_TOKEN')
+    expect(visto).toHaveLength(1)
+    expect(visto[0].url).toBe('https://p.vercel.app/e2e-meta.json')
+    expect(visto.some((v) => v.url.includes('vercel.com'))).toBe(false)
+  })
+
+  it('un bucle de redirects del mismo origen se corta en MAX_SALTOS_MISMO_ORIGEN', async () => {
+    const { f, visto } = secuencia(conSetCookie(307, '/e2e-meta.json'))
+    const { meta, errorFetch } = await leerMeta('https://p.vercel.app', f, TOKEN)
+    expect(meta).toBeNull()
+    expect(errorFetch).toContain(`más de ${MAX_SALTOS_MISMO_ORIGEN} redirects`)
+    expect(errorFetch).not.toContain(TOKEN)
+    expect(visto).toHaveLength(MAX_SALTOS_MISMO_ORIGEN + 1)
+  })
+
+  it('un 3xx sin Location no se sigue a ciegas', async () => {
+    const { errorFetch } = await leerMeta('https://p.vercel.app', async () => respuesta(307), TOKEN)
+    expect(errorFetch).toContain('sin Location')
+    expect(errorFetch).toContain('E2E_VERCEL_BYPASS_TOKEN')
   })
 
   it('preflight y fixture no pueden divergir en el nombre de los headers', () => {

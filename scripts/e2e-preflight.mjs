@@ -398,23 +398,53 @@ export const HEADER_SIEMBRA_COOKIE = 'x-vercel-set-bypass-cookie'
 
 const esRedirect = (status) => typeof status === 'number' && status >= 300 && status < 400
 
+/** Cuántos redirects DENTRO del propio origen se siguen antes de rendirse. */
+export const MAX_SALTOS_MISMO_ORIGEN = 3
+
 /**
- * Origen + ruta del Location, SIN query: la pantalla de autenticación de Vercel
- * devuelve un `_vercel_share=<token>` en la URL y ese token no tiene por qué
- * quedar escrito en el log del job.
+ * Resuelve el Location contra la URL desde la que se respondió (puede venir
+ * relativo, como el 307 de la siembra de cookie de Vercel).
+ *
+ * @returns {URL|null}
  */
-function destinoDeRedirect(r) {
+function destinoDeRedirect(r, desde) {
   const bruto = r?.headers?.get?.('location') || ''
-  if (!bruto) return 'sin Location'
+  if (!bruto) return null
   try {
-    const u = new URL(bruto)
-    return `${u.origin}${u.pathname}`
+    return new URL(bruto, desde)
   } catch {
-    return bruto.split('?')[0]
+    return null
   }
 }
 
-/** Mismo diagnóstico para 3xx y 401/403: el bypass no se aplicó. */
+/**
+ * Origen + ruta, SIN query: la pantalla de autenticación de Vercel devuelve un
+ * `_vercel_share=<token>` en la URL, y el token del bypass tampoco tiene por
+ * qué quedar escrito en el log del job si alguna vez viaja ahí.
+ */
+const sinQuery = (u) => `${u.origin}${u.pathname}`
+
+/**
+ * Junta las cookies que el destino va sembrando (el `_vercel_jwt` del bypass)
+ * para mandarlas en el salto siguiente. Sólo el par nombre=valor: los
+ * atributos (Path, Expires, HttpOnly…) no se reenvían.
+ */
+function acumularCookies(previas, r) {
+  const crudas = r?.headers?.getSetCookie?.() ?? (r?.headers?.get?.('set-cookie') ? [r.headers.get('set-cookie')] : [])
+  const pares = new Map()
+  for (const trozo of previas ? previas.split('; ') : []) {
+    const i = trozo.indexOf('=')
+    if (i > 0) pares.set(trozo.slice(0, i), trozo.slice(i + 1))
+  }
+  for (const cruda of crudas) {
+    const par = String(cruda).split(';')[0]
+    const i = par.indexOf('=')
+    if (i > 0) pares.set(par.slice(0, i).trim(), par.slice(i + 1))
+  }
+  return [...pares].map(([k, v]) => `${k}=${v}`).join('; ')
+}
+
+/** Diagnóstico de "el bypass no se aplicó": 401/403 y los 3xx que se van del origen. */
 function motivoProteccion(prefijo) {
   return (
     `${prefijo} — la Deployment Protection de Vercel no dejó pasar la petición. ` +
@@ -425,30 +455,66 @@ function motivoProteccion(prefijo) {
   )
 }
 
+/**
+ * Descarga /e2e-meta.json del candidato, con el bypass de Vercel en headers.
+ *
+ * DOS CLASES DE 3xx, y confundirlas costó una corrida entera (run 32751852528,
+ * "HTTP 307 → /e2e-meta.json" reportado como token rechazado cuando el token
+ * era correcto):
+ *
+ *   · MISMO ORIGEN — es la siembra de la cookie: con
+ *     x-vercel-set-bypass-cookie: true Vercel responde Set-Cookie + redirect a
+ *     la misma URL. Se SIGUE a mano (hasta MAX_SALTOS_MISMO_ORIGEN), llevando
+ *     las cookies sembradas y el header del bypass, que no sale del origen.
+ *   · OTRO ORIGEN — es la pantalla de autenticación (vercel.com/sso-api): el
+ *     bypass no se aplicó. Se corta ahí y se reporta; el token JAMÁS se
+ *     reenvía al nuevo origen.
+ *
+ * Nunca se sigue con `redirect: 'follow'`: eso mandaría el header del bypass a
+ * donde apunte el Location y convertiría el fallo en un "fetch failed" opaco.
+ */
 export async function leerMeta(url, fetchImpl = fetch, bypassToken = '') {
+  const objetivo = new URL('/e2e-meta.json', url)
+  const origen = objetivo.origin
   const headers = { accept: 'application/json' }
   if (bypassToken) {
     headers[HEADER_BYPASS] = bypassToken
     headers[HEADER_SIEMBRA_COOKIE] = 'true'
   }
+
+  let actual = objetivo
+  let cookies = ''
   try {
-    const r = await fetchImpl(new URL('/e2e-meta.json', url), {
-      signal: AbortSignal.timeout(15_000),
-      // MANUAL a propósito: si el bypass no se aplica, Vercel responde 3xx
-      // hacia su pantalla de autenticación. Siguiendo el redirect el fallo
-      // llegaba como un "fetch failed" opaco (o un JSON inválido) y el
-      // operador no tenía forma de saber que el problema era el token.
-      redirect: 'manual',
-      headers,
-    })
-    if (esRedirect(r.status)) {
-      return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status} → ${destinoDeRedirect(r)}`) }
+    for (let salto = 0; salto <= MAX_SALTOS_MISMO_ORIGEN; salto += 1) {
+      const r = await fetchImpl(actual, {
+        signal: AbortSignal.timeout(15_000),
+        redirect: 'manual',
+        headers: cookies ? { ...headers, cookie: cookies } : headers,
+      })
+
+      if (esRedirect(r.status)) {
+        const destino = destinoDeRedirect(r, actual)
+        if (!destino) {
+          return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status} sin Location`) }
+        }
+        if (destino.origin !== origen) {
+          return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status} → ${sinQuery(destino)}`) }
+        }
+        cookies = acumularCookies(cookies, r)
+        actual = destino
+        continue
+      }
+
+      if (r.status === 401 || r.status === 403) {
+        return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status}`) }
+      }
+      if (!r.ok) return { meta: null, errorFetch: `HTTP ${r.status}` }
+      return { meta: await r.json(), errorFetch: null }
     }
-    if (r.status === 401 || r.status === 403) {
-      return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status}`) }
+    return {
+      meta: null,
+      errorFetch: motivoProteccion(`más de ${MAX_SALTOS_MISMO_ORIGEN} redirects dentro de ${origen}`),
     }
-    if (!r.ok) return { meta: null, errorFetch: `HTTP ${r.status}` }
-    return { meta: await r.json(), errorFetch: null }
   } catch (e) {
     // undici envuelve TODO fallo de transporte como "fetch failed" y deja el
     // motivo real (ENOTFOUND, ECONNREFUSED, redirect count exceeded…) en
