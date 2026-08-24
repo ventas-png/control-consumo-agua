@@ -273,6 +273,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/limpieza_catalogos/run.sh
 
+      # 20260905000100 arregla un bug VIVO (el par de cierre colgaba de
+      # `completado_en`, columna que no existe: la RPC actividad_equipo revienta
+      # con 42703) y retira dos policies legacy company_rw_* que anulaban por OR
+      # el gate RBAC. Ambas cosas sólo se comprueban ejecutando: que la RPC
+      # devuelva filas, y que cada rol vea exactamente lo que le toca. Incluye
+      # la re-aplicación completa (idempotencia).
+      - name: Paridad de tareas_bloque — cierre sellado, anulación y RLS re-gateada
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/tareas_bloque_paridad/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
