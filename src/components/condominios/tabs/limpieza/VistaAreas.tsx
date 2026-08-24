@@ -29,6 +29,12 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /**
+   * Borrado, independiente de canEdit: la programación con historial ni
+   * siquiera se puede borrar en BD (FK RESTRICT), y quien no tiene el permiso
+   * conserva Desactivar como alternativa.
+   */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -53,7 +59,7 @@ const ALERTA_STYLE = {
   sin_fecha: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', badge: 'var(--at-ink-3)', badgeBg: 'var(--at-chip)', label: 'Sin fecha' },
 }
 
-export function VistaAreas({ programaciones, personal, areas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function VistaAreas({ programaciones, personal, areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -427,7 +433,7 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
                   </label>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                     {canEdit && <button onClick={() => openEdit(p)} aria-label={`Editar ${nombreArea}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(p)} aria-label={`Eliminar ${nombreArea}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>}
+                    {canDelete && <button onClick={() => handleDelete(p)} aria-label={`Eliminar ${nombreArea}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>}
                   </div>
                 </div>
 

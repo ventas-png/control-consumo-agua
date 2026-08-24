@@ -282,9 +282,10 @@ BEGIN
     NULL;
   END;
   -- Una plantilla desechable con su vínculo: borrarla debe llevarse el vínculo
-  -- (la receta es parte de la definición, no historial).
+  -- (la receta es parte de la definición, no historial). Cargo del catálogo:
+  -- el trigger de 20260904000100 ya no admite texto libre en INSERT.
   INSERT INTO public.plantillas_tarea_cargo (id, company_id, project_id, cargo, titulo)
-  VALUES ('d0000000-0000-0000-0000-000000000099', CO_A, P1, 'Limpieza', 'Desechable');
+  VALUES ('d0000000-0000-0000-0000-000000000099', CO_A, P1, 'conserje', 'Desechable');
   INSERT INTO public.plantilla_tarea_suministros
     (company_id, project_id, plantilla_tarea_id, suministro_id, cantidad)
   VALUES (CO_A, P1, 'd0000000-0000-0000-0000-000000000099', SUM_CLORO, 1);
@@ -295,7 +296,87 @@ BEGIN
     RAISE EXCEPTION '17b: quedaron % vínculos huérfanos tras borrar la plantilla', n; END IF;
   RAISE NOTICE 'OK 17 el catálogo de recursos queda protegido; la receta muere con su plantilla';
 
-  RAISE NOTICE '── 17 invariantes de datos OK ──';
+  -- ── 18. El tenant de un padre relacionado es INMÓVIL (FKs compuestas) ────
+  -- PL_LIMPIEZA tiene vínculos vivos (Cloro e Hidrolavadora): moverla de
+  -- proyecto o de empresa debe chocar con la FK compuesta del hijo. Ídem
+  -- mover el recurso.
+  BEGIN
+    UPDATE public.plantillas_tarea_cargo SET project_id = P1B WHERE id = PL_LIMPIEZA;
+    RAISE EXCEPTION '18a: una plantilla con recursos se movió de proyecto';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+  BEGIN
+    UPDATE public.suministros_condominio SET company_id = CO_B WHERE id = SUM_CLORO;
+    RAISE EXCEPTION '18b: un suministro relacionado se movió de empresa';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+  BEGIN
+    UPDATE public.inventario_condominio SET project_id = P1B WHERE id = HER_HIDRO;
+    RAISE EXCEPTION '18c: una herramienta relacionada se movió de proyecto';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+  RAISE NOTICE 'OK 18 plantilla y recursos relacionados no pueden cambiar de empresa/proyecto';
+
+  -- ── 19. Cargo controlado en capturas nuevas; el legado sigue operable ────
+  BEGIN
+    INSERT INTO public.plantillas_tarea_cargo (company_id, project_id, cargo, titulo)
+    VALUES (CO_A, P1, 'Cocinero', 'Cargo fuera de catálogo');
+    RAISE EXCEPTION '19a: se insertó un cargo fuera del catálogo';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  INSERT INTO public.plantillas_tarea_cargo (id, company_id, project_id, cargo, titulo)
+  VALUES ('d0000000-0000-0000-0000-000000000098', CO_A, P1, ' Conserje ', 'Mayúscula y espacios pasan');
+  DELETE FROM public.plantillas_tarea_cargo WHERE id = 'd0000000-0000-0000-0000-000000000098';
+  -- El legado con cargo libre ('Polivalente') se puede seguir operando.
+  UPDATE public.plantillas_tarea_cargo SET activo = false WHERE id = PL_POLIV;
+  UPDATE public.plantillas_tarea_cargo SET activo = true  WHERE id = PL_POLIV;
+  RAISE NOTICE 'OK 19 el cargo nuevo va controlado; el histórico no se toca y sigue operable';
+
+  -- ── 20. Checklist obligatorio = checklist con contenido real ─────────────
+  BEGIN
+    UPDATE public.plantillas_tarea_cargo
+    SET requiere_checklist = true, checklist = '[]'::jsonb WHERE id = PL_POLIV;
+    RAISE EXCEPTION '20a: checklist obligatorio aceptó un checklist vacío';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  BEGIN
+    UPDATE public.plantillas_tarea_cargo
+    SET requiere_checklist = true, checklist = '["   "]'::jsonb WHERE id = PL_POLIV;
+    RAISE EXCEPTION '20b: checklist obligatorio aceptó pasos en blanco';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  UPDATE public.plantillas_tarea_cargo
+  SET requiere_checklist = true WHERE id = PL_LIMPIEZA;  -- tiene 3 pasos reales
+  UPDATE public.plantillas_tarea_cargo
+  SET requiere_checklist = false WHERE id = PL_LIMPIEZA;
+  RAISE NOTICE 'OK 20 requiere_checklist exige al menos un paso de texto no vacío (en BD)';
+
+  -- ── 21. Anular exige motivo, la BD sella al autor, restaurar limpia ──────
+  BEGIN
+    UPDATE public.ejecuciones_limpieza SET anulada_en = now() WHERE id = 'c0000000-0000-0000-0000-000000000001';
+    RAISE EXCEPTION '21a: se anuló sin motivo';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  UPDATE public.ejecuciones_limpieza
+  SET anulada_en = now(), motivo_anulacion = 'Cargada al área equivocada'
+  WHERE id = 'c0000000-0000-0000-0000-000000000001';
+  SELECT anulada_por::text INTO t FROM public.ejecuciones_limpieza
+  WHERE id = 'c0000000-0000-0000-0000-000000000001';
+  IF t IS DISTINCT FROM ADMIN_A::text THEN
+    RAISE EXCEPTION '21b: anulada_por = % (debía sellarse con el usuario de la sesión)', t; END IF;
+  UPDATE public.ejecuciones_limpieza
+  SET anulada_en = NULL, anulada_por = NULL, motivo_anulacion = NULL
+  WHERE id = 'c0000000-0000-0000-0000-000000000001';
+  RAISE NOTICE 'OK 21 la anulación lógica exige motivo, sella al autor y es restaurable';
+
+  RAISE NOTICE '── 21 invariantes de datos OK ──';
 END;
 $$;
 
@@ -317,16 +398,17 @@ DECLARE
   P1        uuid := '11111111-0000-0000-0000-000000000001';
   PL_JARDIN uuid := 'd0000000-0000-0000-0000-000000000002';
   SUM_CLORO uuid := 'f0000000-0000-0000-0000-000000000001';
+  EJEC_HIST uuid := 'c0000000-0000-0000-0000-000000000001';
   n     bigint;
   v_id  uuid;
 BEGIN
   SET LOCAL ROLE limpieza_tester;
 
-  -- ── 18. Con el permiso del tab se leen y editan los puentes propios ──────
+  -- ── 22. Con el permiso del tab se leen y editan los puentes propios ──────
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);  -- Diana: plantillas_cargo
   SELECT count(*) INTO n FROM public.plantilla_tarea_suministros;
   IF n = 0 THEN
-    RAISE EXCEPTION '18a: con plantillas_cargo debía ver los insumos planificados y vio 0'; END IF;
+    RAISE EXCEPTION '22a: con plantillas_cargo debía ver los insumos planificados y vio 0'; END IF;
   INSERT INTO public.plantilla_tarea_suministros
     (company_id, project_id, plantilla_tarea_id, suministro_id, cantidad)
   VALUES (CO_A, P1, PL_JARDIN, SUM_CLORO, 1)
@@ -334,80 +416,135 @@ BEGIN
   DELETE FROM public.plantilla_tarea_suministros WHERE id = v_id;
   SELECT count(*) INTO n FROM public.plantilla_tarea_suministros WHERE id = v_id;
   IF n <> 0 THEN
-    RAISE EXCEPTION '18b: el operador con el permiso no pudo quitar su propio insumo'; END IF;
-  RAISE NOTICE 'OK 18 el permiso del tab abre lectura, alta y baja de recursos';
+    RAISE EXCEPTION '22b: el operador con el permiso no pudo quitar su propio insumo'; END IF;
+  RAISE NOTICE 'OK 22 el permiso del tab abre lectura, alta y baja de recursos';
 
-  -- ── 19. La empresa vecina ni ve ni escribe puentes ajenos ────────────────
+  -- ── 23. La empresa vecina ni ve ni escribe puentes ajenos ────────────────
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000c', true);  -- Caro: admin de B
   SELECT count(*) INTO n FROM public.plantilla_tarea_suministros;
   IF n <> 0 THEN
-    RAISE EXCEPTION '19a: la vecina vio % insumos planificados ajenos', n; END IF;
+    RAISE EXCEPTION '23a: la vecina vio % insumos planificados ajenos', n; END IF;
   BEGIN
     INSERT INTO public.plantilla_tarea_suministros
       (company_id, project_id, plantilla_tarea_id, suministro_id, cantidad)
     VALUES (CO_A, P1, PL_JARDIN, SUM_CLORO, 1);
-    RAISE EXCEPTION '19b: la vecina insertó un puente sobre una plantilla ajena';
+    RAISE EXCEPTION '23b: la vecina insertó un puente sobre una plantilla ajena';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
-  RAISE NOTICE 'OK 19 el aislamiento por empresa se sostiene en los puentes';
+  RAISE NOTICE 'OK 23 el aislamiento por empresa se sostiene en los puentes';
 
-  -- ── 20. Sin el permiso, ni lectura ni escritura ──────────────────────────
+  -- ── 24. Sin el permiso, ni lectura ni escritura ──────────────────────────
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000e', true);  -- Elio: sin permisos
   SELECT count(*) INTO n FROM public.plantilla_tarea_suministros;
   IF n <> 0 THEN
-    RAISE EXCEPTION '20a: sin permiso se vieron % insumos planificados', n; END IF;
+    RAISE EXCEPTION '24a: sin permiso se vieron % insumos planificados', n; END IF;
   BEGIN
     INSERT INTO public.plantilla_tarea_suministros
       (company_id, project_id, plantilla_tarea_id, suministro_id, cantidad)
     VALUES (CO_A, P1, PL_JARDIN, SUM_CLORO, 1);
-    RAISE EXCEPTION '20b: sin permiso se insertó un puente';
+    RAISE EXCEPTION '24b: sin permiso se insertó un puente';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
-  RAISE NOTICE 'OK 20 sin el permiso del tab los puentes no existen para el usuario';
+  RAISE NOTICE 'OK 24 sin el permiso del tab los puentes no existen para el usuario';
 
-  -- ── 21. La escritura de áreas quedó en manos de los tres tabs ────────────
-  -- Beto solo trae rutas_ronda: antes escribía áreas gracias a la legacy
-  -- company_rw_areas; ahora escribe porque la policy lo acepta explícitamente.
-  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000b', true);  -- Beto: rutas_ronda
+  -- ── 25. Administrar áreas exige AUTORIZACIÓN ESPECÍFICA ──────────────────
+  -- Beto (rutas_ronda a secas) escribía gracias a la legacy company_rw_areas;
+  -- ver un tab consumidor ya no basta para administrar el catálogo canónico.
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000b', true);  -- Beto: solo rutas_ronda
+  BEGIN
+    INSERT INTO public.areas_condominio (company_id, project_id, nombre)
+    VALUES (CO_A, P1, 'Área que Beto no debería crear');
+    RAISE EXCEPTION '25a: rutas_ronda a secas creó un área del catálogo canónico';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  -- Gina trae el permiso específico (condominios.areas.manage, el que la
+  -- migración concede a los roles de sistema Seguridad y Operaciones).
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000f', true);  -- Gina: areas.manage
   INSERT INTO public.areas_condominio (company_id, project_id, nombre)
   VALUES (CO_A, P1, 'Caseta de vigilancia')
   RETURNING id INTO v_id;
+  UPDATE public.areas_condominio SET activo = false WHERE id = v_id;
+  UPDATE public.areas_condominio SET activo = true  WHERE id = v_id;
   -- …pero borrar sigue siendo de owner/admin: su DELETE no alcanza la fila.
   DELETE FROM public.areas_condominio WHERE id = v_id;
   SELECT count(*) INTO n FROM public.areas_condominio WHERE id = v_id;
   IF n <> 1 THEN
-    RAISE EXCEPTION '21a: el DELETE de áreas debía seguir reservado a owner/admin'; END IF;
-  -- Diana (plantillas_cargo) NO está en el conjunto de escritura de áreas.
+    RAISE EXCEPTION '25b: el DELETE de áreas debía seguir reservado a owner/admin'; END IF;
+  -- Diana (plantillas_cargo) y Elio (nada) tampoco entran.
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
   BEGIN
     INSERT INTO public.areas_condominio (company_id, project_id, nombre)
     VALUES (CO_A, P1, 'Área que no debería entrar');
-    RAISE EXCEPTION '21b: plantillas_cargo no da derecho a crear áreas y aún así entró';
+    RAISE EXCEPTION '25c: plantillas_cargo no da derecho a crear áreas y aún así entró';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
-  -- Elio, sin ningún permiso, tampoco.
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000e', true);
   BEGIN
     INSERT INTO public.areas_condominio (company_id, project_id, nombre)
     VALUES (CO_A, P1, 'Área sin permiso');
-    RAISE EXCEPTION '21c: sin permisos se creó un área';
+    RAISE EXCEPTION '25d: sin permisos se creó un área';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
-  RAISE NOTICE 'OK 21 áreas: escriben checklist_areas/rutas_ronda/prog_limpieza; borra owner/admin';
+  RAISE NOTICE 'OK 25 áreas: administra quien trae checklist_areas o areas.manage; borra owner/admin';
+
+  -- ── 26. Limpieza lee el catálogo de actividades sin permisos de Seguridad ─
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000010', true);  -- Hugo: solo prog_limpieza
+  SELECT count(*) INTO n FROM public.plantillas_tarea_cargo;
+  IF n = 0 THEN
+    RAISE EXCEPTION '26a: con prog_limpieza debía leer las actividades y vio 0'; END IF;
+  SELECT count(*) INTO n FROM public.plantilla_tarea_suministros;
+  IF n = 0 THEN
+    RAISE EXCEPTION '26b: con prog_limpieza debía leer los insumos planificados y vio 0'; END IF;
+  SELECT count(*) INTO n FROM public.plantilla_tarea_herramientas;
+  IF n = 0 THEN
+    RAISE EXCEPTION '26c: con prog_limpieza debía leer las herramientas planificadas y vio 0'; END IF;
+  -- …pero leer no es escribir:
+  BEGIN
+    INSERT INTO public.plantilla_tarea_suministros
+      (company_id, project_id, plantilla_tarea_id, suministro_id, cantidad)
+    VALUES (CO_A, P1, PL_JARDIN, SUM_CLORO, 1);
+    RAISE EXCEPTION '26d: prog_limpieza pudo escribir un puente';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  RAISE NOTICE 'OK 26 prog_limpieza lee actividades y recursos; no los edita';
+
+  -- ── 27. El historial no se borra desde la aplicación: ni el admin ────────
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000a', true);  -- Ana: admin del condominio
+  SELECT count(*) INTO n FROM public.ejecuciones_limpieza WHERE id = EJEC_HIST;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '27a: el admin debía VER la ejecución histórica'; END IF;
+  DELETE FROM public.ejecuciones_limpieza WHERE id = EJEC_HIST;
+  SELECT count(*) INTO n FROM public.ejecuciones_limpieza WHERE id = EJEC_HIST;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '27b: el admin borró físicamente una ejecución histórica'; END IF;
+  -- La corrección legítima es la anulación lógica, y esa sí puede:
+  UPDATE public.ejecuciones_limpieza
+  SET anulada_en = now(), motivo_anulacion = 'Prueba RLS: corrección por anulación'
+  WHERE id = EJEC_HIST;
+  SELECT count(*) INTO n FROM public.ejecuciones_limpieza
+  WHERE id = EJEC_HIST AND anulada_en IS NOT NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '27c: el admin no pudo anular lógicamente'; END IF;
+  UPDATE public.ejecuciones_limpieza
+  SET anulada_en = NULL, anulada_por = NULL, motivo_anulacion = NULL
+  WHERE id = EJEC_HIST;
+  RAISE NOTICE 'OK 27 el DELETE físico del historial queda fuera del alcance del condominio';
 
   RESET ROLE;
 
-  -- ── 22. Las policies legacy quedaron retiradas ───────────────────────────
+  -- ── 28. Las policies legacy quedaron retiradas ───────────────────────────
   SELECT count(*) INTO n FROM pg_policies
   WHERE policyname IN ('company_rw_areas', 'company_rw_plantillas_cargo');
   IF n <> 0 THEN
-    RAISE EXCEPTION '22: siguen vivas % policies company_rw_* que anulan el gate RBAC', n; END IF;
-  RAISE NOTICE 'OK 22 company_rw_areas y company_rw_plantillas_cargo ya no existen';
+    RAISE EXCEPTION '28: siguen vivas % policies company_rw_* que anulan el gate RBAC', n; END IF;
+  RAISE NOTICE 'OK 28 company_rw_areas y company_rw_plantillas_cargo ya no existen';
 
-  RAISE NOTICE '── 5 invariantes de RLS OK ──';
+  RAISE NOTICE '── 7 invariantes de RLS OK ──';
 END;
 $$;

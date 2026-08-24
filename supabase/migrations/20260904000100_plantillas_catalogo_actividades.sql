@@ -26,20 +26,37 @@
 --   3. Backfill conservador de `servicio` SOLO donde lower(btrim(cargo)) es un
 --      nombre de familia inequívoco (limpieza, mantenimiento, seguridad,
 --      guardia, jardinería/jardinero). Todo lo demás queda NULL a propósito.
---   4. Retira la policy legacy "company_rw_plantillas_cargo" (20260424000060:70),
+--   4. Capturas nuevas CONTROLADAS también en BD: un trigger BEFORE INSERT
+--      exige que `cargo` sea uno de los seis del catálogo de personal
+--      (conserje|guardia|jardinero|mantenimiento|administrador|otro). Solo
+--      INSERT a propósito: un CHECK (incluso NOT VALID) re-validaría la fila
+--      completa en cualquier UPDATE y rompería hasta el activar/desactivar de
+--      las filas legadas con cargo libre — que NO se reescriben.
+--   5. Si `requiere_checklist` es true, el checklist debe traer al menos un
+--      paso de texto no vacío — CHECK con función IMMUTABLE (un CHECK no
+--      admite subconsultas directas).
+--   6. UNIQUE (id, company_id, project_id): el ancla de las FKs COMPUESTAS de
+--      las tablas puente (20260904000200). Con ellas, mover una plantilla ya
+--      relacionada a otra empresa u otro proyecto es imposible: la FK
+--      compuesta del hijo lo bloquea a nivel de motor.
+--   7. Retira la policy legacy "company_rw_plantillas_cargo" (20260424000060:70),
 --      que neutralizaba el gate RBAC de 20260519000002, y re-declara las
---      cuatro policies. El SELECT acepta también `tareas_personal`: ese tab
---      lee las plantillas para heredarlas a tareas de bloque y el rol semilla
---      Seguridad/Guardia lo trae; sin el OR ese flujo dependería solo de que
---      el rol traiga `plantillas_cargo`.
+--      cuatro policies. El SELECT acepta también `tareas_personal` (ese tab
+--      hereda plantillas a tareas de bloque) y `prog_limpieza` (el módulo
+--      Limpieza consulta el catálogo de actividades filtrado por servicio sin
+--      requerir permisos del módulo Seguridad).
 --
 -- IDEMPOTENTE: ADD COLUMN IF NOT EXISTS, CHECKs dentro de DO $$ con guardia
 -- por conname, backfill con WHERE servicio IS NULL, DROP POLICY IF EXISTS
 -- antes de cada CREATE POLICY.
 --
 -- REVERSA: DROP de las 6 columnas nuevas (los CHECKs y el índice caen con
--- ellas); recrear "company_rw_plantillas_cargo" y las policies de
--- 20260519000002. El backfill de `servicio` desaparece con la columna.
+-- ellas); DROP CONSTRAINT plantillas_cargo_id_tenant_uq (exige antes soltar
+-- las FKs compuestas de 20260904000200); DROP del trigger
+-- trg_plantillas_cargo_controlado y de las funciones
+-- plantillas_cargo_valida_cargo / plantilla_checklist_valido; recrear
+-- "company_rw_plantillas_cargo" y las policies de 20260519000002. El backfill
+-- de `servicio` desaparece con la columna.
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Columnas nuevas
@@ -95,6 +112,81 @@ CREATE INDEX IF NOT EXISTS idx_plantillas_cargo_servicio
   ON public.plantillas_tarea_cargo(project_id, servicio)
   WHERE servicio IS NOT NULL;
 
+-- Ancla de las FKs compuestas de las tablas puente (id ya es único; el trío
+-- existe para que el motor pueda referenciarlo y bloquear cambios de tenant en
+-- plantillas ya relacionadas).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plantillas_cargo_id_tenant_uq') THEN
+    ALTER TABLE public.plantillas_tarea_cargo
+      ADD CONSTRAINT plantillas_cargo_id_tenant_uq UNIQUE (id, company_id, project_id);
+  END IF;
+END;
+$$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 2b. Checklist obligatorio = checklist con contenido (CHECK con función)
+-- ────────────────────────────────────────────────────────────────────────────
+-- Un CHECK no admite subconsultas; la función es IMMUTABLE y solo mira el
+-- valor. authenticated necesita EXECUTE: el CHECK corre con los permisos de
+-- quien inserta.
+CREATE OR REPLACE FUNCTION public.plantilla_checklist_valido(p_checklist jsonb)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT jsonb_typeof(p_checklist) = 'array'
+     AND EXISTS (
+       SELECT 1 FROM jsonb_array_elements_text(p_checklist) AS paso
+       WHERE btrim(paso) <> ''
+     )
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.plantilla_checklist_valido(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.plantilla_checklist_valido(jsonb) TO authenticated, service_role;
+
+COMMENT ON FUNCTION public.plantilla_checklist_valido(jsonb) IS
+  'true si el checklist es un array con al menos un paso de texto no vacío. Usada por plantillas_cargo_checklist_oblig_check.';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plantillas_cargo_checklist_oblig_check') THEN
+    ALTER TABLE public.plantillas_tarea_cargo
+      ADD CONSTRAINT plantillas_cargo_checklist_oblig_check
+      CHECK (NOT requiere_checklist OR public.plantilla_checklist_valido(checklist));
+  END IF;
+END;
+$$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 2c. Cargo controlado en capturas nuevas (trigger BEFORE INSERT)
+-- ────────────────────────────────────────────────────────────────────────────
+-- Solo INSERT a propósito: un CHECK re-validaría la fila entera en cualquier
+-- UPDATE y rompería hasta el toggle de activo de las filas legadas con cargo
+-- libre (que no se reescriben). El catálogo es el mismo de personal_condominio
+-- (prog_limpieza_cargo_check, 20260807130000): así el matching por cargo de
+-- TareasPersonalTab deja de depender de texto libre.
+CREATE OR REPLACE FUNCTION public.plantillas_cargo_valida_cargo()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF lower(btrim(NEW.cargo)) NOT IN
+     ('conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro') THEN
+    RAISE EXCEPTION 'PLANTILLAS_CARGO: cargo "%" fuera del catálogo (conserje|guardia|jardinero|mantenimiento|administrador|otro)', NEW.cargo
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_plantillas_cargo_controlado ON public.plantillas_tarea_cargo;
+CREATE TRIGGER trg_plantillas_cargo_controlado
+  BEFORE INSERT ON public.plantillas_tarea_cargo
+  FOR EACH ROW EXECUTE FUNCTION public.plantillas_cargo_valida_cargo();
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 3. Backfill conservador de `servicio`
 -- ────────────────────────────────────────────────────────────────────────────
@@ -130,7 +222,8 @@ CREATE POLICY "plantillas_tarea_cargo_select" ON public.plantillas_tarea_cargo
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.plantillas_cargo')
-             OR public.user_has_permission('condominios.tab.tareas_personal')))
+             OR public.user_has_permission('condominios.tab.tareas_personal')
+             OR public.user_has_permission('condominios.tab.prog_limpieza')))
   );
 
 DROP POLICY IF EXISTS "plantillas_tarea_cargo_insert" ON public.plantillas_tarea_cargo;

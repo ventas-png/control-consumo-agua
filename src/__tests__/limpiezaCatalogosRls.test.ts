@@ -25,6 +25,7 @@ const PERM_RONDAS = 'condominios.tab.rutas_ronda'
 const PERM_LIMPIEZA = 'condominios.tab.prog_limpieza'
 const PERM_PLANTILLAS = 'condominios.tab.plantillas_cargo'
 const PERM_TAREAS = 'condominios.tab.tareas_personal'
+const PERM_AREAS_MANAGE = 'condominios.areas.manage'
 
 interface Policy { nombre: string; cuerpo: string; archivo: string }
 
@@ -98,17 +99,26 @@ describe('policies de areas_condominio tras el ensanche', () => {
   })
 
   for (const nombre of ['areas_condominio_insert', 'areas_condominio_update']) {
-    it(`${nombre} acepta los TRES tabs que administran áreas`, () => {
-      // Si el generador de 20260518000010 se re-corre, la policy vuelve a un
-      // permiso único y el rol Seguridad (rutas_ronda, sin checklist_areas)
-      // pierde el alta de áreas sin que nada truene.
+    it(`${nombre} exige autorización ESPECÍFICA, no un tab consumidor`, () => {
+      // Ver rutas_ronda o prog_limpieza (tabs que CONSUMEN el catálogo) no
+      // puede bastar para administrarlo: hace falta el gate canónico o el
+      // permiso dedicado.
       const cuerpo = vigentes.get(nombre)!.cuerpo
       expect(cuerpo).toContain(PERM_CHECKLIST)
-      expect(cuerpo).toContain(PERM_RONDAS)
-      expect(cuerpo).toContain(PERM_LIMPIEZA)
+      expect(cuerpo).toContain(PERM_AREAS_MANAGE)
+      expect(cuerpo).not.toContain(PERM_RONDAS)
+      expect(cuerpo).not.toContain(PERM_LIMPIEZA)
       expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
     })
   }
+
+  it('el permiso dedicado se siembra y se concede a los roles que ya administraban áreas', () => {
+    const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_AREAS), 'utf8'))
+    expect(sql).toMatch(/INSERT INTO public\.permissions[\s\S]*'condominios\.areas\.manage'/)
+    // Operaciones/Mantenimiento y Seguridad/Guardia (ids fijos de 20260518000006).
+    expect(sql).toMatch(/'00000000-0000-0000-0000-000000000004', 'condominios\.areas\.manage'/)
+    expect(sql).toMatch(/'00000000-0000-0000-0000-000000000005', 'condominios\.areas\.manage'/)
+  })
 
   it('el DELETE se gobierna por rol, no por el helper de permisos', () => {
     // user_has_permission devuelve true a cualquier clave para owner/admin
@@ -122,10 +132,13 @@ describe('policies de areas_condominio tras el ensanche', () => {
 describe('policies de plantillas_tarea_cargo tras el catálogo de actividades', () => {
   const vigentes = policiesVigentes('plantillas_tarea_cargo')
 
-  it('el SELECT acepta plantillas_cargo Y tareas_personal (herencia hacia bloques)', () => {
+  it('el SELECT acepta plantillas_cargo, tareas_personal y prog_limpieza', () => {
+    // prog_limpieza: el módulo Limpieza consulta el catálogo de actividades
+    // sin requerir permisos del módulo Seguridad.
     const cuerpo = vigentes.get('plantillas_tarea_cargo_select')!.cuerpo
     expect(cuerpo).toContain(PERM_PLANTILLAS)
     expect(cuerpo).toContain(PERM_TAREAS)
+    expect(cuerpo).toContain(PERM_LIMPIEZA)
   })
 
   for (const nombre of ['plantillas_tarea_cargo_insert', 'plantillas_tarea_cargo_update']) {
@@ -153,10 +166,11 @@ for (const tabla of ['plantilla_tarea_suministros', 'plantilla_tarea_herramienta
       }
     })
 
-    it('el SELECT acepta plantillas_cargo y tareas_personal, acotado a la empresa', () => {
+    it('el SELECT acepta plantillas_cargo, tareas_personal y prog_limpieza, acotado a la empresa', () => {
       const cuerpo = vigentes.get(`${tabla}_select`)!.cuerpo
       expect(cuerpo).toContain(PERM_PLANTILLAS)
       expect(cuerpo).toContain(PERM_TAREAS)
+      expect(cuerpo).toContain(PERM_LIMPIEZA)
       expect(cuerpo).toMatch(/company_id = public\.get_my_company_id\(\)/)
     })
 
@@ -234,5 +248,93 @@ describe('protección del historial y del backfill (texto de las migraciones)', 
     expect(codigo).toMatch(/UNIQUE \(plantilla_tarea_id, suministro_id\)/)
     expect(codigo).toMatch(/UNIQUE \(plantilla_tarea_id, inventario_id\)/)
     expect(codigo).toMatch(/CHECK \(cantidad > 0\)/)
+  })
+})
+
+describe('historial de ejecuciones: inmutable desde la aplicación', () => {
+  const vigentes = policiesVigentes('ejecuciones_limpieza')
+
+  it('el DELETE queda reservado a soporte de plataforma (ni owner ni admin)', () => {
+    const cuerpo = vigentes.get('ejecuciones_limpieza_delete')!.cuerpo
+    expect(cuerpo).toMatch(/is_super_admin\(\)/)
+    expect(cuerpo).not.toMatch(/company_owner/)
+    expect(cuerpo).not.toMatch(/current_user_role/)
+  })
+
+  it('la anulación lógica existe, exige motivo y sella al autor', () => {
+    const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_AREAS), 'utf8'))
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS anulada_en/)
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS motivo_anulacion/)
+    expect(sql).toMatch(/ejec_limpieza_anulacion_check/)
+    expect(sql).toMatch(/btrim\(coalesce\(motivo_anulacion, ''\)\) <> ''/)
+    expect(sql).toMatch(/sellar_cierre\('anulada_en', 'anulada_por'\)/)
+  })
+
+  it('ninguna pantalla borra ejecuciones de limpieza', () => {
+    // El historial se anula; un deleteCondominioRow('ejecuciones_limpieza', …)
+    // en cualquier componente sería un borrado físico de evidencia.
+    const archivos: string[] = []
+    const recorrer = (dir: string) => {
+      for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+        const ruta = join(dir, entrada.name)
+        if (entrada.isDirectory()) recorrer(ruta)
+        else if (/\.tsx?$/.test(entrada.name)) archivos.push(ruta)
+      }
+    }
+    recorrer(resolve('src/components'))
+    const infractores = archivos.filter(f =>
+      /delete\w*\(\s*['"]ejecuciones_limpieza['"]/.test(readFileSync(f, 'utf8')),
+    )
+    expect(infractores).toEqual([])
+  })
+})
+
+describe('integridad multiempresa: FKs compuestas', () => {
+  const sqlPuentes = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_PUENTES), 'utf8'))
+  const sqlPlantillas = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_PLANTILLAS), 'utf8'))
+
+  it('los padres exponen el ancla UNIQUE (id, company_id, project_id)', () => {
+    expect(sqlPlantillas).toMatch(/plantillas_cargo_id_tenant_uq UNIQUE \(id, company_id, project_id\)/)
+    expect(sqlPuentes).toMatch(/suministros_id_tenant_uq UNIQUE \(id, company_id, project_id\)/)
+    expect(sqlPuentes).toMatch(/inventario_id_tenant_uq UNIQUE \(id, company_id, project_id\)/)
+  })
+
+  it('cada puente referencia al padre y al recurso POR EL TRÍO completo', () => {
+    for (const fk of ['pt_suministro_plantilla_fk', 'pt_suministro_recurso_fk',
+                      'pt_herramienta_plantilla_fk', 'pt_herramienta_recurso_fk']) {
+      expect(sqlPuentes).toContain(fk)
+    }
+    expect(sqlPuentes).toMatch(/FOREIGN KEY \(plantilla_tarea_id, company_id, project_id\)/)
+    expect(sqlPuentes).toMatch(/FOREIGN KEY \(suministro_id, company_id, project_id\)/)
+    expect(sqlPuentes).toMatch(/FOREIGN KEY \(inventario_id, company_id, project_id\)/)
+  })
+
+  it('las tablas nuevas llevan GRANT de mínimo privilegio', () => {
+    expect(sqlPuentes).toMatch(/REVOKE ALL ON public\.plantilla_tarea_suministros, public\.plantilla_tarea_herramientas FROM PUBLIC, anon/)
+    expect(sqlPuentes).toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE/)
+    expect(sqlPuentes).toMatch(/TO authenticated/)
+  })
+
+  it('la cantidad de insumos usa la precisión del stock de suministros', () => {
+    expect(sqlPuentes).toMatch(/cantidad\s+numeric\(10,2\)/)
+  })
+})
+
+describe('reglas del catálogo de actividades', () => {
+  const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_PLANTILLAS), 'utf8'))
+
+  it('requiere_checklist exige pasos con texto (CHECK con función IMMUTABLE)', () => {
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.plantilla_checklist_valido/)
+    expect(sql).toMatch(/IMMUTABLE/)
+    expect(sql).toMatch(/plantillas_cargo_checklist_oblig_check/)
+    expect(sql).toMatch(/NOT requiere_checklist OR public\.plantilla_checklist_valido\(checklist\)/)
+  })
+
+  it('el cargo nuevo va controlado por trigger, solo en INSERT', () => {
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.plantillas_cargo_valida_cargo/)
+    expect(sql).toMatch(/BEFORE INSERT ON public\.plantillas_tarea_cargo/)
+    // Nunca BEFORE UPDATE: re-validaría filas legadas con cargo libre.
+    expect(sql).not.toMatch(/BEFORE INSERT OR UPDATE ON public\.plantillas_tarea_cargo/)
+    expect(sql).toMatch(/'conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro'/)
   })
 })

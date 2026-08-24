@@ -104,6 +104,24 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.sellar_cierre()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+DECLARE
+  v_hito  text := TG_ARGV[0];
+  v_actor text := TG_ARGV[1];
+  v_uid   uuid := auth.uid();
+  v_old   text := to_jsonb(OLD)->>v_hito;
+  v_new   text := to_jsonb(NEW)->>v_hito;
+BEGIN
+  IF v_uid IS NOT NULL
+     AND COALESCE(v_old, 'false') IN ('', 'false')
+     AND COALESCE(v_new, 'false') NOT IN ('', 'false') THEN
+    NEW := jsonb_populate_record(NEW, jsonb_build_object(v_actor, v_uid));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
 -- ── Tablas del módulo TAL COMO ESTÁN EN PROD hoy ────────────────────────────
 
 -- personal_condominio: solo lo que programacion_limpieza referencia.
@@ -245,7 +263,8 @@ CREATE TABLE public.programacion_limpieza (
 );
 
 -- ejecuciones_limpieza: 20260807130000, CON la FK CASCADE original — la
--- migración bajo prueba la convierte en RESTRICT.
+-- migración bajo prueba la convierte en RESTRICT — y CON sus policies de
+-- origen (delete por owner/admin, que la migración reduce a super_admin).
 CREATE TABLE public.ejecuciones_limpieza (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id      uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -256,6 +275,40 @@ CREATE TABLE public.ejecuciones_limpieza (
   foto_urls       jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.ejecuciones_limpieza ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ejecuciones_limpieza_select" ON public.ejecuciones_limpieza
+  FOR SELECT TO authenticated
+  USING (
+    public.is_super_admin()
+    OR (company_id = public.get_my_company_id()
+        AND public.user_has_permission('condominios.tab.prog_limpieza'))
+  );
+CREATE POLICY "ejecuciones_limpieza_insert" ON public.ejecuciones_limpieza
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    public.is_super_admin()
+    OR (company_id = public.get_my_company_id()
+        AND public.user_has_permission('condominios.tab.prog_limpieza'))
+  );
+CREATE POLICY "ejecuciones_limpieza_update" ON public.ejecuciones_limpieza
+  FOR UPDATE TO authenticated
+  USING (
+    public.is_super_admin()
+    OR (company_id = public.get_my_company_id()
+        AND public.user_has_permission('condominios.tab.prog_limpieza'))
+  )
+  WITH CHECK (
+    public.is_super_admin()
+    OR (company_id = public.get_my_company_id()
+        AND public.user_has_permission('condominios.tab.prog_limpieza'))
+  );
+CREATE POLICY "ejecuciones_limpieza_delete" ON public.ejecuciones_limpieza
+  FOR DELETE TO authenticated
+  USING (
+    public.is_super_admin()
+    OR (public.current_user_role() = ANY(ARRAY['company_owner', 'admin'])
+        AND company_id = public.get_my_company_id())
+  );
 
 -- suministros_condominio (20260420000021) e inventario_condominio
 -- (20260420000004): lo que las tablas puente y su trigger consultan.
@@ -293,6 +346,8 @@ INSERT INTO auth.users (id) VALUES
   ('e0000000-0000-0000-0000-00000000000b'),   -- operador de A: solo rutas_ronda
   ('e0000000-0000-0000-0000-00000000000d'),   -- operador de A: solo plantillas_cargo
   ('e0000000-0000-0000-0000-00000000000e'),   -- operador de A: sin permisos
+  ('e0000000-0000-0000-0000-00000000000f'),   -- operador de A: rutas_ronda + areas.manage
+  ('e0000000-0000-0000-0000-000000000010'),   -- operador de A: solo prog_limpieza
   ('e0000000-0000-0000-0000-00000000000c');   -- admin de la empresa vecina
 
 INSERT INTO public.app_users (id, full_name, company_id, role) VALUES
@@ -300,15 +355,23 @@ INSERT INTO public.app_users (id, full_name, company_id, role) VALUES
   ('e0000000-0000-0000-0000-00000000000b', 'Beto Rondas',        'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
   ('e0000000-0000-0000-0000-00000000000d', 'Diana Plantillas',   'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
   ('e0000000-0000-0000-0000-00000000000e', 'Elio Sin Permisos',  'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  ('e0000000-0000-0000-0000-00000000000f', 'Gina Gestora Areas', 'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
+  ('e0000000-0000-0000-0000-000000000010', 'Hugo Limpieza',      'aaaaaaaa-0000-0000-0000-000000000001', 'operator'),
   ('e0000000-0000-0000-0000-00000000000c', 'Caro Vecina',        'aaaaaaaa-0000-0000-0000-000000000002', 'admin');
 
--- Roles RBAC acotados.
+-- Roles RBAC acotados. El de Gina simula lo que la migración concede a los
+-- roles de sistema Seguridad/Operaciones: el permiso específico del catálogo.
 INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('cccccccc-0000-0000-0000-000000000001', 'condominios.tab.rutas_ronda',      'allow'),
-  ('cccccccc-0000-0000-0000-000000000002', 'condominios.tab.plantillas_cargo', 'allow');
+  ('cccccccc-0000-0000-0000-000000000002', 'condominios.tab.plantillas_cargo', 'allow'),
+  ('cccccccc-0000-0000-0000-000000000003', 'condominios.tab.rutas_ronda',      'allow'),
+  ('cccccccc-0000-0000-0000-000000000003', 'condominios.areas.manage',         'allow'),
+  ('cccccccc-0000-0000-0000-000000000004', 'condominios.tab.prog_limpieza',    'allow');
 INSERT INTO public.user_roles (user_id, role_id) VALUES
   ('e0000000-0000-0000-0000-00000000000b', 'cccccccc-0000-0000-0000-000000000001'),
-  ('e0000000-0000-0000-0000-00000000000d', 'cccccccc-0000-0000-0000-000000000002');
+  ('e0000000-0000-0000-0000-00000000000d', 'cccccccc-0000-0000-0000-000000000002'),
+  ('e0000000-0000-0000-0000-00000000000f', 'cccccccc-0000-0000-0000-000000000003'),
+  ('e0000000-0000-0000-0000-000000000010', 'cccccccc-0000-0000-0000-000000000004');
 
 -- Catálogo de áreas ANTES del backfill.
 --   P1 de A: 'Piscina' (match único), 'Jardín' (match único con acento),

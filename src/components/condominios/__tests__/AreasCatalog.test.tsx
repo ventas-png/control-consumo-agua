@@ -47,6 +47,7 @@ function renderCatalog(props: Partial<Parameters<typeof AreasCatalog>[0]> = {}) 
       companyId="co1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,
@@ -125,9 +126,18 @@ describe('AreasCatalog — catálogo compartido de áreas', () => {
   })
 
   it('sin permisos de edición no hay botones de escritura', () => {
-    renderCatalog({ canCreate: false, canEdit: false })
+    renderCatalog({ canCreate: false, canEdit: false, canDelete: false })
     expect(screen.queryByText('+ Nueva área')).toBeNull()
     expect(screen.queryByText('✏️ Editar')).toBeNull()
+  })
+
+  it('canEdit sin canDelete: se puede editar y desactivar, pero NO eliminar', () => {
+    // El DELETE de areas_condominio es de company_owner/admin: mostrar el
+    // botón a quien solo edita produciría un fallo silencioso de RLS.
+    renderCatalog({ canDelete: false })
+    expect(screen.getByText('✏️ Editar')).toBeTruthy()
+    expect(screen.getByText('Desactivar')).toBeTruthy()
+    expect(screen.queryByLabelText('Eliminar Piscina')).toBeNull()
   })
 
   it('catálogo vacío → estado vacío compartido', () => {

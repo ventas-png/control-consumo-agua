@@ -20,12 +20,18 @@
 -- existencias (eso llega en PRs posteriores; el stock además lo protege
 -- trg_suministros_guard_stock, 20260821000200).
 --
--- TENANT: company_id/project_id van DENORMALIZADOS para que las policies sean
--- un comparador simple, pero NO se le creen al cliente: un trigger BEFORE los
--- sella desde la plantilla (patrón set_project_id_desde_padre, 20260729000600)
--- y aborta si el recurso pertenece a otra empresa u otro proyecto (patrón
--- conta_tg_linea_mismo_ledger, 20260813120000). Sin el trigger, un cliente
--- malicioso podría vincular recursos ajenos: las FK no miran RLS.
+-- TENANT — DOS capas que se complementan:
+--   · Un trigger BEFORE sella company_id/project_id desde la plantilla
+--     ignorando al cliente (patrón set_project_id_desde_padre, 20260729000600)
+--     y aborta con un error legible si el recurso es de otra empresa u otro
+--     proyecto (patrón conta_tg_linea_mismo_ledger, 20260813120000).
+--   · FKs COMPUESTAS (id, company_id, project_id) hacia la plantilla y hacia
+--     el recurso: el motor garantiza la coherencia DURANTE TODA LA VIDA de la
+--     fila — mover una plantilla, un suministro o una herramienta ya
+--     relacionados a otra empresa/proyecto viola la FK del hijo y se bloquea,
+--     cosa que un trigger sobre el hijo no puede ver. Las anclas UNIQUE
+--     (id, company_id, project_id) de los padres viven en 20260904000100
+--     (plantillas) y aquí (suministros/inventario).
 --
 -- BORRADO: la FK a la plantilla es CASCADE (el vínculo es parte de la
 -- definición de la actividad, no historial); las FK al recurso son RESTRICT
@@ -42,22 +48,50 @@
 -- REVERSA: DROP TABLE public.plantilla_tarea_suministros,
 -- public.plantilla_tarea_herramientas;
 -- DROP FUNCTION public.plantilla_recurso_coherente();
+-- DROP CONSTRAINT suministros_id_tenant_uq / inventario_id_tenant_uq.
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 0. Anclas UNIQUE para las FKs compuestas
+-- ────────────────────────────────────────────────────────────────────────────
+-- (la de plantillas_tarea_cargo vive en 20260904000100)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'suministros_id_tenant_uq') THEN
+    ALTER TABLE public.suministros_condominio
+      ADD CONSTRAINT suministros_id_tenant_uq UNIQUE (id, company_id, project_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventario_id_tenant_uq') THEN
+    ALTER TABLE public.inventario_condominio
+      ADD CONSTRAINT inventario_id_tenant_uq UNIQUE (id, company_id, project_id);
+  END IF;
+END;
+$$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Tablas
 -- ────────────────────────────────────────────────────────────────────────────
+-- `cantidad` en numeric(10,2): la misma precisión que el stock del inventario
+-- de suministros (stock_actual numeric(10,2), 20260420000021) — planificar con
+-- más decimales de los que el stock puede registrar solo fabrica descuadres.
 CREATE TABLE IF NOT EXISTS public.plantilla_tarea_suministros (
   id                 uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id         uuid          NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   project_id         uuid          NOT NULL REFERENCES public.projects(id)  ON DELETE CASCADE,
-  plantilla_tarea_id uuid          NOT NULL REFERENCES public.plantillas_tarea_cargo(id) ON DELETE CASCADE,
-  suministro_id      uuid          NOT NULL REFERENCES public.suministros_condominio(id) ON DELETE RESTRICT,
-  cantidad           numeric(14,4) NOT NULL DEFAULT 1,
+  plantilla_tarea_id uuid          NOT NULL,
+  suministro_id      uuid          NOT NULL,
+  cantidad           numeric(10,2) NOT NULL DEFAULT 1,
   notas              text,
   creado_por         uuid          REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at         timestamptz   NOT NULL DEFAULT now(),
   CONSTRAINT pt_suministro_cantidad_check CHECK (cantidad > 0),
-  CONSTRAINT pt_suministro_unico UNIQUE (plantilla_tarea_id, suministro_id)
+  CONSTRAINT pt_suministro_unico UNIQUE (plantilla_tarea_id, suministro_id),
+  -- FKs compuestas: la coherencia de tenant la garantiza el motor de por vida.
+  CONSTRAINT pt_suministro_plantilla_fk
+    FOREIGN KEY (plantilla_tarea_id, company_id, project_id)
+    REFERENCES public.plantillas_tarea_cargo(id, company_id, project_id) ON DELETE CASCADE,
+  CONSTRAINT pt_suministro_recurso_fk
+    FOREIGN KEY (suministro_id, company_id, project_id)
+    REFERENCES public.suministros_condominio(id, company_id, project_id) ON DELETE RESTRICT
 );
 
 COMMENT ON TABLE public.plantilla_tarea_suministros IS
@@ -69,19 +103,27 @@ COMMENT ON COLUMN public.plantilla_tarea_suministros.company_id IS
 COMMENT ON COLUMN public.plantilla_tarea_suministros.project_id IS
   'Denormalizado de la plantilla. Lo sella la BD (plantilla_recurso_coherente); lo que mande el cliente se ignora.';
 
+-- `cantidad` int: el inventario cuenta unidades enteras (cantidad int,
+-- 20260420000004).
 CREATE TABLE IF NOT EXISTS public.plantilla_tarea_herramientas (
   id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id         uuid        NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   project_id         uuid        NOT NULL REFERENCES public.projects(id)  ON DELETE CASCADE,
-  plantilla_tarea_id uuid        NOT NULL REFERENCES public.plantillas_tarea_cargo(id) ON DELETE CASCADE,
-  inventario_id      uuid        NOT NULL REFERENCES public.inventario_condominio(id) ON DELETE RESTRICT,
+  plantilla_tarea_id uuid        NOT NULL,
+  inventario_id      uuid        NOT NULL,
   cantidad           int         NOT NULL DEFAULT 1,
   obligatoria        boolean     NOT NULL DEFAULT false,
   notas              text,
   creado_por         uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at         timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT pt_herramienta_cantidad_check CHECK (cantidad > 0),
-  CONSTRAINT pt_herramienta_unica UNIQUE (plantilla_tarea_id, inventario_id)
+  CONSTRAINT pt_herramienta_unica UNIQUE (plantilla_tarea_id, inventario_id),
+  CONSTRAINT pt_herramienta_plantilla_fk
+    FOREIGN KEY (plantilla_tarea_id, company_id, project_id)
+    REFERENCES public.plantillas_tarea_cargo(id, company_id, project_id) ON DELETE CASCADE,
+  CONSTRAINT pt_herramienta_recurso_fk
+    FOREIGN KEY (inventario_id, company_id, project_id)
+    REFERENCES public.inventario_condominio(id, company_id, project_id) ON DELETE RESTRICT
 );
 
 COMMENT ON TABLE public.plantilla_tarea_herramientas IS
@@ -196,9 +238,10 @@ COMMENT ON COLUMN public.plantilla_tarea_herramientas.creado_por IS
 -- ────────────────────────────────────────────────────────────────────────────
 -- 4. RLS
 -- ────────────────────────────────────────────────────────────────────────────
--- Molde de 20260807130000:144-185. SELECT acepta también `tareas_personal`
--- (mismo criterio que el SELECT del padre en 20260904000100: ese tab hereda
--- plantillas y, en PRs posteriores, sus recursos). El DELETE va con el permiso
+-- Molde de 20260807130000:144-185. SELECT acepta también `tareas_personal` y
+-- `prog_limpieza` (mismo criterio que el SELECT del padre en 20260904000100:
+-- esos tabs consumen el catálogo de actividades y sus recursos sin permisos
+-- del módulo Seguridad). El DELETE va con el permiso
 -- del tab y NO con owner/admin — desviación deliberada del convenio: quitar un
 -- insumo de una plantilla es edición de catálogo, no destrucción de historial
 -- (el historial lo protegen los RESTRICT de esta serie); con owner/admin, el
@@ -207,6 +250,14 @@ COMMENT ON COLUMN public.plantilla_tarea_herramientas.creado_por IS
 ALTER TABLE public.plantilla_tarea_suministros  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.plantilla_tarea_herramientas ENABLE ROW LEVEL SECURITY;
 
+-- GRANTs explícitos de mínimo privilegio: anon no toca las tablas nuevas;
+-- authenticated pasa por RLS; service_role las administra (jobs de sistema).
+REVOKE ALL ON public.plantilla_tarea_suministros, public.plantilla_tarea_herramientas FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON public.plantilla_tarea_suministros, public.plantilla_tarea_herramientas
+  TO authenticated;
+GRANT ALL ON public.plantilla_tarea_suministros, public.plantilla_tarea_herramientas TO service_role;
+
 DROP POLICY IF EXISTS "plantilla_tarea_suministros_select" ON public.plantilla_tarea_suministros;
 CREATE POLICY "plantilla_tarea_suministros_select" ON public.plantilla_tarea_suministros
   FOR SELECT TO authenticated
@@ -214,7 +265,8 @@ CREATE POLICY "plantilla_tarea_suministros_select" ON public.plantilla_tarea_sum
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.plantillas_cargo')
-             OR public.user_has_permission('condominios.tab.tareas_personal')))
+             OR public.user_has_permission('condominios.tab.tareas_personal')
+             OR public.user_has_permission('condominios.tab.prog_limpieza')))
   );
 
 DROP POLICY IF EXISTS "plantilla_tarea_suministros_insert" ON public.plantilla_tarea_suministros;
@@ -256,7 +308,8 @@ CREATE POLICY "plantilla_tarea_herramientas_select" ON public.plantilla_tarea_he
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.plantillas_cargo')
-             OR public.user_has_permission('condominios.tab.tareas_personal')))
+             OR public.user_has_permission('condominios.tab.tareas_personal')
+             OR public.user_has_permission('condominios.tab.prog_limpieza')))
   );
 
 DROP POLICY IF EXISTS "plantilla_tarea_herramientas_insert" ON public.plantilla_tarea_herramientas;

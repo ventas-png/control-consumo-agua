@@ -25,15 +25,21 @@
 --   3. `ejecuciones_limpieza.programacion_id` pasa de CASCADE a RESTRICT: el
 --      historial operativo (fotos, novedades, reportes) sobrevive; borrar una
 --      programación con ejecuciones falla y la UI ofrece desactivarla.
---   4. Se retira la policy legacy "company_rw_areas" (20260424000059:57), que
+--   4. El historial tampoco se borra fila por fila: el DELETE de
+--      `ejecuciones_limpieza` queda reservado a super_admin (soporte de
+--      plataforma). Corregir una ejecución equivocada es una ANULACIÓN LÓGICA:
+--      anulada_en + anulada_por (sellado por la BD) + motivo obligatorio. La
+--      fila, sus fotos y su rastro quedan; la UI la excluye de la ruta activa.
+--   5. Se retira la policy legacy "company_rw_areas" (20260424000059:57), que
 --      nunca se dropeó y neutralizaba el gate RBAC de 20260519000002 (cualquier
 --      authenticated de la empresa escribía áreas). La escritura se re-declara
---      aceptando cualquiera de los tres tabs que legítimamente administran
---      áreas — checklist_areas (el gate original), rutas_ronda (donde vive el
---      CRUD) y prog_limpieza (que con esta migración también selecciona áreas
---      del catálogo) — porque el rol semilla Seguridad/Guardia (20260518000006)
---      tiene rutas_ronda pero no checklist_areas: sin el OR perdería el alta de
---      áreas que hoy le funciona gracias a la legacy.
+--      con AUTORIZACIÓN ESPECÍFICA: `condominios.tab.checklist_areas` (el gate
+--      canónico original) o el permiso nuevo `condominios.areas.manage`, que
+--      esta migración siembra y concede a los roles de sistema que hoy
+--      administran áreas de facto (Seguridad/Guardia vía RutasRondaTab y
+--      Operaciones/Mantenimiento). Tener visible un tab que CONSUME el
+--      catálogo (rutas_ronda, prog_limpieza) deja de bastar para
+--      administrarlo: un rol custom necesita el permiso explícito.
 --
 -- POR QUÉ SIN unaccent: la extensión no está instalada en el proyecto y no se
 -- quiere depender de ella (mismo criterio que conta_normalizar_nombre,
@@ -45,10 +51,12 @@
 -- policies van con DROP POLICY IF EXISTS antes de cada CREATE.
 --
 -- REVERSA: ALTER TABLE public.programacion_limpieza DROP COLUMN area_id;
--- recrear la FK de ejecuciones_limpieza con ON DELETE CASCADE; recrear
--- "company_rw_areas" y las policies de 20260519000002. Las áreas que el
--- backfill haya creado NO se auto-revierten: son entradas de catálogo válidas
--- (borrarlas exigiría verificar que nada más las referencia ya).
+-- recrear la FK de ejecuciones_limpieza con ON DELETE CASCADE; DROP de las
+-- columnas de anulación y su trigger; recrear "company_rw_areas" y las
+-- policies de 20260519000002; DELETE del permiso 'condominios.areas.manage'
+-- en role_permissions y permissions. Las áreas que el backfill haya creado NO
+-- se auto-revierten: son entradas de catálogo válidas (borrarlas exigiría
+-- verificar que nada más las referencia ya).
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 0. Normalizador de nombres de área
@@ -187,7 +195,76 @@ END;
 $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 4. areas_condominio: retirar la legacy y re-declarar la escritura
+-- 4. ejecuciones_limpieza: anulación lógica en lugar de borrado físico
+-- ────────────────────────────────────────────────────────────────────────────
+-- El RESTRICT del punto 3 protege el historial del borrado EN CASCADA, pero un
+-- admin del condominio todavía podía borrar filas una por una (policy DELETE
+-- por rol de 20260807130000). Fotos y reportes de ejecución son evidencia
+-- operativa: corregir un error se hace anulando con motivo, no destruyendo.
+ALTER TABLE public.ejecuciones_limpieza
+  ADD COLUMN IF NOT EXISTS anulada_en       timestamptz,
+  ADD COLUMN IF NOT EXISTS anulada_por      uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS motivo_anulacion text;
+
+COMMENT ON COLUMN public.ejecuciones_limpieza.anulada_en IS
+  'Anulación lógica: la fila fue un error (área equivocada, duplicado manual). Se conserva con sus fotos; la UI la excluye de la ruta activa. NULL = vigente.';
+COMMENT ON COLUMN public.ejecuciones_limpieza.anulada_por IS
+  'Usuario que anuló. Lo sella la BD (trg_sellar_anulacion) en la transición; no es falsificable desde el navegador.';
+COMMENT ON COLUMN public.ejecuciones_limpieza.motivo_anulacion IS
+  'Motivo de la anulación. Obligatorio cuando anulada_en no es NULL (CHECK).';
+
+-- Anular exige decir por qué; restaurar limpia el trío completo.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ejec_limpieza_anulacion_check') THEN
+    ALTER TABLE public.ejecuciones_limpieza
+      ADD CONSTRAINT ejec_limpieza_anulacion_check
+      CHECK (
+        (anulada_en IS NULL AND anulada_por IS NULL AND motivo_anulacion IS NULL)
+        OR (anulada_en IS NOT NULL AND btrim(coalesce(motivo_anulacion, '')) <> '')
+      );
+  END IF;
+END;
+$$;
+
+-- Mismo mecanismo que completada_en → completada_por: el actor lo pone la BD
+-- en la transición vacío → valor (sellar_cierre, 20260731000000).
+DROP TRIGGER IF EXISTS trg_sellar_anulacion ON public.ejecuciones_limpieza;
+CREATE TRIGGER trg_sellar_anulacion
+  BEFORE UPDATE ON public.ejecuciones_limpieza
+  FOR EACH ROW EXECUTE FUNCTION public.sellar_cierre('anulada_en', 'anulada_por');
+
+-- DELETE solo para soporte de plataforma. Ni company_owner ni admin del
+-- condominio borran historial: anulan. (service_role no pasa por RLS, así que
+-- las purgas programadas del sistema no cambian.)
+DROP POLICY IF EXISTS "ejecuciones_limpieza_delete" ON public.ejecuciones_limpieza;
+CREATE POLICY "ejecuciones_limpieza_delete" ON public.ejecuciones_limpieza
+  FOR DELETE TO authenticated
+  USING (public.is_super_admin());
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 5. Permiso específico para administrar el catálogo canónico de áreas
+-- ────────────────────────────────────────────────────────────────────────────
+-- `condominios.areas.manage` NO es una clave de tab (no vuelve visible ningún
+-- tab): autoriza únicamente crear/editar áreas del catálogo canónico. Se
+-- concede a los roles de sistema que hoy lo administran de facto; un rol
+-- custom lo recibe explícitamente desde la pantalla de roles.
+INSERT INTO public.permissions (key, category, label, description) VALUES
+  ('condominios.areas.manage', 'condominios',
+   'Administrar catálogo de áreas',
+   'Crear y editar áreas del catálogo canónico del condominio (areas_condominio). No otorga visibilidad de ningún tab.')
+ON CONFLICT (key) DO NOTHING;
+
+-- Roles de sistema (ids fijos de 20260518000006): Operaciones/Mantenimiento
+-- (dueño natural, trae checklist_areas) y Seguridad/Guardia (administra áreas
+-- desde RutasRondaTab desde 20260424000059).
+INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
+  ('00000000-0000-0000-0000-000000000004', 'condominios.areas.manage', 'allow'),
+  ('00000000-0000-0000-0000-000000000005', 'condominios.areas.manage', 'allow')
+ON CONFLICT DO NOTHING;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 6. areas_condominio: retirar la legacy y re-declarar la escritura
 -- ────────────────────────────────────────────────────────────────────────────
 -- "company_rw_areas" (FOR ALL, solo company_id) sobrevivió al hardening RBAC:
 -- el loop de 20260519000002 solo dropea nombres con sufijo _select/_insert/…
@@ -205,6 +282,8 @@ CREATE POLICY "areas_condominio_select" ON public.areas_condominio
     OR company_id = public.get_my_company_id()
   );
 
+-- Escritura con autorización ESPECÍFICA: el gate canónico (checklist_areas) o
+-- el permiso dedicado del catálogo. Ver un tab consumidor no basta.
 DROP POLICY IF EXISTS "areas_condominio_insert" ON public.areas_condominio;
 CREATE POLICY "areas_condominio_insert" ON public.areas_condominio
   FOR INSERT TO authenticated
@@ -212,8 +291,7 @@ CREATE POLICY "areas_condominio_insert" ON public.areas_condominio
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.checklist_areas')
-             OR public.user_has_permission('condominios.tab.rutas_ronda')
-             OR public.user_has_permission('condominios.tab.prog_limpieza')))
+             OR public.user_has_permission('condominios.areas.manage')))
   );
 
 DROP POLICY IF EXISTS "areas_condominio_update" ON public.areas_condominio;
@@ -223,15 +301,13 @@ CREATE POLICY "areas_condominio_update" ON public.areas_condominio
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.checklist_areas')
-             OR public.user_has_permission('condominios.tab.rutas_ronda')
-             OR public.user_has_permission('condominios.tab.prog_limpieza')))
+             OR public.user_has_permission('condominios.areas.manage')))
   )
   WITH CHECK (
     public.is_super_admin()
     OR (company_id = public.get_my_company_id()
         AND (SELECT public.user_has_permission('condominios.tab.checklist_areas')
-             OR public.user_has_permission('condominios.tab.rutas_ronda')
-             OR public.user_has_permission('condominios.tab.prog_limpieza')))
+             OR public.user_has_permission('condominios.areas.manage')))
   );
 
 -- DELETE sigue reservado a los roles de empresa: borrar un área es destructivo

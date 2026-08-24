@@ -572,6 +572,14 @@ export interface EjecucionLimpieza {
   requiere_mantenimiento: boolean
   prioridad?: PrioridadNovedadLimpieza | null
   created_at: string
+  // ── Anulación lógica (20260904000000) ────────────────────────────────────
+  // El historial no se borra físicamente: una ejecución equivocada se anula
+  // con motivo y queda fuera de la ruta activa, con sus fotos intactas.
+  /** NULL = vigente. La BD sella `anulada_por` en la transición. */
+  anulada_en?: string | null
+  anulada_por?: string | null
+  /** Obligatorio cuando anulada_en no es NULL (CHECK en BD). */
+  motivo_anulacion?: string | null
 }
 
 export type TipoConsumoEnergia = 'electricidad' | 'agua' | 'gas' | 'otro'

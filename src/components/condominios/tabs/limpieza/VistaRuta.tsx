@@ -11,8 +11,10 @@
 // "vencida / próxima" del catálogo sin que nadie los toque a mano.
 import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../../lib/format'
-import { createCondominioRow, updateCondominioRow, deleteCondominioRow } from '../../../../domain/condominios/tabMutations'
-import { notify, confirm } from '../../../shared/Dialog'
+// Sin deleteCondominioRow a propósito: el historial de ejecuciones no se borra
+// desde la app (20260904000000) — se anula lógicamente con motivo.
+import { createCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
+import { notify } from '../../../shared/Dialog'
 import { openPromptDialog } from '../../../shared/PromptDialog'
 import { MultiImageUploader } from '../../../shared/ImageUploader'
 import { ImageGallery } from '../../../shared/ImageGallery'
@@ -55,8 +57,15 @@ export function VistaRuta({
   )
   const nombrePersonal = useMemo(() => new Map(personal.map(p => [p.id, p.nombre])), [personal])
 
+  // Las anuladas no cuentan como ruta del día: no bloquean regenerar el área
+  // ni entran en el avance. Se listan aparte (`anuladasDelDia`) para poder
+  // restaurarlas, con su motivo a la vista.
   const delDia = useMemo(
-    () => ejecuciones.filter(e => e.fecha === fecha),
+    () => ejecuciones.filter(e => e.fecha === fecha && !e.anulada_en),
+    [ejecuciones, fecha],
+  )
+  const anuladasDelDia = useMemo(
+    () => ejecuciones.filter(e => e.fecha === fecha && e.anulada_en),
     [ejecuciones, fecha],
   )
   const visibles = useMemo(() => {
@@ -210,14 +219,43 @@ export function VistaRuta({
     onRefresh()
   }
 
-  async function quitar(ejec: EjecucionLimpieza) {
+  /**
+   * Quitar de la ruta = ANULAR, no borrar. Desde 20260904000000 el DELETE de
+   * `ejecuciones_limpieza` está reservado a soporte de plataforma: la fila y
+   * sus fotos son historial operativo. La anulación exige motivo (CHECK en BD)
+   * y la BD sella quién la hizo; la fila queda fuera de la ruta activa y es
+   * restaurable.
+   */
+  async function anular(ejec: EjecucionLimpieza) {
     const prog = areaPorId.get(ejec.programacion_id)
-    const r = await confirm({
-      title: '¿Quitar de la ruta?', text: prog?.area ?? '',
-      icon: 'warning', variant: 'danger', confirmText: 'Quitar',
+    const r = await openPromptDialog({
+      title: 'Anular de la ruta',
+      description: `${prog?.area ?? ''} — la ejecución se conserva con sus fotos y queda marcada como anulada; no se borra.`,
+      fields: [{
+        name: 'motivo', label: 'Motivo de la anulación', control: 'textarea', rows: 3,
+        required: true, autoFocus: true,
+        placeholder: 'Ej. se generó al área equivocada, quedó duplicada…',
+      }],
+      submitText: 'Anular',
     })
-    if (!r.isConfirmed) return
-    await deleteCondominioRow('ejecuciones_limpieza', ejec.id)
+    if (!r) return
+    setSaving(true)
+    const { error } = await updateCondominioRow('ejecuciones_limpieza', ejec.id, {
+      anulada_en: new Date().toISOString(),
+      motivo_anulacion: r.motivo.trim(),
+    })
+    setSaving(false)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+    onRefresh()
+  }
+
+  async function restaurarAnulada(ejec: EjecucionLimpieza) {
+    setSaving(true)
+    const { error } = await updateCondominioRow('ejecuciones_limpieza', ejec.id, {
+      anulada_en: null, anulada_por: null, motivo_anulacion: null,
+    })
+    setSaving(false)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
     onRefresh()
   }
 
@@ -394,14 +432,60 @@ export function VistaRuta({
                         ↩ Reabrir
                       </button>
                     )}
-                    <button disabled={saving} onClick={() => quitar(ejec)} style={btn('var(--at-danger-tint)', 'var(--at-danger)', { padding: '6px 12px', fontSize: '12px' })}>
-                      🗑
-                    </button>
+                    {ejec.anulada_en
+                      ? (
+                        <button disabled={saving} onClick={() => restaurarAnulada(ejec)} aria-label={`Restaurar ${areaPorId.get(ejec.programacion_id)?.area ?? 'ejecución'}`} style={btn('var(--at-chip)', 'var(--at-ink-2)', { padding: '6px 12px', fontSize: '12px' })}>
+                          ♻ Restaurar
+                        </button>
+                      )
+                      : (
+                        <button disabled={saving} onClick={() => anular(ejec)} aria-label={`Anular ${areaPorId.get(ejec.programacion_id)?.area ?? 'ejecución'}`} style={btn('var(--at-danger-tint)', 'var(--at-danger)', { padding: '6px 12px', fontSize: '12px' })}>
+                          🚫 Anular
+                        </button>
+                      )}
                   </div>
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Anuladas del día — se conservan (con fotos) y son restaurables. */}
+      {anuladasDelDia.length > 0 && (
+        <div style={{ marginTop: '18px' }}>
+          <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>
+            🚫 Anuladas ({anuladasDelDia.length}) — se conservan como historial
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {anuladasDelDia.map(ejec => (
+              <div key={ejec.id} style={{ background: 'var(--at-surface-2)', border: '1px dashed var(--at-line)', borderRadius: '10px', padding: '10px 14px', opacity: 0.75 }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', flex: 1 }}>
+                    {areaPorId.get(ejec.programacion_id)?.area ?? 'Área'}
+                  </span>
+                  {(ejec.foto_urls?.length ?? 0) > 0 && (
+                    <span style={chip('var(--at-chip)', 'var(--at-ink-3)')}>📷 {ejec.foto_urls.length}</span>
+                  )}
+                  {canEdit && (
+                    <button
+                      disabled={saving}
+                      onClick={() => restaurarAnulada(ejec)}
+                      aria-label={`Restaurar ${areaPorId.get(ejec.programacion_id)?.area ?? 'ejecución'}`}
+                      style={btn('var(--at-chip)', 'var(--at-ink-2)', { padding: '5px 12px', fontSize: '12px' })}
+                    >
+                      ♻ Restaurar
+                    </button>
+                  )}
+                </div>
+                {ejec.motivo_anulacion && (
+                  <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
+                    Motivo: {ejec.motivo_anulacion}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

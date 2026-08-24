@@ -11,23 +11,32 @@
 # bien, borrar una programación sigue arrastrando fotos y reportes históricos.
 # Nada de esto se valida leyendo el SQL.
 #
-# QUÉ COMPRUEBA (22 invariantes)
+# QUÉ COMPRUEBA (28 invariantes)
 #   A · BACKFILL    coincidencia única (con espacios, mayúsculas y acentos),
 #                   área inexistente creada UNA sola vez, ambigua que se queda
 #                   pendiente, texto en blanco que no ensucia, y que cada
 #                   empresa vincula contra su propio catálogo.
 #   B · HISTORIAL   la FK quedó RESTRICT: la programación con ejecuciones no se
-#                   borra, la sin historial sí, y el área en uso tampoco.
+#                   borra, la sin historial sí, y el área en uso tampoco. El
+#                   DELETE fila a fila queda fuera del alcance del condominio
+#                   (ni el admin); corregir es ANULAR con motivo, sellado por
+#                   la BD y restaurable.
 #   C · ACTIVIDADES el servicio se clasifica solo donde el cargo es inequívoco
-#                   (cargo nunca se reescribe) y los CHECK de servicio/duración/
-#                   checklist rechazan lo inválido.
+#                   (cargo nunca se reescribe); los CHECK de servicio/duración/
+#                   checklist rechazan lo inválido; el cargo nuevo va
+#                   controlado (el legado sigue operable) y requiere_checklist
+#                   exige pasos con texto real.
 #   D · PUENTES     company/project/creado_por los sella la BD; recurso de otra
 #                   empresa U otro proyecto aborta; sin duplicados; cantidad
 #                   positiva; el recurso vinculado no se borra y la receta muere
-#                   con su plantilla.
+#                   con su plantilla. Las FKs COMPUESTAS congelan el tenant:
+#                   una plantilla/suministro/herramienta relacionados no se
+#                   mueven de empresa ni de proyecto.
 #   E · RLS         el permiso del tab abre los puentes, la vecina no los ve ni
-#                   los escribe, la escritura de áreas quedó en los tres tabs
-#                   (y el DELETE en owner/admin), y las policies legacy
+#                   los escribe, administrar áreas exige autorización
+#                   específica (checklist_areas o areas.manage; borrar,
+#                   owner/admin), prog_limpieza lee el catálogo de actividades
+#                   sin permisos de Seguridad, y las policies legacy
 #                   company_rw_* ya no existen.
 #   + IDEMPOTENCIA  re-aplicar la serie no duplica áreas, no resuelve ambiguos
 #                   solo y no revive policies.
@@ -120,5 +129,6 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/reassert.sql" 2>&1) || 
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 echo
-echo "✅ limpieza_catalogos: 22 invariantes (backfill, historial protegido,"
-echo "   actividades, puentes de recursos y RLS), serie idempotente."
+echo "✅ limpieza_catalogos: 28 invariantes (backfill, historial inmutable con"
+echo "   anulación lógica, actividades controladas, puentes con tenant"
+echo "   congelado y RLS), serie idempotente."

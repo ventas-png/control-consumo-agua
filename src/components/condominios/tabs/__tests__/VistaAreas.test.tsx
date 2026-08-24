@@ -59,6 +59,7 @@ function renderVista(props: Partial<Parameters<typeof VistaAreas>[0]> = {}) {
       companyId="co1"
       canCreate
       canEdit
+      canDelete
       onRefresh={() => {}}
       {...props}
     />,
@@ -151,6 +152,13 @@ describe('VistaAreas — historial protegido', () => {
     const aviso = mocks.notify.mock.calls[0][0] as { title: string; text: string }
     expect(aviso.title).toBe('Tiene historial')
     expect(aviso.text).toMatch(/desactívala/i)
+  })
+
+  it('canEdit sin canDelete: se edita y desactiva, pero no se elimina', async () => {
+    renderVista({ canDelete: false })
+    expect(screen.getByLabelText(/^Editar /)).toBeTruthy()
+    expect(screen.getByText(/Desactivar/)).toBeTruthy()
+    expect(screen.queryByLabelText(/^Eliminar /)).toBeNull()
   })
 
   it('el confirm ya no promete borrar el historial en cascada', async () => {

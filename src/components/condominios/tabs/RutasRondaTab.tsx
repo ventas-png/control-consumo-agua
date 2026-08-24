@@ -17,6 +17,7 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -24,7 +25,7 @@ function blank_ruta(): { nombre: string; descripcion: string; tiempo_estimado_mi
   return { nombre: '', descripcion: '', tiempo_estimado_min: '' }
 }
 
-export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [vista, setVista] = useState<'areas' | 'rutas'>('areas')
   const [saving, setSaving] = useState(false)
 
@@ -156,6 +157,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
           companyId={companyId}
           canCreate={canCreate}
           canEdit={canEdit}
+          canDelete={canDelete}
           onRefresh={onRefresh}
         />
       )}

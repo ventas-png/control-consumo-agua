@@ -25,6 +25,13 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /**
+   * Permiso de BORRADO, independiente de canEdit: la policy de
+   * areas_condominio reserva el DELETE a company_owner/admin, así que mostrar
+   * el botón a quien solo puede editar produciría un fallo silencioso. Quien
+   * no puede borrar conserva Desactivar como alternativa.
+   */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -43,7 +50,7 @@ const labelStyle: CSSProperties = {
   fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px',
 }
 
-export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -197,7 +204,7 @@ export function AreasCatalog({ areas, proyectoId, companyId, canCreate, canEdit,
                   <button onClick={() => toggleActivo(a)} style={{ padding: '6px 10px', background: a.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: `1px solid ${a.activo ? 'var(--at-warning-border)' : 'var(--at-success-border)'}`, borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: a.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', fontWeight: 600 }}>
                     {a.activo ? 'Desactivar' : 'Activar'}
                   </button>
-                  <button onClick={() => handleDelete(a)} aria-label={`Eliminar ${a.nombre}`} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
+                  {canDelete && <button onClick={() => handleDelete(a)} aria-label={`Eliminar ${a.nombre}`} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>}
                 </div>
               )}
             </div>

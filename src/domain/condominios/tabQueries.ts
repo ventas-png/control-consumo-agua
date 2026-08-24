@@ -529,10 +529,9 @@ export async function fetchUsuariosAsignablesPersonal(
  * la única consumidora en este PR, así que va aquí y no en el loader global de
  * sectionData (que es posicional y no debe crecer por un solo tab).
  *
- * Va en `supabase` (sin tipar) y no en `db`: `plantilla_tarea_suministros` y
- * `plantilla_tarea_herramientas` no existen en database.types.ts hasta la
- * próxima corrida de `npm run gen:db-types`. El shape lo fijan
- * `PlantillaTareaSuministro`/`PlantillaTareaHerramienta` en types/condominios.
+ * Va en `db` (tipado): las tablas puente y sus relaciones existen en
+ * database.types.ts desde la sincronización del PR de catálogos, así que el
+ * embed del recurso viene chequeado contra el esquema.
  *
  * Devuelve `{ …, error }` y NO degrada en silencio: "no pude leer la receta"
  * mostrado como "esta actividad no ocupa recursos" invitaría a recapturarla.
@@ -546,12 +545,12 @@ export async function fetchRecursosPlantillas(
   error: { message: string } | null
 }> {
   const [sumRes, herRes] = await Promise.all([
-    supabase
+    db
       .from('plantilla_tarea_suministros')
       .select('*, suministros_condominio(nombre, unidad_medida, activo)')
       .eq('project_id', projectId)
       .eq('company_id', companyId),
-    supabase
+    db
       .from('plantilla_tarea_herramientas')
       .select('*, inventario_condominio(nombre, estado)')
       .eq('project_id', projectId)
@@ -559,24 +558,20 @@ export async function fetchRecursosPlantillas(
   ])
   const error = sumRes.error ?? herRes.error
   reportDegradedQuery('condominios.fetchRecursosPlantillas', error)
-  const suministros = ((sumRes.data as Array<Record<string, unknown>> | null) ?? []).map(r => {
-    const s = r.suministros_condominio as { nombre?: string; unidad_medida?: string; activo?: boolean } | null
-    const { suministros_condominio: _s, ...resto } = r
-    return {
+  const suministros: PlantillaTareaSuministro[] = (sumRes.data ?? []).map(
+    ({ suministros_condominio: s, ...resto }) => ({
       ...resto,
       suministro_nombre: s?.nombre,
       unidad_medida: s?.unidad_medida,
       suministro_activo: s?.activo,
-    } as unknown as PlantillaTareaSuministro
-  })
-  const herramientas = ((herRes.data as Array<Record<string, unknown>> | null) ?? []).map(r => {
-    const h = r.inventario_condominio as { nombre?: string; estado?: string } | null
-    const { inventario_condominio: _h, ...resto } = r
-    return {
+    }),
+  )
+  const herramientas: PlantillaTareaHerramienta[] = (herRes.data ?? []).map(
+    ({ inventario_condominio: h, ...resto }) => ({
       ...resto,
       inventario_nombre: h?.nombre,
       inventario_estado: h?.estado,
-    } as unknown as PlantillaTareaHerramienta
-  })
+    }),
+  )
   return { suministros, herramientas, error: error ? { message: error.message } : null }
 }

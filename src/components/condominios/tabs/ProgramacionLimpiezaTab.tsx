@@ -5,6 +5,12 @@
 //               el área se elige del catálogo canónico (`areas_condominio`).
 //   Catálogo    el catálogo compartido de áreas (el mismo CRUD que usa Rondas
 //               en seguridad), para dar de alta/baja áreas sin salir del tab.
+//   Actividades el catálogo compartido de actividades (ActividadesCatalog, el
+//               mismo componente del tab Plantillas), filtrado de entrada por
+//               servicio = limpieza y en modo consulta: la administración vive
+//               en Seguridad → Plantillas y no se duplica aquí. La RLS de
+//               20260904000100/000200 acepta `prog_limpieza` en el SELECT, así
+//               que se lee sin permisos del módulo Seguridad.
 //   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
 //               cierre área por área.
 //   Novedades   lo que se encontró de paso y necesita mantenimiento.
@@ -15,8 +21,12 @@
 // completo — programar, ejecutar con evidencia, escalar el hallazgo.
 import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../lib/format'
-import type { AreaCondominio, ProgramacionLimpieza, EjecucionLimpieza, PersonalCondominio } from '../../../types'
+import type {
+  AreaCondominio, EjecucionLimpieza, ItemInventario, PersonalCondominio,
+  PlantillaTareaCargo, ProgramacionLimpieza, SuministroCondominio,
+} from '../../../types'
 import { AreasCatalog } from '../AreasCatalog'
+import { ActividadesCatalog } from '../ActividadesCatalog'
 import { VistaAreas } from './limpieza/VistaAreas'
 import { VistaRuta } from './limpieza/VistaRuta'
 import { VistaNovedades } from './limpieza/VistaNovedades'
@@ -27,24 +37,30 @@ interface Props {
   ejecuciones: EjecucionLimpieza[]
   personal: PersonalCondominio[]
   areas: AreaCondominio[]
+  plantillas: PlantillaTareaCargo[]
+  suministros: SuministroCondominio[]
+  inventario: ItemInventario[]
   proyectoId: string
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
 }
 
-type Vista = 'areas' | 'catalogo' | 'ruta' | 'novedades'
+type Vista = 'areas' | 'catalogo' | 'actividades' | 'ruta' | 'novedades'
 
 const VISTAS: { id: Vista; label: string; icon: string }[] = [
-  { id: 'areas',     label: 'Áreas',     icon: '🧹' },
-  { id: 'catalogo',  label: 'Catálogo de áreas', icon: '📍' },
-  { id: 'ruta',      label: 'Ruta del día', icon: '🗓️' },
-  { id: 'novedades', label: 'Novedades', icon: '⚠️' },
+  { id: 'areas',       label: 'Áreas',     icon: '🧹' },
+  { id: 'catalogo',    label: 'Catálogo de áreas', icon: '📍' },
+  { id: 'actividades', label: 'Actividades', icon: '📋' },
+  { id: 'ruta',        label: 'Ruta del día', icon: '🗓️' },
+  { id: 'novedades',   label: 'Novedades', icon: '⚠️' },
 ]
 
 export function ProgramacionLimpiezaTab({
-  programaciones, ejecuciones, personal, areas, proyectoId, companyId, canCreate, canEdit, onRefresh,
+  programaciones, ejecuciones, personal, areas, plantillas, suministros, inventario,
+  proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<Vista>('areas')
 
@@ -111,7 +127,29 @@ export function ProgramacionLimpiezaTab({
           companyId={companyId}
           canCreate={canCreate}
           canEdit={canEdit}
+          canDelete={canDelete}
           onRefresh={onRefresh}
+        />
+      )}
+      {vista === 'actividades' && (
+        // MISMO componente que el tab Plantillas: un solo catálogo, sin
+        // implementación paralela. Aquí abre filtrado por servicio=limpieza y
+        // en consulta (soloLectura); administrarlo sigue siendo de Plantillas.
+        <ActividadesCatalog
+          plantillas={plantillas}
+          areas={areas}
+          suministros={suministros}
+          inventario={inventario}
+          proyectoId={proyectoId}
+          companyId={companyId}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onRefresh={onRefresh}
+          servicioInicial="limpieza"
+          soloLectura
+          titulo="Actividades de limpieza"
+          subtitulo="Catálogo compartido de actividades, filtrado por servicio de limpieza."
         />
       )}
       {vista === 'catalogo' && (
@@ -124,6 +162,7 @@ export function ProgramacionLimpiezaTab({
           companyId={companyId}
           canCreate={canCreate}
           canEdit={canEdit}
+          canDelete={canDelete}
           onRefresh={onRefresh}
         />
       )}
