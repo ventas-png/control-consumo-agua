@@ -582,6 +582,32 @@ describe('Vercel Deployment Protection — bypass fail-closed, token jamás impr
   })
 })
 
+// El helper de login hacía clic en /iniciar sesión/i sin acotar y, con el modal
+// abierto, el nav aporta un segundo botón con ese mismo nombre accesible:
+// strict mode violation y 13 specs caídos en la primera corrida real
+// (run 32752735170). El clic tiene que quedar DENTRO del diálogo.
+describe('el helper de login no puede volver a chocar con el botón del nav', () => {
+  const auth = readFileSync(resolve('e2e/fixtures/auth.ts'), 'utf8')
+
+  it('el submit se acota al role="dialog", no a la página entera', () => {
+    const iLogin = auth.indexOf('export async function login(')
+    expect(iLogin).toBeGreaterThan(0)
+    const cuerpo = auth.slice(iLogin)
+    expect(cuerpo).toContain("dialogoDeLogin(page).getByRole('button', { name: /iniciar sesión/i }).click()")
+    // Sin ningún clic al botón SIN acotar dentro de login().
+    expect(cuerpo).not.toMatch(/^\s*await page\s*\n?\s*\.?getByRole\('button', \{ name: \/iniciar sesión\/i \}\)\.click\(\)/m)
+  })
+
+  it('el acotador usa el rol del diálogo, no el título (que cambia con el idioma)', () => {
+    expect(auth).toContain("const dialogoDeLogin = (page: Page) => page.getByRole('dialog')")
+  })
+
+  it('el modal de Nav.tsx sigue siendo un role="dialog": el selector no puede quedar huérfano', () => {
+    const nav = readFileSync(resolve('src/components/landing/Nav.tsx'), 'utf8')
+    expect(nav).toMatch(/role="dialog"/)
+  })
+})
+
 describe('el YAML invoca el contrato (no una copia)', () => {
   const jobE2e = readFileSync(resolve('.github/workflows/e2e.yml'), 'utf8')
 
@@ -634,6 +660,19 @@ describe('el YAML invoca el contrato (no una copia)', () => {
     const i = jobE2e.indexOf('- name: Run E2E')
     const bloque = jobE2e.slice(i, jobE2e.indexOf('- name:', i + 1))
     expect(bloque).toContain('E2E_BASE_URL: ${{ steps.preflight.outputs.url }}')
+  })
+
+  it('el verificador corre AUNQUE Playwright falle: el recuento no se pierde con el rojo', () => {
+    // En la corrida 32752735170 Playwright falló y este paso quedó skipped: se
+    // perdió saber cuántas pruebas corrieron y cuántas se omitieron.
+    const i = jobE2e.indexOf('- name: Verificar que la suite ejecutó pruebas de verdad')
+    expect(i).toBeGreaterThan(0)
+    const bloque = jobE2e.slice(i, jobE2e.indexOf('- name:', i + 1))
+    expect(bloque).toContain('node scripts/e2e-verificar.mjs')
+    expect(bloque).toMatch(/if:\s*\$\{\{\s*!cancelled\(\)/)
+    // Y se salta sólo cuando Playwright ni arrancó (no hay reporte que leer).
+    expect(bloque).toContain("steps.playwright.outcome != 'skipped'")
+    expect(jobE2e).toMatch(/- name: Run E2E\n\s+id: playwright\b/)
   })
 
   it('la instalación dinámica con caret desapareció: npm ci + sólo el binario del navegador', () => {

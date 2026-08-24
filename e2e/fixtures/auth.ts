@@ -8,7 +8,16 @@ import { LOGIN } from './env'
 // Sin data-testid en el código (confirmado), se usan selectores semánticos:
 //   - email:    placeholder "nombre@empresa.com"
 //   - password: placeholder "••••••••"
-//   - submit:   botón con texto /iniciar sesión/i
+//   - submit:   botón /iniciar sesión/i DENTRO del diálogo
+//
+// EL SUBMIT SE ACOTA AL DIÁLOGO A PROPÓSITO. Con el modal abierto hay DOS
+// botones "Iniciar sesión" en la página — el del nav, que lo abre, y el submit
+// del formulario— y un clic sin acotar aborta por strict mode. Fue el fallo de
+// la primera corrida real de la suite (run 32752735170: 13 pruebas caídas en
+// este mismo punto). El modal es role="dialog" (Nav.tsx), así que getByRole
+// lo delimita sin depender del texto del título ni del idioma activo.
+const dialogoDeLogin = (page: Page) => page.getByRole('dialog')
+
 export async function openLoginModal(page: Page): Promise<void> {
   await page.goto('/')
   const email = page.getByPlaceholder('nombre@empresa.com')
@@ -30,7 +39,7 @@ export async function login(
   await openLoginModal(page)
   await page.getByPlaceholder('nombre@empresa.com').fill(email)
   await page.getByPlaceholder('••••••••').fill(password)
-  await page.getByRole('button', { name: /iniciar sesión/i }).click()
+  await dialogoDeLogin(page).getByRole('button', { name: /iniciar sesión/i }).click()
 
   // Éxito = el formulario de login desaparece y entra el shell autenticado.
   // (El destino exacto depende del rol: admin-dashboard / superadmin / cobros…),

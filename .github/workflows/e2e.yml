@@ -115,6 +115,7 @@ jobs:
         run: npx tsc -p e2e/tsconfig.json
 
       - name: Run E2E
+        id: playwright
         env:
           # La URL VALIDADA por el preflight (metadata + sha + ref), no el
           # secreto en crudo: si la resolución eligió el despliegue del SHA,
@@ -129,7 +130,15 @@ jobs:
       # obligatorio enteramente omitido, o un condicional omitido con su
       # variable presente. Lee playwright-results.json (reporter json del
       # config). Ver scripts/e2e-verificar.mjs.
+      #
+      # Corre AUNQUE Playwright haya fallado: con una prueba en rojo el job ya
+      # está rojo, pero el recuento de ejecutadas/omitidas es justo lo que hace
+      # falta para saber si el rojo es "una prueba falla" o "media suite no
+      # corrió". En la corrida 32752735170 este paso quedó skipped y esa
+      # contabilidad se perdió. Se salta sólo si Playwright ni siquiera llegó a
+      # arrancar (preflight en rojo): ahí no hay reporte que leer.
       - name: Verificar que la suite ejecutó pruebas de verdad
+        if: ${{ !cancelled() && steps.playwright.outcome != 'skipped' }}
         run: node scripts/e2e-verificar.mjs
 
       # `always()`: el reporte es MÁS valioso cuando algo falló. `ignore` cubre
