@@ -105,6 +105,32 @@ En *Settings → Secrets and variables → Actions*:
 | `E2E_INVITE_TOKEN` | condicional | Token de invitación **fresco y de un solo uso** (insert en `user_invitations` + edge `invite-user`). No puede vivir como secreto estático: se genera justo antes de la corrida que deba ejercitar ese flujo. Ausente → `invitation-accept` queda como **omitido declarado**. |
 | `E2E_FISCAL_SANDBOX_READY` | condicional | `1` cuando el despliegue de pruebas tiene PAC **sandbox** y configuración fiscal cargada. Ausente → `fiscal-timbrar` queda como **omitido declarado**. |
 
+#### Comprobá las credenciales ANTES de guardarlas
+
+Una credencial mal copiada no se nota al guardarla: se nota ~15 minutos después,
+como trece pruebas de Playwright cayendo en un timeout de 20 s. Pasó en el run
+32753812314 — el Supabase era el correcto y el bypass funcionaba, pero Supabase
+contestaba `400 invalid_credentials` a cada intento. Preguntáselo directamente:
+
+```bash
+VITE_SUPABASE_URL="https://<ref-del-sandbox>.supabase.co" \
+VITE_SUPABASE_ANON_KEY="<anon key del MISMO proyecto>" \
+E2E_LOGIN_EMAIL="…"      E2E_LOGIN_PASSWORD="…" \
+E2E_RESTRICTED_EMAIL="…" E2E_RESTRICTED_PASSWORD="…" \
+node scripts/verificar-credenciales-e2e.mjs
+```
+
+Usa la **anon key**, la misma que el navegador, así que comprueba exactamente lo
+que hará Playwright. Distingue "contraseña incorrecta" de "email sin confirmar",
+de "anon key de otro proyecto" y de un fallo de red; y nunca imprime una
+contraseña. Lo que **no** puede comprobar: que ambos usuarios pertenezcan a la
+misma empresa y que el restringido no sea admin ni owner.
+
+> **Las cuentas de `scripts/seed-rls-sandbox.mjs` rotan en CADA corrida del
+> seed.** Sirve la contraseña de la última. Si volvés a sembrar después de
+> guardar los secretos E2E, quedan obsoletos — y también los `RLS_USER_*`, que
+> el harness RLS usa. Actualizá todos de una sola salida del seed.
+
 El entorno de referencia: **Vercel Preview** de esta rama (no el alias de
 producción), construido con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` del
 proyecto **Supabase sandbox** y `VITE_E2E_ENVIRONMENT=e2e-sandbox` — las tres
