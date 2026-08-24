@@ -615,6 +615,7 @@ export type Database = {
       }
       areas_condominio: {
         Row: {
+          activo: boolean
           company_id: string
           created_at: string
           descripcion: string | null
@@ -625,6 +626,7 @@ export type Database = {
           project_id: string
         }
         Insert: {
+          activo?: boolean
           company_id: string
           created_at?: string
           descripcion?: string | null
@@ -635,6 +637,7 @@ export type Database = {
           project_id: string
         }
         Update: {
+          activo?: boolean
           company_id?: string
           created_at?: string
           descripcion?: string | null
@@ -645,6 +648,27 @@ export type Database = {
           project_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "areas_condominio_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "areas_condominio_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "areas_condominio_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "areas_condominio_project_id_fkey"
             columns: ["project_id"]
@@ -814,6 +838,115 @@ export type Database = {
           },
           {
             foreignKeyName: "asambleas_digital_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asignaciones_turno: {
+        Row: {
+          activa: boolean
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          cubre_dias_no_laborables: boolean
+          dia_mes: number | null
+          dias_semana: Json
+          fecha_fin: string | null
+          fecha_inicio: string
+          fechas_especificas: Json
+          frecuencia: string
+          id: string
+          intervalo_dias: number | null
+          mes_ancla: number | null
+          nombre: string | null
+          notas: string | null
+          personal_id: string
+          plantilla_horario_id: string
+          project_id: string
+        }
+        Insert: {
+          activa?: boolean
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          cubre_dias_no_laborables?: boolean
+          dia_mes?: number | null
+          dias_semana?: Json
+          fecha_fin?: string | null
+          fecha_inicio: string
+          fechas_especificas?: Json
+          frecuencia?: string
+          id?: string
+          intervalo_dias?: number | null
+          mes_ancla?: number | null
+          nombre?: string | null
+          notas?: string | null
+          personal_id: string
+          plantilla_horario_id: string
+          project_id: string
+        }
+        Update: {
+          activa?: boolean
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          cubre_dias_no_laborables?: boolean
+          dia_mes?: number | null
+          dias_semana?: Json
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          fechas_especificas?: Json
+          frecuencia?: string
+          id?: string
+          intervalo_dias?: number | null
+          mes_ancla?: number | null
+          nombre?: string | null
+          notas?: string | null
+          personal_id?: string
+          plantilla_horario_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "asignaciones_turno_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_turno_plantilla_horario_id_fkey"
+            columns: ["plantilla_horario_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_horario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_turno_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1495,53 +1628,112 @@ export type Database = {
       }
       bloques_turno: {
         Row: {
+          asignacion_id: string | null
+          cerrado_en: string | null
           company_id: string
           creado_por: string | null
           created_at: string
+          cruza_medianoche: boolean
           estado: string
           fecha: string
-          finalizado_en: string | null
+          hora_fin: string | null
+          hora_inicio: string | null
+          horas_planificadas: number | null
           id: string
           iniciado_en: string | null
           notas: string | null
+          origen: string
           personal_id: string
+          plantilla_horario_id: string | null
           project_id: string
+          puntaje_completitud: number | null
           turno: string
         }
         Insert: {
+          asignacion_id?: string | null
+          cerrado_en?: string | null
           company_id: string
           creado_por?: string | null
           created_at?: string
+          cruza_medianoche?: boolean
           estado?: string
           fecha: string
-          finalizado_en?: string | null
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_planificadas?: number | null
           id?: string
           iniciado_en?: string | null
           notas?: string | null
+          origen?: string
           personal_id: string
+          plantilla_horario_id?: string | null
           project_id: string
+          puntaje_completitud?: number | null
           turno: string
         }
         Update: {
+          asignacion_id?: string | null
+          cerrado_en?: string | null
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          cruza_medianoche?: boolean
           estado?: string
           fecha?: string
-          finalizado_en?: string | null
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_planificadas?: number | null
           id?: string
           iniciado_en?: string | null
           notas?: string | null
+          origen?: string
           personal_id?: string
+          plantilla_horario_id?: string | null
           project_id?: string
+          puntaje_completitud?: number | null
           turno?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "bloques_turno_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones_turno"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloques_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloques_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloques_turno_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "bloques_turno_personal_id_fkey"
             columns: ["personal_id"]
             isOneToOne: false
             referencedRelation: "personal_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloques_turno_plantilla_horario_id_fkey"
+            columns: ["plantilla_horario_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_horario"
             referencedColumns: ["id"]
           },
           {
@@ -8650,6 +8842,7 @@ export type Database = {
           categoria: string
           company_id: string
           costo_unitario: number | null
+          creado_por: string | null
           created_at: string
           descripcion: string | null
           estado: string
@@ -8671,6 +8864,7 @@ export type Database = {
           categoria?: string
           company_id: string
           costo_unitario?: number | null
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           estado?: string
@@ -8692,6 +8886,7 @@ export type Database = {
           categoria?: string
           company_id?: string
           costo_unitario?: number | null
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           estado?: string
@@ -11704,6 +11899,7 @@ export type Database = {
           codigos_acceso: Json
           company_id: string
           contactos_emergencia: Json
+          creado_por: string | null
           created_at: string
           direccion: string | null
           dpi: string | null
@@ -11732,6 +11928,7 @@ export type Database = {
           tipo_cuenta: string | null
           tipo_sangre: string | null
           turno: string
+          user_id: string | null
         }
         Insert: {
           alergias?: string | null
@@ -11740,6 +11937,7 @@ export type Database = {
           codigos_acceso?: Json
           company_id: string
           contactos_emergencia?: Json
+          creado_por?: string | null
           created_at?: string
           direccion?: string | null
           dpi?: string | null
@@ -11768,6 +11966,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_sangre?: string | null
           turno?: string
+          user_id?: string | null
         }
         Update: {
           alergias?: string | null
@@ -11776,6 +11975,7 @@ export type Database = {
           codigos_acceso?: Json
           company_id?: string
           contactos_emergencia?: Json
+          creado_por?: string | null
           created_at?: string
           direccion?: string | null
           dpi?: string | null
@@ -11804,6 +12004,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_sangre?: string | null
           turno?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -12203,6 +12404,95 @@ export type Database = {
           },
           {
             foreignKeyName: "plantillas_cuota_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plantillas_horario: {
+        Row: {
+          activo: boolean
+          codigo: string | null
+          color: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          cruza_medianoche: boolean
+          hora_fin: string
+          hora_inicio: string
+          horas_jornada: number | null
+          id: string
+          minutos_descanso: number
+          nombre: string
+          notas: string | null
+          project_id: string
+          tolerancia_entrada_min: number
+          turno: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo?: string | null
+          color?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          cruza_medianoche?: boolean
+          hora_fin: string
+          hora_inicio: string
+          horas_jornada?: number | null
+          id?: string
+          minutos_descanso?: number
+          nombre: string
+          notas?: string | null
+          project_id: string
+          tolerancia_entrada_min?: number
+          turno?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string | null
+          color?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          cruza_medianoche?: boolean
+          hora_fin?: string
+          hora_inicio?: string
+          horas_jornada?: number | null
+          id?: string
+          minutos_descanso?: number
+          nombre?: string
+          notas?: string | null
+          project_id?: string
+          tolerancia_entrada_min?: number
+          turno?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantillas_horario_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantillas_horario_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantillas_horario_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "plantillas_horario_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -13014,7 +13304,9 @@ export type Database = {
           area_id: string | null
           cargo: string | null
           company_id: string
+          creado_por: string | null
           created_at: string
+          ejecutado_por: string | null
           estado: string
           frecuencia: string
           id: string
@@ -13034,7 +13326,9 @@ export type Database = {
           area_id?: string | null
           cargo?: string | null
           company_id: string
+          creado_por?: string | null
           created_at?: string
+          ejecutado_por?: string | null
           estado?: string
           frecuencia?: string
           id?: string
@@ -13054,7 +13348,9 @@ export type Database = {
           area_id?: string | null
           cargo?: string | null
           company_id?: string
+          creado_por?: string | null
           created_at?: string
+          ejecutado_por?: string | null
           estado?: string
           frecuencia?: string
           id?: string
@@ -13603,6 +13899,7 @@ export type Database = {
       puntos_control_ruta: {
         Row: {
           area_id: string
+          creado_por: string | null
           created_at: string
           id: string
           instrucciones: string | null
@@ -13612,6 +13909,7 @@ export type Database = {
         }
         Insert: {
           area_id: string
+          creado_por?: string | null
           created_at?: string
           id?: string
           instrucciones?: string | null
@@ -13621,6 +13919,7 @@ export type Database = {
         }
         Update: {
           area_id?: string
+          creado_por?: string | null
           created_at?: string
           id?: string
           instrucciones?: string | null
@@ -15285,6 +15584,7 @@ export type Database = {
         Row: {
           bloque_id: string
           comentario: string | null
+          creado_por: string | null
           created_at: string | null
           estado: string
           id: string
@@ -15295,6 +15595,7 @@ export type Database = {
         Insert: {
           bloque_id: string
           comentario?: string | null
+          creado_por?: string | null
           created_at?: string | null
           estado?: string
           id?: string
@@ -15305,6 +15606,7 @@ export type Database = {
         Update: {
           bloque_id?: string
           comentario?: string | null
+          creado_por?: string | null
           created_at?: string | null
           estado?: string
           id?: string
@@ -15724,7 +16026,9 @@ export type Database = {
       }
       rutas_ronda: {
         Row: {
+          activo: boolean
           company_id: string
+          creado_por: string | null
           created_at: string
           descripcion: string | null
           id: string
@@ -15733,7 +16037,9 @@ export type Database = {
           tiempo_estimado_min: number | null
         }
         Insert: {
+          activo?: boolean
           company_id: string
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           id?: string
@@ -15742,7 +16048,9 @@ export type Database = {
           tiempo_estimado_min?: number | null
         }
         Update: {
+          activo?: boolean
           company_id?: string
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           id?: string
@@ -16635,6 +16943,7 @@ export type Database = {
           categoria: string
           company_id: string
           costo_unitario: number | null
+          creado_por: string | null
           created_at: string
           id: string
           nombre: string
@@ -16651,6 +16960,7 @@ export type Database = {
           categoria?: string
           company_id: string
           costo_unitario?: number | null
+          creado_por?: string | null
           created_at?: string
           id?: string
           nombre: string
@@ -16667,6 +16977,7 @@ export type Database = {
           categoria?: string
           company_id?: string
           costo_unitario?: number | null
+          creado_por?: string | null
           created_at?: string
           id?: string
           nombre?: string
@@ -16711,42 +17022,75 @@ export type Database = {
       }
       tareas_bloque: {
         Row: {
+          anulada_en: string | null
+          anulada_por: string | null
           area_id: string | null
           bloque_id: string
-          completado_en: string | null
+          completada_en: string | null
+          completado_por: string | null
+          creado_por: string | null
           created_at: string
           descripcion: string | null
           estado: string
-          foto_url: string | null
-          icono: string | null
+          evidencia_texto: string | null
+          foto_urls: Json
           id: string
+          motivo_anulacion: string | null
+          notas_operativo: string | null
+          novedad: string | null
           orden: number | null
+          plantilla_id: string | null
+          prioridad: string | null
+          requiere_foto: boolean
+          requiere_mantenimiento: boolean
           titulo: string
         }
         Insert: {
+          anulada_en?: string | null
+          anulada_por?: string | null
           area_id?: string | null
           bloque_id: string
-          completado_en?: string | null
+          completada_en?: string | null
+          completado_por?: string | null
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           estado?: string
-          foto_url?: string | null
-          icono?: string | null
+          evidencia_texto?: string | null
+          foto_urls?: Json
           id?: string
+          motivo_anulacion?: string | null
+          notas_operativo?: string | null
+          novedad?: string | null
           orden?: number | null
+          plantilla_id?: string | null
+          prioridad?: string | null
+          requiere_foto?: boolean
+          requiere_mantenimiento?: boolean
           titulo: string
         }
         Update: {
+          anulada_en?: string | null
+          anulada_por?: string | null
           area_id?: string | null
           bloque_id?: string
-          completado_en?: string | null
+          completada_en?: string | null
+          completado_por?: string | null
+          creado_por?: string | null
           created_at?: string
           descripcion?: string | null
           estado?: string
-          foto_url?: string | null
-          icono?: string | null
+          evidencia_texto?: string | null
+          foto_urls?: Json
           id?: string
+          motivo_anulacion?: string | null
+          notas_operativo?: string | null
+          novedad?: string | null
           orden?: number | null
+          plantilla_id?: string | null
+          prioridad?: string | null
+          requiere_foto?: boolean
+          requiere_mantenimiento?: boolean
           titulo?: string
         }
         Relationships: [
@@ -16762,6 +17106,13 @@ export type Database = {
             columns: ["bloque_id"]
             isOneToOne: false
             referencedRelation: "bloques_turno"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_bloque_plantilla_id_fkey"
+            columns: ["plantilla_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_tarea_cargo"
             referencedColumns: ["id"]
           },
         ]
