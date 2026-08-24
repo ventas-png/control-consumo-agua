@@ -74,11 +74,28 @@ export function interpretar(status, cuerpo) {
     return { ok: false, motivo: `Supabase rechazó la petición: ${descripcion}` }
   }
   if (status === 401 || status === 403) {
+    // Un 401/403 de Supabase SIEMPRE trae cuerpo JSON con su error. Uno sin
+    // cuerpo reconocible no vino de Supabase: lo puso algo en el camino — un
+    // proxy corporativo, un firewall, un portal cautivo. Decir "tu anon key
+    // está mal" ahí manda a corregir lo que no está roto (me pasó: el sandbox
+    // desde el que se escribió esto tiene *.supabase.co bloqueado y el
+    // gateway contesta 403 al CONNECT).
+    if (!codigo && !descripcion) {
+      return {
+        ok: false,
+        motivo:
+          `HTTP ${status} SIN cuerpo de error de Supabase: lo más probable es que la ` +
+          'petición no haya llegado a Supabase (proxy, firewall o VPN cortando ' +
+          `${'*.supabase.co'}). Comprobalo con: curl -sS -o /dev/null -w '%{http_code}\\n' ` +
+          '"$VITE_SUPABASE_URL/auth/v1/health" — si eso tampoco responde 200, es la red.',
+      }
+    }
     return {
       ok: false,
       motivo:
-        `HTTP ${status}. La ANON key no corresponde a este proyecto, o está vencida. ` +
-        'Copiala de Supabase → Settings → API → anon/public del MISMO proyecto que la URL.',
+        `HTTP ${status} (${codigo || descripcion}). La ANON key no corresponde a este ` +
+        'proyecto, o está vencida. Copiala de Supabase → Settings → API → anon/public ' +
+        'del MISMO proyecto que la URL.',
     }
   }
   if (status === 429) {

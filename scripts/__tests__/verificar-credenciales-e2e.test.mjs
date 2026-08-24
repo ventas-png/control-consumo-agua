@@ -77,11 +77,23 @@ describe('el veredicto es accionable, no un volcado de HTTP', () => {
     expect(r.motivo).not.toContain('seed-rls-sandbox.mjs')
   })
 
-  it('401/403 apunta a la ANON key, no a las credenciales', () => {
+  it('401/403 CON error de Supabase apunta a la ANON key, no a las credenciales', () => {
     for (const status of [401, 403]) {
-      const r = interpretar(status, {})
+      const r = interpretar(status, { message: 'Invalid API key' })
       expect(r.ok).toBe(false)
       expect(r.motivo).toMatch(/ANON key/)
+    }
+  })
+
+  it('401/403 SIN cuerpo de Supabase se atribuye a la red, no a la anon key', () => {
+    // Un proxy que contesta 403 al CONNECT llega como un 403 pelado. Culpar a
+    // la anon key ahí manda a cambiar lo que está bien.
+    for (const status of [401, 403]) {
+      const r = interpretar(status, null)
+      expect(r.ok).toBe(false)
+      expect(r.motivo).toMatch(/proxy, firewall o VPN/)
+      expect(r.motivo).not.toMatch(/ANON key/)
+      expect(r.motivo).toMatch(/auth\/v1\/health/)
     }
   })
 
