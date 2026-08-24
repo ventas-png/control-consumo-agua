@@ -131,6 +131,41 @@ misma empresa y que el restringido no sea admin ni owner.
 > guardar los secretos E2E, quedan obsoletos — y también los `RLS_USER_*`, que
 > el harness RLS usa. Actualizá todos de una sola salida del seed.
 
+#### Y sembrá el tenant: con credenciales válidas todavía no alcanza
+
+`seed-rls-sandbox.mjs` crea USUARIOS y una empresa de juguete, pero deja el
+tenant vacío. Con eso la suite entra al shell y los specs de dinero se
+auto-skipean en runtime — y como `agua-lectura-cobro` y `condominios-cuota` son
+**obligatorios**, quedarse en cero ejecutadas los pone rojos en el verificador:
+
+```
+la unidad no tiene contador sembrado
+sin cargos pendientes para emitir — sembrar registro pendiente
+sin cuotas pendientes — generar/sembrar una cuota
+sin cuotas cobrables — sembrar una cuota emitida
+```
+
+```bash
+SEED_SERVICE_ROLE_KEY="<service_role del sandbox>" \
+VITE_SUPABASE_URL="https://<ref>.supabase.co" \
+E2E_EXPECTED_SUPABASE_REF="<ref>" \
+E2E_LOGIN_EMAIL="<el mismo del secreto>" \
+node scripts/seed-e2e-tenant.mjs
+```
+
+Siembra una tarifa vigente, un contador en la unidad, un cargo pendiente y dos
+cuotas (una pendiente y una emitida). El tenant **no se pasa a mano**: se
+resuelve desde `E2E_LOGIN_EMAIL`, así que siempre siembra la empresa que la
+suite va a recorrer. Como escribe con `service_role`, exige
+`E2E_EXPECTED_SUPABASE_REF` y no toca nada si no coincide con el ref de la URL.
+
+> **Corrélo antes de cada corrida de E2E.** No es sólo idempotente: es
+> **re-ejecutable**. La suite CONSUME lo sembrado —emite la factura pendiente,
+> paga la cuota emitida—, así que cada corrida del script REPONE los estados de
+> partida en vez de limitarse a insertar lo que falte. Reconoce sus filas por
+> marcadores estables (`E2E-CONTADOR-001`, `E2E-PENDIENTE`, `E2E-EMITIDA`), de
+> modo que correrlo dos veces no duplica nada.
+
 El entorno de referencia: **Vercel Preview** de esta rama (no el alias de
 producción), construido con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` del
 proyecto **Supabase sandbox** y `VITE_E2E_ENVIRONMENT=e2e-sandbox` — las tres
