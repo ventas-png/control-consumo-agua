@@ -23,6 +23,11 @@ import {
   sembrarCookieDeBypass,
   urlDeSiembra,
 } from '../../e2e/fixtures/vercelBypass'
+import {
+  HEADER_BYPASS as HEADER_BYPASS_PREFLIGHT,
+  HEADER_SIEMBRA_COOKIE as HEADER_COOKIE_PREFLIGHT,
+  leerMeta,
+} from '../e2e-preflight.mjs'
 
 const TOKEN = 'token-bypass-de-prueba-b7c1'
 const COOKIE_DE_VERCEL = '_vercel_jwt=cookie-simulada-del-preview'
@@ -181,5 +186,65 @@ describe('la configuración no puede volver a filtrar el token', () => {
     // reporter; el estado con la cookie no puede estar entre esos paths.
     const yml = readFileSync(resolve('.github/workflows/e2e.yml'), 'utf8')
     expect(yml).not.toContain('.estado')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Diagnóstico cuando la protección NO deja pasar (corrida real 2026-08-24).
+// ════════════════════════════════════════════════════════════════════════════
+// El preflight reportó «no respondió /e2e-meta.json (fetch failed)» y con eso
+// era imposible saber si el problema era DNS, TLS o el bypass: Vercel responde
+// 3xx hacia su pantalla de autenticación y `fetch` seguía el redirect hasta
+// morir con un error genérico. Ahora el redirect NO se sigue y el motivo real
+// del transporte (`cause`) viaja en el mensaje.
+describe('leerMeta clasifica el rechazo de la protección en vez de esconderlo', () => {
+  const TOKEN = 'token-bypass-de-prueba-b7c1'
+  const SSO = 'https://vercel.com/sso-api?url=https%3A%2F%2Fx.vercel.app&_vercel_share=SHARE_SECRETO_123'
+  const respuesta = (status, location) => ({
+    status,
+    ok: status >= 200 && status < 300,
+    headers: { get: (k) => (k.toLowerCase() === 'location' ? location : null) },
+    json: async () => ({}),
+  })
+
+  it('pide el recurso SIN seguir redirects', async () => {
+    let init = null
+    await leerMeta('https://p.vercel.app', async (_u, i) => { init = i; return respuesta(200) }, TOKEN)
+    expect(init.redirect).toBe('manual')
+  })
+
+  it('un 3xx hacia el SSO se reporta como bypass no aceptado, nombrando la variable', async () => {
+    const { meta, errorFetch } = await leerMeta('https://p.vercel.app', async () => respuesta(302, SSO), TOKEN)
+    expect(meta).toBeNull()
+    expect(errorFetch).toContain('HTTP 302')
+    expect(errorFetch).toContain('E2E_VERCEL_BYPASS_TOKEN')
+    expect(errorFetch).toMatch(/Deployment Protection/)
+  })
+
+  it('el destino del redirect se recorta: ni el _vercel_share ni el token quedan en el log', async () => {
+    const { errorFetch } = await leerMeta('https://p.vercel.app', async () => respuesta(302, SSO), TOKEN)
+    expect(errorFetch).toContain('https://vercel.com/sso-api')
+    expect(errorFetch).not.toContain('SHARE_SECRETO_123')
+    expect(errorFetch).not.toContain('_vercel_share')
+    expect(errorFetch).not.toContain(TOKEN)
+  })
+
+  it('un 401 conserva el mismo diagnóstico accionable', async () => {
+    const { errorFetch } = await leerMeta('https://p.vercel.app', async () => respuesta(401), TOKEN)
+    expect(errorFetch).toContain('E2E_VERCEL_BYPASS_TOKEN')
+    expect(errorFetch).not.toContain(TOKEN)
+  })
+
+  it('un fallo de transporte expone la causa real (undici la esconde bajo "fetch failed")', async () => {
+    const roto = Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } })
+    const { errorFetch } = await leerMeta('https://p.vercel.app', async () => { throw roto }, TOKEN)
+    expect(errorFetch).toContain('fetch failed')
+    expect(errorFetch).toContain('ENOTFOUND')
+    expect(errorFetch).not.toContain(TOKEN)
+  })
+
+  it('preflight y fixture no pueden divergir en el nombre de los headers', () => {
+    expect(HEADER_BYPASS_PREFLIGHT).toBe(HEADER_BYPASS)
+    expect(HEADER_COOKIE_PREFLIGHT).toBe(HEADER_SIEMBRA_COOKIE)
   })
 })

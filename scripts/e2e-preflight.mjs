@@ -338,31 +338,68 @@ export async function resolverUrlsPorSha({ repo, sha, token, fetchImpl = fetch }
  * ningún mensaje: un 401/403 se reporta como "la protección rechazó el
  * acceso", nombrando la VARIABLE, nunca su contenido.
  */
+export const HEADER_BYPASS = 'x-vercel-protection-bypass'
+export const HEADER_SIEMBRA_COOKIE = 'x-vercel-set-bypass-cookie'
+
+const esRedirect = (status) => typeof status === 'number' && status >= 300 && status < 400
+
+/**
+ * Origen + ruta del Location, SIN query: la pantalla de autenticación de Vercel
+ * devuelve un `_vercel_share=<token>` en la URL y ese token no tiene por qué
+ * quedar escrito en el log del job.
+ */
+function destinoDeRedirect(r) {
+  const bruto = r?.headers?.get?.('location') || ''
+  if (!bruto) return 'sin Location'
+  try {
+    const u = new URL(bruto)
+    return `${u.origin}${u.pathname}`
+  } catch {
+    return bruto.split('?')[0]
+  }
+}
+
+/** Mismo diagnóstico para 3xx y 401/403: el bypass no se aplicó. */
+function motivoProteccion(prefijo) {
+  return (
+    `${prefijo} — la Deployment Protection de Vercel no dejó pasar la petición. ` +
+    'El header x-vercel-protection-bypass SE ENVIÓ, así que el token no fue aceptado: ' +
+    'E2E_VERCEL_BYPASS_TOKEN está mal copiado, vencido, o no es el secreto de ' +
+    '"Protection Bypass for Automation" de ESTE proyecto. Regeneralo en Vercel → ' +
+    'Settings → Deployment Protection y actualizá el secreto en GitHub Actions.'
+  )
+}
+
 export async function leerMeta(url, fetchImpl = fetch, bypassToken = '') {
   const headers = { accept: 'application/json' }
   if (bypassToken) {
-    headers['x-vercel-protection-bypass'] = bypassToken
-    headers['x-vercel-set-bypass-cookie'] = 'true'
+    headers[HEADER_BYPASS] = bypassToken
+    headers[HEADER_SIEMBRA_COOKIE] = 'true'
   }
   try {
     const r = await fetchImpl(new URL('/e2e-meta.json', url), {
       signal: AbortSignal.timeout(15_000),
+      // MANUAL a propósito: si el bypass no se aplica, Vercel responde 3xx
+      // hacia su pantalla de autenticación. Siguiendo el redirect el fallo
+      // llegaba como un "fetch failed" opaco (o un JSON inválido) y el
+      // operador no tenía forma de saber que el problema era el token.
+      redirect: 'manual',
       headers,
     })
+    if (esRedirect(r.status)) {
+      return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status} → ${destinoDeRedirect(r)}`) }
+    }
     if (r.status === 401 || r.status === 403) {
-      return {
-        meta: null,
-        errorFetch:
-          `HTTP ${r.status} — la Deployment Protection de Vercel rechazó el acceso. ` +
-          'El header x-vercel-protection-bypass se envió: E2E_VERCEL_BYPASS_TOKEN está ' +
-          'vencido, fue rotado o no corresponde a este proyecto de Vercel. Regeneralo en ' +
-          'Vercel → Settings → Deployment Protection y actualizá el secreto.',
-      }
+      return { meta: null, errorFetch: motivoProteccion(`HTTP ${r.status}`) }
     }
     if (!r.ok) return { meta: null, errorFetch: `HTTP ${r.status}` }
     return { meta: await r.json(), errorFetch: null }
   } catch (e) {
-    return { meta: null, errorFetch: e?.message ?? 'fetch falló' }
+    // undici envuelve TODO fallo de transporte como "fetch failed" y deja el
+    // motivo real (ENOTFOUND, ECONNREFUSED, redirect count exceeded…) en
+    // `cause`. Sin esto el log no distingue un DNS caído de una protección.
+    const causa = e?.cause?.code || e?.cause?.message
+    return { meta: null, errorFetch: `${e?.message ?? 'fetch falló'}${causa ? ` — causa: ${causa}` : ''}` }
   }
 }
 
