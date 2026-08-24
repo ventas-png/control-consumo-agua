@@ -19,6 +19,7 @@ const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG_AREAS = '20260904000000_limpieza_area_catalogo_e_historial.sql'
 const MIG_PLANTILLAS = '20260904000100_plantillas_catalogo_actividades.sql'
 const MIG_PUENTES = '20260904000200_plantilla_tarea_recursos.sql'
+const MIG_DEDUPE = '20260905000000_areas_dedupe_y_unicidad.sql'
 
 const PERM_CHECKLIST = 'condominios.tab.checklist_areas'
 const PERM_RONDAS = 'condominios.tab.rutas_ronda'
@@ -336,5 +337,70 @@ describe('reglas del catálogo de actividades', () => {
     // Nunca BEFORE UPDATE: re-validaría filas legadas con cargo libre.
     expect(sql).not.toMatch(/BEFORE INSERT OR UPDATE ON public\.plantillas_tarea_cargo/)
     expect(sql).toMatch(/'conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro'/)
+  })
+})
+
+describe('fusión de áreas duplicadas (20260905000000)', () => {
+  const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_DEDUPE), 'utf8'))
+
+  it('re-apunta las CUATRO FKs entrantes, ninguna menos', () => {
+    // Si alguien añade una quinta FK a areas_condominio y no la suma aquí, la
+    // fusión dejaría filas apuntando a un área retirada.
+    for (const tabla of ['puntos_control_ruta', 'plantillas_tarea_cargo',
+                         'tareas_bloque', 'programacion_limpieza']) {
+      expect(sql).toMatch(new RegExp(`UPDATE public\\.${tabla}[\\s\\S]*?SET area_id = f\\.ganadora_id`))
+    }
+  })
+
+  it('el conjunto de FKs del guard coincide con las declaradas en las migraciones', () => {
+    // Fuente de verdad: todo REFERENCES … areas_condominio de cualquier migración.
+    const tablasConFk = new Set<string>()
+    for (const archivo of archivosOrdenados) {
+      const texto = soloCodigo(readFileSync(join(MIGRATIONS_DIR, archivo), 'utf8'))
+      // CREATE TABLE: la tabla es la del CREATE; ADD COLUMN: la del ALTER.
+      const reCreate = /CREATE TABLE(?: IF NOT EXISTS)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
+      for (const m of texto.matchAll(reCreate)) {
+        if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablasConFk.add(m[1])
+      }
+      const reAlter = /ALTER TABLE(?: ONLY)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
+      for (const m of texto.matchAll(reAlter)) {
+        if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablasConFk.add(m[1])
+      }
+    }
+    expect([...tablasConFk].sort()).toEqual([
+      'plantillas_tarea_cargo', 'programacion_limpieza', 'puntos_control_ruta', 'tareas_bloque',
+    ])
+  })
+
+  it('verifica fail-closed ANTES de retirar nada', () => {
+    const posVerif = sql.indexOf('v_huerfanas')
+    const posDelete = sql.indexOf('DELETE FROM public.areas_condominio')
+    expect(posVerif).toBeGreaterThan(-1)
+    expect(posDelete).toBeGreaterThan(posVerif)
+    expect(sql).toMatch(/RAISE EXCEPTION 'areas_dedupe abortado/)
+    // El cruce de tenant se comprueba por JOIN al padre en las dos tablas que
+    // no tienen project_id propio.
+    expect(sql).toMatch(/JOIN public\.rutas_ronda/)
+    expect(sql).toMatch(/JOIN public\.bloques_turno/)
+  })
+
+  it('particiona por proyecto y elige superviviente de forma determinista', () => {
+    expect(sql).toMatch(/PARTITION BY a\.project_id, public\.areas_normalizar_nombre\(a\.nombre\)/)
+    expect(sql).toMatch(/a\.activo DESC/)
+    expect(sql).toMatch(/a\.created_at ASC NULLS LAST/)
+    expect(sql).toMatch(/a\.id ASC/)
+  })
+
+  it('el UNIQUE es TOTAL, no parcial por activo', () => {
+    expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS uq_areas_nombre_normalizado/)
+    expect(sql).toMatch(/ON public\.areas_condominio \(project_id, public\.areas_normalizar_nombre\(nombre\)\)/)
+    // Un parcial WHERE activo contradiría el mensaje de la UI ("reactívala").
+    const idx = sql.slice(sql.indexOf('uq_areas_nombre_normalizado'))
+    expect(idx.slice(0, 200)).not.toMatch(/WHERE\s+activo/)
+  })
+
+  it('no reescribe ningún texto histórico', () => {
+    expect(sql).not.toMatch(/SET\s+nombre\s*=/i)
+    expect(sql).not.toMatch(/SET\s+area\s*=/i)
   })
 })
