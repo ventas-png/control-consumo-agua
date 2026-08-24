@@ -64,10 +64,10 @@ BEGIN
     RAISE EXCEPTION '2b: "JARDÍN" debía vincular a "Jardín" y quedó %', v_area; END IF;
   RAISE NOTICE 'OK 2  jardin y JARDÍN ↔ Jardín: los acentos no impiden el match';
 
-  -- ── 3. Ambigua: dos áreas con el mismo nombre normalizado ────────────────
+  -- ── 3. Ambigua: tres áreas con el mismo nombre normalizado ───────────────
   SELECT area_id INTO v_area FROM public.programacion_limpieza WHERE id = PROG_LOBBY;
   IF v_area IS NOT NULL THEN
-    RAISE EXCEPTION '3: "Lobby" es ambigua (Lobby / " lobby ") y aún así se vinculó a %', v_area; END IF;
+    RAISE EXCEPTION '3: "Lobby" es ambigua (Lobby / " lobby " / LOBBY) y aún así se vinculó a %', v_area; END IF;
   RAISE NOTICE 'OK 3  la coincidencia ambigua NO se resuelve sola: queda pendiente';
 
   -- ── 4. Inexistente: se crea UNA área para las dos variantes ──────────────
@@ -90,8 +90,8 @@ BEGIN
   IF v_area IS NOT NULL THEN
     RAISE EXCEPTION '5a: la programación con área en blanco se vinculó a %', v_area; END IF;
   SELECT count(*) INTO n FROM public.areas_condominio WHERE project_id = P1;
-  IF n <> 5 THEN
-    RAISE EXCEPTION '5b: P1 debía tener 5 áreas (4 del fixture + Terraza) y tiene %', n; END IF;
+  IF n <> 6 THEN
+    RAISE EXCEPTION '5b: P1 debía tener 6 áreas (5 del fixture + Terraza) y tiene %', n; END IF;
   RAISE NOTICE 'OK 5  el área en blanco se salta: ni vincula ni ensucia el catálogo';
 
   -- ── 6. El backfill respeta el tenant ─────────────────────────────────────
