@@ -291,12 +291,26 @@ describe('esperarUrlsPorSha (sondeo con reloj y espera inyectados)', () => {
   })
 
   it('agotada la ventana devuelve vacío: el fail-closed se mantiene', async () => {
+    // El reloj avanza al dormir y la dormida REVIENTA pasadas las que caben en
+    // la ventana: si el corte desaparece, esto falla en el acto en vez de
+    // colgar la suite hasta el timeout.
+    let dormidas = 0
     const reloj = relojFalso()
+    const dormir = async (ms) => {
+      if ((dormidas += 1) > 60_000 / INTERVALO_SONDEO_MS) throw new Error('sondeó más allá de la ventana')
+      await reloj.dormir(ms)
+    }
     const urls = await esperarUrlsPorSha(
-      base({ fetchImpl: listoTrasIntentos(Number.POSITIVE_INFINITY), tiempoMaxMs: 60_000, ...reloj }),
+      base({
+        fetchImpl: listoTrasIntentos(Number.POSITIVE_INFINITY),
+        tiempoMaxMs: 60_000,
+        ahora: reloj.ahora,
+        dormir,
+      }),
     )
     expect(urls).toEqual([])
     expect(reloj.transcurrido).toBeLessThanOrEqual(60_000)
+    expect(dormidas).toBe(4) // duerme en 0/15/30/45s; a los 60s ya no cabe otro
   })
 
   it('con tiempoMaxMs 0 hace UN intento y no duerme (caso E2E_BASE_URL explícita)', async () => {
@@ -306,7 +320,10 @@ describe('esperarUrlsPorSha (sondeo con reloj y espera inyectados)', () => {
       if (String(url).includes('/deployments?')) consultas += 1
       return { ok: true, json: async () => [] }
     }
-    expect(await esperarUrlsPorSha(base({ fetchImpl: f, tiempoMaxMs: 0, ...reloj }))).toEqual([])
+    const dormirProhibido = async () => { throw new Error('no debía dormir con tiempoMaxMs 0') }
+    expect(
+      await esperarUrlsPorSha(base({ fetchImpl: f, tiempoMaxMs: 0, ahora: reloj.ahora, dormir: dormirProhibido })),
+    ).toEqual([])
     expect(consultas).toBe(1)
     expect(reloj.transcurrido).toBe(0)
   })

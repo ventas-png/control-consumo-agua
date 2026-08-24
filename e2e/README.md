@@ -42,6 +42,14 @@ En CI el verde de este job significa «la suite corrió», no «no se opuso»:
   su `environment_url`) y los valida; `E2E_BASE_URL` es opcional y entra como
   un candidato más, sometido a las mismas comprobaciones. La URL elegida es la
   que corre la suite.
+- **El preflight ESPERA al build de Vercel**: el workflow arranca con el push y
+  Vercel tarda alrededor de un minuto en construir, así que consultar la API una
+  sola vez perdía la carrera siempre. El preflight sondea cada 15 s hasta 15 min
+  (`INTERVALO_SONDEO_MS` / `ESPERA_DESPLIEGUE_MS`). Esto **no afloja el
+  fail-closed**: agotada la ventana no hay candidato y el job queda rojo. Con
+  `E2E_BASE_URL` definida no espera nada: ya hay destino que validar. Si el job
+  se queda esperando los 15 min completos, mirá en Vercel si el build de ese
+  commit falló o quedó en cola.
 - **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
   `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
   corridas se encolan, ninguna muere a medias.
