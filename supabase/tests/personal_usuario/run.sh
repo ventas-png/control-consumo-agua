@@ -13,16 +13,19 @@
 # ON DELETE SET NULL) y ninguna se puede comprobar leyendo el SQL: dependen de
 # cómo se comportan al escribir.
 #
-# QUÉ COMPRUEBA (22 invariantes)
+# QUÉ COMPRUEBA (24 invariantes)
 #   1-3    la columna es opcional, apunta a app_users y es ON DELETE SET NULL
 #   4-7    una cuenta = un expediente POR CONDOMINIO; varios sin cuenta conviven;
 #          borrar la cuenta deja el expediente vivo
 #   8-9    el trigger corta el vínculo cross-tenant en INSERT y en UPDATE
-#   10-18  el catálogo del selector: a quién lista (ni residentes ni otra
-#          empresa), qué reporta (correo, empleado que ya la tomó, acceso al
-#          proyecto por cada cuenta) y a quién le contesta (permiso del tab,
-#          empresa del proyecto, proyecto inexistente)
-#   19-22  la ACL: anon no ejecuta el catálogo, authenticated sí, la función
+#   10-14  el catálogo del selector: a quién lista (ni residentes ni otra
+#          empresa) y qué reporta (correo, empleado que ya la tomó, acceso al
+#          proyecto por cada cuenta)
+#   15-16  el catálogo se acota a ESTE condominio: no lista cuentas sin acceso
+#          al proyecto, pero sí la que ya está vinculada a un empleado de aquí
+#   17-20  a quién le contesta (permiso del tab, empresa del proyecto, proyecto
+#          inexistente)
+#   21-24  la ACL: anon no ejecuta el catálogo, authenticated sí, la función
 #          trigger no es invocable por nadie — y aun así el trigger dispara
 #
 # USO
@@ -35,6 +38,9 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20260826000000_personal_usuario_de_ingreso.sql"
+# El catálogo del selector se acota al proyecto en una segunda migración; los
+# invariantes 15-16 son suyos y sin ella fallan.
+MIGRACION_2="$RAIZ/supabase/migrations/20260904000000_personal_usuarios_asignables_solo_del_proyecto.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -83,9 +89,11 @@ echo "── 1/3 · fixture: esquema y cuentas de la empresa ──────�
 aplicar "$AQUI/fixture.sql"
 echo "  OK    stubs + 8 cuentas + 2 condominios + 4 expedientes"
 
-echo "── 2/3 · migración 20260826000000, aplicada DOS veces (idempotente) ────"
+echo "── 2/3 · migraciones 20260826000000 + 20260904000000, DOS veces ────────"
 aplicar "$MIGRACION"
+aplicar "$MIGRACION_2"
 aplicar "$MIGRACION"
+aplicar "$MIGRACION_2"
 echo "  OK    re-aplicar no falla"
 
 echo "── 3/3 · invariantes ───────────────────────────────────────────────────"
@@ -104,4 +112,4 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ personal_usuario: el vínculo es único por condominio, no cruza empresas y su catálogo solo lo ve quien tiene el permiso del tab."
+echo "✅ personal_usuario: el vínculo es único por condominio, no cruza empresas y su catálogo —solo cuentas con acceso a ESTE condominio— lo ve quien tiene el permiso del tab."
