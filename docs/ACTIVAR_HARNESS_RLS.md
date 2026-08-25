@@ -532,6 +532,37 @@ fallar el job.
 Y el artefacto `rls-report-<run_id>` guarda el reporte JSON. **No contiene
 secretos**: sólo nombres de prueba (literales del repo) y recuentos.
 
+### Si falla con «Invalid login credentials»
+
+Es el modo de fallo más probable de este harness, y no es un bug del código:
+
+```
+FAIL src/test/rls/rlsHarness.test.ts > gate por clase en paquetes_recibidos
+Error: No se pudo autenticar ***: Invalid login credentials
+```
+
+Significa que **el secreto de GitHub y la contraseña real del usuario en el
+sandbox dejaron de coincidir**. Pasa solo, sin que nadie toque el repo, porque
+el seed **regenera todas las contraseñas en cada corrida**: quien lo corra para
+sembrar una tabla nueva rota de paso las credenciales de los seis usuarios, y
+los secretos que no se actualicen quedan viejos.
+
+Cómo se lee el síntoma:
+
+| Qué falla | Qué credencial se movió |
+|---|---|
+| Todo el archivo, desde el primer `beforeAll` | `RLS_USER_A_*` o `RLS_USER_B_*` |
+| Sólo el bloque `gate por clase`, con el resto en verde | alguna de `RLS_USER_PAQ_*`, `CORR`, `ADMIN` u `OWNER` |
+
+El arreglo es re-correr el seed (Paso 3) y **volver a pegar los quince** —no sólo
+los que parecen afectados—, porque una sola corrida los rota todos a la vez. Si
+también hay copia como *Dependabot secrets*, hay que actualizar los dos
+almacenes: dejar uno viejo reproduce el mismo rojo en cuanto Dependabot corra.
+
+Que el job se ponga **rojo** ante esto es lo correcto: la alternativa —seguir con
+el bloque omitido— sería un verde con doce pruebas menos, que es justo el falso
+verde que este gate existe para eliminar.
+
 ---
 
 ## Limitaciones (lo que este harness NO demuestra)
