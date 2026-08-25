@@ -8,6 +8,8 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
+import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
+import { MultiImageUploader } from '../../shared/ImageUploader'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio,
@@ -156,7 +158,42 @@ export function TareasPersonalTab({
     setSaving(false); onRefresh()
   }
 
-  async function marcarTarea(tareaId: string, estado: EstadoTareaBloque) {
+  // ── Evidencia al cerrar (20260905000400) ──────────────────────────────────
+  // El trigger `trg_exigir_evidencia` es la garantía; esto es la cortesía: que
+  // quien ejecuta vea QUÉ le falta antes del viaje de ida y vuelta, y tenga
+  // dónde aportarlo. Hasta esta versión `requiere_foto` era un badge y nada más.
+  const [evidenciaDe, setEvidenciaDe] = useState<string | null>(null)
+  const [comentario, setComentario] = useState('')
+  const [motivo, setMotivo] = useState('')
+
+  function abrirEvidencia(t: TareaBloque) {
+    setEvidenciaDe(actual => (actual === t.id ? null : t.id))
+    setComentario(t.evidencia_texto ?? '')
+    setMotivo('')
+  }
+
+  /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
+  async function togglePaso(t: TareaBloque, i: number) {
+    const hechos = new Set(t.checklist_completado ?? [])
+    if (hechos.has(i)) hechos.delete(i); else hechos.add(i)
+    const { error } = await updateCondominioRow('tareas_bloque', t.id, {
+      checklist_completado: [...hechos].sort((a, b) => a - b),
+    })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    onRefresh()
+  }
+
+  async function guardarFotos(t: TareaBloque, urls: string[]) {
+    const { error } = await updateCondominioRow('tareas_bloque', t.id, { foto_urls: urls })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    onRefresh()
+  }
+
+  async function marcarTarea(
+    tareaId: string,
+    estado: EstadoTareaBloque,
+    motivoAplicable = '',
+  ) {
     if (estado === 'con_observacion') {
       const result = await openPromptDialog({
         title: '¿Qué observación encontraste?',
@@ -177,10 +214,41 @@ export function TareasPersonalTab({
         completada_en: new Date().toISOString(),
       })
     } else {
-      await updateCondominioRow('tareas_bloque', tareaId, {
+      // Sólo el cierre por 'completada' exige evidencia — igual que el trigger.
+      // `omitida` es que no se hizo, y `con_observacion` ya se resolvió arriba:
+      // exigirles lo mismo empujaría a cerrar en falso.
+      const extra: Record<string, unknown> = {}
+      if (estado === 'completada') {
+        const t = tareas.find(x => x.id === tareaId)
+        if (t) {
+          const chequeo = evidenciaSuficiente(t, { ...t, motivo_sin_evidencia: motivoAplicable })
+          if (!chequeo.ok) {
+            setEvidenciaDe(tareaId)
+            setComentario(t.evidencia_texto ?? '')
+            notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
+            return
+          }
+        }
+        if (motivoAplicable) extra.motivo_sin_evidencia = motivoAplicable
+      }
+      const { error } = await updateCondominioRow('tareas_bloque', tareaId, {
         estado,
         completada_en: estado !== 'pendiente' ? new Date().toISOString() : null,
+        ...extra,
       })
+      if (error) {
+        // El trigger marca sus mensajes con `EVIDENCIA:`; se traduce en vez de
+        // mostrarle a un operativo el texto crudo de Postgres.
+        notify({
+          variant: 'error',
+          title: esErrorDeEvidencia(error.message) ? 'Falta evidencia' : 'Error',
+          text: esErrorDeEvidencia(error.message)
+            ? 'La tarea no se puede cerrar sin la evidencia que exige. Adjuntala, o declará el motivo.'
+            : error.message,
+        })
+        return
+      }
+      setEvidenciaDe(null); setMotivo(''); setComentario('')
     }
     onRefresh()
   }
@@ -357,7 +425,8 @@ export function TareasPersonalTab({
                           const areaNombre = t.area_nombre ?? (areas.find(a => a.id === t.area_id)?.nombre)
                           const areaIcono  = t.area_icono  ?? (areas.find(a => a.id === t.area_id)?.icono ?? '')
                           return (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: et.bg, borderRadius: '10px', border: `1px solid ${et.border}` }}>
+                            <div key={t.id}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: et.bg, borderRadius: '10px', border: `1px solid ${et.border}` }}>
                               <span style={{ fontWeight: 800, fontSize: '12px', color: 'var(--at-warning)', width: '18px', textAlign: 'center', flexShrink: 0 }}>{idx + 1}</span>
                               <span style={{ fontSize: '18px', flexShrink: 0 }}>{et.icon}</span>
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -365,7 +434,20 @@ export function TareasPersonalTab({
                                 {t.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t.descripcion}</div>}
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
                                   {areaNombre && <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{areaIcono} {areaNombre}</span>}
+                                  {t.duracion_estimada_min != null && <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>⏱ {t.duracion_estimada_min} min</span>}
                                   {t.requiere_foto && <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>📷 Requiere foto</span>}
+                                  {t.requiere_comentario && <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>💬 Requiere comentario</span>}
+                                  {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
+                                    <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>
+                                      ☑️ {(t.checklist_completado ?? []).length}/{t.checklist!.length}
+                                    </span>
+                                  )}
+                                  {t.motivo_sin_evidencia && (
+                                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-warning-strong)' }}
+                                      title={`Se cerró sin la evidencia exigida: ${t.motivo_sin_evidencia}`}>
+                                      ⚠ Cerrada con excepción
+                                    </span>
+                                  )}
                                   {t.notas_operativo && <span style={{ fontSize: '11.5px', color: 'var(--at-warning)' }}>⚠ {t.notas_operativo}</span>}
                                   {t.completada_en && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{new Date(t.completada_en).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
                                 </div>
@@ -376,12 +458,88 @@ export function TareasPersonalTab({
                                   <button onClick={() => marcarTarea(t.id, 'completada')} title="Completada" style={{ padding: '5px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>✅</button>
                                   <button onClick={() => marcarTarea(t.id, 'con_observacion')} title="Con observación" style={{ padding: '5px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⚠️</button>
                                   <button onClick={() => marcarTarea(t.id, 'omitida')} title="Omitir" style={{ padding: '5px 9px', background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⏭</button>
+                                  {(t.requiere_foto || t.requiere_comentario || t.requiere_checklist || t.instrucciones_seguridad) && (
+                                    <button onClick={() => abrirEvidencia(t)} aria-label={`Evidencia de ${t.titulo}`} title="Evidencia e instrucciones" style={{ padding: '5px 9px', background: evidenciaDe === t.id ? 'var(--at-primary-soft)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>📋</button>
+                                  )}
                                 </div>
                               )}
                               {canEdit && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                                 <button onClick={() => deleteTarea(t.id)} style={{ padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '13px', flexShrink: 0 }}>✕</button>
                               )}
                             </div>
+                            {evidenciaDe === t.id && (
+                              <div style={{ padding: '12px', margin: '0 0 8px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
+                                {/* Las instrucciones van ARRIBA y siempre: leerlas al cerrar es tarde. */}
+                                {t.instrucciones_seguridad && (
+                                  <div role="note" style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
+                                    🦺 <strong>Antes de empezar:</strong> {t.instrucciones_seguridad}
+                                  </div>
+                                )}
+
+                                {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
+                                  <div style={{ marginBottom: '10px' }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Pasos</div>
+                                    {t.checklist!.map((paso, i) => {
+                                      const hecho = (t.checklist_completado ?? []).includes(i)
+                                      return (
+                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '3px', cursor: 'pointer' }}>
+                                          <input type="checkbox" checked={hecho}
+                                            onChange={() => void togglePaso(t, i)}
+                                            aria-label={paso} />
+                                          <span style={{ textDecoration: hecho ? 'line-through' : 'none', opacity: hecho ? 0.6 : 1 }}>{paso}</span>
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+
+                                {t.requiere_foto && (
+                                  <div style={{ marginBottom: '10px' }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>Foto de evidencia</div>
+                                    <MultiImageUploader
+                                      values={t.foto_urls ?? []}
+                                      onChange={urls => { void guardarFotos(t, urls) }}
+                                      folder="tareas"
+                                      label="Evidencia"
+                                      maxFiles={6}
+                                      capture
+                                    />
+                                  </div>
+                                )}
+
+                                {t.requiere_comentario && (
+                                  <div style={{ marginBottom: '10px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }} htmlFor={`com-${t.id}`}>
+                                      Comentario de quien ejecuta
+                                    </label>
+                                    <textarea id={`com-${t.id}`} rows={2} value={comentario}
+                                      onChange={e => setComentario(e.target.value)}
+                                      onBlur={() => void updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: comentario }).then(onRefresh)}
+                                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
+                                  </div>
+                                )}
+
+                                {/* La salida declarada. No es un bypass: queda escrita en la fila. */}
+                                <details>
+                                  <summary style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>
+                                    No puedo aportar la evidencia
+                                  </summary>
+                                  <div style={{ marginTop: '6px' }}>
+                                    <input value={motivo} onChange={e => setMotivo(e.target.value)}
+                                      aria-label="Motivo para cerrar sin evidencia"
+                                      placeholder="Por qué no se puede aportar (queda registrado)"
+                                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
+                                    <button
+                                      onClick={() => void marcarTarea(t.id, 'completada', motivo.trim())}
+                                      disabled={motivo.trim() === ''}
+                                      style={{ marginTop: '6px', padding: '6px 12px', background: motivo.trim() === '' ? 'var(--at-chip)' : 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', cursor: motivo.trim() === '' ? 'default' : 'pointer', fontSize: '12.5px', fontWeight: 700, color: 'var(--at-warning-strong)', opacity: motivo.trim() === '' ? 0.5 : 1 }}>
+                                      Cerrar declarando el motivo
+                                    </button>
+                                  </div>
+                                </details>
+                              </div>
+                            )}
+                          </div>
                           )
                         })}
                       </div>

@@ -197,6 +197,15 @@ export interface TareaBloque {
   requiere_checklist?: boolean
   /** Rutina que generó la tarea. null = alta manual o carga suelta. */
   rutina_id?: string | null
+  // ── Evidencia al cerrar (20260905000400) ─────────────────────────────────
+  /** Posiciones (0-based) de `checklist` ya cumplidas. */
+  checklist_completado?: number[]
+  /**
+   * Excepción DECLARADA: permite cerrar sin la evidencia exigida dejando por
+   * escrito el porqué. Es la alternativa a un bypass por rol, que no dejaría
+   * rastro en la fila.
+   */
+  motivo_sin_evidencia?: string | null
   // joins
   area_nombre?: string
   area_icono?: string

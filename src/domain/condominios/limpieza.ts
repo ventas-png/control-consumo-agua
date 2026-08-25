@@ -19,6 +19,7 @@ import type {
   EjecucionLimpieza,
   FrecuenciaLimpieza,
 } from '../../types'
+import { evidenciaSuficiente } from './evidencia'
 
 /** Días que suma cada frecuencia para calcular la próxima ejecución. */
 export const FRECUENCIA_DIAS: Record<FrecuenciaLimpieza, number> = {
@@ -137,15 +138,23 @@ export function construirRuta(params: {
  * ¿Se puede cerrar la ejecución? El área que exige foto no se cierra sin ella:
  * es la razón de ser de la evidencia, y dejarlo a la buena voluntad de la UI
  * significa que el primer atajo la pierde.
+ *
+ * Delega en `evidenciaSuficiente` (domain/condominios/evidencia.ts), que es el
+ * mismo chequeo que usa Tareas de personal: dos implementaciones de esta idea
+ * serían dos maneras de discrepar con el trigger que la impone en la base.
+ * Limpieza sólo declara `requiere_foto`, así que sólo eso se le exige.
  */
 export function puedeCerrar(
   ejec: Pick<EjecucionLimpieza, 'foto_urls'>,
   prog: Pick<ProgramacionLimpieza, 'requiere_foto'> | undefined,
 ): { ok: true } | { ok: false; motivo: string } {
-  if (prog?.requiere_foto && ejec.foto_urls.length === 0) {
-    return { ok: false, motivo: 'Esta área requiere al menos una foto para cerrarse.' }
-  }
-  return { ok: true }
+  const r = evidenciaSuficiente(
+    { requiere_foto: prog?.requiere_foto },
+    { foto_urls: ejec.foto_urls },
+  )
+  return r.ok
+    ? { ok: true }
+    : { ok: false, motivo: 'Esta área requiere al menos una foto para cerrarse.' }
 }
 
 /** Resumen de la ruta para las tarjetas de avance del tab. */
