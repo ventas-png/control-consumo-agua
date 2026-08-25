@@ -16068,6 +16068,176 @@ export type Database = {
           },
         ]
       }
+      rutina_actividades: {
+        Row: {
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          notas: string | null
+          obligatoria: boolean
+          orden: number
+          plantilla_tarea_id: string
+          project_id: string
+          rutina_id: string
+        }
+        Insert: {
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          obligatoria?: boolean
+          orden?: number
+          plantilla_tarea_id: string
+          project_id: string
+          rutina_id: string
+        }
+        Update: {
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          obligatoria?: boolean
+          orden?: number
+          plantilla_tarea_id?: string
+          project_id?: string
+          rutina_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rutina_actividades_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutina_actividades_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutina_actividades_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "rutina_act_plantilla_fk"
+            columns: ["plantilla_tarea_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_tarea_cargo"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "rutina_act_rutina_fk"
+            columns: ["rutina_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "rutinas_limpieza"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "rutina_actividades_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rutinas_limpieza: {
+        Row: {
+          activa: boolean
+          area_id: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          orden: number
+          plantilla_horario_id: string | null
+          project_id: string
+          servicio: string
+        }
+        Insert: {
+          activa?: boolean
+          area_id?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          orden?: number
+          plantilla_horario_id?: string | null
+          project_id: string
+          servicio?: string
+        }
+        Update: {
+          activa?: boolean
+          area_id?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          plantilla_horario_id?: string | null
+          project_id?: string
+          servicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rutinas_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutinas_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rutinas_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "rutinas_limpieza_area_fk"
+            columns: ["area_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "rutinas_limpieza_horario_fk"
+            columns: ["plantilla_horario_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_horario"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "rutinas_limpieza_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sanciones_condominio: {
         Row: {
           company_id: string

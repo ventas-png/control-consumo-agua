@@ -44,6 +44,17 @@ interface Props {
   servicioInicial?: ServicioOperativo
   /** Consulta sin edición (Limpieza): oculta toda acción de escritura. */
   soloLectura?: boolean
+  /**
+   * Modo SELECTOR (armado de rutinas): cambia las acciones de la tarjeta por un
+   * botón de elegir y apaga toda escritura. Existe para que quien arma una
+   * rutina herede los filtros por cargo/servicio/estado de este catálogo en vez
+   * de que el armador se fabrique un listado propio que iría divergiendo.
+   */
+  seleccion?: {
+    /** Ids ya elegidos: sus tarjetas quedan marcadas y sin botón. */
+    yaElegidas: Set<string>
+    onElegir: (plantilla: PlantillaTareaCargo) => void
+  }
   titulo?: string
   subtitulo?: string
 }
@@ -88,7 +99,7 @@ function blankForm() {
 export function ActividadesCatalog({
   plantillas, areas, suministros, inventario, proyectoId, companyId,
   canCreate, canEdit, canDelete, onRefresh,
-  servicioInicial, soloLectura = false, titulo, subtitulo,
+  servicioInicial, soloLectura = false, seleccion, titulo, subtitulo,
 }: Props) {
   const [saving, setSaving] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -101,9 +112,11 @@ export function ActividadesCatalog({
   // Panel de recursos abierto (uno a la vez); vive FUERA del formulario.
   const [recursosDe, setRecursosDe] = useState<string | null>(null)
 
-  const puedeCrear = canCreate && !soloLectura
-  const puedeEditar = canEdit && !soloLectura
-  const puedeBorrar = canDelete && !soloLectura
+  // En modo selector no se administra el catálogo: se elige de él.
+  const enSeleccion = seleccion != null
+  const puedeCrear = canCreate && !soloLectura && !enSeleccion
+  const puedeEditar = canEdit && !soloLectura && !enSeleccion
+  const puedeBorrar = canDelete && !soloLectura && !enSeleccion
 
   // ── Recursos planificados (insumos + herramientas) ─────────────────────────
   const [recSuministros, setRecSuministros] = useState<PlantillaTareaSuministro[]>([])
@@ -649,6 +662,13 @@ export function ActividadesCatalog({
                         <button onClick={() => abrirRecursos(p.id)} aria-label={`Recursos de ${p.titulo}`} style={{ flex: 1, padding: '5px', background: recursosDe === p.id ? 'var(--at-primary-soft)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>
                           🧰 Recursos ({nSum + nHer})
                         </button>
+                        {enSeleccion && (
+                          seleccion.yaElegidas.has(p.id)
+                            ? <span style={{ flex: 1, padding: '5px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: 'var(--at-success)' }}>✓ En la rutina</span>
+                            : <button onClick={() => seleccion.onElegir(p)} aria-label={`Agregar ${p.titulo} a la rutina`} style={{ flex: 1, padding: '5px', background: 'var(--at-primary-soft)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-primary)', fontWeight: 700 }}>
+                                ➕ Agregar
+                              </button>
+                        )}
                         {puedeEditar && <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '5px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>}
                         {puedeEditar && (
                           <button onClick={() => toggleActivo(p)} style={{ padding: '5px 10px', background: p.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: `1px solid ${p.activo ? 'var(--at-warning-border)' : 'var(--at-success-border)'}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: p.activo ? 'var(--at-warning-strong)' : 'var(--at-success)' }}>
