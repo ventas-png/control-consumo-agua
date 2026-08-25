@@ -39,9 +39,26 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
 
   await page.getByRole('button', { name: /Nueva cuota/i }).click()
 
-  // La unidad es opcional, pero elegirla acerca la cuota a una real de
-  // cobranza; si el proyecto no tiene unidades activas, seguimos sin ella.
-  await chooseFirstRealOption(page.locator('#cuota-unidad')).catch(() => null)
+  // CAM SIN UNIDAD, y no una cuota de mantenimiento con unidad. No es un
+  // capricho: es el único alta que se puede repetir.
+  //
+  // uq_cuotas_condominio_llave_natural es (unidad_id, periodo, concepto) con
+  // WHERE deleted_at IS NULL AND unidad_id IS NOT NULL. Con una unidad fija,
+  // el período por defecto (el mes en curso) y el concepto por defecto
+  // ('mantenimiento'), la SEGUNDA alta del mes choca con el índice:
+  // handleGuardar avisa «Cuota ya existe» y vuelve sin insertar nada. Eso pasó
+  // en el run 32892210359 — la primera prueba creó su cuota y la segunda se
+  // quedó sin ninguna, con 0 botones donde esperaba 1. Y no habría bastado con
+  // variar el período: el mes sólo da doce valores al año, así que la segunda
+  // corrida del mismo mes volvería a chocar.
+  //
+  // El índice exime a propósito las filas con unidad_id NULL, y el schema
+  // (cuotaInputSchema.superRefine) permite unidad nula EXACTAMENTE para 'CAM'
+  // — "la única cuota global a nivel proyecto sin unidad específica". Índice y
+  // schema coinciden en que ése es el caso sin límite, así que es el que se
+  // usa. Las transiciones que la prueba ejercita (emitir → pagar) son las
+  // mismas para cualquier concepto.
+  await page.locator('#cuota-concepto').selectOption('CAM')
   await page.locator('#cuota-monto').fill(monto)
   await page.locator('#cuota-notas').fill(marcaDeCorrida('E2E · creada por la suite'))
 

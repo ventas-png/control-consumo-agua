@@ -1037,4 +1037,20 @@ describe('los specs de dinero fabrican su propia precondición', () => {
   it('la cuota creada NO vence hoy: nacería vencida y no se podría cobrar', () => {
     expect(sinComentarios(sembrar)).toMatch(/30 \* 86_400_000/)
   })
+
+  it('el alta repetible es CAM SIN unidad: la llave natural no admite otra cosa', () => {
+    // uq_cuotas_condominio_llave_natural = (unidad_id, periodo, concepto)
+    // WHERE deleted_at IS NULL AND unidad_id IS NOT NULL. Con unidad fija, el
+    // mes en curso y 'mantenimiento', la SEGUNDA alta del mes choca y
+    // handleGuardar vuelve sin insertar («Cuota ya existe»): el run
+    // 32892210359 se cayó justo así, con 0 botones donde esperaba 1. Variar el
+    // período no alcanza — doce valores al año.
+    //
+    // El índice exime unidad_id NULL y cuotaInputSchema permite unidad nula
+    // sólo para 'CAM'. Es el único alta repetible que el modelo admite.
+    const codigo = sinComentarios(sembrar)
+    expect(codigo).toMatch(/selectOption\('CAM'\)/)
+    // Y no puede volver a atarse a una unidad, que es lo que reintroduce el choque.
+    expect(codigo).not.toMatch(/cuota-unidad/)
+  })
 })
