@@ -275,6 +275,11 @@ BEGIN
   -- la RPC (invariante 5) y NO puede insertar un movimiento a mano, porque no
   -- tiene `condominios.tab.suministros`. Consumir haciendo el trabajo y
   -- administrar el almacén son permisos distintos.
+  --
+  -- Lo que hace HONESTO a 11a son los GRANT de tabla del fixture. Sin ellos el
+  -- rechazo podía venir del privilegio faltante y no de la política: el mismo
+  -- SQLSTATE, la misma prueba en verde, la RLS sin ejercitarse. Si alguien los
+  -- quita, esto vuelve a pasar por el motivo equivocado.
   PERFORM set_config('app.uid', 'a0000000-0000-0000-0000-00000000000a', true);
   SET LOCAL ROLE authenticated;
 

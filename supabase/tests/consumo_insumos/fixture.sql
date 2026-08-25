@@ -489,6 +489,25 @@ CREATE TRIGGER trg_sellar_creado_por
   BEFORE INSERT OR UPDATE ON public.movimientos_suministro
   FOR EACH ROW EXECUTE FUNCTION public.sellar_actor('creado_por', 'forzar');
 
+-- ── GRANTs de tabla, como en producción ─────────────────────────────────────
+-- IMPORTANTE, y no es un detalle de arranque. Supabase otorga por defecto los
+-- privilegios de tabla a `anon` y `authenticated` en el esquema public: lo que
+-- realmente decide quién ve y escribe qué es la RLS, no el GRANT.
+--
+-- Sin esto, un rechazo en el sandbox podría venir del privilegio de tabla y no
+-- de la política — y los dos levantan el MISMO SQLSTATE (42501), así que un
+-- `EXCEPTION WHEN insufficient_privilege` no los distingue. Es exactamente lo
+-- que afirma el invariante 11a: «Ana no puede insertar un movimiento a mano
+-- PORQUE no tiene `condominios.tab.suministros`». Sin estos GRANT esa prueba
+-- pasaría igual con la RLS apagada, y estaría pasando por el motivo equivocado.
+--
+-- No hace falta `ALTER DEFAULT PRIVILEGES`: la única tabla que nace DESPUÉS de
+-- este punto es `tarea_bloque_suministros`, y 20260905000500 hace su propio
+-- GRANT sobre ella (igual que en producción). Las migraciones que corren encima
+-- también hacen su REVOKE donde corresponde.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+
 -- ── Padrón mínimo ───────────────────────────────────────────────────────────
 -- Dos usuarios con permisos DISJUNTOS, que es el punto entero de la RPC:
 --   Ana   conserje  → `tareas_personal`, SIN `suministros`. Puede cerrar la
