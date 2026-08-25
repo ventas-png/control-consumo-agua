@@ -84,6 +84,48 @@ export interface PlantillaTareaHerramienta {
   inventario_estado?: string
 }
 
+// ── Rutinas de limpieza (20260905000200) ─────────────────────────────────────
+
+/**
+ * Receta repetible: un conjunto ordenado de actividades del catálogo que se
+ * ejecuta junto. Es DEFINICIÓN — la ocurrencia del día se materializa en
+ * `tareas_bloque`, no aquí.
+ */
+export interface RutinaLimpieza {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  /** Área del catálogo. null = rutina general, no atada a una zona. */
+  area_id?: string | null
+  servicio: ServicioOperativo
+  /** Jornada en la que corre. null = sin jornada fija. */
+  plantilla_horario_id?: string | null
+  activa: boolean
+  orden: number
+  creado_por?: string | null
+  created_at: string
+  // joins (embed areas_condominio(nombre), plantillas_horario(nombre))
+  area_nombre?: string
+  horario_nombre?: string
+}
+
+/** Un paso de la rutina: una actividad del catálogo, en su orden. */
+export interface RutinaActividad {
+  id: string
+  company_id: string
+  project_id: string
+  rutina_id: string
+  plantilla_tarea_id: string
+  orden: number
+  /** false = paso opcional; la rutina se cumple sin él. */
+  obligatoria: boolean
+  notas?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
 export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'
 export type TurnoTipo = 'manana' | 'tarde' | 'noche'
 

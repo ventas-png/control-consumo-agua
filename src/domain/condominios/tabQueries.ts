@@ -14,6 +14,8 @@ import type {
   HorasPersonal,
   PlantillaTareaHerramienta,
   PlantillaTareaSuministro,
+  RutinaActividad,
+  RutinaLimpieza,
   UsuarioAsignablePersonal,
 } from '../../types'
 
@@ -574,4 +576,65 @@ export async function fetchRecursosPlantillas(
     }),
   )
   return { suministros, herramientas, error: error ? { message: error.message } : null }
+}
+
+// ── Rutinas de limpieza (20260905000200) ──
+
+/**
+ * Rutinas del proyecto con sus pasos. Loader propio del tab y no del cargador
+ * monolítico: sólo la vista de Rutinas las necesita, y bajarlas en cada entrada
+ * a Condominios sería tráfico que casi nadie usa.
+ *
+ * El nombre del área y de la jornada vienen por embed en vez de resolverse
+ * contra las listas ya cargadas: una rutina puede apuntar a un área desactivada
+ * que la UI filtró de su selector, y sin el embed se mostraría en blanco.
+ */
+export async function fetchRutinasLimpieza(
+  projectId: string,
+  companyId: string,
+): Promise<{
+  rutinas: RutinaLimpieza[]
+  pasos: RutinaActividad[]
+  horarios: Array<{ id: string; nombre: string; hora_inicio: string; hora_fin: string }>
+  error: { message: string } | null
+}> {
+  const [rutRes, pasRes, horRes] = await Promise.all([
+    db
+      .from('rutinas_limpieza')
+      .select('*, areas_condominio(nombre), plantillas_horario(nombre)')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId)
+      .order('orden')
+      .order('nombre'),
+    db
+      .from('rutina_actividades')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId)
+      .order('orden'),
+    // Las jornadas son catálogo de Turnos, pero la rutina elige una: se bajan
+    // aquí y no en el cargador monolítico porque sólo esta vista las necesita.
+    db
+      .from('plantillas_horario')
+      .select('id, nombre, hora_inicio, hora_fin')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId)
+      .eq('activo', true)
+      .order('hora_inicio'),
+  ])
+  const error = rutRes.error ?? pasRes.error ?? horRes.error
+  reportDegradedQuery('condominios.fetchRutinasLimpieza', error)
+  const rutinas: RutinaLimpieza[] = (rutRes.data ?? []).map(
+    ({ areas_condominio: a, plantillas_horario: h, ...resto }) => ({
+      ...resto,
+      area_nombre: a?.nombre,
+      horario_nombre: h?.nombre,
+    }),
+  ) as RutinaLimpieza[]
+  return {
+    rutinas,
+    pasos: (pasRes.data ?? []) as RutinaActividad[],
+    horarios: horRes.data ?? [],
+    error: error ? { message: error.message } : null,
+  }
 }

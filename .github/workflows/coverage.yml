@@ -284,6 +284,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/tareas_bloque_paridad/run.sh
 
+      # 20260905000200 descansa en CUATRO FKs compuestas (id, company_id,
+      # project_id) y un trigger de sellado. Que estén escritas no demuestra que
+      # el motor rechace mover de proyecto una fila ya relacionada, ni que el
+      # trigger imponga el tenant por encima del cliente. El fallo que previene
+      # es el peor en multi-tenant: una rutina apuntando al área o a la
+      # actividad de OTRO condominio.
+      - name: Rutinas de limpieza — tenant congelado por FK compuesta y RLS
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/rutinas_limpieza/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
