@@ -16,7 +16,10 @@
 // P2 tipos: las funciones con tabla/RPC LITERAL usan el cliente tipado `db`;
 // los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
 import { supabase, db } from '../../lib/supabase'
-import type { ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas } from '../../types'
+import type {
+  ConsumoDeclarado, ResultadoConsumoInsumos,
+  ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas,
+} from '../../types'
 import { TABLA_DE_FUENTE, type NovedadOperativa } from './novedades'
 
 /**
@@ -293,4 +296,32 @@ export async function atenderNovedad(novedad: NovedadOperativa): Promise<{ error
   return updateCondominioRow(TABLA_DE_FUENTE[novedad.fuente], novedad.id, {
     requiere_mantenimiento: false,
   })
+}
+
+/**
+ * Descuenta del almacén los insumos declarados al cerrar una tarea de turno
+ * (RPC `consumir_insumos_tarea`, 20260905000500).
+ *
+ * ES UNA RPC Y NO UN INSERT porque el operativo NO tiene
+ * `condominios.tab.suministros`, y `movimientos_suministro_insert` lo exige: un
+ * INSERT desde esta pantalla moriría por RLS. La RPC es SECURITY DEFINER y se
+ * gatea por los permisos de la TAREA — quien puede cerrarla puede declarar lo
+ * que gastó haciéndola, sin por eso poder administrar el almacén.
+ *
+ * Idempotente en la base: sólo toca las filas del plan que aún no tienen
+ * movimiento, así que reintentar un cierre no descuenta dos veces.
+ *
+ * Va en `supabase` (sin tipar) por lo mismo que `materializarRutinasTurno`.
+ * Devuelve UNA fila.
+ */
+export async function consumirInsumosTarea(
+  tareaId: string,
+  consumos: ConsumoDeclarado[],
+): Promise<{ data: ResultadoConsumoInsumos | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('consumir_insumos_tarea', {
+    p_tarea_id: tareaId,
+    p_consumos: consumos,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoConsumoInsumos | null) ?? null, error }
 }

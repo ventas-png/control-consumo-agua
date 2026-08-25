@@ -39,6 +39,11 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
+// El tab baja el plan de insumos al montar (20260905000500). Aquí no se prueba
+// eso, y sin el mock el cliente falso de `lib/supabase` reventaría en `.select`.
+vi.mock('../../../../domain/condominios/tabQueries', () => ({
+  fetchInsumosDeTareas: async () => ({ insumos: [], error: null }),
+}))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
 vi.mock('../../../shared/ImageUploader', () => ({

@@ -1,5 +1,5 @@
 import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
-import { useState } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import {
@@ -7,12 +7,14 @@ import {
   createCondominioRowReturning,
   updateCondominioRow,
   deleteCondominioRow,
+  consumirInsumosTarea,
 } from '../../../domain/condominios/tabMutations'
+import { fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
-  PersonalCondominio, AreaCondominio,
+  PersonalCondominio, AreaCondominio, TareaBloqueSuministro,
   EstadoBloqueTurno, TurnoTipo, EstadoTareaBloque,
 } from '../../../types'
 
@@ -172,6 +174,88 @@ export function TareasPersonalTab({
     setMotivo('')
   }
 
+  // ── Insumos usados (20260905000500) ───────────────────────────────────────
+  // El plan lo congeló la BD al crearse la tarea; aquí sólo se muestra y se deja
+  // corregir. La cantidad se edita porque el inventario sirve para reflejar el
+  // consumo REAL: descontar siempre la receta convertiría el stock en una
+  // estimación. `0` es una respuesta válida y distinta de omitir — es «no lo
+  // necesité», y queda escrito.
+  const [insumos, setInsumos] = useState<TareaBloqueSuministro[]>([])
+  // Por fila del plan, no por insumo: el mismo insumo puede estar en dos tareas.
+  const [cantidades, setCantidades] = useState<Record<string, string>>({})
+
+  // Sólo las tareas visibles. Traer el plan de todo el proyecto sería bajar un
+  // histórico entero para pintar tres filas.
+  const idsVisibles = useMemo(
+    () => bloquesFiltrados.flatMap(b => tareasDeBloque(b.id).map(t => t.id)).sort().join(','),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bloquesFiltrados.map(b => b.id).join(','), tareas],
+  )
+
+  const recargarInsumos = useCallback(async () => {
+    const ids = idsVisibles ? idsVisibles.split(',') : []
+    const { insumos: filas } = await fetchInsumosDeTareas(ids)
+    setInsumos(filas)
+  }, [idsVisibles])
+
+  useEffect(() => {
+    let vigente = true
+    const ids = idsVisibles ? idsVisibles.split(',') : []
+    void fetchInsumosDeTareas(ids).then(({ insumos: filas }) => {
+      if (vigente) setInsumos(filas)
+    })
+    return () => { vigente = false }
+  }, [idsVisibles])
+
+  const insumosDe = useCallback(
+    (tareaId: string) => insumos.filter(i => i.tarea_id === tareaId),
+    [insumos],
+  )
+
+  /** Lo pendiente de consumir: una fila ya consumida no se vuelve a ofrecer. */
+  const pendientesDe = useCallback(
+    (tareaId: string) => insumosDe(tareaId).filter(i => !i.movimiento_id),
+    [insumosDe],
+  )
+
+  /**
+   * Descuenta lo declarado. Corre DESPUÉS de que el cierre haya pasado: si el
+   * trigger de evidencia rechaza la tarea, no se gastó nada del almacén.
+   *
+   * La falta de stock NO es un error: el consumo se registró y el cierre ya
+   * ocurrió. Se avisa para que alguien reponga, no para culpar a quien ejecutó.
+   */
+  async function consumirDe(tareaId: string) {
+    const pendientes = pendientesDe(tareaId)
+    if (pendientes.length === 0) return
+
+    const { data, error } = await consumirInsumosTarea(
+      tareaId,
+      pendientes.map(i => ({
+        suministro_id: i.suministro_id,
+        cantidad: cantidades[i.id] !== undefined
+          ? Number(cantidades[i.id]) || 0
+          : i.cantidad_planificada,
+      })),
+    )
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo descontar el insumo', text: error.message })
+      return
+    }
+    if (data && data.sin_stock.length > 0) {
+      notify({
+        variant: 'warning',
+        title: 'Se descontó, pero faltaba existencia',
+        text: data.sin_stock
+          .map(f => `${f.nombre}: se usaron ${f.pedido} ${f.unidad} y había ${f.disponible}`)
+          .join('. '),
+      })
+    }
+    // `onRefresh` recarga las tareas, no el plan de insumos: sin esto la
+    // pantalla seguiría ofreciendo editar lo que ya se descontó.
+    await recargarInsumos()
+  }
+
   /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
   async function togglePaso(t: TareaBloque, i: number) {
     const hechos = new Set(t.checklist_completado ?? [])
@@ -271,6 +355,11 @@ export function TareasPersonalTab({
         })
         return
       }
+      // El consumo va DESPUÉS del cierre y sólo si el cierre pasó: si el
+      // trigger de evidencia rechazó la tarea, no se gastó nada del almacén.
+      // Y sólo en 'completada' — omitir es que NO se hizo, y `con_observacion`
+      // se resolvió en la rama de arriba.
+      if (estado === 'completada') await consumirDe(tareaId)
       setEvidenciaDe(null); setMotivo(''); setComentario('')
     }
     onRefresh()
@@ -465,6 +554,14 @@ export function TareasPersonalTab({
                                       ☑️ {(t.checklist_completado ?? []).length}/{t.checklist!.length}
                                     </span>
                                   )}
+                                  {pendientesDe(t.id).length > 0 && (
+                                    <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>
+                                      🧴 {pendientesDe(t.id).length} insumo{pendientesDe(t.id).length !== 1 ? 's' : ''} por descontar
+                                    </span>
+                                  )}
+                                  {insumosDe(t.id).length > 0 && pendientesDe(t.id).length === 0 && (
+                                    <span style={{ fontSize: '11.5px', color: 'var(--at-success)' }}>🧴 Insumos descontados</span>
+                                  )}
                                   {t.motivo_sin_evidencia && (
                                     <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-warning-strong)' }}
                                       title={`Se cerró sin la evidencia exigida: ${t.motivo_sin_evidencia}`}>
@@ -482,7 +579,7 @@ export function TareasPersonalTab({
                                   <button onClick={() => marcarTarea(t.id, 'completada')} title="Completada" style={{ padding: '5px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>✅</button>
                                   <button onClick={() => marcarTarea(t.id, 'con_observacion')} title="Con observación" style={{ padding: '5px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⚠️</button>
                                   <button onClick={() => marcarTarea(t.id, 'omitida')} title="Omitir" style={{ padding: '5px 9px', background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⏭</button>
-                                  {(t.requiere_foto || t.requiere_comentario || t.requiere_checklist || t.instrucciones_seguridad) && (
+                                  {(t.requiere_foto || t.requiere_comentario || t.requiere_checklist || t.instrucciones_seguridad || insumosDe(t.id).length > 0) && (
                                     <button onClick={() => abrirEvidencia(t)} aria-label={`Evidencia de ${t.titulo}`} title="Evidencia e instrucciones" style={{ padding: '5px 9px', background: evidenciaDe === t.id ? 'var(--at-primary-soft)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>📋</button>
                                   )}
                                 </div>
@@ -497,6 +594,45 @@ export function TareasPersonalTab({
                                 {t.instrucciones_seguridad && (
                                   <div role="note" style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '12.5px', color: 'var(--at-warning-strong)' }}>
                                     🦺 <strong>Antes de empezar:</strong> {t.instrucciones_seguridad}
+                                  </div>
+                                )}
+
+                                {/* Los insumos van tras las instrucciones y antes de los pasos:
+                                    primero cómo no lastimarse, después con qué se hace. */}
+                                {insumosDe(t.id).length > 0 && (
+                                  <div style={{ marginBottom: '10px' }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '4px' }}>
+                                      Insumos usados
+                                    </div>
+                                    {insumosDe(t.id).map(ins => (
+                                      <div key={ins.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                        <span style={{ flex: 1, minWidth: 0, fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+                                          {ins.nombre_suministro}
+                                        </span>
+                                        {ins.movimiento_id ? (
+                                          // Ya descontado: no se vuelve a ofrecer. La RPC lo ignoraría
+                                          // igual, pero un campo editable que no hace nada miente.
+                                          <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 700 }}>
+                                            ✓ descontado
+                                          </span>
+                                        ) : (
+                                          <>
+                                            <input
+                                              type="number" min="0" step="0.01"
+                                              aria-label={`Cantidad usada de ${ins.nombre_suministro}`}
+                                              value={cantidades[ins.id] ?? String(ins.cantidad_planificada)}
+                                              onChange={e => setCantidades(c => ({ ...c, [ins.id]: e.target.value }))}
+                                              style={{ width: '78px', padding: '5px 7px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '12.5px', background: 'var(--at-surface)' }} />
+                                            <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', width: '54px' }}>
+                                              {ins.unidad_medida}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                                      Se descuentan del almacén al marcar la tarea completada. Poné 0 en lo que no hayas usado.
+                                    </div>
                                   </div>
                                 )}
 
