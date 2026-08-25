@@ -221,19 +221,35 @@ export function RutaEditor({ ctx }: { ctx: RutasCtx }) {
         <div style={{ fontWeight: 700, marginBottom: '16px', color: 'var(--at-ink-2)' }}>Asignar Operador</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
           <div>
-            <label style={labelStyle}>Operador</label>
+            <label style={labelStyle} htmlFor="ruta-operador">Operador</label>
             <select
+              id="ruta-operador"
               style={inputStyle}
               value={form.asignado_a}
               onChange={e => handleUsuarioChange(e.target.value)}
             >
               <option value="">-- Sin asignar --</option>
+              {/* El asignado puede no estar en la lista: se cambió el proyecto
+                  de la ruta, o perdió el acceso. Sin esta opción el select se
+                  vería vacío y guardar borraría la asignación sin pedirlo. */}
+              {form.asignado_a && !usuarios.some(u => u.id === form.asignado_a) && (
+                <option value={form.asignado_a}>
+                  {form.asignado_nombre || 'Operador asignado'} (sin acceso a este proyecto)
+                </option>
+              )}
               {usuarios.map(u => (
                 <option key={u.id} value={u.id}>
                   {u.full_name} ({u.role})
                 </option>
               ))}
             </select>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px', lineHeight: 1.5 }}>
+              {!form.project_id
+                ? 'Elige primero el proyecto de la ruta: solo se ofrecen los usuarios con acceso a él.'
+                : usuarios.length === 0
+                  ? 'Ningún usuario tiene acceso a este proyecto. Dáselo en Administración › Usuarios › Asignar acceso.'
+                  : 'Solo se listan los usuarios con acceso a este proyecto: quien no lo tiene no podría leer sus contadores.'}
+            </div>
           </div>
           <div>
             <label style={labelStyle}>Email (para notificación)</label>

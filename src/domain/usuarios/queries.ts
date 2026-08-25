@@ -27,6 +27,34 @@ export async function fetchActiveAppUsers(): Promise<AppUser[]> {
   return (data as AppUser[] | null) ?? []
 }
 
+/**
+ * Operadores a los que se les puede asignar una ruta DE ESE PROYECTO (RPC
+ * `rutas_operadores_asignables`, 20260905000000): cuentas activas de la empresa
+ * del proyecto que además tienen acceso a él.
+ *
+ * No es `fetchActiveAppUsers()` con un filtro encima por dos razones. La primera
+ * es que el dato no está en el cliente: quién ve qué proyecto vive en
+ * `user_project_assignments`, que la RLS no deja leer a quien administra rutas.
+ * La segunda es que ese SELECT solo devuelve filas a `company_owner`/`admin`
+ * (policy `app_users_select`, 20260417000012): para un operador con
+ * `agua.rutas.edit` el selector salía vacío, y para un owner salía con el
+ * personal de todos los condominios de la empresa.
+ *
+ * Va en `supabase` (sin tipar) y no en `db`: la RPC es nueva y no existe en
+ * database.types.ts hasta la próxima corrida de `npm run gen:db-types`.
+ *
+ * Degrada a `[]` como el resto de las lecturas de este módulo: el editor de
+ * rutas no tiene dónde mostrar un error, y distingue "sin proyecto elegido" de
+ * "nadie tiene acceso" con el texto de ayuda del propio selector.
+ */
+export async function fetchOperadoresAsignablesRuta(projectId: string): Promise<AppUser[]> {
+  const { data, error } = await supabase.rpc('rutas_operadores_asignables', {
+    p_project_id: projectId,
+  })
+  reportDegradedQuery('usuarios.fetchOperadoresAsignablesRuta', error)
+  return (data as AppUser[] | null) ?? []
+}
+
 /** Nombre (id + full_name) de un conjunto de usuarios por id. Para el indicador
  * de presencia (resuelve nombres faltantes). Degrada a `[]`. */
 export async function fetchAppUserNamesByIds(
