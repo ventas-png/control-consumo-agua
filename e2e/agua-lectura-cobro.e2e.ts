@@ -29,12 +29,31 @@ test.describe('AGUA · lectura → cobro', () => {
     const c = await chooseFirstRealOption(contador)
     test.skip(c === null, 'la unidad no tiene contador sembrado')
 
-    await page.getByPlaceholder('Ingrese lectura del medidor').fill('999999')
-    await page.getByRole('button', { name: /Guardar Lectura/i }).click()
+    // LA LECTURA CRECE CON EL RELOJ, y no es una constante. La clave natural
+    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha): con
+    // un '999999' fijo, la segunda corrida DEL MISMO DÍA choca con el índice,
+    // el guardado se rechaza y la prueba se cae sin que nada esté roto. Los
+    // minutos desde epoch crecen siempre, así que cada corrida trae un valor
+    // nuevo y además mayor que el que dejó la anterior — que es lo que
+    // validarLectura exige para no tratarlo como retroceso del medidor.
+    const lectura = String(Math.floor(Date.now() / 60_000))
+    await page.getByPlaceholder('Ingrese lectura del medidor').fill(lectura)
+    const guardar = page.getByRole('button', { name: /Guardar Lectura/i })
+    await guardar.click()
 
-    // Éxito = no aparece un error de validación bloqueante (tarifa vencida, etc.).
-    // El toast de éxito es efímero; afirmamos que el form sigue operable.
-    await expect(page.getByRole('button', { name: /Guardar Lectura/i })).toBeVisible()
+    // ÉXITO = EL FORMULARIO SE CIERRA. La aserción anterior era la contraria
+    // («el form sigue operable») y estaba INVERTIDA: LecturasSection sólo llama
+    // a limpiarFormulario() en los caminos de guardado, y eso borra el contador
+    // seleccionado, con lo que el bloque {contadorSeleccionado && …} —input y
+    // botón incluidos— se desmonta. Un rechazo de validación, en cambio, hace
+    // `return notify(...)` ANTES y deja el formulario en pantalla. Es decir: la
+    // prueba pasaba cuando la lectura NO se guardaba y fallaba cuando sí.
+    //
+    // Se vio en el run 32888464432: el primer intento guardó de verdad (botón
+    // desmontado → rojo) y el reintento pasó porque para entonces la app ya
+    // rechazaba la lectura. Quedó marcada como "flaky", que es como se ve un
+    // verde falso cuando el mundo deja de cooperar.
+    await expect(guardar).toBeHidden({ timeout: 20_000 })
   })
 
   test('emite factura de un cargo pendiente', async ({ page }) => {

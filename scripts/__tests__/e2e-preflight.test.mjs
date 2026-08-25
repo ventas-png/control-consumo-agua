@@ -869,3 +869,100 @@ describe('el YAML invoca el contrato (no una copia)', () => {
     expect(sinComentarios.toLowerCase()).not.toContain('service_role')
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// Un spec no puede afirmar un texto que la app nunca dice.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO QUE ESTO CIERRA (run 32888464432).
+// agua-lectura-validaciones esperaba ver /Consumo Negativo|mayor o igual a la
+// anterior/ tras meter una lectura negativa. Ninguna de las dos frases existe
+// en el código: el mensaje real de validarLectura es «La lectura actual no
+// puede ser negativa.». La prueba no podía pasar NUNCA — y su fallo,
+// «element(s) not found» tras 15 s, se lee igual que una regresión de la app.
+// Quince minutos de corrida y tres reintentos para descubrir que el error
+// estaba en la prueba.
+//
+// Esto es estático: cuesta milisegundos y falla con el nombre del archivo.
+describe('los textos que los specs afirman tienen que existir en la app', () => {
+  const fuentesDeSrc = (() => {
+    const acc = []
+    const recorrer = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = resolve(dir, e.name)
+        if (e.isDirectory()) recorrer(p)
+        else if (/\.tsx?$/.test(e.name)) acc.push(readFileSync(p, 'utf8'))
+      }
+    }
+    recorrer(resolve('src'))
+    return acc.join('\n')
+  })()
+
+  /** Alternativas literales de un getByText(/a|b/): 'a', 'b'. */
+  const alternativas = (patron) =>
+    patron
+      .split('|')
+      .map((a) => a.trim())
+      .filter((a) => a.length > 0)
+
+  const casos = []
+  for (const archivo of readdirSync(resolve('e2e')).filter((f) => f.endsWith('.e2e.ts'))) {
+    const fuente = readFileSync(resolve('e2e', archivo), 'utf8')
+    for (const m of fuente.matchAll(/getByText\(\/([^/]+)\//g)) {
+      casos.push({ archivo, patron: m[1] })
+    }
+  }
+
+  it('hay textos que comprobar (si esto cae a cero, el extractor se rompió)', () => {
+    // Sin este piso, borrar el regex de arriba dejaría la guarda verde y vacía.
+    expect(casos.length).toBeGreaterThan(0)
+  })
+
+  it.each(casos)('$archivo: /$patron/ aparece en src/', ({ patron }) => {
+    // Basta con que UNA alternativa exista: /Timbrado|Rechazado/ afirma un
+    // estado u otro, no los dos a la vez.
+    const encontradas = alternativas(patron).filter((a) => fuentesDeSrc.includes(a))
+    expect(encontradas.length).toBeGreaterThan(0)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Las dos aserciones espejo del formulario de lecturas no pueden invertirse.
+// ════════════════════════════════════════════════════════════════════════════
+// EL FALLO QUE ESTO CIERRA (run 32888464432). «captura una lectura de medidor»
+// afirmaba que tras pulsar «Guardar Lectura» el botón SEGUÍA visible, con el
+// comentario "el form sigue operable". Está al revés: LecturasSection sólo
+// llama a limpiarFormulario() en los caminos de guardado, y eso desmonta el
+// bloque {contadorSeleccionado && …} con el botón dentro. Un rechazo de
+// validación hace `return notify(...)` antes y deja el formulario en pantalla.
+// O sea: la prueba pasaba cuando la lectura NO se guardaba.
+//
+// No salió como rojo sino como "flaky" — el primer intento guardó de verdad y
+// falló, el reintento no guardó y pasó. Un verde falso disfrazado de
+// intermitencia, que es la forma más cara de todas.
+//
+// El par sólo prueba algo mientras siga siendo un par: éxito = desaparece,
+// rechazo = permanece. Invertir cualquiera de los dos lo rompe en silencio.
+describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del otro', () => {
+  const cobro = readFileSync(resolve('e2e/agua-lectura-cobro.e2e.ts'), 'utf8')
+  const validaciones = readFileSync(resolve('e2e/agua-lectura-validaciones.e2e.ts'), 'utf8')
+  const sinComentarios = (s) =>
+    s.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
+
+  it('captura exitosa: el botón de guardar DESAPARECE', () => {
+    expect(sinComentarios(cobro)).toMatch(/expect\(guardar\)\.toBeHidden\(/)
+    expect(sinComentarios(cobro)).not.toMatch(/expect\(guardar\)\.toBeVisible\(/)
+  })
+
+  it('rechazo por consumo negativo: el botón de guardar PERMANECE', () => {
+    expect(sinComentarios(validaciones)).toMatch(/expect\(guardar\)\.toBeVisible\(/)
+    expect(sinComentarios(validaciones)).not.toMatch(/expect\(guardar\)\.toBeHidden\(/)
+  })
+
+  it('la lectura que se captura NO es una constante (clave natural anti-duplicado)', () => {
+    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha): con
+    // un valor fijo, la segunda corrida del mismo día choca con el índice y el
+    // guardado se rechaza — la prueba se caería sin que nada esté roto.
+    expect(sinComentarios(cobro)).toMatch(/fill\(lectura\)/)
+    expect(sinComentarios(cobro)).toMatch(/Date\.now\(\)/)
+  })
+})
