@@ -966,3 +966,75 @@ describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del
     expect(sinComentarios(cobro)).toMatch(/Date\.now\(\)/)
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// Los caminos de dinero CREAN lo que consumen: la suite no se queda sin datos.
+// ════════════════════════════════════════════════════════════════════════════
+// EL PROBLEMA QUE ESTO CIERRA. Emitir gasta una cuota pendiente; pagar gasta
+// una emitida; emitir factura gasta un cargo pendiente. Con los datos venidos
+// de una siembra manual por SQL, la suite pasaba UNA vez: el run 32889832167
+// quedó en verde y la corrida SIGUIENTE se habría omitido con «sin cuotas
+// pendientes» — un skip inesperado, o sea rojo, sin que nada estuviera roto.
+// Un verde que sólo ocurre una vez no es un verde, es una foto.
+//
+// La garantía es que cada prueba destructiva fabrique su precondición por la
+// misma UI que después ejercita. Si alguien la quita y vuelve a apoyarse en
+// datos preexistentes, esto se pone rojo antes de que la suite lo descubra
+// una corrida tarde.
+describe('los specs de dinero fabrican su propia precondición', () => {
+  const cuota = readFileSync(resolve('e2e/condominios-cuota.e2e.ts'), 'utf8')
+  const cobro = readFileSync(resolve('e2e/agua-lectura-cobro.e2e.ts'), 'utf8')
+  const sembrar = readFileSync(resolve('e2e/fixtures/sembrar.ts'), 'utf8')
+  const sinComentarios = (s) =>
+    s.split('\n').filter((l) => !l.trimStart().startsWith('//') && !l.trimStart().startsWith('*')).join('\n')
+
+  it('las DOS pruebas de cuota crean la cuota antes de emitir o pagar', () => {
+    // Dos llamadas: una por prueba. Pagar necesita además emitirla primero,
+    // porque el alta las crea pendientes.
+    const llamadas = sinComentarios(cuota).match(/crearCuotaPendiente\(page\)/g) ?? []
+    expect(llamadas).toHaveLength(2)
+  })
+
+  it('la prueba del cargo de agua captura su lectura antes de emitir', () => {
+    // Un registro de lectura nace con factura_estado 'pendiente': capturar ES
+    // crear el cargo. No vale confiar en que la prueba de arriba ya lo hizo —
+    // las pruebas no pueden depender del orden de ejecución.
+    expect(sinComentarios(cobro)).toMatch(/capturarLectura\(page\)/)
+  })
+
+  it('ningún spec de dinero se omite por falta del dato TRANSACCIONAL', () => {
+    // La distinción importa. Hay dos clases de precondición:
+    //
+    //   · el dato TRANSACCIONAL —la cuota pendiente, el cargo por facturar—,
+    //     que la prueba consume y que ahora fabrica ella misma. Omitirse por
+    //     esto es la regresión que este bloque persigue.
+    //   · el FIXTURE DEL TENANT —una unidad, un contador con tarifa vigente—,
+    //     que es alta de administración y queda fuera del alcance de un spec
+    //     de dinero. Su ausencia sigue siendo un skip, y el verificador lo
+    //     pondrá en rojo igual: es una señal fail-closed sobre el entorno, no
+    //     sobre el código, y ahí el rojo es la respuesta correcta.
+    //
+    // Por eso se prohíben las razones concretas que confesaban lo primero, no
+    // cualquier mención a sembrar.
+    const PROHIBIDAS = [/sin cuotas pendientes/i, /sin cuotas cobrables/i, /sin cargos pendientes/i]
+    for (const [nombre, fuente] of [['cuota', cuota], ['cobro', cobro]]) {
+      const razones = [...sinComentarios(fuente).matchAll(/test\.skip\([^,]+,\s*'([^']*)'/g)].map((m) => m[1])
+      expect(razones.length, `${nombre} debería tener guardas de runtime`).toBeGreaterThan(0)
+      for (const razon of razones) {
+        for (const prohibida of PROHIBIDAS) {
+          expect(razon, `${nombre}: "${razon}" espera el dato en vez de crearlo`).not.toMatch(prohibida)
+        }
+      }
+    }
+  })
+
+  it('el alta CONFIRMA que creó la fila, no sólo que pulsó Guardar', () => {
+    // Sin esta aserción, un alta fallida se manifestaría más tarde como un
+    // skip confuso en la prueba que la consume.
+    expect(sinComentarios(sembrar)).toMatch(/toHaveCount\(antes \+ 1/)
+  })
+
+  it('la cuota creada NO vence hoy: nacería vencida y no se podría cobrar', () => {
+    expect(sinComentarios(sembrar)).toMatch(/30 \* 86_400_000/)
+  })
+})

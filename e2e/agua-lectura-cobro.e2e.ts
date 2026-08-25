@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { login } from './fixtures/auth'
 import { hasBaseUrl, hasLoginCreds, reasons } from './fixtures/env'
+import { capturarLectura } from './fixtures/sembrar'
 import { chooseFirstRealOption, exists, gotoSection } from './fixtures/ui'
 
 // CAMINO DE DINERO #1 (agua) — capturar LECTURA → emitir COBRO/Factura.
@@ -58,11 +59,25 @@ test.describe('AGUA · lectura → cobro', () => {
 
   test('emite factura de un cargo pendiente', async ({ page }) => {
     await login(page)
-    await gotoSection(page, '/cobros')
 
+    // FABRICA SU PROPIO CARGO. Un registro de lectura nace con
+    // factura_estado 'pendiente', o sea que capturar una lectura ES crear el
+    // cargo que esta prueba emite. Antes el cargo venía de una siembra manual
+    // por SQL y emitirlo lo gastaba: la corrida siguiente se omitía con «sin
+    // cargos pendientes» — un skip inesperado, es decir rojo, sin que nada
+    // estuviera roto.
+    //
+    // Se captura aquí y no se confía en que la prueba de arriba ya lo hizo:
+    // las pruebas no pueden depender del orden en que Playwright las corra.
+    await gotoSection(page, '/lecturas')
+    if (!(await capturarLectura(page))) {
+      test.skip(true, 'sin unidad o contador para capturar: no se puede fabricar el cargo')
+    }
+
+    await gotoSection(page, '/cobros')
     const emitibles = page.locator('button[title^="Emitir factura"]')
     if (!(await exists(emitibles.first()))) {
-      test.skip(true, 'sin cargos pendientes para emitir — sembrar registro pendiente')
+      test.skip(true, 'la lectura capturada no aparece como cargo emitible en /cobros')
     }
 
     const antes = await emitibles.count()

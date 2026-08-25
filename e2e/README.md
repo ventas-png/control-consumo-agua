@@ -177,7 +177,7 @@ No hay `data-testid` en la app (confirmado), así que los selectores son
 **semánticos** (placeholder, label, rol+texto). Si la UI cambia esos textos, hay
 que ajustar el selector — está aislado en `e2e/fixtures/`.
 
-## Dos trampas que costaron corridas enteras
+## Tres trampas que costaron corridas enteras
 
 ### El esquema del sandbox tiene que salir de las migraciones
 
@@ -229,6 +229,38 @@ Si algún día `STORAGE_KEY` se versiona (`…-v2`) y la fixture no, el banner
 vuelve y los clics vuelven a morir mudos:
 `scripts/__tests__/e2e-consentimiento.test.mjs` ata las dos puntas pasando lo
 que sembramos por el `readConsent()` real.
+
+### Cada spec de dinero crea lo que consume
+
+Emitir gasta una cuota pendiente; pagar gasta una emitida; emitir factura gasta
+un cargo pendiente. Mientras esos datos vinieron de una siembra manual por SQL,
+la suite pasaba **una** vez: el run `32889832167` quedó verde y la corrida
+siguiente se habría omitido con «sin cuotas pendientes» — un skip inesperado, o
+sea rojo, sin que nada estuviera roto. Un verde que sólo ocurre una vez no es
+un verde: es una foto.
+
+Ahora cada prueba destructiva fabrica su precondición por la **misma UI** que
+después ejercita (`e2e/fixtures/sembrar.ts`):
+
+| Spec | Qué crea antes de consumirlo |
+|---|---|
+| «emite una cuota pendiente» | da de alta una cuota con «+ Nueva cuota» |
+| «registra el pago de una cuota» | da de alta una cuota **y la emite** (el alta las crea pendientes) |
+| «emite factura de un cargo pendiente» | captura una lectura — el registro nace con `factura_estado='pendiente'`, así que capturar *es* crear el cargo |
+
+Dos detalles que costaron corridas y conviene no deshacer:
+
+- El alta **afirma que la fila apareció** (`toHaveCount(antes + 1)`), no sólo
+  que se pulsó Guardar. Sin eso, un alta fallida se manifiesta más tarde como
+  un skip confuso en la prueba que la consume.
+- La cuota creada vence a **30 días**, no hoy: con `hoy` nace vencida y el
+  botón «💰 Pagar» no llega a aparecer.
+
+Queda una clase de precondición que los specs **no** fabrican, a propósito: los
+*fixtures del tenant* (una unidad, un contador con tarifa vigente). Eso es alta
+de administración, fuera del alcance de un spec de dinero. Si faltan, el spec
+se omite y el verificador pone el job en rojo — que es la respuesta correcta,
+porque el problema está en el entorno y no en el código.
 
 ## Correr local
 
