@@ -168,9 +168,15 @@ describe('la configuración no puede volver a filtrar el token', () => {
     expect(bloque).toContain("screenshot: 'off'")
   })
 
-  it('bypass.setup.ts siembra con la fixture y guarda el estado compartido', () => {
+  it('bypass.setup.ts siembra con la fixture y guarda el estado en RUTA_ESTADO', () => {
+    // El estado ya no se escribe con `request.storageState({ path })`: ese
+    // atajo sólo persiste COOKIES y tiraba el localStorage del consentimiento
+    // de cookies, con lo que el banner volvía a interceptar los clics. Ahora
+    // se pide el objeto y se escribe a mano — lo que se exige aquí es que siga
+    // acabando en RUTA_ESTADO, que es lo que carga el proyecto chromium.
     expect(setupFuente).toContain('sembrarCookieDeBypass')
-    expect(setupFuente).toContain('request.storageState({ path: RUTA_ESTADO })')
+    expect(setupFuente).toMatch(/writeFileSync\(\s*RUTA_ESTADO/)
+    expect(setupFuente).toContain('await request.storageState()')
   })
 
   it('ningún spec del navegador toca el token: sólo el setup lo lee', () => {

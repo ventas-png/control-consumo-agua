@@ -177,6 +177,59 @@ No hay `data-testid` en la app (confirmado), así que los selectores son
 **semánticos** (placeholder, label, rol+texto). Si la UI cambia esos textos, hay
 que ajustar el selector — está aislado en `e2e/fixtures/`.
 
+## Dos trampas que costaron corridas enteras
+
+### El esquema del sandbox tiene que salir de las migraciones
+
+El sandbox de E2E se construye **entero** desde `supabase/migrations`. Eso lo
+convierte, sin querer, en la única prueba real de que el repositorio sabe
+reconstruir el esquema — y en la corrida 32884549901 destapó que
+`cuotas_condominio.{fecha_pago,metodo_pago,referencia_pago,comprobante_url}` y
+`{contadores,tarifas,unidades}.updated_by_name` existían **sólo en
+producción**: se habían añadido a mano y ninguna migración las creaba.
+
+El síntoma no se parecía en nada a la causa. PostgREST respondía `400 column
+does not exist` a la proyección de cuotas, `runQuery` se comía el error, la
+proyección quedaba vacía y la UI caía al `estado` legacy — que las transiciones
+ya no escriben. Resultado: «📤 Emitir» seguía saliendo en filas ya emitidas, y
+la prueba «emite una cuota pendiente» quedaba roja **aunque la fila sí
+transicionaba en la base**. Es decir, la pestaña de cobranza se degradaba en
+silencio en cualquier entorno levantado desde cero (un restore de DR, una
+región nueva) y nadie se enteraba porque producción funcionaba.
+
+La reparación está en `supabase/migrations/20260904000000_columnas_solo_en_
+produccion.sql` (siete `ADD COLUMN IF NOT EXISTS`, no-op en producción). La
+guarda que impide que vuelva a pasar es `npm test`:
+`scripts/columnas-vs-migraciones.mjs` compara cada columna que la app nombra en
+un `.select()` contra lo que crean las migraciones — hoy 652 columnas, 0
+faltantes. Los `.select()` con `*` o recursos embebidos **no** se analizan (no
+se puede atribuir la columna a la tabla del `from` sin adivinar) y la prueba
+imprime cuántos quedaron fuera, para que el verde no se lea como cobertura
+total.
+
+### El aviso de cookies tapa los botones
+
+`CookieConsent` se monta global y, mientras nadie decida, pinta un
+`role="dialog"` fijo abajo. Playwright resolvía «💾 Guardar Lectura» —visible,
+habilitado, estable— y se comía los 60 s del timeout reintentando el clic:
+
+```
+<div class="cookie-card">…</div> from <div role="dialog" …> subtree
+intercepts pointer events
+```
+
+Dos de los tres fallos de esa corrida eran esto y no la lógica de negocio. La
+decisión se siembra ahora en el `storageState` del proyecto `setup`
+(`e2e/fixtures/consentimiento.ts`), con la misma clave que usa
+`src/lib/cookieConsent.ts` y con **«solo esenciales»**: los robots no entran en
+la analítica. Se hace ahí y no con un clic por spec para que las pruebas midan
+la app y no su periferia.
+
+Si algún día `STORAGE_KEY` se versiona (`…-v2`) y la fixture no, el banner
+vuelve y los clics vuelven a morir mudos:
+`scripts/__tests__/e2e-consentimiento.test.mjs` ata las dos puntas pasando lo
+que sembramos por el `readConsent()` real.
+
 ## Correr local
 
 Contra un dev server o un preview ya levantado:

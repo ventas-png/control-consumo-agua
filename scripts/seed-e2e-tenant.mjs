@@ -106,7 +106,13 @@ export function validarEntorno(env) {
  * @param {{ companyId: string, projectId: string, unidadId: string, ahora: string }} ctx
  */
 export function planDeSiembra({ companyId, projectId, unidadId, ahora }) {
-  const hoy = ahora.slice(0, 10)
+  // Vencimiento a 30 días, NO hoy. Con `hoy` la cuota emitida amanecía vencida
+  // al día siguiente (esVencida: hay fecha, ya pasó, y no está pagada ni
+  // anulada), el botón «💰 Pagar» desaparecía y «registra el pago de una
+  // cuota» se skipeaba con "sin cuotas cobrables". Treinta días es también el
+  // default de diasVencimiento en CuotasTab cuando no hay regla de mora.
+  const VENCE_EN_DIAS = 30
+  const vence = new Date(Date.parse(ahora) + VENCE_EN_DIAS * 86_400_000).toISOString().slice(0, 10)
 
   return {
     tarifa: {
@@ -176,10 +182,14 @@ export function planDeSiembra({ companyId, projectId, unidadId, ahora }) {
           periodo: MARCADORES.cuotaPendiente,
           monto: 500,
           total_a_pagar: 500,
-          fecha_vencimiento: hoy,
+          fecha_vencimiento: vence,
           estado: 'pendiente',
         },
         reposicion: {
+          // La fecha va en la reposición, no sólo en la fila: la fila sólo se
+          // usa al INSERTAR. Sin esto, la cuota sembrada hace un mes conserva
+          // su vencimiento viejo en cada corrida y vuelve a nacer vencida.
+          fecha_vencimiento: vence,
           cuota_estado: 'pendiente',
           emitida_at: null,
           pagada_at: null,
@@ -199,13 +209,17 @@ export function planDeSiembra({ companyId, projectId, unidadId, ahora }) {
           periodo: MARCADORES.cuotaEmitida,
           monto: 750,
           total_a_pagar: 750,
-          fecha_vencimiento: hoy,
+          fecha_vencimiento: vence,
           estado: 'pendiente',
         },
         reposicion: {
+          fecha_vencimiento: vence,
           cuota_estado: 'emitida',
           emitida_at: ahora,
           pagada_at: null,
+          fecha_pago: null,
+          metodo_pago: null,
+          referencia_pago: null,
           vencida_at: null,
           anulada_at: null,
           deleted_at: null,

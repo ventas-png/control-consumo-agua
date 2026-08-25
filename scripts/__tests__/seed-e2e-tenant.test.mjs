@@ -133,7 +133,36 @@ describe('el plan repone los estados que la suite consume', () => {
   })
 
   it('la fecha de vencimiento sale del "ahora" inyectado: el plan es determinista', () => {
-    for (const c of plan.cuotas) expect(c.fila.fecha_vencimiento).toBe('2026-08-24')
+    // Treinta días DESPUÉS del ahora inyectado (2026-08-24), no el mismo día.
+    for (const c of plan.cuotas) expect(c.fila.fecha_vencimiento).toBe('2026-09-23')
+  })
+
+  it('vence en el FUTURO: una cuota que nace vencida no se puede cobrar', () => {
+    // Con fecha_vencimiento = hoy, al día siguiente esVencida() daba true, el
+    // botón «💰 Pagar» desaparecía y «registra el pago de una cuota» se
+    // skipeaba con "sin cuotas cobrables" — un skip inesperado que pone el
+    // verificador en rojo, causado por el propio seed.
+    for (const c of plan.cuotas) {
+      expect(Date.parse(c.fila.fecha_vencimiento)).toBeGreaterThan(Date.parse(CTX.ahora))
+    }
+  })
+
+  it('la reposición TAMBIÉN refresca el vencimiento, no sólo el insert', () => {
+    // `fila` sólo se usa al insertar. Sin la fecha en `reposicion`, la cuota
+    // sembrada hace un mes conserva su vencimiento viejo en cada corrida y
+    // vuelve a nacer vencida por más que el seed se vuelva a ejecutar.
+    for (const c of plan.cuotas) {
+      expect(c.reposicion.fecha_vencimiento).toBe(c.fila.fecha_vencimiento)
+    }
+  })
+
+  it('la reposición borra los datos del pago anterior', () => {
+    // La cuota emitida termina 'pagada' tras una corrida. Devolverla a
+    // 'emitida' conservando fecha_pago/metodo_pago la dejaría incoherente.
+    const emitida = plan.cuotas.find((c) => c.reposicion.cuota_estado === 'emitida')
+    expect(emitida.reposicion.fecha_pago).toBeNull()
+    expect(emitida.reposicion.metodo_pago).toBeNull()
+    expect(emitida.reposicion.referencia_pago).toBeNull()
   })
 })
 
