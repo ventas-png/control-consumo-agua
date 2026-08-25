@@ -17,6 +17,7 @@
 // los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
 import { supabase, db } from '../../lib/supabase'
 import type { ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas } from '../../types'
+import { TABLA_DE_FUENTE, type NovedadOperativa } from './novedades'
 
 /**
  * Error con el shape mínimo que consume la UI (mensaje legible). `code` es el
@@ -277,4 +278,19 @@ export async function materializarRutinasTurno(
   })
   const fila = Array.isArray(data) ? data[0] : data
   return { data: (fila as ResultadoMaterializacionRutinas | null) ?? null, error }
+}
+
+/**
+ * Marca atendida una novedad, venga de la ruta de limpieza o de un turno de
+ * personal. "Atender" NO borra el hallazgo: baja la bandera de mantenimiento y
+ * deja el texto — el histórico de qué falló en cada área es justo lo que hace
+ * útil el listado el mes que viene.
+ *
+ * Vive aquí y no en cada tab para que la fuente decida la tabla en un solo
+ * lugar (`TABLA_DE_FUENTE`), y no en dos handlers que pueden divergir.
+ */
+export async function atenderNovedad(novedad: NovedadOperativa): Promise<{ error: RowError }> {
+  return updateCondominioRow(TABLA_DE_FUENTE[novedad.fuente], novedad.id, {
+    requiere_mantenimiento: false,
+  })
 }

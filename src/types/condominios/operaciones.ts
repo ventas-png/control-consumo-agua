@@ -182,7 +182,8 @@ export interface TareaBloque {
   completado_por?: string | null
   /** Lo que se encontró y no le toca resolver a quien ejecuta. */
   novedad?: string | null
-  prioridad?: string | null
+  /** Mismo dominio que `EjecucionLimpieza.prioridad`: lo fija un CHECK en BD. */
+  prioridad?: PrioridadNovedadLimpieza | null
   requiere_mantenimiento?: boolean
   /** Anulación lógica: la fila fue un error. Se conserva con su evidencia. */
   anulada_en?: string | null

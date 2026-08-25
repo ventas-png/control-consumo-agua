@@ -35,6 +35,9 @@ import { VistaRutinas } from './limpieza/VistaRutinas'
 import { VistaRuta } from './limpieza/VistaRuta'
 import { VistaNovedades } from './limpieza/VistaNovedades'
 import { sumarDias } from '../../../domain/condominios/limpieza'
+import { novedadesDeEjecuciones, type NovedadOperativa } from '../../../domain/condominios/novedades'
+import { atenderNovedad } from '../../../domain/condominios/tabMutations'
+import { notify } from '../../shared/Dialog'
 
 interface Props {
   programaciones: ProgramacionLimpieza[]
@@ -69,6 +72,11 @@ export function ProgramacionLimpiezaTab({
 }: Props) {
   const [vista, setVista] = useState<Vista>('areas')
 
+  const novedades = useMemo(
+    () => novedadesDeEjecuciones(programaciones, ejecuciones, personal),
+    [programaciones, ejecuciones, personal],
+  )
+
   const kpis = useMemo(() => {
     const hoy = hoyLocalISO()
     const en3 = sumarDias(hoy, 3)
@@ -78,9 +86,22 @@ export function ProgramacionLimpiezaTab({
     const sinAsignar = activas.filter(p => !p.personal_id && !p.turno && !p.cargo && !p.responsable).length
     const delDia = ejecuciones.filter(e => e.fecha === hoy)
     const pendientesHoy = delDia.filter(e => e.estado === 'pendiente').length
-    const novedades = ejecuciones.filter(e => e.requiere_mantenimiento).length
-    return { vencidas, proximas, sinAsignar, pendientesHoy, novedades, totalHoy: delDia.length }
-  }, [programaciones, ejecuciones])
+    // Cuenta sobre las novedades normalizadas y no sobre `ejecuciones` a secas:
+    // el adaptador descarta las ejecuciones anuladas, y un KPI que diga 3
+    // mientras el listado muestra 2 sólo hace dudar de los dos números.
+    const conManto = novedades.filter(n => n.requiere_mantenimiento).length
+    return { vencidas, proximas, sinAsignar, pendientesHoy, novedades: conManto, totalHoy: delDia.length }
+  }, [programaciones, ejecuciones, novedades])
+
+  /**
+   * La vista de novedades ya no sabe a qué tabla escribe: lo decide el padre,
+   * que es quien conoce su fuente. Aquí, `ejecuciones_limpieza`.
+   */
+  async function atender(novedad: NovedadOperativa) {
+    const { error } = await atenderNovedad(novedad)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+    onRefresh()
+  }
 
   return (
     <div style={{ padding: '20px', maxWidth: '1060px', margin: '0 auto' }}>
@@ -201,11 +222,9 @@ export function ProgramacionLimpiezaTab({
       )}
       {vista === 'novedades' && (
         <VistaNovedades
-          programaciones={programaciones}
-          ejecuciones={ejecuciones}
-          personal={personal}
+          novedades={novedades}
           canEdit={canEdit}
-          onRefresh={onRefresh}
+          onAtender={atender}
         />
       )}
     </div>
