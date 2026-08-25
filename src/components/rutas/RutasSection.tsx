@@ -2,7 +2,7 @@ import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useRef, type DragEvent } from 'react'
 import { confirm, notify } from '../shared/Dialog'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
-import { fetchActiveAppUsers, type AppUser } from '../../domain/usuarios/queries'
+import { fetchOperadoresAsignablesRuta, type AppUser } from '../../domain/usuarios/queries'
 import { createRuta, updateRuta, deleteRuta } from '../../domain/rutas/mutations'
 import { enviarNotificacionRuta, dispararRecordatorioRuta } from '../../lib/email'
 import { APP_CONFIG } from '../../lib/config'
@@ -72,9 +72,21 @@ export function RutasSection({
   // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
   const canDelete = canEdit && canDeleteProp
 
+  // Los operadores asignables dependen del PROYECTO de la ruta, no de la
+  // empresa: quien no tiene acceso al condominio no puede leer sus contadores
+  // aunque se le asigne la ruta (`rutas_select` se la mostraría por ser el
+  // asignado, pero `can_access_project` le niega los items que debe recorrer).
+  // Por eso se recarga al cambiar de proyecto y no una sola vez al montar.
   useEffect(() => {
-    void fetchActiveAppUsers().then(setUsuarios)
-  }, [])
+    const projectId = form.project_id
+    if (!projectId) { setUsuarios([]); return }
+    // Cambiar de proyecto dos veces seguidas puede resolver las respuestas en
+    // desorden; sin esta guarda la lista quedaría con los operadores del
+    // proyecto anterior.
+    let vigente = true
+    void fetchOperadoresAsignablesRuta(projectId).then(u => { if (vigente) setUsuarios(u) })
+    return () => { vigente = false }
+  }, [form.project_id])
 
   function abrirCrear() {
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
