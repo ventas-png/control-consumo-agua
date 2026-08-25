@@ -6,6 +6,12 @@ import { chooseFirstRealOption, exists, gotoSection } from './fixtures/ui'
 // CAMINO DE DINERO #1 (agua) — capturar LECTURA → emitir COBRO/Factura.
 // Requiere datos sembrados (unidad + contador + tarifa vigente; cargo pendiente).
 // Cada paso se guarda en runtime: si falta el dato, se skipea (no falla).
+//
+// EL BOTÓN DE EMITIR SE DIRECCIONA POR SU `title`: la barra de /cobros tiene
+// acciones MASIVAS («Emitir facturas», «Emitir período») siempre presentes
+// aunque la tabla esté vacía, y el localizador por nombre de rol agarraba una
+// de ellas — abría un diálogo de confirmación en vez de emitir la fila. La
+// aserción es que ese botón desaparezca, no que exista el texto "Emitida".
 test.describe('AGUA · lectura → cobro', () => {
   test.skip(!hasBaseUrl, reasons.baseUrl)
   test.skip(!hasLoginCreds, reasons.login)
@@ -35,11 +41,13 @@ test.describe('AGUA · lectura → cobro', () => {
     await login(page)
     await gotoSection(page, '/cobros')
 
-    const emitir = page.getByRole('button', { name: /Emitir/i }).first()
-    if (!(await exists(emitir))) test.skip(true, 'sin cargos pendientes para emitir — sembrar registro pendiente')
+    const emitibles = page.locator('button[title^="Emitir factura"]')
+    if (!(await exists(emitibles.first()))) {
+      test.skip(true, 'sin cargos pendientes para emitir — sembrar registro pendiente')
+    }
 
-    await emitir.click()
-    // Tras emitir, el registro pasa a estado "emitida": aparece el badge Emitida.
-    await expect(page.getByText(/Emitida/i).first()).toBeVisible({ timeout: 20_000 })
+    const antes = await emitibles.count()
+    await emitibles.first().click()
+    await expect(emitibles).toHaveCount(antes - 1, { timeout: 20_000 })
   })
 })

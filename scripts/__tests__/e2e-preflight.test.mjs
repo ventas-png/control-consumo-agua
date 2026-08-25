@@ -8,6 +8,7 @@
 // rojo explicado; y el destino se demuestra a sí mismo — marcador
 // environment=e2e-sandbox, ref de Supabase declarado y el MISMO sha del job.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { execSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -639,6 +640,117 @@ describe('el helper de login no puede volver a chocar con el botón del nav', ()
 // El verificador leyó playwright-results.json desde la raíz y no estaba: con
 // una ruta relativa, Playwright lo dejó en otro sitio y el paso murió con
 // ENOENT aunque la suite había corrido entera (run 32753812314).
+// Un getByLabel de Playwright NO encuentra un <label> suelto: exige asociación
+// real (htmlFor→id, envoltura o aria-label). LecturasSection tenía los labels
+// sin asociar, así que `getByLabel('Seleccionar Unidad')` no resolvía y dos
+// specs OBLIGATORIOS se auto-skipeaban con «UI de lecturas no disponible para
+// este rol» — un mensaje que culpaba al rol de un defecto de accesibilidad.
+// Esto ata las dos puntas: cada label que un spec direccione por getByLabel
+// tiene que estar asociado a un control en la app.
+describe('los labels que los specs direccionan están asociados a su control', () => {
+  const specs = readdirSync(resolve('e2e'))
+    .filter((f) => f.endsWith('.e2e.ts'))
+    .map((f) => readFileSync(resolve('e2e', f), 'utf8'))
+
+  /** Los textos que los specs buscan con getByLabel(/…/i). */
+  const etiquetasBuscadas = [
+    ...new Set(specs.flatMap((t) => [...t.matchAll(/getByLabel\(\/([^/]+)\/i\)/g)].map((m) => m[1]))),
+  ]
+
+  const fuentes = new Map()
+  const leerFuente = (ruta) => {
+    if (!fuentes.has(ruta)) fuentes.set(ruta, readFileSync(ruta, 'utf8'))
+    return fuentes.get(ruta)
+  }
+
+  it('los specs efectivamente usan getByLabel (si no, esta prueba no vigila nada)', () => {
+    expect(etiquetasBuscadas.length).toBeGreaterThan(0)
+  })
+
+  for (const etiqueta of etiquetasBuscadas) {
+    it(`"${etiqueta}" está asociada a un control`, () => {
+      // Se busca el <label> por su texto en los componentes de la app.
+      const candidatos = execSync(
+        `grep -rl ">${etiqueta}</label>" src --include=*.tsx || true`,
+        { encoding: 'utf8' },
+      )
+        .split('\n')
+        .filter(Boolean)
+
+      // Si ningún componente declara ese texto como <label>, el spec lo
+      // resuelve por otra vía (aria-label, envoltura) y aquí no hay nada que
+      // exigir; lo que NO puede pasar es un <label> suelto.
+      if (candidatos.length === 0) return
+
+      for (const ruta of candidatos) {
+        const fuente = leerFuente(ruta)
+        const linea = fuente
+          .split('\n')
+          .find((l) => l.includes(`>${etiqueta}</label>`))
+        expect(linea, `${ruta}: <label>${etiqueta}</label> sin htmlFor`).toMatch(/htmlFor="([^"]+)"/)
+        const id = linea.match(/htmlFor="([^"]+)"/)[1]
+        expect(fuente, `${ruta}: htmlFor="${id}" no tiene ningún control con ese id`).toContain(`id="${id}"`)
+      }
+    })
+  }
+
+  it('ningún htmlFor de LecturasSection apunta a un id inexistente', () => {
+    const fuente = readFileSync(resolve('src/components/lecturas/LecturasSection.tsx'), 'utf8')
+    const ids = [...fuente.matchAll(/htmlFor="([^"]+)"/g)].map((m) => m[1])
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect(fuente, `htmlFor="${id}" huérfano`).toContain(`id="${id}"`)
+  })
+})
+
+// Las secciones de dinero tienen acciones MASIVAS en la barra («Emitir
+// facturas», «📤 Emitir período») que se renderizan SIEMPRE, aunque la tabla no
+// tenga una sola fila. Un getByRole('button', { name: /Emitir/i }).first()
+// agarraba una de ellas: la prueba abría un diálogo de confirmación, la
+// aserción encontraba el texto "Emitida" en otro sitio de la página y pasaba
+// EN VERDE sin haber emitido nada — exactamente el falso verde que este PR
+// existe para eliminar (run 32778903667: la cuota E2E-PENDIENTE seguía en
+// 'pendiente' con emitida_at nulo después de que la prueba "pasara").
+describe('los caminos de dinero no pueden confundir la acción masiva con la de fila', () => {
+  const specsDeDinero = ['agua-lectura-cobro.e2e.ts', 'condominios-cuota.e2e.ts']
+
+  /** Sin las líneas de comentario: el propio comentario que explica la trampa
+   *  nombra el localizador prohibido, y lo que se vigila es el CÓDIGO. */
+  const codigoDe = (archivo) =>
+    readFileSync(resolve('e2e', archivo), 'utf8')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('//'))
+      .join('\n')
+
+  for (const archivo of specsDeDinero) {
+    const texto = codigoDe(archivo)
+
+    it(`${archivo} direcciona el botón por su title de FILA, no por /Emitir/i`, () => {
+      expect(texto).toMatch(/button\[title\^?=/)
+      // El localizador ambiguo no puede volver.
+      expect(texto).not.toMatch(/getByRole\('button', \{ name: \/Emitir\/i \}\)/)
+      expect(texto).not.toMatch(/getByRole\('button', \{ name: \/Pagar\/i \}\)/)
+    })
+
+    it(`${archivo} afirma que el botón de la fila DESAPARECE, no que exista un texto`, () => {
+      // toHaveCount(antes - 1) prueba la transición; getByText(/Emitida/) no.
+      expect(texto).toMatch(/toHaveCount\(antes - 1/)
+      expect(texto).not.toMatch(/getByText\(\/Emitida\/i\)/)
+      expect(texto).not.toMatch(/getByText\(\/Pagada\/i\)/)
+    })
+  }
+
+  it('los titles que los specs buscan existen en los componentes', () => {
+    const titulos = specsDeDinero.flatMap((a) =>
+      [...codigoDe(a).matchAll(/button\[title\^?="([^"]+)"\]/g)].map((m) => m[1]),
+    )
+    expect(titulos.length).toBeGreaterThan(0)
+    for (const t of titulos) {
+      const hallado = execSync(`grep -rl 'title="${t}' src --include=*.tsx || true`, { encoding: 'utf8' }).trim()
+      expect(hallado, `ningún componente declara title="${t}…"`).not.toBe('')
+    }
+  })
+})
+
 describe('el reporte JSON aterriza donde el verificador lo busca', () => {
   const config = readFileSync(resolve('e2e/playwright.config.ts'), 'utf8')
 
