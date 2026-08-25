@@ -5,6 +5,8 @@ import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '.
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
+import { SERVICIOS } from '../SolicitudRentaDetalle'
+import type { ResponsableServicio } from '../../../types'
 
 interface Props {
   contratos: ContratoArrendamiento[]
@@ -34,6 +36,8 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
     unidad_id: '', arrendatario_nombre: '', arrendatario_identificacion: '',
     arrendatario_telefono: '', arrendatario_email: '',
     monto_renta: '', dia_pago: '5', fecha_inicio: '', fecha_fin: '', deposito: '', notas: '',
+    resp_mantenimiento: 'propietario', resp_agua: 'propietario', resp_electricidad: 'propietario',
+    resp_basura: 'propietario', resp_telefonia: 'propietario', resp_internet: 'propietario',
   })
 
   const filtrados = contratos.filter(c => {
@@ -56,7 +60,12 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   const porVencer = contratos.filter(c => c.estado === 'activo' && c.fecha_fin && c.fecha_fin <= en30)
 
   function resetForm() {
-    setForm({ unidad_id: '', arrendatario_nombre: '', arrendatario_identificacion: '', arrendatario_telefono: '', arrendatario_email: '', monto_renta: '', dia_pago: '5', fecha_inicio: '', fecha_fin: '', deposito: '', notas: '' })
+    setForm({
+      unidad_id: '', arrendatario_nombre: '', arrendatario_identificacion: '', arrendatario_telefono: '', arrendatario_email: '',
+      monto_renta: '', dia_pago: '5', fecha_inicio: '', fecha_fin: '', deposito: '', notas: '',
+      resp_mantenimiento: 'propietario', resp_agua: 'propietario', resp_electricidad: 'propietario',
+      resp_basura: 'propietario', resp_telefonia: 'propietario', resp_internet: 'propietario',
+    })
     setShowForm(false); setEditingId(null)
   }
 
@@ -69,6 +78,12 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       monto_renta: String(c.monto_renta), dia_pago: String(c.dia_pago),
       fecha_inicio: c.fecha_inicio, fecha_fin: c.fecha_fin ?? '',
       deposito: c.deposito != null ? String(c.deposito) : '', notas: c.notas ?? '',
+      resp_mantenimiento: c.resp_mantenimiento ?? 'propietario',
+      resp_agua:          c.resp_agua          ?? 'propietario',
+      resp_electricidad:  c.resp_electricidad  ?? 'propietario',
+      resp_basura:        c.resp_basura        ?? 'propietario',
+      resp_telefonia:     c.resp_telefonia     ?? 'propietario',
+      resp_internet:      c.resp_internet      ?? 'propietario',
     })
     setEditingId(c.id); setShowForm(true)
   }
@@ -90,6 +105,12 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       deposito: form.deposito ? Number(form.deposito) : null,
       estado: 'activo' as EstadoContrato,
       notas: form.notas.trim() || null,
+      resp_mantenimiento: form.resp_mantenimiento,
+      resp_agua:          form.resp_agua,
+      resp_electricidad:  form.resp_electricidad,
+      resp_basura:        form.resp_basura,
+      resp_telefonia:     form.resp_telefonia,
+      resp_internet:      form.resp_internet,
     }
     const { error } = editingId
       ? await updateCondominioRow('contratos_arrendamiento', editingId, data)
@@ -234,6 +255,26 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
               <input type="date" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
+            {/* Quién paga cada servicio. Al aprobar una solicitud del portal
+              * estos valores llegan copiados; aquí se capturan cuando el
+              * contrato lo registra la administración a mano. */}
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              {SERVICIOS.map(sv => (
+                <div key={sv.key}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>
+                    {sv.icon} {sv.label}
+                  </label>
+                  <select
+                    aria-label={`Responsable de ${sv.label}`}
+                    value={form[sv.key]}
+                    onChange={e => setForm(f => ({ ...f, [sv.key]: e.target.value as ResponsableServicio }))}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', cursor: 'pointer' }}>
+                    <option value="propietario">Propietario</option>
+                    <option value="inquilino">Inquilino</option>
+                  </select>
+                </div>
+              ))}
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Condiciones especiales, observaciones..."
@@ -277,6 +318,20 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                 <span style={{ color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
                   {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
                   {vence30 && <span style={{ display: 'block', fontSize: 11, color: 'var(--at-warning)' }}>⚠️ Por vencer</span>}
+                </span>
+              )
+            } },
+          { key: 'servicios', header: 'Servicios a cargo', hideOnMobile: true,
+            // Lo accionable es quién NO es el propietario: la lista corta de
+            // servicios que paga el inquilino en ESTE contrato.
+            accessor: (c) => SERVICIOS.filter(sv => c[sv.key] === 'inquilino').length,
+            render: (c) => {
+              const delInquilino = SERVICIOS.filter(sv => c[sv.key] === 'inquilino')
+              if (!SERVICIOS.some(sv => c[sv.key] != null)) return <span style={{ color: 'var(--at-ink-3)' }}>—</span>
+              if (delInquilino.length === 0) return <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Todos el propietario</span>
+              return (
+                <span style={{ fontSize: 12, color: 'var(--at-ink-2)' }} title={`A cargo del inquilino: ${delInquilino.map(sv => sv.label).join(', ')}`}>
+                  Inquilino: {delInquilino.map(sv => sv.icon).join(' ')}
                 </span>
               )
             } },

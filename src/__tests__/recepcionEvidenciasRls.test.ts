@@ -1,0 +1,435 @@
+import { describe, it, expect } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve, join } from 'node:path'
+
+// Guards ESTÁTICOS del bucket de evidencias y del acuse (20260831000000).
+//
+// ALCANCE Y LÍMITE. Esto lee el SQL del repo; la verificación CONDUCTUAL —quién
+// puede leer, sustituir y borrar la firma de acuse del vecino— vive en
+// scripts/rls-evidencias-sandbox.sh y corre contra un Postgres real. Lo de aquí
+// es lo que aquello no puede ver: que la regla siga ESCRITA como debe y que
+// nadie devuelva las evidencias al bucket permisivo del que salieron.
+
+const MIGRATIONS_DIR = resolve('supabase/migrations')
+const MIGRACION = '20260831000000_recepcion_evidencias_y_acuse.sql'
+// El estado FINAL lo declara la de integridad: el preview ya tenía aplicadas
+// versiones anteriores de las otras dos, y el bot solo empuja archivos nuevos.
+// Los guards de policies y RPC miran ESTA, que es la que manda al final.
+const FINAL = '20260901000000_recepcion_integridad_final.sql'
+// Y la ÚLTIMA vuelve a declarar la RPC del acuse y las dos del aviso: el
+// preview ya tenía aplicada la anterior, así que el MIME estricto y el dueño
+// del claim sólo llegan a la base si viajan en un archivo nuevo.
+const CLAIM_MIME = '20260902000000_recepcion_claim_owner_y_mime.sql'
+const BUCKET = 'recepcion-evidencias'
+const sql = readFileSync(join(MIGRATIONS_DIR, FINAL), 'utf8')
+const sqlEvidencias = readFileSync(join(MIGRATIONS_DIR, MIGRACION), 'utf8')
+const sqlUltima = readFileSync(join(MIGRATIONS_DIR, CLAIM_MIME), 'utf8')
+
+/** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
+function soloCodigo(texto: string): string {
+  return texto.replace(/--[^\n]*/g, '')
+}
+
+/**
+ * TypeScript sin sus líneas de comentario. Hace falta porque estos guards
+ * afirman que cierto código YA NO ESTÁ, y las cabeceras de los archivos CITAN
+ * literalmente lo que se eliminó para explicar por qué. Sin quitarlas, la cita
+ * haría fallar la prueba — o, peor, obligaría a no documentar el fallo.
+ */
+function soloCodigoTs(texto: string): string {
+  return texto.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+}
+
+/** Cuerpo de una policy de storage.objects por nombre, o null si no existe. */
+function policy(nombre: string): string | null {
+  const re = new RegExp(
+    `CREATE\\s+POLICY\\s+"${nombre}"\\s+ON\\s+storage\\.objects([\\s\\S]*?);\\s*\\n`, 'i',
+  )
+  return sql.match(re)?.[1] ?? null
+}
+
+describe('bucket de evidencias de recepción', () => {
+  it('es privado y solo acepta imágenes', () => {
+    const codigo = soloCodigo(sql)
+    expect(codigo).toMatch(new RegExp(`INSERT INTO storage\\.buckets[\\s\\S]*'${BUCKET}'`))
+    // `public` en false tanto al crear como al re-aplicar: un bucket público
+    // haría irrelevantes las cuatro policies de abajo.
+    expect(codigo).toMatch(/'recepcion-evidencias',\s*false/)
+    expect(codigo).toMatch(/ON CONFLICT \(id\) DO UPDATE[\s\S]*SET public = false/)
+    expect(codigo).toMatch(/allowed_mime_types[\s\S]*image\/jpeg/)
+  })
+
+  it('las evidencias NO se quedan en condominios-media', () => {
+    // El bucket viejo autoriza por proyecto (20260603220000 / 20260822020000):
+    // allí cualquier residente del condominio podía leer y borrar la firma de
+    // acuse de su vecino. Si alguien vuelve a apuntar el uploader ahí, esto lo
+    // dice.
+    const tab = readFileSync(resolve('src/components/condominios/tabs/CorrespondenciaCondTab.tsx'), 'utf8')
+    expect(tab).toContain('BUCKET_EVIDENCIAS')
+    expect(tab).not.toMatch(/uploadCondominiosMedia/)
+    const portal = readFileSync(resolve('src/components/condominios/tabs/PortalCorrespondenciaTab.tsx'), 'utf8')
+    expect(portal).toContain('BUCKET_EVIDENCIAS')
+  })
+
+  it('ninguna de las dos toca la migración de storage ya fusionada', () => {
+    // 20260822020000 es historia: reescribirla no la re-aplicaría en el preview
+    // (el bot solo empuja archivos nuevos) y sí rompería el histórico.
+    expect(soloCodigo(sql)).not.toMatch(/cond_media_(select|insert|update|delete)/)
+    expect(soloCodigo(sqlEvidencias)).not.toMatch(/cond_media_(select|insert|update|delete)/)
+  })
+})
+
+describe('policies del bucket', () => {
+  it('SELECT resuelve el permiso por la PIEZA, no por el proyecto', () => {
+    const cuerpo = policy('recepcion_evidencias_select')
+    expect(cuerpo, 'falta la policy de SELECT').toBeTruthy()
+    // Se ancla a paquetes_recibidos por la segunda carpeta de la ruta.
+    expect(cuerpo!).toMatch(/FROM public\.paquetes_recibidos p/)
+    expect(cuerpo!).toMatch(/p\.id::text = \(storage\.foldername\(name\)\)\[2\]/)
+    // Personal: empresa + proyecto + permiso DE LA CLASE.
+    expect(cuerpo!).toMatch(/p\.company_id = public\.get_my_company_id\(\)/)
+    expect(cuerpo!).toMatch(/public\.can_access_project\(p\.project_id\)/)
+    expect(cuerpo!).toMatch(/CASE p\.clase[\s\S]*condominios\.tab\.correspondencia/)
+    expect(cuerpo!).toMatch(/condominios\.tab\.paqueteria/)
+  })
+
+  it('el residente solo ve lo dirigido a UNA DE SUS unidades', () => {
+    const cuerpo = policy('recepcion_evidencias_select')!
+    expect(cuerpo).toMatch(/p\.destinatario_tipo = 'unidad'/)
+    expect(cuerpo).toMatch(/p\.unidad_id IN \(SELECT public\.mis_unidades_ids\(\)\)/)
+    // Y nunca por proyecto a secas, que era justo el agujero del bucket viejo.
+    expect(cuerpo).not.toMatch(/mis_proyectos_ids/)
+  })
+
+  it('subir exige el permiso y un proyecto de la propia empresa', () => {
+    const cuerpo = policy('recepcion_evidencias_insert')!
+    expect(cuerpo).toMatch(/public\.user_has_permission\('condominios\.tab\.correspondencia'\)/)
+    expect(cuerpo).toMatch(/FROM public\.projects pr[\s\S]*pr\.company_id = public\.get_my_company_id\(\)/)
+    // Y que el id de pieza de la ruta no sea de otro tenant.
+    expect(cuerpo).toMatch(/NOT public\.recepcion_pieza_es_ajena\(/)
+  })
+
+  it('NO existe policy de UPDATE: una firma no se sustituye', () => {
+    // Deliberado. Si alguien añade una, este test lo obliga a justificarlo.
+    expect(policy('recepcion_evidencias_update')).toBeNull()
+    expect(soloCodigo(sql)).not.toMatch(/CREATE POLICY "recepcion_evidencias_update"/)
+  })
+
+  it('DELETE reparte igual que la pieza: correspondencia solo company_owner', () => {
+    const cuerpo = policy('recepcion_evidencias_delete')!
+    expect(cuerpo).toMatch(/WHEN 'correspondencia' THEN public\.current_user_role\(\) = 'company_owner'/)
+    expect(cuerpo).toMatch(/ELSE public\.current_user_role\(\) = ANY\(ARRAY\['company_owner','admin'\]\)/)
+    // El huérfano propio (nada lo referencia todavía) es la única excepción, y
+    // está acotada al dueño del objeto.
+    expect(cuerpo).toMatch(/owner = \(SELECT auth\.uid\(\)\)/)
+    expect(cuerpo).toMatch(/NOT public\.recepcion_evidencia_referenciada\(name\)/)
+    // El residente no entra por ninguna rama.
+    expect(cuerpo).not.toMatch(/mis_unidades_ids/)
+  })
+})
+
+describe('acuse de entrega', () => {
+  it('una correspondencia no queda entregada sin nombre ni hora', () => {
+    const codigo = soloCodigo(sql)
+    expect(codigo).toMatch(/ADD CONSTRAINT paquetes_correspondencia_acuse_chk CHECK/)
+    expect(codigo).toMatch(/entregado_a_nombre IS NOT NULL/)
+    expect(codigo).toMatch(/btrim\(entregado_a_nombre\) <> ''/)
+    expect(codigo).toMatch(/hora_entrega IS NOT NULL/)
+    // VALIDADA, no NOT VALID: una constraint sin validar no protegería de un
+    // UPDATE sobre una fila vieja, que es justo el caso que hay que cerrar.
+    expect(codigo).not.toMatch(/paquetes_correspondencia_acuse_chk[\s\S]{0,400}NOT VALID/)
+  })
+
+  it('las filas históricas se rellenan ANTES de añadir la constraint', () => {
+    const posBackfill = sql.indexOf("SET entregado_a_nombre = COALESCE(")
+    const posConstraint = sql.indexOf('ADD CONSTRAINT paquetes_correspondencia_acuse_chk')
+    expect(posBackfill).toBeGreaterThan(-1)
+    expect(posConstraint).toBeGreaterThan(posBackfill)
+    // Y se marcan como lo que son, sin inventarle un receptor a nadie.
+    expect(sql).toMatch(/No registrado \(acuse anterior a 2026-08-31\)/)
+  })
+
+  it('la RPC valida clase, estado, autorización y nombre', () => {
+    const cuerpo = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'))
+    expect(cuerpo).toMatch(/El nombre de quien recibe es obligatorio/)
+    expect(cuerpo).toMatch(/v_pieza\.clase <> 'correspondencia'/)
+    expect(cuerpo).toMatch(/v_pieza\.estado <> 'pendiente'/)
+    expect(cuerpo).toMatch(/user_has_permission\('condominios\.tab\.correspondencia'\)/)
+    expect(cuerpo).toMatch(/can_access_project\(v_pieza\.project_id\)/)
+    // FOR UPDATE: dos operadores entregando a la vez se serializan.
+    expect(cuerpo).toMatch(/FOR UPDATE/)
+    expect(cuerpo).toMatch(/entregado_por\s*=\s*auth\.uid\(\)/)
+  })
+
+  it('la firma se verifica contra storage.objects, no se cree el texto', () => {
+    // La definición VIGENTE es la de la última migración, no la de FINAL.
+    const cuerpo = sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    )
+    expect(cuerpo).toMatch(/FROM storage\.objects o/)
+    expect(cuerpo).toMatch(/o\.bucket_id = 'recepcion-evidencias'/)
+    // Ruta exacta proyecto/pieza/archivo, con los ids de ESTA pieza.
+    expect(cuerpo).toMatch(/array_length\(v_partes, 1\) IS DISTINCT FROM 3/)
+    expect(cuerpo).toMatch(/v_partes\[1\] IS DISTINCT FROM v_pieza\.project_id::text/)
+    expect(cuerpo).toMatch(/v_partes\[2\] IS DISTINCT FROM p_pieza_id::text/)
+    // La subió quien firma.
+    expect(cuerpo).toMatch(/o\.owner = auth\.uid\(\)/)
+    expect(cuerpo).toMatch(/png\|jpg\|jpeg\|webp/)
+  })
+
+  it('el MIME de la firma es una lista blanca, no un COALESCE optimista', () => {
+    const cuerpo = soloCodigo(sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    ))
+    expect(cuerpo).toMatch(
+      /o\.metadata->>'mimetype' IN \('image\/jpeg', 'image\/png', 'image\/webp'\)/,
+    )
+    // Lo que se elimina, nombrado: una metadata ausente NO se da por PNG, y
+    // `LIKE 'image/%'` dejaba pasar image/svg+xml, que lleva scripts.
+    expect(cuerpo).not.toMatch(/COALESCE\(o\.metadata->>'mimetype'/)
+    expect(cuerpo).not.toMatch(/mimetype[^\n]*LIKE 'image\/%'/)
+  })
+
+  it('el bucket declara la misma lista blanca', () => {
+    expect(soloCodigo(sqlUltima)).toMatch(
+      /allowed_mime_types = ARRAY\['image\/jpeg', 'image\/png', 'image\/webp'\]/,
+    )
+  })
+
+  it('la vía siempre es presencial: portal rechazado y sellado en el servidor', () => {
+    const cuerpo = sqlUltima.slice(
+      sqlUltima.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_registrar_acuse'),
+    )
+    expect(cuerpo).toMatch(/p_via IS DISTINCT FROM 'porteria'/)
+    // No se guarda p_via: se guarda la constante.
+    expect(cuerpo).toMatch(/entregado_via\s*=\s*'porteria'/)
+  })
+
+  it('la UI ya no cierra la custodia con un UPDATE pelado', () => {
+    const tab = readFileSync(resolve('src/components/condominios/tabs/CorrespondenciaCondTab.tsx'), 'utf8')
+    expect(tab).toContain('registrarAcuseCorrespondencia')
+    // 'atendido' no puede aparecer en ningún patch de la pestaña.
+    expect(tab).not.toMatch(/estado:\s*'atendido'/)
+  })
+})
+
+describe('funciones nuevas: SECURITY DEFINER cerradas', () => {
+  const nuevas = [
+    'recepcion_pieza_existe(text)',
+    'recepcion_pieza_es_ajena(text, text)',
+    'correspondencia_registrar_acuse(uuid, text, text, text)',
+  ]
+  // CREATE FUNCTION concede EXECUTE a PUBLIC por defecto (#765): sin el REVOKE
+  // quedan ejecutables por `anon`. migrations-guard.mjs también lo exige; esto
+  // nombra las tres firmas para que un rename no se lleve el guard por delante.
+  for (const firma of nuevas) {
+    it(`${firma} revoca PUBLIC y concede solo a authenticated`, () => {
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION public.${firma} FROM PUBLIC`)
+      expect(sql).toContain(`GRANT EXECUTE ON FUNCTION public.${firma} TO authenticated`)
+    })
+  }
+})
+
+describe('la migración es nueva, no una edición', () => {
+  it('su versión es posterior a todas las que reemite', () => {
+    // El preview ya aplicó versiones anteriores de 20260829 y 20260831; el bot
+    // solo empuja archivos NUEVOS, así que el estado final tiene que declararse
+    // en una migración posterior, no editando aquellas.
+    //
+    // Se compara contra las que ESTA reemite, no contra el máximo global del
+    // repositorio: anclarlo al máximo hacía que cualquier migración futura
+    // —de recepción o no— rompiera esta prueba sin que nada estuviera mal.
+    const reemitidas = [MIGRACION, FINAL, '20260829000600_recepcion_motor_unico.sql']
+    for (const previa of reemitidas) {
+      expect(CLAIM_MIME.slice(0, 14) > previa.slice(0, 14), `${CLAIM_MIME} debe ir después de ${previa}`).toBe(true)
+    }
+  })
+
+  it('y sigue existiendo en el repositorio con ese nombre', () => {
+    const archivos = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql'))
+    expect(archivos).toContain(CLAIM_MIME)
+  })
+})
+
+// ── El FK contradictorio ────────────────────────────────────────────────────
+describe('unidad con historial de recepción', () => {
+  it('el FK pasa a RESTRICT y los dos CHECK NO se relajan', () => {
+    const codigo = soloCodigo(sql)
+    expect(codigo).toMatch(/ADD CONSTRAINT paquetes_recibidos_unidad_id_fkey[\s\S]*ON DELETE RESTRICT/)
+    expect(codigo).not.toMatch(/paquetes_recibidos_unidad_id_fkey[\s\S]{0,200}ON DELETE SET NULL/)
+    // Relajarlos permitiría crear paquetes sin unidad: peor que el problema.
+    expect(codigo).toMatch(/paquetes_unidad_por_clase_chk[\s\S]*clase <> 'paquete' OR unidad_id IS NOT NULL/)
+    expect(codigo).toMatch(/paquetes_destinatario_unidad_chk[\s\S]*destinatario_tipo <> 'unidad' OR unidad_id IS NOT NULL/)
+    expect(codigo).not.toMatch(/DROP CONSTRAINT IF EXISTS paquetes_unidad_por_clase_chk/)
+  })
+
+  it('la UI traduce el rechazo del FK en vez de enseñar el SQL', () => {
+    const mut = readFileSync(resolve('src/domain/unidades/mutations.ts'), 'utf8')
+    expect(mut).toContain('mensajeBorradoUnidad')
+    expect(mut).toMatch(/historial de recepción/)
+    expect(mut).toMatch(/[Dd]esactívala/)
+  })
+})
+
+// ── La RPC como única puerta ────────────────────────────────────────────────
+describe('el acuse no se puede escribir a mano', () => {
+  const guard = () => sql.slice(
+    sql.indexOf('CREATE OR REPLACE FUNCTION public.correspondencia_acuse_guard'),
+    sql.indexOf('DROP TRIGGER IF EXISTS correspondencia_acuse_guard_trg'),
+  )
+
+  it('hay un trigger BEFORE UPDATE que lo vigila', () => {
+    expect(soloCodigo(sql)).toMatch(
+      /CREATE TRIGGER correspondencia_acuse_guard_trg\s+BEFORE UPDATE ON public\.paquetes_recibidos/)
+  })
+
+  it('NO usa un GUC como autorización: el cliente podría ponerlo', () => {
+    // `set_config`/`current_setting` sobre una clave propia es un dato que el
+    // llamante controla. Lo que no puede falsificar es su ROL.
+    expect(soloCodigo(sql)).not.toMatch(/set_config\s*\(/)
+    expect(guard()).not.toMatch(/current_setting/)
+    expect(soloCodigo(sql)).toMatch(/current_user IN \('authenticated', 'anon'\)/)
+  })
+
+  it('el guard es SECURITY INVOKER: uno DEFINER vería siempre a su propio dueño', () => {
+    expect(guard()).not.toMatch(/SECURITY DEFINER/)
+    // Y el helper que mira `current_user`, igual: si fuera DEFINER devolvería
+    // siempre el rol de SU dueño y dejaría pasar cualquier UPDATE del cliente.
+    const desde = sql.indexOf('CREATE OR REPLACE FUNCTION public.recepcion_llamada_de_cliente')
+    // soloCodigo: la propia declaración lleva un comentario que dice
+    // "NO SECURITY DEFINER", y no queremos que el guard se dispare con él.
+    const helper = soloCodigo(sql.slice(desde, sql.indexOf('$$;', desde)))
+    expect(helper).not.toMatch(/SECURITY DEFINER/)
+  })
+
+  it('bloquea la transición y la reapertura, y sella los seis campos', () => {
+    const cuerpo = guard()
+    expect(cuerpo).toMatch(/NEW\.estado = 'atendido' AND public\.recepcion_llamada_de_cliente\(\)/)
+    expect(cuerpo).toMatch(/OLD\.estado = 'atendido'/)
+    for (const col of ['estado', 'entregado_a_nombre', 'entregado_por',
+                       'entregado_via', 'hora_entrega', 'firma_path']) {
+      expect(cuerpo, `${col} tiene que quedar sellado`).toMatch(new RegExp(`NEW\\.${col}\\s+IS DISTINCT FROM OLD\\.${col}`))
+    }
+  })
+
+  it('paquetería, devolución y archivado siguen pasando', () => {
+    const cuerpo = guard()
+    // Sale temprano para la otra clase…
+    expect(cuerpo).toMatch(/COALESCE\(NEW\.clase, OLD\.clase\) <> 'correspondencia'[\s\S]{0,60}RETURN NEW/)
+    // …y la rama que bloquea campos en pieza abierta NO incluye los tres que
+    // sella la devolución.
+    const abierta = soloCodigo(cuerpo.slice(cuerpo.indexOf('-- (c)')))
+    expect(abierta).toMatch(/entregado_a_nombre/)
+    expect(abierta).toMatch(/firma_path/)
+    expect(abierta).not.toMatch(/hora_entrega/)
+    expect(abierta).not.toMatch(/entregado_via/)
+  })
+})
+
+// ── El aviso: claim con DUEÑO ───────────────────────────────────────────────
+describe('carrera de notificado_at', () => {
+  it('el claim guarda QUIÉN lo tiene, no sólo cuándo se tomó', () => {
+    const codigo = soloCodigo(sqlUltima)
+    expect(codigo).toMatch(/ADD COLUMN IF NOT EXISTS notificacion_claim_id uuid/)
+    // Un solo UPDATE condicional: el row lock serializa las dos llamadas.
+    expect(codigo).toMatch(
+      /UPDATE public\.paquetes_recibidos[\s\S]*notificacion_claim_id = p_claim_id[\s\S]*notificado_at IS NULL[\s\S]*notificacion_claim_at < now\(\) - make_interval/,
+    )
+  })
+
+  it('finalizar EXIGE el token: una ejecución zombi no pisa el claim vivo', () => {
+    const cuerpo = soloCodigo(
+      sqlUltima.slice(sqlUltima.indexOf('FUNCTION public.paquete_finalizar_aviso')),
+    )
+    // La cláusula que lo cambia todo. Sin ella, filtrar sólo por id permitía a
+    // una ejecución caducada liberar —o sellar— el aviso de la que sí enviaba.
+    expect(cuerpo).toMatch(/WHERE id = p_pieza_id[\s\S]*AND notificacion_claim_id = p_claim_id/)
+    expect(cuerpo).toMatch(/notificacion_claim_id = NULL/)
+  })
+
+  it('las firmas VIEJAS de dos argumentos se eliminan, no conviven', () => {
+    // Mientras existieran, quien las llamara seguiría pudiendo liberar un claim
+    // ajeno: una puerta cerrada al lado de otra abierta no cierra nada.
+    const codigo = soloCodigo(sqlUltima)
+    expect(codigo).toMatch(/DROP FUNCTION IF EXISTS public\.paquete_reclamar_aviso\(uuid, integer\)/)
+    expect(codigo).toMatch(/DROP FUNCTION IF EXISTS public\.paquete_finalizar_aviso\(uuid, boolean\)/)
+  })
+
+  it('sólo service_role puede reclamar o finalizar', () => {
+    const codigo = soloCodigo(sqlUltima)
+    for (const firma of ['paquete_reclamar_aviso(uuid, uuid, integer)', 'paquete_finalizar_aviso(uuid, uuid, boolean)']) {
+      for (const quien of ['PUBLIC', 'anon', 'authenticated']) {
+        expect(codigo).toContain(`REVOKE ALL ON FUNCTION public.${firma} FROM ${quien}`)
+      }
+      expect(codigo).toContain(`GRANT EXECUTE ON FUNCTION public.${firma} TO service_role`)
+    }
+  })
+
+  it('un fallo transitorio NO se sella como notificado', () => {
+    const cuerpo = sqlUltima.slice(sqlUltima.indexOf('FUNCTION public.paquete_finalizar_aviso'))
+    expect(cuerpo).toMatch(/CASE WHEN p_entregado THEN COALESCE\(notificado_at, now\(\)\)/)
+    expect(cuerpo).toMatch(/ELSE notificado_at END/)
+  })
+
+  it('la edge function genera su token, lo pasa a las dos RPC y acota al proveedor', () => {
+    const fn = readFileSync(resolve('supabase/functions/notify-package/index.ts'), 'utf8')
+    expect(fn).toMatch(/const claimId = crypto\.randomUUID\(\)/)
+    expect(fn).toContain("rpc('paquete_reclamar_aviso'")
+    expect(fn).toContain("rpc('paquete_finalizar_aviso'")
+    expect(fn).toMatch(/p_claim_id: claimId/)
+    // El resultado del cierre ya no se ignora.
+    expect(fn).toMatch(/errFin \|\| finalizado !== true/)
+    // Sin plazo, una llamada colgada sobreviviría al lease y otra ejecución
+    // reclamaría legítimamente: dos avisos.
+    expect(fn).toMatch(/AbortSignal\.timeout\(TIMEOUT_PROVEEDOR_MS\)/)
+    expect(fn).not.toMatch(/\bawait fetch\(/)
+    // Y no se promete exactly-once, que el proveedor externo no da.
+    expect(fn).toMatch(/at-least-once/)
+  })
+})
+
+// ── RBAC del aviso ──────────────────────────────────────────────────────────
+describe('notify-package delega el RBAC en la base', () => {
+  const fn = readFileSync(resolve('supabase/functions/notify-package/index.ts'), 'utf8')
+  const auth = readFileSync(resolve('supabase/functions/notify-package/autorizacion.ts'), 'utf8')
+  const logic = readFileSync(resolve('supabase/functions/notify-package/logic.ts'), 'utf8')
+
+  it('valida el JWT antes de nada', () => {
+    expect(fn).toContain('admin.auth.getUser(token)')
+  })
+
+  it('abre un cliente LIMITADO al JWT del usuario', () => {
+    // Preguntar con el service_role haría que los helpers respondieran sobre un
+    // auth.uid() nulo: la comprobación parecería hecha y no valdría nada.
+    expect(fn).toMatch(/createClient\(SUPABASE_URL, ANON_KEY, \{[\s\S]*Authorization: `Bearer \$\{token\}`/)
+    expect(fn).toContain('autorizarAviso(usuario,')
+  })
+
+  it('consulta los helpers server-side, no tablas de permisos', () => {
+    for (const helper of ['is_super_admin', 'get_my_company_id', 'can_access_project', 'user_has_permission']) {
+      expect(auth).toContain(helper)
+    }
+    // La incrustación imposible que devolvía error y se ignoraba.
+    expect(fn).not.toContain('role_permissions')
+    expect(fn).not.toContain('user_project_assignments')
+    // Sin los comentarios: la cabecera CITA la consulta que se eliminó, y esa
+    // cita no puede contarse como código vivo.
+    expect(soloCodigoTs(auth)).not.toContain('.from(')
+  })
+
+  it('el espejo del RBAC en TypeScript ya no existe', () => {
+    // Mantener una copia de user_has_permission aquí fue el origen del fallo:
+    // divergió y se quedó sin la rama del deny explícito.
+    for (const muerto of ['puedeNotificar', 'tienePermiso', 'accedeAlProyecto', 'ROLES_TODO_PERMISO']) {
+      expect(soloCodigoTs(logic), `${muerto} debería haberse retirado de logic.ts`)
+        .not.toMatch(new RegExp(`(export function|const) ${muerto}\\b`))
+    }
+  })
+
+  it('un error de autorización falla CERRADO y con su propio código', () => {
+    expect(auth).toMatch(/typeof res\?\.data !== 'boolean'/)
+    expect(auth).toMatch(/motivo: 'error_autorizacion'/)
+    // 503, no 403: "no se pudo decidir" no es "no tenés permiso".
+    expect(fn).toMatch(/permitido\.motivo === 'error_autorizacion'[\s\S]{0,140}503/)
+  })
+})

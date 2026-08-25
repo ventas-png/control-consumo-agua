@@ -18,6 +18,7 @@ export type NotificationGroup =
   | 'solicitudes'
   | 'reservas'
   | 'paquetes'
+  | 'correspondencia'
   | 'cobros'
   | 'operacion'
   | 'cuenta'
@@ -39,10 +40,14 @@ export const GROUP_META: Record<NotificationGroup, GroupMeta> = {
   solicitudes: { label: 'solicitudes', labelSingular: 'solicitud',  icon: '📥', order: 2 },
   reservas:    { label: 'reservas',    labelSingular: 'reserva',    icon: '🏊', order: 3 },
   paquetes:    { label: 'paquetes',    labelSingular: 'paquete',    icon: '📦', order: 4 },
-  cobros:      { label: 'cobros',      labelSingular: 'cobro',      icon: '💰', order: 5 },
-  operacion:   { label: 'operación',   labelSingular: 'operación',  icon: '🛠️', order: 6 },
-  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 7 },
-  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 8 },
+  // Grupo propio y no dentro de 'paquetes': una notificación legal con plazo no
+  // es lo mismo que una caja de Amazon, y el resumen de la campana ("2 paquetes
+  // · 1 correspondencia") es justo donde esa diferencia se lee sin abrir nada.
+  correspondencia: { label: 'correspondencia', labelSingular: 'correspondencia', icon: '📬', order: 5 },
+  cobros:      { label: 'cobros',      labelSingular: 'cobro',      icon: '💰', order: 6 },
+  operacion:   { label: 'operación',   labelSingular: 'operación',  icon: '🛠️', order: 7 },
+  cuenta:      { label: 'cuenta',      labelSingular: 'cuenta',     icon: '🔐', order: 8 },
+  otros:       { label: 'avisos',      labelSingular: 'aviso',      icon: '🔔', order: 9 },
 }
 
 // `tipo` exactos que emiten los productores. Los que no estén aquí caen en
@@ -64,6 +69,7 @@ const TIPO_TO_GROUP: Record<string, NotificationGroup> = {
 // consultan por prefijo para no tener que listar cada variante nueva.
 const PREFIX_TO_GROUP: ReadonlyArray<[string, NotificationGroup]> = [
   ['paquete_', 'paquetes'],
+  ['correspondencia_', 'correspondencia'],
   ['cuota_', 'cobros'],
   ['recibo_', 'cobros'],
 ]

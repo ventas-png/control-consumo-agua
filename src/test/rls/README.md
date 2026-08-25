@@ -77,14 +77,61 @@ export RLS_USER_A_PASSWORD="********"
 export RLS_USER_B_EMAIL="qa-b@example.com"
 export RLS_USER_B_PASSWORD="********"
 
+# OBLIGATORIO — gate por CLASE de paquetes_recibidos (motor único, 20260829000600).
+# CUATRO usuarios de la MISMA empresa, porque hay dos gates distintos:
+#   · SELECT/INSERT/UPDATE van por PERMISO de la clase. Solo se ve con usuarios
+#     SIN rol admin: `user_has_permission` le dice true a TODO a
+#     super_admin/company_owner/admin, así que un admin no sirve para probarlo.
+#   · DELETE va por ROL: la correspondencia solo la borra company_owner. Ahí sí
+#     hace falta un admin, para comprobar que NO puede.
+# A/B tampoco sirven: son de empresas distintas y lo que se vería es el
+# aislamiento de tenant.
+#
+# Sin estas ocho, el harness ENTERO no corre: forman parte del mismo conjunto
+# que exige `exigirDestinoDeclarado`, y en CI el preflight deja el job en rojo
+# antes de instalar nada. Antes eran opcionales y el bloque se auto-saltaba con
+# un `describe.skipIf`: el job terminaba verde con 13 pruebas omitidas y el
+# reporte las contaba como cobertura. Las crea `scripts/seed-rls-sandbox.mjs`.
+export RLS_USER_PAQ_EMAIL="qa-paqueteria@example.com"      # rol granular (operator) + condominios.tab.paqueteria
+export RLS_USER_PAQ_PASSWORD="********"
+export RLS_USER_CORR_EMAIL="qa-correspondencia@example.com" # rol granular + condominios.tab.correspondencia
+export RLS_USER_CORR_PASSWORD="********"
+export RLS_USER_ADMIN_EMAIL="qa-admin@example.com"          # rol admin, MISMA empresa
+export RLS_USER_ADMIN_PASSWORD="********"
+export RLS_USER_OWNER_EMAIL="qa-owner@example.com"          # rol company_owner, MISMA empresa
+export RLS_USER_OWNER_PASSWORD="********"
+
 npx vitest run src/test/rls/rlsHarness.test.ts
 ```
 
-Las **siete** son obligatorias: quien corre `vitest` a mano no pasa por el
+Las **quince** son obligatorias: quien corre `vitest` a mano no pasa por el
 preflight, así que el propio harness repite la validación del destino.
 
+El bloque de clase es **no destructivo**: siembra sus propias filas desechables
+con quien sí tiene el permiso y las limpia al terminar. Empieza afirmando las
+precondiciones (misma empresa, roles esperados, permisos efectivos disjuntos)
+para que ningún caso pueda pasar por aislamiento de tenant o por falta del rol.
+
+## Sin credenciales: los sandboxes de Postgres
+
+Dos runners prueban **las reglas reales** contra un Postgres desechable, sin
+Supabase ni secretos. Montan el andamiaje mínimo (`auth.uid`, `app_users`, los
+helpers de RBAC), aplican el SQL **tal como se va a desplegar** y ejecutan los
+escenarios como cada usuario. No sustituyen al harness —no cubren GoTrue ni el
+resto del esquema— pero sí se ejecutan siempre.
+
+| Runner | Qué prueba |
+|---|---|
+| `scripts/rls-recepcion-sandbox.sh` | Las policies de `paquetes_recibidos` por clase (**extrae** la sección 5 de `20260829000600`): quién ve, crea, reclasifica y borra correspondencia frente a paquetería. |
+| `scripts/rls-evidencias-sandbox.sh` | Monta `paquetes_recibidos` **tal como era antes del motor** y le aplica la cadena real de migraciones (`20260829` → `20260830` → `20260831` → `20260901`). Así hereda el FK y los CHECK de verdad: la primera versión partía de una tabla simplificada y eso ocultó que `ON DELETE SET NULL` era incompatible con los CHECK de unidad. Cubre el borrado de una unidad con historial, el bucket de evidencias, la RPC del acuse con la firma verificada, la inmutabilidad tras el cierre y el claim del aviso. |
+
+El segundo cubre justo lo que el bucket viejo dejaba abierto: en
+`condominios-media` las cuatro policies autorizan por proyecto, así que
+cualquier residente del condominio podía leer, sustituir y borrar la firma de
+acuse de su vecino.
+
 En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
-`rls-harness`). Estado hoy: **corre de verdad** — 128 pruebas pasadas, 0
+`rls-harness`). Estado hoy: **corre de verdad** — 146 pruebas pasadas, 0
 omitidas, contra el sandbox. Detalle y evidencia en
 `docs/ACTIVAR_HARNESS_RLS.md`.
 

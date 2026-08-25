@@ -1,7 +1,7 @@
 // Tests de la lógica pura de notify-package (infra:I22 · Track T8). Como el
 // resto de tests de edge fns, corre bajo vitest (no Deno) tratando el módulo
 // como TS normal. Cubre: sanitización HTML (escapeHtml aplicado en la plantilla),
-// etiqueta de tipo de envío, gate de autorización por empresa, filas in-app,
+// etiqueta de tipo de envío, mapa clase → permiso, filas in-app,
 // normalización de teléfono y payloads/selección de proveedor de WhatsApp.
 
 import { describe, it, expect } from 'vitest'
@@ -9,12 +9,15 @@ import {
   TIPO_LABEL,
   type WhatsAppEnv,
   applyVars,
-  autorizadoParaEmpresa,
   buildMetaWaPayload,
   buildPaqueteInAppRows,
   buildTwilioWaParams,
   digits,
   escapeHtml,
+  esPiezaSaliente,
+  motivoOmision,
+  permisoDeClase,
+  plantillaMeta,
   renderPaquete,
   resolveWhatsAppProvider,
   tipoLabel,
@@ -41,19 +44,16 @@ describe('notify-package/tipoLabel', () => {
 
   it('tipo desconocido cae a "Envío"', () => {
     expect(tipoLabel('caja_gigante')).toBe('Envío')
+  })
+
+  it('con clase=correspondencia usa el vocabulario documental', () => {
+    // El mismo campo `tipo` lleva dos vocabularios desde la unificación; sin la
+    // clase, una notificación legal se anunciaría como "Envío".
+    expect(tipoLabel('notificacion_legal', 'correspondencia')).toBe('Notificación legal')
+    expect(tipoLabel('carta', 'correspondencia')).toBe('Carta')
+    expect(tipoLabel('otro', 'correspondencia')).toBe('Correspondencia')
+    expect(tipoLabel('lo_que_sea', 'correspondencia')).toBe('Correspondencia')
     expect(TIPO_LABEL).toEqual({ paquete: 'Paquete', documento: 'Documento', sobre: 'Sobre', otro: 'Envío' })
-  })
-})
-
-describe('notify-package/autorizadoParaEmpresa (gate por tenant)', () => {
-  it('interno (service key) y super_admin pasan siempre', () => {
-    expect(autorizadoParaEmpresa({ internal: true, callerIsSuperAdmin: false, callerCompanyId: null }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: true, callerCompanyId: 'otra' }, 'c1')).toBe(true)
-  })
-
-  it('usuario de empresa solo notifica paquetes de SU empresa (no cross-tenant)', () => {
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c2')).toBe(false)
   })
 })
 
@@ -95,6 +95,16 @@ describe('notify-package/renderPaquete', () => {
     expect(renderPaquete(vars, 'https://fallback').html).toContain('href="https://mi.app"')
     expect(renderPaquete({ ...vars, app_url: '' }, 'https://fallback').html).toContain('href="https://fallback"')
   })
+
+  it('el correo de correspondencia no promete firmar desde el portal', () => {
+    // `paquete_firmar_recepcion` está acotada a clase='paquete'
+    // (20260829000600): ofrecer el botón de firma en una carta sería mandar al
+    // residente a hacer algo que la base de datos le va a rechazar.
+    const out = renderPaquete({ ...vars, clase: 'correspondencia', tipo_label: 'Carta' })
+    expect(out.subject).toBe('📬 Carta disponible en administración · A-3')
+    expect(out.html).toContain('Ver mi correspondencia')
+    expect(out.html).not.toContain('firmar la recepción')
+  })
 })
 
 describe('notify-package/buildPaqueteInAppRows', () => {
@@ -118,6 +128,96 @@ describe('notify-package/buildPaqueteInAppRows', () => {
     const rows = buildPaqueteInAppRows(['u1'], { ...vars, remitente: '' }, { companyId: 'c1', paqueteId: 'p1' })
     expect(rows[0].cuerpo).toBe('Caja para A-3. Pasa a recogerlo cuando gustes.')
     expect(buildPaqueteInAppRows([], vars, { companyId: 'c1', paqueteId: 'p1' })).toEqual([])
+  })
+
+  // Motor único (20260829000600): el mismo endpoint avisa las dos clases.
+  it('la correspondencia navega a SU pestaña del portal, no a "Mis paquetes"', () => {
+    const rows = buildPaqueteInAppRows(
+      ['u1'],
+      { ...vars, clase: 'correspondencia', tipo_label: 'Notificación legal' },
+      { companyId: 'c1', paqueteId: 'c9' },
+    )
+    // Un aviso de carta que abriera 'paquetes' dejaría al residente mirando una
+    // lista donde su carta no está.
+    expect(rows[0].seccion).toBe('correspondencia')
+    expect(rows[0].tipo).toBe('correspondencia_pendiente')
+    expect(rows[0].titulo).toBe('📬 Notificación legal en administración')
+  })
+})
+
+// ── WhatsApp por clase (motor único, 20260829000600) ────────────────────────
+// Meta manda PLANTILLAS APROBADAS: su texto es fijo y no lo escribimos nosotros.
+// Reutilizar la de paquetería para anunciar correspondencia le mandaría al
+// residente un mensaje falso ("tienes un paquete en portería") por un canal que
+// no puede contrastar. Twilio manda texto libre, así que ahí sí adaptamos.
+describe('notify-package/WhatsApp por clase', () => {
+  const envMeta: WhatsAppEnv = {
+    provider: 'meta', metaToken: 'tok', metaPhoneId: '123', metaTemplate: 'paquete_es',
+    twilioSid: '', twilioToken: '', twilioFrom: '',
+  }
+  const envTwilio: WhatsAppEnv = {
+    provider: 'twilio', metaToken: '', metaPhoneId: '', metaTemplate: '',
+    twilioSid: 'AC1', twilioToken: 'tk', twilioFrom: 'whatsapp:+50200000000',
+  }
+  const varsPaquete = { tipo_label: 'Paquete', descripcion: 'Caja', unidad: 'A-3', clase: 'paquete' }
+  const varsCorreo = {
+    tipo_label: 'Notificación legal', descripcion: 'Citación', unidad: 'A-3',
+    clase: 'correspondencia',
+  }
+
+  describe('Meta', () => {
+    it('paquetería sigue igual: resuelve meta con su plantilla de siempre', () => {
+      expect(resolveWhatsAppProvider(envMeta, 'paquete')).toBe('meta')
+      expect(plantillaMeta(envMeta, 'paquete')).toBe('paquete_es')
+    })
+
+    it('correspondencia SIN plantilla propia: no se envía por Meta', () => {
+      // Preferimos no mandar WhatsApp antes que mandar el texto de paquetes.
+      expect(plantillaMeta(envMeta, 'correspondencia')).toBeNull()
+      expect(resolveWhatsAppProvider(envMeta, 'correspondencia')).toBeNull()
+    })
+
+    it('correspondencia CON plantilla propia: se envía con ESA plantilla', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: 'correspondencia_es' }
+      expect(resolveWhatsAppProvider(env, 'correspondencia')).toBe('meta')
+      expect(plantillaMeta(env, 'correspondencia')).toBe('correspondencia_es')
+      expect(buildMetaWaPayload('50255551234', varsCorreo, 'correspondencia_es', 'es').template)
+        .toMatchObject({ name: 'correspondencia_es' })
+    })
+
+    it('una plantilla en blanco cuenta como no configurada', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: '   ' }
+      expect(resolveWhatsAppProvider(env, 'correspondencia')).toBeNull()
+    })
+
+    it('la plantilla de correspondencia no altera la de paquetería', () => {
+      const env = { ...envMeta, metaTemplateCorrespondencia: 'correspondencia_es' }
+      expect(plantillaMeta(env, 'paquete')).toBe('paquete_es')
+    })
+  })
+
+  describe('Twilio', () => {
+    it('paquetería conserva EXACTAMENTE el cuerpo anterior', () => {
+      const body = buildTwilioWaParams('50255551234', varsPaquete, envTwilio.twilioFrom).Body
+      expect(body).toBe('📦 Tienes Paquete en portería para A-3: Caja. Pasa a recogerlo cuando gustes.')
+    })
+
+    it('correspondencia usa su icono, su lugar y su cierre', () => {
+      const body = buildTwilioWaParams('50255551234', varsCorreo, envTwilio.twilioFrom).Body
+      expect(body).toBe('📬 Tienes Notificación legal en administración para A-3: Citación. Puedes retirarla presentando tu identificación.')
+      expect(body).not.toContain('portería')
+      expect(body).not.toContain('recogerlo')
+    })
+
+    it('sirve a las dos clases: no necesita plantilla aprobada', () => {
+      expect(resolveWhatsAppProvider(envTwilio, 'paquete')).toBe('twilio')
+      expect(resolveWhatsAppProvider(envTwilio, 'correspondencia')).toBe('twilio')
+    })
+
+    it('sin `clase` en vars se comporta como paquetería (compatibilidad)', () => {
+      const body = buildTwilioWaParams('50255551234', { tipo_label: 'Paquete', descripcion: 'Caja', unidad: 'A-3' }, envTwilio.twilioFrom).Body
+      expect(body).toContain('portería')
+    })
   })
 })
 
@@ -188,5 +288,123 @@ describe('notify-package/buildTwilioWaParams', () => {
       To: 'whatsapp:+50255551234',
       Body: '📦 Tienes Paquete en portería para A-3: Caja. Pasa a recogerlo cuando gustes.',
     })
+  })
+})
+
+// ── Entrada vs salida, impuesto en el SERVIDOR ──────────────────────────────
+// El hallazgo: una pieza `direccion='saliente'` podía notificarse. El aviso
+// entero está escrito desde "algo llegó para ti" — mandárselo al residente por
+// lo que él mismo despachó es decirle que vaya a buscar lo que acaba de
+// entregar. Que la pestaña ya no lo intente no basta: esta función es
+// invocable con cualquier id por cualquiera con un JWT de la empresa.
+describe('notify-package/esPiezaSaliente', () => {
+  it('reconoce las dos formas de salir', () => {
+    expect(esPiezaSaliente('saliente')).toBe(true)
+    expect(esPiezaSaliente('saliente_tercero')).toBe(true)
+  })
+
+  it('entrante, vacío o ausente son entradas', () => {
+    expect(esPiezaSaliente('entrante')).toBe(false)
+    expect(esPiezaSaliente(null)).toBe(false)
+    expect(esPiezaSaliente(undefined)).toBe(false)
+  })
+})
+
+describe('notify-package/motivoOmision', () => {
+  const entrante = {
+    direccion: 'entrante', notificado_at: null,
+    unidades: { nombre: 'A-3', cliente_id: 'cli-1' },
+  }
+
+  it('una ENTRADA a una unidad sí se avisa', () => {
+    expect(motivoOmision(entrante)).toBeNull()
+  })
+
+  it('una SALIDA no se avisa', () => {
+    expect(motivoOmision({ ...entrante, direccion: 'saliente' })).toBe('pieza_saliente')
+    expect(motivoOmision({ ...entrante, direccion: 'saliente_tercero' })).toBe('pieza_saliente')
+  })
+
+  it('la salida gana incluso sobre la idempotencia', () => {
+    // Importa el orden: una salida no debe ni sellarse como "ya notificada".
+    expect(motivoOmision({ ...entrante, direccion: 'saliente', notificado_at: '2026-08-19T00:00:00Z' }))
+      .toBe('pieza_saliente')
+  })
+
+  it('sigue respetando las dos razones que ya existían', () => {
+    expect(motivoOmision({ ...entrante, notificado_at: '2026-08-19T00:00:00Z' })).toBe('already_notified')
+    expect(motivoOmision({ ...entrante, unidades: null })).toBe('no_cliente')
+    expect(motivoOmision({ ...entrante, unidades: { nombre: 'Admin', cliente_id: null } })).toBe('no_cliente')
+  })
+})
+
+// Los tres canales se construyen igual para cualquier pieza: la decisión de
+// NO avisar una salida se toma antes, en motivoOmision. Estas pruebas fijan
+// las dos mitades de ese contrato — que la entrada produce los tres avisos con
+// su texto, y que la salida ni llega a construirlos.
+describe('notify-package/canales según la dirección', () => {
+  const varsEntrante = {
+    to_name: 'Ana', unidad: 'A-3', descripcion: 'Citación', tipo_label: 'Notificación legal',
+    clase: 'correspondencia', empresa_nombre: 'Torre Norte', app_url: 'https://app',
+  }
+  const envTwilio: WhatsAppEnv = {
+    provider: 'twilio', metaToken: '', metaPhoneId: '', metaTemplate: '',
+    twilioSid: 'AC', twilioToken: 't', twilioFrom: 'whatsapp:+1',
+  }
+
+  it('ENTRADA: correo, in-app y WhatsApp salen con el texto de "te llegó algo"', () => {
+    const pieza = { direccion: 'entrante', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBeNull()
+
+    const correo = renderPaquete(varsEntrante)
+    expect(correo.subject).toContain('disponible en administración')
+    expect(correo.html).toContain('Puedes retirarla en administración')
+
+    const [inApp] = buildPaqueteInAppRows(['u1'], varsEntrante, { companyId: 'c1', paqueteId: 'p1' })
+    expect(inApp.titulo).toBe('📬 Notificación legal en administración')
+    expect(inApp.seccion).toBe('correspondencia')
+
+    expect(resolveWhatsAppProvider(envTwilio, 'correspondencia')).toBe('twilio')
+    expect(buildTwilioWaParams('50255551234', varsEntrante, 'whatsapp:+1').Body)
+      .toBe('📬 Tienes Notificación legal en administración para A-3: Citación. Puedes retirarla presentando tu identificación.')
+  })
+
+  it('SALIDA: el handler corta antes, así que no se construye ningún canal', () => {
+    const pieza = { direccion: 'saliente', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBe('pieza_saliente')
+  })
+
+  it('SALIDA de paquetería (retiro por tercero): mismo corte', () => {
+    const pieza = { direccion: 'saliente_tercero', notificado_at: null, unidades: { cliente_id: 'cli-1' } }
+    expect(motivoOmision(pieza)).toBe('pieza_saliente')
+  })
+})
+
+// ── RBAC del aviso ──────────────────────────────────────────────────────────
+// El bloque que espejaba `user_has_permission`/`can_access_project` en
+// TypeScript se retiró junto con las funciones que probaba: la autorización ya
+// no se reimplementa, se le pregunta a la base. Lo que queda aquí es el único
+// pedazo que sigue siendo del lado de la aplicación —el mapa clase → clave— y
+// la decisión completa se prueba en:
+//
+//   · __tests__/autorizacion.test.ts  — la capa, con el cliente doblado a nivel
+//     de `.rpc()`, incluidos los fallos de consulta que ningún objeto en
+//     memoria puede representar.
+//   · __tests__/handler.test.ts       — el handler entero, comprobando que
+//     pregunta CON EL JWT DEL USUARIO y no con el service_role.
+//   · scripts/rls-evidencias-asserts.sql (bloque 9) — que la base hace ganar al
+//     deny explícito, contra Postgres real.
+describe('notify-package/permisoDeClase', () => {
+  it('la clave de permiso la decide la clase', () => {
+    expect(permisoDeClase('correspondencia')).toBe('condominios.tab.correspondencia')
+    expect(permisoDeClase('paquete')).toBe('condominios.tab.paqueteria')
+    expect(permisoDeClase(null)).toBe('condominios.tab.paqueteria')
+  })
+
+  it('una clase desconocida NO cae en correspondencia', () => {
+    // Elegir mal el lado por defecto abriría el aviso de correspondencia a
+    // quien sólo tiene paquetería.
+    expect(permisoDeClase('inventada')).toBe('condominios.tab.paqueteria')
+    expect(permisoDeClase(undefined)).toBe('condominios.tab.paqueteria')
   })
 })

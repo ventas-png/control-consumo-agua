@@ -159,6 +159,39 @@ export async function firmarRecepcionPaquete(
   return { error }
 }
 
+/** Parámetros del acuse de correspondencia (`correspondencia_registrar_acuse`). */
+export interface AcuseCorrespondenciaParams {
+  piezaId: string
+  /** Nombre REAL de quien recibe. La RPC rechaza el vacío. */
+  nombre: string
+  /** Objeto ya subido a `recepcion-evidencias`, o null si se entregó sin firma. */
+  firmaPath?: string | null
+}
+
+/**
+ * Cierra la custodia de una correspondencia con su acuse, en una sola
+ * transacción del servidor.
+ *
+ * Sustituye al `UPDATE … SET estado='atendido'` que hacían "Atender" y la
+ * entrega firmada: aquel podía dejar la pieza entregada sin nombre de quien
+ * recibió, y no comprobaba ni la clase ni el estado anterior, así que dos
+ * clics seguidos re-sellaban la hora de entrega. La RPC valida clase, estado
+ * pendiente, empresa/proyecto, permiso y nombre, y sella empleado y hora
+ * (20260831000000).
+ */
+export async function registrarAcuseCorrespondencia(
+  { piezaId, nombre, firmaPath = null }: AcuseCorrespondenciaParams,
+): Promise<{ error: RowError }> {
+  // `supabase` y no `db`: la RPC es nueva y aún no está en database.types.ts.
+  const { error } = await supabase.rpc('correspondencia_registrar_acuse', {
+    p_pieza_id: piezaId,
+    p_nombre: nombre,
+    p_firma_path: firmaPath,
+    p_via: 'porteria',
+  })
+  return { error }
+}
+
 /** Parámetros de `autorizarSalidaPaquete` (el residente autoriza un retiro por tercero). */
 export interface AutorizarSalidaParams {
   unidadId: string

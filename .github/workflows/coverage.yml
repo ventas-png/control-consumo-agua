@@ -6,7 +6,7 @@ name: Coverage gate & E2E
 #   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
 #   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
 # `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
-# `rls-harness` YA NO: exige las 6 variables RLS_* y falla si falta cualquiera,
+# `rls-harness` YA NO: exige las 15 variables RLS_* y falla si falta cualquiera,
 # salvo cuando GitHub no entrega secretos por diseño (PR de fork o ejecución de
 # Dependabot), donde se omite explícitamente. Sin `pull_request_target`.
 
@@ -221,6 +221,48 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  rls-sandbox:
+    name: RLS sandbox de recepción (Postgres desechable)
+    runs-on: ubuntu-latest
+    # SIN gate por secretos, a diferencia de rls-harness: estos runners levantan
+    # su propio Postgres y aplican el SQL del repo, así que corren en CADA PR y
+    # fallan de verdad. Son la única verificación conductual de la RLS de
+    # recepción que no depende de tener un preview con usuarios sembrados.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Localizar el Postgres del runner
+        id: pg
+        run: |
+          set -euo pipefail
+          BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$BIN" ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql
+            BIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          fi
+          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
+          "$BIN/initdb" --version
+
+      - name: Motor de recepción — policies por clase
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-recepcion-sandbox.sh
+
+      - name: Evidencias y acuse — bucket privado y RPC de entrega
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-evidencias-sandbox.sh
+
+      # La migración de mantenimiento valida una constraint y BORRA la única
+      # copia de las filas originales de correspondencia. Su valor está en
+      # abortar cuando algo no cuadra, así que se ejercita con datos que no
+      # cuadran, no sólo con el camino feliz.
+      - name: Cierre posfusión — validar el CHECK y retirar el respaldo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/cierre-posfusion-sandbox.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
@@ -236,6 +278,23 @@ jobs:
       RLS_USER_A_PASSWORD: ${{ secrets.RLS_USER_A_PASSWORD }}
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
+      # Gate por CLASE de paquetes_recibidos: cuatro usuarios de la MISMA
+      # empresa (ver src/test/rls/README.md). Son OBLIGATORIOS: el preflight los
+      # exige junto a los otros siete y deja el job en ROJO si falta cualquiera.
+      #
+      # Antes eran opcionales y su bloque se auto-saltaba: el job terminaba
+      # verde con 13 pruebas omitidas y el reporte lo contaba como cobertura
+      # completa. Los crea `scripts/seed-rls-sandbox.mjs`, que además verifica
+      # el login de cada uno y comprueba que sus permisos efectivos son los que
+      # la suite supone.
+      RLS_USER_PAQ_EMAIL: ${{ secrets.RLS_USER_PAQ_EMAIL }}
+      RLS_USER_PAQ_PASSWORD: ${{ secrets.RLS_USER_PAQ_PASSWORD }}
+      RLS_USER_CORR_EMAIL: ${{ secrets.RLS_USER_CORR_EMAIL }}
+      RLS_USER_CORR_PASSWORD: ${{ secrets.RLS_USER_CORR_PASSWORD }}
+      RLS_USER_ADMIN_EMAIL: ${{ secrets.RLS_USER_ADMIN_EMAIL }}
+      RLS_USER_ADMIN_PASSWORD: ${{ secrets.RLS_USER_ADMIN_PASSWORD }}
+      RLS_USER_OWNER_EMAIL: ${{ secrets.RLS_USER_OWNER_EMAIL }}
+      RLS_USER_OWNER_PASSWORD: ${{ secrets.RLS_USER_OWNER_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
 

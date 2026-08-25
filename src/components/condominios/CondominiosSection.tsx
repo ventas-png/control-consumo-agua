@@ -40,7 +40,7 @@ import type {
   SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MensajePortal, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
-  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
+  PiezaRecepcion, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
@@ -124,6 +124,10 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const canChangeStatus = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'change_status'), [currentUser, esCliente])
   const canApprove = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'approve'), [currentUser, esCliente])
   const canDelete = useCallback((tabId: string) => esCliente || canActInCondominiosTab(currentUser, tabId, 'delete'), [currentUser, esCliente])
+  // Misma resolución que usa la nav para decidir qué pestañas mostrar. La
+  // consume la bandeja unificada de recepción, que mezcla filas de dos tabs
+  // (paquetería + correspondencia) y no debe enseñar las de un tab vedado.
+  const canView = useCallback((tabId: string) => canViewCondominiosTabByPermission(currentUser, tabId), [currentUser])
 
   const visibleSections = useMemo(() =>
     SECTIONS
@@ -237,7 +241,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   const [sanciones, setSanciones] = useState<SancionCondominio[]>([])
   const [planesMantenimiento, setPlanesMantenimiento] = useState<PlanMantenimiento[]>([])
   // Fase 14
-  const [correspondencia, setCorrespondencia] = useState<CorrespondenciaCondominio[]>([])
+  const [correspondencia, setCorrespondencia] = useState<PiezaRecepcion[]>([])
   const [libroNovedades, setLibroNovedades] = useState<LibroNovedad[]>([])
   const [acuerdos, setAcuerdos] = useState<SeguimientoAcuerdo[]>([])
   // Fase 15
@@ -373,7 +377,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     if (efectiva === 'panel') {
       const [
         cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes,
-        paquetesRes, polizasRes, inspeccionesRes, gastosRes,
+        paquetesRes, polizasRes, inspeccionesRes, gastosRes, correspondenciaPanelRes,
       ] = await fetchCondominiosPanelData(pid, cid)
       if (runSeqRef.current !== run) return // una carga más nueva ya corre
       // Mismos mapeos que el batch grande (mantener sincronizados).
@@ -390,6 +394,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
       setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
       setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
       setGastos((gastosRes.data ?? []) as GastoCondominio[])
+      setCorrespondencia(mapUnidad<PiezaRecepcion>(correspondenciaPanelRes.data ?? []))
       setLoading(false)
       return
     }
@@ -616,7 +621,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     setVotaciones((votacionesRes.data ?? []) as Votacion[])
     setSanciones(mapUnidad<SancionCondominio>(sancionesRes.data ?? []))
     setPlanesMantenimiento((planesRes.data ?? []) as PlanMantenimiento[])
-    setCorrespondencia(mapUnidad<CorrespondenciaCondominio>(correspondenciaRes.data ?? []))
+    setCorrespondencia(mapUnidad<PiezaRecepcion>(correspondenciaRes.data ?? []))
     setLibroNovedades((libroRes.data ?? []) as LibroNovedad[])
     setAcuerdos((acuerdosRes.data ?? []) as SeguimientoAcuerdo[])
     setVehiculos((vehiculosRes.data ?? []) as VehiculoResidente[])
@@ -733,7 +738,8 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
   // useMemo: estabiliza la referencia entre renders mientras los inputs no
   // cambien (tabs reciben el mismo objeto, pueden memorizar si lo necesitan).
   const tabCtx: CondominiosTabContext = useMemo(() => ({
-    canCreate, canEdit, canChangeStatus, canApprove, canDelete, onRefresh: cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, canView,
+    onRefresh: cargarDatos, irATab: setActiveTab,
     proyectoId: selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,
@@ -766,7 +772,8 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
     flujoAprobacion, ordenesCompra, asambleasDigital, proformas, conciliaciones,
     fondoReservaMovs, configCondominio,
   }), [
-    canCreate, canEdit, canChangeStatus, canApprove, canDelete, cargarDatos,
+    canCreate, canEdit, canChangeStatus, canApprove, canDelete, canView,
+    cargarDatos, setActiveTab,
     selectedProyectoId, proyectoActual, proyectosActivos,
     unidadesProyecto, cid, uid, currentUser, moneda,
     cuotas, visitantes, amenidades, reservas, bloqueosAmenidades, tickets, anuncios,

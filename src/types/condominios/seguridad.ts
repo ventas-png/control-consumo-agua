@@ -9,7 +9,21 @@ export type TipoParqueo = 'asignado' | 'visita' | 'discapacitado'
 export type EspecieMascota = 'perro' | 'gato' | 'ave' | 'otro'
 export type EstadoPaquete = 'pendiente' | 'entregado' | 'devuelto'
 export type TipoPaquete = 'paquete' | 'documento' | 'sobre' | 'otro'
-export type DireccionPaquete = 'entrante' | 'saliente_tercero'
+// 'saliente'         = la administración despacha correspondencia hacia afuera.
+// 'saliente_tercero' = el residente deja algo para que un tercero lo retire con código.
+export type DireccionPaquete = 'entrante' | 'saliente' | 'saliente_tercero'
+// ── Motor único de recepción (migración 20260829000600) ──────────────────────
+export type ClasePieza = 'paquete' | 'correspondencia'
+export type DestinatarioPieza = 'unidad' | 'administracion' | 'junta' | 'proveedor'
+export type PrioridadPieza = 'normal' | 'urgente'
+export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
+// 'devuelto' se añadió en 20260830000000: una carta que vuelve al remitente no
+// es "atendida" (nadie la atendió) ni "archivada" (eso no dice que volvió).
+export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado' | 'devuelto'
+/** Subtipo de la pieza: el vocabulario aplicable depende de `clase`. */
+export type SubtipoPieza = TipoPaquete | CategoriaCorrespondencia
+/** Estado de la pieza: el vocabulario aplicable depende de `clase`. */
+export type EstadoPieza = EstadoPaquete | EstadoCorrespondencia
 export type TipoInfraccion = 'ruido' | 'basura' | 'estacionamiento' | 'mascota' | 'daños' | 'otro'
 export type EstadoInfraccion = 'emitida' | 'notificada' | 'en_descargo' | 'resuelta' | 'anulada'
 export type EstadoRonda = 'en_curso' | 'completada' | 'incompleta'
@@ -53,18 +67,36 @@ export interface Mascota {
   unidad_nombre?: string
 }
 
-export interface PaqueteRecibido {
+/**
+ * Fila de `paquetes_recibidos`, el motor único de recepción (migración
+ * 20260829000600). Guarda las dos clases de pieza en custodia de portería:
+ * paquetería y correspondencia. `clase` decide qué vocabulario de `tipo` y
+ * `estado` aplica, y qué permiso RBAC gobierna la fila.
+ */
+export interface PiezaRecepcion {
   id: string
   company_id: string
   project_id: string
-  unidad_id: string
+  /** NULL solo cuando la pieza no va dirigida a una unidad (correspondencia a la administración o la junta). */
+  unidad_id: string | null
+  clase: ClasePieza
+  destinatario_tipo: DestinatarioPieza
   remitente?: string | null
+  /** Descripción del paquete o asunto del documento. */
   descripcion: string
+  destinatario?: string | null
   num_guia?: string | null
   empresa_mensajeria?: string | null
-  tipo: TipoPaquete
-  estado: EstadoPaquete
+  /** Subtipo: paquete/documento/sobre/otro, o carta/notificacion_legal/factura/circular/otro. */
+  tipo: SubtipoPieza
+  /** pendiente/entregado/devuelto, o pendiente/atendido/archivado. */
+  estado: EstadoPieza
   direccion?: DireccionPaquete | null
+  prioridad: PrioridadPieza
+  /** Plazo legal de la pieza (correspondencia). */
+  fecha_limite?: string | null
+  /** Fecha del documento; distinta de hora_recepcion, que es cuándo se registró. */
+  fecha_pieza?: string | null
   fotos?: string[] | null
   firma_path?: string | null
   // Salida para retiro por tercero
@@ -84,6 +116,12 @@ export interface PaqueteRecibido {
   // joins
   unidad_nombre?: string
 }
+
+/**
+ * Nombre histórico de la fila cuando se la mira desde paquetería. Es el MISMO
+ * tipo: la tabla es una sola desde la unificación.
+ */
+export type PaqueteRecibido = PiezaRecepcion
 
 export interface InfraccionCondominio {
   id: string

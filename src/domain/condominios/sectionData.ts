@@ -38,12 +38,14 @@ async function fetchAllCuotas(pid: string, cid: string) {
 }
 
 /**
- * Fase PANEL del loader (P2 perf): SOLO las 9 colecciones que consume el tab por
+ * Fase PANEL del loader (P2 perf): SOLO las 10 colecciones que consume el tab por
  * defecto (PanelGeneralTab: cuotas, visitantes, amenidades, reservas, tickets,
- * paquetes, pólizas, inspecciones, gastos). Abrir Condominios pasa de ~141
- * queries a 9; el resto se carga al activar el primer tab distinto de Panel
- * (fetchCondominiosSectionData, sin cambios). Cada select ESPEJA 1:1 su entrada
- * del batch grande (mismos filtros/orden/límites) — mantener sincronizados.
+ * paquetes, pólizas, inspecciones, gastos, correspondencia). Abrir Condominios
+ * pasa de ~141 queries a 10; el resto se carga al activar el primer tab distinto
+ * de Panel (fetchCondominiosSectionData, sin cambios). Cada select ESPEJA 1:1 su
+ * entrada del batch grande (mismos filtros/orden/límites) — mantener
+ * sincronizados; si divergieran, abrir Panel y luego la pestaña dejaría dos
+ * conjuntos distintos en el mismo state.
  */
 export async function fetchCondominiosPanelData(pid: string, cid: string) {
   return Promise.all([
@@ -52,10 +54,15 @@ export async function fetchCondominiosPanelData(pid: string, cid: string) {
     db.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
     db.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
     db.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
-    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+    // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
+    // también guarda correspondencia, que tiene su propia entrada más abajo.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
     db.from('inspecciones_normativas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     db.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+    // Correspondencia: el Panel alerta de plazos legales vencidos. Espeja la
+    // entrada del batch grande.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(300),
   ])
 }
 
@@ -78,7 +85,9 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     db.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     db.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
     db.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
-    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+    // clase='paquete': desde 20260829000600 la tabla es el motor de recepción y
+    // también guarda correspondencia, que tiene su propia entrada más abajo.
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'paquete').order('hora_recepcion', { ascending: false }).limit(200),
     db.from('infracciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
     db.from('rondas_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('inicio', { ascending: false }).limit(100),
     db.from('novedades_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(200),
@@ -123,7 +132,7 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     supabase.from('votaciones').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
     db.from('sanciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }).limit(300),
     db.from('planes_mantenimiento').select('*').eq('project_id', pid).eq('company_id', cid).order('proxima_ejecucion'),
-    db.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(300),
+    db.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).eq('clase', 'correspondencia').order('hora_recepcion', { ascending: false }).limit(300),
     db.from('libro_novedades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
     db.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
     db.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('placa'),
@@ -225,7 +234,9 @@ export async function fetchCondominiosSectionData(pid: string, cid: string) {
     // Fase 43
     db.from('fondo_reserva').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
     db.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
-    db.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
+    // Los borradores son solicitudes que el propietario todavía está llenando en
+    // el portal (20260829000200): no son trabajo para la administración.
+    db.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).neq('estado', 'borrador').order('created_at', { ascending: false }).limit(300),
     db.from('solicitud_mudanza_unidad').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
     // Mensajes que los residentes envían desde su portal ("Mensajes a la
     // administración"). Los escribe PortalMiUnidadTab y hasta ahora el único

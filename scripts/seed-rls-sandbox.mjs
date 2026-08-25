@@ -310,13 +310,424 @@ export async function upsertUsuario(admin, email, pass, buscar) {
   return data.user.id
 }
 
-/** Fila de app_users que ata el usuario a su empresa (lo que lee get_my_company_id). */
-async function upsertAppUser(admin, userId, companyId, nombre) {
+/**
+ * Fila de app_users que ata el usuario a su empresa (lo que lee
+ * get_my_company_id) y le fija el ROL, que es lo que resuelven
+ * `current_user_role()` y el atajo de `user_has_permission` para
+ * admin/company_owner.
+ */
+async function upsertAppUser(admin, userId, companyId, nombre, role = 'company_owner') {
   const { error } = await admin.from('app_users').upsert({
-    id: userId, company_id: companyId, role: 'company_owner',
+    id: userId, company_id: companyId, role,
     full_name: nombre, activo: true,
   }, { onConflict: 'id' })
   if (error) throw new Error(`app_users upsert: ${error.message}`)
+}
+
+// ── Gate por CLASE de paquetes_recibidos ────────────────────────────────────
+// El motor único (20260829000600) resuelve el permiso POR FILA con un CASE
+// sobre `clase`, y su suite de comportamiento necesita CUATRO usuarios de la
+// MISMA empresa. No sirven A y B: son de empresas distintas, así que cualquier
+// "no ve la otra clase" podría estar pasando por aislamiento de tenant y no por
+// el gate que se quiere comprobar.
+//
+//   · paq / corr — rol NO administrativo (`operator`) con UN permiso granular
+//     cada uno. Tienen que ser no administrativos porque `user_has_permission`
+//     le dice true a TODO a admin/company_owner (20260518000008): con un admin,
+//     el gate de SELECT/INSERT/UPDATE sencillamente no se vería.
+//   · admin      — para el caso central de DELETE: mismo tenant, permiso
+//     efectivo sobre todo, y aun así NO puede borrar correspondencia.
+//   · owner      — control positivo de ese mismo DELETE.
+const CLASE_EMPRESA = 'RLS Sandbox — Gate por clase'
+//
+// LAS ACCIONES NO SON OPCIONALES. `canActInCondominiosTab` exige DOS permisos
+// para dejar actuar: la clave base de la tab y la de la acción concreta
+// (`condominios.tab.<tab>.<accion>`, derivadas en 20260703000000). Con sólo la
+// base, PAQ inicia sesión, ve su proyecto, ve la pestaña Paquetería… y no le
+// aparece «Registrar paquete», porque `canCreate` es false.
+//
+// Ese fue el tercer falso «Sandbox listo» de este fixture, y los tres comparten
+// forma: el seed comprobaba lo que había escrito, no lo que hace falta para
+// trabajar. Por eso aquí se declara el conjunto EXACTO y el verificador lo
+// contrasta contra `user_has_permission`, que es lo que mira la app.
+//
+// `delete` queda FUERA a propósito: el borrado de correspondencia va por ROL
+// (sólo company_owner) y el fixture necesita que los granulares NO puedan, que
+// es justo lo que prueban los escenarios de DELETE del harness.
+const ACCIONES_CLASE = ['create', 'edit']
+const permisosDeTab = (tab) => [tab, ...ACCIONES_CLASE.map((a) => `${tab}.${a}`)]
+
+export const CLASE_ROLES = {
+  paq: { nombre: 'RLS Paquetería', permisos: permisosDeTab('condominios.tab.paqueteria') },
+  corr: { nombre: 'RLS Correspondencia', permisos: permisosDeTab('condominios.tab.correspondencia') },
+}
+//
+// `asignado` decide quién lleva fila en `user_project_assignments`, y NO es un
+// detalle: la policy `projects_select` (20260815000000) deja ver un proyecto a
+// quien sea `user_is_project_exempt()` O tenga `user_has_project_access()`. Un
+// `operator` no es exento, así que SIN asignación no ve NINGÚN proyecto y la
+// app le muestra «No tienes ningún proyecto asignado» — aunque su login, su
+// empresa y sus permisos sean correctos.
+//
+// Al revés también importa: `user_is_project_exempt` deja de aplicar al `admin`
+// en cuanto tiene UNA asignación explícita (pasa de ver toda la empresa a ver
+// sólo lo asignado). Por eso ADMIN y OWNER tienen que quedarse SIN filas.
+export const CLASE_USUARIOS = [
+  { key: 'PAQ', email: 'rls-paq@sandbox.invalid', role: 'operator', rbac: 'paq', asignado: true, nombre: 'Operador de paquetería' },
+  { key: 'CORR', email: 'rls-corr@sandbox.invalid', role: 'operator', rbac: 'corr', asignado: true, nombre: 'Operador de correspondencia' },
+  { key: 'ADMIN', email: 'rls-admin@sandbox.invalid', role: 'admin', rbac: null, asignado: false, nombre: 'Administrador' },
+  { key: 'OWNER', email: 'rls-owner@sandbox.invalid', role: 'company_owner', rbac: null, asignado: false, nombre: 'Dueña' },
+]
+
+/**
+ * Crea (idempotentemente) el rol de empresa con SU ÚNICO permiso.
+ *
+ * El permiso se fija con delete+insert en vez de con un upsert ciego: si una
+ * corrida anterior dejó al rol una clave de más, el rol concedería dos clases y
+ * la prueba de "no ve la otra" pasaría a ser imposible de fallar. El fixture
+ * tiene que converger al estado declarado, no acumular.
+ */
+export async function upsertRolDeClase(admin, companyId, { nombre, permisos }) {
+  const roleId = await upsertPorMatch(
+    admin, 'roles',
+    { company_id: companyId, name: nombre },
+    { company_id: companyId, name: nombre, description: 'Fixture del harness RLS', is_system: false },
+  )
+
+  // Primero se BORRA todo lo que no esté declarado. Un permiso que sobrevive de
+  // una corrida anterior —la clave de la otra clase, un `delete` que alguien
+  // probó a mano— haría que «no puede tocar la clase ajena» pasara a ser
+  // imposible de fallar. El fixture converge al conjunto declarado; no lo
+  // acumula.
+  const lista = `(${permisos.map((k) => `"${k}"`).join(',')})`
+  const { error: eDel } = await admin.from('role_permissions')
+    .delete().eq('role_id', roleId).not('permission_key', 'in', lista)
+  if (eDel) {
+    throw new Error(
+      `role_permissions limpieza del rol "${nombre}": ${eDel.message}. ` +
+      'Sin poder quitar los permisos sobrantes, el fixture concedería de más.',
+    )
+  }
+
+  for (const permission_key of permisos) {
+    const { error: eIns } = await admin.from('role_permissions')
+      .upsert({ role_id: roleId, permission_key, effect: 'allow' },
+              { onConflict: 'role_id,permission_key' })
+    if (eIns) {
+      throw new Error(
+        `role_permissions upsert de "${permission_key}" en el rol "${nombre}": ${eIns.message}. ` +
+        'Sin la clave de acción, la app no muestra los botones de crear/editar.',
+      )
+    }
+  }
+  return roleId
+}
+
+/**
+ * Siembra la empresa del gate por clase con sus cuatro usuarios, un proyecto y
+ * una unidad. Devuelve lo necesario para verificarlo e imprimir los secretos.
+ */
+export async function seedGateDeClase(admin, buscarUsuario) {
+  const companyId = await upsertPorMatch(
+    admin, 'companies', { nombre: CLASE_EMPRESA }, { nombre: CLASE_EMPRESA },
+  )
+
+  // El harness siembra sus propias filas desechables y necesita un proyecto y
+  // una unidad VÁLIDOS: `paquetes_unidad_por_clase_chk` exige unidad para la
+  // clase 'paquete', así que sin unidad la mitad de los escenarios no se puede
+  // ni montar.
+  const projectId = await upsertPorMatch(
+    admin, 'projects',
+    { company_id: companyId, nombre: 'Proyecto sandbox CLASE' },
+    { company_id: companyId, nombre: 'Proyecto sandbox CLASE', estado: 'activo' },
+  )
+  const unidadId = await upsertPorMatch(
+    admin, 'unidades',
+    { company_id: companyId, project_id: projectId, nombre: 'Unidad sandbox CLASE' },
+    { company_id: companyId, project_id: projectId, nombre: 'Unidad sandbox CLASE' },
+  )
+
+  const roles = {}
+  for (const [k, def] of Object.entries(CLASE_ROLES)) {
+    roles[k] = await upsertRolDeClase(admin, companyId, def)
+  }
+
+  const usuarios = []
+  for (const u of CLASE_USUARIOS) {
+    const pass = password()
+    const userId = await upsertUsuario(admin, u.email, pass, buscarUsuario)
+    await upsertAppUser(admin, userId, companyId, `RLS ${u.nombre}`, u.role)
+
+    // Las asignaciones de rol también CONVERGEN: se borra cualquier otra para
+    // que un fixture de una corrida anterior no le regale permisos de más.
+    const rolEsperado = u.rbac ? roles[u.rbac] : null
+    let q = admin.from('user_roles').delete().eq('user_id', userId)
+    if (rolEsperado) q = q.neq('role_id', rolEsperado)
+    const { error: eDel } = await q
+    if (eDel) throw new Error(`user_roles limpieza: ${eDel.message}`)
+
+    if (rolEsperado) {
+      const { error } = await admin.from('user_roles')
+        .upsert({ user_id: userId, role_id: rolEsperado }, { onConflict: 'user_id,role_id' })
+      if (error) throw new Error(`user_roles upsert: ${error.message}`)
+    }
+
+    // ── Alcance por proyecto ──
+    // Faltaba, y el síntoma no se parecía a la causa: el seed decía «Sandbox
+    // listo», PAQ entraba sin problemas, y la app le respondía «No tienes
+    // ningún proyecto asignado». Login, empresa y permisos estaban bien; lo que
+    // faltaba era la fila de `user_project_assignments` que `projects_select`
+    // exige a quien no es exento.
+    //
+    // Converge igual que los roles: primero se BORRA lo que sobra —una
+    // asignación a un proyecto viejo dejaría al usuario viendo dos, o el
+    // proyecto equivocado— y después se inserta la que toca.
+    const { error: eDelProy } = u.asignado
+      ? await admin.from('user_project_assignments')
+          .delete().eq('user_id', userId).neq('project_id', projectId)
+      // ADMIN y OWNER se quedan SIN ninguna: en cuanto un admin tiene una
+      // asignación explícita deja de ser exento y pierde la vista de empresa.
+      : await admin.from('user_project_assignments').delete().eq('user_id', userId)
+    if (eDelProy) {
+      throw new Error(
+        `user_project_assignments limpieza de ${u.key} (${u.email}): ${eDelProy.message}. ` +
+        'Sin poder converger el alcance por proyecto, el fixture quedaría mintiendo.',
+      )
+    }
+
+    if (u.asignado) {
+      const { error: eProy } = await admin.from('user_project_assignments')
+        .upsert({ user_id: userId, project_id: projectId }, { onConflict: 'user_id,project_id' })
+      if (eProy) {
+        throw new Error(
+          `user_project_assignments upsert de ${u.key} (${u.email}) al proyecto ${projectId}: ${eProy.message}. ` +
+          'Sin esta fila, la app le dirá «No tienes ningún proyecto asignado».',
+        )
+      }
+    }
+
+    usuarios.push({ ...u, userId, pass })
+  }
+
+  return { companyId, projectId, unidadId, usuarios }
+}
+
+/**
+ * Entra como cada uno de los cuatro y comprueba que el fixture ES el que el
+ * harness supone. No basta con que el login funcione: si `corr` acabara con el
+ * permiso de paquetería, la suite seguiría verde probando lo contrario de lo
+ * que dice probar.
+ *
+ * Se comprueba TAMBIÉN el alcance por proyecto, en sus dos caras:
+ *
+ *   · como el usuario: que VEA el proyecto del fixture. Es la misma consulta de
+ *     la que depende la app (`projects_select`), así que es lo único que
+ *     distingue «tiene permisos» de «puede trabajar». Sin esto, el seed daba el
+ *     sandbox por bueno y PAQ se encontraba con «No tienes ningún proyecto
+ *     asignado».
+ *   · como admin: que el CONJUNTO de filas de `user_project_assignments` sea
+ *     exactamente el declarado. Ver el proyecto correcto no basta: una
+ *     asignación de más le daría acceso a otro proyecto sin que nada fallara,
+ *     y una explícita en el ADMIN le quitaría la exención de empresa.
+ *
+ * @returns {Promise<string[]>} lista de fallos (vacía = todo correcto).
+ */
+export async function verificarGateDeClase(url, anon, clase, admin, crearCliente = createClient) {
+  const fallos = []
+  // Se comprueba la clave BASE y las de ACCIÓN, porque
+  // `canActInCondominiosTab` exige las dos: con sólo la base, el operador ve la
+  // pestaña y no le aparece «Registrar». Verificar únicamente la visibilidad
+  // fue lo que dejó pasar ese falso positivo hasta la validación visual.
+  const suya = (tab) => ({
+    [tab]: true, [`${tab}.create`]: true, [`${tab}.edit`]: true,
+    // `delete` NO: el borrado va por rol, y los escenarios del harness exigen
+    // que el granular no pueda. Concederlo los volvería vacuos.
+    [`${tab}.delete`]: false,
+  })
+  const ajena = (tab) => ({
+    [tab]: false, [`${tab}.create`]: false, [`${tab}.edit`]: false, [`${tab}.delete`]: false,
+  })
+  const PAQ_TAB = 'condominios.tab.paqueteria'
+  const CORR_TAB = 'condominios.tab.correspondencia'
+  // Para admin y owner el helper dice true a todo: es el rasgo por el que el
+  // reparto de DELETE va por ROL y no por permiso, así que se afirma.
+  const todoTrue = { [PAQ_TAB]: true, [CORR_TAB]: true, [`${PAQ_TAB}.create`]: true, [`${CORR_TAB}.create`]: true }
+
+  const esperado = {
+    PAQ: { ...suya(PAQ_TAB), ...ajena(CORR_TAB) },
+    CORR: { ...suya(CORR_TAB), ...ajena(PAQ_TAB) },
+    ADMIN: todoTrue,
+    OWNER: todoTrue,
+  }
+
+  for (const u of clase.usuarios) {
+    const cli = crearCliente(url, anon, { auth: { persistSession: false, autoRefreshToken: false } })
+    const { error: eLogin } = await cli.auth.signInWithPassword({ email: u.email, password: u.pass })
+    if (eLogin) {
+      fallos.push(`${u.key} (${u.email}): no se pudo iniciar sesión — ${eLogin.message}`)
+      continue
+    }
+
+    const { data: empresa, error: eEmp } = await cli.rpc('get_my_company_id')
+    if (eEmp) fallos.push(`${u.key}: get_my_company_id falló (${eEmp.message})`)
+    else if (empresa !== clase.companyId) {
+      fallos.push(`${u.key}: está en la empresa ${empresa}, no en la del gate (${clase.companyId})`)
+    }
+
+    for (const [clave, quiero] of Object.entries(esperado[u.key])) {
+      const { data, error } = await cli.rpc('user_has_permission', { perm_key: clave })
+      if (error) fallos.push(`${u.key}: user_has_permission(${clave}) falló (${error.message})`)
+      else if (data !== quiero) {
+        const porQue = clave.endsWith('.create') || clave.endsWith('.edit')
+          ? (quiero
+              ? ' — sin esta clave la app NO muestra el botón de crear/editar aunque vea la pestaña'
+              : ' — es una acción de la clase ajena; concederla rompe el gate')
+          : ''
+        fallos.push(`${u.key}: user_has_permission(${clave}) = ${data}, se esperaba ${quiero}${porQue}`)
+      }
+    }
+    // ── Alcance por proyecto, como el usuario ──
+    // La app resuelve los proyectos disponibles con esta misma lectura. Si
+    // devuelve 0 filas, el operador ve «No tienes ningún proyecto asignado»
+    // por mucho que su login y sus permisos estén bien.
+    const { data: visibles, error: eProy } = await cli
+      .from('projects').select('id').eq('id', clase.projectId)
+    if (eProy) {
+      fallos.push(`${u.key}: no pudo consultar el proyecto del fixture (${eProy.message})`)
+    } else if ((visibles ?? []).length !== 1) {
+      fallos.push(
+        `${u.key}: NO ve el proyecto del fixture (${clase.projectId}). ` +
+        'La app le mostraría «No tienes ningún proyecto asignado». ' +
+        (u.asignado
+          ? 'Le falta su fila en user_project_assignments.'
+          : 'Debería verlo por exención de rol; revisá user_is_project_exempt.'),
+      )
+    }
+
+    await cli.auth.signOut()
+
+    // ── Alcance por proyecto, como admin: el CONJUNTO exacto ──
+    const { data: asigs, error: eAsig } = await admin
+      .from('user_project_assignments').select('project_id').eq('user_id', u.userId)
+    if (eAsig) {
+      fallos.push(`${u.key}: no se pudieron leer sus asignaciones (${eAsig.message})`)
+    } else {
+      const tiene = (asigs ?? []).map((a) => a.project_id).sort()
+      const quiero = u.asignado ? [clase.projectId] : []
+      if (tiene.join('|') !== quiero.join('|')) {
+        fallos.push(
+          `${u.key}: asignaciones de proyecto [${tiene.join(', ') || '(ninguna)'}], ` +
+          `se esperaba [${quiero.join(', ') || '(ninguna)'}]. ` +
+          (u.asignado
+            ? 'Una de más le daría acceso a un proyecto que el fixture no declara.'
+            : 'Una asignación explícita le quita la exención y deja de ver toda la empresa.'),
+        )
+      }
+    }
+
+    log(`✔ ${u.key} (${u.role}): login, empresa, permisos operacionales y alcance por proyecto como se esperaba`)
+  }
+  return fallos
+}
+
+// ── Esquema del motor único de recepción ────────────────────────────────────
+// POR QUÉ ESTE CHEQUEO EXISTE.
+// El seed crea empresas, proyectos, unidades, roles y usuarios. NINGUNA de esas
+// cosas toca `paquetes_recibidos`, así que un sandbox al que le falten las
+// migraciones de recepción pasa el seed ENTERO sin un solo fallo — y el script
+// remataba con su banner final de éxito. Verificado a medias: los usuarios sí,
+// el esquema que el harness necesita no.
+//
+// Pasó de verdad. Con los quince secretos ya puestos, el harness falló ocho
+// veces con `column paquetes_recibidos.clase does not exist` mientras el seed
+// daba el sandbox por bueno. El seed es quien tiene que detectarlo ANTES, y
+// decirlo con el remedio.
+//
+// Se comprueban las DOS columnas que introduce 20260829000600 y sin las cuales
+// el gate por clase no existe: `clase` (gobierna las cuatro policies vía CASE) y
+// `destinatario_tipo` (distingue pieza de unidad de pieza de administración).
+export const COLUMNAS_RECEPCION = ['clase', 'destinatario_tipo']
+
+/**
+ * Las SEIS migraciones del motor de recepción, en orden.
+ *
+ * Se enumeran una por una y NO como rango. #779 (Renta) ocupó
+ * `20260829000000`…`20260829000500`, así que entre la primera y la última de
+ * esta cadena hay ahora migraciones que no son de recepción: un «aplicá de X a
+ * Y» arrastraría trabajo ajeno.
+ */
+export const CADENA_RECEPCION_ARCHIVOS = [
+  '20260828000300_correspondencia_acuse_trazabilidad',
+  '20260829000600_recepcion_motor_unico',
+  '20260830000000_correspondencia_devolucion',
+  '20260831000000_recepcion_evidencias_y_acuse',
+  '20260901000000_recepcion_integridad_final',
+  '20260902000000_recepcion_claim_owner_y_mime',
+  '20260903000000_recepcion_cierre_posfusion',
+]
+
+/** Primera y última de la cadena que hay que aplicar entera. */
+export const CADENA_RECEPCION = {
+  desde: CADENA_RECEPCION_ARCHIVOS[0].slice(0, 14),
+  hasta: CADENA_RECEPCION_ARCHIVOS[CADENA_RECEPCION_ARCHIVOS.length - 1].slice(0, 14),
+}
+
+/**
+ * Traduce el error de PostgREST a algo accionable. Se mira el CÓDIGO, no sólo
+ * el texto: un mensaje puede cambiar de redacción entre versiones.
+ *
+ * `42703` lo devuelve Postgres cuando la columna no existe de verdad.
+ * `PGRST204`/`PGRST205` los devuelve PostgREST cuando no la encuentra en su
+ * caché de esquema. Los dos se tratan igual —falta aplicar la cadena— porque
+ * desde fuera no se distinguen con certeza, y el remedio de la caché sólo
+ * aplica si las migraciones YA constan aplicadas.
+ *
+ * @returns {'ausente'|'otro'}
+ */
+export function clasificarErrorEsquema(error) {
+  const code = String(error?.code ?? '')
+  if (code === '42703' || code === 'PGRST204' || code === 'PGRST205') return 'ausente'
+  if (/does not exist|schema cache/i.test(String(error?.message ?? ''))) return 'ausente'
+  return 'otro'
+}
+
+/** El texto que hay que leer cuando falta el esquema. Se prueba tal cual. */
+export function mensajeEsquemaAusente(columnas, ref) {
+  const { desde, hasta } = CADENA_RECEPCION
+  return [
+    `a \`paquetes_recibidos\` le faltan columnas del motor único (${columnas.join(', ')}).`,
+    `   Aplicá la cadena COMPLETA ${desde}…${hasta} al proyecto ${ref || 'de SEED_EXPECTED_REF'},`,
+    '   en orden y entera: son estas siete, y las de en medio no son opcionales.',
+    ...CADENA_RECEPCION_ARCHIVOS.map((a) => `     · ${a}.sql`),
+    '   Son SÓLO esas: entre la primera y la última hay migraciones de Renta que no van aquí.',
+    '   Sin ellas el harness no puede probar el gate por clase, que es justo lo que viene a probar.',
+    "   Sólo si esas migraciones YA constan aplicadas y el error persiste, la caché de PostgREST",
+    "   está desactualizada: recargala con  NOTIFY pgrst, 'reload schema'.",
+  ].join('\n')
+}
+
+/**
+ * Comprueba que el esquema de recepción está en el sandbox. Se consulta CADA
+ * columna por separado —con el cliente admin, para que un 0 filas por RLS no se
+ * confunda con una columna ausente— y se mira el error, no el conteo: una tabla
+ * vacía es perfectamente válida y no dice nada del esquema.
+ *
+ * @returns {Promise<string[]>} lista de fallos (vacía = esquema correcto).
+ */
+export async function verificarEsquemaRecepcion(admin, ref) {
+  const ausentes = []
+  for (const col of COLUMNAS_RECEPCION) {
+    const { error } = await admin.from('paquetes_recibidos').select(col).limit(1)
+    if (!error) continue
+    if (clasificarErrorEsquema(error) === 'ausente') {
+      ausentes.push(col)
+      continue
+    }
+    // Un error que NO es de columna ausente tampoco se traga: no saber si el
+    // esquema está bien es motivo suficiente para no decir «listo».
+    return [`no se pudo verificar la columna \`${col}\` de paquetes_recibidos: ${error.message ?? 'error sin mensaje'}`]
+  }
+  return ausentes.length > 0 ? [mensajeEsquemaAusente(ausentes, ref)] : []
 }
 
 /**
@@ -499,7 +910,7 @@ async function main(env) {
   if (env.SEED_CONFIRM !== 'si') {
     return abortar(`⚠️  Confirmación requerida.
 
-   Vas a crear 2 empresas, 2 usuarios y datos de prueba en el sandbox
+   Vas a crear 3 empresas, 6 usuarios y datos de prueba en el sandbox
    "${destino.ref}":
      ${URL}
 
@@ -538,6 +949,12 @@ async function main(env) {
         `asiento ${recursos.asientoId} · movimiento ${recursos.movimientoId} · ` +
         `amenidad ${recursos.amenidadId} · reserva ${recursos.reservaId} · cliente ${recursos.clienteId}`)
   }
+
+  // ── Empresa del gate por clase (cuatro usuarios, MISMA empresa) ──────────
+  console.log('\n🌱 Empresa del gate por clase de paquetes_recibidos\n')
+  const clase = await seedGateDeClase(admin, buscarUsuario)
+  log(`✔ empresa ${clase.companyId}  proyecto ${clase.projectId}  unidad ${clase.unidadId}`)
+  for (const u of clase.usuarios) log(`   ${u.key.padEnd(5)} ${u.role.padEnd(14)} ${u.email}`)
 
   // ── Verificación: que el sandbox NO produzca un verde vacío ───────────────
   // Se entra como CADA usuario con la anon key y se comprueba, TABLA POR TABLA,
@@ -583,6 +1000,18 @@ async function main(env) {
     await cli.auth.signOut()
   }
 
+  console.log('\n🔍 Verificando los cuatro usuarios del gate por clase\n')
+  fallos.push(...await verificarGateDeClase(URL, ANON, clase, admin))
+
+  // El esquema, al final y SIEMPRE: es lo único que el resto del seed no toca,
+  // y por tanto lo único que podía faltar sin que nada fallara antes.
+  console.log('\n🔍 Verificando el esquema del motor único de recepción\n')
+  const fallosEsquema = await verificarEsquemaRecepcion(admin, destino.ref)
+  if (fallosEsquema.length === 0) {
+    log(`✔ paquetes_recibidos expone ${COLUMNAS_RECEPCION.join(' y ')}`)
+  }
+  fallos.push(...fallosEsquema)
+
   if (fallos.length > 0) {
     console.error('\n❌ El sandbox NO está en condiciones. El harness daría un verde sin significado:\n')
     for (const f of fallos) console.error(`   • ${f}`)
@@ -627,7 +1056,7 @@ async function main(env) {
   console.log(`
 ✅ Sandbox listo y VERIFICADO como ambos usuarios.
 
-Pegá estos 7 secretos en el repo
+Pegá estos 15 secretos en el repo
 (Settings → Secrets and variables → Actions → New repository secret):
 
   RLS_SUPABASE_URL          ${URL}
@@ -638,16 +1067,39 @@ Pegá estos 7 secretos en el repo
   RLS_USER_B_EMAIL          ${creado[1].email}
   RLS_USER_B_PASSWORD       ${creado[1].pass}
 
+Y estos OCHO, del gate por clase (los cuatro son de la MISMA empresa
+"${CLASE_EMPRESA}"):
+
+${clase.usuarios.map((u) =>
+  `  RLS_USER_${u.key}_EMAIL${' '.repeat(Math.max(1, 15 - u.key.length))}${u.email}\n` +
+  `  RLS_USER_${u.key}_PASSWORD${' '.repeat(Math.max(1, 12 - u.key.length))}${u.pass}`,
+).join('\n')}
+
+Los ocho son OBLIGATORIOS: sin ellos el preflight del workflow falla y el job
+queda en rojo. No hay ruta verde sin ejecutar — la suite del gate por clase no
+se auto-salta.
+
 RLS_EXPECTED_PROJECT_REF no es una credencial: es la DECLARACIÓN del proyecto
 contra el que puede operar el harness. Sin ella, cambiar RLS_SUPABASE_URL
 bastaría para que las escrituras de prueba fueran a parar a otro proyecto.
 El preflight exige que ambas coincidan y aborta si no.
 
-⚠️  La service_role NO va a GitHub. CI sólo recibe la anon key y estas dos
-   cuentas de bajo privilegio.
+⚠️  La service_role NO va a GitHub, ni se imprime aquí, ni se guarda en ningún
+   archivo: entra por SEED_SERVICE_ROLE_KEY y se queda en esta máquina. CI sólo
+   recibe la anon key y estas SEIS cuentas de bajo privilegio (usuarios de dos
+   empresas de juguete y de una tercera para el gate, en un proyecto
+   desechable).
 
-Las contraseñas se generan nuevas en cada corrida y NO se guardan en ningún
-sitio: si las perdés, volvé a correr el script y usá las nuevas.
+⚠️  ACTUALIZÁ LOS QUINCE, NO SÓLO LOS OCHO DEL GATE.
+
+Esta corrida rotó las SEIS contraseñas —A y B incluidas, aunque ya existieran—,
+así que RLS_USER_A_PASSWORD y RLS_USER_B_PASSWORD también quedaron obsoletas.
+Pegar sólo los ocho nuevos cambia el motivo del rojo: el harness pasaría de
+faltarle secretos a fallar el login de A y B.
+
+Las contraseñas no se guardan en ningún sitio: si las perdés, volvé a correr el
+script y usá las nuevas. Después de actualizar los quince, relanzá el job
+"RLS harness (server-side)".
 `)
   return 0
 }

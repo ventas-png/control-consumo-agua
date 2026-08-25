@@ -101,6 +101,41 @@
       "clave": "negative-write-verificado-como-b",
       "patron": "verificado COMO B",
       "porQue": "un data vacío para A no prueba que la fila no se escribiera; hay que mirarlo desde B"
+    },
+    {
+      "clave": "clase-misma-empresa",
+      "patron": "los cuatro usuarios son de la MISMA empresa",
+      "porQue": "si fueran de empresas distintas, todo lo que el gate por clase 'demuestra' lo estaría demostrando el aislamiento de tenant"
+    },
+    {
+      "clave": "clase-permisos-disjuntos",
+      "patron": "los permisos efectivos son disjuntos entre los dos granulares",
+      "porQue": "un fixture donde ambos tuvieran los dos permisos haría imposible fallar las negativas de clase"
+    },
+    {
+      "clave": "clase-select",
+      "patron": "cada granular ve SU clase y no la otra",
+      "porQue": "el permiso de paquetería no puede abrir la lectura de correspondencia, que incluye notificaciones legales"
+    },
+    {
+      "clave": "clase-insert",
+      "patron": "ninguno puede CREAR en la clase ajena",
+      "porQue": "crear en la clase ajena permitiría fabricar correspondencia sin tener su permiso"
+    },
+    {
+      "clave": "clase-reclasificar",
+      "patron": "reclasificar está bloqueado en LAS DOS direcciones",
+      "porQue": "mover una pieza de clase con un solo permiso sería la vía de escape del gate entero"
+    },
+    {
+      "clave": "clase-delete-admin",
+      "patron": "admin NO borra correspondencia",
+      "porQue": "el caso central: mismo tenant, permiso efectivo sobre todo, y aun así una notificación legal no la destruye un admin"
+    },
+    {
+      "clave": "clase-delete-owner",
+      "patron": "company_owner SÍ borra correspondencia",
+      "porQue": "control positivo: sin él, un DELETE roto para todos también pasaría la prueba anterior"
     }
   ],
   "_rpcs": [
@@ -370,6 +405,36 @@
         "anon",
         "authenticated-cross-tenant"
       ]
+    },
+    {
+      "nombre": "portal_reservar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — abre el borrador cuyo id es la carpeta de los adjuntos en renta-docs; sobre una unidad ajena sembraría un expediente en el tenant de otro",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_enviar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — única vía de escritura del portal desde que 20260829000100 le quitó la policy de INSERT que permitía autoaprobarse; escribe los datos del contrato y los responsables de una unidad",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
+    },
+    {
+      "nombre": "portal_descartar_solicitud_renta",
+      "dominio": "solicitud-renta",
+      "porQue": "20260829000200 — borra el borrador de una unidad; sobre una ajena destruiría el expediente en curso de otro tenant",
+      "garantia": "rol",
+      "evidencias": [
+        "anon",
+        "authenticated-cross-tenant"
+      ]
     }
   ],
   "_sandbox": [
@@ -377,7 +442,7 @@
     "`minimoPruebas` es la red secundaria: los gates reales son los escenarios y",
     "las RPC declaradas una a una."
   ],
-  "minimoPruebas": 100,
+  "minimoPruebas": 130,
   "dominiosSandboxPermitidos": [
     "supabase.co",
     "supabase.in"

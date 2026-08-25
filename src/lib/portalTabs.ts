@@ -4,6 +4,7 @@
 
 export type PortalTab =
   | 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes'
+  | 'correspondencia'
   | 'anuncios' | 'rentas' | 'mudanza' | 'asambleas' | 'transparencia'
 
 export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
@@ -13,6 +14,7 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'tickets',       label: 'Mantenimiento',   icon: '🔧' },
   { id: 'visitantes',    label: 'Visitantes',      icon: '🚪' },
   { id: 'paquetes',      label: 'Paquetería',      icon: '📦' },
+  { id: 'correspondencia', label: 'Correspondencia', icon: '📬' },
   { id: 'anuncios',      label: 'Anuncios',        icon: '📢' },
   { id: 'asambleas',     label: 'Asambleas',       icon: '🏛️' },
   { id: 'transparencia', label: 'Transparencia',   icon: '📊' },
@@ -26,8 +28,12 @@ export const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
 // RLS ya lo cubre vía mis_unidades_ids — decisión de producto en 20260713080000).
 // Lo que queda fuera es del dueño: rentas (autorización/contratos/STR),
 // asambleas (voto por unidad) y transparencia financiera.
+// 'correspondencia' entra aquí junto a 'paquetes': lo que llega a la unidad es
+// del que la habita, y el RLS solo le proyecta las piezas de SU unidad (la
+// dirigida a la administración no lleva unidad_id y nunca le llega).
 const TABS_NO_PROPIETARIO: readonly PortalTab[] = [
-  'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios', 'mudanza',
+  'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes',
+  'correspondencia', 'anuncios', 'mudanza',
 ]
 
 /**

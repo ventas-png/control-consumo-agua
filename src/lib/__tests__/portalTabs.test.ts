@@ -6,7 +6,7 @@ import { PORTAL_TABS, tabsForRol } from '../portalTabs'
 describe('tabsForRol', () => {
   const todos = PORTAL_TABS.map(t => t.id)
 
-  it('propietario ve los 11 tabs', () => {
+  it('propietario ve todos los tabs', () => {
     expect(tabsForRol('propietario')).toEqual(todos)
   })
 
@@ -18,8 +18,16 @@ describe('tabsForRol', () => {
 
   it('arrendatario ve solo los tabs operativos (mudanza incluida)', () => {
     expect(tabsForRol('arrendatario')).toEqual([
-      'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes', 'anuncios', 'mudanza',
+      'mi_unidad', 'reservas', 'cuenta', 'tickets', 'visitantes', 'paquetes',
+      'correspondencia', 'anuncios', 'mudanza',
     ])
+  })
+
+  it('el inquilino ve la correspondencia de su unidad', () => {
+    // Lo que llega a la unidad es de quien la habita. El RLS solo le proyecta
+    // las piezas con SU unidad_id; la dirigida a la administración no lleva
+    // unidad y nunca aparece aquí.
+    expect(tabsForRol('arrendatario')).toContain('correspondencia')
   })
 
   it('arrendatario NO ve rentas, asambleas ni transparencia', () => {

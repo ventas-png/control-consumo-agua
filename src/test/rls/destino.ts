@@ -24,7 +24,14 @@ import { validarDestino } from '../../../scripts/rls-destino.mjs'
 // abrir un socket. Que "aborta antes de conectarse" no es una promesa sobre el
 // orden de los pasos: es una propiedad de sus importaciones.
 
-/** Las siete variables que el harness necesita. */
+/**
+ * Las quince variables que el harness necesita: siete del aislamiento por
+ * tenant y ocho del gate por clase de `paquetes_recibidos`.
+ *
+ * Las ocho del gate son OBLIGATORIAS, no opcionales. Mientras lo fueron, su
+ * bloque se auto-saltaba con un `describe.skipIf` y el job terminaba verde con
+ * 13 pruebas omitidas — el mismo falso verde por omisión, un nivel más abajo.
+ */
 export interface EntornoRls {
   RLS_SUPABASE_URL?: string
   RLS_SUPABASE_ANON_KEY?: string
@@ -33,13 +40,28 @@ export interface EntornoRls {
   RLS_USER_A_PASSWORD?: string
   RLS_USER_B_EMAIL?: string
   RLS_USER_B_PASSWORD?: string
+  RLS_USER_PAQ_EMAIL?: string
+  RLS_USER_PAQ_PASSWORD?: string
+  RLS_USER_CORR_EMAIL?: string
+  RLS_USER_CORR_PASSWORD?: string
+  RLS_USER_ADMIN_EMAIL?: string
+  RLS_USER_ADMIN_PASSWORD?: string
+  RLS_USER_OWNER_EMAIL?: string
+  RLS_USER_OWNER_PASSWORD?: string
 }
 
 export type Destino =
   | { ok: true; ref: string }
   | { ok: false; clave: string; motivo: string }
 
-/** ¿Están las seis credenciales? (la séptima variable es la declaración del destino). */
+/**
+ * ¿Están las catorce credenciales? (la quinceava variable,
+ * `RLS_EXPECTED_PROJECT_REF`, es la declaración del destino, no una credencial).
+ *
+ * Se exigen TODAS, las del gate por clase incluidas: con las de tenant puestas
+ * y las de clase vacías, el harness corría a medias y el reporte lo contaba
+ * como cobertura completa.
+ */
 export function credencialesPresentes(env: EntornoRls): boolean {
   return Boolean(
     env.RLS_SUPABASE_URL &&
@@ -47,7 +69,15 @@ export function credencialesPresentes(env: EntornoRls): boolean {
     env.RLS_USER_A_EMAIL &&
     env.RLS_USER_A_PASSWORD &&
     env.RLS_USER_B_EMAIL &&
-    env.RLS_USER_B_PASSWORD,
+    env.RLS_USER_B_PASSWORD &&
+    env.RLS_USER_PAQ_EMAIL &&
+    env.RLS_USER_PAQ_PASSWORD &&
+    env.RLS_USER_CORR_EMAIL &&
+    env.RLS_USER_CORR_PASSWORD &&
+    env.RLS_USER_ADMIN_EMAIL &&
+    env.RLS_USER_ADMIN_PASSWORD &&
+    env.RLS_USER_OWNER_EMAIL &&
+    env.RLS_USER_OWNER_PASSWORD,
   )
 }
 
