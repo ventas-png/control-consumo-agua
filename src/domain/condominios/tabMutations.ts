@@ -16,7 +16,7 @@
 // P2 tipos: las funciones con tabla/RPC LITERAL usan el cliente tipado `db`;
 // los helpers genéricos (tabla como parámetro string) siguen en `supabase`.
 import { supabase, db } from '../../lib/supabase'
-import type { ResultadoGeneracionTurnos } from '../../types'
+import type { ResultadoGeneracionTurnos, ResultadoMaterializacionRutinas } from '../../types'
 
 /**
  * Error con el shape mínimo que consume la UI (mensaje legible). `code` es el
@@ -252,4 +252,29 @@ export async function generarBloquesTurno(
   })
   const fila = Array.isArray(data) ? data[0] : data
   return { data: (fila as ResultadoGeneracionTurnos | null) ?? null, error }
+}
+
+/**
+ * Convierte las rutinas activas del proyecto en tareas de `tareas_bloque` para
+ * el rango dado (RPC `materializar_rutinas_turno`, 20260905000300). Empareja por
+ * jornada; copia lo que la actividad declara en vez de leerlo por join; no pisa
+ * lo existente, no resucita lo anulado y no toca bloques cerrados. Volver a
+ * llamarla no duplica.
+ *
+ * Va en `supabase` (sin tipar) y no en `db` por lo mismo que
+ * `generarBloquesTurno`: la RPC no existe en database.types.ts hasta la próxima
+ * corrida de `npm run gen:db-types`. Devuelve UNA fila.
+ */
+export async function materializarRutinasTurno(
+  projectId: string,
+  desde: string,
+  hasta: string,
+): Promise<{ data: ResultadoMaterializacionRutinas | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('materializar_rutinas_turno', {
+    p_project_id: projectId,
+    p_desde: desde,
+    p_hasta: hasta,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoMaterializacionRutinas | null) ?? null, error }
 }

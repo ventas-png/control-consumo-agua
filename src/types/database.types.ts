@@ -17196,23 +17196,29 @@ export type Database = {
           anulada_por: string | null
           area_id: string | null
           bloque_id: string
+          checklist: Json
           completada_en: string | null
           completado_por: string | null
           creado_por: string | null
           created_at: string
           descripcion: string | null
+          duracion_estimada_min: number | null
           estado: string
           evidencia_texto: string | null
           foto_urls: Json
           id: string
+          instrucciones_seguridad: string | null
           motivo_anulacion: string | null
           notas_operativo: string | null
           novedad: string | null
           orden: number | null
           plantilla_id: string | null
           prioridad: string | null
+          requiere_checklist: boolean
+          requiere_comentario: boolean
           requiere_foto: boolean
           requiere_mantenimiento: boolean
+          rutina_id: string | null
           titulo: string
         }
         Insert: {
@@ -17220,23 +17226,29 @@ export type Database = {
           anulada_por?: string | null
           area_id?: string | null
           bloque_id: string
+          checklist?: Json
           completada_en?: string | null
           completado_por?: string | null
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
+          duracion_estimada_min?: number | null
           estado?: string
           evidencia_texto?: string | null
           foto_urls?: Json
           id?: string
+          instrucciones_seguridad?: string | null
           motivo_anulacion?: string | null
           notas_operativo?: string | null
           novedad?: string | null
           orden?: number | null
           plantilla_id?: string | null
           prioridad?: string | null
+          requiere_checklist?: boolean
+          requiere_comentario?: boolean
           requiere_foto?: boolean
           requiere_mantenimiento?: boolean
+          rutina_id?: string | null
           titulo: string
         }
         Update: {
@@ -17244,23 +17256,29 @@ export type Database = {
           anulada_por?: string | null
           area_id?: string | null
           bloque_id?: string
+          checklist?: Json
           completada_en?: string | null
           completado_por?: string | null
           creado_por?: string | null
           created_at?: string
           descripcion?: string | null
+          duracion_estimada_min?: number | null
           estado?: string
           evidencia_texto?: string | null
           foto_urls?: Json
           id?: string
+          instrucciones_seguridad?: string | null
           motivo_anulacion?: string | null
           notas_operativo?: string | null
           novedad?: string | null
           orden?: number | null
           plantilla_id?: string | null
           prioridad?: string | null
+          requiere_checklist?: boolean
+          requiere_comentario?: boolean
           requiere_foto?: boolean
           requiere_mantenimiento?: boolean
+          rutina_id?: string | null
           titulo?: string
         }
         Relationships: [
@@ -17276,6 +17294,13 @@ export type Database = {
             columns: ["bloque_id"]
             isOneToOne: false
             referencedRelation: "bloques_turno"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_bloque_rutina_fk"
+            columns: ["rutina_id"]
+            isOneToOne: false
+            referencedRelation: "rutinas_limpieza"
             referencedColumns: ["id"]
           },
           {
