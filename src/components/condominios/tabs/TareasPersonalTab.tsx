@@ -134,7 +134,13 @@ export function TareasPersonalTab({
       titulo: plantilla?.titulo ?? nuevaTarea.titulo.trim(),
       descripcion: (plantilla?.descripcion ?? nuevaTarea.descripcion.trim()) || null,
       area_id: nuevaTarea.area_id || plantilla?.area_id || null,
-      requiere_foto: nuevaTarea.requiere_foto || plantilla?.requiere_foto || false,
+      // Sólo lo que el operativo marcó. Lo que la plantilla exige —foto,
+      // comentario, checklist, instrucciones y duración— lo copia la BD
+      // (trg_tarea_copiar_snapshot, 20260905000600), que además cubre las otras
+      // dos rutas de alta. Antes esto OR-eaba `requiere_foto` a mano y las otras
+      // cuatro columnas se perdían: la tarea llegaba sin las instrucciones de
+      // seguridad y el gate de evidencia se desarmaba solo.
+      requiere_foto: nuevaTarea.requiere_foto,
       orden: maxOrden + 1,
     })
     setSaving(false)
@@ -150,10 +156,12 @@ export function TareasPersonalTab({
     const maxOrden = ts.length ? Math.max(...ts.map(t => t.orden)) : -1
     setSaving(true)
     await createCondominioRow('tareas_bloque',
+      // `requiere_foto` y el resto del snapshot los pone la BD desde la
+      // plantilla (20260905000600); mandarlos aquí sería repetir la regla.
       pls.map((p, i) => ({
         bloque_id: bloqueId, plantilla_id: p.id,
         titulo: p.titulo, descripcion: p.descripcion ?? null,
-        area_id: p.area_id ?? null, requiere_foto: p.requiere_foto,
+        area_id: p.area_id ?? null,
         orden: maxOrden + 1 + i,
       }))
     )

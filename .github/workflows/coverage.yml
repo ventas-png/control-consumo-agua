@@ -325,6 +325,18 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/consumo_insumos/run.sh
 
+      # 20260905000600 existe porque dos de las tres rutas de alta perdían el
+      # snapshot de la plantilla — instrucciones de seguridad incluidas. Lo que
+      # hay que probar es que el trigger sólo pueda APRETAR (con `boolean NOT
+      # NULL DEFAULT false` no se distingue «dijo false» de «no dijo nada», así
+      # que un OR convertido en asignación aflojaría exigencias puestas a mano),
+      # que no le cambie el resultado a la materialización, y que la copia
+      # funcione para quien tiene `turnos` y NO puede leer el catálogo.
+      - name: Snapshot al crear la tarea — la copia sólo aprieta, nunca afloja
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/snapshot_al_crear/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
