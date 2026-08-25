@@ -153,16 +153,38 @@ describe('PersonalTab — usuario de ingreso del empleado', () => {
     expect(payload.user_id).toBeNull()
   })
 
-  it('avisa cuando la cuenta elegida no tiene acceso a este condominio', async () => {
+  it('el selector no ofrece cuentas de la empresa sin acceso a este condominio', async () => {
+    // El caso del administrador de un condominio en una empresa con varios: la
+    // garita del proyecto de al lado no puede registrar nada aquí, y ofrecerla
+    // solo invita a sellar el expediente con la cuenta de otro condominio.
     mocks.fetchUsuariosAsignablesPersonal.mockResolvedValue({
-      data: [cuenta({ tiene_acceso_proyecto: false })],
+      data: [
+        cuenta(),
+        cuenta({ usuario_id: 'u2', nombre: 'Garita Otro Proyecto', email: 'garita@mayan.com', tiene_acceso_proyecto: false }),
+      ],
       error: null,
     })
     renderTab({ personal: [] })
-    const select = await abrirAlta()
+    await abrirAlta()
 
-    expect(screen.queryByText(/aún no tiene acceso a este condominio/)).toBeNull()
-    fireEvent.change(select, { target: { value: 'u1' } })
+    expect(screen.getByRole('option', { name: 'Dina Villatoro · dina@mayan.com' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /Garita Otro Proyecto/ })).toBeNull()
+    // Se dice cuántas se ocultaron y cómo hacerlas aparecer: en silencio, el
+    // administrador buscaría una cuenta que existe y creería que falta crearla.
+    expect(screen.getByText(/otra cuenta de la empresa no aparece/)).toBeTruthy()
+  })
+
+  it('la cuenta ya vinculada aquí sigue en la lista aunque haya perdido el acceso, y se avisa', async () => {
+    mocks.fetchUsuariosAsignablesPersonal.mockResolvedValue({
+      data: [cuenta({ tiene_acceso_proyecto: false, personal_id: 'emp1', personal_nombre: 'Dina Villatoro' })],
+      error: null,
+    })
+    renderTab({ personal: [empleado({ user_id: 'u1' })] })
+
+    fireEvent.click(screen.getByText('✏️'))
+    const select = await screen.findByLabelText('Cuenta con la que ingresa') as HTMLSelectElement
+    expect(select.value).toBe('u1')
+    expect(screen.getByRole('option', { name: /Dina Villatoro/ })).toBeTruthy()
     expect(await screen.findByText(/aún no tiene acceso a este condominio/)).toBeTruthy()
   })
 
@@ -219,15 +241,15 @@ describe('PersonalTab — usuario de ingreso del empleado', () => {
     await abrirAlta()
 
     expect(screen.getByText(/No se pudo cargar la lista de usuarios/)).toBeTruthy()
-    expect(screen.queryByText(/todavía no tiene usuarios que asignar/)).toBeNull()
+    expect(screen.queryByText(/tiene acceso a este condominio todavía/)).toBeNull()
   })
 
-  it('sin cuentas en la empresa explica dónde crearlas', async () => {
+  it('sin cuentas con acceso al condominio explica cómo conseguirlas', async () => {
     mocks.fetchUsuariosAsignablesPersonal.mockResolvedValue({ data: [], error: null })
     renderTab({ personal: [] })
     await abrirAlta()
 
-    expect(screen.getByText(/todavía no tiene usuarios que asignar/)).toBeTruthy()
+    expect(screen.getByText(/tiene acceso a este condominio todavía/)).toBeTruthy()
   })
 
   it('el choque del índice único se traduce a un mensaje accionable', async () => {

@@ -8,8 +8,9 @@
 --    1-3   la columna: opcional, FK a app_users, ON DELETE SET NULL
 --    4-7   una cuenta, un expediente POR CONDOMINIO (y varios NULL conviven)
 --    8-9   el vínculo no cruza empresas
---   10-16  el catálogo: a quién lista, qué reporta y a quién le contesta
---   17-19  la ACL: anon no ejecuta nada; el trigger no es invocable
+--   10-20  el catálogo: a quién lista (empresa, acceso al proyecto), qué
+--          reporta y a quién le contesta
+--   21-24  la ACL: anon no ejecuta nada; el trigger no es invocable
 -- ════════════════════════════════════════════════════════════════════════════
 
 DO $$
@@ -109,7 +110,7 @@ BEGIN
     RAISE NOTICE 'OK 9  el trigger rechaza una cuenta de otra empresa en INSERT';
   END;
 
-  -- ── 10-16 · El catálogo de cuentas asignables ────────────────────────────
+  -- ── 10-18 · El catálogo de cuentas asignables ────────────────────────────
   PERFORM set_config('app.uid', OWNER::text, false);
 
   SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = RITA;
@@ -129,7 +130,13 @@ BEGIN
   RAISE NOTICE 'OK 11 la cuenta tomada dice a qué empleado de ESTE proyecto pertenece';
 
   -- Tomada en P1 no es tomada en P2: el selector de cada condominio decide solo.
-  SELECT personal_id INTO v FROM public.personal_usuarios_asignables(P2) WHERE usuario_id = SARA;
+  -- Se mira ADM_A —asignado a P2— y no una cuenta sin acceso: desde
+  -- 20260904000000 una cuenta ajena al proyecto no sale en su catálogo, y
+  -- "libre" se confundiría con "ausente".
+  SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P2) WHERE usuario_id = ADM_A;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '12: la cuenta asignada a P2 no aparece en el catálogo de P2 (n=%)', n; END IF;
+  SELECT personal_id INTO v FROM public.personal_usuarios_asignables(P2) WHERE usuario_id = ADM_A;
   IF v IS NOT NULL THEN
     RAISE EXCEPTION '12: una cuenta libre aparece como tomada (personal_id=%)', v; END IF;
   RAISE NOTICE 'OK 12 una cuenta sin expediente en el proyecto aparece libre';
@@ -144,66 +151,89 @@ BEGIN
   IF b IS NOT true THEN RAISE EXCEPTION '14: company_owner debería ver todo el proyecto'; END IF;
   SELECT tiene_acceso_proyecto INTO b FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = ADM_L;
   IF b IS NOT true THEN RAISE EXCEPTION '14: admin sin asignaciones es exento y debería tener acceso'; END IF;
-  SELECT tiene_acceso_proyecto INTO b FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = ADM_A;
-  IF b IS NOT false THEN RAISE EXCEPTION '14: admin acotado a P2 no debería tener acceso a P1'; END IF;
   SELECT tiene_acceso_proyecto INTO b FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = DINA;
   IF b IS NOT true THEN RAISE EXCEPTION '14: la asignación explícita a P1 no se vio'; END IF;
-  SELECT tiene_acceso_proyecto INTO b FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = SARA;
-  IF b IS NOT false THEN RAISE EXCEPTION '14: una cuenta sin acceso figura con acceso'; END IF;
   RAISE NOTICE 'OK 14 tiene_acceso_proyecto espeja can_access_project para CADA cuenta';
+
+  -- ── 15-16 · El catálogo se acota al proyecto (20260904000000) ────────────
+  -- Lo que el selector no debe ofrecer: la cuenta de la empresa que NO ve este
+  -- condominio. Ofrecerla invita a sellar el expediente de un empleado con la
+  -- cuenta de alguien de otro proyecto —el aviso explicaba, pero no impedía
+  -- guardar— y de paso exhibe la plantilla entera de la empresa a quien
+  -- administra un solo condominio.
+  SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = SARA;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '15: el catálogo lista una cuenta sin acceso al proyecto'; END IF;
+  SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = ADM_A;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '15: el catálogo lista al admin acotado a OTRO proyecto'; END IF;
+  RAISE NOTICE 'OK 15 el catálogo no lista cuentas sin acceso a ESTE condominio';
+
+  -- La excepción: la cuenta que ya está vinculada a un empleado de aquí sigue
+  -- listada aunque hoy no tenga acceso. Con ella el tab nombra al vinculado en
+  -- la tarjeta y explica el «ya es Fulano»; sin ella, el empleado se vería
+  -- suelto y su cuenta se ofrecería a otro.
+  UPDATE public.personal_condominio SET user_id = SARA WHERE id = EMP2;
+  SELECT tiene_acceso_proyecto, personal_id INTO b, v
+    FROM public.personal_usuarios_asignables(P1) WHERE usuario_id = SARA;
+  IF v IS DISTINCT FROM EMP2 THEN
+    RAISE EXCEPTION '16: la cuenta ya vinculada aquí desapareció del catálogo (personal_id=%)', v; END IF;
+  IF b IS NOT false THEN
+    RAISE EXCEPTION '16: la cuenta vinculada sin acceso no reporta la falta de acceso'; END IF;
+  RAISE NOTICE 'OK 16 la cuenta ya vinculada en el proyecto se lista aunque no tenga acceso';
 
   -- El operador con el permiso del tab puede abrir el selector; sin él, no.
   PERFORM set_config('app.uid', DINA::text, false);
   SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P1);
-  IF n = 0 THEN RAISE EXCEPTION '15: el operador con permiso no obtuvo catálogo'; END IF;
-  RAISE NOTICE 'OK 15 un operador con condominios.tab.personal obtiene el catálogo';
+  IF n = 0 THEN RAISE EXCEPTION '17: el operador con permiso no obtuvo catálogo'; END IF;
+  RAISE NOTICE 'OK 17 un operador con condominios.tab.personal obtiene el catálogo';
 
   PERFORM set_config('app.uid', SARA::text, false);
   BEGIN
     PERFORM count(*) FROM public.personal_usuarios_asignables(P1);
-    RAISE EXCEPTION '16: una cuenta SIN el permiso del tab obtuvo el catálogo';
+    RAISE EXCEPTION '18: una cuenta SIN el permiso del tab obtuvo el catálogo';
   EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'OK 16 sin condominios.tab.personal el catálogo no se entrega';
+    RAISE NOTICE 'OK 18 sin condominios.tab.personal el catálogo no se entrega';
   END;
 
   PERFORM set_config('app.uid', AJENO::text, false);
   BEGIN
     PERFORM count(*) FROM public.personal_usuarios_asignables(P1);
-    RAISE EXCEPTION '17: otra empresa enumeró las cuentas de este proyecto';
+    RAISE EXCEPTION '19: otra empresa enumeró las cuentas de este proyecto';
   EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'OK 17 un proyecto de otra empresa no se puede enumerar';
+    RAISE NOTICE 'OK 19 un proyecto de otra empresa no se puede enumerar';
   END;
 
   PERFORM set_config('app.uid', OWNER::text, false);
   BEGIN
     PERFORM count(*) FROM public.personal_usuarios_asignables('00000000-0000-0000-0000-000000000000');
-    RAISE EXCEPTION '18: un proyecto inexistente devolvió catálogo';
+    RAISE EXCEPTION '20: un proyecto inexistente devolvió catálogo';
   EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'OK 18 un proyecto inexistente no devuelve nada, falla';
+    RAISE NOTICE 'OK 20 un proyecto inexistente no devuelve nada, falla';
   END;
 
   -- Deja la sesión limpia para lo que siga.
   PERFORM set_config('app.uid', '', false);
 END $$;
 
--- ── 19-21 · ACL: la clase #378/#380 no vuelve por esta puerta ───────────────
+-- ── 21-23 · ACL: la clase #378/#380 no vuelve por esta puerta ───────────────
 DO $$
 BEGIN
   IF has_function_privilege('anon', 'public.personal_usuarios_asignables(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION '19: anon puede ejecutar personal_usuarios_asignables'; END IF;
-  RAISE NOTICE 'OK 19 anon NO puede ejecutar el catálogo';
+    RAISE EXCEPTION '21: anon puede ejecutar personal_usuarios_asignables'; END IF;
+  RAISE NOTICE 'OK 21 anon NO puede ejecutar el catálogo';
 
   IF NOT has_function_privilege('authenticated', 'public.personal_usuarios_asignables(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION '20: authenticated no puede ejecutar el catálogo que el tab llama'; END IF;
-  RAISE NOTICE 'OK 20 authenticated SÍ puede ejecutarlo (es quien lo llama)';
+    RAISE EXCEPTION '22: authenticated no puede ejecutar el catálogo que el tab llama'; END IF;
+  RAISE NOTICE 'OK 22 authenticated SÍ puede ejecutarlo (es quien lo llama)';
 
   IF has_function_privilege('anon', 'public.personal_validar_usuario()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.personal_validar_usuario()', 'EXECUTE') THEN
-    RAISE EXCEPTION '21: la función trigger es invocable directamente'; END IF;
-  RAISE NOTICE 'OK 21 la función trigger no es invocable por nadie vía API';
+    RAISE EXCEPTION '23: la función trigger es invocable directamente'; END IF;
+  RAISE NOTICE 'OK 23 la función trigger no es invocable por nadie vía API';
 END $$;
 
--- ── 22 · El trigger sigue disparando pese a no tener EXECUTE ───────────────
+-- ── 24 · El trigger sigue disparando pese a no tener EXECUTE ───────────────
 -- Postgres verifica el EXECUTE en CREATE TRIGGER, no en cada disparo. Sin esta
 -- comprobación, el REVOKE de arriba podría estar rompiendo la escritura entera
 -- de la tabla y el resto del assert (que corre como superusuario) no lo vería.
@@ -218,9 +248,9 @@ BEGIN
     INSERT INTO public.personal_condominio (company_id, project_id, nombre, user_id)
       VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
               'Alta cruzada sin execute', 'e0000000-0000-0000-0000-000000000009');
-    RAISE EXCEPTION '22: el trigger NO disparó para un rol sin EXECUTE';
+    RAISE EXCEPTION '24: el trigger NO disparó para un rol sin EXECUTE';
   EXCEPTION WHEN foreign_key_violation THEN
-    RAISE NOTICE 'OK 22 el trigger dispara aunque el rol no tenga EXECUTE sobre él';
+    RAISE NOTICE 'OK 24 el trigger dispara aunque el rol no tenga EXECUTE sobre él';
   END;
 END $$;
 RESET ROLE;
