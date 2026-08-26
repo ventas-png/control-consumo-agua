@@ -12,7 +12,7 @@
 import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../../lib/format'
 // Sin deleteCondominioRow a propósito: el historial de ejecuciones no se borra
-// desde la app (20260904000000) — se anula lógicamente con motivo.
+// desde la app (20260904000100) — se anula lógicamente con motivo.
 import { createCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import { notify } from '../../../shared/Dialog'
 import { openPromptDialog } from '../../../shared/PromptDialog'
@@ -220,7 +220,7 @@ export function VistaRuta({
   }
 
   /**
-   * Quitar de la ruta = ANULAR, no borrar. Desde 20260904000000 el DELETE de
+   * Quitar de la ruta = ANULAR, no borrar. Desde 20260904000100 el DELETE de
    * `ejecuciones_limpieza` está reservado a soporte de plataforma: la fila y
    * sus fotos son historial operativo. La anulación exige motivo (CHECK en BD)
    * y la BD sella quién la hizo; la fila queda fuera de la ruta activa y es

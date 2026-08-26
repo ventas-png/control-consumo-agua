@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE de los catálogos operativos de limpieza
-# (20260904000000 · 000100 · 000200).
+# (20260904000100 · 000200 · 000300).
 #
 # POR QUÉ EXISTE
 # La serie migra DATOS además de esquema: el backfill decide a qué área del
@@ -50,9 +50,9 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIG_AREAS="$RAIZ/supabase/migrations/20260904000000_limpieza_area_catalogo_e_historial.sql"
-MIG_PLANT="$RAIZ/supabase/migrations/20260904000100_plantillas_catalogo_actividades.sql"
-MIG_PUENTES="$RAIZ/supabase/migrations/20260904000200_plantilla_tarea_recursos.sql"
+MIG_AREAS="$RAIZ/supabase/migrations/20260904000100_limpieza_area_catalogo_e_historial.sql"
+MIG_PLANT="$RAIZ/supabase/migrations/20260904000200_plantillas_catalogo_actividades.sql"
+MIG_PUENTES="$RAIZ/supabase/migrations/20260904000300_plantilla_tarea_recursos.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH

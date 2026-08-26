@@ -9,7 +9,7 @@ import type { ResponsableServicio } from './residentes'
 // ── Tareas operativas ─────────────────────────────────────────────────────
 
 /**
- * Familia operativa de una ACTIVIDAD (20260904000100). No confundir con
+ * Familia operativa de una ACTIVIDAD (20260904000200). No confundir con
  * `cargo`, que es el puesto del personal que puede desempeñarla.
  */
 export type ServicioOperativo =
@@ -33,7 +33,7 @@ export interface PlantillaTareaCargo {
   requiere_foto: boolean
   activo: boolean
   created_at: string
-  // ── Catálogo de actividades (20260904000100) ─────────────────────────────
+  // ── Catálogo de actividades (20260904000200) ─────────────────────────────
   // Opcionales porque las filas creadas antes de la migración no las traen.
   /** NULL = fila legada pendiente de clasificar. */
   servicio?: ServicioOperativo | null
@@ -48,7 +48,7 @@ export interface PlantillaTareaCargo {
   area_nombre?: string
 }
 
-// ── Recursos planificados por actividad (20260904000200) ─────────────────────
+// ── Recursos planificados por actividad (20260904000300) ─────────────────────
 
 /** Insumo planificado de una actividad. La unidad se deriva del suministro. */
 export interface PlantillaTareaSuministro {
@@ -540,7 +540,7 @@ export interface ProgramacionLimpieza {
   orden?: number
   /** Si es true, la ejecución del día no se cierra sin al menos una foto. */
   requiere_foto?: boolean
-  // ── Normalización de áreas (20260904000000) ──────────────────────────────
+  // ── Normalización de áreas (20260904000100) ──────────────────────────────
   /**
    * Área del catálogo (areas_condominio). NULL = registro legado pendiente de
    * vincular (o ambiguo en el backfill). `area` queda como snapshot del texto.
@@ -572,7 +572,7 @@ export interface EjecucionLimpieza {
   requiere_mantenimiento: boolean
   prioridad?: PrioridadNovedadLimpieza | null
   created_at: string
-  // ── Anulación lógica (20260904000000) ────────────────────────────────────
+  // ── Anulación lógica (20260904000100) ────────────────────────────────────
   // El historial no se borra físicamente: una ejecución equivocada se anula
   // con motivo y queda fuera de la ruta activa, con sus fotos intactas.
   /** NULL = vigente. La BD sella `anulada_por` en la transición. */

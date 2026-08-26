@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- Invariantes de los catálogos operativos de limpieza
--- (20260904000000 · 000100 · 000200).
+-- (20260904000100 · 000200 · 000300).
 -- Cada bloque RAISE EXCEPTION si algo no se cumple.
 
 DO $$
@@ -283,7 +283,7 @@ BEGIN
   END;
   -- Una plantilla desechable con su vínculo: borrarla debe llevarse el vínculo
   -- (la receta es parte de la definición, no historial). Cargo del catálogo:
-  -- el trigger de 20260904000100 ya no admite texto libre en INSERT.
+  -- el trigger de 20260904000200 ya no admite texto libre en INSERT.
   INSERT INTO public.plantillas_tarea_cargo (id, company_id, project_id, cargo, titulo)
   VALUES ('d0000000-0000-0000-0000-000000000099', CO_A, P1, 'conserje', 'Desechable');
   INSERT INTO public.plantilla_tarea_suministros

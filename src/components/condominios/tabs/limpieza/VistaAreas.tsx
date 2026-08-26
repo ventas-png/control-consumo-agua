@@ -1,7 +1,7 @@
 // Vista "Áreas": las programaciones de limpieza y —lo que agrega esta fase— a
 // quién le toca cada una.
 //
-// Desde 20260904000000 el área se ELIGE del catálogo canónico
+// Desde 20260904000100 el área se ELIGE del catálogo canónico
 // (`areas_condominio`, el mismo de rondas y plantillas) en lugar de teclearse:
 // `area_id` es el vínculo y `area` queda como snapshot del nombre. Las filas
 // legadas que el backfill no pudo vincular (ambiguas) siguen mostrando su texto

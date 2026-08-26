@@ -1,4 +1,4 @@
--- Fixture mínimo para EJECUTAR las migraciones 20260904000000 · 000100 · 000200
+-- Fixture mínimo para EJECUTAR las migraciones 20260904000100 · 000200 · 000300
 -- contra un Postgres de verdad. Reproduce el estado ANTERIOR a la serie: el
 -- padrón multi-tenant, los helpers de RLS/trazabilidad, y las tablas del módulo
 -- tal como están en prod hoy — incluidas las policies legacy `company_rw_*` que
@@ -186,7 +186,7 @@ CREATE POLICY "areas_condominio_delete" ON public.areas_condominio
   );
 
 -- plantillas_tarea_cargo: 20260424000060, con su legacy viva y las RBAC de
--- 20260519000002. SIN las columnas que añade 20260904000100 — eso es lo que se
+-- 20260519000002. SIN las columnas que añade 20260904000200 — eso es lo que se
 -- prueba.
 CREATE TABLE public.plantillas_tarea_cargo (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

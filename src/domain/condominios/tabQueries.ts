@@ -524,7 +524,7 @@ export async function fetchUsuariosAsignablesPersonal(
 
 /**
  * Insumos y herramientas planificados de TODAS las plantillas del proyecto
- * (tablas puente de 20260904000200), con el nombre/unidad/estado del recurso
+ * (tablas puente de 20260904000300), con el nombre/unidad/estado del recurso
  * aplanados del embed. Un solo fetch por proyecto: la pantalla de plantillas es
  * la única consumidora en este PR, así que va aquí y no en el loader global de
  * sectionData (que es posicional y no debe crecer por un solo tab).

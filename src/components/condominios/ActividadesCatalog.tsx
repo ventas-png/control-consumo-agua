@@ -4,7 +4,7 @@
 //   · Limpieza → Actividades: el mismo catálogo en consulta, filtrado
 //     inicialmente por servicio = limpieza (soloLectura: la administración
 //     vive en Plantillas; el SELECT de BD acepta prog_limpieza desde
-//     20260904000100, así que un operador de Limpieza lo lee sin permisos del
+//     20260904000200, así que un operador de Limpieza lo lee sin permisos del
 //     módulo Seguridad).
 //
 // GUARDADO: el formulario de la actividad es un BORRADOR (nada persiste hasta

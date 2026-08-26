@@ -4,7 +4,7 @@
 // cualquier otro consumidor administren EL MISMO catálogo sin duplicar
 // formularios, validaciones ni mutaciones. Los permisos los decide el tab
 // anfitrión (rutas_ronda en Rondas, prog_limpieza en Limpieza) y se reciben
-// por props; la BD los respalda con las policies de 20260904000000.
+// por props; la BD los respalda con las policies de 20260904000100.
 //
 // Diferencias deliberadas con el CRUD original:
 //   · el insert manda `activo` (antes dependía del DEFAULT y el form lo perdía),

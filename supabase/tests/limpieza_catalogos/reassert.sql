@@ -2,7 +2,7 @@
 \pset tuples_only on
 \pset format unaligned
 
--- Post-idempotencia: tras RE-APLICAR la serie 20260904000000 · 000100 · 000200
+-- Post-idempotencia: tras RE-APLICAR la serie 20260904000100 · 000200 · 000300
 -- sobre una base ya migrada (y con los datos que los asserts dejaron), nada
 -- debe duplicarse ni resolverse solo.
 

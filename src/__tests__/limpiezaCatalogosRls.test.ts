@@ -16,9 +16,9 @@ import { resolve, join } from 'node:path'
 // que corre en cada PR (job rls-sandbox de coverage.yml).
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
-const MIG_AREAS = '20260904000000_limpieza_area_catalogo_e_historial.sql'
-const MIG_PLANTILLAS = '20260904000100_plantillas_catalogo_actividades.sql'
-const MIG_PUENTES = '20260904000200_plantilla_tarea_recursos.sql'
+const MIG_AREAS = '20260904000100_limpieza_area_catalogo_e_historial.sql'
+const MIG_PLANTILLAS = '20260904000200_plantillas_catalogo_actividades.sql'
+const MIG_PUENTES = '20260904000300_plantilla_tarea_recursos.sql'
 
 const PERM_CHECKLIST = 'condominios.tab.checklist_areas'
 const PERM_RONDAS = 'condominios.tab.rutas_ronda'
@@ -176,7 +176,7 @@ for (const tabla of ['plantilla_tarea_suministros', 'plantilla_tarea_herramienta
 
     for (const op of ['insert', 'update', 'delete']) {
       it(`${op} se gatea por plantillas_cargo y queda acotado a la empresa`, () => {
-        // DELETE incluido A PROPÓSITO (desviación documentada en 20260904000200):
+        // DELETE incluido A PROPÓSITO (desviación documentada en 20260904000300):
         // quitar un recurso de una plantilla es edición de catálogo, no
         // destrucción de historial — eso lo protegen los RESTRICT.
         const cuerpo = vigentes.get(`${tabla}_${op}`)!.cuerpo

@@ -36,7 +36,7 @@
 --      paso de texto no vacío — CHECK con función IMMUTABLE (un CHECK no
 --      admite subconsultas directas).
 --   6. UNIQUE (id, company_id, project_id): el ancla de las FKs COMPUESTAS de
---      las tablas puente (20260904000200). Con ellas, mover una plantilla ya
+--      las tablas puente (20260904000300). Con ellas, mover una plantilla ya
 --      relacionada a otra empresa u otro proyecto es imposible: la FK
 --      compuesta del hijo lo bloquea a nivel de motor.
 --   7. Retira la policy legacy "company_rw_plantillas_cargo" (20260424000060:70),
@@ -52,7 +52,7 @@
 --
 -- REVERSA: DROP de las 6 columnas nuevas (los CHECKs y el índice caen con
 -- ellas); DROP CONSTRAINT plantillas_cargo_id_tenant_uq (exige antes soltar
--- las FKs compuestas de 20260904000200); DROP del trigger
+-- las FKs compuestas de 20260904000300); DROP del trigger
 -- trg_plantillas_cargo_controlado y de las funciones
 -- plantillas_cargo_valida_cargo / plantilla_checklist_valido; recrear
 -- "company_rw_plantillas_cargo" y las policies de 20260519000002. El backfill
@@ -211,7 +211,7 @@ WHERE servicio IS NULL
 -- ────────────────────────────────────────────────────────────────────────────
 -- 4. Policies: retirar la legacy y re-declarar las cuatro
 -- ────────────────────────────────────────────────────────────────────────────
--- Mismo caso que "company_rw_areas" (ver 20260904000000): el loop de
+-- Mismo caso que "company_rw_areas" (ver 20260904000100): el loop de
 -- 20260519000002 no la dropeó por el sufijo del nombre y su OR anulaba el gate.
 DROP POLICY IF EXISTS "company_rw_plantillas_cargo" ON public.plantillas_tarea_cargo;
 

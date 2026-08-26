@@ -4,7 +4,7 @@
 --
 -- QUÉ FALTABA
 -- El catálogo de actividades (plantillas_tarea_cargo, extendido en
--- 20260904000100) no decía QUÉ se necesita para ejecutar cada actividad. Los
+-- 20260904000200) no decía QUÉ se necesita para ejecutar cada actividad. Los
 -- catálogos ya existen — `suministros_condominio` (insumos, con su
 -- unidad_medida) e `inventario_condominio` (herramientas y equipo) — pero no
 -- había relación normalizada actividad ↔ recurso.
@@ -30,7 +30,7 @@
 --     fila — mover una plantilla, un suministro o una herramienta ya
 --     relacionados a otra empresa/proyecto viola la FK del hijo y se bloquea,
 --     cosa que un trigger sobre el hijo no puede ver. Las anclas UNIQUE
---     (id, company_id, project_id) de los padres viven en 20260904000100
+--     (id, company_id, project_id) de los padres viven en 20260904000200
 --     (plantillas) y aquí (suministros/inventario).
 --
 -- BORRADO: la FK a la plantilla es CASCADE (el vínculo es parte de la
@@ -53,7 +53,7 @@
 -- ────────────────────────────────────────────────────────────────────────────
 -- 0. Anclas UNIQUE para las FKs compuestas
 -- ────────────────────────────────────────────────────────────────────────────
--- (la de plantillas_tarea_cargo vive en 20260904000100)
+-- (la de plantillas_tarea_cargo vive en 20260904000200)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'suministros_id_tenant_uq') THEN
@@ -239,7 +239,7 @@ COMMENT ON COLUMN public.plantilla_tarea_herramientas.creado_por IS
 -- 4. RLS
 -- ────────────────────────────────────────────────────────────────────────────
 -- Molde de 20260807130000:144-185. SELECT acepta también `tareas_personal` y
--- `prog_limpieza` (mismo criterio que el SELECT del padre en 20260904000100:
+-- `prog_limpieza` (mismo criterio que el SELECT del padre en 20260904000200:
 -- esos tabs consumen el catálogo de actividades y sus recursos sin permisos
 -- del módulo Seguridad). El DELETE va con el permiso
 -- del tab y NO con owner/admin — desviación deliberada del convenio: quitar un

@@ -1,7 +1,7 @@
 // Tab Limpieza — cuatro vistas sobre el mismo dato:
 //
 //   Áreas       programaciones + a quién le toca cada área (persona, o perfil
-//               turno+cargo), con asignación en bloque. Desde 20260904000000
+//               turno+cargo), con asignación en bloque. Desde 20260904000100
 //               el área se elige del catálogo canónico (`areas_condominio`).
 //   Catálogo    el catálogo compartido de áreas (el mismo CRUD que usa Rondas
 //               en seguridad), para dar de alta/baja áreas sin salir del tab.
@@ -9,7 +9,7 @@
 //               mismo componente del tab Plantillas), filtrado de entrada por
 //               servicio = limpieza y en modo consulta: la administración vive
 //               en Seguridad → Plantillas y no se duplica aquí. La RLS de
-//               20260904000100/000200 acepta `prog_limpieza` en el SELECT, así
+//               20260904000200/000300 acepta `prog_limpieza` en el SELECT, así
 //               que se lee sin permisos del módulo Seguridad.
 //   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
 //               cierre área por área.
@@ -155,7 +155,7 @@ export function ProgramacionLimpiezaTab({
       {vista === 'catalogo' && (
         // El mismo componente que usa Rondas: un solo catálogo, un solo CRUD.
         // Los permisos son los del tab anfitrión (prog_limpieza); la BD acepta
-        // la escritura desde este tab desde 20260904000000.
+        // la escritura desde este tab desde 20260904000100.
         <AreasCatalog
           areas={areas}
           proyectoId={proyectoId}

@@ -1,7 +1,7 @@
 // domain/condominios/areas.ts — reglas puras del catálogo de áreas.
 //
 // `normalizarNombreArea` es el ESPEJO en cliente de la función SQL
-// public.areas_normalizar_nombre (20260904000000): minúsculas, sin espacios ni
+// public.areas_normalizar_nombre (20260904000100): minúsculas, sin espacios ni
 // signos, sin acentos. Solo para COMPARAR — el texto capturado nunca se
 // reescribe. Mantener ambas implementaciones alineadas: el backfill de la BD y
 // la validación de duplicados de la UI deben ver el mismo mundo.
