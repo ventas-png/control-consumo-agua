@@ -18,24 +18,258 @@ Tests end-to-end de los flujos **críticos de dinero y autenticación**, contra 
 > Los specs usan extensión `*.e2e.ts` (no `*.spec.ts`) a propósito: así el glob por
 > defecto de Vitest (`**/*.{test,spec}.ts`) no los recoge. Sólo Playwright los corre.
 
-## Diseño: credencial-gated + guardas de runtime
+## Diseño: FAIL-CLOSED en CI, gating como comodidad local
 
-- **Sin `E2E_BASE_URL`** → todos los specs se **skipean** (CI verde sin secretos).
-- Cada flujo tiene su propio gate de credenciales (login / invite token / fiscal).
-- Los pasos que dependen de **datos sembrados** (una unidad, un cargo pendiente,
-  una cuota…) se **skipean en runtime** si el dato no está, en vez de fallar. Así
-  la suite nunca da un falso rojo; cuando el preview está sembrado, corre de verdad.
+En CI el verde de este job significa «la suite corrió», no «no se opuso»:
+
+- **Preflight** (`scripts/e2e-preflight.mjs`): sin cualquiera de las SEIS
+  variables obligatorias, el job **falla ANTES de instalar nada ni ejecutar
+  Playwright** — no existe ningún camino en el que la falta de variables
+  produzca un verde. PR de fork y Dependabot —que no reciben Actions secrets
+  por diseño— también quedan en **rojo**, con la explicación estructural y cómo
+  desbloquear (rama interna).
+- **El destino se valida POSITIVAMENTE, no por denylist**: el despliegue
+  publica `/e2e-meta.json` (lo genera `scripts/generar-e2e-meta.mjs`, colgado
+  del build) y tiene que demostrar TRES cosas: `environment=e2e-sandbox` (el
+  marcador que sólo lleva un build con `VITE_E2E_ENVIRONMENT=e2e-sandbox`),
+  `supabase_project_ref` igual a `E2E_EXPECTED_SUPABASE_REF`, y `commit_sha`
+  igual al commit que el job está probando (en PRs, el HEAD de la rama). Un
+  despliegue viejo, producción o un alias desconocido fallan aunque no estén
+  en ninguna lista. La denylist de hosts de producción (de `vercel.json`)
+  queda como segunda defensa: a esos ni se les consulta la metadata.
+- **La URL se RESUELVE por SHA**: el preflight busca en la API de Deployments
+  de GitHub los despliegues registrados para el commit (Vercel los publica con
+  su `environment_url`) y los valida; `E2E_BASE_URL` es opcional y entra como
+  un candidato más, sometido a las mismas comprobaciones. La URL elegida es la
+  que corre la suite.
+- **El preflight ESPERA al build de Vercel**: el workflow arranca con el push y
+  Vercel tarda alrededor de un minuto en construir, así que consultar la API una
+  sola vez perdía la carrera siempre. El preflight sondea cada 15 s hasta 15 min
+  (`INTERVALO_SONDEO_MS` / `ESPERA_DESPLIEGUE_MS`). Esto **no afloja el
+  fail-closed**: agotada la ventana no hay candidato y el job queda rojo. Con
+  `E2E_BASE_URL` definida no espera nada: ya hay destino que validar. Si el job
+  se queda esperando los 15 min completos, mirá en Vercel si el build de ese
+  commit falló o quedó en cola.
+- **Sin ejecuciones simultáneas contra el sandbox compartido**: el job usa
+  `concurrency: e2e-shared-sandbox` con `cancel-in-progress: false` — las
+  corridas se encolan, ninguna muere a medias.
+- **Vercel Deployment Protection, fail-closed y limitada al origen**: un
+  Preview protegido devuelve 401 a cualquier visitante sin sesión de Vercel.
+  El job usa el mecanismo oficial —**Protection Bypass for Automation**—:
+  `E2E_VERCEL_BYPASS_TOKEN` es **obligatorio** y viaja como header
+  `x-vercel-protection-bypass` (con `x-vercel-set-bypass-cookie: true`)
+  **únicamente hacia el origen del Preview**: en el fetch de `/e2e-meta.json`
+  del preflight y en la única petición de siembra del proyecto `setup` de
+  Playwright (`e2e/bypass.setup.ts`), que guarda la **cookie** de bypass en un
+  `storageState` que el proyecto `chromium` carga. El navegador navega con la
+  cookie — que sólo se envía a su propio origen — y el token **jamás** entra
+  como header global (`use.extraHTTPHeaders` acompañaría TODAS las solicitudes
+  del contexto, también hacia otros orígenes, filtrando el secreto; una prueba
+  con dos orígenes locales lo impide: `scripts/__tests__/e2e-bypass.test.mjs`).
+  Un 401/403 se diagnostica nombrando la variable — el **valor** del token no
+  aparece en URLs, logs, reportes, traces ni artifacts.
+- **Sin `service_role`**: el job no la recibe ni la necesita; el despliegue de
+  pruebas usa la anon key de su sandbox, como cualquier cliente.
+- **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`): lee el reporte
+  JSON y **falla** si se descubrieron cero pruebas, si todas quedaron skipped,
+  si un spec obligatorio no ejecutó ninguna, si un condicional se omitió con
+  su variable presente, o si quedó **cualquier skip inesperado** (un test
+  suelto de un spec obligatorio, o de un archivo fuera de las listas), aunque
+  el resto del archivo haya corrido.
+
+  **El criterio del verde**, explícito: **0 fallos**, **0 skips inesperados**
+  (el único skip admitido es el de un spec condicional sin su variable, y
+  queda **declarado** en el resumen) y **todos los specs obligatorios con al
+  menos una prueba ejecutada**. No es "0 skips literal": `invitation-accept`
+  y `fiscal-timbrar` pueden quedar en omisión declarada sin sus variables —
+  si algún día se quiere el 100 %, basta configurar `E2E_INVITE_TOKEN` fresco
+  y `E2E_FISCAL_SANDBOX_READY=1` y el verificador los exigirá.
+- El auto-skip de `fixtures/env.ts` sigue existiendo como **comodidad local**
+  (correr sin variables no revienta tu terminal); en CI esos skips son
+  precisamente lo que el verificador convierte en rojo.
+- Los pasos que dependen de **datos sembrados** (una unidad, un cargo, una
+  cuota…) se skipean en runtime con un mensaje accionable; si eso deja un spec
+  obligatorio en cero ejecutadas, el job falla nombrando qué hay que sembrar.
+
+### Secretos que configura el administrador
+
+En *Settings → Secrets and variables → Actions*:
+
+| Secreto | Obligatorio | Qué es y de dónde sale |
+|---|---|---|
+| `E2E_EXPECTED_SUPABASE_REF` | ✅ | La DECLARACIÓN del proyecto Supabase sandbox contra el que corre la suite (el ref, no una credencial). El despliegue tiene que apuntar exactamente ahí. |
+| `E2E_BASE_URL` | opcional | Candidato ESTÁTICO de URL, sometido a la misma validación positiva (marcador + ref + sha). Normalmente innecesario: el preflight resuelve el despliegue del commit por la API de Deployments. |
+| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | ✅ | Cuenta admin/operadora del tenant sembrado en ese sandbox. |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | ✅ | Usuario del MISMO tenant con rol restringido (viewer/operator, no admin ni owner). |
+| `E2E_VERCEL_BYPASS_TOKEN` | ✅ | **Protection Bypass for Automation** del proyecto de Vercel (Settings → Deployment Protection). Sin él, un Preview protegido respondería 401 al preflight y al navegador. Nunca se imprime. |
+| `E2E_INVITE_TOKEN` | condicional | Token de invitación **fresco y de un solo uso** (insert en `user_invitations` + edge `invite-user`). No puede vivir como secreto estático: se genera justo antes de la corrida que deba ejercitar ese flujo. Ausente → `invitation-accept` queda como **omitido declarado**. |
+| `E2E_FISCAL_SANDBOX_READY` | condicional | `1` cuando el despliegue de pruebas tiene PAC **sandbox** y configuración fiscal cargada. Ausente → `fiscal-timbrar` queda como **omitido declarado**. |
+
+#### Comprobá las credenciales ANTES de guardarlas
+
+Una credencial mal copiada no se nota al guardarla: se nota ~15 minutos después,
+como trece pruebas de Playwright cayendo en un timeout de 20 s. Pasó en el run
+32753812314 — el Supabase era el correcto y el bypass funcionaba, pero Supabase
+contestaba `400 invalid_credentials` a cada intento. Preguntáselo directamente:
+
+```bash
+VITE_SUPABASE_URL="https://<ref-del-sandbox>.supabase.co" \
+VITE_SUPABASE_ANON_KEY="<anon key del MISMO proyecto>" \
+E2E_LOGIN_EMAIL="…"      E2E_LOGIN_PASSWORD="…" \
+E2E_RESTRICTED_EMAIL="…" E2E_RESTRICTED_PASSWORD="…" \
+node scripts/verificar-credenciales-e2e.mjs
+```
+
+Usa la **anon key**, la misma que el navegador, así que comprueba exactamente lo
+que hará Playwright. Distingue "contraseña incorrecta" de "email sin confirmar",
+de "anon key de otro proyecto" y de un fallo de red; y nunca imprime una
+contraseña. Lo que **no** puede comprobar: que ambos usuarios pertenezcan a la
+misma empresa y que el restringido no sea admin ni owner.
+
+> **Las cuentas de `scripts/seed-rls-sandbox.mjs` rotan en CADA corrida del
+> seed.** Sirve la contraseña de la última. Si volvés a sembrar después de
+> guardar los secretos E2E, quedan obsoletos — y también los `RLS_USER_*`, que
+> el harness RLS usa. Actualizá todos de una sola salida del seed.
+
+#### Y sembrá el tenant: con credenciales válidas todavía no alcanza
+
+`seed-rls-sandbox.mjs` crea USUARIOS y una empresa de juguete, pero deja el
+tenant vacío. Con eso la suite entra al shell y los specs de dinero se
+auto-skipean en runtime — y como `agua-lectura-cobro` y `condominios-cuota` son
+**obligatorios**, quedarse en cero ejecutadas los pone rojos en el verificador:
+
+```
+la unidad no tiene contador sembrado
+sin cargos pendientes para emitir — sembrar registro pendiente
+sin cuotas pendientes — generar/sembrar una cuota
+sin cuotas cobrables — sembrar una cuota emitida
+```
+
+```bash
+SEED_SERVICE_ROLE_KEY="<service_role del sandbox>" \
+VITE_SUPABASE_URL="https://<ref>.supabase.co" \
+E2E_EXPECTED_SUPABASE_REF="<ref>" \
+E2E_LOGIN_EMAIL="<el mismo del secreto>" \
+node scripts/seed-e2e-tenant.mjs
+```
+
+Siembra una tarifa vigente, un contador en la unidad, un cargo pendiente y dos
+cuotas (una pendiente y una emitida). El tenant **no se pasa a mano**: se
+resuelve desde `E2E_LOGIN_EMAIL`, así que siempre siembra la empresa que la
+suite va a recorrer. Como escribe con `service_role`, exige
+`E2E_EXPECTED_SUPABASE_REF` y no toca nada si no coincide con el ref de la URL.
+
+> **Corrélo antes de cada corrida de E2E.** No es sólo idempotente: es
+> **re-ejecutable**. La suite CONSUME lo sembrado —emite la factura pendiente,
+> paga la cuota emitida—, así que cada corrida del script REPONE los estados de
+> partida en vez de limitarse a insertar lo que falte. Reconoce sus filas por
+> marcadores estables (`E2E-CONTADOR-001`, `E2E-PENDIENTE`, `E2E-EMITIDA`), de
+> modo que correrlo dos veces no duplica nada.
+
+El entorno de referencia: **Vercel Preview** de esta rama (no el alias de
+producción), construido con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` del
+proyecto **Supabase sandbox** y `VITE_E2E_ENVIRONMENT=e2e-sandbox` — las tres
+como variables de entorno *Preview* en Vercel (idealmente restringidas a las
+ramas de prueba). Sin el marcador, ningún despliegue pasa la validación
+positiva; con él pero apuntando a otro Supabase, tampoco.
 
 No hay `data-testid` en la app (confirmado), así que los selectores son
 **semánticos** (placeholder, label, rol+texto). Si la UI cambia esos textos, hay
 que ajustar el selector — está aislado en `e2e/fixtures/`.
+
+## Tres trampas que costaron corridas enteras
+
+### El esquema del sandbox tiene que salir de las migraciones
+
+El sandbox de E2E se construye **entero** desde `supabase/migrations`. Eso lo
+convierte, sin querer, en la única prueba real de que el repositorio sabe
+reconstruir el esquema — y en la corrida 32884549901 destapó que
+`cuotas_condominio.{fecha_pago,metodo_pago,referencia_pago,comprobante_url}` y
+`{contadores,tarifas,unidades}.updated_by_name` existían **sólo en
+producción**: se habían añadido a mano y ninguna migración las creaba.
+
+El síntoma no se parecía en nada a la causa. PostgREST respondía `400 column
+does not exist` a la proyección de cuotas, `runQuery` se comía el error, la
+proyección quedaba vacía y la UI caía al `estado` legacy — que las transiciones
+ya no escriben. Resultado: «📤 Emitir» seguía saliendo en filas ya emitidas, y
+la prueba «emite una cuota pendiente» quedaba roja **aunque la fila sí
+transicionaba en la base**. Es decir, la pestaña de cobranza se degradaba en
+silencio en cualquier entorno levantado desde cero (un restore de DR, una
+región nueva) y nadie se enteraba porque producción funcionaba.
+
+La reparación está en `supabase/migrations/20260904000000_columnas_solo_en_
+produccion.sql` (siete `ADD COLUMN IF NOT EXISTS`, no-op en producción). La
+guarda que impide que vuelva a pasar es `npm test`:
+`scripts/columnas-vs-migraciones.mjs` compara cada columna que la app nombra en
+un `.select()` contra lo que crean las migraciones — hoy 652 columnas, 0
+faltantes. Los `.select()` con `*` o recursos embebidos **no** se analizan (no
+se puede atribuir la columna a la tabla del `from` sin adivinar) y la prueba
+imprime cuántos quedaron fuera, para que el verde no se lea como cobertura
+total.
+
+### El aviso de cookies tapa los botones
+
+`CookieConsent` se monta global y, mientras nadie decida, pinta un
+`role="dialog"` fijo abajo. Playwright resolvía «💾 Guardar Lectura» —visible,
+habilitado, estable— y se comía los 60 s del timeout reintentando el clic:
+
+```
+<div class="cookie-card">…</div> from <div role="dialog" …> subtree
+intercepts pointer events
+```
+
+Dos de los tres fallos de esa corrida eran esto y no la lógica de negocio. La
+decisión se siembra ahora en el `storageState` del proyecto `setup`
+(`e2e/fixtures/consentimiento.ts`), con la misma clave que usa
+`src/lib/cookieConsent.ts` y con **«solo esenciales»**: los robots no entran en
+la analítica. Se hace ahí y no con un clic por spec para que las pruebas midan
+la app y no su periferia.
+
+Si algún día `STORAGE_KEY` se versiona (`…-v2`) y la fixture no, el banner
+vuelve y los clics vuelven a morir mudos:
+`scripts/__tests__/e2e-consentimiento.test.mjs` ata las dos puntas pasando lo
+que sembramos por el `readConsent()` real.
+
+### Cada spec de dinero crea lo que consume
+
+Emitir gasta una cuota pendiente; pagar gasta una emitida; emitir factura gasta
+un cargo pendiente. Mientras esos datos vinieron de una siembra manual por SQL,
+la suite pasaba **una** vez: el run `32889832167` quedó verde y la corrida
+siguiente se habría omitido con «sin cuotas pendientes» — un skip inesperado, o
+sea rojo, sin que nada estuviera roto. Un verde que sólo ocurre una vez no es
+un verde: es una foto.
+
+Ahora cada prueba destructiva fabrica su precondición por la **misma UI** que
+después ejercita (`e2e/fixtures/sembrar.ts`):
+
+| Spec | Qué crea antes de consumirlo |
+|---|---|
+| «emite una cuota pendiente» | da de alta una cuota con «+ Nueva cuota» |
+| «registra el pago de una cuota» | da de alta una cuota **y la emite** (el alta las crea pendientes) |
+| «emite factura de un cargo pendiente» | captura una lectura — el registro nace con `factura_estado='pendiente'`, así que capturar *es* crear el cargo |
+
+Dos detalles que costaron corridas y conviene no deshacer:
+
+- El alta **afirma que la fila apareció** (`toHaveCount(antes + 1)`), no sólo
+  que se pulsó Guardar. Sin eso, un alta fallida se manifiesta más tarde como
+  un skip confuso en la prueba que la consume.
+- La cuota creada vence a **30 días**, no hoy: con `hoy` nace vencida y el
+  botón «💰 Pagar» no llega a aparecer.
+
+Queda una clase de precondición que los specs **no** fabrican, a propósito: los
+*fixtures del tenant* (una unidad, un contador con tarifa vigente). Eso es alta
+de administración, fuera del alcance de un spec de dinero. Si faltan, el spec
+se omite y el verificador pone el job en rojo — que es la respuesta correcta,
+porque el problema está en el entorno y no en el código.
 
 ## Correr local
 
 Contra un dev server o un preview ya levantado:
 
 ```bash
-npm i -D @playwright/test @types/node
+# @playwright/test y @types/node ya están FIJADOS en package.json (versión
+# exacta): npm ci los instala; sólo falta el binario del navegador.
+npm ci
 npx playwright install chromium
 
 export E2E_BASE_URL="https://<preview-ref>.vercel.app"   # o http://localhost:5173
@@ -54,20 +288,48 @@ npx playwright test --config e2e/playwright.config.ts
 
 ## Variables de entorno
 
-| Var | Para | Obligatoria |
+| Var | Para | En CI |
 |---|---|---|
-| `E2E_BASE_URL` | base URL del preview/sandbox | sí (sin ella, todo skip) |
-| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | login/agua/condominios/fiscal |
-| `E2E_INVITE_TOKEN` | token fresco de invitación | sólo invitation-accept |
-| `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | sólo fiscal-timbrar |
-| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | sólo role-restricted-access |
+| `E2E_BASE_URL` | base URL del preview/sandbox. En CI es **opcional**: el preflight resuelve la URL del despliegue del SHA por la API de Deployments; si se define, entra como un candidato más bajo la misma validación positiva. En local es la forma normal de apuntar la suite. | opcional |
+| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | obligatoria |
+| `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | obligatoria |
+| `E2E_EXPECTED_SUPABASE_REF` | declaración del proyecto Supabase sandbox esperado | obligatoria |
+| `E2E_VERCEL_BYPASS_TOKEN` | bypass oficial de la Deployment Protection de Vercel | obligatoria |
+| `E2E_INVITE_TOKEN` | token fresco de invitación | condicional (sólo invitation-accept) |
+| `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | condicional (sólo fiscal-timbrar) |
 
 ## CI
 
-Job `e2e` en `.github/workflows/coverage.yml`: sólo instala Playwright y corre los
-specs cuando el secreto `E2E_BASE_URL` del repo está presente; si no, es no-op
-verde. No se agrega `@playwright/test` a `package.json` (evita que el `npm ci` de
-`ci.yml` dispare la descarga de browsers): el job lo instala on-demand.
+Workflow **dedicado** `.github/workflows/e2e.yml` (job `E2E (caminos de
+dinero/auth)`), disparado en `pull_request` y `workflow_dispatch` — **no** en
+push a `main`: el build de `main` es el de producción y nunca lleva el marcador
+`e2e-sandbox`, así que un run automático ahí sólo podría quedar rojo por
+ausencia de destino. Cuando exista un despliegue de pruebas del SHA exacto de
+`main`, se lanza a mano con `workflow_dispatch`.
+
+La secuencia del job:
+
+1. **Preflight fail-closed** (`scripts/e2e-preflight.mjs`): exige las SEIS
+   variables obligatorias y **descubre el despliegue por la API de Deployments
+   de GitHub** para el SHA exacto que el job prueba (en PRs, el HEAD de la
+   rama). Cada candidato tiene que demostrar `environment=e2e-sandbox`, el
+   `supabase_project_ref` igual a `E2E_EXPECTED_SUPABASE_REF` y el
+   `commit_sha` exacto, leyendo `/e2e-meta.json` con el header de bypass de
+   Vercel. Sin destino válido, el job falla **antes de instalar nada**.
+2. `npm ci` (dependencias fijadas en el lockfile — no hay instalación bajo
+   demanda de Playwright) + el binario de Chromium + type-check de `e2e/`.
+3. `npx playwright test` contra la URL validada: primero el proyecto `setup`
+   siembra la cookie de bypass con una petición al origen exacto del Preview,
+   después `chromium` navega con esa cookie (`storageState`).
+4. **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`) sobre el
+   reporte JSON: cero ejecutadas, todas skipped, un spec obligatorio omitido
+   o cualquier **skip inesperado** → rojo. El reporte se sube como artifact
+   incluso en fallo (el `storageState` con la cookie de bypass no está entre
+   los paths subidos).
+
+Las corridas se **encolan** (`concurrency: e2e-shared-sandbox`,
+`cancel-in-progress: false`): el sandbox es compartido y una corrida cancelada
+a medias dejaría datos a medio sembrar.
 
 ## Type-check
 

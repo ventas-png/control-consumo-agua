@@ -1,0 +1,157 @@
+name: E2E
+
+# Workflow DEDICADO de la suite Playwright (antes vivía como job de
+# coverage.yml). Separarlo tiene dos razones:
+#
+#   1. Su concurrency es INCOMPATIBLE con la del resto: coverage.yml cancela
+#      la corrida anterior del mismo ref (cancel-in-progress: true), pero una
+#      suite E2E cancelada a medias deja el sandbox compartido con datos a
+#      medio sembrar. Aquí el grupo es FIJO y nada se cancela: las corridas se
+#      encolan.
+#   2. Sus disparadores difieren: NO corre automáticamente en push a main.
+#      El despliegue que Vercel construye de main es el de PRODUCCIÓN — nunca
+#      lleva el marcador e2e-sandbox — y hoy no existe un deployment
+#      e2e-sandbox del SHA exacto de main, así que ese run sólo podría quedar
+#      rojo por ausencia de destino, ruido que no verifica nada. Cuando exista
+#      un despliegue de pruebas por SHA de main, se lanza a mano con
+#      workflow_dispatch (el preflight le exige lo mismo que a un PR).
+#
+# El job es FAIL-CLOSED (mismo criterio que rls-harness): salía VERDE SIN
+# EJECUTAR cuando faltaba E2E_BASE_URL, y ese verde se contabilizó como
+# cobertura E2E durante semanas. Ahora:
+#   · faltan variables obligatorias (las SEIS E2E_*) → preflight ROJO;
+#   · PR de fork / Dependabot (sin secretos por diseño) → ROJO;
+#   · el destino se valida POSITIVAMENTE: el despliegue publica
+#     /e2e-meta.json y tiene que declarar environment=e2e-sandbox, el ref
+#     de Supabase esperado y el MISMO commit que este job prueba. La
+#     denylist de producción queda como segunda defensa;
+#   · la suite corre y DESPUÉS se verifica que ejecutó pruebas de verdad:
+#     cero descubiertas o todas skipped → ROJO aunque Playwright saliera 0.
+# La única omisión admitida es por spec CONDICIONAL (invite token efímero,
+# PAC sandbox) y queda DECLARADA en el resumen, nunca silenciosa.
+#
+# SIN service_role: este job no la recibe ni la necesita — el despliegue de
+# pruebas usa la anon key de su sandbox, como cualquier cliente. El bypass de
+# la Vercel Deployment Protection viaja como header, nunca se imprime.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Permisos mínimos del GITHUB_TOKEN (mismo criterio que coverage.yml).
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (caminos de dinero/auth)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Para resolver por SHA los despliegues registrados (Vercel los publica
+      # en la API de Deployments con su environment_url).
+      deployments: read
+    # El sandbox es COMPARTIDO: dos corridas simultáneas escribiendo lecturas y
+    # pagos sobre el mismo tenant se pisan. Grupo fijo → las corridas se
+    # encolan; cancel-in-progress: false → ninguna muere a medias dejando datos
+    # a medio sembrar.
+    concurrency:
+      group: e2e-shared-sandbox
+      cancel-in-progress: false
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
+      E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+      E2E_INVITE_TOKEN: ${{ secrets.E2E_INVITE_TOKEN }}
+      E2E_FISCAL_SANDBOX_READY: ${{ secrets.E2E_FISCAL_SANDBOX_READY }}
+      E2E_RESTRICTED_EMAIL: ${{ secrets.E2E_RESTRICTED_EMAIL }}
+      E2E_RESTRICTED_PASSWORD: ${{ secrets.E2E_RESTRICTED_PASSWORD }}
+      E2E_EXPECTED_SUPABASE_REF: ${{ secrets.E2E_EXPECTED_SUPABASE_REF }}
+      # Vercel Protection Bypass for Automation: los Previews protegidos
+      # devuelven 401 a un visitante sin sesión; este token —generado en
+      # Vercel → Settings → Deployment Protection— viaja como header
+      # x-vercel-protection-bypass SOLO hacia el origen del Preview: en el
+      # preflight (al leer /e2e-meta.json) y en la única petición de siembra
+      # del proyecto `setup` de Playwright, que convierte el bypass en una
+      # COOKIE de ese origen (e2e/bypass.setup.ts). El navegador jamás lleva
+      # el token como header. Es OBLIGATORIO: sin él, un Preview protegido
+      # haría fallar la suite con un 401 indistinguible de un bug. Nunca se
+      # imprime.
+      E2E_VERCEL_BYPASS_TOKEN: ${{ secrets.E2E_VERCEL_BYPASS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preflight fail-closed y resolución del despliegue por SHA
+        id: preflight
+        env:
+          # `head.repo.fork` sólo existe en eventos pull_request; en
+          # workflow_dispatch queda vacío → se trata como interno →
+          # fail-closed. Correcto.
+          ES_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          # En pull_request, GITHUB_SHA es el MERGE commit; el despliegue de
+          # Vercel se construye del HEAD de la rama. Comparar contra el merge
+          # commit fallaría SIEMPRE — por eso el head.sha explícito.
+          SHA_ESPERADO: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/e2e-preflight.mjs
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # @playwright/test y @types/node están FIJADOS en package.json (versiones
+      # exactas, sin caret): npm ci instala lo que el lockfile dice, no lo que
+      # el registro opine hoy. Sólo el BINARIO del navegador se instala aparte.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium (binario del navegador)
+        run: npx playwright install --with-deps chromium
+
+      - name: Type-check e2e
+        run: npx tsc -p e2e/tsconfig.json
+
+      - name: Run E2E
+        id: playwright
+        env:
+          # La URL VALIDADA por el preflight (metadata + sha + ref), no el
+          # secreto en crudo: si la resolución eligió el despliegue del SHA,
+          # es ésa la que se prueba. El bypass de Vercel ya está en el env del
+          # job; el proyecto `setup` de Playwright lo convierte en una cookie
+          # del origen exacto del Preview (nunca en headers globales).
+          E2E_BASE_URL: ${{ steps.preflight.outputs.url }}
+        run: npx playwright test --config e2e/playwright.config.ts
+
+      # Playwright pone el job en rojo si una prueba FALLA; esto lo pone en rojo
+      # si la suite NO CORRIÓ: cero descubiertas, todas skipped, un spec
+      # obligatorio enteramente omitido, o un condicional omitido con su
+      # variable presente. Lee playwright-results.json (reporter json del
+      # config). Ver scripts/e2e-verificar.mjs.
+      #
+      # Corre AUNQUE Playwright haya fallado: con una prueba en rojo el job ya
+      # está rojo, pero el recuento de ejecutadas/omitidas es justo lo que hace
+      # falta para saber si el rojo es "una prueba falla" o "media suite no
+      # corrió". En la corrida 32752735170 este paso quedó skipped y esa
+      # contabilidad se perdió. Se salta sólo si Playwright ni siquiera llegó a
+      # arrancar (preflight en rojo): ahí no hay reporte que leer.
+      - name: Verificar que la suite ejecutó pruebas de verdad
+        if: ${{ !cancelled() && steps.playwright.outcome != 'skipped' }}
+        run: node scripts/e2e-verificar.mjs
+
+      # `always()`: el reporte es MÁS valioso cuando algo falló. `ignore` cubre
+      # el único caso sin artefactos posibles: el preflight abortó antes de
+      # instalar nada.
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+            playwright-results.json
+          retention-days: 14
+          if-no-files-found: ignore

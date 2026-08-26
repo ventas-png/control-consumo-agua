@@ -585,8 +585,9 @@ export function LecturasSection({
 
         {/* Selector de unidad */}
         <div style={{ marginBottom: '20px' }}>
-          <label style={labelStyle}>Seleccionar Unidad</label>
+          <label htmlFor="lectura-unidad" style={labelStyle}>Seleccionar Unidad</label>
           <select
+            id="lectura-unidad"
             value={selectedUnidadId}
             onChange={e => setSelectedUnidadId(e.target.value)}
             style={inputStyle}
@@ -630,8 +631,9 @@ export function LecturasSection({
               </div>
             ) : (
               <div style={{ marginBottom: '20px' }}>
-                <label style={labelStyle}>Seleccionar Contador</label>
+                <label htmlFor="lectura-contador" style={labelStyle}>Seleccionar Contador</label>
                 <select
+                  id="lectura-contador"
                   value={selectedContadorId}
                   onChange={e => { setSelectedContadorId(e.target.value); setLecturaActual('') }}
                   style={inputStyle}
@@ -681,12 +683,12 @@ export function LecturasSection({
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
                   <div>
-                    <label style={labelStyle}>Lectura Actual</label>
-                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? 'var(--at-danger)' : 'var(--at-line)' }} />
+                    <label htmlFor="lectura-actual" style={labelStyle}>Lectura Actual</label>
+                    <input id="lectura-actual" type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? 'var(--at-danger)' : 'var(--at-line)' }} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumoEfectivo !== null ? (consumoInvalido ? (consumo ?? 0).toFixed(2) + ' (ERROR)' : consumoEfectivo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
+                    <label htmlFor="lectura-consumo" style={labelStyle}>Consumo Calculado (m³)</label>
+                    <input id="lectura-consumo" type="text" readOnly value={consumoEfectivo !== null ? (consumoInvalido ? (consumo ?? 0).toFixed(2) + ' (ERROR)' : consumoEfectivo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
                   </div>
                   {consumo !== null && consumo < 0 && (
                     <div style={{ gridColumn: '1 / -1' }}>
@@ -730,35 +732,35 @@ export function LecturasSection({
                     )}
                   </div>
                   <div>
-                    <label style={labelStyle}>Fecha Lectura Anterior</label>
+                    <label htmlFor="lectura-fecha-anterior" style={labelStyle}>Fecha Lectura Anterior</label>
                     {esPrimeraLectura ? (
                       <>
-                        <input type="date" value={fechaAnteriorManual || (ultimaLecturaInfo.fecha ? ultimaLecturaInfo.fecha.split('T')[0] : '')} onChange={e => setFechaAnteriorManual(e.target.value)} style={{ ...inputStyle, borderColor: 'var(--at-warning)' }} />
+                        <input id="lectura-fecha-anterior" type="date" value={fechaAnteriorManual || (ultimaLecturaInfo.fecha ? ultimaLecturaInfo.fecha.split('T')[0] : '')} onChange={e => setFechaAnteriorManual(e.target.value)} style={{ ...inputStyle, borderColor: 'var(--at-warning)' }} />
                         <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
                       </>
                     ) : (
-                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
+                      <input id="lectura-fecha-anterior" type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
                     )}
                   </div>
                   <div>
-                    <label style={labelStyle}>Fecha Lectura Actual</label>
-                    <input type="date" value={fechaLecturaActual} onChange={e => setFechaLecturaActual(e.target.value)} style={inputStyle} />
+                    <label htmlFor="lectura-fecha-actual" style={labelStyle}>Fecha Lectura Actual</label>
+                    <input id="lectura-fecha-actual" type="date" value={fechaLecturaActual} onChange={e => setFechaLecturaActual(e.target.value)} style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Días de Servicio</label>
-                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? 'var(--at-primary)' : 'var(--at-ink-3)', background: 'var(--at-surface-2)' }} />
+                    <label htmlFor="lectura-dias-servicio" style={labelStyle}>Días de Servicio</label>
+                    <input id="lectura-dias-servicio" type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? 'var(--at-primary)' : 'var(--at-ink-3)', background: 'var(--at-surface-2)' }} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Estado Pago</label>
-                    <select value={estado} onChange={e => setEstado(e.target.value as Registro['estado'])} style={inputStyle}>
+                    <label htmlFor="lectura-estado-pago" style={labelStyle}>Estado Pago</label>
+                    <select id="lectura-estado-pago" value={estado} onChange={e => setEstado(e.target.value as Registro['estado'])} style={inputStyle}>
                       <option value="pendiente">Pendiente</option>
                       <option value="pagado">Pagado</option>
                       <option value="mora">Mora</option>
                     </select>
                   </div>
                   <div style={{ gridColumn: '1/-1' }}>
-                    <label style={labelStyle}>Observaciones</label>
-                    <input type="text" value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" style={inputStyle} />
+                    <label htmlFor="lectura-observaciones" style={labelStyle}>Observaciones</label>
+                    <input id="lectura-observaciones" type="text" value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" style={inputStyle} />
                   </div>
                 </div>
 
