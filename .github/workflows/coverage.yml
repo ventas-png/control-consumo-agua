@@ -237,6 +237,21 @@ jobs:
       - name: Actividad del equipo — la RPC se ejecuta y el cierre vuelve a sellarse
         run: supabase/tests/actividad_equipo/run.sh
 
+      # Los dos selectores de asignación: quién puede quedar registrado como el
+      # usuario de un empleado, y quién puede quedar como responsable de una
+      # ruta. Los dos harness existían y NINGUNO corría en CI — 43 invariantes
+      # que sólo se ejecutaban a mano. Llevan puerto propio porque varios
+      # sandboxes comparten el de por defecto y aquí corren en fila.
+      - name: Personal — el catálogo de cuentas se acota a este condominio
+        env:
+          PGPORT_TEST: 55481
+        run: supabase/tests/personal_usuario/run.sh
+
+      - name: Rutas — el operador asignable sale del proyecto de la ruta
+        env:
+          PGPORT_TEST: 55482
+        run: supabase/tests/rutas_operadores/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

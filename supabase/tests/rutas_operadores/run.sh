@@ -1,35 +1,30 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de la migración 20260826000000: el vínculo entre el
-# expediente del empleado (`personal_condominio`) y su cuenta de ingreso
-# (`app_users`).
+# Verificación EJECUTABLE de la migración 20260906000400: el selector «Asignar
+# Operador» de Rutas solo ofrece cuentas con acceso al proyecto de la ruta.
 #
 # POR QUÉ EXISTE
-# El valor del vínculo es que sea CONFIABLE: sobre él se van a colgar la
-# asignación de tareas y la lectura de "qué ejecutó cada quien". Un vínculo
-# duplicado o cruzado entre empresas no se ve —la columna se llena igual— y
-# firmaría los actos de una persona con el expediente de otra. Las tres reglas
-# que lo sostienen viven en la BD (índice único parcial, trigger de empresa, FK
-# ON DELETE SET NULL) y ninguna se puede comprobar leyendo el SQL: dependen de
-# cómo se comportan al escribir.
+# El daño de este selector no se ve al guardar: la ruta queda con un operador
+# válido a los ojos de la BD (`asignado_a` es un uuid de app_users y nada más),
+# y solo aparece cuando esa persona abre la app y no encuentra los contadores
+# —`rutas_select` le muestra la ruta por ser el asignado, `can_access_project`
+# le niega los items—. La regla que lo evita es un filtro dentro de un RPC
+# SECURITY DEFINER, y quién queda dentro o fuera depende de tres caminos de
+# acceso distintos (rol exento, project_id legacy, asignación explícita) que no
+# se pueden comprobar leyendo el SQL.
 #
-# QUÉ COMPRUEBA (24 invariantes)
-#   1-3    la columna es opcional, apunta a app_users y es ON DELETE SET NULL
-#   4-7    una cuenta = un expediente POR CONDOMINIO; varios sin cuenta conviven;
-#          borrar la cuenta deja el expediente vivo
-#   8-9    el trigger corta el vínculo cross-tenant en INSERT y en UPDATE
-#   10-14  el catálogo del selector: a quién lista (ni residentes ni otra
-#          empresa) y qué reporta (correo, empleado que ya la tomó, acceso al
-#          proyecto por cada cuenta)
-#   15-16  el catálogo se acota a ESTE condominio: no lista cuentas sin acceso
-#          al proyecto, pero sí la que ya está vinculada a un empleado de aquí
-#   17-20  a quién le contesta (permiso del tab, empresa del proyecto, proyecto
-#          inexistente)
-#   21-24  la ACL: anon no ejecuta el catálogo, authenticated sí, la función
-#          trigger no es invocable por nadie — y aun así el trigger dispara
+# QUÉ COMPRUEBA (19 invariantes)
+#    1-5   usuario_acceso_a_proyecto: el espejo de can_access_project para una
+#          cuenta cualquiera; nunca NULL, ni para una cuenta inexistente
+#    6-11  a quién lista el catálogo y a quién no: acceso al proyecto, cuentas
+#          inactivas, residentes, otra empresa, y el nombre de quien no lo tiene
+#   12-16  a quién le contesta: permiso agua.rutas.view, empresa del proyecto,
+#          alcance del llamador y proyecto inexistente
+#   17-18  la ACL: anon no ejecuta el catálogo; el helper no lo ejecuta nadie
+#      19  el catálogo del tab Personal sobrevive al helper compartido
 #
 # USO
-#   supabase/tests/personal_usuario/run.sh
+#   supabase/tests/rutas_operadores/run.sh
 # Requiere binarios de PostgreSQL (initdb/pg_ctl/psql). No toca ningún proyecto
 # remoto: levanta un cluster temporal, corre todo y lo destruye.
 # ════════════════════════════════════════════════════════════════════════════
@@ -37,14 +32,12 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
+# Las tres, en orden: la 1ª crea el vínculo empleado ↔ cuenta (de donde sale el
+# esquema que el fixture reproduce), la 2ª acota el catálogo del tab Personal y
+# la 3ª —la que este harness verifica— extrae el helper de acceso y agrega el
+# catálogo de operadores de rutas.
 MIGRACION="$RAIZ/supabase/migrations/20260826000000_personal_usuario_de_ingreso.sql"
-# El catálogo del selector se acota al proyecto en una segunda migración; los
-# invariantes 15-16 son suyos y sin ella fallan.
 MIGRACION_2="$RAIZ/supabase/migrations/20260906000300_personal_usuarios_asignables_solo_del_proyecto.sql"
-# 20260906000400 vuelve a reemplazar el catálogo para que el acceso salga de un
-# helper compartido con el selector de operadores de Rutas. Se aplica aquí para
-# que estas 24 invariantes se comprueben contra la versión que corre en
-# producción, no contra la que quedó a mitad de camino.
 MIGRACION_3="$RAIZ/supabase/migrations/20260906000400_rutas_operadores_del_proyecto.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
@@ -53,9 +46,9 @@ export PATH
 command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)"; exit 1; }
 
 # El socket unix tiene un tope de 107 bytes: se usa una ruta corta a propósito.
-DATA=$(mktemp -d /tmp/perdata.XXXX)
-SOCK=$(mktemp -d /tmp/persock.XXXX)
-PUERTO=${PGPORT_TEST:-55439}
+DATA=$(mktemp -d /tmp/rutdata.XXXX)
+SOCK=$(mktemp -d /tmp/rutsock.XXXX)
+PUERTO=${PGPORT_TEST:-55441}
 
 # Postgres se niega a correr como root; si lo somos, se delega en el usuario
 # `postgres` del sistema. El apagado se delega IGUAL que el arranque: con
@@ -81,18 +74,18 @@ correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK' -l $DATA/pg.log start" >/dev/nu
 sleep 2
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
-psql -q -d postgres -c "CREATE DATABASE personal" >/dev/null
+psql -q -d postgres -c "CREATE DATABASE rutas_ops" >/dev/null
 # anon/authenticated no existen en un Postgres pelado; la migración les revoca y
 # otorga privilegios por nombre de rol.
-psql -q -d personal -c "CREATE ROLE anon; CREATE ROLE authenticated;" >/dev/null 2>&1 || true
+psql -q -d rutas_ops -c "CREATE ROLE anon; CREATE ROLE authenticated;" >/dev/null 2>&1 || true
 
 aplicar() {
-  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d personal -f "$1" >/dev/null
+  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rutas_ops -f "$1" >/dev/null
 }
 
-echo "── 1/3 · fixture: esquema y cuentas de la empresa ──────────────────────"
+echo "── 1/3 · fixture: esquema, cuentas y accesos por proyecto ──────────────"
 aplicar "$AQUI/fixture.sql"
-echo "  OK    stubs + 8 cuentas + 2 condominios + 4 expedientes"
+echo "  OK    stubs + 9 cuentas (exentas, asignadas, legacy, inactiva, ajena)"
 
 echo "── 2/3 · las tres migraciones, aplicadas DOS veces (idempotentes) ──────"
 for _ in 1 2; do
@@ -107,7 +100,7 @@ echo "── 3/3 · invariantes ────────────────
 # se captura, el harness muere ANTES de imprimir nada y el fallo se ve como una
 # salida vacía.
 CODIGO=0
-SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d personal -f "$AQUI/assert.sql" 2>&1) || CODIGO=$?
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rutas_ops -f "$AQUI/assert.sql" 2>&1) || CODIGO=$?
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 if [ "$CODIGO" -ne 0 ]; then
@@ -118,4 +111,4 @@ if [ "$CODIGO" -ne 0 ]; then
 fi
 
 echo
-echo "✅ personal_usuario: el vínculo es único por condominio, no cruza empresas y su catálogo —solo cuentas con acceso a ESTE condominio— lo ve quien tiene el permiso del tab."
+echo "✅ rutas_operadores: el selector de operador solo ofrece cuentas activas con acceso al proyecto de la ruta, y solo se lo entrega a quien ve ese proyecto."

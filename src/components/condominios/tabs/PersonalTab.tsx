@@ -74,7 +74,8 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const [saving, setSaving] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  // Catálogo de cuentas de ingreso de la empresa. Se carga al montar (y no al
+  // Catálogo de cuentas de ingreso de la empresa con acceso a este condominio
+  // (más las ya vinculadas aquí). Se carga al montar (y no al
   // abrir el formulario) porque las tarjetas también lo usan: sin él, un empleado
   // vinculado se vería igual que uno sin cuenta.
   const [usuarios, setUsuarios] = useState<UsuarioAsignablePersonal[]>([])
@@ -90,6 +91,18 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
 
   const usuarioPorId = new Map(usuarios.map(u => [u.usuario_id, u]))
   const usuarioSeleccionado = form.user_id ? usuarioPorId.get(form.user_id) : undefined
+  // Lo que el selector puede ofrecer: la cuenta que ve ESTE condominio y la que
+  // ya está vinculada a un empleado de aquí (hay que poder nombrarla y explicar
+  // «ya es Fulano» aunque haya perdido el acceso). Una cuenta de la empresa que
+  // no ve el condominio no podría registrar nada en él, y ofrecerla solo invita
+  // a sellar el expediente con la cuenta de alguien de otro proyecto.
+  //
+  // El catálogo ya llega filtrado desde 20260906000300; el filtro se repite aquí
+  // porque `usuarios` alimenta además el mapa de las tarjetas —que sí necesita
+  // TODAS las filas— y porque el tab debe comportarse igual contra una base
+  // donde esa migración aún no corrió.
+  const asignables = usuarios.filter(u => u.tiene_acceso_proyecto || u.personal_id !== null)
+  const ocultasSinAcceso = usuarios.length - asignables.length
   const sinCuenta = personal.filter(p => p.estado === 'activo' && !p.user_id).length
 
   const filtered = personal.filter(p => {
@@ -322,7 +335,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                   {form.user_id && !usuarioSeleccionado && (
                     <option value={form.user_id}>Cuenta vinculada (no disponible en la lista)</option>
                   )}
-                  {usuarios.map(u => {
+                  {asignables.map(u => {
                     const tomada = u.personal_id !== null && u.personal_id !== editId
                     return (
                       <option key={u.usuario_id} value={u.usuario_id} disabled={tomada}>
@@ -341,9 +354,19 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                   ⚠️ No se pudo cargar la lista de usuarios: {usuariosError}
                 </span>
               )}
-              {!usuariosError && usuarios.length === 0 && (
+              {!usuariosError && asignables.length === 0 && (
                 <span style={avisoStyle('warning')}>
-                  Esta empresa todavía no tiene usuarios que asignar. Créalos en Administración › Usuarios.
+                  Ninguna cuenta de la empresa tiene acceso a este condominio todavía. Créala o dale
+                  acceso en Administración › Usuarios › Asignar acceso.
+                </span>
+              )}
+              {!usuariosError && ocultasSinAcceso > 0 && (
+                <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+                  Solo se listan las cuentas con acceso a este condominio
+                  {' '}({ocultasSinAcceso === 1
+                    ? 'otra cuenta de la empresa no aparece'
+                    : `otras ${ocultasSinAcceso} cuentas de la empresa no aparecen`}).
+                  Para que una salga aquí, dale acceso en Administración › Usuarios › Asignar acceso.
                 </span>
               )}
               {usuarioSeleccionado && !usuarioSeleccionado.activo && (
