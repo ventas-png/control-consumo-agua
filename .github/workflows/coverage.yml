@@ -252,6 +252,18 @@ jobs:
           PGPORT_TEST: 55482
         run: supabase/tests/rutas_operadores/run.sh
 
+      # 20260907000100 retira dos policies legacy company_rw_* que anulaban por
+      # OR el gate RBAC —cualquier miembro de la empresa leía y escribía tareas
+      # de turno— y le da a `tareas_bloque` las garantías que ya tenía
+      # ejecuciones_limpieza: CHECK de estado, unicidad por plantilla, anulación
+      # lógica sellada. Nada de eso se comprueba leyendo el SQL: hay que ver que
+      # cada rol vea exactamente lo que le toca y que cargar plantillas dos veces
+      # deje de duplicar. Incluye la re-aplicación completa.
+      - name: Paridad de tareas_bloque — anulación sellada y RLS re-gateada
+        env:
+          PGPORT_TEST: 55483
+        run: supabase/tests/tareas_bloque_paridad/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
