@@ -200,6 +200,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/limpieza_catalogos/run.sh
 
+      # El sandbox de arriba construye el esquema tal como lo DECLARAN las
+      # migraciones, y por eso estaba verde el 2026-08-27 mientras el apply a
+      # producción fallaba con 42703: allí `areas_condominio.activo` no existe.
+      # Éste deforma el esquema hasta la forma real de producción antes de
+      # probar, y empieza comprobando que sin la reparación el fallo se
+      # reproduce — si dejara de reproducirse, el escenario ya no vale.
+      - name: Drift de producción — la serie de limpieza sobre el esquema real
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/drift_produccion/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
