@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE de los catálogos operativos de limpieza
-# (20260904000100 · 000200 · 000300 · 000400).
+# (20260904000100 · 000200 · 000300 · 000400 · 20260907000000).
 #
 # POR QUÉ EXISTE
 # La serie migra DATOS además de esquema: el backfill decide a qué área del
@@ -11,7 +11,7 @@
 # bien, borrar una programación sigue arrastrando fotos y reportes históricos.
 # Nada de esto se valida leyendo el SQL.
 #
-# QUÉ COMPRUEBA (28 invariantes)
+# QUÉ COMPRUEBA (37 invariantes)
 #   A · BACKFILL    coincidencia única (con espacios, mayúsculas y acentos),
 #                   área inexistente creada UNA sola vez, ambigua que se queda
 #                   pendiente, texto en blanco que no ensucia, y que cada
@@ -38,8 +38,14 @@
 #                   owner/admin), prog_limpieza lee el catálogo de actividades
 #                   sin permisos de Seguridad, y las policies legacy
 #                   company_rw_* ya no existen.
-#   + IDEMPOTENCIA  re-aplicar la serie no duplica áreas, no resuelve ambiguos
-#                   solo y no revive policies.
+#   F · FUSIÓN      (20260907000000) las áreas duplicadas de un proyecto se
+#                   fusionan en una sola eligiendo por activa > más referenciada
+#                   > más antigua; las CUATRO FKs entrantes quedan re-apuntadas
+#                   sin huérfanas; el homónimo de OTRO proyecto no se toca; la
+#                   programación que quedó ambigua en el backfill se cierra; y
+#                   el UNIQUE por nombre normalizado bloquea nuevos duplicados.
+#   + IDEMPOTENCIA  re-aplicar la serie no duplica ni resucita áreas, no
+#                   resuelve ambiguos por su cuenta y no revive policies.
 #
 # USO
 #   supabase/tests/limpieza_catalogos/run.sh
@@ -54,6 +60,7 @@ MIG_AREAS="$RAIZ/supabase/migrations/20260904000100_limpieza_area_catalogo_e_his
 MIG_PLANT="$RAIZ/supabase/migrations/20260904000200_plantillas_catalogo_actividades.sql"
 MIG_PUENTES="$RAIZ/supabase/migrations/20260904000300_plantilla_tarea_recursos.sql"
 MIG_FINAL="$RAIZ/supabase/migrations/20260904000400_limpieza_integridad_final.sql"
+MIG_DEDUPE="$RAIZ/supabase/migrations/20260907000000_areas_dedupe_y_unicidad.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -89,17 +96,17 @@ psql -q -d postgres -c "CREATE DATABASE limpcat" >/dev/null
 # revocan/conceden permisos por nombre de rol.
 psql -q -d limpcat -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;" >/dev/null 2>&1 || true
 
-echo "── 1/4 · fixture (estado previo: legacy vivas, FK CASCADE, area texto libre) ─"
+echo "── 1/5 · fixture (estado previo: legacy vivas, FK CASCADE, area texto libre) ─"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/4 · aplicar la serie de migraciones ───────────────────────────────"
+echo "── 2/5 · aplicar la serie de catálogos ─────────────────────────────────"
 for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES" "$MIG_FINAL"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
 
-echo "── 3/4 · invariantes ───────────────────────────────────────────────────"
+echo "── 3/5 · invariantes de la serie de catálogos ──────────────────────────"
 # Sin este `|| { … }`, `set -e` aborta con la salida de psql dentro de la
 # sustitución y la consola no muestra NADA (ver supabase/tests/turnos/run.sh).
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/assert.sql" 2>&1) || {
@@ -118,8 +125,24 @@ if echo "$SALIDA" | grep -q 'WARNING:'; then
 fi
 
 echo
-echo "── 4/4 · idempotencia (re-aplicar la serie y re-verificar) ─────────────"
-for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES" "$MIG_FINAL"; do
+echo "── 4/5 · dedupe de áreas y unicidad ────────────────────────────────────"
+# El backfill nunca deja una programación colgando de una perdedora, así que el
+# cuarto UPDATE de la fusión hay que provocarlo a mano o se verifica en vacío.
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/pre_dedupe.sql" >/dev/null
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$MIG_DEDUPE" >/dev/null
+echo "  OK    $(basename "$MIG_DEDUPE")"
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/dedupe.sql" 2>&1) || {
+  echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+  echo
+  echo "❌ invariante de dedupe incumplida:"
+  echo "$SALIDA" | sed -n 's/.*ERROR:  /  /p'
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
+echo
+echo "── 5/5 · idempotencia (re-aplicar la serie completa y re-verificar) ────"
+for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES" "$MIG_FINAL" "$MIG_DEDUPE"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$m" >/dev/null
 done
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/reassert.sql" 2>&1) || {
@@ -130,7 +153,8 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/reassert.sql" 2>&1) || 
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 echo
-echo "✅ limpieza_catalogos: 34 invariantes (backfill, historial inmutable con"
+echo "✅ limpieza_catalogos: 41 invariantes (backfill, historial inmutable con"
 echo "   anulación lógica, actividades controladas, puentes con tenant"
-echo "   congelado, RLS, y la integridad final: área por tenant y catálogo"
-echo "   de cargos también en UPDATE), serie idempotente."
+echo "   congelado, RLS, la integridad final —área por tenant y catálogo de"
+echo "   cargos también en UPDATE— y la fusión de áreas duplicadas), serie"
+echo "   idempotente."

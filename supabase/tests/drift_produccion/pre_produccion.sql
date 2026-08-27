@@ -36,7 +36,11 @@ INSERT INTO public.areas_condominio (id, company_id, project_id, nombre, icono, 
 -- 20260424000059 la declara con `activo`; producción tampoco lo tiene. El
 -- fixture de limpieza_catalogos no monta esta tabla (no la necesita), así que
 -- se crea aquí con la forma real para que la reparación tenga qué reparar.
-CREATE TABLE public.rutas_ronda (
+-- `rutas_ronda` la trae ahora el fixture compartido (la añadió 20260907000000
+-- para poder colgar de ella un punto de control). Aquí sólo hace de andamio
+-- para las FKs, así que sirve cualquiera de las dos formas y se conserva este
+-- CREATE por si el fixture dejara de traerla.
+CREATE TABLE IF NOT EXISTS public.rutas_ronda (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id          uuid NOT NULL REFERENCES public.companies(id),
   project_id          uuid NOT NULL REFERENCES public.projects(id),

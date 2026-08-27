@@ -331,6 +331,47 @@ CREATE TABLE public.inventario_condominio (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- rutas_ronda + puntos_control_ruta (20260424000059): la 1ª y la 3ª FK
+-- entrantes a areas_condominio. `puntos_control_ruta.area_id` es NOT NULL: el
+-- dedupe está obligado a re-apuntarla, no puede desatarla.
+CREATE TABLE public.rutas_ronda (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES public.companies(id),
+  project_id uuid NOT NULL REFERENCES public.projects(id),
+  nombre     text NOT NULL,
+  activo     boolean NOT NULL DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE public.puntos_control_ruta (
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ruta_id  uuid NOT NULL REFERENCES public.rutas_ronda(id) ON DELETE CASCADE,
+  area_id  uuid NOT NULL REFERENCES public.areas_condominio(id),
+  orden    int  NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+-- bloques_turno + tareas_bloque (20260424000060): la 4ª FK entrante. Ninguna
+-- de las dos tiene project_id propio — el dedupe verifica su tenant por JOIN
+-- al padre.
+CREATE TABLE public.bloques_turno (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id  uuid NOT NULL REFERENCES public.companies(id),
+  project_id  uuid NOT NULL REFERENCES public.projects(id),
+  personal_id uuid NOT NULL REFERENCES public.personal_condominio(id),
+  turno       text NOT NULL DEFAULT 'manana',
+  fecha       date NOT NULL,
+  estado      text NOT NULL DEFAULT 'pendiente',
+  created_at  timestamptz DEFAULT now()
+);
+CREATE TABLE public.tareas_bloque (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bloque_id uuid NOT NULL REFERENCES public.bloques_turno(id) ON DELETE CASCADE,
+  area_id   uuid REFERENCES public.areas_condominio(id),
+  titulo    text NOT NULL,
+  orden     int  NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
 -- ── Datos base ──────────────────────────────────────────────────────────────
 INSERT INTO public.companies (id) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000001'),
@@ -373,6 +414,10 @@ INSERT INTO public.user_roles (user_id, role_id) VALUES
   ('e0000000-0000-0000-0000-00000000000f', 'cccccccc-0000-0000-0000-000000000003'),
   ('e0000000-0000-0000-0000-000000000010', 'cccccccc-0000-0000-0000-000000000004');
 
+INSERT INTO public.personal_condominio (id, company_id, project_id, nombre) VALUES
+  ('50000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000001', 'Lucía Conserje');
+
 -- Catálogo de áreas ANTES del backfill.
 --   P1 de A: 'Piscina' (match único), 'Jardín' (match único con acento),
 --            'Lobby' + ' lobby ' (AMBIGUAS: mismo nombre normalizado).
@@ -383,6 +428,20 @@ INSERT INTO public.areas_condominio (id, company_id, project_id, nombre) VALUES
   ('a0000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Lobby'),
   ('a0000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', ' lobby '),
   ('a0000000-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000002', 'Piscina');
+
+-- Escenario de desempate: en P1 hay un tercer 'LOBBY' INACTIVO y más antiguo.
+-- La regla (activo DESC, referencias DESC, created_at ASC, id ASC) debe
+-- descartarlo aunque sea el más viejo.
+INSERT INTO public.areas_condominio (id, company_id, project_id, nombre, activo, created_at) VALUES
+  ('a0000000-0000-0000-0000-000000000006', 'aaaaaaaa-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000001', 'LOBBY', false, '2020-01-01T00:00:00Z');
+
+-- Duplicado CROSS-PROYECTO dentro de la MISMA empresa: 'Lobby' en el 2º
+-- proyecto de A. NO debe fusionarse con el de P1 (el PARTITION es por
+-- project_id). Es el fallo más probable de un dedupe mal escrito.
+INSERT INTO public.areas_condominio (id, company_id, project_id, nombre) VALUES
+  ('a0000000-0000-0000-0000-000000000007', 'aaaaaaaa-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000003', 'Lobby');
 
 -- Programaciones de limpieza legadas (area = texto libre).
 INSERT INTO public.programacion_limpieza (id, company_id, project_id, area) VALUES
@@ -426,3 +485,43 @@ INSERT INTO public.suministros_condominio (id, company_id, project_id, nombre, u
 INSERT INTO public.inventario_condominio (id, company_id, project_id, nombre) VALUES
   ('f1000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Hidrolavadora'),
   ('f1000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000002', 'Hidrolavadora vecina');
+
+-- ── Referencias a la SUPERVIVIENTE (' lobby ', …0004) ───────────────────────
+-- Son las que la hacen ganar: la regla de desempate mira, tras `activo`, cuál
+-- está más referenciada. Fijan el resultado de la fusión, pero NO prueban el
+-- re-apuntado: apuntan a la que sobrevive, así que su `area_id` no cambia.
+-- Para eso están las de más abajo, sobre la INACTIVA.
+INSERT INTO public.rutas_ronda (id, company_id, project_id, nombre) VALUES
+  ('e1000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000001', 'Ronda nocturna');
+INSERT INTO public.puntos_control_ruta (id, ruta_id, area_id, orden) VALUES
+  ('e2000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000004', 0);
+
+INSERT INTO public.bloques_turno (id, company_id, project_id, personal_id, fecha) VALUES
+  ('e3000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001', DATE '2026-08-01');
+INSERT INTO public.tareas_bloque (id, bloque_id, area_id, titulo) VALUES
+  ('e4000000-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000004', 'Trapear el lobby');
+
+-- Una plantilla y una programación también atadas a la perdedora.
+UPDATE public.plantillas_tarea_cargo
+SET area_id = 'a0000000-0000-0000-0000-000000000004'
+WHERE id = 'd0000000-0000-0000-0000-000000000001';
+
+-- ── Referencias a una PERDEDORA de verdad ('LOBBY', …0006) ──────────────────
+-- Éstas son las que prueban el re-apuntado: si la migración se olvidara de una
+-- de las cuatro tablas, estas filas quedarían apuntando a un área retirada.
+-- Se cuelgan de la INACTIVA a propósito: pierde por `activo DESC` antes de que
+-- se cuente ninguna referencia, así que sumarle filas no puede cambiar quién
+-- gana — y el escenario de desempate de arriba se mantiene intacto.
+INSERT INTO public.puntos_control_ruta (id, ruta_id, area_id, orden) VALUES
+  ('e2000000-0000-0000-0000-000000000002', 'e1000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000006', 1);
+INSERT INTO public.tareas_bloque (id, bloque_id, area_id, titulo) VALUES
+  ('e4000000-0000-0000-0000-000000000002', 'e3000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000006', 'Barrer el LOBBY');
+UPDATE public.plantillas_tarea_cargo
+SET area_id = 'a0000000-0000-0000-0000-000000000006'
+WHERE id = 'd0000000-0000-0000-0000-000000000003';

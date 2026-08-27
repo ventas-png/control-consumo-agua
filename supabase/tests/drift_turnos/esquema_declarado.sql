@@ -33,6 +33,14 @@ CREATE TABLE public.amenidades_bloqueos (
 );
 
 -- 20260424000060:18, con `cerrado_en` y `puntaje_completitud`.
+-- El fixture compartido de limpieza_catalogos crea `bloques_turno` y
+-- `tareas_bloque` con la forma DECLARADA desde 20260907000000, que las necesita
+-- para probar el re-apuntado de FKs. Aquí hacen falta con OTRA forma, así que
+-- se reemplazan: quedarse con las del fixture dejaría este sandbox probando el
+-- escenario contrario al que dice reproducir.
+DROP TABLE IF EXISTS public.tareas_bloque;
+DROP TABLE IF EXISTS public.bloques_turno;
+
 CREATE TABLE public.bloques_turno (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id          uuid NOT NULL REFERENCES public.companies(id),
