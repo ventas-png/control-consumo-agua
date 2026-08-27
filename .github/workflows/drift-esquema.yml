@@ -39,17 +39,6 @@ name: Drift de esquema (migraciones ↔ producción)
 # medio aplicar— sino por `workflow_run`, cuando el apply terminó de verdad. Los
 # que no tocan migraciones no tienen carrera y siguen por `push`.
 on:
-  # ⚠️ TEMPORAL — SE QUITA ANTES DE FUSIONAR.
-  # `workflow_dispatch` sólo es invocable si el workflow ya vive en la rama por
-  # defecto, y éste es nuevo. Sin esto no hay forma de correrlo contra
-  # producción desde la rama, y sin una corrida real el allowlist habría que
-  # sembrarlo a ojo — que es exactamente lo que el propio script prohíbe.
-  # Ya en modo BLOQUEANTE: la corrida de descubrimiento (run 33107076122) sirvió
-  # para sembrarlo, y ésta tiene que salir verde para demostrar que lo cubre.
-  pull_request:
-    paths:
-      - 'scripts/migraciones-vs-produccion.mjs'
-      - '.github/workflows/drift-esquema.yml'
   push:
     branches: [main]
     paths-ignore:
