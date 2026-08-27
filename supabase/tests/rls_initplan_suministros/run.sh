@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE del envoltorio (SELECT …) en las políticas de
-# suministros (20260906000000).
+# suministros (20260906000100).
 #
 # POR QUÉ EXISTE
 # La migración promete algo que el SQL no puede demostrar solo: que re-escribir
@@ -32,7 +32,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIG="$RAIZ/supabase/migrations/20260906000000_rls_initplan_suministros.sql"
+MIG="$RAIZ/supabase/migrations/20260906000100_rls_initplan_suministros.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -84,7 +84,7 @@ PGOPTIONS="-c client_min_messages=warning" \
   psql -q -v ON_ERROR_STOP=1 -v etapa=antes -d initplan -f "$AQUI/medir.sql" >/dev/null
 echo "  OK    seis accesos medidos"
 
-echo "── 3/5 · aplicar 20260906000000 (dos veces: idempotencia) ─────────────"
+echo "── 3/5 · aplicar 20260906000100 (dos veces: idempotencia) ─────────────"
 aplicar "$MIG"
 # Segunda pasada: si no fuera idempotente, aquí revienta. Las migraciones se
 # re-aplican de verdad en reconciliaciones y en preview branches.

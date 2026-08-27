@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- Mide SEIS accesos y los anota en `public.medicion` bajo la etapa recibida.
--- Se corre dos veces —antes y después de 20260906000000— y `assert.sql` exige
+-- Se corre dos veces —antes y después de 20260906000100— y `assert.sql` exige
 -- que las dos tandas coincidan caso por caso.
 --
 -- Los seis están elegidos para cubrir las dos direcciones del error posible:

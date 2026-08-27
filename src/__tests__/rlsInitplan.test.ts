@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
-// Guard del envoltorio `(SELECT …)` en las políticas RLS (20260906000000).
+// Guard del envoltorio `(SELECT …)` en las políticas RLS (20260906000100).
 //
 // EL PROBLEMA QUE FIJA
 // `public.user_has_permission()` es `LANGUAGE sql STABLE` y, dentro de una
@@ -17,7 +17,7 @@ import { resolve, join } from 'node:path'
 // porque el SQL era correcto. Arreglar las de suministros sin dejar algo que
 // avise sería arreglar el síntoma de hoy.
 //
-// EL RECORTE IMPORTA: sólo se exige desde 20260906000000 en adelante. Las
+// EL RECORTE IMPORTA: sólo se exige desde 20260906000100 en adelante. Las
 // migraciones anteriores son historia inmutable (scripts/migrations-append-only)
 // y reescribirlas es justamente lo que ese guard prohíbe.
 //
@@ -26,8 +26,8 @@ import { resolve, join } from 'node:path'
 // fila que evitar. Un guard que gritara por eso enseñaría a ignorarlo.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
-const DESDE = '20260906000000'
-const MIG_INITPLAN = '20260906000000_rls_initplan_suministros.sql'
+const DESDE = '20260906000100'
+const MIG_INITPLAN = '20260906000100_rls_initplan_suministros.sql'
 
 /** Quita comentarios de línea y de bloque para no analizar prosa. */
 function soloCodigo(sql: string): string {
@@ -83,7 +83,7 @@ describe('RLS · los helpers van envueltos en (SELECT …) dentro de las policie
   })
 })
 
-describe('20260906000000 · qué arregla exactamente', () => {
+describe('20260906000100 · qué arregla exactamente', () => {
   const sql = readFileSync(join(MIGRATIONS_DIR, MIG_INITPLAN), 'utf-8')
   const TABLAS = ['suministros_condominio', 'movimientos_suministro'] as const
   const OPERACIONES = ['select', 'insert', 'update', 'delete'] as const
@@ -118,7 +118,7 @@ describe('20260906000000 · qué arregla exactamente', () => {
   })
 })
 
-describe('20260906000000 · el sandbox conductual está cableado a CI', () => {
+describe('20260906000100 · el sandbox conductual está cableado a CI', () => {
   it('el job rls-sandbox ejecuta rls_initplan_suministros', () => {
     const wf = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf-8')
     expect(wf).toMatch(/supabase\/tests\/rls_initplan_suministros\/run\.sh/)

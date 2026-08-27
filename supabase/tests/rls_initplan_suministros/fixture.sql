@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20260906000000 contra un Postgres de verdad.
+-- Fixture para EJECUTAR 20260906000100 contra un Postgres de verdad.
 --
 -- LA IDEA DEL SANDBOX
 -- El cambio es de forma, no de fondo: `(SELECT public.user_has_permission(…))`

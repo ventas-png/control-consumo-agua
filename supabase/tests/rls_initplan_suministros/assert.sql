@@ -2,7 +2,7 @@
 \pset tuples_only on
 \pset format unaligned
 
--- Invariantes de 20260906000000. Dos preguntas, y las dos hay que ejecutarlas:
+-- Invariantes de 20260906000100. Dos preguntas, y las dos hay que ejecutarlas:
 --   A · ¿cambió algún acceso? (no debe)
 --   B · ¿la forma nueva llegó al catálogo? (debe)
 
@@ -159,6 +159,14 @@ BEGIN
     RAISE EXCEPTION '6a: desapareció rbac_install_company_policies'; END IF;
   IF position('(SELECT public.user_has_permission(%L))' in v_prosrc) = 0 THEN
     RAISE EXCEPTION '6b: la plantilla del generador sigue con la llamada desnuda'; END IF;
+
+  -- Y NINGUNA queda desnuda. La plantilla emite la llamada CUATRO veces —SELECT,
+  -- INSERT y las dos mitades del UPDATE— así que preguntar si alguna está
+  -- envuelta no alcanza: desenvolver una sola dejaba pasar la invariante. Se
+  -- borran las envueltas y se exige que no sobre ninguna mención.
+  IF replace(v_prosrc, '(SELECT public.user_has_permission(%L))', '')
+       LIKE '%user_has_permission%' THEN
+    RAISE EXCEPTION '6c: quedó una llamada desnuda en la plantilla del generador'; END IF;
 
   RAISE NOTICE 'OK 6  el generador emite el envoltorio para las tablas futuras';
 END;
