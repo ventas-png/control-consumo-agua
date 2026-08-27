@@ -19,6 +19,7 @@ const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG_AREAS = '20260904000100_limpieza_area_catalogo_e_historial.sql'
 const MIG_PLANTILLAS = '20260904000200_plantillas_catalogo_actividades.sql'
 const MIG_PUENTES = '20260904000300_plantilla_tarea_recursos.sql'
+const MIG_FINAL = '20260904000400_limpieza_integridad_final.sql'
 
 const PERM_CHECKLIST = 'condominios.tab.checklist_areas'
 const PERM_RONDAS = 'condominios.tab.rutas_ronda'
@@ -330,11 +331,74 @@ describe('reglas del catálogo de actividades', () => {
     expect(sql).toMatch(/NOT requiere_checklist OR public\.plantilla_checklist_valido\(checklist\)/)
   })
 
-  it('el cargo nuevo va controlado por trigger, solo en INSERT', () => {
+  it('20260904000200 declaró el trigger de cargo solo en INSERT', () => {
+    // Se fija el estado HISTÓRICO de este archivo, que es inmutable. La forma
+    // vigente la pone 20260904000400 (ver el bloque de integridad final): allí
+    // se demuestra que sí se puede validar el UPDATE de `cargo` sin romper las
+    // filas legadas, que era el motivo declarado para dejarlo en INSERT.
     expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.plantillas_cargo_valida_cargo/)
     expect(sql).toMatch(/BEFORE INSERT ON public\.plantillas_tarea_cargo/)
-    // Nunca BEFORE UPDATE: re-validaría filas legadas con cargo libre.
-    expect(sql).not.toMatch(/BEFORE INSERT OR UPDATE ON public\.plantillas_tarea_cargo/)
     expect(sql).toMatch(/'conserje', 'guardia', 'jardinero', 'mantenimiento', 'administrador', 'otro'/)
+  })
+})
+
+describe('20260904000400 · integridad final', () => {
+  const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_FINAL), 'utf8'))
+
+  it('el ancla UNIQUE de áreas lleva el trío completo', () => {
+    // Sin ella la FK compuesta no es declarable: PostgreSQL exige un índice
+    // único que cubra EXACTAMENTE las columnas referenciadas.
+    expect(sql).toMatch(
+      /ADD CONSTRAINT areas_id_tenant_uq UNIQUE \(id, company_id, project_id\)/,
+    )
+  })
+
+  it('la FK de area_id pasa a ser compuesta y sigue siendo RESTRICT', () => {
+    expect(sql).toMatch(/FOREIGN KEY \(area_id, company_id, project_id\)/)
+    expect(sql).toMatch(
+      /REFERENCES public\.areas_condominio \(id, company_id, project_id\)/,
+    )
+    expect(sql).toMatch(/ON DELETE RESTRICT/)
+    // company_id sola no alcanza: dejaría pasar un área de otro proyecto de la
+    // MISMA empresa. El sandbox lo prueba ejecutándolo (invariante 30).
+    expect(sql).not.toMatch(/FOREIGN KEY \(area_id, company_id\)\s*\n\s*REFERENCES/)
+  })
+
+  it('descubre la FK vieja por catálogo en vez de asumir su nombre', () => {
+    // Es anónima (la declaró un ADD COLUMN … REFERENCES inline), así que el
+    // nombre lo puso PostgreSQL y puede diferir entre entornos.
+    expect(sql).toMatch(/FROM pg_constraint/)
+    expect(sql).toMatch(/conkey\s*=\s*ARRAY\[v_attnum\]/)
+    expect(sql).not.toMatch(/DROP CONSTRAINT programacion_limpieza_area_id_fkey/)
+  })
+
+  it('el trigger de cargo cubre INSERT y UPDATE OF cargo', () => {
+    expect(sql).toMatch(
+      /BEFORE INSERT OR UPDATE OF cargo ON public\.plantillas_tarea_cargo/,
+    )
+  })
+
+  it('y sólo valida cuando el cargo CAMBIA', () => {
+    // EL FILO DE TODO EL ARREGLO. `UPDATE OF cargo` no dispara si el UPDATE no
+    // menciona la columna, pero sí dispara con `SET cargo = cargo` — que es lo
+    // que genera cualquier ORM que reescriba la fila entera. Sin este guard,
+    // una fila legada con cargo de texto libre se vuelve ineditable.
+    expect(sql).toMatch(/TG_OP = 'INSERT' OR NEW\.cargo IS DISTINCT FROM OLD\.cargo/)
+  })
+
+  it('el desvinculado de áreas cruzadas conserva el texto y avisa', () => {
+    // Poner area_id a NULL es una escritura de datos: no puede pasar callada.
+    expect(sql).toMatch(/SET area_id = NULL/)
+    expect(sql).toMatch(/RAISE NOTICE 'LIMPIEZA_INTEGRIDAD/)
+    // El snapshot `area` NO se toca: es lo que deja la fila mostrable como
+    // «pendiente de vincular» en vez de vacía.
+    expect(sql).not.toMatch(/SET area_id = NULL,\s*area\s*=/)
+  })
+
+  it('el sandbox aplica la cuarta migración y la re-aplica', () => {
+    const runSh = readFileSync(resolve('supabase/tests/limpieza_catalogos/run.sh'), 'utf8')
+    expect(runSh).toContain(MIG_FINAL)
+    // Dos veces: la serie y la pasada de idempotencia.
+    expect(runSh.match(/\$MIG_FINAL/g) ?? []).toHaveLength(2)
   })
 })

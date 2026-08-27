@@ -548,3 +548,158 @@ BEGIN
   RAISE NOTICE '── 7 invariantes de RLS OK ──';
 END;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- D · INTEGRIDAD FINAL (20260904000400)
+-- ════════════════════════════════════════════════════════════════════════════
+-- Los dos huecos que la serie declaraba cerrar y no cerraba. Ninguno de los dos
+-- se ve leyendo el SQL: uno es un motor de FK y el otro es qué eventos disparan
+-- un trigger. Hay que intentar la escritura ilegal y ver que rebota.
+
+DO $$
+DECLARE v_id uuid;
+BEGIN
+  -- ── 29. El área de OTRA EMPRESA se rechaza ───────────────────────────────
+  -- a0000000-…0005 es de la empresa vecina. Con la FK simple de 20260904000100
+  -- esto pasaba: el área existe, y eso era todo lo que se comprobaba.
+  BEGIN
+    INSERT INTO public.programacion_limpieza (company_id, project_id, area, area_id)
+    VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+            '11111111-0000-0000-0000-000000000001',
+            'Piscina', 'a0000000-0000-0000-0000-000000000005');
+    RAISE EXCEPTION '29: se vinculó un área de OTRA EMPRESA';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  RAISE NOTICE 'OK 29 el área de otra empresa se rechaza en la BD';
+END;
+$$;
+
+DO $$
+BEGIN
+  -- ── 30. El área de OTRO PROYECTO de la MISMA empresa se rechaza ──────────
+  -- El caso que una FK por company_id sola dejaría pasar, y por el que la FK
+  -- lleva el trío completo. El área se crea aquí (el fixture no siembra
+  -- ninguna en el 2º proyecto de A) para que la prueba no dependa de datos
+  -- que existen para otra cosa.
+  INSERT INTO public.areas_condominio (id, company_id, project_id, nombre) VALUES
+    ('a0000000-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000001',
+     '11111111-0000-0000-0000-000000000003', 'Piscina del otro proyecto')
+  ON CONFLICT (id) DO NOTHING;
+
+  BEGIN
+    INSERT INTO public.programacion_limpieza (company_id, project_id, area, area_id)
+    VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+            '11111111-0000-0000-0000-000000000001',
+            'Piscina', 'a0000000-0000-0000-0000-000000000009');
+    RAISE EXCEPTION '30: se vinculó un área de otro PROYECTO de la misma empresa';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  RAISE NOTICE 'OK 30 el área de otro proyecto se rechaza aunque la empresa coincida';
+END;
+$$;
+
+DO $$
+DECLARE v_id uuid; n int;
+BEGIN
+  -- ── 31. Lo legítimo sigue pasando, en las dos formas ─────────────────────
+  -- Si la FK compuesta rechazara de más, este PR habría roto el alta normal.
+  INSERT INTO public.programacion_limpieza (company_id, project_id, area, area_id)
+  VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+          '11111111-0000-0000-0000-000000000001',
+          'Piscina', 'a0000000-0000-0000-0000-000000000001')
+  RETURNING id INTO v_id;
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION '31a: no se pudo vincular un área del MISMO tenant'; END IF;
+  DELETE FROM public.programacion_limpieza WHERE id = v_id;
+
+  -- Y la fila legada sin área tampoco se rompe: con area_id NULL la FK
+  -- compuesta no se evalúa (MATCH SIMPLE). Es la mitad del diseño.
+  INSERT INTO public.programacion_limpieza (company_id, project_id, area, area_id)
+  VALUES ('aaaaaaaa-0000-0000-0000-000000000001',
+          '11111111-0000-0000-0000-000000000001',
+          'Área sin vincular', NULL)
+  RETURNING id INTO v_id;
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION '31b: la FK compuesta rompió el alta sin área'; END IF;
+  DELETE FROM public.programacion_limpieza WHERE id = v_id;
+
+  -- Y el RESTRICT del borrado sigue en pie tras cambiar la FK.
+  SELECT count(*) INTO n FROM pg_constraint
+   WHERE conname = 'prog_limpieza_area_tenant_fk' AND confdeltype = 'r';
+  IF n <> 1 THEN
+    RAISE EXCEPTION '31c: la FK nueva perdió el ON DELETE RESTRICT'; END IF;
+
+  RAISE NOTICE 'OK 31 el área del mismo tenant entra, la fila sin área también, y sigue RESTRICT';
+END;
+$$;
+
+DO $$
+DECLARE v_cargo text;
+BEGIN
+  -- ── 32. UPDATE a un cargo INVÁLIDO se rechaza ────────────────────────────
+  -- El bypass entero: con BEFORE INSERT a secas, esto pasaba sin mirar y el
+  -- catálogo quedaba en nada.
+  BEGIN
+    UPDATE public.plantillas_tarea_cargo
+       SET cargo = 'lo que se me ocurra'
+     WHERE id = 'd0000000-0000-0000-0000-000000000001';
+    RAISE EXCEPTION '32: un UPDATE metió un cargo fuera del catálogo';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  RAISE NOTICE 'OK 32 el UPDATE a un cargo fuera del catálogo se rechaza';
+END;
+$$;
+
+DO $$
+DECLARE v_cargo text;
+BEGIN
+  -- ── 33. UPDATE a un cargo VÁLIDO se acepta ───────────────────────────────
+  -- El reverso: cerrar el bypass no puede impedir corregir un cargo legado.
+  UPDATE public.plantillas_tarea_cargo
+     SET cargo = 'conserje'
+   WHERE id = 'd0000000-0000-0000-0000-000000000001';
+
+  SELECT cargo INTO v_cargo FROM public.plantillas_tarea_cargo
+   WHERE id = 'd0000000-0000-0000-0000-000000000001';
+  IF v_cargo <> 'conserje' THEN
+    RAISE EXCEPTION '33: no se pudo corregir el cargo a un valor del catálogo (quedó %)', v_cargo; END IF;
+
+  RAISE NOTICE 'OK 33 el UPDATE a un cargo del catálogo se acepta';
+END;
+$$;
+
+DO $$
+DECLARE v_cargo text; v_activo boolean;
+BEGIN
+  -- ── 34. La fila HISTÓRICA con cargo libre se sigue editando ──────────────
+  -- d0000000-…0003 tiene cargo 'Polivalente', que NO está en el catálogo y que
+  -- a propósito no se reescribe. Este invariante es el que obliga a las dos
+  -- defensas: `UPDATE OF cargo` para el UPDATE que ni menciona la columna, y
+  -- `IS DISTINCT FROM` para el que la menciona sin cambiarla.
+  SELECT cargo INTO v_cargo FROM public.plantillas_tarea_cargo
+   WHERE id = 'd0000000-0000-0000-0000-000000000003';
+  IF lower(btrim(v_cargo)) IN
+     ('conserje','guardia','jardinero','mantenimiento','administrador','otro') THEN
+    RAISE EXCEPTION '34-setup: la fila de control dejó de tener cargo libre (%)', v_cargo; END IF;
+
+  -- 34a · UPDATE que NO menciona `cargo`.
+  UPDATE public.plantillas_tarea_cargo SET activo = false
+   WHERE id = 'd0000000-0000-0000-0000-000000000003';
+  SELECT activo INTO v_activo FROM public.plantillas_tarea_cargo
+   WHERE id = 'd0000000-0000-0000-0000-000000000003';
+  IF v_activo THEN
+    RAISE EXCEPTION '34a: no se pudo desactivar una fila legada con cargo libre'; END IF;
+
+  -- 34b · UPDATE que SÍ lo menciona pero no lo cambia (lo que hace un ORM que
+  -- reescribe la fila entera). Sin el IS DISTINCT FROM, esto reventaría.
+  UPDATE public.plantillas_tarea_cargo SET activo = true, cargo = cargo
+   WHERE id = 'd0000000-0000-0000-0000-000000000003';
+  SELECT activo, cargo INTO v_activo, v_cargo FROM public.plantillas_tarea_cargo
+   WHERE id = 'd0000000-0000-0000-0000-000000000003';
+  IF NOT v_activo OR v_cargo <> 'Polivalente' THEN
+    RAISE EXCEPTION '34b: reescribir la fila legada sin cambiar el cargo falló (activo=%, cargo=%)', v_activo, v_cargo; END IF;
+
+  RAISE NOTICE 'OK 34 la fila legada con cargo libre se sigue editando, mencione o no la columna';
+  RAISE NOTICE '── 6 invariantes de integridad final OK ──';
+END;
+$$;

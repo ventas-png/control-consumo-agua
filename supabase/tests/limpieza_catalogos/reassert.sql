@@ -45,3 +45,49 @@ BEGIN
   RAISE NOTICE 'OK   re-aplicar la serie no duplica áreas, no resuelve ambiguos y no revive policies';
 END;
 $$;
+
+DO $$
+DECLARE n int; v_tgtype smallint;
+BEGIN
+  -- Post-idempotencia de 20260904000400. Lo que hay que vigilar aquí es que la
+  -- CUARTA migración sobreviva a la re-aplicación de las TRES anteriores: la
+  -- 000200 vuelve a declarar el trigger como BEFORE INSERT, y es la 000400 —que
+  -- corre después— la que tiene que dejarlo otra vez en su forma correcta. Si
+  -- alguien reordenara la serie, esto lo caza.
+
+  -- El ancla y la FK compuesta existen UNA vez, no duplicadas.
+  SELECT count(*) INTO n FROM pg_constraint WHERE conname = 'areas_id_tenant_uq';
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'idem-6: quedaron % anclas areas_id_tenant_uq (esperado 1)', n; END IF;
+
+  SELECT count(*) INTO n FROM pg_constraint WHERE conname = 'prog_limpieza_area_tenant_fk';
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'idem-7: quedaron % FKs compuestas de área (esperado 1)', n; END IF;
+
+  -- Y la FK simple no volvió a aparecer junto a la compuesta.
+  SELECT count(*) INTO n FROM pg_constraint c
+   WHERE c.conrelid = 'public.programacion_limpieza'::regclass
+     AND c.contype  = 'f'
+     AND array_length(c.conkey, 1) = 1
+     AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute
+                            WHERE attrelid = 'public.programacion_limpieza'::regclass
+                              AND attname  = 'area_id' AND NOT attisdropped)];
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'idem-8: la re-aplicación resucitó la FK simple de area_id'; END IF;
+
+  -- El trigger es uno solo y sigue cubriendo INSERT y UPDATE OF cargo.
+  -- tgtype: bit 0 = ROW, bit 1 = BEFORE, bit 2 = INSERT, bit 4 = UPDATE → 23.
+  SELECT count(*), min(tgtype) INTO n, v_tgtype FROM pg_trigger
+   WHERE tgrelid = 'public.plantillas_tarea_cargo'::regclass
+     AND tgname  = 'trg_plantillas_cargo_controlado'
+     AND NOT tgisinternal;
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'idem-9: quedaron % triggers de cargo (esperado 1)', n; END IF;
+  IF (v_tgtype & 16) = 0 THEN
+    RAISE EXCEPTION 'idem-10: tras re-aplicar la serie el trigger de cargo dejó de cubrir UPDATE (tgtype=%)', v_tgtype; END IF;
+  IF (v_tgtype & 4) = 0 THEN
+    RAISE EXCEPTION 'idem-11: tras re-aplicar la serie el trigger de cargo dejó de cubrir INSERT (tgtype=%)', v_tgtype; END IF;
+
+  RAISE NOTICE 'OK   la integridad final sobrevive a re-aplicar la serie entera';
+END;
+$$;

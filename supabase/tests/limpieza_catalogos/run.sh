@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
 # Verificación EJECUTABLE de los catálogos operativos de limpieza
-# (20260904000100 · 000200 · 000300).
+# (20260904000100 · 000200 · 000300 · 000400).
 #
 # POR QUÉ EXISTE
 # La serie migra DATOS además de esquema: el backfill decide a qué área del
@@ -53,6 +53,7 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIG_AREAS="$RAIZ/supabase/migrations/20260904000100_limpieza_area_catalogo_e_historial.sql"
 MIG_PLANT="$RAIZ/supabase/migrations/20260904000200_plantillas_catalogo_actividades.sql"
 MIG_PUENTES="$RAIZ/supabase/migrations/20260904000300_plantilla_tarea_recursos.sql"
+MIG_FINAL="$RAIZ/supabase/migrations/20260904000400_limpieza_integridad_final.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -93,7 +94,7 @@ PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat
 echo "  OK    fixture cargado"
 
 echo "── 2/4 · aplicar la serie de migraciones ───────────────────────────────"
-for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES"; do
+for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES" "$MIG_FINAL"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$m" >/dev/null
   echo "  OK    $(basename "$m")"
 done
@@ -118,7 +119,7 @@ fi
 
 echo
 echo "── 4/4 · idempotencia (re-aplicar la serie y re-verificar) ─────────────"
-for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES"; do
+for m in "$MIG_AREAS" "$MIG_PLANT" "$MIG_PUENTES" "$MIG_FINAL"; do
   PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$m" >/dev/null
 done
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/reassert.sql" 2>&1) || {
@@ -129,6 +130,7 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d limpcat -f "$AQUI/reassert.sql" 2>&1) || 
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 echo
-echo "✅ limpieza_catalogos: 28 invariantes (backfill, historial inmutable con"
+echo "✅ limpieza_catalogos: 34 invariantes (backfill, historial inmutable con"
 echo "   anulación lógica, actividades controladas, puentes con tenant"
-echo "   congelado y RLS), serie idempotente."
+echo "   congelado, RLS, y la integridad final: área por tenant y catálogo"
+echo "   de cargos también en UPDATE), serie idempotente."
