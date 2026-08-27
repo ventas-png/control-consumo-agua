@@ -169,15 +169,22 @@ suite va a recorrer. Como escribe con `service_role`, exige
 El entorno de referencia: **Vercel Preview** de esta rama (no el alias de
 producción), construido con `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` del
 proyecto **Supabase sandbox** y `VITE_E2E_ENVIRONMENT=e2e-sandbox` — las tres
-como variables de entorno *Preview* en Vercel (idealmente restringidas a las
-ramas de prueba). Sin el marcador, ningún despliegue pasa la validación
-positiva; con él pero apuntando a otro Supabase, tampoco.
+como variables de entorno *Preview* en Vercel, restringidas a las ramas de
+prueba. Sin el marcador, ningún despliegue pasa la validación positiva; con él
+pero apuntando a otro Supabase, tampoco.
+
+**Ese alcance por rama tiene una consecuencia que conviene tener presente:** una
+rama sin las tres variables alcanzadas produce un preview `environment:"no-e2e"`
+y su job de E2E queda **en rojo**, aunque su diff no toque nada relacionado. No
+es un fallo del cambio; es el fail-closed haciendo su trabajo. Para dar cobertura
+E2E a una rama nueva hay que alcanzarle las variables **y** redeplegarla (ver la
+cuarta trampa).
 
 No hay `data-testid` en la app (confirmado), así que los selectores son
 **semánticos** (placeholder, label, rol+texto). Si la UI cambia esos textos, hay
 que ajustar el selector — está aislado en `e2e/fixtures/`.
 
-## Tres trampas que costaron corridas enteras
+## Cuatro trampas que costaron corridas enteras
 
 ### El esquema del sandbox tiene que salir de las migraciones
 
@@ -261,6 +268,36 @@ Queda una clase de precondición que los specs **no** fabrican, a propósito: lo
 de administración, fuera del alcance de un spec de dinero. Si faltan, el spec
 se omite y el verificador pone el job en rojo — que es la respuesta correcta,
 porque el problema está en el entorno y no en el código.
+
+### Las variables `VITE_*` son de BUILD: cargarlas no arregla un preview ya construido
+
+Costó dos corridas rojas seguidas en un PR cuyo diff no tenía nada que ver.
+
+`VITE_E2E_ENVIRONMENT` no se lee en tiempo de ejecución: Vite la **hornea en el
+bundle**, y `dist/e2e-meta.json` lo escribe `scripts/generar-e2e-meta.mjs`
+colgado del `npm run build`. O sea que el marcador se decide **en el momento del
+build**, no cuando alguien guarda la variable en el dashboard.
+
+La consecuencia es contraintuitiva: podés tener las tres variables perfectamente
+cargadas y alcanzadas a la rama, y aun así el preflight seguirá leyendo
+`environment:"no-e2e"` — porque el despliegue vigente se construyó **antes** de
+que existieran. Relanzar el workflow no ayuda: busca el despliegue con status
+*success* para el SHA, encuentra el mismo artefacto y falla igual, con el mismo
+mensaje. El síntoma no cambia, así que es fácil concluir que las variables están
+mal cuando en realidad están bien.
+
+**El orden correcto es: cargar las variables → REDEPLEGAR → relanzar el E2E.**
+En el redeploy conviene destildar *«Use existing Build Cache»*: con caché puede
+reusar el bundle anterior y no volver a generar el meta.
+
+Dos atajos que **no** funcionan, por si se los busca:
+
+- Desplegar con `vercel deploy` desde archivos sueltos: sin
+  `VERCEL_GIT_COMMIT_SHA` el meta sale con `commit_sha: null` y el preflight
+  aborta por no coincidir con el SHA que está probando.
+- Leer `/e2e-meta.json` desde fuera del navegador para diagnosticar: con Vercel
+  Authentication activa devuelve 302 a `vercel.com/sso-api`. Desde el navegador
+  con sesión de Vercel sí se ve; en CI lo resuelve el bypass por header.
 
 ## Correr local
 
