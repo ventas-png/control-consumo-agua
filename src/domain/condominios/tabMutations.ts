@@ -18,8 +18,12 @@
 import { supabase, db } from '../../lib/supabase'
 import type { ResultadoGeneracionTurnos } from '../../types'
 
-/** Error con el shape mínimo que consume la UI (mensaje legible). */
-export type RowError = { message: string } | null
+/**
+ * Error con el shape mínimo que consume la UI (mensaje legible). `code` es el
+ * SQLSTATE que supabase-js ya trae (23503 = FK en uso, 23505 = duplicado):
+ * permite mapear a mensajes accionables sin parsear el texto en inglés.
+ */
+export type RowError = { message: string; code?: string } | null
 
 /** Inserta una fila (o varias) en `table` (payload ya armado por la UI). */
 export async function createCondominioRow(

@@ -10,7 +10,12 @@
 // tablas que no existen en el esquema generado (ver comentarios in situ).
 import { reportDegradedQuery } from '../queryFetch'
 import { db, supabase } from '../../lib/supabase'
-import type { HorasPersonal, UsuarioAsignablePersonal } from '../../types'
+import type {
+  HorasPersonal,
+  PlantillaTareaHerramienta,
+  PlantillaTareaSuministro,
+  UsuarioAsignablePersonal,
+} from '../../types'
 
 // ── DirectorioTab ──
 
@@ -513,4 +518,60 @@ export async function fetchUsuariosAsignablesPersonal(
     data: (data as UsuarioAsignablePersonal[] | null) ?? [],
     error: error ? { message: error.message } : null,
   }
+}
+
+// ── PlantillasCargoTab ──
+
+/**
+ * Insumos y herramientas planificados de TODAS las plantillas del proyecto
+ * (tablas puente de 20260904000300), con el nombre/unidad/estado del recurso
+ * aplanados del embed. Un solo fetch por proyecto: la pantalla de plantillas es
+ * la única consumidora en este PR, así que va aquí y no en el loader global de
+ * sectionData (que es posicional y no debe crecer por un solo tab).
+ *
+ * Va en `db` (tipado): las tablas puente y sus relaciones existen en
+ * database.types.ts desde la sincronización del PR de catálogos, así que el
+ * embed del recurso viene chequeado contra el esquema.
+ *
+ * Devuelve `{ …, error }` y NO degrada en silencio: "no pude leer la receta"
+ * mostrado como "esta actividad no ocupa recursos" invitaría a recapturarla.
+ */
+export async function fetchRecursosPlantillas(
+  projectId: string,
+  companyId: string,
+): Promise<{
+  suministros: PlantillaTareaSuministro[]
+  herramientas: PlantillaTareaHerramienta[]
+  error: { message: string } | null
+}> {
+  const [sumRes, herRes] = await Promise.all([
+    db
+      .from('plantilla_tarea_suministros')
+      .select('*, suministros_condominio(nombre, unidad_medida, activo)')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId),
+    db
+      .from('plantilla_tarea_herramientas')
+      .select('*, inventario_condominio(nombre, estado)')
+      .eq('project_id', projectId)
+      .eq('company_id', companyId),
+  ])
+  const error = sumRes.error ?? herRes.error
+  reportDegradedQuery('condominios.fetchRecursosPlantillas', error)
+  const suministros: PlantillaTareaSuministro[] = (sumRes.data ?? []).map(
+    ({ suministros_condominio: s, ...resto }) => ({
+      ...resto,
+      suministro_nombre: s?.nombre,
+      unidad_medida: s?.unidad_medida,
+      suministro_activo: s?.activo,
+    }),
+  )
+  const herramientas: PlantillaTareaHerramienta[] = (herRes.data ?? []).map(
+    ({ inventario_condominio: h, ...resto }) => ({
+      ...resto,
+      inventario_nombre: h?.nombre,
+      inventario_estado: h?.estado,
+    }),
+  )
+  return { suministros, herramientas, error: error ? { message: error.message } : null }
 }

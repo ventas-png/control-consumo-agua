@@ -6,6 +6,7 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
+import { AreasCatalog } from '../AreasCatalog'
 import type { AreaCondominio, RutaRonda, PuntoControlRuta } from '../../../types'
 
 interface Props {
@@ -16,27 +17,17 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  canDelete: boolean
   onRefresh: () => void
-}
-
-const ICONOS_PREDEFINIDOS = ['📍', '🚪', '🏊', '🏋️', '🚗', '🌳', '💡', '🔥', '📦', '🛗', '⚡', '💧', '🎭', '📮', '🏥', '🔐']
-
-function blank_area(): Omit<AreaCondominio, 'id' | 'company_id' | 'project_id' | 'created_at'> {
-  return { nombre: '', descripcion: '', icono: '📍', orden: 0, activo: true }
 }
 
 function blank_ruta(): { nombre: string; descripcion: string; tiempo_estimado_min: string } {
   return { nombre: '', descripcion: '', tiempo_estimado_min: '' }
 }
 
-export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [vista, setVista] = useState<'areas' | 'rutas'>('areas')
   const [saving, setSaving] = useState(false)
-
-  // ── Areas state ─────────────────────────────────────────────
-  const [showAreaForm, setShowAreaForm] = useState(false)
-  const [editAreaId, setEditAreaId] = useState<string | null>(null)
-  const [areaForm, setAreaForm] = useState(blank_area())
 
   // ── Rutas state ─────────────────────────────────────────────
   const [showRutaForm, setShowRutaForm] = useState(false)
@@ -47,44 +38,6 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   const [newPuntoAreaId, setNewPuntoAreaId] = useState('')
   const [newPuntoInstrucciones, setNewPuntoInstrucciones] = useState('')
   const [newPuntoTiempo, setNewPuntoTiempo] = useState('')
-
-  // ── Areas helpers ────────────────────────────────────────────
-  function startEditArea(a: AreaCondominio) {
-    setEditAreaId(a.id)
-    setAreaForm({ nombre: a.nombre, descripcion: a.descripcion ?? '', icono: a.icono, orden: a.orden, activo: a.activo })
-    setShowAreaForm(true)
-  }
-
-  function resetAreaForm() {
-    setAreaForm(blank_area()); setEditAreaId(null); setShowAreaForm(false)
-  }
-
-  async function saveArea() {
-    if (!areaForm.nombre.trim()) { notify({ variant: 'error', title: 'Error', text: 'Ingrese el nombre del área.' }); return }
-    setSaving(true)
-    if (editAreaId) {
-      const { error } = await updateCondominioRow('areas_condominio', editAreaId, {
-        nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
-        icono: areaForm.icono, orden: areaForm.orden, activo: areaForm.activo,
-      })
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
-    } else {
-      const { error } = await createCondominioRow('areas_condominio', {
-        company_id: companyId, project_id: proyectoId,
-        nombre: areaForm.nombre.trim(), descripcion: (areaForm.descripcion ?? '').trim() || null,
-        icono: areaForm.icono, orden: areaForm.orden,
-      })
-      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); setSaving(false); return }
-    }
-    setSaving(false); resetAreaForm(); onRefresh()
-  }
-
-  async function deleteArea(id: string) {
-    const r = await confirm({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
-    if (!r.isConfirmed) return
-    await deleteCondominioRow('areas_condominio', id)
-    onRefresh()
-  }
 
   // ── Rutas helpers ────────────────────────────────────────────
   function startEditRuta(r: RutaRonda) {
@@ -177,12 +130,6 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {vista === 'areas' && canCreate && (
-            <button onClick={() => { resetAreaForm(); setShowAreaForm(true) }}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
-              + Nueva área
-            </button>
-          )}
           {vista === 'rutas' && canCreate && (
             <button onClick={() => { resetRutaForm(); setShowRutaForm(true) }}
               style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
@@ -202,78 +149,17 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         ))}
       </div>
 
-      {/* ─── ÁREAS ──────────────────────────────────────────────────────── */}
+      {/* ─── ÁREAS (catálogo compartido con Limpieza) ───────────────────── */}
       {vista === 'areas' && (
-        <>
-          {showAreaForm && (
-            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editAreaId ? 'Editar área' : 'Nueva área'}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre del área *</label>
-                  <input value={areaForm.nombre} onChange={e => setAreaForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej. Lobby principal, Estacionamiento B2..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Ícono</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
-                    {ICONOS_PREDEFINIDOS.map(ic => (
-                      <button key={ic} onClick={() => setAreaForm(f => ({ ...f, icono: ic }))}
-                        style={{ width: '36px', height: '36px', fontSize: '20px', borderRadius: '8px', border: '2px solid', borderColor: areaForm.icono === ic ? 'var(--at-accent)' : 'transparent', background: areaForm.icono === ic ? 'var(--at-accent-tint)' : 'transparent', cursor: 'pointer' }}>
-                        {ic}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Orden</label>
-                  <input type="number" value={areaForm.orden} onChange={e => setAreaForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} min={0}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción</label>
-                  <input value={areaForm.descripcion ?? ''} onChange={e => setAreaForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción opcional..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={saveArea} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-                  {saving ? 'Guardando...' : editAreaId ? 'Actualizar' : 'Guardar'}
-                </button>
-                <button onClick={resetAreaForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {areas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '56px', color: 'var(--at-ink-3)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📍</div>
-              <p style={{ fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Sin áreas definidas</p>
-              <p style={{ fontSize: '13px' }}>Crea las áreas físicas del condominio para construir rutas de ronda.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-              {areas.sort((a, b) => a.orden - b.orden).map(a => (
-                <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${a.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '14px', padding: '16px', opacity: a.activo ? 1 : 0.55 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '28px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--at-accent-tint-2)', borderRadius: '10px' }}>{a.icono}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nombre}</div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>Orden: {a.orden} · {a.activo ? 'Activa' : 'Inactiva'}</div>
-                    </div>
-                  </div>
-                  {a.descripcion && <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: 'var(--at-ink-3)' }}>{a.descripcion}</p>}
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => startEditArea(a)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>
-                      <button onClick={() => deleteArea(a.id)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        <AreasCatalog
+          areas={areas}
+          proyectoId={proyectoId}
+          companyId={companyId}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onRefresh={onRefresh}
+        />
       )}
 
       {/* ─── RUTAS ──────────────────────────────────────────────────────── */}
