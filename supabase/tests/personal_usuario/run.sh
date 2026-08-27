@@ -40,12 +40,12 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGRACION="$RAIZ/supabase/migrations/20260826000000_personal_usuario_de_ingreso.sql"
 # El catálogo del selector se acota al proyecto en una segunda migración; los
 # invariantes 15-16 son suyos y sin ella fallan.
-MIGRACION_2="$RAIZ/supabase/migrations/20260904000000_personal_usuarios_asignables_solo_del_proyecto.sql"
-# 20260905000000 vuelve a reemplazar el catálogo para que el acceso salga de un
+MIGRACION_2="$RAIZ/supabase/migrations/20260906000300_personal_usuarios_asignables_solo_del_proyecto.sql"
+# 20260906000400 vuelve a reemplazar el catálogo para que el acceso salga de un
 # helper compartido con el selector de operadores de Rutas. Se aplica aquí para
 # que estas 24 invariantes se comprueben contra la versión que corre en
 # producción, no contra la que quedó a mitad de camino.
-MIGRACION_3="$RAIZ/supabase/migrations/20260905000000_rutas_operadores_del_proyecto.sql"
+MIGRACION_3="$RAIZ/supabase/migrations/20260906000400_rutas_operadores_del_proyecto.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done

@@ -97,7 +97,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   // no ve el condominio no podría registrar nada en él, y ofrecerla solo invita
   // a sellar el expediente con la cuenta de alguien de otro proyecto.
   //
-  // El catálogo ya llega filtrado desde 20260904000000; el filtro se repite aquí
+  // El catálogo ya llega filtrado desde 20260906000300; el filtro se repite aquí
   // porque `usuarios` alimenta además el mapa de las tarjetas —que sí necesita
   // TODAS las filas— y porque el tab debe comportarse igual contra una base
   // donde esa migración aún no corrió.

@@ -17,7 +17,7 @@
 --     misma policy devuelve CERO filas: el selector aparece vacío y parece que
 --     la empresa no tiene a quién asignarle nada.
 --
--- Es el mismo agujero que 20260904000000 cerró en el selector de «usuario de
+-- Es el mismo agujero que 20260906000300 cerró en el selector de «usuario de
 -- ingreso» del tab Personal, por la otra vía: allá el catálogo era un RPC que
 -- listaba de más; acá es un SELECT directo que, según quién pregunte, lista de
 -- más o de menos.
@@ -27,7 +27,7 @@
 --      `can_access_project()` (20260815000000) para una cuenta CUALQUIERA y no
 --      para el llamador. La regla es la misma (rol exento de empresa, o
 --      `app_users.project_id` legacy, o asignación explícita) y ahora vive en un
---      solo lugar: 20260904000000 la tenía copiada dentro de
+--      solo lugar: 20260906000300 la tenía copiada dentro de
 --      `personal_usuarios_asignables`, que aquí pasa a llamarla. Dos selectores
 --      que responden «¿quién ve este proyecto?» no pueden divergir en la
 --      respuesta.
@@ -51,7 +51,7 @@
 --
 -- REVERSIÓN
 --   DROP FUNCTION IF EXISTS public.rutas_operadores_asignables(uuid);
---   -- y reaplicar 20260904000000 para volver a la copia inline del acceso:
+--   -- y reaplicar 20260906000300 para volver a la copia inline del acceso:
 --   DROP FUNCTION IF EXISTS public.usuario_acceso_a_proyecto(uuid, uuid);
 --
 -- Idempotente: CREATE OR REPLACE en las tres funciones.
@@ -108,7 +108,7 @@ COMMENT ON FUNCTION public.usuario_acceso_a_proyecto(uuid, uuid) IS
 REVOKE EXECUTE ON FUNCTION public.usuario_acceso_a_proyecto(uuid, uuid) FROM PUBLIC, anon, authenticated;
 
 -- ── 2. El catálogo del tab Personal usa el helper ───────────────────────────
--- Mismo comportamiento que 20260904000000; cambia solo de dónde sale el
+-- Mismo comportamiento que 20260906000300; cambia solo de dónde sale el
 -- acceso, para que no queden dos copias de la regla.
 CREATE OR REPLACE FUNCTION public.personal_usuarios_asignables(p_project_id uuid)
 RETURNS TABLE (

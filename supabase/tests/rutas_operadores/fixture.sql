@@ -1,5 +1,5 @@
--- Fixture mínimo para EJECUTAR las migraciones 20260826000000 / 20260904000000 /
--- 20260905000000 contra un Postgres de verdad. Reproduce solo lo que tocan los
+-- Fixture mínimo para EJECUTAR las migraciones 20260826000000 / 20260906000300 /
+-- 20260906000400 contra un Postgres de verdad. Reproduce solo lo que tocan los
 -- dos selectores que preguntan «¿quién puede hacerse cargo de esto AQUÍ?»: el
 -- usuario de ingreso del tab Personal y el operador de una ruta.
 --

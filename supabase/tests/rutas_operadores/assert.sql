@@ -3,7 +3,7 @@
 \pset format unaligned
 
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes del selector «Asignar Operador» de Rutas (20260905000000).
+-- Invariantes del selector «Asignar Operador» de Rutas (20260906000400).
 --
 --    1-5   usuario_acceso_a_proyecto: el espejo de can_access_project para una
 --          cuenta cualquiera (exento, legacy project_id, asignación, ninguna)
@@ -162,7 +162,7 @@ BEGIN
 END $$;
 
 -- ── 19 · El catálogo del tab Personal sigue en pie tras el refactor ────────
--- 20260905000000 reemplaza personal_usuarios_asignables para que use el helper
+-- 20260906000400 reemplaza personal_usuarios_asignables para que use el helper
 -- en vez de su copia inline de la regla. Si el reemplazo se equivocara de
 -- firma o de filtro, el tab Personal se rompería sin que este harness —que va
 -- de rutas— se enterara. El detalle lo cubre supabase/tests/personal_usuario,

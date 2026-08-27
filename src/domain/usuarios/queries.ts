@@ -29,7 +29,7 @@ export async function fetchActiveAppUsers(): Promise<AppUser[]> {
 
 /**
  * Operadores a los que se les puede asignar una ruta DE ESE PROYECTO (RPC
- * `rutas_operadores_asignables`, 20260905000000): cuentas activas de la empresa
+ * `rutas_operadores_asignables`, 20260906000400): cuentas activas de la empresa
  * del proyecto que además tienen acceso a él.
  *
  * No es `fetchActiveAppUsers()` con un filtro encima por dos razones. La primera

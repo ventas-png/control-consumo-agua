@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de la migración 20260905000000: el selector «Asignar
+# Verificación EJECUTABLE de la migración 20260906000400: el selector «Asignar
 # Operador» de Rutas solo ofrece cuentas con acceso al proyecto de la ruta.
 #
 # POR QUÉ EXISTE
@@ -37,8 +37,8 @@ RAIZ="$(cd "$AQUI/../../.." && pwd)"
 # la 3ª —la que este harness verifica— extrae el helper de acceso y agrega el
 # catálogo de operadores de rutas.
 MIGRACION="$RAIZ/supabase/migrations/20260826000000_personal_usuario_de_ingreso.sql"
-MIGRACION_2="$RAIZ/supabase/migrations/20260904000000_personal_usuarios_asignables_solo_del_proyecto.sql"
-MIGRACION_3="$RAIZ/supabase/migrations/20260905000000_rutas_operadores_del_proyecto.sql"
+MIGRACION_2="$RAIZ/supabase/migrations/20260906000300_personal_usuarios_asignables_solo_del_proyecto.sql"
+MIGRACION_3="$RAIZ/supabase/migrations/20260906000400_rutas_operadores_del_proyecto.sql"
 
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done

@@ -131,7 +131,7 @@ BEGIN
 
   -- Tomada en P1 no es tomada en P2: el selector de cada condominio decide solo.
   -- Se mira ADM_A —asignado a P2— y no una cuenta sin acceso: desde
-  -- 20260904000000 una cuenta ajena al proyecto no sale en su catálogo, y
+  -- 20260906000300 una cuenta ajena al proyecto no sale en su catálogo, y
   -- "libre" se confundiría con "ausente".
   SELECT count(*) INTO n FROM public.personal_usuarios_asignables(P2) WHERE usuario_id = ADM_A;
   IF n <> 1 THEN
@@ -155,7 +155,7 @@ BEGIN
   IF b IS NOT true THEN RAISE EXCEPTION '14: la asignación explícita a P1 no se vio'; END IF;
   RAISE NOTICE 'OK 14 tiene_acceso_proyecto espeja can_access_project para CADA cuenta';
 
-  -- ── 15-16 · El catálogo se acota al proyecto (20260904000000) ────────────
+  -- ── 15-16 · El catálogo se acota al proyecto (20260906000300) ────────────
   -- Lo que el selector no debe ofrecer: la cuenta de la empresa que NO ve este
   -- condominio. Ofrecerla invita a sellar el expediente de un empleado con la
   -- cuenta de alguien de otro proyecto —el aviso explicaba, pero no impedía
