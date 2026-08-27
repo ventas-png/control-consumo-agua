@@ -1,0 +1,7 @@
+{
+  "_README": "Deuda de esquema DECLARADA para scripts/migraciones-vs-produccion.mjs: tablas y columnas que una migración YA APLICADA declara y que producción no tiene. Cada entrada es un 42703 que aceptamos que exista, así que lleva `reason` obligatorio y, si corresponde, el plan para cerrarla. El guard delata las entradas que ya no aplican: si una columna aparece en producción, hay que retirarla de aquí — una lista que nadie poda acaba siendo un `permitir todo`. Lo contrario de esta lista es reponer la columna con una migración forward-only, patrón 20260904000500_reparar_prerrequisitos_limpieza.sql. Sembrada desde una corrida REAL contra producción, nunca a ojo.",
+
+  "columnas": [],
+
+  "tablas": []
+}

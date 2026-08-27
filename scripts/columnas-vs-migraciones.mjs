@@ -53,18 +53,49 @@ export function partirEnComasDePrimerNivel(cuerpo) {
 }
 
 /**
- * Columnas que cada CREATE TABLE / ALTER TABLE … ADD COLUMN deja en cada tabla.
- * @returns {Map<string, Set<string>>} tabla → columnas
+ * Estado del esquema que dejan las migraciones, con la procedencia de cada dato.
+ *
+ * SUMA Y RESTA. Antes esto sólo sumaba (CREATE TABLE y ADD COLUMN). Para el
+ * consumidor original —¿existe en alguna migración la columna que la app
+ * nombra?— eso sólo era permisivo. Para `migraciones-vs-produccion.mjs` sería
+ * una fábrica de falsos positivos: `mudanzas`, `user_module_permissions`,
+ * `password_reset_tokens` y varias columnas de `companies` y `app_users` se
+ * CREAN en una migración y se ELIMINAN en otra posterior, así que exigir que
+ * sigan en producción sería exigir lo contrario de lo que el repositorio dice.
+ *
+ * Por eso los eventos se aplican EN ORDEN DE APARICIÓN, no en dos pasadas por
+ * tipo: `20260320000000` dropea `app_users` y la vuelve a crear en el mismo
+ * archivo, y con dos pasadas el DROP se aplicaría después del CREATE y la tabla
+ * desaparecería del resultado.
+ *
+ * @param {Array<string | {nombre: string, sql: string}>} entradas
+ * @returns {{porTabla: Map<string, Set<string>>, origen: Map<string, string>, origenTabla: Map<string, string>}}
+ *   porTabla    tabla → columnas vigentes
+ *   origen      'tabla.columna' → migración que la declaró por última vez
+ *   origenTabla tabla → migración que la creó por última vez
  */
-export function columnasDeLasMigraciones(sqls) {
+export function columnasDeLasMigracionesConOrigen(entradas) {
   const porTabla = new Map()
-  const agregar = (tabla, columna) => {
+  const origen = new Map()
+  const origenTabla = new Map()
+
+  const agregar = (tabla, columna, nombre) => {
     if (!porTabla.has(tabla)) porTabla.set(tabla, new Set())
     porTabla.get(tabla).add(columna)
+    origen.set(`${tabla}.${columna}`, nombre)
+  }
+  const quitar = (tabla, columna) => {
+    porTabla.get(tabla)?.delete(columna)
+    origen.delete(`${tabla}.${columna}`)
   }
 
-  for (const sql of sqls) {
+  for (const entrada of entradas) {
+    const sql = typeof entrada === 'string' ? entrada : entrada.sql
+    const nombre = typeof entrada === 'string' ? '?' : entrada.nombre
     const limpio = sql.replace(/--[^\n]*/g, '')
+
+    /** @type {{pos: number, aplicar: () => void}[]} */
+    const eventos = []
 
     // CREATE TABLE [IF NOT EXISTS] [public.]t ( … ) — el cuerpo se corta por
     // las comas de PRIMER nivel (las de numeric(12,2) o de un CHECK van
@@ -72,24 +103,71 @@ export function columnasDeLasMigraciones(sqls) {
     const crea = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?\s*\(([\s\S]*?)\n\s*\)\s*;/gi
     for (const m of limpio.matchAll(crea)) {
       const [, tabla, cuerpo] = m
-      for (const trozo of partirEnComasDePrimerNivel(cuerpo)) {
-        const nombre = trozo.trim().replace(/^"|"$/g, '').split(/[\s(]/)[0]
-        // CONSTRAINT/PRIMARY KEY/UNIQUE/CHECK/… definen la tabla, no columnas.
-        if (!/^\w+$/.test(nombre)) continue
-        if (/^(constraint|primary|unique|check|foreign|exclude|like)$/i.test(nombre)) continue
-        agregar(tabla, nombre)
-      }
+      eventos.push({
+        pos: m.index,
+        aplicar: () => {
+          origenTabla.set(tabla, nombre)
+          if (!porTabla.has(tabla)) porTabla.set(tabla, new Set())
+          for (const trozo of partirEnComasDePrimerNivel(cuerpo)) {
+            const col = trozo.trim().replace(/^"|"$/g, '').split(/[\s(]/)[0]
+            // CONSTRAINT/PRIMARY KEY/UNIQUE/CHECK/… definen la tabla, no columnas.
+            if (!/^\w+$/.test(col)) continue
+            if (/^(constraint|primary|unique|check|foreign|exclude|like)$/i.test(col)) continue
+            agregar(tabla, col, nombre)
+          }
+        },
+      })
     }
 
-    // ALTER TABLE [public.]t … ADD COLUMN [IF NOT EXISTS] c … (una o varias).
+    // ALTER TABLE [public.]t … ADD/DROP/RENAME COLUMN (una o varias por sentencia).
     const altera = /ALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?([\s\S]*?);/gi
     for (const m of limpio.matchAll(altera)) {
       const [, tabla, resto] = m
-      const add = /ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?/gi
-      for (const a of resto.matchAll(add)) agregar(tabla, a[1])
+      const base = m.index
+      const sub = [
+        [/ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?/gi, (c) => agregar(tabla, c, nombre)],
+        [/DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?"?(\w+)"?/gi, (c) => quitar(tabla, c)],
+      ]
+      for (const [re, accion] of sub) {
+        for (const a of resto.matchAll(re)) eventos.push({ pos: base + a.index, aplicar: () => accion(a[1]) })
+      }
+      // RENAME COLUMN vieja TO nueva — se resta y se suma en el mismo evento.
+      const renombra = /RENAME\s+COLUMN\s+"?(\w+)"?\s+TO\s+"?(\w+)"?/gi
+      for (const a of resto.matchAll(renombra)) {
+        eventos.push({
+          pos: base + a.index,
+          aplicar: () => { quitar(tabla, a[1]); agregar(tabla, a[2], nombre) },
+        })
+      }
     }
+
+    // DROP TABLE [IF EXISTS] [public.]t [CASCADE];
+    const borra = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?/gi
+    for (const m of limpio.matchAll(borra)) {
+      const tabla = m[1]
+      eventos.push({
+        pos: m.index,
+        aplicar: () => {
+          for (const col of porTabla.get(tabla) ?? []) origen.delete(`${tabla}.${col}`)
+          porTabla.delete(tabla)
+          origenTabla.delete(tabla)
+        },
+      })
+    }
+
+    eventos.sort((a, b) => a.pos - b.pos)
+    for (const e of eventos) e.aplicar()
   }
-  return porTabla
+
+  return { porTabla, origen, origenTabla }
+}
+
+/**
+ * Columnas vigentes que dejan las migraciones en cada tabla.
+ * @returns {Map<string, Set<string>>} tabla → columnas
+ */
+export function columnasDeLasMigraciones(sqls) {
+  return columnasDeLasMigracionesConOrigen(sqls).porTabla
 }
 
 /** Constantes `const X = '…'` o `const X = \`…\`` del propio archivo. */
