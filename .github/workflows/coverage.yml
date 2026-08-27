@@ -228,6 +228,15 @@ jobs:
       - name: Envoltorio (SELECT …) en suministros — los accesos no cambian
         run: supabase/tests/rls_initplan_suministros/run.sh
 
+      # Un renombre de columna arrastra índices, policies y vistas, pero NO los
+      # cuerpos plpgsql —son texto— ni los argumentos de un trigger —son
+      # literales—. Eso dejó `actividad_equipo` reventando con 42703 y
+      # `trg_sellar_cierre` sellando en silencio contra una clave inexistente.
+      # Ninguna guarda de esquema puede verlo: hay que EJECUTAR la RPC y
+      # COMPLETAR una tarea, en la forma de producción y en una base nueva.
+      - name: Actividad del equipo — la RPC se ejecuta y el cierre vuelve a sellarse
+        run: supabase/tests/actividad_equipo/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
