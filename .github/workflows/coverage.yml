@@ -222,6 +222,12 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/drift_turnos/run.sh
 
+      # Re-escribir ocho políticas RLS "sin cambiar nada" es de las cosas que
+      # sólo se comprueban ejecutándolas: mide los mismos seis accesos antes y
+      # después de aplicar la migración, contra las políticas de producción.
+      - name: Envoltorio (SELECT …) en suministros — los accesos no cambian
+        run: supabase/tests/rls_initplan_suministros/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
