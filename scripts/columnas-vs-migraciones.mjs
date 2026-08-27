@@ -68,6 +68,20 @@ export function partirEnComasDePrimerNivel(cuerpo) {
  * archivo, y con dos pasadas el DROP se aplicaría después del CREATE y la tabla
  * desaparecería del resultado.
  *
+ * PUNTO CIEGO DECLARADO: el DDL DINÁMICO es invisible. Varias migraciones
+ * hacen `EXECUTE format('ALTER TABLE public.%I ADD COLUMN …', tabla)` sobre una
+ * lista calculada en tiempo de ejecución —20260729000600 (project_id),
+ * 20260731000000 (creado_por) y 20260801000200 (archivo_urls)—, y un parser
+ * estático no puede saber a qué tablas les toca. Esas columnas NO se verifican.
+ *
+ * Lo que sí se evita es ADIVINARLAS: el lookahead `(?![\w.])` hace que
+ * `public.%I` no matchee en absoluto. Tiene que excluir el carácter de palabra
+ * además del punto: con sólo `(?!\.)` el motor retrocede DENTRO de `\w+` y
+ * captura `publi`, que pasa el lookahead. Sin nada de esto capturaba `public`
+ * como nombre de tabla, y la guarda reportaba una tabla fantasma
+ * llamada `public` con las columnas de todas esas sentencias dinámicas — que es
+ * exactamente lo que salió en su primera corrida contra producción.
+ *
  * @param {Array<string | {nombre: string, sql: string}>} entradas
  * @returns {{porTabla: Map<string, Set<string>>, origen: Map<string, string>, origenTabla: Map<string, string>}}
  *   porTabla    tabla → columnas vigentes
@@ -100,7 +114,7 @@ export function columnasDeLasMigracionesConOrigen(entradas) {
     // CREATE TABLE [IF NOT EXISTS] [public.]t ( … ) — el cuerpo se corta por
     // las comas de PRIMER nivel (las de numeric(12,2) o de un CHECK van
     // anidadas) y de cada trozo se toma el primer identificador.
-    const crea = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?\s*\(([\s\S]*?)\n\s*\)\s*;/gi
+    const crea = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?(?![\w.])\s*\(([\s\S]*?)\n\s*\)\s*;/gi
     for (const m of limpio.matchAll(crea)) {
       const [, tabla, cuerpo] = m
       eventos.push({
@@ -120,7 +134,7 @@ export function columnasDeLasMigracionesConOrigen(entradas) {
     }
 
     // ALTER TABLE [public.]t … ADD/DROP/RENAME COLUMN (una o varias por sentencia).
-    const altera = /ALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?([\s\S]*?);/gi
+    const altera = /ALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?(?![\w.])([\s\S]*?);/gi
     for (const m of limpio.matchAll(altera)) {
       const [, tabla, resto] = m
       const base = m.index
@@ -142,7 +156,7 @@ export function columnasDeLasMigracionesConOrigen(entradas) {
     }
 
     // DROP TABLE [IF EXISTS] [public.]t [CASCADE];
-    const borra = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?/gi
+    const borra = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?(?![\w.])/gi
     for (const m of limpio.matchAll(borra)) {
       const tabla = m[1]
       eventos.push({

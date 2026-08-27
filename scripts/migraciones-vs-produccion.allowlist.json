@@ -1,7 +1,60 @@
 {
-  "_README": "Deuda de esquema DECLARADA para scripts/migraciones-vs-produccion.mjs: tablas y columnas que una migración YA APLICADA declara y que producción no tiene. Cada entrada es un 42703 que aceptamos que exista, así que lleva `reason` obligatorio y, si corresponde, el plan para cerrarla. El guard delata las entradas que ya no aplican: si una columna aparece en producción, hay que retirarla de aquí — una lista que nadie poda acaba siendo un `permitir todo`. Lo contrario de esta lista es reponer la columna con una migración forward-only, patrón 20260904000500_reparar_prerrequisitos_limpieza.sql. Sembrada desde una corrida REAL contra producción, nunca a ojo.",
+  "_README": "Deuda de esquema DECLARADA para scripts/migraciones-vs-produccion.mjs: tablas y columnas que una migración YA APLICADA declara y que producción no tiene. Cada entrada es un 42703 esperando a que alguien escriba esa columna, así que lleva `reason` obligatorio. El guard delata las entradas que ya no aplican: cuando una columna se repone hay que retirarla de aquí — una lista que nadie poda acaba siendo un `permitir todo` de facto. Lo contrario de esta lista es reponer la columna con una migración forward-only, patrón 20260904000500_reparar_prerrequisitos_limpieza.sql. Sembrada el 2026-08-27 desde la PRIMERA corrida real contra producción (run 33107076122), nunca a ojo.",
 
-  "columnas": [],
+  "_NOTA_ESTAS_10_NO_SON_DEUDA_TRANQUILA": "Las diez entradas de abajo son ROTURAS VIVAS, no huecos benignos, y están aquí sólo para que la guarda pueda ser bloqueante ante lo NUEVO mientras se deciden. Dos tablas de turnos (bloques_turno, tareas_bloque) existen en producción con una forma MÁS VIEJA y con OTROS NOMBRES para el mismo concepto: prod tiene `finalizado_en`, `completado_en` y `foto_url`; la migración declara `cerrado_en`, `completada_en` y `foto_urls`. Ninguno de los nombres de producción aparece en migración alguna, así que esas tablas se crearon a mano y el repositorio nunca describió lo que hay. Por eso NO se pueden reponer a ciegas: agregar `completada_en` junto a `completado_en` deja dos columnas para lo mismo y los datos históricos en la vieja. La decisión (renombrar en prod, migrar los datos, o cambiar la app a los nombres reales) necesita su propio PR.",
+
+  "columnas": [
+    {
+      "tabla": "bloques_turno",
+      "columna": "cerrado_en",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:27; producción tiene `finalizado_en` en su lugar y ese nombre no aparece en ninguna migración. TareasPersonalTab.cerrarBloque() la ESCRIBE (:106) y NO comprueba el error que devuelve updateCondominioRow, así que cerrar un bloque de turno falla EN SILENCIO en producción. Requiere decisión de nombres + migración de datos."
+    },
+    {
+      "tabla": "bloques_turno",
+      "columna": "puntaje_completitud",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:28 y ausente en producción. Se escribe en el mismo update que `cerrado_en` (TareasPersonalTab:106), así que el porcentaje de completitud del turno nunca se guarda. Mismo fallo silencioso."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "plantilla_id",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:38 y ausente en producción. TareasPersonalTab la manda al INSERT de la tarea (:127), así que agregar una tarea a un bloque devuelve 400."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "requiere_foto",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:43 y ausente en producción. Va en el mismo INSERT que `plantilla_id`."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "completada_en",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:45; producción tiene `completado_en` (masculino) con los datos históricos. TareasPersonalTab la escribe al marcar una tarea (:175 y :180) sin mirar el error: completar una tarea falla en silencio. Reponerla sin más dejaría DOS columnas para lo mismo."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "evidencia_texto",
+      "reason": "Declarada en 20260424000060:46 y ausente en producción. Es la única de las ocho que la app todavía no escribe; entra igual porque la declara la misma migración registrada."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "foto_urls",
+      "reason": "ROTURA LATENTE. Declarada en 20260424000060:47 (jsonb, lista); producción tiene `foto_url` (text, singular). Mismo choque de nombre y además de TIPO: no es un ADD COLUMN, es una migración de datos."
+    },
+    {
+      "tabla": "tareas_bloque",
+      "columna": "notas_operativo",
+      "reason": "ROTURA VIVA. Declarada en 20260424000060:48 y ausente en producción. TareasPersonalTab la escribe al registrar una observación (:175), en el mismo update silencioso que `completada_en`."
+    },
+    {
+      "tabla": "amenidades_bloqueos",
+      "columna": "notas",
+      "reason": "ROTURA VIVA Y VISIBLE. Declarada en 20260425000002 y ausente en producción. AmenidadesTab la manda al INSERT del bloqueo (:341) y SÍ comprueba el error, así que aquí el usuario ve un mensaje: crear un bloqueo de amenidad no funciona. Esta sí se puede reponer con un ADD COLUMN limpio — no choca con ningún nombre existente."
+    },
+    {
+      "tabla": "amenidades_bloqueos",
+      "columna": "created_by",
+      "reason": "ROTURA VIVA Y VISIBLE. Declarada en 20260425000002 y ausente en producción. Va en el mismo INSERT que `notas` (AmenidadesTab:341). Igual de reponible con un ADD COLUMN limpio."
+    }
+  ],
 
   "tablas": []
 }
