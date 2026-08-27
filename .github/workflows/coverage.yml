@@ -1,14 +1,19 @@
-name: Coverage gate & E2E
+# El nombre conserva "& E2E" sólo en la historia de git: hoy la suite E2E vive
+# en .github/workflows/e2e.yml.
+name: Coverage gate
 
 # ADITIVO a ci.yml (no lo toca). ci.yml corre tsc/test/build + coverage ADVISORY
 # (sin umbral). Este workflow agrega lo que falta para el Track T8:
 #   • coverage-gate: umbral DURO sobre la lógica de negocio crítica (money/auth).
-#   • e2e:           Playwright de los caminos de dinero/auth (gated por secreto).
+#   • rls-sandbox:   RLS de recepción contra un Postgres desechable.
 #   • rls-harness:   verificación RLS server-side, FAIL-CLOSED (ver el job).
-# `e2e` sigue siendo no-op verde sin secretos (se aborda en un PR aparte).
-# `rls-harness` YA NO: exige las 15 variables RLS_* y falla si falta cualquiera,
-# salvo cuando GitHub no entrega secretos por diseño (PR de fork o ejecución de
-# Dependabot), donde se omite explícitamente. Sin `pull_request_target`.
+# La suite Playwright vive en su PROPIO workflow (.github/workflows/e2e.yml):
+# necesita una concurrency incompatible con la de aquí (grupo fijo del sandbox
+# compartido, sin cancelar en curso) y no corre en push a main (ver su header).
+# rls-harness no admite el verde sin ejecutar: exige sus 15 variables RLS_* y
+# falla si falta cualquiera. Los contextos sin secretos por diseño (PR de
+# fork, Dependabot) también quedan en ROJO, con la explicación estructural.
+# Sin `pull_request_target`.
 
 on:
   pull_request:
@@ -143,84 +148,6 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  e2e:
-    name: E2E (caminos de dinero/auth)
-    runs-on: ubuntu-latest
-    env:
-      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
-      E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
-      E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
-      E2E_INVITE_TOKEN: ${{ secrets.E2E_INVITE_TOKEN }}
-      E2E_FISCAL_SANDBOX_READY: ${{ secrets.E2E_FISCAL_SANDBOX_READY }}
-      E2E_RESTRICTED_EMAIL: ${{ secrets.E2E_RESTRICTED_EMAIL }}
-      E2E_RESTRICTED_PASSWORD: ${{ secrets.E2E_RESTRICTED_PASSWORD }}
-    steps:
-      - uses: actions/checkout@v7
-
-      # Sin E2E_BASE_URL no hay preview contra el cual correr → job no-op verde,
-      # pero VISIBLE: warning annotation + step summary, para que el "verde" no
-      # oculte que la suite Playwright no se ejecutó (auditoría 2026-07-10:
-      # "E2E/RLS verdes no-op").
-      - name: Gate por E2E_BASE_URL
-        id: gate
-        run: |
-          if [ -n "$E2E_BASE_URL" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=E2E omitido::E2E_BASE_URL no configurado — la suite Playwright NO se ejecutó (no-op verde). Configurá los secretos E2E_* del repo para activarla. Ver e2e/README.md."
-            {
-              echo "### ⚠️ E2E omitido — la suite Playwright no se ejecutó"
-              echo ""
-              echo "Este job quedó **verde sin correr** por falta del secreto \`E2E_BASE_URL\`."
-              echo "Para activar los E2E, configurá en *Settings → Secrets and variables → Actions*:"
-              echo ""
-              echo "- \`E2E_BASE_URL\` — URL del preview/staging contra el que correr"
-              echo "- \`E2E_LOGIN_EMAIL\` / \`E2E_LOGIN_PASSWORD\` — cuenta de prueba"
-              echo "- \`E2E_INVITE_TOKEN\` — flujo de aceptar invitación"
-              echo "- \`E2E_RESTRICTED_EMAIL\` / \`E2E_RESTRICTED_PASSWORD\` — flujo de rol restringido"
-              echo ""
-              echo "Referencia: \`e2e/README.md\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - uses: actions/setup-node@v7
-        if: steps.gate.outputs.run == 'true'
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        if: steps.gate.outputs.run == 'true'
-        run: npm ci
-
-      # Playwright se instala ON-DEMAND (no está en package.json a propósito: evita
-      # que el npm ci de ci.yml dispare la descarga de browsers).
-      - name: Install Playwright (on-demand)
-        if: steps.gate.outputs.run == 'true'
-        run: |
-          npm i -D --no-save @playwright/test@^1.48.0 @types/node@^20
-          npx playwright install --with-deps chromium
-
-      - name: Type-check e2e
-        if: steps.gate.outputs.run == 'true'
-        run: npx tsc -p e2e/tsconfig.json
-
-      - name: Run E2E
-        if: steps.gate.outputs.run == 'true'
-        run: npx playwright test --config e2e/playwright.config.ts
-
-      - name: Upload Playwright report
-        if: ${{ steps.gate.outputs.run == 'true' && always() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 14
-          if-no-files-found: ignore
-
   rls-sandbox:
     name: RLS sandbox de recepción (Postgres desechable)
     runs-on: ubuntu-latest
@@ -262,6 +189,38 @@ jobs:
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: scripts/cierre-posfusion-sandbox.sh
+
+      # La serie 20260904* migra DATOS (backfill de áreas por nombre
+      # normalizado) y cambia una FK de CASCADE a RESTRICT: si el backfill ata
+      # mal, corrompe en silencio; si la FK no queda, borrar una programación
+      # sigue arrastrando el historial. Se ejercita contra un Postgres real,
+      # incluida la re-aplicación completa (idempotencia).
+      - name: Catálogos de limpieza — backfill, historial y puentes de recursos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/limpieza_catalogos/run.sh
+
+      # El sandbox de arriba construye el esquema tal como lo DECLARAN las
+      # migraciones, y por eso estaba verde el 2026-08-27 mientras el apply a
+      # producción fallaba con 42703: allí `areas_condominio.activo` no existe.
+      # Éste deforma el esquema hasta la forma real de producción antes de
+      # probar, y empieza comprobando que sin la reparación el fallo se
+      # reproduce — si dejara de reproducirse, el escenario ya no vale.
+      - name: Drift de producción — la serie de limpieza sobre el esquema real
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/drift_produccion/run.sh
+
+      # Turnos y amenidades existen en producción con OTROS NOMBRES para el
+      # mismo concepto (finalizado_en, completado_en, foto_url), que ninguna
+      # migración declara. La reparación renombra y convierte datos, así que no
+      # basta con comprobar que las columnas existan: este sandbox monta la forma
+      # real, verifica que los cuatro gestos rotos fallan ahí, y que tras la
+      # migración la evidencia sobrevivió al cambio de text a jsonb.
+      - name: Drift de turnos — renombres y conversión de evidencia
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/drift_turnos/run.sh
 
       # Re-escribir ocho políticas RLS "sin cambiar nada" es de las cosas que
       # sólo se comprueban ejecutándolas: mide los mismos seis accesos antes y

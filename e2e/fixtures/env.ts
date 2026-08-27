@@ -1,8 +1,10 @@
 // Centraliza la lectura de env para los E2E + los flags de "gating".
 //
-// Filosofía: cada spec se SKIPEA con un mensaje claro si le faltan datos, en vez
-// de fallar. Así la suite queda verde sin secretos (CI sin wiring) y, cuando se
-// cablean contra el preview/sandbox, los caminos corren de verdad.
+// El gating es una comodidad LOCAL: correr sin variables en tu máquina skipea
+// con un mensaje claro en vez de reventar. En CI ya NO produce verde: el
+// preflight (scripts/e2e-preflight.mjs) falla el job ANTES de Playwright si
+// faltan las variables obligatorias, y el verificador (scripts/e2e-verificar.mjs)
+// lo falla DESPUÉS si estos skips dejaron un spec obligatorio sin ejecutar.
 
 function env(name: string): string {
   return process.env[name] || ''

@@ -50,6 +50,7 @@ import {
   countRecibosByProyecto,
   fetchCuotaCondominioNotas,
   fetchGeneracionCuotasLogs,
+  fetchRecursosPlantillas,
 } from '../tabQueries'
 
 beforeEach(() => { h.state.byTable = {}; h.state.fallback = { data: null, count: null, error: null } })
@@ -255,5 +256,36 @@ describe('cuotas / cobranza', () => {
   it('fetchGeneracionCuotasLogs devuelve filas', async () => {
     h.state.byTable.generacion_cuotas_log = { data: [{ id: 'l1' }], error: null }
     expect(await fetchGeneracionCuotasLogs('p1', 'co1')).toEqual([{ id: 'l1' }])
+  })
+})
+
+describe('fetchRecursosPlantillas', () => {
+  it('aplana el embed del recurso (nombre, unidad, estado) en cada puente', async () => {
+    h.state.byTable.plantilla_tarea_suministros = { data: [
+      { id: 's1', plantilla_tarea_id: 'pl1', suministro_id: 'sum1', cantidad: 0.5, suministros_condominio: { nombre: 'Cloro', unidad_medida: 'litro', activo: true } },
+    ], error: null }
+    h.state.byTable.plantilla_tarea_herramientas = { data: [
+      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', cantidad: 1, obligatoria: true, inventario_condominio: { nombre: 'Hidrolavadora', estado: 'dado_de_baja' } },
+    ], error: null }
+    const r = await fetchRecursosPlantillas('p1', 'co1')
+    expect(r.error).toBeNull()
+    expect(r.suministros).toEqual([
+      { id: 's1', plantilla_tarea_id: 'pl1', suministro_id: 'sum1', cantidad: 0.5, suministro_nombre: 'Cloro', unidad_medida: 'litro', suministro_activo: true },
+    ])
+    expect(r.herramientas).toEqual([
+      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', cantidad: 1, obligatoria: true, inventario_nombre: 'Hidrolavadora', inventario_estado: 'dado_de_baja' },
+    ])
+  })
+
+  it('propaga el error en lugar de degradar a listas "vacías" engañosas', async () => {
+    h.state.byTable.plantilla_tarea_suministros = { data: null, error: { message: 'permission denied' } }
+    const r = await fetchRecursosPlantillas('p1', 'co1')
+    expect(r.error).toEqual({ message: 'permission denied' })
+    expect(r.suministros).toEqual([])
+  })
+
+  it('sin filas → listas vacías sin error', async () => {
+    const r = await fetchRecursosPlantillas('p1', 'co1')
+    expect(r).toEqual({ suministros: [], herramientas: [], error: null })
   })
 })

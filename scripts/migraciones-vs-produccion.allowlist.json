@@ -1,0 +1,9 @@
+{
+  "_README": "Deuda de esquema DECLARADA para scripts/migraciones-vs-produccion.mjs: tablas y columnas que una migración YA APLICADA declara y que producción no tiene. Cada entrada es un 42703 esperando a que alguien escriba esa columna, así que lleva `reason` obligatorio. El guard delata las entradas que ya no aplican: cuando una columna se repone hay que retirarla de aquí — una lista que nadie poda acaba siendo un `permitir todo` de facto. Lo contrario de esta lista es reponer la columna con una migración forward-only, patrón 20260904000500 y 20260906000000. Sembrar SIEMPRE desde una corrida real contra producción, nunca a ojo.",
+
+  "_HISTORIA": "Se sembró el 2026-08-27 con las 10 columnas que la primera corrida real (run 33107076122) encontró ausentes: 8 de bloques_turno/tareas_bloque y 2 de amenidades_bloqueos. Ninguna era deuda benigna — cerrar un bloque de turno y completar una tarea fallaban EN SILENCIO en producción, y agregar una tarea o bloquear una amenidad daban 400. 20260906000000_reparar_esquema_turnos_y_amenidades.sql las cerró alineando producción con lo que el repositorio declara, así que la lista vuelve a su estado sano: vacía. Que esté vacía es la afirmación fuerte de este archivo — significa que producción tiene TODO lo que declara cada migración aplicada.",
+
+  "columnas": [],
+
+  "tablas": []
+}

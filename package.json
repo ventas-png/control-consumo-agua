@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prerender-legal.mjs",
+    "build": "vite build && node scripts/prerender-legal.mjs && node scripts/generar-e2e-meta.mjs",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -58,12 +58,14 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
+    "@playwright/test": "1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@storybook/react-vite": "^10.5.5",
     "@testing-library/react": "^16.3.2",
     "@types/dompurify": "^3.2.0",
     "@types/jest-axe": "^3.5.9",
     "@types/leaflet": "^1.9.8",
+    "@types/node": "20.19.43",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^6.0.5",

@@ -289,16 +289,14 @@ export async function fetchCondominiosTareasData(pid: string, cid: string) {
  * y un resumen corto de novedades, y una tabla que crece una fila por área y
  * por día no se puede cargar entera para siempre.
  *
- * Va en `supabase` (sin tipar) y no en `db`: `ejecuciones_limpieza` la crea la
- * migración 20260807130000 y no existe en database.types.ts hasta la próxima
- * corrida de `npm run gen:db-types`. Mismo caso que las 4 excepciones de la
- * cabecera. El shape lo fija `EjecucionLimpieza` en types/condominios.
+ * Va en `db` (tipado): `ejecuciones_limpieza` existe en database.types.ts
+ * desde la sincronización del PR de catálogos de limpieza (serie 20260904*).
  */
 export async function fetchCondominiosLimpiezaData(pid: string, cid: string, dias = 45) {
   const desde = new Date()
   desde.setDate(desde.getDate() - dias)
   const desdeISO = desde.toISOString().slice(0, 10)
-  return supabase.from('ejecuciones_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).gte('fecha', desdeISO).order('fecha', { ascending: false }).order('orden').limit(2000)
+  return db.from('ejecuciones_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).gte('fecha', desdeISO).order('fecha', { ascending: false }).order('orden').limit(2000)
 }
 
 /**

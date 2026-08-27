@@ -240,6 +240,7 @@ jobs:
         run: |
           set -uo pipefail
           fail=0
+          detenida=""
           {
             echo "### Aplicación de migraciones a producción"
             echo ""
@@ -277,12 +278,25 @@ jobs:
             elif ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$resp"; then
               motivo="respuesta inesperada (se esperaba un array de filas)"
             fi
+            # FAIL-FAST. Antes esto era `continue`, y el 2026-08-27 costó caro: al
+            # fallar 20260904000100 (le faltaba una columna en el esquema real de
+            # producción), el bucle siguió y aplicó 000200 y 000300 encima. Producción
+            # quedó en un estado que NINGUNA migración describe —dos aplicadas y
+            # registradas, una revertida, una que ni podía correr— y el frontend
+            # desplegado en ese mismo push contaba con las cuatro.
+            #
+            # Una serie de migraciones es una secuencia, no un lote independiente: la
+            # N+1 suele dar por hecho lo que hizo la N. Aplicar la siguiente después de
+            # un fallo no adelanta trabajo, sólo produce un estado híbrido más difícil
+            # de razonar que el fallo original. Se corta aquí y las que faltan se
+            # declaran no intentadas en el resumen.
             if [ -n "$motivo" ]; then
               echo "::error::Falló $base — $motivo: $(head -c 300 /tmp/apply-resp.json)"
               echo "- ❌ \`$base\` — $motivo" >> "$GITHUB_STEP_SUMMARY"
               fail=1
+              detenida="$base"
               echo "::endgroup::"
-              continue
+              break
             fi
             # Registrar en el historial (idempotente con ON CONFLICT). Sigue siendo
             # best-effort —el DDL ya se aplicó, no tiene sentido marcar la migración
@@ -302,6 +316,21 @@ jobs:
             echo "- ✅ \`$base\`" >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
+
+          # Las posteriores a la que falló NO se intentaron: decirlo es la mitad del
+          # valor del corte. Un resumen que sólo muestre la fallida se lee como si el
+          # resto hubiera pasado.
+          if [ -n "${detenida:-}" ]; then
+            visto=0
+            for f in $FILES; do
+              b=$(basename "$f" .sql)
+              if [ "$visto" = "1" ]; then
+                echo "- ⏭️ \`$b\` — no intentada (se detuvo en \`$detenida\`)" >> "$GITHUB_STEP_SUMMARY"
+              fi
+              [ "$b" = "$detenida" ] && visto=1
+            done
+            echo "::error::Se detuvo en $detenida sin intentar las posteriores. Corregir el prerrequisito y volver a disparar."
+          fi
 
           if [ "$fail" -ne 0 ]; then
             echo "::error::Una o más migraciones fallaron. Revisá el log."

@@ -1,0 +1,105 @@
+name: Drift de esquema (migraciones ↔ producción)
+
+# Verifica, contra el esquema real de PRODUCCIÓN (solo LECTURA, sin mutación),
+# que toda tabla y columna declarada por una migración YA REGISTRADA como
+# aplicada exista de verdad.
+#
+# EL INCIDENTE QUE REGRESA-GUARDA. El 2026-08-27 el merge de #782 aplicó su
+# serie a producción y falló a medias (run 33095288091):
+#
+#   20260904000100 → 42703: column "activo" of relation "areas_condominio"
+#                    does not exist
+#
+# `20260424000059` declara esa columna y la tabla real nunca la tuvo: esa tabla
+# no la creó esa migración. Las 257 migraciones anteriores al 2026-06-05 «se
+# aplicaron por otra vía» y el historial se rellenó como papeleo, sin ejecutar el
+# SQL (ver scripts/backfill-schema-migrations.sql). Todo el CI estaba verde y no
+# mentía: en un esquema construido desde supabase/migrations la columna sí
+# existe. Nadie miraba el otro sentido.
+#
+# Complementa, sin solaparse:
+#   columnas-vs-migraciones.mjs → app ↔ migraciones   (bloquea `npm test`)
+#   security-guard.mjs          → aislamiento en prod (bloquea)
+#   types-drift.yml             → prod ↔ database.types.ts (advisory, semanal)
+#
+# Gated por presencia de secretos: sin SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN
+# el job es NO-OP VERDE (no rompe forks ni CI sin wiring). Con credenciales y una
+# consulta que falla, sale 1 — fail-closed.
+
+# NO HAY DISPARADOR `push`, Y ESO ES DELIBERADO.
+#
+# El primer intento sí lo tenía, con `paths-ignore: supabase/migrations/**` para
+# esquivar la carrera con el apply — la misma que security-guard.yml documenta
+# con un VERDE FALSO (#678) y un ROJO FALSO (#684). No funcionó, y produjo un
+# rojo falso EN SU PRIMER USO: el merge de #797 (run 33111303280) leyó el
+# catálogo a las 20:01:49 y el apply terminó a las 20:01:58, así que reportó
+# como drift las diez columnas que esa misma migración estaba reparando.
+#
+# La causa es la semántica de `paths-ignore`: GitHub omite el run sólo si TODOS
+# los archivos del push casan con el patrón. Aquel push tocaba migraciones Y
+# `coverage.yml`, `supabase/tests/**` y el allowlist, así que se disparó igual.
+# No hay forma de expresar «omitir si ALGÚN archivo es una migración».
+#
+# Pero además el disparador no aportaba nada: el drift de esquema sólo puede
+# cambiar cuando se APLICAN migraciones a producción. Un push que no las toca no
+# puede alterar el esquema real, así que `push` sólo añadía la carrera. Quedan
+# los tres que sí significan algo: `workflow_run` justo después del apply,
+# `schedule` para los cambios hechos fuera de banda (panel, MCP, a mano), y
+# `workflow_dispatch`.
+on:
+  workflow_run:
+    workflows: ['Apply Migrations to Production']
+    types: [completed]
+  schedule:
+    # 07:30 UTC diario. Media hora después del security guard para no pelear por
+    # la misma API ni mezclar sus rojos en la misma notificación.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'bloquear = falla si hay drift · reporte = lo lista y sale verde (para sembrar el allowlist)'
+        type: choice
+        options: [bloquear, reporte]
+        default: bloquear
+
+concurrency:
+  group: drift-esquema-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Esquema de prod — sin columnas declaradas que falten
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Gate por secretos de Supabase
+        id: gate
+        run: |
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN no configurados — guard omitido (no-op verde)."
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+
+      # Sin dependencias: el script usa solo APIs nativas de Node (fetch, fs).
+      - name: Comparar migraciones aplicadas contra el esquema real
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          if [ "${{ github.event.inputs.modo }}" = "reporte" ]; then
+            node scripts/migraciones-vs-produccion.mjs --reporte
+          else
+            node scripts/migraciones-vs-produccion.mjs
+          fi

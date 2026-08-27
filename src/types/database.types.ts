@@ -5848,6 +5848,121 @@ export type Database = {
           },
         ]
       }
+      ejecuciones_limpieza: {
+        Row: {
+          anulada_en: string | null
+          anulada_por: string | null
+          company_id: string
+          completada_en: string | null
+          completada_por: string | null
+          creado_por: string | null
+          created_at: string
+          estado: string
+          fecha: string
+          foto_urls: Json
+          id: string
+          motivo_anulacion: string | null
+          novedad: string | null
+          observacion: string | null
+          orden: number
+          personal_id: string | null
+          prioridad: string | null
+          programacion_id: string
+          project_id: string
+          requiere_mantenimiento: boolean
+          turno: string | null
+        }
+        Insert: {
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id: string
+          completada_en?: string | null
+          completada_por?: string | null
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha: string
+          foto_urls?: Json
+          id?: string
+          motivo_anulacion?: string | null
+          novedad?: string | null
+          observacion?: string | null
+          orden?: number
+          personal_id?: string | null
+          prioridad?: string | null
+          programacion_id: string
+          project_id: string
+          requiere_mantenimiento?: boolean
+          turno?: string | null
+        }
+        Update: {
+          anulada_en?: string | null
+          anulada_por?: string | null
+          company_id?: string
+          completada_en?: string | null
+          completada_por?: string | null
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha?: string
+          foto_urls?: Json
+          id?: string
+          motivo_anulacion?: string | null
+          novedad?: string | null
+          observacion?: string | null
+          orden?: number
+          personal_id?: string | null
+          prioridad?: string | null
+          programacion_id?: string
+          project_id?: string
+          requiere_mantenimiento?: boolean
+          turno?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ejecuciones_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ejecuciones_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ejecuciones_limpieza_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "mv_superadmin_empresa_counts"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "ejecuciones_limpieza_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ejecuciones_limpieza_programacion_id_fkey"
+            columns: ["programacion_id"]
+            isOneToOne: false
+            referencedRelation: "programacion_limpieza"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ejecuciones_limpieza_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ejecuciones_mantenimiento: {
         Row: {
           company_id: string
@@ -11879,6 +11994,139 @@ export type Database = {
           },
         ]
       }
+      plantilla_tarea_herramientas: {
+        Row: {
+          cantidad: number
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          inventario_id: string
+          notas: string | null
+          obligatoria: boolean
+          plantilla_tarea_id: string
+          project_id: string
+        }
+        Insert: {
+          cantidad?: number
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          inventario_id: string
+          notas?: string | null
+          obligatoria?: boolean
+          plantilla_tarea_id: string
+          project_id: string
+        }
+        Update: {
+          cantidad?: number
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          inventario_id?: string
+          notas?: string | null
+          obligatoria?: boolean
+          plantilla_tarea_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_tarea_herramientas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tarea_herramientas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_herramienta_plantilla_fk"
+            columns: ["plantilla_tarea_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_tarea_cargo"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "pt_herramienta_recurso_fk"
+            columns: ["inventario_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+        ]
+      }
+      plantilla_tarea_suministros: {
+        Row: {
+          cantidad: number
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          notas: string | null
+          plantilla_tarea_id: string
+          project_id: string
+          suministro_id: string
+        }
+        Insert: {
+          cantidad?: number
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          plantilla_tarea_id: string
+          project_id: string
+          suministro_id: string
+        }
+        Update: {
+          cantidad?: number
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          notas?: string | null
+          plantilla_tarea_id?: string
+          project_id?: string
+          suministro_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plantilla_tarea_suministros_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plantilla_tarea_suministros_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_suministro_plantilla_fk"
+            columns: ["plantilla_tarea_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "plantillas_tarea_cargo"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+          {
+            foreignKeyName: "pt_suministro_recurso_fk"
+            columns: ["suministro_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "suministros_condominio"
+            referencedColumns: ["id", "company_id", "project_id"]
+          },
+        ]
+      }
       plantillas_cuota: {
         Row: {
           activa: boolean
@@ -12035,42 +12283,60 @@ export type Database = {
           activo: boolean
           area_id: string | null
           cargo: string
+          checklist: Json
           company_id: string
           created_at: string
           descripcion: string | null
+          duracion_estimada_min: number | null
           icono: string | null
           id: string
+          instrucciones_seguridad: string | null
           orden: number | null
           project_id: string
+          requiere_checklist: boolean
+          requiere_comentario: boolean
           requiere_foto: boolean
+          servicio: string | null
           titulo: string
         }
         Insert: {
           activo?: boolean
           area_id?: string | null
           cargo: string
+          checklist?: Json
           company_id: string
           created_at?: string
           descripcion?: string | null
+          duracion_estimada_min?: number | null
           icono?: string | null
           id?: string
+          instrucciones_seguridad?: string | null
           orden?: number | null
           project_id: string
+          requiere_checklist?: boolean
+          requiere_comentario?: boolean
           requiere_foto?: boolean
+          servicio?: string | null
           titulo: string
         }
         Update: {
           activo?: boolean
           area_id?: string | null
           cargo?: string
+          checklist?: Json
           company_id?: string
           created_at?: string
           descripcion?: string | null
+          duracion_estimada_min?: number | null
           icono?: string | null
           id?: string
+          instrucciones_seguridad?: string | null
           orden?: number | null
           project_id?: string
+          requiere_checklist?: boolean
+          requiere_comentario?: boolean
           requiere_foto?: boolean
+          servicio?: string | null
           titulo?: string
         }
         Relationships: [
@@ -12745,46 +13011,71 @@ export type Database = {
         Row: {
           activo: boolean
           area: string
+          area_id: string | null
+          cargo: string | null
           company_id: string
           created_at: string
           estado: string
           frecuencia: string
           id: string
           notas: string | null
+          orden: number
+          personal_id: string | null
           project_id: string
           proxima_ejecucion: string | null
+          requiere_foto: boolean
           responsable: string | null
+          turno: string | null
           ultima_ejecucion: string | null
         }
         Insert: {
           activo?: boolean
           area: string
+          area_id?: string | null
+          cargo?: string | null
           company_id: string
           created_at?: string
           estado?: string
           frecuencia?: string
           id?: string
           notas?: string | null
+          orden?: number
+          personal_id?: string | null
           project_id: string
           proxima_ejecucion?: string | null
+          requiere_foto?: boolean
           responsable?: string | null
+          turno?: string | null
           ultima_ejecucion?: string | null
         }
         Update: {
           activo?: boolean
           area?: string
+          area_id?: string | null
+          cargo?: string | null
           company_id?: string
           created_at?: string
           estado?: string
           frecuencia?: string
           id?: string
           notas?: string | null
+          orden?: number
+          personal_id?: string | null
           project_id?: string
           proxima_ejecucion?: string | null
+          requiere_foto?: boolean
           responsable?: string | null
+          turno?: string | null
           ultima_ejecucion?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "programacion_limpieza_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas_condominio"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "programacion_limpieza_company_id_fkey"
             columns: ["company_id"]
@@ -12805,6 +13096,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mv_superadmin_empresa_counts"
             referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "programacion_limpieza_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "personal_condominio"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "programacion_limpieza_project_id_fkey"

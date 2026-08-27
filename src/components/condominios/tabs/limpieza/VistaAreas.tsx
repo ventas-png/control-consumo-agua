@@ -1,5 +1,12 @@
-// Vista "Áreas": el catálogo general de áreas de limpieza y —lo que agrega
-// esta fase— a quién le toca cada una.
+// Vista "Áreas": las programaciones de limpieza y —lo que agrega esta fase— a
+// quién le toca cada una.
+//
+// Desde 20260904000100 el área se ELIGE del catálogo canónico
+// (`areas_condominio`, el mismo de rondas y plantillas) en lugar de teclearse:
+// `area_id` es el vínculo y `area` queda como snapshot del nombre. Las filas
+// legadas que el backfill no pudo vincular (ambiguas) siguen mostrando su texto
+// histórico con la marca "Pendiente de vincular"; editarlas permite resolverlas
+// a mano sin obligar a hacerlo para tocar otros campos.
 //
 // La asignación tiene dos niveles (ver domain/condominios/limpieza.ts):
 // persona concreta, o perfil (turno + cargo) para las áreas que cubre "quien
@@ -9,22 +16,30 @@ import { useState, useMemo } from 'react'
 import { hoyLocalISO } from '../../../../lib/format'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../../domain/condominios/tabMutations'
 import { notify, confirm } from '../../../shared/Dialog'
-import type { ProgramacionLimpieza, PersonalCondominio } from '../../../../types'
+import type { AreaCondominio, ProgramacionLimpieza, PersonalCondominio } from '../../../../types'
 import { empleadosDeArea, sumarDias } from '../../../../domain/condominios/limpieza'
+import { nombreAreaDe } from '../../../../domain/condominios/areas'
 import { btn, chip, inputStyle, labelStyle, FRECUENCIA_LABEL, TURNO_LABEL, CARGO_LABEL } from './ui'
 
 interface Props {
   programaciones: ProgramacionLimpieza[]
   personal: PersonalCondominio[]
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /**
+   * Borrado, independiente de canEdit: la programación con historial ni
+   * siquiera se puede borrar en BD (FK RESTRICT), y quien no tiene el permiso
+   * conserva Desactivar como alternativa.
+   */
+  canDelete: boolean
   onRefresh: () => void
 }
 
 const BLANK = {
-  area: '', frecuencia: 'semanal', responsable: '', personal_id: '', turno: '', cargo: '',
+  area_id: '', frecuencia: 'semanal', responsable: '', personal_id: '', turno: '', cargo: '',
   orden: '0', requiere_foto: 'true', ultima_ejecucion: '', proxima_ejecucion: '',
   activo: 'true', notas: '',
 }
@@ -44,7 +59,7 @@ const ALERTA_STYLE = {
   sin_fecha: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', badge: 'var(--at-ink-3)', badgeBg: 'var(--at-chip)', label: 'Sin fecha' },
 }
 
-export function VistaAreas({ programaciones, personal, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function VistaAreas({ programaciones, personal, areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -69,7 +84,7 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
   const openNew = () => { setForm({ ...BLANK }); setEditId(null); setShowForm(true) }
   const openEdit = (p: ProgramacionLimpieza) => {
     setForm({
-      area: p.area, frecuencia: p.frecuencia, responsable: p.responsable ?? '',
+      area_id: p.area_id ?? '', frecuencia: p.frecuencia, responsable: p.responsable ?? '',
       personal_id: p.personal_id ?? '', turno: p.turno ?? '', cargo: p.cargo ?? '',
       orden: String(p.orden ?? 0), requiere_foto: String(p.requiere_foto ?? true),
       ultima_ejecucion: p.ultima_ejecucion ?? '', proxima_ejecucion: p.proxima_ejecucion ?? '',
@@ -78,12 +93,32 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
     setEditId(p.id); setShowForm(true)
   }
 
+  const editando = editId ? programaciones.find(p => p.id === editId) : undefined
+
+  // Opciones del select: áreas activas + (al editar) el área ya vinculada
+  // aunque esté inactiva — si no, el select no podría mostrar el valor actual.
+  const opcionesArea = useMemo(() => {
+    const activas = areas.filter(a => a.activo)
+    const vinculada = form.area_id ? areas.find(a => a.id === form.area_id) : undefined
+    const lista = vinculada && !vinculada.activo ? [...activas, vinculada] : activas
+    return [...lista].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
+  }, [areas, form.area_id])
+
   const handleSave = async () => {
-    if (!form.area.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'El área es obligatoria.' })
+    const areaSel = areas.find(a => a.id === form.area_id)
+    // Alta nueva: el área viene del catálogo, sin excepciones. Al editar un
+    // legado se permite guardar sin vincular (queda "pendiente"), para no
+    // forzar un vínculo apurado por corregir otra cosa.
+    if (!editId && !areaSel) {
+      return notify({ variant: 'warning', title: 'Campo requerido', text: 'Selecciona el área del catálogo. Si no existe, créala en "Catálogo de áreas".' })
+    }
     setSaving(true)
     const payload = {
       company_id: companyId, project_id: proyectoId,
-      area: form.area.trim(), frecuencia: form.frecuencia,
+      // `area` es el snapshot del nombre al momento de vincular; si el legado
+      // sigue sin vincular, no se toca (conserva su texto histórico).
+      ...(areaSel ? { area_id: areaSel.id, area: areaSel.nombre.trim() } : {}),
+      frecuencia: form.frecuencia,
       responsable: form.responsable.trim() || null,
       personal_id: form.personal_id || null,
       turno: form.turno || null,
@@ -109,9 +144,22 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
   }
 
   const handleDelete = async (p: ProgramacionLimpieza) => {
-    const r = await confirm({ title: '¿Eliminar área?', text: `${p.area} — se borra también su historial de ejecuciones.`, icon: 'warning', variant: 'danger', confirmText: 'Eliminar' })
+    const r = await confirm({
+      title: '¿Eliminar programación?',
+      text: `${nombreAreaDe(p.area_id, areas, p.area)} — solo se puede eliminar si no tiene ejecuciones registradas. Si ya tiene historial, desactívala: las fotos y reportes se conservan.`,
+      icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
+    })
     if (!r.isConfirmed) return
-    await deleteCondominioRow('programacion_limpieza', p.id)
+    const { error } = await deleteCondominioRow('programacion_limpieza', p.id)
+    if (error) {
+      notify({
+        variant: 'error', title: 'Tiene historial',
+        text: error.code === '23503'
+          ? 'Esta programación tiene ejecuciones registradas (fotos, reportes). El historial está protegido: desactívala en su lugar.'
+          : error.message,
+      })
+      return
+    }
     setSeleccion(s => { const n = new Set(s); n.delete(p.id); return n })
     onRefresh()
   }
@@ -165,7 +213,8 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
   })
 
   const ordenadas = [...filtered].sort(
-    (a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.area.localeCompare(b.area),
+    (a, b) => (a.orden ?? 0) - (b.orden ?? 0)
+      || nombreAreaDe(a.area_id, areas, a.area).localeCompare(nombreAreaDe(b.area_id, areas, b.area)),
   )
 
   return (
@@ -251,7 +300,19 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={labelStyle}>Área *</label>
-              <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Ej. Piscina, Lobby, Gimnasio" autoFocus />
+              <select style={inputStyle} value={form.area_id} onChange={e => setF('area_id', e.target.value)} autoFocus>
+                <option value="">
+                  {editando && !editando.area_id ? '— Sin vincular (registro anterior) —' : '— Selecciona un área —'}
+                </option>
+                {opcionesArea.map(a => (
+                  <option key={a.id} value={a.id}>{a.icono} {a.nombre}{a.activo ? '' : ' (inactiva)'}</option>
+                ))}
+              </select>
+              {editando && !editando.area_id && (
+                <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
+                  ⚠ Registro anterior con texto libre: “{editando.area}”. Elegí el área del catálogo para vincularlo (si no existe, créala en “Catálogo de áreas”).
+                </div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Frecuencia</label>
@@ -337,6 +398,9 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
             const fr = FRECUENCIA_LABEL[p.frecuencia] ?? FRECUENCIA_LABEL.semanal
             const seleccionada = seleccion.has(p.id)
             const cubren = p.personal_id ? [] : empleadosDeArea(p, personal)
+            // Con vínculo, manda el catálogo; sin él, el snapshot histórico.
+            const nombreArea = nombreAreaDe(p.area_id, areas, p.area)
+            const iconoArea = (p.area_id && areas.find(a => a.id === p.area_id)?.icono) || '🧹'
             return (
               <div key={p.id} style={{
                 background: p.activo ? al.bg : 'var(--at-surface-2)',
@@ -350,12 +414,12 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
                         type="checkbox"
                         checked={seleccionada}
                         onChange={() => toggleSel(p.id)}
-                        aria-label={`Seleccionar ${p.area}`}
+                        aria-label={`Seleccionar ${nombreArea}`}
                         style={{ marginTop: '3px', cursor: 'pointer' }}
                       />
                     )}
                     <span>
-                      <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>🧹 {p.area}</span>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{iconoArea} {nombreArea}</span>
                       <span style={{ display: 'block', fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                         {p.personal_id
                           ? `👤 ${nombrePersonal.get(p.personal_id) ?? 'Empleado dado de baja'}`
@@ -368,12 +432,20 @@ export function VistaAreas({ programaciones, personal, proyectoId, companyId, ca
                     </span>
                   </label>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                    {canEdit && <button onClick={() => openEdit(p)} aria-label={`Editar ${p.area}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(p)} aria-label={`Eliminar ${p.area}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>}
+                    {canEdit && <button onClick={() => openEdit(p)} aria-label={`Editar ${nombreArea}`} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
+                    {canDelete && <button onClick={() => handleDelete(p)} aria-label={`Eliminar ${nombreArea}`} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>}
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  {!p.area_id && (
+                    <span
+                      style={chip('var(--at-warning-tint)', 'var(--at-warning-strong)')}
+                      title="Registro anterior con texto libre: edítalo y elegí el área del catálogo."
+                    >
+                      ⚠ Pendiente de vincular
+                    </span>
+                  )}
                   <span style={chip(fr.bg, fr.color)}>{fr.label}</span>
                   {p.turno && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{TURNO_LABEL[p.turno].icon} {TURNO_LABEL[p.turno].label}</span>}
                   {p.cargo && <span style={chip('var(--at-chip)', 'var(--at-ink-2)')}>{CARGO_LABEL[p.cargo]}</span>}
