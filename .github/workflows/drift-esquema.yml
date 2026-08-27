@@ -1,0 +1,101 @@
+name: Drift de esquema (migraciones ↔ producción)
+
+# Verifica, contra el esquema real de PRODUCCIÓN (solo LECTURA, sin mutación),
+# que toda tabla y columna declarada por una migración YA REGISTRADA como
+# aplicada exista de verdad.
+#
+# EL INCIDENTE QUE REGRESA-GUARDA. El 2026-08-27 el merge de #782 aplicó su
+# serie a producción y falló a medias (run 33095288091):
+#
+#   20260904000100 → 42703: column "activo" of relation "areas_condominio"
+#                    does not exist
+#
+# `20260424000059` declara esa columna y la tabla real nunca la tuvo: esa tabla
+# no la creó esa migración. Las 257 migraciones anteriores al 2026-06-05 «se
+# aplicaron por otra vía» y el historial se rellenó como papeleo, sin ejecutar el
+# SQL (ver scripts/backfill-schema-migrations.sql). Todo el CI estaba verde y no
+# mentía: en un esquema construido desde supabase/migrations la columna sí
+# existe. Nadie miraba el otro sentido.
+#
+# Complementa, sin solaparse:
+#   columnas-vs-migraciones.mjs → app ↔ migraciones   (bloquea `npm test`)
+#   security-guard.mjs          → aislamiento en prod (bloquea)
+#   types-drift.yml             → prod ↔ database.types.ts (advisory, semanal)
+#
+# Gated por presencia de secretos: sin SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN
+# el job es NO-OP VERDE (no rompe forks ni CI sin wiring). Con credenciales y una
+# consulta que falla, sale 1 — fail-closed.
+
+# CARRERA CON EL APPLY DE MIGRACIONES — por qué los disparadores son así.
+#
+# Esto NO es copiar security-guard.yml por inercia: es el mismo problema. Aquel
+# leía el catálogo de producción en el mismo `push` que aplicaba migraciones, y
+# su cabecera documenta que produjo un VERDE FALSO (#678) y un ROJO FALSO (#684)
+# en dos merges seguidos. Esta guarda lee el mismo catálogo justo después del
+# mismo apply y tendría exactamente la misma carrera.
+#
+# Por eso: los pushes que TOCAN migraciones no disparan por `push` —lo harían
+# antes de que la migración se aplicara, reportando como drift lo que está a
+# medio aplicar— sino por `workflow_run`, cuando el apply terminó de verdad. Los
+# que no tocan migraciones no tienen carrera y siguen por `push`.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'supabase/migrations/**'
+  workflow_run:
+    workflows: ['Apply Migrations to Production']
+    types: [completed]
+  schedule:
+    # 07:30 UTC diario. Media hora después del security guard para no pelear por
+    # la misma API ni mezclar sus rojos en la misma notificación.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'bloquear = falla si hay drift · reporte = lo lista y sale verde (para sembrar el allowlist)'
+        type: choice
+        options: [bloquear, reporte]
+        default: bloquear
+
+concurrency:
+  group: drift-esquema-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Esquema de prod — sin columnas declaradas que falten
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Gate por secretos de Supabase
+        id: gate
+        run: |
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN no configurados — guard omitido (no-op verde)."
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+
+      # Sin dependencias: el script usa solo APIs nativas de Node (fetch, fs).
+      - name: Comparar migraciones aplicadas contra el esquema real
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          if [ "${{ github.event.inputs.modo }}" = "reporte" ]; then
+            node scripts/migraciones-vs-produccion.mjs --reporte
+          else
+            node scripts/migraciones-vs-produccion.mjs
+          fi

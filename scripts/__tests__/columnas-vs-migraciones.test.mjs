@@ -178,3 +178,30 @@ describe('el parser de .select()', () => {
     expect([c.get('A'), c.get('B')]).toEqual(['x', 'y'])
   })
 })
+
+describe('columnasDeLasMigraciones · DDL dinámico', () => {
+  it('ignora `ALTER TABLE public.%I` en vez de inventarse una tabla llamada `public`', () => {
+    // Varias migraciones hacen EXECUTE format('ALTER TABLE public.%I ADD COLUMN
+    // …', tabla) sobre una lista calculada en ejecución. Sin el lookahead el
+    // motor retrocedía, capturaba `public` como nombre de tabla y le colgaba las
+    // columnas de todas esas sentencias. La primera corrida de
+    // migraciones-vs-produccion contra producción reportó justo eso: una tabla
+    // fantasma `public` ausente. No poder resolverlo es correcto; adivinarlo no.
+    const porTabla = columnasDeLasMigraciones([
+      `DO $$ BEGIN
+         EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS project_id uuid', t);
+       END $$;`,
+    ])
+
+    expect(porTabla.has('public')).toBe(false)
+    expect([...porTabla.keys()]).toEqual([])
+  })
+
+  it('sigue leyendo el ALTER TABLE normal con esquema explícito', () => {
+    const porTabla = columnasDeLasMigraciones([
+      `ALTER TABLE public.areas_condominio ADD COLUMN IF NOT EXISTS activo boolean;`,
+    ])
+
+    expect([...porTabla.get('areas_condominio')]).toEqual(['activo'])
+  })
+})
