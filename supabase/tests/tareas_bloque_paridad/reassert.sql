@@ -2,7 +2,7 @@
 \pset tuples_only on
 \pset format unaligned
 
--- Post-idempotencia: re-aplicar 20260905000100 sobre una base ya migrada no
+-- Post-idempotencia: re-aplicar 20260907000100 sobre una base ya migrada no
 -- puede revivir las legadas, duplicar policies ni perder las garantías.
 
 DO $$

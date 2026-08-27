@@ -2,7 +2,7 @@
 \pset tuples_only on
 \pset format unaligned
 
--- Invariantes de la paridad de tareas_bloque (20260905000100).
+-- Invariantes de la paridad de tareas_bloque (20260907000100).
 
 DO $$
 DECLARE
@@ -49,10 +49,12 @@ BEGIN
     RAISE EXCEPTION '1c: el cliente logró atribuir el cierre a % ', v_uuid; END IF;
   RAISE NOTICE 'OK 1  el cierre de la tarea ya sabe QUIÉN, y lo impone la BD';
 
-  -- ── 2. La rama de la RPC que reventaba ahora resuelve ────────────────────
-  -- Era el bug vivo: `tb.completado_en` no existe (la real es `completada_en`)
-  -- y `tb.completado_por` no se había creado. Este SELECT es exactamente el
-  -- de la rama 'limpiezas' de actividad_equipo.
+  -- ── 2. Las columnas que la RPC necesita resuelven ───────────────────────
+  -- Este SELECT es, literal, la rama 'limpiezas' de `actividad_equipo`. No
+  -- llama a la función —de eso se encarga supabase/tests/actividad_equipo, que
+  -- la ejecuta— sino que comprueba que el par que esa rama lee existe y
+  -- resuelve. Es la garantía que aporta la sección 1 de esta migración: sin
+  -- `completado_por`, la RPC vuelve a reventar con 42703 en una base nueva.
   SELECT count(*) INTO n
     FROM public.tareas_bloque tb
     JOIN public.bloques_turno bt ON bt.id = tb.bloque_id
@@ -60,7 +62,7 @@ BEGIN
      AND tb.completada_en >= now() - interval '30 days';
   IF n < 1 THEN
     RAISE EXCEPTION '2: la rama de actividad del equipo no devolvió la tarea recién cerrada'; END IF;
-  RAISE NOTICE 'OK 2  la consulta de actividad del equipo ya no revienta con 42703';
+  RAISE NOTICE 'OK 2  el par que lee actividad_equipo existe y su consulta resuelve';
 
   -- ── 3. Estado y prioridad controlados ────────────────────────────────────
   BEGIN

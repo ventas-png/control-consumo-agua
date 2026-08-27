@@ -1,4 +1,4 @@
--- Fixture mínimo para EJECUTAR las migraciones 20260904000000 · 000100 · 000200
+-- Fixture mínimo para EJECUTAR las migraciones 20260904000100 · 000200 · 000300
 -- contra un Postgres de verdad. Reproduce el estado ANTERIOR a la serie: el
 -- padrón multi-tenant, los helpers de RLS/trazabilidad, y las tablas del módulo
 -- tal como están en prod hoy — incluidas las policies legacy `company_rw_*` que

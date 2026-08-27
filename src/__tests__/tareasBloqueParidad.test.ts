@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
-// Guards ESTÁTICOS de la paridad de `tareas_bloque` (20260905000100).
+// Guards ESTÁTICOS de la paridad de `tareas_bloque` (20260907000100).
 //
 // ALCANCE Y LÍMITE. Esto lee el SQL del repo; no ejecuta nada contra una base.
 // La verificación CONDUCTUAL vive en supabase/tests/tareas_bloque_paridad/run.sh
@@ -23,7 +23,10 @@ import { resolve, join } from 'node:path'
 //      resultado es 42703 en runtime. Se vigila que no vuelva a colarse.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
-const MIG_PARIDAD = '20260905000100_tareas_bloque_paridad.sql'
+const MIG_PARIDAD = '20260907000100_tareas_bloque_paridad.sql'
+// Donde vive hoy la reparación de la RPC: llegó a `main` antes que esta
+// migración y aquí se retiró la copia duplicada (ver el guard de abajo).
+const MIG_HOTFIX_RPC = '20260906000200_reparar_sellado_y_actividad_tareas_bloque.sql'
 
 const PERM_TAREAS = 'condominios.tab.tareas_personal'
 const PERM_TURNOS = 'condominios.tab.turnos'
@@ -86,7 +89,7 @@ const POLICIES_BLOQUES = policiesVigentes('bloques_turno')
 const permisosDe = (cuerpo: string) =>
   new Set([...cuerpo.matchAll(/user_has_permission\(\s*'([^']+)'\s*\)/g)].map(m => m[1]))
 
-describe('20260905000100 · las legadas company_rw_* quedaron retiradas', () => {
+describe('20260907000100 · las legadas company_rw_* quedaron retiradas', () => {
   it.each([
     ['tareas_bloque', POLICIES_TAREAS, 'company_rw_tareas_bloque'],
     ['revisiones_tarea', POLICIES_REVISIONES, 'company_rw_revisiones_tarea'],
@@ -112,7 +115,7 @@ describe('20260905000100 · las legadas company_rw_* quedaron retiradas', () => 
   })
 })
 
-describe('20260905000100 · el re-gateo nombra a los consumidores REALES', () => {
+describe('20260907000100 · el re-gateo nombra a los consumidores REALES', () => {
   // `panel_turno` era el gate nominal y PanelTurnoTab no toca la tabla: quienes
   // la leen son tareas_personal, revision_tareas, desempeno_personal y turnos.
   it.each([
@@ -155,12 +158,14 @@ describe('20260905000100 · el re-gateo nombra a los consumidores REALES', () =>
   it('el borrado de la tarea ejecutada está cerrado: se anula, no se borra', () => {
     const cuerpo = POLICIES_TAREAS.get('tareas_bloque_delete')!.cuerpo
     expect(cuerpo).toMatch(/completada_en\s+IS\s+NULL/i)
-    expect(cuerpo).toMatch(/current_user_role\(\)\s*=\s*ANY/i)
+    // El envoltorio `(SELECT …)` es indiferente aquí —lo exige rlsInitplan y
+    // no cambia a quién deja borrar—, así que el patrón lo admite.
+    expect(cuerpo).toMatch(/current_user_role\(\)\)?\s*=\s*ANY/i)
     expect(permisosDe(cuerpo).size, 'el DELETE no se abre por permiso de tab').toBe(0)
   })
 })
 
-describe('20260905000100 · el hito de cierre apunta a la columna que existe', () => {
+describe('20260907000100 · el hito de cierre apunta a la columna que existe', () => {
   it('el trigger de sellado usa completada_en, no el completado_en inexistente', () => {
     const trigger = sqlParidad.match(
       /CREATE TRIGGER trg_sellar_cierre[\s\S]*?sellar_cierre\(([^)]*)\)/i,
@@ -170,11 +175,19 @@ describe('20260905000100 · el hito de cierre apunta a la columna que existe', (
     expect(trigger![1]).toContain("'completado_por'")
   })
 
-  it('la RPC actividad_equipo se re-declara sin la columna fantasma', () => {
-    const rpc = sqlParidad.match(
+  it('la RPC actividad_equipo lee la columna que existe', () => {
+    // La reparación NO vive en esta migración. Cuando se escribió, sí: traía
+    // una copia literal de la RPC con el nombre corregido. Pero 20260906000200
+    // llegó antes a `main` e hizo exactamente eso, así que repetirla aquí
+    // dejaría dos copias de 200 líneas destinadas a divergir. El guard sigue
+    // vigilando lo mismo —que la RPC no vuelva a leer la columna fantasma—,
+    // apuntando a donde de verdad está.
+    const sqlHotfix = codigo.get(MIG_HOTFIX_RPC)
+    expect(sqlHotfix, `falta ${MIG_HOTFIX_RPC}`).toBeDefined()
+    const rpc = sqlHotfix!.match(
       /CREATE OR REPLACE FUNCTION public\.actividad_equipo\(([\s\S]*?)\n\$\$;/i,
     )
-    expect(rpc, 'la migración debe re-declarar actividad_equipo').not.toBeNull()
+    expect(rpc, 'debe re-declarar actividad_equipo').not.toBeNull()
     expect(rpc![1]).toMatch(/tb\.completada_en/)
     expect(rpc![1], 'volvió a colarse el typo que da 42703').not.toMatch(/\bcompletado_en\b/)
   })
@@ -187,7 +200,7 @@ describe('20260905000100 · el hito de cierre apunta a la columna que existe', (
   })
 })
 
-describe('20260905000100 · paridad de evidencia con ejecuciones_limpieza', () => {
+describe('20260907000100 · paridad de evidencia con ejecuciones_limpieza', () => {
   it('la anulación lógica exige motivo y la sella la BD', () => {
     expect(sqlParidad).toMatch(/ADD CONSTRAINT tareas_bloque_anulacion_check/i)
     expect(sqlParidad).toMatch(/CREATE TRIGGER trg_tareas_bloque_anulacion/i)

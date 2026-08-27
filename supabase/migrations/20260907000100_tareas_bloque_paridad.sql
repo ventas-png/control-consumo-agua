@@ -11,19 +11,17 @@
 -- las mismas garantías, o migrar sería una regresión de todo lo que 20260904*
 -- acaba de construir.
 --
--- Además arrastra dos problemas VIVOS que esta migración cierra:
+-- EL PAR DE CIERRE YA ESTÁ ARREGLADO, y no por esta migración. Cuando se
+-- escribió, `completado_por` no existía en el esquema declarado, el trigger
+-- `trg_sellar_cierre` no estaba instalado y la RPC `actividad_equipo` reventaba
+-- con 42703: la trazabilidad (20260731000000:253) había colgado el par de
+-- `completado_en` y la columna real es `completada_en`. Todo eso lo cerró
+-- 20260906000200 contra producción y contra el esquema declarado. Aquí se
+-- conservan la columna y el trigger de la sección 1 —son idempotentes y dejan
+-- la garantía escrita en el archivo que la exige— y se retiró la copia de la
+-- RPC, que sólo habría duplicado 200 líneas destinadas a divergir.
 --
---   · UN BUG EN PRODUCCIÓN. La migración de trazabilidad (20260731000000:253)
---     declaró el par de cierre como ('completado_en','completado_por') cuando
---     la columna real, creada en 20260424000060:45 y nunca renombrada, es
---     `completada_en` (femenino). Consecuencias encadenadas: `completado_por`
---     jamás se creó, su índice tampoco, el trigger `trg_sellar_cierre` no se
---     instaló, y las DOS versiones de la RPC `actividad_equipo`
---     (20260731000300 y 20260829000600:541-546) referencian columnas
---     inexistentes. PL/pgSQL no valida nombres al crear la función, así que se
---     crearon bien y REVIENTAN EN RUNTIME con 42703 en cuanto se ejecuta esa
---     rama. Que la UI escriba `completada_en` sin errores (TareasPersonalTab)
---     confirma cuál es el nombre real.
+-- Lo que SÍ sigue vivo y esta migración cierra:
 --
 --   · UN AGUJERO DE PERMISOS. Las policies legadas `company_rw_tareas_bloque`
 --     y `company_rw_revisiones_tarea` (20260424000060:78-84) nunca se
@@ -44,7 +42,7 @@
 -- gate dejaría esos cuatro tabs sin acceso. Aquí se re-declara con el conjunto
 -- REAL de consumidores, incluido `prog_limpieza` para que la limpieza pueda
 -- materializar sus rutinas sin pedir permisos del módulo Seguridad (mismo
--- criterio que 20260904000100 aplicó al SELECT del catálogo de actividades).
+-- criterio que 20260904000200 aplicó al SELECT del catálogo de actividades).
 --
 -- LO QUE NO HACE: no migra ninguna ejecución de limpieza a `tareas_bloque` ni
 -- crea rutinas. Esto solo nivela el terreno.
@@ -154,8 +152,8 @@ DROP POLICY IF EXISTS "bloques_turno_select" ON public.bloques_turno;
 CREATE POLICY "bloques_turno_select" ON public.bloques_turno
   FOR SELECT TO authenticated
   USING (
-    public.is_super_admin()
-    OR (company_id = public.get_my_company_id()
+    (SELECT public.is_super_admin())
+    OR (company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.revision_tareas')
@@ -170,8 +168,8 @@ DROP POLICY IF EXISTS "bloques_turno_insert" ON public.bloques_turno;
 CREATE POLICY "bloques_turno_insert" ON public.bloques_turno
   FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_super_admin()
-    OR (company_id = public.get_my_company_id()
+    (SELECT public.is_super_admin())
+    OR (company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.prog_limpieza')))
@@ -181,15 +179,15 @@ DROP POLICY IF EXISTS "bloques_turno_update" ON public.bloques_turno;
 CREATE POLICY "bloques_turno_update" ON public.bloques_turno
   FOR UPDATE TO authenticated
   USING (
-    public.is_super_admin()
-    OR (company_id = public.get_my_company_id()
+    (SELECT public.is_super_admin())
+    OR (company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.prog_limpieza')))
   )
   WITH CHECK (
-    public.is_super_admin()
-    OR (company_id = public.get_my_company_id()
+    (SELECT public.is_super_admin())
+    OR (company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.prog_limpieza')))
@@ -204,10 +202,10 @@ DROP POLICY IF EXISTS "tareas_bloque_select" ON public.tareas_bloque;
 CREATE POLICY "tareas_bloque_select" ON public.tareas_bloque
   FOR SELECT TO authenticated
   USING (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = tareas_bloque.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.revision_tareas')
@@ -220,10 +218,10 @@ DROP POLICY IF EXISTS "tareas_bloque_insert" ON public.tareas_bloque;
 CREATE POLICY "tareas_bloque_insert" ON public.tareas_bloque
   FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = tareas_bloque.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.prog_limpieza'))
@@ -234,10 +232,10 @@ DROP POLICY IF EXISTS "tareas_bloque_update" ON public.tareas_bloque;
 CREATE POLICY "tareas_bloque_update" ON public.tareas_bloque
   FOR UPDATE TO authenticated
   USING (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = tareas_bloque.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.revision_tareas')
@@ -245,10 +243,10 @@ CREATE POLICY "tareas_bloque_update" ON public.tareas_bloque
     )
   )
   WITH CHECK (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = tareas_bloque.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.tareas_personal')
              OR public.user_has_permission('condominios.tab.turnos')
              OR public.user_has_permission('condominios.tab.revision_tareas')
@@ -263,13 +261,13 @@ DROP POLICY IF EXISTS "tareas_bloque_delete" ON public.tareas_bloque;
 CREATE POLICY "tareas_bloque_delete" ON public.tareas_bloque
   FOR DELETE TO authenticated
   USING (
-    public.is_super_admin() OR (
+    (SELECT public.is_super_admin()) OR (
       tareas_bloque.completada_en IS NULL
       AND EXISTS (
         SELECT 1 FROM public.bloques_turno b
         WHERE b.id = tareas_bloque.bloque_id
-          AND b.company_id = public.get_my_company_id()
-          AND public.current_user_role() = ANY(ARRAY['company_owner', 'admin'])
+          AND b.company_id = (SELECT public.get_my_company_id())
+          AND (SELECT public.current_user_role()) = ANY(ARRAY['company_owner', 'admin'])
       )
     )
   );
@@ -280,10 +278,10 @@ DROP POLICY IF EXISTS "revisiones_tarea_select" ON public.revisiones_tarea;
 CREATE POLICY "revisiones_tarea_select" ON public.revisiones_tarea
   FOR SELECT TO authenticated
   USING (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = revisiones_tarea.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.revision_tareas')
              OR public.user_has_permission('condominios.tab.desempeno_personal')
              OR public.user_has_permission('condominios.tab.tareas_personal'))
@@ -294,10 +292,10 @@ DROP POLICY IF EXISTS "revisiones_tarea_insert" ON public.revisiones_tarea;
 CREATE POLICY "revisiones_tarea_insert" ON public.revisiones_tarea
   FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = revisiones_tarea.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.revision_tareas'))
     )
   );
@@ -306,18 +304,18 @@ DROP POLICY IF EXISTS "revisiones_tarea_update" ON public.revisiones_tarea;
 CREATE POLICY "revisiones_tarea_update" ON public.revisiones_tarea
   FOR UPDATE TO authenticated
   USING (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = revisiones_tarea.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.revision_tareas'))
     )
   )
   WITH CHECK (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = revisiones_tarea.bloque_id
-        AND b.company_id = public.get_my_company_id()
+        AND b.company_id = (SELECT public.get_my_company_id())
         AND (SELECT public.user_has_permission('condominios.tab.revision_tareas'))
     )
   );
@@ -326,219 +324,23 @@ DROP POLICY IF EXISTS "revisiones_tarea_delete" ON public.revisiones_tarea;
 CREATE POLICY "revisiones_tarea_delete" ON public.revisiones_tarea
   FOR DELETE TO authenticated
   USING (
-    public.is_super_admin() OR EXISTS (
+    (SELECT public.is_super_admin()) OR EXISTS (
       SELECT 1 FROM public.bloques_turno b
       WHERE b.id = revisiones_tarea.bloque_id
-        AND b.company_id = public.get_my_company_id()
-        AND public.current_user_role() = ANY(ARRAY['company_owner', 'admin'])
+        AND b.company_id = (SELECT public.get_my_company_id())
+        AND (SELECT public.current_user_role()) = ANY(ARRAY['company_owner', 'admin'])
     )
   );
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 5. Reparar la RPC actividad_equipo
+-- 5. La RPC actividad_equipo ya está reparada — aquí no se toca
 -- ────────────────────────────────────────────────────────────────────────────
--- Copia literal de la de 20260829000600 con UN cambio: `tb.completado_en` pasa
--- a `tb.completada_en` (el nombre real). `tb.completado_por` ya existe gracias
--- a la sección 1. Sin esto, el tab de actividad del equipo sigue reventando
--- con 42703 en cuanto un usuario tiene tareas cerradas en el rango.
-
-CREATE OR REPLACE FUNCTION public.actividad_equipo(
-  p_project_id uuid,
-  p_desde      date DEFAULT (now() - interval '30 days')::date,
-  p_hasta      date DEFAULT now()::date
-)
-RETURNS TABLE (
-  usuario_id            uuid,
-  usuario_nombre        text,
-  usuario_rol           text,
-  lecturas              bigint,
-  lecturas_m3           numeric,
-  limpiezas             bigint,
-  checklists            bigint,
-  rondas_iniciadas      bigint,
-  puntos_marcados       bigint,
-  visitas_registradas   bigint,
-  paquetes              bigint,
-  solicitudes_creadas   bigint,
-  tareas_cerradas       bigint,
-  total                 bigint,
-  ultima_actividad      timestamptz
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  v_company uuid := public.get_my_company_id();
-  v_desde   timestamptz := p_desde::timestamptz;
-  -- p_hasta es inclusivo para el usuario: "al 31" incluye todo el día 31.
-  v_hasta   timestamptz := (p_hasta + 1)::timestamptz;
-BEGIN
-  IF NOT (
-    public.is_super_admin()
-    OR (v_company IS NOT NULL
-        AND public.current_user_role() = ANY (ARRAY['company_owner', 'admin']))
-  ) THEN
-    RAISE EXCEPTION 'No autorizado' USING ERRCODE = '42501';
-  END IF;
-
-  IF NOT public.is_super_admin() AND NOT EXISTS (
-    SELECT 1 FROM public.projects p
-    WHERE p.id = p_project_id AND p.company_id = v_company
-  ) THEN
-    RAISE EXCEPTION 'Proyecto fuera de la empresa' USING ERRCODE = '42501';
-  END IF;
-
-  RETURN QUERY
-  WITH hechos AS (
-    -- Lecturas de agua capturadas
-    SELECT r.creado_por AS uid, 'lecturas'::text AS tipo,
-           COALESCE(r.consumo, 0)::numeric AS m3, r.fecha AS cuando
-      FROM public.registros r
-     WHERE r.project_id = p_project_id
-       AND r.deleted_at IS NULL
-       AND r.creado_por IS NOT NULL
-       AND r.fecha >= v_desde AND r.fecha < v_hasta
-
-    -- Limpieza: ejecuciones del programa + tareas de bloque completadas
-    UNION ALL
-    SELECT pl.ejecutado_por, 'limpiezas', 0, pl.ultima_ejecucion::timestamptz
-      FROM public.programacion_limpieza pl
-     WHERE pl.project_id = p_project_id
-       AND pl.ejecutado_por IS NOT NULL
-       AND pl.ultima_ejecucion >= v_desde AND pl.ultima_ejecucion < v_hasta
-
-    UNION ALL
-    SELECT sh.creado_por, 'limpiezas', 0, sh.fecha::timestamptz
-      FROM public.servicios_housekeeping sh
-     WHERE sh.project_id = p_project_id
-       AND sh.creado_por IS NOT NULL
-       AND sh.fecha >= v_desde AND sh.fecha < v_hasta
-
-    UNION ALL
-    SELECT tb.completado_por, 'limpiezas', 0, tb.completada_en
-      FROM public.tareas_bloque tb
-      JOIN public.bloques_turno bt ON bt.id = tb.bloque_id
-     WHERE bt.project_id = p_project_id
-       AND tb.completado_por IS NOT NULL
-       AND tb.completada_en >= v_desde AND tb.completada_en < v_hasta
-
-    -- Checklists e inspecciones de área + bitácora de mantenimiento firmada
-    UNION ALL
-    SELECT ca.creado_por, 'checklists', 0, ca.fecha::timestamptz
-      FROM public.checklist_areas ca
-     WHERE ca.project_id = p_project_id
-       AND ca.creado_por IS NOT NULL
-       AND ca.fecha >= v_desde AND ca.fecha < v_hasta
-
-    UNION ALL
-    SELECT bm.creado_por, 'checklists', 0, bm.fecha::timestamptz
-      FROM public.bitacora_manto bm
-     WHERE bm.project_id = p_project_id
-       AND bm.creado_por IS NOT NULL
-       AND bm.fecha >= v_desde AND bm.fecha < v_hasta
-
-    -- Rondas de seguridad abiertas y puntos de control marcados
-    UNION ALL
-    SELECT rs.creado_por, 'rondas_iniciadas', 0, rs.inicio
-      FROM public.rondas_seguridad rs
-     WHERE rs.project_id = p_project_id
-       AND rs.creado_por IS NOT NULL
-       AND rs.inicio >= v_desde AND rs.inicio < v_hasta
-
-    UNION ALL
-    SELECT vc.visitado_por, 'puntos_marcados', 0, vc.visitado_en
-      FROM public.visitas_control vc
-      JOIN public.rondas_seguridad rs2 ON rs2.id = vc.ronda_id
-     WHERE rs2.project_id = p_project_id
-       AND vc.visitado_por IS NOT NULL
-       AND vc.visitado_en >= v_desde AND vc.visitado_en < v_hasta
-
-    -- Visitas registradas en caseta
-    UNION ALL
-    SELECT v.registrado_por, 'visitas_registradas', 0, v.created_at
-      FROM public.visitantes v
-     WHERE v.project_id = p_project_id
-       AND v.registrado_por IS NOT NULL
-       AND v.created_at >= v_desde AND v.created_at < v_hasta
-
-    -- Paquetes recibidos
-    UNION ALL
-    SELECT pr.creado_por, 'paquetes', 0, pr.created_at
-      FROM public.paquetes_recibidos pr
-     WHERE pr.project_id = p_project_id
-       -- ÚNICO CAMBIO respecto de 20260731000300: la tabla ahora también
-       -- guarda correspondencia. La métrica contaba paquetes y sigue contando
-       -- paquetes; sin este filtro subiría sola el día de la unificación.
-       AND pr.clase = 'paquete'
-       AND pr.creado_por IS NOT NULL
-       AND pr.created_at >= v_desde AND pr.created_at < v_hasta
-
-    -- Solicitudes levantadas
-    UNION ALL
-    SELECT sr.creado_por, 'solicitudes_creadas', 0, sr.created_at
-      FROM public.solicitudes_residente sr
-     WHERE sr.project_id = p_project_id
-       AND sr.creado_por IS NOT NULL
-       AND sr.created_at >= v_desde AND sr.created_at < v_hasta
-
-    UNION ALL
-    SELECT sc.creado_por, 'solicitudes_creadas', 0, sc.created_at
-      FROM public.solicitudes_concierge sc
-     WHERE sc.project_id = p_project_id
-       AND sc.creado_por IS NOT NULL
-       AND sc.created_at >= v_desde AND sc.created_at < v_hasta
-
-    -- Tareas cerradas
-    UNION ALL
-    SELECT tc.cerrado_por, 'tareas_cerradas', 0, tc.fecha_cierre::timestamptz
-      FROM public.tareas_condominio tc
-     WHERE tc.project_id = p_project_id
-       AND tc.cerrado_por IS NOT NULL
-       AND tc.fecha_cierre >= v_desde AND tc.fecha_cierre < v_hasta
-  ),
-  agregado AS (
-    SELECT
-      h.uid,
-      count(*) FILTER (WHERE h.tipo = 'lecturas')            AS lecturas,
-      COALESCE(sum(h.m3) FILTER (WHERE h.tipo = 'lecturas'), 0) AS lecturas_m3,
-      count(*) FILTER (WHERE h.tipo = 'limpiezas')           AS limpiezas,
-      count(*) FILTER (WHERE h.tipo = 'checklists')          AS checklists,
-      count(*) FILTER (WHERE h.tipo = 'rondas_iniciadas')    AS rondas_iniciadas,
-      count(*) FILTER (WHERE h.tipo = 'puntos_marcados')     AS puntos_marcados,
-      count(*) FILTER (WHERE h.tipo = 'visitas_registradas') AS visitas_registradas,
-      count(*) FILTER (WHERE h.tipo = 'paquetes')            AS paquetes,
-      count(*) FILTER (WHERE h.tipo = 'solicitudes_creadas') AS solicitudes_creadas,
-      count(*) FILTER (WHERE h.tipo = 'tareas_cerradas')     AS tareas_cerradas,
-      count(*)                                               AS total,
-      max(h.cuando)                                          AS ultimo_hecho
-    FROM hechos h
-    GROUP BY h.uid
-  ),
-  ultima_bitacora AS (
-    SELECT b.usuario_id AS uid, max(b.created_at) AS ultima
-      FROM public.bitacora_acciones b
-     WHERE b.project_id = p_project_id
-       AND b.usuario_id IS NOT NULL
-       AND b.created_at >= v_desde AND b.created_at < v_hasta
-     GROUP BY b.usuario_id
-  )
-  SELECT
-    a.uid,
-    COALESCE(NULLIF(au.full_name, ''), 'Usuario ' || left(a.uid::text, 8)),
-    COALESCE(au.role, '—'),
-    a.lecturas, a.lecturas_m3, a.limpiezas, a.checklists,
-    a.rondas_iniciadas, a.puntos_marcados, a.visitas_registradas,
-    a.paquetes, a.solicitudes_creadas, a.tareas_cerradas, a.total,
-    GREATEST(a.ultimo_hecho, ub.ultima)
-  FROM agregado a
-  LEFT JOIN public.app_users au ON au.id = a.uid
-  LEFT JOIN ultima_bitacora ub  ON ub.uid = a.uid
-  ORDER BY a.total DESC, 2 ASC;
-END;
-$$;
-
--- Los GRANT de la RPC no se repiten: CREATE OR REPLACE conserva la ACL
--- existente, y 20260829000600 ya la dejó revocada de PUBLIC/anon y concedida a
--- authenticated/service_role.
+-- La versión original de esta migración traía una copia literal de
+-- `actividad_equipo` con `tb.completado_en` cambiado por `tb.completada_en`.
+-- 20260906000200 hizo exactamente eso, y además re-apuntó el trigger de
+-- sellado, así que repetirlo aquí dejaría DOS copias del mismo cuerpo de 200
+-- líneas en el repositorio: la próxima vez que haya que tocar esa consulta,
+-- una de las dos se quedaría atrás sin que nada avise.
+--
+-- Se retira a propósito. Si alguna vez hiciera falta reintroducirla, el sitio
+-- es una migración nueva, no ésta.

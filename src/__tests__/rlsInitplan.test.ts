@@ -46,10 +46,53 @@ function sentenciasDePolicy(sql: string): string[] {
   return soloCodigo(sql).match(/CREATE\s+POLICY[\s\S]*?;/gi) ?? []
 }
 
+/**
+ * Tramos `( SELECT … )` de la sentencia, como pares [inicio, fin) sobre el
+ * texto. Lo que cae dentro de uno YA se resuelve como InitPlan.
+ *
+ * Hace falta mirar el tramo entero y no sólo el `(SELECT` pegado al helper,
+ * porque un subselect puede envolver una DISYUNCIÓN de varias llamadas:
+ *
+ *   AND (SELECT public.user_has_permission('a')
+ *        OR  public.user_has_permission('b'))
+ *
+ * Eso es UN InitPlan para las dos, o sea mejor que envolver cada una por
+ * separado. Exigir un `(SELECT` por llamada obligaría a escribir dos.
+ *
+ * PERO NO TODO `( SELECT` ES UN INITPLAN. `EXISTS (SELECT 1 FROM tabla …)` es
+ * una subconsulta CORRELACIONADA: se evalúa por fila, igual que un helper
+ * desnudo, así que lo que vive dentro no está a salvo. El discriminador es su
+ * `FROM`: un subselect escalar sin FROM no puede depender de la fila y el
+ * planificador lo resuelve una vez. Si lo tiene, no se da por envuelto — que
+ * es el lado conservador del error.
+ */
+function tramosEnvueltos(sentencia: string): Array<[number, number]> {
+  const tramos: Array<[number, number]> = []
+  const re = /\(\s*SELECT\s/gi
+  for (const m of sentencia.matchAll(re)) {
+    let prof = 0
+    for (let i = m.index!; i < sentencia.length; i++) {
+      if (sentencia[i] === '(') prof++
+      else if (sentencia[i] === ')') {
+        prof--
+        if (prof === 0) {
+          const cuerpo = sentencia.slice(m.index!, i)
+          if (!/\bFROM\b/i.test(cuerpo)) tramos.push([m.index!, i])
+          break
+        }
+      }
+    }
+  }
+  return tramos
+}
+
 /** Llamadas a un helper de RLS que NO están envueltas en `(SELECT …)`. */
 function sinEnvolver(sentencia: string, helper: string): string[] {
-  const re = new RegExp(`(\\(\\s*SELECT\\s+)?public\\.${helper}\\s*\\(`, 'gi')
-  return [...sentencia.matchAll(re)].filter(m => !m[1]).map(m => m[0])
+  const tramos = tramosEnvueltos(sentencia)
+  const re = new RegExp(`public\\.${helper}\\s*\\(`, 'gi')
+  return [...sentencia.matchAll(re)]
+    .filter(m => !tramos.some(([a, b]) => m.index! > a && m.index! < b))
+    .map(m => m[0])
 }
 
 const HELPERS = ['user_has_permission', 'is_super_admin', 'get_my_company_id', 'current_user_role']
@@ -80,6 +123,39 @@ describe('RLS · los helpers van envueltos en (SELECT …) dentro de las policie
       `${file}: dentro de CREATE POLICY los helpers van como \`(SELECT public.x())\`, ` +
         'no desnudos — si no, el planificador los evalúa fila por fila',
     ).toEqual([])
+  })
+})
+
+describe('el detector distingue un InitPlan de una subconsulta correlacionada', () => {
+  // Dos casos que el detector original resolvía mal, y en direcciones opuestas.
+  // Van con SQL inline y no contra un archivo: lo que se prueba es la regla,
+  // no una migración concreta.
+
+  it('una disyunción envuelta UNA vez no se reporta: es un solo InitPlan', () => {
+    const sql = `CREATE POLICY "x" ON public.t FOR SELECT TO authenticated USING (
+      (SELECT public.user_has_permission('a') OR public.user_has_permission('b'))
+    );`
+    const [sentencia] = sentenciasDePolicy(sql)
+    expect(sinEnvolver(sentencia, 'user_has_permission')).toEqual([])
+  })
+
+  it('dentro de un EXISTS correlacionado NO cuenta como envuelto', () => {
+    // `EXISTS (SELECT 1 FROM …)` también empieza por `( SELECT`, pero se
+    // evalúa por fila. Darlo por envuelto dejaría pasar justo lo que el guard
+    // existe para cazar — y es el error más caro de los dos, porque calla.
+    const sql = `CREATE POLICY "x" ON public.t FOR SELECT TO authenticated USING (
+      EXISTS (SELECT 1 FROM public.p b WHERE b.company_id = public.get_my_company_id())
+    );`
+    const [sentencia] = sentenciasDePolicy(sql)
+    expect(sinEnvolver(sentencia, 'get_my_company_id')).toHaveLength(1)
+  })
+
+  it('y envuelta dentro de ese EXISTS sí cuenta', () => {
+    const sql = `CREATE POLICY "x" ON public.t FOR SELECT TO authenticated USING (
+      EXISTS (SELECT 1 FROM public.p b WHERE b.company_id = (SELECT public.get_my_company_id()))
+    );`
+    const [sentencia] = sentenciasDePolicy(sql)
+    expect(sinEnvolver(sentencia, 'get_my_company_id')).toEqual([])
   })
 })
 

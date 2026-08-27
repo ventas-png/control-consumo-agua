@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de la paridad de tareas_bloque (20260905000100).
+# Verificación EJECUTABLE de la paridad de tareas_bloque (20260907000100).
 #
 # POR QUÉ EXISTE
 # Esta migración cierra dos problemas que llevaban meses vivos y que NO se ven
@@ -44,7 +44,7 @@ set -euo pipefail
 
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
-MIG="$RAIZ/supabase/migrations/20260905000100_tareas_bloque_paridad.sql"
+MIG="$RAIZ/supabase/migrations/20260907000100_tareas_bloque_paridad.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
