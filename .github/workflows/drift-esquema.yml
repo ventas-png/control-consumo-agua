@@ -26,23 +26,27 @@ name: Drift de esquema (migraciones ↔ producción)
 # el job es NO-OP VERDE (no rompe forks ni CI sin wiring). Con credenciales y una
 # consulta que falla, sale 1 — fail-closed.
 
-# CARRERA CON EL APPLY DE MIGRACIONES — por qué los disparadores son así.
+# NO HAY DISPARADOR `push`, Y ESO ES DELIBERADO.
 #
-# Esto NO es copiar security-guard.yml por inercia: es el mismo problema. Aquel
-# leía el catálogo de producción en el mismo `push` que aplicaba migraciones, y
-# su cabecera documenta que produjo un VERDE FALSO (#678) y un ROJO FALSO (#684)
-# en dos merges seguidos. Esta guarda lee el mismo catálogo justo después del
-# mismo apply y tendría exactamente la misma carrera.
+# El primer intento sí lo tenía, con `paths-ignore: supabase/migrations/**` para
+# esquivar la carrera con el apply — la misma que security-guard.yml documenta
+# con un VERDE FALSO (#678) y un ROJO FALSO (#684). No funcionó, y produjo un
+# rojo falso EN SU PRIMER USO: el merge de #797 (run 33111303280) leyó el
+# catálogo a las 20:01:49 y el apply terminó a las 20:01:58, así que reportó
+# como drift las diez columnas que esa misma migración estaba reparando.
 #
-# Por eso: los pushes que TOCAN migraciones no disparan por `push` —lo harían
-# antes de que la migración se aplicara, reportando como drift lo que está a
-# medio aplicar— sino por `workflow_run`, cuando el apply terminó de verdad. Los
-# que no tocan migraciones no tienen carrera y siguen por `push`.
+# La causa es la semántica de `paths-ignore`: GitHub omite el run sólo si TODOS
+# los archivos del push casan con el patrón. Aquel push tocaba migraciones Y
+# `coverage.yml`, `supabase/tests/**` y el allowlist, así que se disparó igual.
+# No hay forma de expresar «omitir si ALGÚN archivo es una migración».
+#
+# Pero además el disparador no aportaba nada: el drift de esquema sólo puede
+# cambiar cuando se APLICAN migraciones a producción. Un push que no las toca no
+# puede alterar el esquema real, así que `push` sólo añadía la carrera. Quedan
+# los tres que sí significan algo: `workflow_run` justo después del apply,
+# `schedule` para los cambios hechos fuera de banda (panel, MCP, a mano), y
+# `workflow_dispatch`.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'supabase/migrations/**'
   workflow_run:
     workflows: ['Apply Migrations to Production']
     types: [completed]
