@@ -211,6 +211,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: supabase/tests/drift_produccion/run.sh
 
+      # Turnos y amenidades existen en producción con OTROS NOMBRES para el
+      # mismo concepto (finalizado_en, completado_en, foto_url), que ninguna
+      # migración declara. La reparación renombra y convierte datos, así que no
+      # basta con comprobar que las columnas existan: este sandbox monta la forma
+      # real, verifica que los cuatro gestos rotos fallan ahí, y que tras la
+      # migración la evidencia sobrevivió al cambio de text a jsonb.
+      - name: Drift de turnos — renombres y conversión de evidencia
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: supabase/tests/drift_turnos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
