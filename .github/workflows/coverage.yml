@@ -286,6 +286,17 @@ jobs:
           PGPORT_TEST: 55485
         run: supabase/tests/materializar_rutinas/run.sh
 
+      # 20260907000400 existe para que la base RECHACE, y un rechazo no se
+      # comprueba leyendo el SQL. Dos filos fáciles de desafilar sin notarlo:
+      # que gatee la TRANSICIÓN y no la fila (validar la fila haría reventar
+      # cualquier edición de una tarea vieja), y que con_observacion/omitida
+      # queden exentas (exigirles la evidencia empuja a cerrar en falso).
+      - name: Evidencia al cerrar — lo que se exige y lo que no se re-valida
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55486
+        run: supabase/tests/evidencia_al_cerrar/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
