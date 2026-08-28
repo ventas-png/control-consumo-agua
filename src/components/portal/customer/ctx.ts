@@ -70,7 +70,11 @@ export interface PortalCtx {
   setSelectedTipoAgua: Dispatch<SetStateAction<string | null>>
 
   // ── Refs / derivados ──
-  chartRef: RefObject<HTMLCanvasElement>
+  // React 19: `useRef<T>(null)` tipa el ref como `RefObject<T | null>` —
+  // dice la verdad, porque el canvas no existe hasta que monta. Los dos
+  // consumidores ya lo contemplan: DashboardTab sólo lo pasa a <canvas ref>,
+  // y CustomerPortal guarda con `if (!chartRef.current) return`.
+  chartRef: RefObject<HTMLCanvasElement | null>
   dashboardData: PortalDashboardData
   hasServices: boolean
 
