@@ -335,6 +335,21 @@ jobs:
           PGPORT_TEST: 55489
         run: supabase/tests/reparar_estado_tareas_bloque/run.sh
 
+      # El trigger del snapshot (20260907000600) es SECURITY DEFINER y buscaba
+      # la plantilla POR ID: un UUID ajeno copiaba checklist, instrucciones y
+      # exigencias de otra compañía, y las FKs simples dejaban colgar la
+      # referencia cruzada. 20260907000800 exige el scope del bloque y estrena
+      # el guard de referencias. Este sandbox monta DOS compañías y DOS
+      # proyectos, reproduce primero el ataque (NEGATIVA) y luego prueba los
+      # rechazos —INSERT y UPDATE, sin oráculo de existencia ni fuga en el
+      # error—, que la plantilla legítima y la ad-hoc no cambian, y que la RPC
+      # de materialización sigue pasando.
+      - name: Snapshot del scope — el UUID ajeno no es una credencial
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55490
+        run: supabase/tests/snapshot_del_scope/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
