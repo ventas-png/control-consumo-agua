@@ -297,6 +297,17 @@ jobs:
           PGPORT_TEST: 55486
         run: supabase/tests/evidencia_al_cerrar/run.sh
 
+      # 20260907000500 toca EXISTENCIAS, que es dinero. Lo que hay que probar no
+      # se lee en el SQL: que el stock baje, que baje UNA sola vez por más que se
+      # reintente el cierre (dos pestañas abiertas no pueden vaciar el almacén),
+      # y —el motivo entero de que la RPC exista— que un conserje SIN
+      # `condominios.tab.suministros` pueda descontar por ella y no a mano.
+      - name: Consumo de insumos — descuento idempotente y autorización cruzada
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55487
+        run: supabase/tests/consumo_insumos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

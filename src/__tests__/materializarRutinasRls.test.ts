@@ -178,9 +178,16 @@ describe('20260907000300 · idempotencia que respeta las decisiones', () => {
 
 describe('20260907000300 · el guard de append-only sigue contento', () => {
   it('es la última migración de la serie y nadie la reescribió después', () => {
+    // Se busca la REDEFINICIÓN, no la mención. Antes bastaba con nombrar la RPC
+    // para que este guard se disparara, y 20260907000500 la nombra dentro de un
+    // `COMMENT ON … IS '…'` —que es texto documentando de dónde vienen las
+    // tareas, no una redefinición— porque `soloCodigo` sólo quita comentarios
+    // `--`, no literales SQL. Un guard que grita por documentar algo enseña a
+    // ignorarlo, y entonces deja de proteger cuando importa.
+    const REDEFINE = /(CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.materializar_rutinas_turno|DROP\s+FUNCTION[^;]*materializar_rutinas_turno)/i
     const posteriores = archivosOrdenados.filter(f => f > MIG_MAT)
     const culpables = posteriores.filter(f =>
-      /materializar_rutinas_turno/.test(soloCodigo(readFileSync(join(MIGRATIONS_DIR, f), 'utf8'))),
+      REDEFINE.test(soloCodigo(readFileSync(join(MIGRATIONS_DIR, f), 'utf8'))),
     )
     // Que exista una migración posterior no es problema; redefinir ESTA RPC sin
     // pasar por aquí, sí — este guard dejaría de vigilar la versión viva.
