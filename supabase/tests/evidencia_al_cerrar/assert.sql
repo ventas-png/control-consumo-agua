@@ -260,11 +260,31 @@ BEGIN
   -- romper el orden —o que el rechazo dejara la fila a medio sellar— no se
   -- vería. Aquí se cierra con el gesto REAL de la app (estado + completada_en,
   -- TareasPersonalTab:214) y se exige que las dos cosas pasen a la vez.
+  --
+  -- NO se cuenta el total: producción lleva DOS MÁS que ningún sandbox puede
+  -- montar —`trg_sellar_creado_por`, que crea el bucle dinámico de
+  -- 20260731000000, y `trg_bitacora`, que es AFTER y por tanto no se
+  -- interpone—, y ninguno toca las columnas en juego. Contar el total haría
+  -- que este assert afirmara una equivalencia con producción que es falsa. Lo
+  -- que sí tiene que valer es lo de abajo: que el par de sellado esté, y que
+  -- el de evidencia ordene ANTES que él.
   SELECT count(*) INTO n FROM pg_trigger t
   JOIN pg_class c ON c.oid = t.tgrelid
-  WHERE NOT t.tgisinternal AND c.relname = 'tareas_bloque';
+  WHERE NOT t.tgisinternal AND c.relname = 'tareas_bloque'
+    AND t.tgname IN ('trg_exigir_evidencia', 'trg_sellar_cierre', 'trg_tareas_bloque_anulacion');
   IF n <> 3 THEN
-    RAISE EXCEPTION '10a: hay % triggers sobre tareas_bloque (esperados 3): el escenario no reproduce producción', n;
+    RAISE EXCEPTION
+      '10a: faltan triggers del escenario (hay % de 3): sin el par de sellado esto mide el gate en soledad', n;
+  END IF;
+
+  IF (SELECT min(t.tgname) FROM pg_trigger t
+        JOIN pg_class c ON c.oid = t.tgrelid
+       WHERE NOT t.tgisinternal AND c.relname = 'tareas_bloque'
+         AND (t.tgtype & 2) <> 0        -- BEFORE
+         AND (t.tgtype & 16) <> 0       -- UPDATE
+     ) <> 'trg_exigir_evidencia' THEN
+    RAISE EXCEPTION
+      '10a-bis: el gate dejó de ser el PRIMER BEFORE UPDATE: el orden alfabético es lo único que garantiza que corra antes del sellado';
   END IF;
 
   PERFORM set_config('app.uid', UID::text, true);
