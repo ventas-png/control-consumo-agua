@@ -17197,6 +17197,7 @@ export type Database = {
           area_id: string | null
           bloque_id: string
           checklist: Json
+          checklist_completado: Json
           completada_en: string | null
           completado_por: string | null
           creado_por: string | null
@@ -17209,6 +17210,7 @@ export type Database = {
           id: string
           instrucciones_seguridad: string | null
           motivo_anulacion: string | null
+          motivo_sin_evidencia: string | null
           notas_operativo: string | null
           novedad: string | null
           orden: number | null
@@ -17227,6 +17229,7 @@ export type Database = {
           area_id?: string | null
           bloque_id: string
           checklist?: Json
+          checklist_completado?: Json
           completada_en?: string | null
           completado_por?: string | null
           creado_por?: string | null
@@ -17239,6 +17242,7 @@ export type Database = {
           id?: string
           instrucciones_seguridad?: string | null
           motivo_anulacion?: string | null
+          motivo_sin_evidencia?: string | null
           notas_operativo?: string | null
           novedad?: string | null
           orden?: number | null
@@ -17257,6 +17261,7 @@ export type Database = {
           area_id?: string | null
           bloque_id?: string
           checklist?: Json
+          checklist_completado?: Json
           completada_en?: string | null
           completado_por?: string | null
           creado_por?: string | null
@@ -17269,6 +17274,7 @@ export type Database = {
           id?: string
           instrucciones_seguridad?: string | null
           motivo_anulacion?: string | null
+          motivo_sin_evidencia?: string | null
           notas_operativo?: string | null
           novedad?: string | null
           orden?: number | null
