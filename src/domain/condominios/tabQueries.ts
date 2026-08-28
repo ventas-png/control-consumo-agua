@@ -16,6 +16,7 @@ import type {
   PlantillaTareaSuministro,
   RutinaActividad,
   RutinaLimpieza,
+  TareaBloqueSuministro,
   UsuarioAsignablePersonal,
 } from '../../types'
 
@@ -635,6 +636,36 @@ export async function fetchRutinasLimpieza(
     rutinas,
     pasos: (pasRes.data ?? []) as RutinaActividad[],
     horarios: horRes.data ?? [],
+    error: error ? { message: error.message } : null,
+  }
+}
+
+/**
+ * El plan de insumos de un conjunto de tareas (20260907000500).
+ *
+ * Se baja aquí y no en el cargador monolítico porque sólo la pantalla de
+ * ejecución lo necesita, y sólo para los turnos que el operativo tiene abiertos:
+ * traer el plan de todas las tareas del proyecto sería bajar un histórico
+ * entero para pintar tres filas.
+ *
+ * Va en `supabase` (sin tipar) y no en `db` por lo mismo que
+ * `materializarRutinasTurno`: la tabla no existe en database.types.ts hasta la
+ * próxima corrida de `npm run gen:db-types`.
+ */
+export async function fetchInsumosDeTareas(
+  tareaIds: string[],
+): Promise<{ insumos: TareaBloqueSuministro[]; error: { message: string } | null }> {
+  if (tareaIds.length === 0) return { insumos: [], error: null }
+
+  const { data, error } = await supabase
+    .from('tarea_bloque_suministros')
+    .select('*')
+    .in('tarea_id', tareaIds)
+    .order('nombre_suministro')
+
+  reportDegradedQuery('condominios.fetchInsumosDeTareas', error)
+  return {
+    insumos: (data ?? []) as TareaBloqueSuministro[],
     error: error ? { message: error.message } : null,
   }
 }

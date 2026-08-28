@@ -212,6 +212,54 @@ export interface TareaBloque {
   area_icono?: string
 }
 
+/**
+ * Insumo planificado PARA UNA TAREA CONCRETA (20260907000500).
+ *
+ * Es un snapshot de `plantilla_tarea_suministros` al crearse la tarea, no un
+ * join: renombrar el insumo en el catálogo no reescribe lo que la orden de
+ * aquel día pedía. La cantidad REALMENTE usada no está aquí — vive en
+ * `movimientos_suministro.cantidad`, alcanzable por `movimiento_id`.
+ */
+export interface TareaBloqueSuministro {
+  id: string
+  company_id: string
+  project_id: string
+  tarea_id: string
+  suministro_id: string
+  cantidad_planificada: number
+  /** Congelados al crear la tarea. */
+  nombre_suministro: string
+  unidad_medida: string
+  /** NULL = todavía no se consumió. Es lo que hace idempotente a la RPC. */
+  movimiento_id?: string | null
+  motivo_no_usado?: string | null
+  creado_por?: string | null
+  created_at: string
+}
+
+/** Lo que el operativo declara haber usado. `cantidad: 0` = «no lo necesité». */
+export interface ConsumoDeclarado {
+  suministro_id: string
+  cantidad: number
+}
+
+/** Un insumo que se consumió con menos existencias de las pedidas. */
+export interface FaltanteDeStock {
+  suministro_id: string
+  nombre: string
+  unidad: string
+  pedido: number
+  disponible: number
+}
+
+/** Lo que devuelve `consumir_insumos_tarea`. */
+export interface ResultadoConsumoInsumos {
+  consumidos: number
+  no_usados: number
+  /** No es un error: el consumo SE REGISTRÓ, y esto es para poder avisar. */
+  sin_stock: FaltanteDeStock[]
+}
+
 export type EstadoRevision = 'pendiente' | 'aprobado' | 'rechazado'
 
 export interface RevisionTarea {
