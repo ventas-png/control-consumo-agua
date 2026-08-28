@@ -12,8 +12,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CONSTRAINTS_CRITICOS,
+  POLICIES_CRITICAS,
+  QUERIES,
   comparar,
   compararConstraints,
+  compararPolicies,
   normalizarDef,
   versionDe,
 } from '../migraciones-vs-produccion.mjs'
@@ -347,6 +350,93 @@ describe('compararConstraints · el homónimo incompatible', () => {
     )
     // …pero la normalización no puede tragarse una diferencia REAL de valores.
     expect(normalizarDef(LEGACY)).not.toBe(normalizarDef(CANONICA))
+  })
+})
+
+// ── Policies críticas: la expresión se exige, no el nombre ───────────────────
+//
+// El caso que fija estas pruebas es tareas_bloque_insert (20260907000900): el
+// WITH CHECK obliga a que la tarea NAZCA pendiente y sin sellos. Re-declararla
+// con el mismo nombre pero sin ese contrato reabre el alta pre-cerrada — y un
+// guard por nombre lo daría por bueno.
+
+const WC_CANONICO = POLICIES_CRITICAS[0].withCheck
+const WC_803 =
+  '(( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id))))))'
+
+function policyProd(with_check, extra = {}) {
+  return {
+    table_name: 'tareas_bloque',
+    policy_name: 'tareas_bloque_insert',
+    cmd: 'INSERT',
+    qual: null,
+    with_check,
+    ...extra,
+  }
+}
+
+const REGISTRADA_LA_POLICY = new Set(['20260907000900'])
+
+describe('compararPolicies · el WITH CHECK del alta', () => {
+  it('declara tareas_bloque_insert como crítica desde 20260907000900, con su contrato', () => {
+    const e = POLICIES_CRITICAS.find((p) => p.policy === 'tareas_bloque_insert')
+    expect(e).toBeDefined()
+    expect(e.tabla).toBe('tareas_bloque')
+    expect(e.cmd).toBe('INSERT')
+    expect(e.desdeVersion).toBe('20260907000900')
+    // El contrato del alta, cláusula por cláusula.
+    expect(e.withCheck).toContain("estado = 'pendiente'")
+    for (const col of ['completada_en', 'completado_por', 'anulada_en', 'anulada_por',
+                       'motivo_anulacion', 'motivo_sin_evidencia']) {
+      expect(e.withCheck, `falta la exigencia de ${col} IS NULL`).toContain(`(${col} IS NULL)`)
+    }
+  })
+
+  it('la query de policies trae las tablas que POLICIES_CRITICAS vigila', () => {
+    // El IN de la query acota el payload: si alguien agrega una entrada sin
+    // ampliar el IN, la policy nueva parecería AUSENTE en cada corrida.
+    for (const p of POLICIES_CRITICAS) {
+      expect(QUERIES.policies, `la query no consulta ${p.tabla}`).toContain(`'${p.tabla}'`)
+    }
+  })
+
+  it('FALLA cuando el nombre coincide pero la expresión es la de #803 (sin contrato)', () => {
+    const hallazgos = compararPolicies({
+      registradas: REGISTRADA_LA_POLICY,
+      policiesProd: [policyProd(WC_803)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('WITH CHECK')
+  })
+
+  it('pasa con la expresión canónica (los saltos de línea de pg_get_expr no cuentan)', () => {
+    expect(
+      compararPolicies({
+        registradas: REGISTRADA_LA_POLICY,
+        policiesProd: [policyProd(WC_CANONICO.replace(/ AND /g, '\n   AND '))],
+      }),
+    ).toEqual([])
+  })
+
+  it('FALLA si la policy desapareció o cubre otro comando', () => {
+    expect(
+      compararPolicies({ registradas: REGISTRADA_LA_POLICY, policiesProd: [] })[0],
+    ).toContain('AUSENTE')
+    expect(
+      compararPolicies({
+        registradas: REGISTRADA_LA_POLICY,
+        policiesProd: [policyProd(WC_CANONICO, { cmd: 'ALL' })],
+      })[0],
+    ).toContain('debía cubrir INSERT')
+  })
+
+  it('no exige nada mientras 20260907000900 NO esté registrada', () => {
+    expect(
+      compararPolicies({
+        registradas: new Set(['20260907000800']),
+        policiesProd: [policyProd(WC_803)],
+      }),
+    ).toEqual([])
   })
 })
 

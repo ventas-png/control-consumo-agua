@@ -46,7 +46,14 @@
 // los cierres canónicos con 23514. Mismo acotamiento: la definición solo se
 // exige cuando la migración que la declara ya está registrada.
 //
-// SOLO LECTURA: cuatro consultas de catálogo. Jamás muta datos ni esquema.
+// TERCER INVARIANTE (2026-08-28, mismo día): para las POLICIES CRÍTICAS de
+// POLICIES_CRITICAS, producción tiene que tener la EXPRESIÓN declarada
+// (pg_get_expr del WITH CHECK), no solo una policy con ese nombre. La lección
+// es tareas_bloque_insert (20260907000900): la tarea nace 'pendiente' y sin
+// sellos — re-declarar la policy sin ese contrato reabriría el alta
+// pre-cerrada con todos los nombres en su sitio.
+//
+// SOLO LECTURA: cinco consultas de catálogo. Jamás muta datos ni esquema.
 //
 // Credencial-gated, igual que security-guard.mjs: sin SUPABASE_PROJECT_ID /
 // SUPABASE_ACCESS_TOKEN sale 0 (no-op) con un aviso. Con credenciales y una
@@ -111,6 +118,21 @@ export const QUERIES = {
     join pg_namespace n on n.oid = rel.relnamespace
     where n.nspname = 'public' and con.contype = 'c'
     order by 1, 2;`,
+  // Mismo criterio para las POLICIES críticas: la EXPRESIÓN (pg_get_expr), no
+  // el nombre. El IN acota el payload a las tablas de POLICIES_CRITICAS —
+  // ampliarlo va de la mano de ampliar esa lista.
+  policies: `
+    select rel.relname as table_name, pol.polname as policy_name,
+           case pol.polcmd when 'r' then 'SELECT' when 'a' then 'INSERT'
+                           when 'w' then 'UPDATE' when 'd' then 'DELETE'
+                           else 'ALL' end as cmd,
+           pg_get_expr(pol.polqual, pol.polrelid) as qual,
+           pg_get_expr(pol.polwithcheck, pol.polrelid) as with_check
+    from pg_policy pol
+    join pg_class rel on rel.oid = pol.polrelid
+    join pg_namespace n on n.oid = rel.relnamespace
+    where n.nspname = 'public' and rel.relname in ('tareas_bloque')
+    order by 1, 2;`,
 }
 
 // ── Constraints críticos: la definición se exige, no solo el nombre ─────────
@@ -160,6 +182,70 @@ export function normalizarDef(def) {
     .replace(/\s+NOT\s+VALID\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// ── Policies críticas: la EXPRESIÓN se exige, no solo el nombre ─────────────
+//
+// EL AGUJERO QUE ESTO TAPA. 20260907000900 endureció el WITH CHECK del INSERT
+// de tareas_bloque: la tarea NACE 'pendiente' y sin cierre, anulación, actor
+// ni sello de excepción pre-cargados — antes, un INSERT directo creaba la
+// tarea pre-cerrada y el gate de evidencia (que solo mira la TRANSICIÓN en
+// UPDATE) nunca la veía. Una policy con ese nombre pero re-declarada sin el
+// contrato del alta reabriría el bypass con todos los guards de nombre en
+// verde. `withCheck` es la salida de pg_get_expr del servidor, comparada tras
+// normalizar espacios; run.sh de insert_solo_pendiente la coteja contra un
+// servidor real en cada corrida de CI. Mismo acotamiento que columnas y
+// constraints: solo se exige cuando `desdeVersion` ya está registrada.
+export const POLICIES_CRITICAS = [
+  {
+    tabla: 'tareas_bloque',
+    policy: 'tareas_bloque_insert',
+    cmd: 'INSERT',
+    desdeVersion: '20260907000900',
+    withCheck:
+      "(( SELECT is_super_admin() AS is_super_admin) OR ((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))",
+  },
+]
+
+/**
+ * Compara las policies críticas contra el catálogo real. Una policy con el
+ * nombre correcto y OTRA expresión ES un hallazgo — re-declararla sin el
+ * contrato del alta es exactamente lo que un guard por nombre no ve.
+ *
+ * @param {object} p
+ * @param {Set<string>} p.registradas  versiones presentes en schema_migrations
+ * @param {{table_name:string, policy_name:string, cmd:string, qual:string|null,
+ *          with_check:string|null}[]} p.policiesProd  policies reales de `public`
+ * @returns {string[]}  hallazgos legibles (vacío = sin drift)
+ */
+export function compararPolicies({ registradas, policiesProd, criticas = POLICIES_CRITICAS }) {
+  const hallazgos = []
+  for (const esperada of criticas) {
+    if (!registradas.has(esperada.desdeVersion)) continue
+    const real = policiesProd.find(
+      (p) => p.table_name === esperada.tabla && p.policy_name === esperada.policy,
+    )
+    if (!real) {
+      hallazgos.push(
+        `${esperada.tabla}.${esperada.policy} — policy AUSENTE en producción y la declara ${esperada.desdeVersion} (ya registrada)`,
+      )
+      continue
+    }
+    if (esperada.cmd && real.cmd !== esperada.cmd) {
+      hallazgos.push(
+        `${esperada.tabla}.${esperada.policy} — cubre ${real.cmd} y debía cubrir ${esperada.cmd}`,
+      )
+      continue
+    }
+    if (esperada.withCheck && normalizarDef(real.with_check) !== normalizarDef(esperada.withCheck)) {
+      hallazgos.push(
+        `${esperada.tabla}.${esperada.policy} — el NOMBRE coincide pero el WITH CHECK no es el de ${esperada.desdeVersion}:\n` +
+          `        esperado: ${normalizarDef(esperada.withCheck)}\n` +
+          `        real:     ${normalizarDef(real.with_check)}`,
+      )
+    }
+  }
+  return hallazgos
 }
 
 /**
@@ -356,13 +442,14 @@ async function main() {
 
   const allowlist = JSON.parse(await readFile(ALLOWLIST_PATH, 'utf8'))
 
-  let filasRegistradas, filasColumnas, filasTablas, filasConstraints
+  let filasRegistradas, filasColumnas, filasTablas, filasConstraints, filasPolicies
   try {
-    ;[filasRegistradas, filasColumnas, filasTablas, filasConstraints] = await Promise.all([
+    ;[filasRegistradas, filasColumnas, filasTablas, filasConstraints, filasPolicies] = await Promise.all([
       runQuery(QUERIES.registradas),
       runQuery(QUERIES.columnas),
       runQuery(QUERIES.tablas),
       runQuery(QUERIES.constraints),
+      runQuery(QUERIES.policies),
     ])
   } catch (err) {
     console.error(`❌ migraciones-vs-produccion: no se pudo leer el esquema — ${err.message}`)
@@ -388,9 +475,13 @@ async function main() {
     registradas,
     constraintsProd: filasConstraints,
   })
+  const policiesConDrift = compararPolicies({
+    registradas,
+    policiesProd: filasPolicies,
+  })
 
   console.log(
-    `Migraciones locales: ${migraciones.length} · registradas en producción: ${r.aplicadas} · columnas comprobadas: ${r.comprobadas} · constraints críticos: ${CONSTRAINTS_CRITICOS.length}`,
+    `Migraciones locales: ${migraciones.length} · registradas en producción: ${r.aplicadas} · columnas comprobadas: ${r.comprobadas} · constraints críticos: ${CONSTRAINTS_CRITICOS.length} · policies críticas: ${POLICIES_CRITICAS.length}`,
   )
 
   if (r.allowlistObsoleto.length > 0) {
@@ -400,11 +491,13 @@ async function main() {
   }
 
   const hallazgos =
-    r.tablasFaltantes.length + r.columnasFaltantes.length + constraintsConDrift.length
+    r.tablasFaltantes.length + r.columnasFaltantes.length +
+    constraintsConDrift.length + policiesConDrift.length
   if (hallazgos === 0) {
     console.log('')
     console.log('✅ migraciones-vs-produccion: producción tiene todo lo que declaran las')
-    console.log('   migraciones ya aplicadas, y los constraints críticos conservan su definición.')
+    console.log('   migraciones ya aplicadas, y los constraints y policies críticos conservan')
+    console.log('   su definición.')
     process.exit(0)
   }
 
@@ -428,6 +521,15 @@ async function main() {
     console.log('   retirar el CHECK adicional— con una migración forward-only que valide,')
     console.log('   patrón 20260907000700. El allowlist NO cubre constraints: no hay deuda')
     console.log('   declarable aquí, solo reparación.')
+    console.log('')
+  }
+  if (policiesConDrift.length > 0) {
+    console.log(`❌ ${policiesConDrift.length} policy(s) crítica(s) con drift de EXPRESIÓN (el nombre no basta):`)
+    for (const c of policiesConDrift) console.log(`   · ${c}`)
+    console.log('')
+    console.log('   Re-declarar una policy sin su contrato reabre el bypass con el nombre en')
+    console.log('   verde (la clase de tareas_bloque_insert: la tarea debe NACER pendiente).')
+    console.log('   Reponer la expresión con una migración forward-only, patrón 20260907000900.')
     console.log('')
   }
   if (r.tablasFaltantes.length + r.columnasFaltantes.length > 0) {
