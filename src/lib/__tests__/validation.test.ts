@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import DOMPurify from 'dompurify'
 import {
   sanitizeInput,
   sanitizeHTML,
@@ -39,6 +40,58 @@ describe('sanitizeInput', () => {
 
   it('cuerpos vacíos o nullish devuelven cadena vacía', () => {
     expect(sanitizeInput('')).toBe('')
+  })
+})
+
+// Regresión del advisory GHSA-55q2-fjhq-7xh7 (DOMPurify <= 3.4.12: la
+// remoción de un hook con IN_PLACE dejaba un subárbol desprendido ejecutable).
+// El fix vive en la librería; lo que se fija AQUÍ es (a) que el lockfile no
+// pueda volver al rango afectado sin que un test lo grite, y (b) que los
+// vectores de mutación que este tipo de bug explota mueran en NUESTRO wrapper,
+// que es la única superficie que la app expone.
+describe('sanitizeInput · regresión del advisory de DOMPurify', () => {
+  it('la versión instalada quedó fuera del rango afectado (<= 3.4.12)', () => {
+    const [major, minor, patch] = DOMPurify.version.split('.').map(Number)
+    const fueraDelRango =
+      major > 3 || (major === 3 && (minor > 4 || (minor === 4 && patch >= 13)))
+    expect(fueraDelRango,
+      `dompurify@${DOMPurify.version} está dentro del rango vulnerable de GHSA-55q2-fjhq-7xh7`,
+    ).toBe(true)
+  })
+
+  it('mata los vectores de mutación mXSS (svg/style, math/mglyph, anidados)', () => {
+    // Payloads clásicos de mutation-XSS: el parser reubica el subárbol al
+    // re-serializar y un sanitizador ingenuo deja vivo el <img onerror>.
+    const vectores = [
+      '<svg><p><style><!--</style><img src=x onerror=alert(1)>--></p></svg>',
+      '<math><mtext><table><mglyph><style><!--</style><img src=x onerror=alert(1)>',
+      '<form><math><mtext></form><form><mglyph><style></math><img src=x onerror=alert(1)>',
+      '<noscript><p title="</noscript><img src=x onerror=alert(1)>">',
+      '<template><img src=x onerror=alert(1)></template>',
+      '<svg></p><style><a id="</style><img src=x onerror=alert(1)>">',
+    ]
+    for (const v of vectores) {
+      const out = sanitizeInput(v)
+      expect(out, `sobrevivió markup en: ${v}`).not.toMatch(/[<>]/)
+      expect(out.toLowerCase(), `sobrevivió un handler en: ${v}`).not.toContain('onerror=')
+    }
+  })
+
+  it('mata variantes codificadas y URLs javascript: en atributos', () => {
+    expect(sanitizeInput('<a href="jav&#x09;ascript:alert(1)">x</a>')).toBe('x')
+    expect(sanitizeInput('<iframe srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;">')).toBe('')
+    expect(sanitizeInput('<img src=x oNeRrOr=alert(1)>')).toBe('')
+  })
+
+  it('IN_PLACE sobre un nodo vivo no deja contenido ejecutable (forma del advisory)', () => {
+    // La app no usa IN_PLACE, pero es el modo del advisory: si una futura
+    // versión lo reabre, esto falla sin depender de nuestro wrapper.
+    const div = document.createElement('div')
+    div.innerHTML = '<b>ok</b><img src="x" onerror="alert(1)"><script>alert(2)</script>'
+    DOMPurify.sanitize(div, { IN_PLACE: true, ALLOWED_TAGS: ['div', 'b', 'img'], ALLOWED_ATTR: ['src'] })
+    expect(div.innerHTML).toContain('<b>ok</b>')
+    expect(div.innerHTML).not.toContain('onerror')
+    expect(div.innerHTML).not.toContain('script')
   })
 })
 

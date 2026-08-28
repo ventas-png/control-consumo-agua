@@ -113,6 +113,39 @@ describe('writeXlsx', () => {
     ])
   })
 
+  it('exceljs sobrevive al override de uuid@11: dataBar CF genera su GUID real', async () => {
+    // package.json fuerza uuid>=11.1.1 dentro de exceljs (advisory de uuid
+    // <11.1.1). El ÚNICO consumidor de uuid en exceljs es el formato
+    // condicional extendido (cf-rule-ext-xform.js → uuidv4). Este round-trip
+    // lo ejecuta de verdad: si el override rompiera la resolución CJS o el
+    // named export v4, writeBuffer explota aquí y no en producción.
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('CF')
+    ws.addRow(['consumo'])
+    ws.addRow([5])
+    ws.addRow([10])
+    ws.addConditionalFormatting({
+      ref: 'A2:A3',
+      rules: [{
+        type: 'dataBar', priority: 1,
+        cfvo: [{ type: 'min' }, { type: 'max' }],
+      }],
+    })
+    const buffer = await wb.xlsx.writeBuffer()
+
+    const wb2 = new ExcelJS.Workbook()
+    await wb2.xlsx.load(buffer as unknown as ArrayBuffer)
+    const ws2 = wb2.worksheets[0]
+    expect(ws2.getCell('A2').value).toBe(5)
+    expect(ws2.getCell('A3').value).toBe(10)
+    // Propiedad runtime sin tipar en @types de exceljs: cast estrecho.
+    const cf = (ws2 as unknown as {
+      conditionalFormattings?: { rules: { type: string }[] }[]
+    }).conditionalFormattings ?? []
+    expect(cf.length, 'el dataBar debía sobrevivir el round-trip').toBeGreaterThan(0)
+    expect(cf[0].rules[0].type).toBe('dataBar')
+  })
+
   it('escapes CSV/Excel formula injection in string cells', async () => {
     // Cells starting with =, +, -, @, tab or CR are interpreted as formulas
     // by Excel/LibreOffice. writeXlsx must prefix them with a single quote
