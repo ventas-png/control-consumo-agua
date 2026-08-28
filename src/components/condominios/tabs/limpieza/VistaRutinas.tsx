@@ -24,14 +24,18 @@ import { EmptyState } from '../../../shared/EmptyState'
 import {
   createCondominioRow,
   deleteCondominioRow,
+  materializarRutinasTurno,
   updateCondominioRow,
 } from '../../../../domain/condominios/tabMutations'
 import { fetchRutinasLimpieza } from '../../../../domain/condominios/tabQueries'
+import { hoyLocalISO } from '../../../../lib/format'
+import { sumarDias } from '../../../../domain/condominios/limpieza'
 import { ActividadesCatalog } from '../../ActividadesCatalog'
 import type {
   AreaCondominio,
   ItemInventario,
   PlantillaTareaCargo,
+  ResultadoMaterializacionRutinas,
   RutinaActividad,
   RutinaLimpieza,
   SuministroCondominio,
@@ -91,6 +95,15 @@ export function VistaRutinas({
   /** Rutina cuyo panel de pasos está abierto (uno a la vez). */
   const [pasosDe, setPasosDe] = useState<string | null>(null)
   const [eligiendo, setEligiendo] = useState(false)
+
+  // ── Materialización (20260907000300) ───────────────────────────────────────
+  // Por defecto la semana que viene: es el horizonte con el que se trabaja, y
+  // un rango corto hace evidente el resultado en vez de sepultarlo en cientos
+  // de tareas. La RPC acepta hasta 400 días si alguien quiere más.
+  const [desde, setDesde] = useState(hoyLocalISO())
+  const [hasta, setHasta] = useState(sumarDias(hoyLocalISO(), 7))
+  const [materializando, setMaterializando] = useState(false)
+  const [ultimo, setUltimo] = useState<ResultadoMaterializacionRutinas | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -192,15 +205,40 @@ export function VistaRutinas({
     const res = await confirm({
       title: '¿Eliminar la rutina?',
       text: n > 0
-        ? `Se eliminará «${r.nombre}» y sus ${n} paso${n !== 1 ? 's' : ''}. Las actividades del catálogo no se tocan.`
+        ? `Se eliminará «${r.nombre}» y sus ${n} paso${n !== 1 ? 's' : ''}. Las actividades del catálogo no se tocan, y si la rutina ya generó tareas en algún turno, la base lo va a impedir.`
         : `Se eliminará la rutina «${r.nombre}».`,
       icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
     })
     if (!res.isConfirmed) return
     const { error } = await deleteCondominioRow('rutinas_limpieza', r.id)
-    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    if (error) {
+      // 23503 = tareas_bloque_rutina_fk (RESTRICT, 20260907000300). Una rutina
+      // que ya generó trabajo es historia: su baja es desactivarla.
+      notify({
+        variant: 'error',
+        title: error.code === '23503' ? 'La rutina ya generó trabajo' : 'Error',
+        text: error.code === '23503'
+          ? 'Esta rutina ya materializó tareas en turnos, y esas tareas son evidencia. Desactivala en vez de borrarla: deja de generar trabajo nuevo y el historial queda intacto.'
+          : error.message,
+      })
+      return
+    }
     if (pasosDe === r.id) setPasosDe(null)
     void cargar(); onRefresh()
+  }
+
+  async function materializar() {
+    setMaterializando(true)
+    const { data, error } = await materializarRutinasTurno(proyectoId, desde, hasta)
+    setMaterializando(false)
+    if (error) {
+      notify({ variant: 'error', title: 'No se pudo materializar', text: error.message })
+      return
+    }
+    setUltimo(data)
+    // Las tareas viven en otro tab; refrescar aquí es para que el padre vuelva a
+    // bajar lo que corresponda, no para esta vista.
+    onRefresh()
   }
 
   // ── Pasos: guardado inmediato, FUERA del formulario ────────────────────────
@@ -373,6 +411,57 @@ export function VistaRutinas({
           </button>
         )}
       </div>
+
+      {canEdit && (
+        <div style={{ marginBottom: '14px', padding: '12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px' }}>
+          <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
+            Generar el trabajo de los turnos
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
+            Cada rutina activa entra en los turnos de <strong>su misma jornada</strong>. No pisa lo que ya
+            haya, no repite lo anulado y no toca turnos cerrados: repetirlo es seguro.
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={labelStyle} htmlFor="mat-desde">Desde</label>
+              <input id="mat-desde" type="date" style={{ ...inputStyle, width: 'auto' }}
+                value={desde} onChange={e => setDesde(e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle} htmlFor="mat-hasta">Hasta</label>
+              <input id="mat-hasta" type="date" style={{ ...inputStyle, width: 'auto' }}
+                value={hasta} onChange={e => setHasta(e.target.value)} />
+            </div>
+            <button onClick={() => void materializar()} disabled={materializando}
+              style={{ padding: '9px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: materializando ? 'default' : 'pointer', fontSize: '13px', fontWeight: 700, opacity: materializando ? 0.6 : 1 }}>
+              {materializando ? 'Generando…' : '🗓️ Generar tareas'}
+            </button>
+          </div>
+
+          {ultimo && (
+            <div role="status" style={{ marginTop: '10px', fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
+              <strong>{ultimo.generadas}</strong> tarea{ultimo.generadas !== 1 ? 's' : ''} generada{ultimo.generadas !== 1 ? 's' : ''}.
+              {ultimo.omitidas_existente > 0 && (
+                <span style={{ color: 'var(--at-ink-3)' }}> · {ultimo.omitidas_existente} ya estaban</span>
+              )}
+              {ultimo.omitidas_bloque_cerrado > 0 && (
+                <span style={{ color: 'var(--at-ink-3)' }}> · {ultimo.omitidas_bloque_cerrado} en turnos ya cerrados</span>
+              )}
+              {ultimo.rutinas_sin_jornada > 0 && (
+                <div style={{ marginTop: '4px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
+                  ⚠ {ultimo.rutinas_sin_jornada} rutina{ultimo.rutinas_sin_jornada !== 1 ? 's' : ''} activa{ultimo.rutinas_sin_jornada !== 1 ? 's' : ''} sin jornada: no se puede saber en qué turno va. Editala y elegile una.
+                </div>
+              )}
+              {ultimo.generadas === 0 && ultimo.omitidas_existente === 0
+                && ultimo.omitidas_bloque_cerrado === 0 && ultimo.rutinas_sin_jornada === 0 && (
+                <div style={{ marginTop: '4px', color: 'var(--at-ink-3)' }}>
+                  No hubo turnos de esas jornadas en el rango. Generá los turnos primero, en el tab de Turnos.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {cargaError && (
         <div role="alert" style={{ marginBottom: '12px', padding: '10px 12px', background: 'var(--at-danger-tint)', borderRadius: '8px', fontSize: '12.5px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', gap: '10px' }}>

@@ -19,6 +19,13 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   updateCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   deleteCondominioRow: vi.fn(async () => ({ error: null as RowError })),
+  materializarRutinasTurno: vi.fn(async () => ({
+    data: {
+      generadas: 0, omitidas_existente: 0,
+      omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 0,
+    } as Record<string, number> | null,
+    error: null as RowError,
+  })),
   fetchRutinasLimpieza: vi.fn(async () => ({
     rutinas: [] as Array<Record<string, unknown>>,
     pasos: [] as Array<Record<string, unknown>>,
@@ -43,6 +50,7 @@ vi.mock('../../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
+  materializarRutinasTurno: mocks.materializarRutinasTurno,
 }))
 vi.mock('../../../../../domain/condominios/tabQueries', () => ({
   fetchRutinasLimpieza: mocks.fetchRutinasLimpieza,
@@ -115,6 +123,10 @@ beforeEach(() => {
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.materializarRutinasTurno.mockResolvedValue({
+    data: { generadas: 0, omitidas_existente: 0, omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 0 },
+    error: null,
+  })
   mocks.fetchRutinasLimpieza.mockResolvedValue({
     rutinas: [], pasos: [], horarios: [], error: null,
   })
@@ -361,5 +373,92 @@ describe('VistaRutinas · permisos', () => {
     expect(screen.queryByText('➕ Agregar actividades del catálogo')).toBeNull()
     expect(screen.queryByLabelText('Quitar Barrer el borde de la rutina')).toBeNull()
     expect(screen.queryByLabelText('Eliminar Matutina de piscina')).toBeNull()
+  })
+})
+
+describe('VistaRutinas · materializar en los turnos', () => {
+  it('llama a la RPC con el proyecto y el rango elegidos', async () => {
+    montar()
+    fireEvent.change(await screen.findByLabelText('Desde'), { target: { value: '2026-09-01' } })
+    fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-09-30' } })
+    fireEvent.click(screen.getByText('🗓️ Generar tareas'))
+
+    await waitFor(() => expect(mocks.materializarRutinasTurno).toHaveBeenCalled())
+    expect(mocks.materializarRutinasTurno).toHaveBeenCalledWith('p1', '2026-09-01', '2026-09-30')
+  })
+
+  it('resume el resultado por bucket en vez de decir sólo "listo"', async () => {
+    mocks.materializarRutinasTurno.mockResolvedValue({
+      data: { generadas: 12, omitidas_existente: 3, omitidas_bloque_cerrado: 2, rutinas_sin_jornada: 0 },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
+
+    const estado = await screen.findByRole('status')
+    expect(estado.textContent).toMatch(/12/)
+    expect(estado.textContent).toMatch(/3 ya estaban/)
+    expect(estado.textContent).toMatch(/2 en turnos ya cerrados/)
+  })
+
+  it('avisa de las rutinas activas SIN jornada, que no pueden materializarse solas', async () => {
+    mocks.materializarRutinasTurno.mockResolvedValue({
+      data: { generadas: 0, omitidas_existente: 0, omitidas_bloque_cerrado: 0, rutinas_sin_jornada: 2 },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
+
+    expect(await screen.findByText(/2 rutinas activas sin jornada/)).toBeTruthy()
+  })
+
+  it('cuando no pasa NADA explica por qué, en vez de dejar un cero mudo', async () => {
+    // Todo en cero y sin rutinas huérfanas sólo puede significar una cosa: no
+    // hay turnos de esas jornadas en el rango. Decirlo evita que el usuario
+    // crea que la rutina está rota.
+    montar()
+    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
+    expect(await screen.findByText(/No hubo turnos de esas jornadas en el rango/)).toBeTruthy()
+  })
+
+  it('un fallo de la RPC se muestra y no simula éxito', async () => {
+    mocks.materializarRutinasTurno.mockResolvedValue({
+      data: null, error: { message: 'no autorizado', code: '42501' },
+    })
+    montar()
+    fireEvent.click(await screen.findByText('🗓️ Generar tareas'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
+    expect(args.title).toBe('No se pudo materializar')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('sin canEdit no se ofrece generar nada', async () => {
+    montar({ canCreate: false, canEdit: false, canDelete: false })
+    await waitFor(() => expect(mocks.fetchRutinasLimpieza).toHaveBeenCalled())
+    expect(screen.queryByText('🗓️ Generar tareas')).toBeNull()
+  })
+})
+
+describe('VistaRutinas · la rutina que ya generó trabajo', () => {
+  it('explica el 23503 en vez de mostrar el error de la FK', async () => {
+    mocks.fetchRutinasLimpieza.mockResolvedValue({
+      rutinas: [rutina()], pasos: [], horarios: [], error: null,
+    })
+    mocks.deleteCondominioRow.mockResolvedValue({
+      error: {
+        message: 'update or delete on table "rutinas_limpieza" violates foreign key constraint "tareas_bloque_rutina_fk"',
+        code: '23503',
+      },
+    })
+    montar()
+    fireEvent.click(await screen.findByLabelText('Eliminar Matutina de piscina'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
+    expect(args.title).toBe('La rutina ya generó trabajo')
+    expect(args.text).toMatch(/Desactivala en vez de borrarla/)
+    expect(args.text).not.toMatch(/foreign key constraint/)
   })
 })
