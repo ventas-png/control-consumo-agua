@@ -275,6 +275,17 @@ jobs:
           PGPORT_TEST: 55484
         run: supabase/tests/rutinas_limpieza/run.sh
 
+      # 20260907000300 es una RPC con cinco JOINs, una ventana y cuatro conteos.
+      # Que compile no dice que empareje por la jornada correcta, ni que la
+      # segunda corrida no duplique, ni —lo más fácil de romper sin notarlo— que
+      # no resucite lo que alguien anuló: un `NOT EXISTS` mirando sólo las
+      # vigentes pasaría la revisión y repetiría cada anulación en cada corrida.
+      - name: Materializar rutinas — snapshot, orden e idempotencia real
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55485
+        run: supabase/tests/materializar_rutinas/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

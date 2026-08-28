@@ -177,6 +177,26 @@ export interface TareaBloque {
   foto_urls: string[]
   notas_operativo?: string | null
   created_at: string
+  // ── Paridad con ejecuciones_limpieza (20260907000100) ────────────────────
+  /** Usuario que cerró la tarea. Lo sella la BD; no es falsificable. */
+  completado_por?: string | null
+  /** Lo que se encontró y no le toca resolver a quien ejecuta. */
+  novedad?: string | null
+  prioridad?: string | null
+  requiere_mantenimiento?: boolean
+  /** Anulación lógica: la fila fue un error. Se conserva con su evidencia. */
+  anulada_en?: string | null
+  anulada_por?: string | null
+  motivo_anulacion?: string | null
+  // ── Snapshot al materializar (20260907000300) ────────────────────────────
+  // Copia, no join: editar el catálogo no reescribe lo que se pidió aquel día.
+  duracion_estimada_min?: number | null
+  checklist?: string[]
+  instrucciones_seguridad?: string | null
+  requiere_comentario?: boolean
+  requiere_checklist?: boolean
+  /** Rutina que generó la tarea. null = alta manual o carga suelta. */
+  rutina_id?: string | null
   // joins
   area_nombre?: string
   area_icono?: string
@@ -317,6 +337,15 @@ export interface HorasPersonal {
   horas_nocturnas: number
   horas_asueto: number
   horas_asueto_ponderadas: number
+}
+
+/** Conteo que devuelve `materializar_rutinas_turno()`, por bucket. */
+export interface ResultadoMaterializacionRutinas {
+  generadas: number
+  omitidas_existente: number
+  omitidas_bloque_cerrado: number
+  /** Rutinas activas que no declaran jornada: no pueden materializarse solas. */
+  rutinas_sin_jornada: number
 }
 
 /** Conteo que devuelve `generar_bloques_turno()`, por bucket. */
