@@ -195,24 +195,47 @@ export function TareasPersonalTab({
     motivoAplicable = '',
   ) {
     if (estado === 'con_observacion') {
+      // Mismos cuatro campos que la ruta de limpieza (VistaRuta · reportarNovedad):
+      // un hallazgo de turno y uno de limpieza se administran en el mismo listado,
+      // así que se capturan igual. Antes esto guardaba sólo un texto en
+      // `notas_operativo`, y `novedad`/`prioridad`/`requiere_mantenimiento`
+      // —agregadas en 20260907000100 «para paridad»— eran inalcanzables.
       const result = await openPromptDialog({
-        title: '¿Qué observación encontraste?',
-        fields: [{
-          name: 'notas',
-          label: 'Observación',
-          control: 'textarea',
-          rows: 4,
-          placeholder: 'Describe la observación o problema...',
-          required: true,
-          autoFocus: true,
-        }],
+        title: '¿Qué encontraste?',
+        description: 'Queda registrada para el administrador, con su prioridad.',
+        fields: [
+          {
+            name: 'novedad', label: 'Observación o hallazgo', control: 'textarea', rows: 4,
+            placeholder: 'Ej. la llave del lavamanos gotea, falta luminaria en el pasillo…',
+            required: true, autoFocus: true,
+          },
+          {
+            name: 'prioridad', label: 'Prioridad', control: 'select', initialValue: 'media',
+            options: [
+              { value: 'baja', label: 'Baja' },
+              { value: 'media', label: 'Media' },
+              { value: 'alta', label: 'Alta' },
+            ],
+          },
+          { name: 'requiere_mantenimiento', label: 'Requiere mantenimiento', control: 'checkbox' },
+        ],
         submitText: 'Registrar',
       })
       if (!result) return
-      await updateCondominioRow('tareas_bloque', tareaId, {
-        estado, notas_operativo: result.notas,
+      // `notas_operativo` no se escribe ni se pisa: las filas viejas conservan su
+      // texto y la tarjeta lee `novedad ?? notas_operativo`. Reescribirlas sería
+      // cambiar qué significaba aquella columna el día que se llenó.
+      const { error } = await updateCondominioRow('tareas_bloque', tareaId, {
+        estado,
+        novedad: result.novedad.trim(),
+        prioridad: result.prioridad || 'media',
+        // El checkbox de PromptDialog devuelve string: 'true' / '' según estado.
+        requiere_mantenimiento: result.requiere_mantenimiento === 'true',
         completada_en: new Date().toISOString(),
       })
+      // Antes esta rama ignoraba el error y refrescaba igual: el operativo veía
+      // su tarea sin la observación y sin saber por qué.
+      if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
     } else {
       // Sólo el cierre por 'completada' exige evidencia — igual que el trigger.
       // `omitida` es que no se hizo, y `con_observacion` ya se resolvió arriba:
@@ -448,7 +471,8 @@ export function TareasPersonalTab({
                                       ⚠ Cerrada con excepción
                                     </span>
                                   )}
-                                  {t.notas_operativo && <span style={{ fontSize: '11.5px', color: 'var(--at-warning)' }}>⚠ {t.notas_operativo}</span>}
+                                  {(t.novedad ?? t.notas_operativo) && <span style={{ fontSize: '11.5px', color: 'var(--at-warning)' }}>⚠ {t.novedad ?? t.notas_operativo}</span>}
+                                  {t.requiere_mantenimiento && <span style={{ fontSize: '11.5px', color: 'var(--at-danger)', fontWeight: 700 }}>🛠 Requiere mantenimiento</span>}
                                   {t.completada_en && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{new Date(t.completada_en).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
                                 </div>
                               </div>
