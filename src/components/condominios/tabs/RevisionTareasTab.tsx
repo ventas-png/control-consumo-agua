@@ -1,7 +1,26 @@
+// Tab "Revisión de turnos" — dos vistas sobre el trabajo ya cerrado:
+//
+//   Revisión   la ronda del administrador: aprobar o rechazar tarea por tarea.
+//   Novedades  lo que el operativo encontró durante el turno y NO le tocaba
+//              resolver (una fuga, una luminaria fundida). Es el mismo listado
+//              que usa Limpieza, alimentado desde `tareas_bloque`.
+//
+// POR QUÉ AQUÍ. Quien revisa el trabajo es quien debe enterarse del hallazgo:
+// ya está mirando ese turno y ya tiene el permiso. Y es el mismo componente que
+// Limpieza, no una copia — el criterio de qué es una novedad y en qué orden se
+// leen vive una sola vez, en domain/condominios/novedades.
+//
+// DOS MONTAJES Y NO UNA VISTA MEZCLADA. Los permisos son distintos
+// (`prog_limpieza` para la ruta de limpieza, `revision_tareas`/`tareas_personal`
+// para los turnos): una sola pantalla con ambas fuentes mostraría datos
+// parciales según quién mire, o exigiría los dos permisos.
 import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
-import { useState } from 'react'
-import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { useState, useMemo } from 'react'
+import { createCondominioRow, updateCondominioRow, atenderNovedad } from '../../../domain/condominios/tabMutations'
 import { openPromptDialog } from '../../shared/PromptDialog'
+import { notify } from '../../shared/Dialog'
+import { novedadesDeTareas, type NovedadOperativa } from '../../../domain/condominios/novedades'
+import { VistaNovedades } from './limpieza/VistaNovedades'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   PersonalCondominio, EstadoRevision,
@@ -17,6 +36,13 @@ interface Props {
   onRefresh: () => void
 }
 
+type Vista = 'revision' | 'novedades'
+
+const VISTAS: { id: Vista; label: string; icon: string }[] = [
+  { id: 'revision',  label: 'Revisión',  icon: '🔍' },
+  { id: 'novedades', label: 'Novedades', icon: '⚠️' },
+]
+
 const ESTADO_REV: Record<EstadoRevision, { label: string; icon: string; bg: string; color: string; border: string }> = {
   pendiente: { label: 'Pendiente revisión', icon: '⏳', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: 'var(--at-line)' },
   aprobado:  { label: 'Aprobado',           icon: '✅', bg: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'var(--at-success-border)' },
@@ -28,6 +54,22 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
   const [selectedFecha, setSelectedFecha] = useState(hoy)
   const [selectedPersonalId, setSelectedPersonalId] = useState('todos')
   const [bloqueAbierto, setBloqueAbierto] = useState<string | null>(null)
+  const [vista, setVista] = useState<Vista>('revision')
+
+  // Sin filtrar por fecha ni por empleado: una novedad no deja de importar
+  // porque el administrador esté mirando otro día. Los filtros de arriba son
+  // para la ronda de revisión, que sí es una tarea por turno.
+  const novedades = useMemo(
+    () => novedadesDeTareas(bloques, tareas, personal),
+    [bloques, tareas, personal],
+  )
+  const novedadesAbiertas = novedades.filter(n => n.requiere_mantenimiento).length
+
+  async function atender(novedad: NovedadOperativa) {
+    const { error } = await atenderNovedad(novedad)
+    if (error) return notify({ variant: 'error', title: 'Error', text: error.message })
+    onRefresh()
+  }
 
   // Solo bloques cerrados (completado/incompleto)
   const bloquesCerrados = bloques.filter(b =>
@@ -92,10 +134,41 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Revisión de turnos</h2>
         <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-          Ronda del administrador · aprueba o rechaza el trabajo realizado por el personal
+          {vista === 'revision'
+            ? 'Ronda del administrador · aprueba o rechaza el trabajo realizado por el personal'
+            : 'Lo que el personal encontró durante su turno y no le tocaba resolver'}
         </p>
       </div>
 
+      {/* Selector de vista — mismo lenguaje visual que el tab Limpieza, que ya
+          tenía este patrón y muestra el mismo listado de novedades. */}
+      <div role="tablist" aria-label="Vistas de revisión" style={{ display: 'flex', gap: '6px', marginBottom: '18px', flexWrap: 'wrap' }}>
+        {VISTAS.map(v => (
+          <button
+            key={v.id}
+            role="tab"
+            aria-selected={vista === v.id}
+            onClick={() => setVista(v.id)}
+            style={{
+              padding: '8px 16px',
+              background: vista === v.id ? 'var(--at-primary)' : 'var(--at-chip)',
+              color: vista === v.id ? 'white' : 'var(--at-ink-2)',
+              border: 'none', borderRadius: '8px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: 700,
+            }}
+          >
+            {v.icon} {v.label}
+            {v.id === 'novedades' && novedadesAbiertas > 0 && ` (${novedadesAbiertas})`}
+          </button>
+        ))}
+      </div>
+
+      {vista === 'novedades' && (
+        <VistaNovedades novedades={novedades} canEdit={canEdit} onAtender={atender} />
+      )}
+
+      {/* La ronda de revisión, de aquí hasta el cierre del fragmento. */}
+      {vista === 'revision' && <>
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={selectedPersonalId} onChange={e => setSelectedPersonalId(e.target.value)}
@@ -193,8 +266,13 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                                     </span>
                                   </div>
                                   {t.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t.descripcion}</div>}
-                                  {t.notas_operativo && (
-                                    <div style={{ fontSize: '12.5px', color: 'var(--at-warning)', marginTop: '3px' }}>💬 {t.notas_operativo}</div>
+                                  {/* `novedad` desde 20260907000100; `notas_operativo` es el respaldo
+                                      de las filas anteriores a que la captura existiera. */}
+                                  {(t.novedad ?? t.notas_operativo) && (
+                                    <div style={{ fontSize: '12.5px', color: 'var(--at-warning)', marginTop: '3px' }}>💬 {t.novedad ?? t.notas_operativo}</div>
+                                  )}
+                                  {t.requiere_mantenimiento && (
+                                    <div style={{ fontSize: '11.5px', color: 'var(--at-danger)', fontWeight: 700, marginTop: '2px' }}>🛠 Requiere mantenimiento</div>
                                   )}
                                   {t.completada_en && (
                                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
@@ -262,6 +340,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
           })}
         </div>
       )}
+      </>}
     </div>
   )
 }
