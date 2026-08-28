@@ -33,11 +33,19 @@ BEGIN
     RAISE EXCEPTION 'limpio-2: el NOT VALID sobrevivió — la reparación debía validar el histórico'; END IF;
 
   -- La fila legacy anterior al constraint quedó convertida (era el hueco que
-  -- el NOT VALID perpetuaba) y el hito de cierre intacto.
+  -- el NOT VALID perpetuaba) y el hito de cierre intacto. Exigía comentario y
+  -- no lo traía: la conversión atravesó trg_exigir_evidencia por su excepción
+  -- documentada, con el motivo estampado (la otra rama — foto — la ejercita
+  -- el escenario de producción).
   SELECT estado INTO v_estado FROM public.tareas_bloque
    WHERE id = 'a1000000-0000-0000-0000-000000000002';
   IF v_estado <> 'completada' THEN
     RAISE EXCEPTION 'limpio-3: la fila legacy quedó en % (esperado completada)', v_estado; END IF;
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE id = 'a1000000-0000-0000-0000-000000000002'
+     AND motivo_sin_evidencia LIKE 'Cierre legacy%';
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'limpio-3b: la legacy sin comentario debía quedar con motivo_sin_evidencia estampado'; END IF;
   SELECT count(*) INTO n FROM public.tareas_bloque
    WHERE estado NOT IN ('pendiente', 'completada', 'con_observacion', 'omitida');
   IF n <> 0 THEN

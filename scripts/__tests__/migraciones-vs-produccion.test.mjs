@@ -293,6 +293,40 @@ describe('compararConstraints · el homónimo incompatible', () => {
     expect(hallazgos[0]).toContain('AUSENTE')
   })
 
+  it('FALLA si aparece un SEGUNDO CHECK sobre estado bajo otro nombre, aunque el canónico esté intacto', () => {
+    // Los CHECKs aplican todos a la vez: el legacy bajo otro nombre vuelve a
+    // rechazar los cierres canónicos con 23514 mientras el nombrado sigue
+    // perfecto — el mismo incidente por la puerta de al lado.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [
+        check(CANONICA),
+        { ...check(LEGACY, { convalidated: false }), constraint_name: 'tareas_bloque_estado_check_old' },
+      ],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('tareas_bloque_estado_check_old')
+    expect(hallazgos[0]).toContain('CHECK ADICIONAL')
+  })
+
+  it('no confunde los CHECKs de OTRAS columnas de la misma tabla', () => {
+    // prioridad y anulación viven en tareas_bloque y no tocan `estado`.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [
+        check(CANONICA),
+        {
+          table_name: 'tareas_bloque',
+          constraint_name: 'tareas_bloque_prioridad_check',
+          definition:
+            "CHECK (((prioridad IS NULL) OR (prioridad = ANY (ARRAY['baja'::text, 'media'::text, 'alta'::text]))))",
+          convalidated: true,
+        },
+      ],
+    })
+    expect(hallazgos).toEqual([])
+  })
+
   it('no exige nada mientras la reparación NO esté registrada', () => {
     // Mismo acotamiento que las columnas: antes del apply, producción tiene
     // legítimamente la forma vieja; exigir la nueva daría rojo en cada deploy.

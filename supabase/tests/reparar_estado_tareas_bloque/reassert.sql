@@ -35,6 +35,13 @@ BEGIN
   SELECT count(*) INTO n FROM public.tareas_bloque;
   IF n <> 4 THEN RAISE EXCEPTION 'idem-6: hay % filas (esperado 4): la re-aplicación insertó o borró', n; END IF;
 
+  -- La re-aplicación no re-estampó motivos (la conversión no encontró filas):
+  -- sigue habiendo exactamente uno, el de la primera pasada.
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE motivo_sin_evidencia IS NOT NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'idem-6b: la re-aplicación cambió los motivos estampados (hay %)', n; END IF;
+
   -- Y sigue rechazando lo legacy.
   BEGIN
     UPDATE public.tareas_bloque SET estado = 'en_curso'

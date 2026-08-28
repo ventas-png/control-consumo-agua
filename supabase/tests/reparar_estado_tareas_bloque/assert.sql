@@ -64,6 +64,35 @@ BEGIN
     RAISE EXCEPTION '2d: quedaron % fila(s) fuera del dominio canónico', n; END IF;
   RAISE NOTICE 'OK 2  completado→completada y omitido→omitida, con el hito de cierre intacto';
 
+  -- ── 2bis. La conversión atravesó trg_exigir_evidencia por la puerta ──────
+  -- La fila que exige foto y no la tiene pasó con la excepción DOCUMENTADA
+  -- estampada (motivo_sin_evidencia); la que trae su foto pasó limpia. Y el
+  -- trigger sigue vivo: un cierre nuevo sin evidencia se rechaza — la
+  -- reparación estampó motivos, no desactivó el control.
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE id = T_COMPLETADA
+     AND motivo_sin_evidencia LIKE 'Cierre legacy%';
+  IF n <> 1 THEN
+    RAISE EXCEPTION '2e: la fila sin evidencia debía quedar con motivo_sin_evidencia estampado'; END IF;
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE id = 'a1000000-0000-0000-0000-000000000004'
+     AND motivo_sin_evidencia IS NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '2f: la fila CON su foto no debía recibir motivo espurio'; END IF;
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE motivo_sin_evidencia IS NOT NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION '2g: debía haber exactamente 1 motivo estampado y hay %', n; END IF;
+  BEGIN
+    UPDATE public.tareas_bloque
+       SET estado = 'completada', requiere_foto = true
+     WHERE id = T_PENDIENTE;
+    RAISE EXCEPTION '2h: un cierre nuevo sin la foto exigida entró — el trigger quedó desactivado';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+  RAISE NOTICE 'OK 2b la evidencia: motivo estampado solo donde faltaba, y el trigger sigue exigiendo';
+
   -- ── 3. La tarea pendiente puede pasar a CADA estado canónico ─────────────
   -- (y volver: el dominio completo se ejercita sobre la misma fila)
   UPDATE public.tareas_bloque SET estado = 'completada'      WHERE id = T_PENDIENTE;
@@ -102,6 +131,6 @@ BEGIN
   END;
   RAISE NOTICE 'OK 4  completado / omitido / en_curso rechazados con 23514, también en INSERT';
 
-  RAISE NOTICE '── 4 invariantes del escenario de producción OK ──';
+  RAISE NOTICE '── 5 invariantes del escenario de producción OK ──';
 END;
 $$;

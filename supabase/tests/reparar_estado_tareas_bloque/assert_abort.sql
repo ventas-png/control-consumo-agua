@@ -42,6 +42,10 @@ BEGIN
   SELECT count(*) INTO n FROM public.tareas_bloque
    WHERE estado IN ('completada', 'omitida', 'con_observacion');
   IF n <> 0 THEN RAISE EXCEPTION 'abort-8: % fila(s) quedaron convertidas pese al aborto', n; END IF;
+  -- El estampado de motivo_sin_evidencia también se revirtió con el rollback.
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE motivo_sin_evidencia IS NOT NULL;
+  IF n <> 0 THEN RAISE EXCEPTION 'abort-9: % motivo(s) estampados sobrevivieron al aborto', n; END IF;
 
   RAISE NOTICE 'OK   el aborto por en_curso no dejó rastro: constraint, definición y datos intactos';
 END;

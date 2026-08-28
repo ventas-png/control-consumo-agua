@@ -133,7 +133,19 @@ export const CONSTRAINTS_CRITICOS = [
   {
     tabla: 'tareas_bloque',
     constraint: 'tareas_bloque_estado_check',
+    // Cualquier OTRO CHECK de la tabla cuya definición nombre esta columna se
+    // reporta también: un segundo CHECK legacy bajo otro nombre aplicaría A LA
+    // VEZ que el canónico y volvería a rechazar los cierres con 23514, con el
+    // canónico intacto — el mismo incidente por la puerta de al lado.
+    columna: 'estado',
     desdeVersion: '20260907000700',
+    // `definicion` es la salida de pg_get_constraintdef para `estado text`
+    // (el tipo que declara 20260424000060), estable en PG 15/16/17 —
+    // run.sh de reparar_estado_tareas_bloque la coteja contra un servidor
+    // real en cada corrida de CI. Si producción tuviera la columna con OTRO
+    // tipo (varchar imprime la forma con casts), esto daría rojo: a
+    // PROPÓSITO — un tipo distinto del declarado es drift que ninguna otra
+    // guarda ve, y el mensaje imprime ambas definiciones para que se lea.
     definicion:
       "CHECK ((estado = ANY (ARRAY['pendiente'::text, 'completada'::text, 'con_observacion'::text, 'omitida'::text])))",
     // 20260907000700 hace VALIDATE: un constraint canónico pero NOT VALID
@@ -165,6 +177,25 @@ export function compararConstraints({ registradas, constraintsProd, criticos = C
   const hallazgos = []
   for (const esperado of criticos) {
     if (!registradas.has(esperado.desdeVersion)) continue
+
+    // Los CHECKs aplican TODOS a la vez: uno legacy bajo OTRO nombre volvería
+    // a rechazar las escrituras canónicas aunque el nombrado esté perfecto.
+    // Se reporta cualquier otro CHECK de la tabla que constriña la columna.
+    if (esperado.columna) {
+      const reColumna = new RegExp(`\\b${esperado.columna}\\b`)
+      for (const extra of constraintsProd.filter(
+        (c) =>
+          c.table_name === esperado.tabla &&
+          c.constraint_name !== esperado.constraint &&
+          reColumna.test(c.definition ?? ''),
+      )) {
+        hallazgos.push(
+          `${esperado.tabla}.${extra.constraint_name} — CHECK ADICIONAL sobre «${esperado.columna}» junto a ${esperado.constraint}: ` +
+            `los CHECKs aplican todos a la vez, así que éste puede rechazar lo que el canónico permite. Definición: ${extra.definition}`,
+        )
+      }
+    }
+
     const real = constraintsProd.find(
       (c) => c.table_name === esperado.tabla && c.constraint_name === esperado.constraint,
     )
@@ -392,15 +423,19 @@ async function main() {
     console.log(`❌ ${constraintsConDrift.length} constraint(s) crítico(s) con drift de DEFINICIÓN (el nombre no basta):`)
     for (const c of constraintsConDrift) console.log(`   · ${c}`)
     console.log('')
-    console.log('   Un CHECK homónimo con otro vocabulario rechaza escrituras legítimas con 23514')
-    console.log('   (la clase de tareas_bloque_estado_check). Reponer la definición canónica con')
-    console.log('   una migración forward-only que la valide — patrón 20260907000700.')
+    console.log('   Un CHECK con otro vocabulario rechaza escrituras legítimas con 23514 (la')
+    console.log('   clase de tareas_bloque_estado_check). Reponer la definición canónica —o')
+    console.log('   retirar el CHECK adicional— con una migración forward-only que valide,')
+    console.log('   patrón 20260907000700. El allowlist NO cubre constraints: no hay deuda')
+    console.log('   declarable aquí, solo reparación.')
     console.log('')
   }
-  console.log('Para cada tabla o columna ausente (un 42703 esperando a que alguien la escriba):')
-  console.log('  · reponerla con una migración forward-only (patrón 20260904000500), o')
-  console.log('  · declararla como deuda en scripts/migraciones-vs-produccion.allowlist.json,')
-  console.log('    con su `reason`.')
+  if (r.tablasFaltantes.length + r.columnasFaltantes.length > 0) {
+    console.log('Para cada tabla o columna ausente (un 42703 esperando a que alguien la escriba):')
+    console.log('  · reponerla con una migración forward-only (patrón 20260904000500), o')
+    console.log('  · declararla como deuda en scripts/migraciones-vs-produccion.allowlist.json,')
+    console.log('    con su `reason`.')
+  }
 
   process.exit(soloReporte ? 0 : 1)
 }

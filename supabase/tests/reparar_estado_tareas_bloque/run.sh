@@ -107,6 +107,28 @@ SALIDA=$(psql -v ON_ERROR_STOP=1 -d repprod -f "$AQUI/postdeploy.sql" 2>&1) || {
 }
 grep -E 'tareas_bloque_estado_check|postdeploy OK' <<<"$SALIDA" | sed 's/^/  /'
 
+# El drift guard compara producción contra un LITERAL (CONSTRAINTS_CRITICOS.
+# definicion) — la migración calcula el suyo en el servidor precisamente para
+# no acoplarse a una versión de Postgres. Este cotejo cierra el hueco: el
+# literal del guard tiene que coincidir, byte a byte, con lo que imprime un
+# servidor real sobre el estado final. Si un upgrade de Postgres cambiara el
+# formato, esto se pone rojo ANTES de que el guard le dé un rojo falso a prod.
+echo "  ── el literal del drift guard coincide con pg_get_constraintdef real ──"
+DEF_GUARD=$(node --input-type=module -e "
+  const m = await import('file://$RAIZ/scripts/migraciones-vs-produccion.mjs');
+  const e = m.CONSTRAINTS_CRITICOS.find(c => c.constraint === 'tareas_bloque_estado_check');
+  if (!e) { console.error('CONSTRAINTS_CRITICOS ya no declara tareas_bloque_estado_check'); process.exit(1); }
+  process.stdout.write(e.definicion);
+")
+DEF_REAL=$(psql -At -d repprod -c "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='public.tareas_bloque'::regclass AND conname='tareas_bloque_estado_check'")
+if [ "$DEF_GUARD" != "$DEF_REAL" ]; then
+  echo "❌ el literal de CONSTRAINTS_CRITICOS no coincide con el servidor:"
+  echo "   guard:    $DEF_GUARD"
+  echo "   servidor: $DEF_REAL"
+  exit 1
+fi
+echo "  OK    la definición que exige el guard es la que el servidor imprime"
+
 echo
 echo "── 2/3 · EN_CURSO: sin decisión documentada, la migración ABORTA ───────"
 psql -q -d postgres -c "CREATE DATABASE repcurso" >/dev/null

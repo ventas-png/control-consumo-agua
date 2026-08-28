@@ -60,7 +60,7 @@ describe('20260907000700 · la migración repara por DEFINICIÓN, no por nombre'
 
   it('convierte EXPLÍCITAMENTE los dos legacy con equivalencia definida', () => {
     expect(sqlReparacion).toMatch(
-      /SET\s+estado\s*=\s*'completada'\s+WHERE\s+estado\s*=\s*'completado'/i,
+      /SET\s+estado\s*=\s*'completada'[\s\S]*?WHERE\s+estado\s*=\s*'completado'/i,
     )
     expect(sqlReparacion).toMatch(
       /SET\s+estado\s*=\s*'omitida'\s+WHERE\s+estado\s*=\s*'omitido'/i,
@@ -69,11 +69,27 @@ describe('20260907000700 · la migración repara por DEFINICIÓN, no por nombre'
 
   it('para en_curso NO hay equivalencia muda: se aborta con mensaje', () => {
     // Ningún UPDATE puede tocar 'en_curso': mapearlo es una decisión de
-    // producto que nadie documentó.
-    expect(sqlReparacion).not.toMatch(/UPDATE[\s\S]*?'en_curso'/i)
+    // producto que nadie documentó. Se inspecciona CADA statement UPDATE por
+    // separado — no el archivo entero, donde el propio mensaje de aborto
+    // menciona el valor legítimamente.
+    const updates = sqlReparacion.match(/\bUPDATE\b[\s\S]*?;/gi) ?? []
+    expect(updates.length).toBeGreaterThan(0)
+    for (const u of updates) {
+      expect(u, 'un UPDATE toca en_curso: eso es la equivalencia muda prohibida').not.toContain("'en_curso'")
+    }
     // El aborto existe y nombra el problema.
     expect(sqlReparacion).toMatch(/RAISE EXCEPTION/i)
     expect(sqlReparacion).toMatch(/fuera del dominio canónico/i)
+  })
+
+  it('atraviesa trg_exigir_evidencia por su excepción documentada, sin desactivarlo', () => {
+    // La conversión a completada pasa por el trigger de 20260907000400 (su
+    // cabecera dice a propósito que un script de migración pasa por él).
+    // La salida legítima es motivo_sin_evidencia; DISABLE TRIGGER sería el
+    // bypass silencioso que ese control existe para evitar.
+    expect(sqlReparacion).toMatch(/motivo_sin_evidencia/)
+    expect(sqlReparacion).not.toMatch(/DISABLE\s+TRIGGER/i)
+    expect(sqlReparacion).not.toMatch(/session_replication_role/i)
   })
 
   it('VALIDA el constraint: el NOT VALID de 20260907000100 no puede sobrevivir', () => {
@@ -98,23 +114,39 @@ describe('20260907000700 · la migración repara por DEFINICIÓN, no por nombre'
 })
 
 describe('drift guard · la definición se vigila desde la versión correcta', () => {
+  // La ENTRADA de tareas_bloque_estado_check, no el archivo entero: con un
+  // regex de primera coincidencia, agregar un segundo constraint crítico
+  // ANTES en la lista haría que estos tests verificaran la entrada equivocada
+  // en silencio. Se aísla el bloque desde su `constraint:` hasta el cierre.
+  const bloqueEntrada = (() => {
+    const desde = guardProduccion.indexOf("constraint: 'tareas_bloque_estado_check'")
+    if (desde === -1) return null
+    const hasta = guardProduccion.indexOf('},', desde)
+    // El bloque arranca en el `{` que precede al constraint.
+    const abre = guardProduccion.lastIndexOf('{', desde)
+    return guardProduccion.slice(abre, hasta === -1 ? undefined : hasta + 1)
+  })()
+
   it('CONSTRAINTS_CRITICOS declara tareas_bloque_estado_check', () => {
     expect(guardProduccion).toMatch(/CONSTRAINTS_CRITICOS/)
-    expect(guardProduccion).toMatch(/constraint:\s*'tareas_bloque_estado_check'/)
-    expect(guardProduccion).toMatch(/tabla:\s*'tareas_bloque'/)
+    expect(bloqueEntrada, 'no hay entrada para tareas_bloque_estado_check').not.toBeNull()
+    expect(bloqueEntrada!).toMatch(/tabla:\s*'tareas_bloque'/)
+    // Y vigila la COLUMNA: sin `columna`, un segundo CHECK legacy bajo otro
+    // nombre reintroduce el 23514 con el guard en verde.
+    expect(bloqueEntrada!).toMatch(/columna:\s*'estado'/)
   })
 
   it('el gate desdeVersion apunta al archivo que existe en el repo', () => {
     // Si la migración se renumera (regla (d) del guard, antes del merge) y la
     // entrada no se actualiza, el gate no se abre nunca: la vigilancia se
     // apaga sin que nada falle.
-    const m = guardProduccion.match(/desdeVersion:\s*'(\d+)'/)
-    expect(m, 'CONSTRAINTS_CRITICOS sin desdeVersion').not.toBeNull()
+    const m = bloqueEntrada!.match(/desdeVersion:\s*'(\d+)'/)
+    expect(m, 'la entrada no tiene desdeVersion').not.toBeNull()
     expect(m![1]).toBe(VERSION_REPARACION)
   })
 
   it('exige los cuatro cánones en la definición esperada, sin vocabulario legacy', () => {
-    const entrada = guardProduccion.match(/definicion:\s*\n?\s*"([^"]+)"/)
+    const entrada = bloqueEntrada!.match(/definicion:\s*\n?\s*"([^"]+)"/)
     expect(entrada).not.toBeNull()
     for (const canon of ['pendiente', 'completada', 'con_observacion', 'omitida']) {
       expect(entrada![1]).toContain(`'${canon}'`)
