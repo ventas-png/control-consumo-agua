@@ -364,6 +364,19 @@ jobs:
           PGPORT_TEST: 55491
         run: supabase/tests/insert_solo_pendiente/run.sh
 
+      # El cierre y el consumo eran DOS requests (#809): el segundo podía
+      # perderse sin reintento, dos sesiones concurrentes descontaban doble, y
+      # una tarea pendiente podía consumir. 20260907001000 los funde en una
+      # transacción con reclamo FOR UPDATE. Este sandbox reproduce primero los
+      # agujeros (NEGATIVA), y la carrera corre con DOS conexiones reales
+      # sincronizadas por barrera de advisory locks — lo único que de verdad
+      # demuestra «como máximo un movimiento y un descuento por fila».
+      - name: Cierre y consumo atómicos — una transacción, un lock por fila
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55492
+        run: supabase/tests/cierre_consumo_atomico/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
