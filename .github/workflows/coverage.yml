@@ -321,6 +321,20 @@ jobs:
           PGPORT_TEST: 55488
         run: supabase/tests/snapshot_al_crear/run.sh
 
+      # 20260907000100 protegió su CHECK de estado por conname, y en producción
+      # ese nombre existía con el vocabulario legacy: el canónico nunca se
+      # instaló y completar una tarea da 23514. Un sandbox construido desde las
+      # migraciones no puede verlo (allí nombre y definición coinciden): éste
+      # monta el homónimo incompatible BAJO EL MISMO NOMBRE, comprueba primero
+      # que el fallo se reproduce, y que 20260907000700 lo reemplaza, convierte
+      # los legacy con equivalencia definida y ABORTA ante en_curso en vez de
+      # inventarle una. Incluye idempotencia y el postdeploy de sólo lectura.
+      - name: Estado de tareas_bloque — el homónimo incompatible se reemplaza
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55489
+        run: supabase/tests/reparar_estado_tareas_bloque/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
