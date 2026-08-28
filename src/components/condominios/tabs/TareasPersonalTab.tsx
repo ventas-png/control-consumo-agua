@@ -7,7 +7,7 @@ import {
   createCondominioRowReturning,
   updateCondominioRow,
   deleteCondominioRow,
-  consumirInsumosTarea,
+  cerrarTareaYConsumir,
 } from '../../../domain/condominios/tabMutations'
 import { fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
@@ -220,49 +220,25 @@ export function TareasPersonalTab({
     [insumos],
   )
 
-  /** Lo pendiente de consumir: una fila ya consumida no se vuelve a ofrecer. */
+  /**
+   * Lo pendiente de consumir: una fila ya consumida —o sellada como «no
+   * usada» (20260907001000)— no se vuelve a ofrecer.
+   */
   const pendientesDe = useCallback(
-    (tareaId: string) => insumosDe(tareaId).filter(i => !i.movimiento_id),
+    (tareaId: string) => insumosDe(tareaId).filter(i => !i.movimiento_id && !i.no_usado_en),
     [insumosDe],
   )
 
-  /**
-   * Descuenta lo declarado. Corre DESPUÉS de que el cierre haya pasado: si el
-   * trigger de evidencia rechaza la tarea, no se gastó nada del almacén.
-   *
-   * La falta de stock NO es un error: el consumo se registró y el cierre ya
-   * ocurrió. Se avisa para que alguien reponga, no para culpar a quien ejecutó.
-   */
-  async function consumirDe(tareaId: string) {
-    const pendientes = pendientesDe(tareaId)
-    if (pendientes.length === 0) return
-
-    const { data, error } = await consumirInsumosTarea(
-      tareaId,
-      pendientes.map(i => ({
-        suministro_id: i.suministro_id,
-        cantidad: cantidades[i.id] !== undefined
-          ? Number(cantidades[i.id]) || 0
-          : i.cantidad_planificada,
-      })),
-    )
-    if (error) {
-      notify({ variant: 'error', title: 'No se pudo descontar el insumo', text: error.message })
-      return
-    }
-    if (data && data.sin_stock.length > 0) {
-      notify({
-        variant: 'warning',
-        title: 'Se descontó, pero faltaba existencia',
-        text: data.sin_stock
-          .map(f => `${f.nombre}: se usaron ${f.pedido} ${f.unidad} y había ${f.disponible}`)
-          .join('. '),
-      })
-    }
-    // `onRefresh` recarga las tareas, no el plan de insumos: sin esto la
-    // pantalla seguiría ofreciendo editar lo que ya se descontó.
-    await recargarInsumos()
-  }
+  /** Lo que se declara a la RPC de cierre: lo editado, o el plan tal cual. */
+  const consumosDeclarados = useCallback(
+    (tareaId: string) => pendientesDe(tareaId).map(i => ({
+      suministro_id: i.suministro_id,
+      cantidad: cantidades[i.id] !== undefined
+        ? Number(cantidades[i.id]) || 0
+        : i.cantidad_planificada,
+    })),
+    [pendientesDe, cantidades],
+  )
 
   /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
   async function togglePaso(t: TareaBloque, i: number) {
@@ -328,29 +304,29 @@ export function TareasPersonalTab({
       // Antes esta rama ignoraba el error y refrescaba igual: el operativo veía
       // su tarea sin la observación y sin saber por qué.
       if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    } else {
-      // Sólo el cierre por 'completada' exige evidencia — igual que el trigger.
-      // `omitida` es que no se hizo, y `con_observacion` ya se resolvió arriba:
-      // exigirles lo mismo empujaría a cerrar en falso.
-      const extra: Record<string, unknown> = {}
-      if (estado === 'completada') {
-        const t = tareas.find(x => x.id === tareaId)
-        if (t) {
-          const chequeo = evidenciaSuficiente(t, { ...t, motivo_sin_evidencia: motivoAplicable })
-          if (!chequeo.ok) {
-            setEvidenciaDe(tareaId)
-            setComentario(t.evidencia_texto ?? '')
-            notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
-            return
-          }
+    } else if (estado === 'completada') {
+      // El cierre y el consumo son UNA transacción (20260907001000). Antes esto
+      // eran DOS requests —UPDATE del estado y después la RPC de consumo— y
+      // entre los dos la tarea podía quedar cerrada con el almacén intacto. Si
+      // la RPC falla (evidencia, autorización, consumo inválido), la tarea
+      // sigue pendiente y el stock no cambió.
+      const t = tareas.find(x => x.id === tareaId)
+      if (t) {
+        // Cortesía de UI: el rechazo con contexto ANTES del viaje a la base.
+        // El control real es el trigger, dentro de la transacción del RPC.
+        const chequeo = evidenciaSuficiente(t, { ...t, motivo_sin_evidencia: motivoAplicable })
+        if (!chequeo.ok) {
+          setEvidenciaDe(tareaId)
+          setComentario(t.evidencia_texto ?? '')
+          notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
+          return
         }
-        if (motivoAplicable) extra.motivo_sin_evidencia = motivoAplicable
       }
-      const { error } = await updateCondominioRow('tareas_bloque', tareaId, {
-        estado,
-        completada_en: estado !== 'pendiente' ? new Date().toISOString() : null,
-        ...extra,
-      })
+      const { data, error } = await cerrarTareaYConsumir(
+        tareaId,
+        consumosDeclarados(tareaId),
+        motivoAplicable || undefined,
+      )
       if (error) {
         // El trigger marca sus mensajes con `EVIDENCIA:`; se traduce en vez de
         // mostrarle a un operativo el texto crudo de Postgres.
@@ -363,11 +339,33 @@ export function TareasPersonalTab({
         })
         return
       }
-      // El consumo va DESPUÉS del cierre y sólo si el cierre pasó: si el
-      // trigger de evidencia rechazó la tarea, no se gastó nada del almacén.
-      // Y sólo en 'completada' — omitir es que NO se hizo, y `con_observacion`
-      // se resolvió en la rama de arriba.
-      if (estado === 'completada') await consumirDe(tareaId)
+      // La falta de stock NO es un error: el cierre y el consumo ya ocurrieron.
+      // Se avisa para que alguien reponga, no para culpar a quien ejecutó.
+      if (data && data.sin_stock.length > 0) {
+        notify({
+          variant: 'warning',
+          title: 'Se descontó, pero faltaba existencia',
+          text: data.sin_stock
+            .map(f => `${f.nombre}: se usaron ${f.pedido} ${f.unidad} y había ${f.disponible}`)
+            .join('. '),
+        })
+      }
+      // `onRefresh` recarga las tareas, no el plan de insumos: sin esto la
+      // pantalla seguiría ofreciendo editar lo que ya se descontó.
+      await recargarInsumos()
+      setEvidenciaDe(null); setMotivo(''); setComentario('')
+    } else {
+      // `omitida` (y el reabrir defensivo a 'pendiente'): no consumen insumos
+      // ni exigen evidencia — omitir es que NO se hizo. El UPDATE directo de
+      // siempre; la RLS y el CHECK de estado siguen vigilando.
+      const { error } = await updateCondominioRow('tareas_bloque', tareaId, {
+        estado,
+        completada_en: estado !== 'pendiente' ? new Date().toISOString() : null,
+      })
+      if (error) {
+        notify({ variant: 'error', title: 'Error', text: error.message })
+        return
+      }
       setEvidenciaDe(null); setMotivo(''); setComentario('')
     }
     onRefresh()
@@ -622,6 +620,12 @@ export function TareasPersonalTab({
                                           // igual, pero un campo editable que no hace nada miente.
                                           <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 700 }}>
                                             ✓ descontado
+                                          </span>
+                                        ) : ins.no_usado_en ? (
+                                          // Sellado como «no usado» (20260907001000): terminal. Deshacerlo
+                                          // es una corrección del admin, no un campo en esta pantalla.
+                                          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 700 }}>
+                                            ∅ no usado
                                           </span>
                                         ) : (
                                           <>

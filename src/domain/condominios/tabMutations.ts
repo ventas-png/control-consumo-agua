@@ -325,3 +325,38 @@ export async function consumirInsumosTarea(
   const fila = Array.isArray(data) ? data[0] : data
   return { data: (fila as ResultadoConsumoInsumos | null) ?? null, error }
 }
+
+/**
+ * Cierra una tarea de turno en 'completada' Y descuenta sus insumos en UNA
+ * transacción (RPC `cerrar_tarea_y_consumir_insumos`, 20260907001000).
+ *
+ * Reemplaza al par «UPDATE del estado + `consumirInsumosTarea`»: entre esos dos
+ * requests la tarea podía quedar cerrada con el almacén intacto si el segundo
+ * fallaba o la respuesta se perdía — y nada volvía a intentarlo. Aquí la
+ * evidencia, la autorización y el consumo se validan DENTRO de la misma
+ * transacción: si algo falla, la tarea sigue pendiente y el stock no cambió.
+ *
+ * Reintento seguro: sobre una tarea ya completada la RPC no re-cierra ni
+ * re-descuenta (cada fila del plan se reclama con lock una sola vez), así que
+ * repetir la llamada tras un timeout devuelve 0 en vez de duplicar salidas.
+ *
+ * Sólo cierra en 'completada': `omitida` y `con_observacion` no consumen y
+ * conservan su camino de UPDATE directo.
+ *
+ * Va en `supabase` (sin tipar) por lo mismo que `materializarRutinasTurno`.
+ * Devuelve UNA fila.
+ */
+export async function cerrarTareaYConsumir(
+  tareaId: string,
+  consumos: ConsumoDeclarado[],
+  motivoSinEvidencia?: string,
+): Promise<{ data: ResultadoConsumoInsumos | null; error: RowError }> {
+  const { data, error } = await supabase.rpc('cerrar_tarea_y_consumir_insumos', {
+    p_tarea_id: tareaId,
+    p_estado: 'completada',
+    p_motivo_sin_evidencia: motivoSinEvidencia || null,
+    p_consumos: consumos,
+  })
+  const fila = Array.isArray(data) ? data[0] : data
+  return { data: (fila as ResultadoConsumoInsumos | null) ?? null, error }
+}

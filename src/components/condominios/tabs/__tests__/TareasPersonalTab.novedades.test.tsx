@@ -37,6 +37,11 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
+  // La rama de 'con_observacion' no la usa, pero el componente la importa:
+  // sin el export el mock del módulo revienta al montar.
+  cerrarTareaYConsumir: vi.fn(async () => ({
+    data: { consumidos: 0, no_usados: 0, sin_stock: [] }, error: null as RowError,
+  })),
   deleteCondominioRow: mocks.deleteCondominioRow,
 }))
 // El tab baja el plan de insumos al montar (20260907000500). Aquí no se prueba
