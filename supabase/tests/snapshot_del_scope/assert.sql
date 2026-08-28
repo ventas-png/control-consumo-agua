@@ -186,6 +186,10 @@ BEGIN
      OR jsonb_array_length(t.checklist) <> 3
      OR NOT (t.requiere_foto AND t.requiere_comentario AND t.requiere_checklist) THEN
     RAISE EXCEPTION '10b: el guard le cambió el resultado a la materialización'; END IF;
+  -- Y la tarea materializada NACE pendiente y sin cierre: es el contrato del
+  -- alta que 20260907000900 exige a los clientes — la RPC lo cumple sola.
+  IF t.estado IS DISTINCT FROM 'pendiente' OR t.completada_en IS NOT NULL THEN
+    RAISE EXCEPTION '10d: la materialización creó la tarea en % (debía nacer pendiente)', t.estado; END IF;
   SELECT count(*) INTO n FROM public.tareas_bloque
    WHERE bloque_id = '70000000-0000-0000-0000-000000000031';
   IF n <> 1 THEN

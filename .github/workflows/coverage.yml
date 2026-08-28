@@ -350,6 +350,20 @@ jobs:
           PGPORT_TEST: 55490
         run: supabase/tests/snapshot_del_scope/run.sh
 
+      # El gate de evidencia (20260907000400) gatea la TRANSICIÓN en UPDATE:
+      # una fila insertada YA cerrada nunca pasa por él. 20260907000900 exige
+      # en el WITH CHECK que la tarea NAZCA pendiente y sin cierre, anulación,
+      # actor ni sello de excepción. Este sandbox reproduce primero el alta
+      # pre-cerrada (NEGATIVA), prueba el rechazo POR FAMILIA de permisos y
+      # como admin, que el cierre por UPDATE sigue exigiendo evidencia, que el
+      # histórico no se re-valida, y coteja el literal de POLICIES_CRITICAS
+      # contra el pg_get_expr de un servidor real.
+      - name: Alta de tareas — la tarea nace pendiente, sin sellos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55491
+        run: supabase/tests/insert_solo_pendiente/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
