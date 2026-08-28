@@ -418,22 +418,45 @@ describe('fusión de áreas duplicadas (20260907000000)', () => {
 
   it('el conjunto de FKs del guard coincide con las declaradas en las migraciones', () => {
     // Fuente de verdad: todo REFERENCES … areas_condominio de cualquier migración.
-    const tablasConFk = new Set<string>()
-    for (const archivo of archivosOrdenados) {
-      const texto = soloCodigo(readFileSync(join(MIGRATIONS_DIR, archivo), 'utf8'))
-      // CREATE TABLE: la tabla es la del CREATE; ADD COLUMN: la del ALTER.
-      const reCreate = /CREATE TABLE(?: IF NOT EXISTS)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
-      for (const m of texto.matchAll(reCreate)) {
-        if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablasConFk.add(m[1])
+    //
+    // SOLO cuentan las declaradas HASTA la fusión. Una FK que nace DESPUÉS no
+    // puede tener filas apuntando a un área perdedora, por dos razones
+    // independientes: cuando la fusión corrió su tabla no existía, y desde esa
+    // misma migración el índice único por nombre normalizado impide que vuelva a
+    // haber duplicados que fusionar. Exigirle a la fusión que re-apunte una
+    // tabla futura sería imposible además de innecesario — pero seguir contando
+    // esas tablas aquí convertiría el guard en un fallo garantizado cada vez que
+    // alguien agregue una tabla nueva con área, que es exactamente el ruido que
+    // hace que se terminen desactivando los guards.
+    const fksHasta = (corte: string) => {
+      const tablas = new Set<string>()
+      for (const archivo of archivosOrdenados.filter(f => f <= corte)) {
+        const texto = soloCodigo(readFileSync(join(MIGRATIONS_DIR, archivo), 'utf8'))
+        // CREATE TABLE: la tabla es la del CREATE; ADD COLUMN: la del ALTER.
+        const reCreate = /CREATE TABLE(?: IF NOT EXISTS)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
+        for (const m of texto.matchAll(reCreate)) {
+          if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablas.add(m[1])
+        }
+        const reAlter = /ALTER TABLE(?: ONLY)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
+        for (const m of texto.matchAll(reAlter)) {
+          if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablas.add(m[1])
+        }
       }
-      const reAlter = /ALTER TABLE(?: ONLY)?\s+(?:public\.)?(\w+)([\s\S]*?);/gi
-      for (const m of texto.matchAll(reAlter)) {
-        if (/REFERENCES\s+(?:public\.)?areas_condominio/i.test(m[2])) tablasConFk.add(m[1])
-      }
+      return tablas
     }
-    expect([...tablasConFk].sort()).toEqual([
+
+    expect([...fksHasta(MIG_DEDUPE)].sort()).toEqual([
       'plantillas_tarea_cargo', 'programacion_limpieza', 'puntos_control_ruta', 'tareas_bloque',
     ])
+
+    // La premisa que sostiene el recorte: la fusión deja el índice único, y es
+    // TOTAL (sin WHERE). Si alguien lo volviera parcial o lo quitara, las FKs
+    // posteriores sí podrían quedar apuntando a un duplicado y este recorte
+    // dejaría de ser legítimo.
+    const idx = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_DEDUPE), 'utf8'))
+      .match(/CREATE UNIQUE INDEX IF NOT EXISTS uq_areas_nombre_normalizado([\s\S]*?);/i)
+    expect(idx, 'la fusión debe dejar el único por nombre normalizado').not.toBeNull()
+    expect(idx![1]).not.toMatch(/WHERE/i)
   })
 
   it('verifica fail-closed ANTES de retirar nada', () => {

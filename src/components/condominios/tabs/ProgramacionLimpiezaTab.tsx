@@ -1,4 +1,4 @@
-// Tab Limpieza — cuatro vistas sobre el mismo dato:
+// Tab Limpieza — seis vistas sobre el mismo dato:
 //
 //   Áreas       programaciones + a quién le toca cada área (persona, o perfil
 //               turno+cargo), con asignación en bloque. Desde 20260904000100
@@ -11,6 +11,9 @@
 //               en Seguridad → Plantillas y no se duplica aquí. La RLS de
 //               20260904000200/000300 acepta `prog_limpieza` en el SELECT, así
 //               que se lee sin permisos del módulo Seguridad.
+//   Rutinas     conjuntos ordenados de actividades que se ejecutan juntos
+//               ("la matutina de la piscina"), para no rearmarlos cada día.
+//               Es DEFINICIÓN: la ocurrencia del día se materializa aparte.
 //   Ruta        lo que le toca hoy a cada empleado, con foto de evidencia y
 //               cierre área por área.
 //   Novedades   lo que se encontró de paso y necesita mantenimiento.
@@ -28,6 +31,7 @@ import type {
 import { AreasCatalog } from '../AreasCatalog'
 import { ActividadesCatalog } from '../ActividadesCatalog'
 import { VistaAreas } from './limpieza/VistaAreas'
+import { VistaRutinas } from './limpieza/VistaRutinas'
 import { VistaRuta } from './limpieza/VistaRuta'
 import { VistaNovedades } from './limpieza/VistaNovedades'
 import { sumarDias } from '../../../domain/condominios/limpieza'
@@ -48,12 +52,13 @@ interface Props {
   onRefresh: () => void
 }
 
-type Vista = 'areas' | 'catalogo' | 'actividades' | 'ruta' | 'novedades'
+type Vista = 'areas' | 'catalogo' | 'actividades' | 'rutinas' | 'ruta' | 'novedades'
 
 const VISTAS: { id: Vista; label: string; icon: string }[] = [
   { id: 'areas',       label: 'Áreas',     icon: '🧹' },
   { id: 'catalogo',    label: 'Catálogo de áreas', icon: '📍' },
   { id: 'actividades', label: 'Actividades', icon: '📋' },
+  { id: 'rutinas',     label: 'Rutinas',     icon: '🧭' },
   { id: 'ruta',        label: 'Ruta del día', icon: '🗓️' },
   { id: 'novedades',   label: 'Novedades', icon: '⚠️' },
 ]
@@ -123,6 +128,22 @@ export function ProgramacionLimpiezaTab({
           programaciones={programaciones}
           personal={personal}
           areas={areas}
+          proyectoId={proyectoId}
+          companyId={companyId}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onRefresh={onRefresh}
+        />
+      )}
+      {vista === 'rutinas' && (
+        // Armado de rutinas: agrupa actividades del catálogo para no
+        // rearmarlas cada día. Reutiliza ActividadesCatalog como selector.
+        <VistaRutinas
+          plantillas={plantillas}
+          areas={areas}
+          suministros={suministros}
+          inventario={inventario}
           proyectoId={proyectoId}
           companyId={companyId}
           canCreate={canCreate}
