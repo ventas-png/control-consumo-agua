@@ -14,20 +14,26 @@
 # QUÉ COMPRUEBA
 #   NEGATIVA    con la policy de #803 a solas, el alta pre-cerrada FUNCIONA.
 #               Si dejara de reproducirse, el escenario no prueba nada.
+#   NEGATIVA 2  con 20260907000900 aplicada, el contrato rige a todos MENOS al
+#               super_admin: Silvia sigue insertando la tarea pre-cerrada.
+#               20260907001100 viene a cerrar exactamente eso.
 #   FAMILIAS    para CADA familia de permisos que acepta la policy
 #               (tareas_personal, turnos, prog_limpieza): INSERT directo en
 #               completada / con_observacion / omitida rechazado con 42501 y
 #               SIN fila; el pendiente limpio de esa misma familia entra.
 #   SELLOS      fecha, actor, anulación y motivo_sin_evidencia pre-cargados se
-#               rechazan aunque el estado sea 'pendiente'. El rol admin no es
-#               bypass; sin permiso y desde la empresa vecina sigue cerrado.
+#               rechazan aunque el estado sea 'pendiente'. Ni el rol admin NI
+#               el super_admin son bypass; sin permiso y desde la empresa
+#               vecina sigue cerrado — y el pendiente limpio del super_admin
+#               entra por su propia rama.
 #   CIERRE      el UPDATE de cierre sigue tal como lo dejó 20260907000400:
 #               exige evidencia o la excepción DECLARADA, sella al actor, y la
 #               fila histórica no se re-valida en ediciones no relacionadas.
 #   EXPRESIÓN   el literal que POLICIES_CRITICAS exige en el drift guard
 #               coincide con el pg_get_expr de un servidor real.
-#   + IDEMPOTENCIA y postdeploy de solo lectura (expresión real de la policy
-#     y definición real del trigger, no sus nombres).
+#   + IDEMPOTENCIA (re-aplicar 000900 → 001100, como un replay del apply) y
+#     postdeploy de solo lectura (expresión real de la policy y definición
+#     real del trigger, no sus nombres).
 #
 # El fixture es el de tareas_bloque_paridad (padrón con permisos disjuntos y
 # el estado previo real) + 20260907000100 (las policies RBAC reales de #803).
@@ -52,6 +58,7 @@ MIGS=(
   "$RAIZ/supabase/migrations/20260907000700_reparar_estado_tareas_bloque.sql"
 )
 MIG_INSERT="$RAIZ/supabase/migrations/20260907000900_insert_solo_pendiente.sql"
+MIG_CONTRATO="$RAIZ/supabase/migrations/20260907001100_endurecer_alta_y_consumo_tareas.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -105,25 +112,32 @@ asertar() { # asertar <archivo.sql>
   fi
 }
 
-echo "── 1/7 · fixture (paridad) y la pila real hasta 20260907000700 ─────────"
+echo "── 1/9 · fixture (paridad) y la pila real hasta 20260907000700 ─────────"
 silencio -f "$FIXTURE" >/dev/null
 for m in "${MIGS[@]}"; do
   silencio -f "$m" >/dev/null
 done
 echo "  OK    fixture + 000100 + pre + 000400 + 000700"
 
-echo "── 2/7 · sembrar la familia turnos ─────────────────────────────────────"
+echo "── 2/9 · sembrar la familia turnos y a la super_admin ──────────────────"
 silencio -f "$AQUI/seed.sql" >/dev/null
-echo "  OK    Tomás (turnos) completa las tres familias"
+echo "  OK    Tomás (turnos) completa las familias; Silvia (super_admin) sin empresa"
 
-echo "── 3/7 · NEGATIVA: sin la reparación, el alta pre-cerrada funciona ─────"
+echo "── 3/9 · NEGATIVA: sin la reparación, el alta pre-cerrada funciona ─────"
 asertar "$AQUI/pre_assert.sql"
 
-echo "── 4/7 · aplicar la reparación ─────────────────────────────────────────"
+echo "── 4/9 · aplicar 20260907000900 ────────────────────────────────────────"
 silencio -f "$MIG_INSERT" >/dev/null
 echo "  OK    $(basename "$MIG_INSERT")"
 
-echo "── 5/7 · invariantes ───────────────────────────────────────────────────"
+echo "── 5/9 · NEGATIVA 2: con 000900, el super_admin sigue exento ───────────"
+asertar "$AQUI/pre_assert_superadmin.sql"
+
+echo "── 6/9 · aplicar 20260907001100 (el contrato rige a todos) ─────────────"
+silencio -f "$MIG_CONTRATO" >/dev/null
+echo "  OK    $(basename "$MIG_CONTRATO")"
+
+echo "── 7/9 · invariantes ───────────────────────────────────────────────────"
 asertar "$AQUI/assert.sql"
 
 # El drift guard exige un LITERAL (POLICIES_CRITICAS.withCheck): tiene que
@@ -147,12 +161,15 @@ fi
 echo "  OK    la expresión que exige el guard es la que el servidor imprime"
 
 echo
-echo "── 6/7 · idempotencia (re-aplicar) ─────────────────────────────────────"
+echo "── 8/9 · idempotencia (re-aplicar 000900 → 001100, como un replay) ─────"
+# El orden importa: re-aplicar 000900 restaura la forma vieja de la policy y
+# 001100 la endurece de nuevo — igual que un replay del apply de producción.
 silencio -f "$MIG_INSERT" >/dev/null
+silencio -f "$MIG_CONTRATO" >/dev/null
 asertar "$AQUI/reassert.sql"
 
 echo
-echo "── 7/7 · postdeploy (sólo lectura): expresión de la policy y del trigger ─"
+echo "── 9/9 · postdeploy (sólo lectura): expresión de la policy y del trigger ─"
 SALIDA=$(psql -v ON_ERROR_STOP=1 -d inspdb -f "$AQUI/postdeploy.sql" 2>&1) || {
   echo "❌ la verificación postdeploy falló:"
   sed -n 's/.*ERROR:  /  /p' <<<"$SALIDA"
@@ -163,4 +180,5 @@ grep -E 'tareas_bloque_insert|postdeploy OK' <<<"$SALIDA" | head -2 | sed 's/^/ 
 echo
 echo "✅ insert_solo_pendiente: ningún cliente autenticado crea una tarea"
 echo "   pre-cerrada o pre-sellada por INSERT directo — en ninguna de las tres"
-echo "   familias ni como admin — y el cierre legítimo sigue exigiendo evidencia."
+echo "   familias, ni como admin, NI COMO SUPER_ADMIN (20260907001100) — y el"
+echo "   cierre legítimo sigue exigiendo evidencia."

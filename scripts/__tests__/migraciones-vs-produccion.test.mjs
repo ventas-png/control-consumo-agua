@@ -355,14 +355,20 @@ describe('compararConstraints · el homónimo incompatible', () => {
 
 // ── Policies críticas: la expresión se exige, no el nombre ───────────────────
 //
-// El caso que fija estas pruebas es tareas_bloque_insert (20260907000900): el
-// WITH CHECK obliga a que la tarea NAZCA pendiente y sin sellos. Re-declararla
-// con el mismo nombre pero sin ese contrato reabre el alta pre-cerrada — y un
-// guard por nombre lo daría por bueno.
+// El caso que fija estas pruebas es tareas_bloque_insert (20260907001100): el
+// WITH CHECK obliga a que la tarea NAZCA pendiente y sin sellos PARA TODOS —
+// super_admin incluido. Re-declararla con el mismo nombre pero sin ese
+// contrato (la forma de #803), o con el bypass por rol delante (la forma de
+// 20260907000900), reabre el alta pre-cerrada — y un guard por nombre lo
+// daría por bueno.
 
 const WC_CANONICO = POLICIES_CRITICAS[0].withCheck
 const WC_803 =
   '(( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id))))))'
+// La forma de 20260907000900: el contrato existe… pero el OR exime al
+// super_admin de nacer pendiente. Es exactamente lo que 001100 vino a cerrar.
+const WC_900 =
+  "(( SELECT is_super_admin() AS is_super_admin) OR ((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))"
 
 function policyProd(with_check, extra = {}) {
   return {
@@ -375,21 +381,24 @@ function policyProd(with_check, extra = {}) {
   }
 }
 
-const REGISTRADA_LA_POLICY = new Set(['20260907000900'])
+const REGISTRADA_LA_POLICY = new Set(['20260907001100'])
 
 describe('compararPolicies · el WITH CHECK del alta', () => {
-  it('declara tareas_bloque_insert como crítica desde 20260907000900, con su contrato', () => {
+  it('declara tareas_bloque_insert como crítica desde 20260907001100, con su contrato', () => {
     const e = POLICIES_CRITICAS.find((p) => p.policy === 'tareas_bloque_insert')
     expect(e).toBeDefined()
     expect(e.tabla).toBe('tareas_bloque')
     expect(e.cmd).toBe('INSERT')
-    expect(e.desdeVersion).toBe('20260907000900')
+    expect(e.desdeVersion).toBe('20260907001100')
     // El contrato del alta, cláusula por cláusula.
     expect(e.withCheck).toContain("estado = 'pendiente'")
     for (const col of ['completada_en', 'completado_por', 'anulada_en', 'anulada_por',
                        'motivo_anulacion', 'motivo_sin_evidencia']) {
       expect(e.withCheck, `falta la exigencia de ${col} IS NULL`).toContain(`(${col} IS NULL)`)
     }
+    // Y el contrato va PRIMERO: is_super_admin vive DENTRO, no delante.
+    expect(e.withCheck.indexOf("estado = 'pendiente'"))
+      .toBeLessThan(e.withCheck.indexOf('is_super_admin'))
   })
 
   it('la query de policies trae las tablas que POLICIES_CRITICAS vigila', () => {
@@ -404,6 +413,18 @@ describe('compararPolicies · el WITH CHECK del alta', () => {
     const hallazgos = compararPolicies({
       registradas: REGISTRADA_LA_POLICY,
       policiesProd: [policyProd(WC_803)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('WITH CHECK')
+  })
+
+  it('FALLA con la forma de 20260907000900: el contrato existe pero exime al super_admin', () => {
+    // El caso sutil: todas las cláusulas del contrato están presentes en el
+    // texto — solo que detrás de un OR que las vuelve opcionales para un rol.
+    // Un guard de substrings lo daría por bueno; la comparación exacta no.
+    const hallazgos = compararPolicies({
+      registradas: REGISTRADA_LA_POLICY,
+      policiesProd: [policyProd(WC_900)],
     })
     expect(hallazgos).toHaveLength(1)
     expect(hallazgos[0]).toContain('WITH CHECK')
@@ -430,11 +451,13 @@ describe('compararPolicies · el WITH CHECK del alta', () => {
     ).toContain('debía cubrir INSERT')
   })
 
-  it('no exige nada mientras 20260907000900 NO esté registrada', () => {
+  it('no exige nada mientras 20260907001100 NO esté registrada', () => {
+    // Con solo 20260907000900 registrada, producción legítimamente tiene la
+    // forma vieja: exigir la nueva daría un rojo falso pre-apply.
     expect(
       compararPolicies({
-        registradas: new Set(['20260907000800']),
-        policiesProd: [policyProd(WC_803)],
+        registradas: new Set(['20260907000900']),
+        policiesProd: [policyProd(WC_900)],
       }),
     ).toEqual([])
   })

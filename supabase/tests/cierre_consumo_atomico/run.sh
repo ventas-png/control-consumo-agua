@@ -17,6 +17,10 @@
 #                no es terminal, "NaN" envenena el stock y el cierre en dos
 #                pasos queda descuadrado si el segundo se pierde. Si dejara de
 #                reproducirse, el escenario no prueba nada.
+#   NEGATIVA 2   con 20260907001000 a solas: lo OMITIDO consume, 0.001 se
+#                vuelve un movimiento de 0.00 que reclama sin descontar, y el
+#                mismo uuid en dos representaciones esquiva el chequeo de
+#                duplicados. 20260907001100 cierra exactamente eso.
 #   ATOMICIDAD   una llamada cierra+consume; el fallo (evidencia, JSON, scope)
 #                revierte TODO: tarea pendiente y stock intacto.
 #   REINTENTO    respuesta perdida y reintento: 0 consumidos, ni un movimiento
@@ -54,6 +58,7 @@ MIGS=(
   "$RAIZ/supabase/migrations/20260907000700_reparar_estado_tareas_bloque.sql"
 )
 MIG_CIERRE="$RAIZ/supabase/migrations/20260907001000_cerrar_tarea_y_consumir_insumos.sql"
+MIG_ENDURECER="$RAIZ/supabase/migrations/20260907001100_endurecer_alta_y_consumo_tareas.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -110,7 +115,7 @@ asertar() { # asertar <archivo.sql>
   fi
 }
 
-echo "── 1/8 · fixture (consumo_insumos) y la pila real hasta 20260907000700 ──"
+echo "── 1/10 · fixture (consumo_insumos) y la pila real hasta 20260907000700 ─"
 silencio -f "$FIXTURE" >/dev/null
 for m in "${MIGS[@]}"; do
   silencio -f "$m" >/dev/null
@@ -118,23 +123,30 @@ done
 silencio -f "$AQUI/pre.sql" >/dev/null
 echo "  OK    fixture + 20260904* + 000200..000700 + triggers de sellado"
 
-echo "── 2/8 · sembrar receta, tareas y la empresa vecina ─────────────────────"
+echo "── 2/10 · sembrar receta, tareas y la empresa vecina ────────────────────"
 silencio -f "$SEED_BASE" >/dev/null
 silencio -f "$AQUI/seed.sql" >/dev/null
 echo "  OK    semilla de consumo_insumos + T5, T6 y Diego (empresa 2)"
 
-echo "── 3/8 · NEGATIVA: con 20260907000500 a solas, #809 se reproduce ────────"
+echo "── 3/10 · NEGATIVA: con 20260907000500 a solas, #809 se reproduce ───────"
 asertar "$AQUI/pre_assert.sql"
 
-echo "── 4/8 · aplicar la reparación ──────────────────────────────────────────"
+echo "── 4/10 · aplicar 20260907001000 ────────────────────────────────────────"
 silencio -f "$MIG_CIERRE" >/dev/null
 echo "  OK    $(basename "$MIG_CIERRE")"
 
-echo "── 5/8 · invariantes (sesión única) ─────────────────────────────────────"
+echo "── 5/10 · NEGATIVA 2: con 001000, lo omitido consume y 0.001 se cuela ───"
+asertar "$AQUI/pre_assert_endurecer.sql"
+
+echo "── 6/10 · aplicar 20260907001100 (el endurecimiento) ────────────────────"
+silencio -f "$MIG_ENDURECER" >/dev/null
+echo "  OK    $(basename "$MIG_ENDURECER")"
+
+echo "── 7/10 · invariantes (sesión única) ────────────────────────────────────"
 asertar "$AQUI/assert.sql"
 
 echo
-echo "── 6/8 · la carrera: dos sesiones reales, barrera con advisory locks ────"
+echo "── 8/10 · la carrera: dos sesiones reales, barrera con advisory locks ───"
 # La coreografía:
 #   1. Un HOLDER toma pg_advisory_lock(4242) EXCLUSIVO y se queda dormido.
 #   2. Dos WORKERS abren transacción y piden el lock COMPARTIDO: quedan
@@ -208,12 +220,15 @@ echo "  OK    una sesión consumió 2, la otra 0 — nunca 2 y 2"
 asertar "$AQUI/assert_concurrencia.sql"
 
 echo
-echo "── 7/8 · idempotencia (re-aplicar) ──────────────────────────────────────"
+echo "── 9/10 · idempotencia (re-aplicar 001000 → 001100, como un replay) ─────"
+# El orden importa: re-aplicar 001000 restaura las funciones permisivas y
+# 001100 las endurece de nuevo — igual que un replay del apply de producción.
 silencio -f "$MIG_CIERRE" >/dev/null
+silencio -f "$MIG_ENDURECER" >/dev/null
 asertar "$AQUI/reassert.sql"
 
 echo
-echo "── 8/8 · postdeploy (sólo lectura): definiciones vivas y ACLs ───────────"
+echo "── 10/10 · postdeploy (sólo lectura): definiciones vivas y ACLs ─────────"
 SALIDA=$(psql -v ON_ERROR_STOP=1 -d ccadb -f "$AQUI/postdeploy.sql" 2>&1) || {
   echo "❌ la verificación postdeploy falló:"
   sed -n 's/.*ERROR:  /  /p' <<<"$SALIDA"
@@ -224,4 +239,5 @@ grep -E 'postdeploy OK' <<<"$SALIDA" | sed 's/^/  /'
 echo
 echo "✅ cierre_consumo_atomico: cierre y stock se confirman o revierten JUNTOS;"
 echo "   dos sesiones concurrentes producen como máximo un movimiento y un"
-echo "   descuento por fila; una tarea pendiente nunca consume inventario."
+echo "   descuento por fila; una tarea pendiente u OMITIDA nunca consume"
+echo "   inventario; y las cantidades viajan exactas a dos decimales."

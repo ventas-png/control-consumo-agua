@@ -102,31 +102,35 @@ asertar() { # asertar <archivo.sql>
   fi
 }
 
-echo "── 1/6 · fixture (forma real) y migraciones del módulo ─────────────────"
+echo "── 1/7 · fixture (forma real) y migraciones del módulo ─────────────────"
 silencio -f "$FIXTURE" >/dev/null
 for m in "${MIGS[@]}"; do
   silencio -f "$m" >/dev/null
 done
 echo "  OK    fixture + $(basename "${MIGS[0]}")…$(basename "${MIGS[6]}")"
 
-echo "── 2/6 · sembrar los dos scopes ajenos ─────────────────────────────────"
+echo "── 2/7 · sembrar los dos scopes ajenos ─────────────────────────────────"
 silencio -f "$AQUI/seed.sql" >/dev/null
 echo "  OK    dos compañías, dos proyectos, plantillas marcadas SECRETO"
 
-echo "── 3/6 · NEGATIVA: sin la reparación, el ataque funciona ───────────────"
+echo "── 3/7 · NEGATIVA: sin la reparación, el ataque funciona ───────────────"
 asertar "$AQUI/pre_assert.sql"
 
-echo "── 4/6 · aplicar la reparación ─────────────────────────────────────────"
+echo "── 4/7 · aplicar la reparación ─────────────────────────────────────────"
 silencio -f "$MIG_SCOPE" >/dev/null
 echo "  OK    $(basename "$MIG_SCOPE")"
 
-echo "── 5/6 · invariantes ───────────────────────────────────────────────────"
+echo "── 5/7 · invariantes ───────────────────────────────────────────────────"
 asertar "$AQUI/assert.sql"
 
 echo
-echo "── 6/6 · idempotencia (re-aplicar) ─────────────────────────────────────"
+echo "── 6/7 · idempotencia (re-aplicar) ─────────────────────────────────────"
 silencio -f "$MIG_SCOPE" >/dev/null
 asertar "$AQUI/reassert.sql"
+
+echo
+echo "── 7/7 · postdeploy (sólo lectura): search_path fijo y EXECUTE revocado ─"
+asertar "$AQUI/postdeploy.sql"
 
 echo
 echo "✅ snapshot_del_scope: el UUID ajeno ya no inserta la referencia ni copia"

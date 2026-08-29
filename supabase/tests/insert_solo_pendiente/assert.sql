@@ -2,9 +2,10 @@
 \pset tuples_only on
 \pset format unaligned
 
--- Invariantes de 20260907000900: la tarea NACE pendiente y sin sellos, para
--- CADA familia de permisos que la policy acepta — y el gate de cierre de
--- 20260907000400 sigue intacto en UPDATE.
+-- Invariantes de 20260907000900 + 20260907001100: la tarea NACE pendiente y
+-- sin sellos, para CADA familia de permisos que la policy acepta Y TAMBIÉN
+-- para el super_admin (001100 lo metió dentro del contrato) — y el gate de
+-- cierre de 20260907000400 sigue intacto en UPDATE.
 
 -- ── 1-3 · Las tres familias: cerrada NO, pendiente SÍ ────────────────────────
 -- Que una puerta esté cerrada no dice nada de las otras dos: se prueba POR
@@ -195,5 +196,68 @@ BEGIN
     RAISE EXCEPTION '6d: la edición no relacionada de la fila histórica no fluyó'; END IF;
 
   RAISE NOTICE 'OK 6  el cierre exige evidencia o su excepción declarada, sella al actor, y el histórico no se re-valida';
+END;
+$$;
+
+-- ── 7 · El super_admin también nace pendiente (20260907001100) ──────────────
+-- Silvia no tiene compañía ni user_roles: la rama de empresa le da false, así
+-- que todo lo que aquí entre o se rechace es la rama `is_super_admin()` a
+-- solas — el contrato tiene que regirla igual.
+DO $$
+DECLARE
+  BLOQUE constant uuid := 'e3000000-0000-0000-0000-000000000001';
+  v_estado text;
+  n bigint;
+BEGIN
+  SET LOCAL ROLE insert_tester;
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000010', true);  -- Silvia
+
+  BEGIN
+    INSERT INTO public.tareas_bloque (bloque_id, titulo, estado)
+    VALUES (BLOQUE, 'Cerrada por la super_admin', 'completada');
+    RAISE EXCEPTION '7a: la super_admin insertó una tarea ya cerrada';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.tareas_bloque (bloque_id, titulo, estado)
+    VALUES (BLOQUE, 'Observada por la super_admin', 'con_observacion');
+    RAISE EXCEPTION '7b: la super_admin insertó una con_observacion';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.tareas_bloque (bloque_id, titulo, estado)
+    VALUES (BLOQUE, 'Omitida por la super_admin', 'omitida');
+    RAISE EXCEPTION '7c: la super_admin insertó una omitida';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.tareas_bloque (bloque_id, titulo, completada_en, completado_por)
+    VALUES (BLOQUE, 'Pre-sellada por la super_admin', now(),
+            'e0000000-0000-0000-0000-00000000000c');
+    RAISE EXCEPTION '7d: la super_admin insertó sellos pre-cargados';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.tareas_bloque (bloque_id, titulo, motivo_sin_evidencia)
+    VALUES (BLOQUE, 'Bypass pre-armado por la super_admin', 'para después');
+    RAISE EXCEPTION '7e: la super_admin pre-cargó el sello de excepción';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+
+  SELECT count(*) INTO n FROM public.tareas_bloque
+   WHERE titulo LIKE '%por la super_admin%';
+  IF n <> 0 THEN
+    RAISE EXCEPTION '7f: % fila(s) rechazadas de la super_admin quedaron insertadas', n; END IF;
+
+  -- La puerta legítima del super_admin sigue abierta: el pendiente limpio
+  -- entra por la rama is_super_admin (sin compañía ni permisos de empresa).
+  INSERT INTO public.tareas_bloque (id, bloque_id, titulo)
+  VALUES ('e5000000-0000-0000-0000-0000000000a7', BLOQUE, 'Pendiente limpia (super_admin)');
+  SELECT estado INTO v_estado FROM public.tareas_bloque
+   WHERE id = 'e5000000-0000-0000-0000-0000000000a7';
+  IF v_estado IS DISTINCT FROM 'pendiente' THEN
+    RAISE EXCEPTION '7g: la pendiente limpia de la super_admin quedó en %', v_estado; END IF;
+
+  RAISE NOTICE 'OK 7  el contrato del alta rige también al super_admin: cerradas y sellos fuera, pendiente limpia entra';
 END;
 $$;

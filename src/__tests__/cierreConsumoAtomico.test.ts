@@ -23,23 +23,27 @@ import { resolve, join } from 'node:path'
 const RAIZ = resolve('.')
 const MIGRATIONS_DIR = join(RAIZ, 'supabase/migrations')
 const MIG_CIERRE = '20260907001000_cerrar_tarea_y_consumir_insumos.sql'
+// 20260907001100 re-declara el motor y consumir_insumos_tarea: SUS cuerpos
+// son la definición VIVA — los filos se vigilan ahí, no en el histórico.
+const MIG_ENDURECER = '20260907001100_endurecer_alta_y_consumo_tareas.sql'
 const SANDBOX_DIR = join(RAIZ, 'supabase/tests/cierre_consumo_atomico')
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
 
 const sqlCierre = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_CIERRE), 'utf8'))
+const sqlEndurecer = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_ENDURECER), 'utf8'))
 
-const cuerpo = (nombre: string) => {
-  const m = sqlCierre.match(new RegExp(
+const cuerpo = (fuente: string, nombre: string) => {
+  const m = fuente.match(new RegExp(
     `CREATE OR REPLACE FUNCTION public\\.${nombre}\\(([\\s\\S]*?)\\n\\$\\$;`, 'i'))
   expect(m, `la migración no define ${nombre}`).not.toBeNull()
   return m![1]
 }
 
-const motor = cuerpo('tarea_bloque_consumir_reclamado')
-const rpcCierre = cuerpo('cerrar_tarea_y_consumir_insumos')
-const rpcVieja = cuerpo('consumir_insumos_tarea')
+const motor = cuerpo(sqlEndurecer, 'tarea_bloque_consumir_reclamado')
+const rpcCierre = cuerpo(sqlCierre, 'cerrar_tarea_y_consumir_insumos')
+const rpcVieja = cuerpo(sqlEndurecer, 'consumir_insumos_tarea')
 
 describe('20260907001000 · el reclamo es un lock, no idempotencia de fe', () => {
   it('el plan se recorre con FOR UPDATE y el filtro excluye lo descartado', () => {
@@ -120,9 +124,15 @@ describe('20260907001000 · la RPC de cierre: una transacción o nada', () => {
   })
 })
 
-describe('20260907001000 · la RPC vieja se endurece, no se borra', () => {
-  it('consumir exige una tarea YA cerrada en estado canónico final', () => {
-    expect(rpcVieja).toMatch(/NOT IN \('completada', 'con_observacion', 'omitida'\)/)
+describe('20260907001100 · consumir exige TRABAJO REALIZADO', () => {
+  it('pendiente y omitida fuera; completada y con_observacion (hallazgo) dentro', () => {
+    // 'omitida' es que NO se hizo: 20260907001100 la sacó de la lista que
+    // 001000 había dejado. 'con_observacion' se queda porque es trabajo
+    // realizado con un hallazgo (la UI captura novedad/prioridad al marcarla).
+    expect(rpcVieja).toMatch(/v_estado = 'pendiente'/)
+    expect(rpcVieja).toMatch(/NOT IN \('completada', 'con_observacion'\)/)
+    expect(rpcVieja, "la lista permisiva de 001000 (con 'omitida') no debe volver")
+      .not.toMatch(/NOT IN \('completada', 'con_observacion', 'omitida'\)/)
     expect(rpcVieja).toMatch(/ERRCODE = 'check_violation'/)
   })
 
@@ -130,6 +140,37 @@ describe('20260907001000 · la RPC vieja se endurece, no se borra', () => {
     expect(rpcVieja).toMatch(/p_consumos jsonb DEFAULT '\[\]'::jsonb/)
     expect(rpcVieja).toMatch(/tarea_bloque_consumir_reclamado/)
     expect(rpcCierre).toMatch(/tarea_bloque_consumir_reclamado/)
+  })
+
+  it('los rechazos van ANTES del motor: ninguna escritura previa al gate', () => {
+    // El gate de estado tiene que aparecer antes del RETURN QUERY que invoca
+    // al motor — es la única escritura posible de la función.
+    expect(rpcVieja.indexOf("NOT IN ('completada', 'con_observacion')"))
+      .toBeLessThan(rpcVieja.indexOf('RETURN QUERY'))
+  })
+})
+
+describe('20260907001100 · p_consumos estricto', () => {
+  it('tras el cast, la cantidad debe ser EXACTA a dos decimales', () => {
+    // numeric(10,2) redondearía 0.001 a 0.00 en silencio: un movimiento de
+    // cero que reclama la fila sin descontar nada.
+    expect(motor).toMatch(/IS DISTINCT FROM round\(v_cant, 2\)/)
+  })
+
+  it('los duplicados se agrupan por el uuid NORMALIZADO, no por el texto', () => {
+    // Dos representaciones del mismo UUID (may/min, sin guiones) deben chocar.
+    expect(motor).toMatch(/GROUP BY \(\(j\.item ->> 'suministro_id'\)::uuid\)/)
+    expect(motor, 'volvió el GROUP BY por texto')
+      .not.toMatch(/GROUP BY j\.item ->> 'suministro_id'/)
+  })
+
+  it('la re-declaración restata los REVOKE/GRANT (no dependemos de la ACL heredada)', () => {
+    expect(sqlEndurecer).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.tarea_bloque_consumir_reclamado\([^)]*\)\s*\n?\s*FROM PUBLIC, anon, authenticated/i)
+    expect(sqlEndurecer).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.consumir_insumos_tarea\(uuid, jsonb\) FROM PUBLIC, anon/i)
+    expect(sqlEndurecer).toMatch(
+      /GRANT\s+EXECUTE ON FUNCTION public\.consumir_insumos_tarea\(uuid, jsonb\) TO authenticated, service_role/i)
   })
 })
 
@@ -178,10 +219,19 @@ describe('el frontend hace UNA operación', () => {
 
 describe('el sandbox del cierre atómico existe y corre en CI', () => {
   it('los archivos del sandbox están completos', () => {
-    for (const f of ['run.sh', 'pre.sql', 'seed.sql', 'pre_assert.sql', 'assert.sql',
+    for (const f of ['run.sh', 'pre.sql', 'seed.sql', 'pre_assert.sql',
+                     'pre_assert_endurecer.sql', 'assert.sql',
                      'assert_concurrencia.sql', 'reassert.sql', 'postdeploy.sql']) {
       expect(existsSync(join(SANDBOX_DIR, f)), `falta ${f}`).toBe(true)
     }
+  })
+
+  it('la NEGATIVA 2 reproduce los agujeros de 001000 antes de endurecer', () => {
+    const pre = readFileSync(join(SANDBOX_DIR, 'pre_assert_endurecer.sql'), 'utf8')
+    expect(pre).toMatch(/la vulnerabilidad ya no se reproduce/i)
+    expect(pre).toMatch(/ROLLBACK/i)
+    expect(pre).toMatch(/omitida/i)
+    expect(pre).toMatch(/0\.001/)
   })
 
   it('la NEGATIVA aborta si los agujeros de #809 dejan de reproducirse', () => {
