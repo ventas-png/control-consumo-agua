@@ -201,9 +201,13 @@ export const POLICIES_CRITICAS = [
     tabla: 'tareas_bloque',
     policy: 'tareas_bloque_insert',
     cmd: 'INSERT',
-    desdeVersion: '20260907000900',
+    // 20260907001100 puso el CONTRATO PRIMERO: super_admin quedó DENTRO del
+    // «nace pendiente y sin sellos» (antes el OR lo eximía). Si producción
+    // volviera a la forma de 20260907000900 —bypass por rol delante— la
+    // expresión ya no coincide y esto da rojo.
+    desdeVersion: '20260907001100',
     withCheck:
-      "(( SELECT is_super_admin() AS is_super_admin) OR ((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))",
+      "((estado = 'pendiente'::text) AND (completada_en IS NULL) AND (completado_por IS NULL) AND (anulada_en IS NULL) AND (anulada_por IS NULL) AND (motivo_anulacion IS NULL) AND (motivo_sin_evidencia IS NULL) AND (( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id)) AND ( SELECT (user_has_permission('condominios.tab.tareas_personal'::text) OR user_has_permission('condominios.tab.turnos'::text) OR user_has_permission('condominios.tab.prog_limpieza'::text))))))))",
   },
 ]
 
