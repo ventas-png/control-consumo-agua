@@ -39,6 +39,24 @@ acceso físico al dispositivo de la víctima.
   tenant lo exige.
 - **Dependencias**: Dependabot (npm + GitHub Actions) semanal.
 
+## Overrides de npm vigentes
+
+`package.json → overrides` fuerza versiones que los padres aún no declaran.
+Cada entrada existe por un advisory concreto y tiene criterio de retiro; no
+agregar overrides sin documentarlos aquí.
+
+| Override | Por qué | Evidencia de compatibilidad | Retirar cuando |
+| --- | --- | --- | --- |
+| `exceljs → uuid ^11.1.1` | uuid <11.1.1: falta el bounds-check del `buf` en v3/v5/v6 (advisory de npm audit). exceljs@4.4.0 declara `uuid ^8.3.2` y no hay release del padre con uuid parcheado; el «fix» que propone `npm audit` DEGRADA exceljs a 3.4.0, que no es aceptable. | exceljs consume únicamente `v4()` por `require` CJS (`lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js`); uuid 11 conserva el build CJS y el named export (13+ es ESM-only: NO subir el override a 13 sin verificar). La costura se ejecuta de verdad en `src/lib/__tests__/xlsx.test.ts` (round-trip con formato condicional dataBar → uuidv4 real). | exceljs publique una versión con `uuid >=11.1.1`. |
+| `xcode → uuid ^11.1.1` | Misma vulnerabilidad, vía `@capacitor/cli → xcode@3.0.1` (`uuid ^7.0.3`). Sólo devDependencies (tooling móvil). | xcode consume únicamente `uuid.v4()` por CJS (`lib/pbxProject.js`), mismo análisis. El tooling iOS corre sólo en macOS: verificar `npx cap sync ios` en la próxima build móvil. | xcode (o @capacitor/cli) declare `uuid >=11.1.1`. |
+
+Estado al 2026-08-28 (Node 22, tras actualizar dompurify a 3.4.14 —
+GHSA-55q2-fjhq-7xh7— y refrescar brace-expansion/fast-uri/nanoid en rango):
+`npm audit` y `npm audit --omit=dev` reportan **0 vulnerabilidades**, sin
+advisories residuales. Regresión del sanitizador en
+`src/lib/__tests__/validation.test.ts` (piso de versión + vectores mXSS +
+forma IN_PLACE del advisory).
+
 ## Configuración del repositorio (checklist del owner)
 
 Estas protecciones se activan en GitHub → Settings (no viven en archivos):

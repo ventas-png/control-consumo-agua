@@ -22,6 +22,12 @@ const mocks = vi.hoisted(() => ({
   createCondominioRowReturning: vi.fn(async () => ({ data: null, error: null as RowError })),
   updateCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   deleteCondominioRow: vi.fn(async () => ({ error: null as RowError })),
+  // El cierre por 'completada' es UNA RPC (20260907001000): evidencia,
+  // transición y consumo se deciden juntos en la base.
+  cerrarTareaYConsumir: vi.fn(async () => ({
+    data: { consumidos: 0, no_usados: 0, sin_stock: [] as unknown[] },
+    error: null as RowError,
+  })),
   openPromptDialog: vi.fn(async () => null as Record<string, string> | null),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
@@ -36,6 +42,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
+  cerrarTareaYConsumir: mocks.cerrarTareaYConsumir,
 }))
 // El tab baja el plan de insumos al montar (20260907000500). Aquí no se prueba
 // eso, y sin el mock el cliente falso de `lib/supabase` reventaría en `.select`.
@@ -107,6 +114,9 @@ const botonCompletar = () => screen.getByTitle('Completada')
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
+  mocks.cerrarTareaYConsumir.mockResolvedValue({
+    data: { consumidos: 0, no_usados: 0, sin_stock: [] }, error: null,
+  })
 })
 afterEach(cleanup)
 
@@ -119,8 +129,10 @@ describe('TareasPersonalTab · el cierre exige lo que la tarea declara', () => {
     const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
     expect(args.title).toBe('Falta evidencia')
     expect(args.text).toMatch(/foto/i)
-    // Lo importante: NO se intentó el UPDATE. El trigger lo rechazaría igual,
-    // pero gastar el viaje para que la base diga lo que ya sabíamos es peor UX.
+    // Lo importante: NO se intentó ninguna escritura. La RPC lo rechazaría
+    // igual, pero gastar el viaje para que la base diga lo que ya sabíamos es
+    // peor UX.
+    expect(mocks.cerrarTareaYConsumir).not.toHaveBeenCalled()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
@@ -133,6 +145,7 @@ describe('TareasPersonalTab · el cierre exige lo que la tarea declara', () => {
     fireEvent.click(botonCompletar())
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    expect(mocks.cerrarTareaYConsumir).not.toHaveBeenCalled()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
@@ -141,26 +154,26 @@ describe('TareasPersonalTab · el cierre exige lo que la tarea declara', () => {
     fireEvent.click(botonCompletar())
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    expect(mocks.cerrarTareaYConsumir).not.toHaveBeenCalled()
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
-  it('sí cierra cuando la evidencia está', async () => {
+  it('sí cierra cuando la evidencia está — por la RPC atómica, sin UPDATE', async () => {
     montar([tarea({ requiere_foto: true, foto_urls: ['evidencia/1.jpg'] })])
     fireEvent.click(botonCompletar())
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalled())
-    const [tabla, id, patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as
-      [string, string, Record<string, unknown>]
-    expect(tabla).toBe('tareas_bloque')
+    await waitFor(() => expect(mocks.cerrarTareaYConsumir).toHaveBeenCalledTimes(1))
+    const [id] = mocks.cerrarTareaYConsumir.mock.calls[0] as unknown as [string]
     expect(id).toBe('tar1')
-    expect(patch.estado).toBe('completada')
+    // Ningún UPDATE de estado aparte: cierre y consumo van en la transacción.
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
   })
 
   it('la tarea sin exigencias se cierra sin ceremonia', async () => {
     montar([tarea()])
     fireEvent.click(botonCompletar())
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalled())
+    await waitFor(() => expect(mocks.cerrarTareaYConsumir).toHaveBeenCalled())
     expect(mocks.notify).not.toHaveBeenCalled()
   })
 
@@ -236,11 +249,11 @@ describe('TareasPersonalTab · la salida declarada', () => {
       { target: { value: 'Cámara rota; lo verificó el supervisor' } })
     fireEvent.click(screen.getByText('Cerrar declarando el motivo'))
 
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalled())
-    const [, , patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as
-      [string, string, Record<string, unknown>]
-    expect(patch.estado).toBe('completada')
-    expect(patch.motivo_sin_evidencia).toBe('Cámara rota; lo verificó el supervisor')
+    await waitFor(() => expect(mocks.cerrarTareaYConsumir).toHaveBeenCalled())
+    const [id, , motivo] = mocks.cerrarTareaYConsumir.mock.calls[0] as unknown as
+      [string, unknown[], string | undefined]
+    expect(id).toBe('tar1')
+    expect(motivo).toBe('Cámara rota; lo verificó el supervisor')
   })
 
   it('sin motivo escrito el botón no deja cerrar', async () => {
@@ -263,7 +276,8 @@ describe('TareasPersonalTab · la salida declarada', () => {
 
 describe('TareasPersonalTab · el error del trigger se traduce', () => {
   it('un rechazo de la base se explica en vez de mostrar el texto de Postgres', async () => {
-    mocks.updateCondominioRow.mockResolvedValue({
+    mocks.cerrarTareaYConsumir.mockResolvedValue({
+      data: null as never,
       error: {
         message: 'EVIDENCIA: la tarea "Barrer el borde" exige foto y no tiene ninguna',
         code: '23514',

@@ -10,7 +10,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { describe, expect, it } from 'vitest'
 
-import { comparar, versionDe } from '../migraciones-vs-produccion.mjs'
+import {
+  CONSTRAINTS_CRITICOS,
+  POLICIES_CRITICAS,
+  QUERIES,
+  comparar,
+  compararConstraints,
+  compararPolicies,
+  normalizarDef,
+  versionDe,
+} from '../migraciones-vs-produccion.mjs'
 
 /** Construye el argumento `columnasProd` desde un objeto plano. */
 function prod(tablas) {
@@ -203,6 +212,231 @@ describe('comparar · allowlist', () => {
   it('acepta la forma corta `tabla.columna` además del objeto', () => {
     const r = comparar({ ...faltante, allowlist: { columnas: ['areas_condominio.activo'] } })
     expect(r.columnasFaltantes).toEqual([])
+  })
+})
+
+// ── Constraints críticos: la definición se exige, no el nombre ───────────────
+//
+// El caso que fija estas pruebas es tareas_bloque_estado_check: producción
+// tenía un CHECK con ESE nombre y el vocabulario legacy, el guard por conname
+// de 20260907000100 lo dio por bueno, y este script estaba verde porque solo
+// miraba tablas y columnas. El criterio nuevo: nombre correcto + definición
+// distinta = hallazgo.
+
+const CANONICA =
+  "CHECK ((estado = ANY (ARRAY['pendiente'::text, 'completada'::text, 'con_observacion'::text, 'omitida'::text])))"
+const LEGACY =
+  "CHECK ((estado = ANY (ARRAY['pendiente'::text, 'en_curso'::text, 'completado'::text, 'omitido'::text])))"
+
+/** Un CHECK real del catálogo, con la forma de la query `constraints`. */
+function check(definition, { convalidated = true } = {}) {
+  return {
+    table_name: 'tareas_bloque',
+    constraint_name: 'tareas_bloque_estado_check',
+    definition,
+    convalidated,
+  }
+}
+
+const REGISTRADA_LA_REPARACION = new Set(['20260907000700'])
+
+describe('compararConstraints · el homónimo incompatible', () => {
+  it('declara tareas_bloque_estado_check como crítico desde 20260907000700', () => {
+    // Si alguien retira la entrada, todo lo demás de esta sección prueba una
+    // lista vacía y el guard vuelve a no ver el homónimo.
+    expect(CONSTRAINTS_CRITICOS).toContainEqual(
+      expect.objectContaining({
+        tabla: 'tareas_bloque',
+        constraint: 'tareas_bloque_estado_check',
+        desdeVersion: '20260907000700',
+        validado: true,
+      }),
+    )
+  })
+
+  it('FALLA cuando el nombre coincide pero la definición es la legacy', () => {
+    // Restaurar el constraint viejo bajo el mismo nombre es exactamente el
+    // drift que el guard por conname no vio. Tiene que salir rojo.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [check(LEGACY)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('tareas_bloque.tareas_bloque_estado_check')
+    expect(hallazgos[0]).toContain('DEFINICIÓN')
+    expect(hallazgos[0]).toContain(LEGACY)
+  })
+
+  it('pasa con la definición canónica validada', () => {
+    expect(
+      compararConstraints({
+        registradas: REGISTRADA_LA_REPARACION,
+        constraintsProd: [check(CANONICA)],
+      }),
+    ).toEqual([])
+  })
+
+  it('FALLA si la definición es correcta pero quedó NOT VALID', () => {
+    // 20260907000700 valida; un convalidated=false significa que el histórico
+    // volvió a quedar sin garantía.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [check(CANONICA, { convalidated: false })],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('convalidated=false')
+  })
+
+  it('FALLA si el constraint desapareció', () => {
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('AUSENTE')
+  })
+
+  it('FALLA si aparece un SEGUNDO CHECK sobre estado bajo otro nombre, aunque el canónico esté intacto', () => {
+    // Los CHECKs aplican todos a la vez: el legacy bajo otro nombre vuelve a
+    // rechazar los cierres canónicos con 23514 mientras el nombrado sigue
+    // perfecto — el mismo incidente por la puerta de al lado.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [
+        check(CANONICA),
+        { ...check(LEGACY, { convalidated: false }), constraint_name: 'tareas_bloque_estado_check_old' },
+      ],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('tareas_bloque_estado_check_old')
+    expect(hallazgos[0]).toContain('CHECK ADICIONAL')
+  })
+
+  it('no confunde los CHECKs de OTRAS columnas de la misma tabla', () => {
+    // prioridad y anulación viven en tareas_bloque y no tocan `estado`.
+    const hallazgos = compararConstraints({
+      registradas: REGISTRADA_LA_REPARACION,
+      constraintsProd: [
+        check(CANONICA),
+        {
+          table_name: 'tareas_bloque',
+          constraint_name: 'tareas_bloque_prioridad_check',
+          definition:
+            "CHECK (((prioridad IS NULL) OR (prioridad = ANY (ARRAY['baja'::text, 'media'::text, 'alta'::text]))))",
+          convalidated: true,
+        },
+      ],
+    })
+    expect(hallazgos).toEqual([])
+  })
+
+  it('no exige nada mientras la reparación NO esté registrada', () => {
+    // Mismo acotamiento que las columnas: antes del apply, producción tiene
+    // legítimamente la forma vieja; exigir la nueva daría rojo en cada deploy.
+    expect(
+      compararConstraints({
+        registradas: new Set(['20260907000600']),
+        constraintsProd: [check(LEGACY, { convalidated: false })],
+      }),
+    ).toEqual([])
+  })
+
+  it('normaliza espacios y el sufijo NOT VALID antes de comparar', () => {
+    // pg_get_constraintdef imprime `... NOT VALID` mientras no se valida, y
+    // los saltos de línea de un dump no deben contar como drift.
+    expect(normalizarDef(`${CANONICA} NOT VALID`)).toBe(normalizarDef(CANONICA))
+    expect(normalizarDef(CANONICA.replace(/, /g, ',\n  '))).toBe(
+      normalizarDef(CANONICA.replace(/, /g, ', ')),
+    )
+    // …pero la normalización no puede tragarse una diferencia REAL de valores.
+    expect(normalizarDef(LEGACY)).not.toBe(normalizarDef(CANONICA))
+  })
+})
+
+// ── Policies críticas: la expresión se exige, no el nombre ───────────────────
+//
+// El caso que fija estas pruebas es tareas_bloque_insert (20260907000900): el
+// WITH CHECK obliga a que la tarea NAZCA pendiente y sin sellos. Re-declararla
+// con el mismo nombre pero sin ese contrato reabre el alta pre-cerrada — y un
+// guard por nombre lo daría por bueno.
+
+const WC_CANONICO = POLICIES_CRITICAS[0].withCheck
+const WC_803 =
+  '(( SELECT is_super_admin() AS is_super_admin) OR (EXISTS ( SELECT 1 FROM bloques_turno b WHERE ((b.id = tareas_bloque.bloque_id) AND (b.company_id = ( SELECT get_my_company_id() AS get_my_company_id))))))'
+
+function policyProd(with_check, extra = {}) {
+  return {
+    table_name: 'tareas_bloque',
+    policy_name: 'tareas_bloque_insert',
+    cmd: 'INSERT',
+    qual: null,
+    with_check,
+    ...extra,
+  }
+}
+
+const REGISTRADA_LA_POLICY = new Set(['20260907000900'])
+
+describe('compararPolicies · el WITH CHECK del alta', () => {
+  it('declara tareas_bloque_insert como crítica desde 20260907000900, con su contrato', () => {
+    const e = POLICIES_CRITICAS.find((p) => p.policy === 'tareas_bloque_insert')
+    expect(e).toBeDefined()
+    expect(e.tabla).toBe('tareas_bloque')
+    expect(e.cmd).toBe('INSERT')
+    expect(e.desdeVersion).toBe('20260907000900')
+    // El contrato del alta, cláusula por cláusula.
+    expect(e.withCheck).toContain("estado = 'pendiente'")
+    for (const col of ['completada_en', 'completado_por', 'anulada_en', 'anulada_por',
+                       'motivo_anulacion', 'motivo_sin_evidencia']) {
+      expect(e.withCheck, `falta la exigencia de ${col} IS NULL`).toContain(`(${col} IS NULL)`)
+    }
+  })
+
+  it('la query de policies trae las tablas que POLICIES_CRITICAS vigila', () => {
+    // El IN de la query acota el payload: si alguien agrega una entrada sin
+    // ampliar el IN, la policy nueva parecería AUSENTE en cada corrida.
+    for (const p of POLICIES_CRITICAS) {
+      expect(QUERIES.policies, `la query no consulta ${p.tabla}`).toContain(`'${p.tabla}'`)
+    }
+  })
+
+  it('FALLA cuando el nombre coincide pero la expresión es la de #803 (sin contrato)', () => {
+    const hallazgos = compararPolicies({
+      registradas: REGISTRADA_LA_POLICY,
+      policiesProd: [policyProd(WC_803)],
+    })
+    expect(hallazgos).toHaveLength(1)
+    expect(hallazgos[0]).toContain('WITH CHECK')
+  })
+
+  it('pasa con la expresión canónica (los saltos de línea de pg_get_expr no cuentan)', () => {
+    expect(
+      compararPolicies({
+        registradas: REGISTRADA_LA_POLICY,
+        policiesProd: [policyProd(WC_CANONICO.replace(/ AND /g, '\n   AND '))],
+      }),
+    ).toEqual([])
+  })
+
+  it('FALLA si la policy desapareció o cubre otro comando', () => {
+    expect(
+      compararPolicies({ registradas: REGISTRADA_LA_POLICY, policiesProd: [] })[0],
+    ).toContain('AUSENTE')
+    expect(
+      compararPolicies({
+        registradas: REGISTRADA_LA_POLICY,
+        policiesProd: [policyProd(WC_CANONICO, { cmd: 'ALL' })],
+      })[0],
+    ).toContain('debía cubrir INSERT')
+  })
+
+  it('no exige nada mientras 20260907000900 NO esté registrada', () => {
+    expect(
+      compararPolicies({
+        registradas: new Set(['20260907000800']),
+        policiesProd: [policyProd(WC_803)],
+      }),
+    ).toEqual([])
   })
 })
 

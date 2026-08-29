@@ -321,6 +321,62 @@ jobs:
           PGPORT_TEST: 55488
         run: supabase/tests/snapshot_al_crear/run.sh
 
+      # 20260907000100 protegió su CHECK de estado por conname, y en producción
+      # ese nombre existía con el vocabulario legacy: el canónico nunca se
+      # instaló y completar una tarea da 23514. Un sandbox construido desde las
+      # migraciones no puede verlo (allí nombre y definición coinciden): éste
+      # monta el homónimo incompatible BAJO EL MISMO NOMBRE, comprueba primero
+      # que el fallo se reproduce, y que 20260907000700 lo reemplaza, convierte
+      # los legacy con equivalencia definida y ABORTA ante en_curso en vez de
+      # inventarle una. Incluye idempotencia y el postdeploy de sólo lectura.
+      - name: Estado de tareas_bloque — el homónimo incompatible se reemplaza
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55489
+        run: supabase/tests/reparar_estado_tareas_bloque/run.sh
+
+      # El trigger del snapshot (20260907000600) es SECURITY DEFINER y buscaba
+      # la plantilla POR ID: un UUID ajeno copiaba checklist, instrucciones y
+      # exigencias de otra compañía, y las FKs simples dejaban colgar la
+      # referencia cruzada. 20260907000800 exige el scope del bloque y estrena
+      # el guard de referencias. Este sandbox monta DOS compañías y DOS
+      # proyectos, reproduce primero el ataque (NEGATIVA) y luego prueba los
+      # rechazos —INSERT y UPDATE, sin oráculo de existencia ni fuga en el
+      # error—, que la plantilla legítima y la ad-hoc no cambian, y que la RPC
+      # de materialización sigue pasando.
+      - name: Snapshot del scope — el UUID ajeno no es una credencial
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55490
+        run: supabase/tests/snapshot_del_scope/run.sh
+
+      # El gate de evidencia (20260907000400) gatea la TRANSICIÓN en UPDATE:
+      # una fila insertada YA cerrada nunca pasa por él. 20260907000900 exige
+      # en el WITH CHECK que la tarea NAZCA pendiente y sin cierre, anulación,
+      # actor ni sello de excepción. Este sandbox reproduce primero el alta
+      # pre-cerrada (NEGATIVA), prueba el rechazo POR FAMILIA de permisos y
+      # como admin, que el cierre por UPDATE sigue exigiendo evidencia, que el
+      # histórico no se re-valida, y coteja el literal de POLICIES_CRITICAS
+      # contra el pg_get_expr de un servidor real.
+      - name: Alta de tareas — la tarea nace pendiente, sin sellos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55491
+        run: supabase/tests/insert_solo_pendiente/run.sh
+
+      # El cierre y el consumo eran DOS requests (#809): el segundo podía
+      # perderse sin reintento, dos sesiones concurrentes descontaban doble, y
+      # una tarea pendiente podía consumir. 20260907001000 los funde en una
+      # transacción con reclamo FOR UPDATE. Este sandbox reproduce primero los
+      # agujeros (NEGATIVA), y la carrera corre con DOS conexiones reales
+      # sincronizadas por barrera de advisory locks — lo único que de verdad
+      # demuestra «como máximo un movimiento y un descuento por fila».
+      - name: Cierre y consumo atómicos — una transacción, un lock por fila
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55492
+        run: supabase/tests/cierre_consumo_atomico/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

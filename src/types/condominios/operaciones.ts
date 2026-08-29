@@ -233,6 +233,12 @@ export interface TareaBloqueSuministro {
   /** NULL = todavía no se consumió. Es lo que hace idempotente a la RPC. */
   movimiento_id?: string | null
   motivo_no_usado?: string | null
+  /**
+   * Sello del «no lo necesité» (20260907001000): junto a `motivo_no_usado`,
+   * saca la fila del conjunto reclamable — un reintento del cierre ya no puede
+   * consumirla por accidente. NULL + `movimiento_id` NULL = aún pendiente.
+   */
+  no_usado_en?: string | null
   creado_por?: string | null
   created_at: string
 }
