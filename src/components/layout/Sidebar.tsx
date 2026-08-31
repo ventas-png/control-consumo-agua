@@ -490,7 +490,14 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          padding: '12px 14px',
+          // 8px, no 12px: con 11 secciones la lista desbordaba el viewport y
+          // "Especiales" —la última— quedaba bajo el corte, con aspecto de haber
+          // desaparecido. El ícono mide 28px, así que 8+28+8 = 44 deja la fila
+          // EXACTAMENTE en el piso de `minHeight`, que es el mínimo de área
+          // táctil (WCAG 2.5.5 / HIG) y por eso NO se toca: esta app también se
+          // empaqueta con Capacitor. La fila medía 52px, y esos 8px de más por
+          // fila costaban ~88px de riel, casi dos secciones.
+          padding: '8px 14px',
           minHeight: '44px',
           border: 'none',
           borderRadius: '10px',
