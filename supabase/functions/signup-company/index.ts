@@ -61,18 +61,28 @@ Deno.serve(async (req: Request) => {
     // archivo marcaba como TODO ("rate-limit table; no en MVP") y, con la dimensión de email,
     // frena el martilleo de un mismo correo desde IPs rotadas. Server-side: el RPC corre como
     // service_role (infra:I2). El de IP corta primero (no quema el contador del email).
+    //
+    // failClosed: este endpoint es ANÓNIMO y el rate limit es su ÚNICO control de
+    // abuso (validateOrigin no cuenta: un cliente que no sea navegador manda el
+    // Origin que quiera, como dice el comentario de create-cliente-account). En
+    // fail-open, una caída del RPC `rate_limit_hit` deja el alta de empresas
+    // completamente abierta — y tumbar ese contador es justo lo que un atacante
+    // provocaría primero. Es la regla que documenta _shared/rateLimit.ts y que
+    // hasta ahora solo aplicaba log-security-event.
     const rl = await enforceRateLimits(admin, [
       {
         subject: `ip:${getClientIp(req)}`,
         action: 'signup_company',
         max: 5,
         message: 'Demasiados registros desde esta red. Espera una hora e intenta de nuevo.',
+        failClosed: true,
       },
       {
         subject: `email:${email}`,
         action: 'signup_company:email',
         max: 3,
         message: 'Demasiados intentos de registro con este correo. Espera una hora e intenta de nuevo.',
+        failClosed: true,
       },
     ], corsHeaders)
     if (rl) return rl
