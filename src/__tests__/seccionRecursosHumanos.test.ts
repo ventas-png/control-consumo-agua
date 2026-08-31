@@ -169,3 +169,33 @@ describe('migración 20260907001200 (catálogo RBAC)', () => {
     expect(sqlRRHH).toMatch(/DROP TABLE _rrhh_claves/)
   })
 })
+
+describe('el riel del sidebar con 11 secciones', () => {
+  // Añadir Recursos Humanos hizo que la lista desbordara el viewport y que
+  // "Especiales" —la última— quedara bajo el corte, con aspecto de haber
+  // desaparecido. Se recuperó bajando el padding de 12px a 8px, que con el
+  // ícono de 28px deja la fila EXACTAMENTE en 44px.
+  //
+  // 44px es el mínimo de área táctil (WCAG 2.5.5 / HIG) y esta app se empaqueta
+  // con Capacitor, así que el siguiente que necesite espacio no puede sacarlo
+  // de ahí. Este guard existe para que ese recorte no pase callando.
+  const sidebar = readFileSync(resolve('src/components/layout/Sidebar.tsx'), 'utf8')
+  const botonSeccion = sidebar.slice(sidebar.indexOf('key={`condo-sec-'))
+
+  it('la fila de sección conserva el piso de área táctil de 44px', () => {
+    expect(botonSeccion).toMatch(/minHeight: '44px'/)
+  })
+
+  it('el padding vertical no vuelve a inflar la fila por encima de 44px', () => {
+    const m = botonSeccion.match(/padding: '(\d+)px \d+px'/)
+    expect(m, 'no se encontró el padding de la fila de sección').not.toBeNull()
+    const vertical = Number(m![1])
+    // 28px de ícono + 2 × padding ≤ 44 ⇒ padding ≤ 8.
+    expect(vertical * 2 + 28).toBeLessThanOrEqual(44)
+  })
+
+  it('Especiales sigue siendo la última sección del riel', () => {
+    expect(SECTIONS[SECTIONS.length - 1].id).toBe('especiales')
+    expect(SECTIONS.find(s => s.id === 'especiales')!.tabs).toContain('str')
+  })
+})
