@@ -129,6 +129,18 @@ const COMUNICACION_TABS = [
 const COMUNICACION_SET = new Set(COMUNICACION_TABS)
 const sinComunicacion = (tabs: string[]) => tabs.filter(t => !COMUNICACION_SET.has(t))
 
+// Sección "Recursos Humanos" (espejo de SECTIONS en components/condominios/sections.ts).
+// Igual que COMUNICACION_TABS: SOLO agrupación del editor de roles. El acceso
+// efectivo por rol (CONDOMINIOS_TAB_ACCESS) no cambia — 'tareas_cond' y
+// 'prog_limpieza' siguen dentro de TODAS_OPERACIONES, así que el rol
+// operaciones conserva exactamente los tabs que ya tenía; lo único que se mueve
+// es en qué bloque los ve quien arma un rol personalizado.
+const RECURSOS_HUMANOS_TABS = [
+  'personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza', 'actividad_equipo',
+]
+const RECURSOS_HUMANOS_SET = new Set(RECURSOS_HUMANOS_TABS)
+const sinRRHH = (tabs: string[]) => tabs.filter(t => !RECURSOS_HUMANOS_SET.has(t))
+
 export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null> = {
   administrador_general: null, // all tabs
 
@@ -236,10 +248,11 @@ export const CONDOMINIOS_SECTION_GROUPS: SectionGroup[] = [
   { key: 'comunicacion',  label: 'Comunicación',   tabs: COMUNICACION_TABS },
   { key: 'finanzas',      label: 'Finanzas',       tabs: TODAS_FINANZAS },
   { key: 'residentes',    label: 'Residentes',     tabs: sinComunicacion(TODAS_RESIDENTES) },
-  { key: 'operaciones',   label: 'Operaciones',    tabs: sinComunicacion(TODAS_OPERACIONES) },
+  { key: 'operaciones',   label: 'Operaciones',    tabs: sinRRHH(sinComunicacion(TODAS_OPERACIONES)) },
   { key: 'instalaciones', label: 'Instalaciones',  tabs: TODAS_INSTALACIONES },
   { key: 'seguridad',     label: 'Seguridad',      tabs: sinComunicacion(TODAS_SEGURIDAD) },
   { key: 'comunidad',     label: 'Comunidad',      tabs: sinComunicacion(TODA_COMUNIDAD) },
+  { key: 'recursos_humanos', label: 'Recursos Humanos', tabs: RECURSOS_HUMANOS_TABS },
 ]
 
 /**

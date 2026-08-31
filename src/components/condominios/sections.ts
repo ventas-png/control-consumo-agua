@@ -1,13 +1,13 @@
 // Secciones de navegación de 2 niveles del Módulo Completo de Condominios.
 // Fuente única compartida por CondominiosSection (cuerpo del módulo) y el
-// Sidebar global (que ahora expone las 10 secciones bajo "Manejo Condominios").
+// Sidebar global (que ahora expone las 11 secciones bajo "Manejo Condominios").
 // IMPORTANTE: mantener este módulo libre de dependencias pesadas (no importar
 // tabRegistry) para no inflar el bundle inicial del sidebar. Los íconos SVG de
 // cada sección viven en ./sectionIcons (.tsx); aquí solo datos de navegación.
 
 export type SectionKey =
   | 'panel' | 'comunicacion' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones'
-  | 'seguridad' | 'comunidad' | 'administracion' | 'especiales'
+  | 'seguridad' | 'comunidad' | 'administracion' | 'recursos_humanos' | 'especiales'
 
 export interface SectionDef { id: SectionKey; label: string; tabs: string[] }
 
@@ -42,9 +42,9 @@ export const SECTIONS: SectionDef[] = [
   ]},
   { id: 'operaciones', label: 'Operaciones', tabs: [
     'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
-    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
+    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros',
     'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
-    'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas',
+    'permisos_obra', 'garantias', 'checklist_areas', 'control_plagas',
     'prestamos',
   ]},
   { id: 'instalaciones', label: 'Instalaciones', tabs: [
@@ -65,12 +65,20 @@ export const SECTIONS: SectionDef[] = [
     'agenda', 'cumpleanos', 'programa_actividades',
   ]},
   { id: 'administracion', label: 'Administración', tabs: [
-    'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
+    'documentos', 'reglamento', 'firmas',
     'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
-    'actividad_equipo',
     'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
     'automatizaciones', 'flujo_aprobacion',
     'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',
+  ]},
+  // Recursos Humanos: todo lo que trata al personal como personas (expediente,
+  // formación, y el trabajo que se les asigna y con el que se les mide). Sale
+  // de Administración (expediente y formación) y de Operaciones (tareas y
+  // limpieza) para que el permiso de "quién administra al personal" no venga
+  // pegado al de "quién administra los documentos del condominio".
+  { id: 'recursos_humanos', label: 'Recursos Humanos', tabs: [
+    'personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza',
+    'actividad_equipo',
   ]},
   { id: 'especiales', label: 'Especiales', tabs: [
     'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'sostenibilidad',
