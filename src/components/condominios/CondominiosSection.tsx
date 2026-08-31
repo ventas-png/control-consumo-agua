@@ -882,7 +882,7 @@ function CondominiosSectionInner({ proyectos, unidades, currentUser }: Props) {
 
       </div>
 
-      {/* Body: contenido a todo el ancho. Las 10 secciones viven en el sidebar
+      {/* Body: contenido a todo el ancho. Las 11 secciones viven en el sidebar
           global; arriba quedan las pestañas de la sección activa. */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* infra:I14 — provides the active project_id to condominios-media uploaders. */}

@@ -346,7 +346,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null)
   const [hoveredSection, setHoveredSection] = useState<SectionKey | null>(null)
 
-  // Las 10 secciones del Módulo Completo, filtradas por permiso, para exponerlas
+  // Las 11 secciones del Módulo Completo, filtradas por permiso, para exponerlas
   // dentro del grupo "Manejo Condominios". El gating del servicio se hace con
   // isServiceEnabled('condominios', …); el por-sección, con permisos de tab.
   const visibleCondominiosSections = useMemo<SectionDef[]>(() => {
@@ -597,7 +597,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
           const visibleTabs = entry.tabs.filter(t =>
             isTabVisible(t, currentUser.role, canViewModule) && isServiceEnabled(t.id, currentUser)
           )
-          // El grupo de condominios además expone las 10 secciones del módulo.
+          // El grupo de condominios además expone las 11 secciones del módulo.
           const condoSections = entry.id === 'condominios_grp' ? visibleCondominiosSections : []
           if (visibleTabs.length === 0 && condoSections.length === 0) return null
 

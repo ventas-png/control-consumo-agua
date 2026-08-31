@@ -58,7 +58,8 @@ function categoryLabel(category: string): string {
   const FIXED: Record<string, string> = {
     panel: 'Panel / Dashboard', finanzas: 'Finanzas', residentes: 'Residentes',
     operaciones: 'Operaciones', instalaciones: 'Instalaciones', seguridad: 'Seguridad',
-    comunidad: 'Comunidad', administracion: 'Administración', especiales: 'Especiales',
+    comunidad: 'Comunidad', administracion: 'Administración',
+    recursos_humanos: 'Recursos Humanos', especiales: 'Especiales',
   }
   if (FIXED[category]) return FIXED[category]
   const pretty = (s: string) => s.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
