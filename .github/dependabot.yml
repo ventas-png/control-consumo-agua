@@ -15,6 +15,21 @@ updates:
     groups:
       minor-y-patch:
         update-types: ["minor", "patch"]
+      # React y ReactDOM NO son dos dependencias, son una: `react@19` con
+      # `react-dom@18` ni siquiera instala — `npm ci` aborta por peers antes de
+      # compilar nada. Los minor/patch ya viajaban juntos por el grupo de
+      # arriba, pero los MAJORS van por dependencia, así que en agosto/2026
+      # Dependabot abrió #734 y #735 con cada mitad de React 19: los dos rojos
+      # en 8-12 segundos, y ninguno fusionable ni siquiera en el orden correcto,
+      # porque el primero en entrar rompe main. Este grupo los une, majors
+      # incluidos, para que el PR llegue completo o no llegue.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types: ["major", "minor", "patch"]
     labels: ["dependencies"]
     # Majors que Dependabot NO debe reabrir solo. Cada uno rompe el pipeline de
     # una forma distinta y ninguno se arregla mergeando el PR tal cual; hay que
