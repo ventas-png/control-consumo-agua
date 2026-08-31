@@ -113,29 +113,59 @@ describe('el acceso efectivo NO se movió con la sección', () => {
 })
 
 describe('migración 20260907001200 (catálogo RBAC)', () => {
-  it('siembra la clave que faltaba de actividad_equipo', () => {
-    expect(sqlRRHH).toMatch(/INSERT INTO public\.permissions[\s\S]*'condominios\.tab\.actividad_equipo'/)
+  // La conducta de la migración —qué se reclasifica, qué hereda cada rol, que
+  // la guarda aborte— se verifica EJECUTÁNDOLA contra un Postgres desechable en
+  // supabase/tests/rbac_recursos_humanos/, que corre en cada PR. Aquí sólo
+  // quedan los guards que un test de conducta NO puede dar: que ese harness
+  // siga cableado en CI, y la trampa de sintaxis que motivó el endurecimiento.
+
+  it('el harness ejecutable está cableado en CI (si no, no corre nunca)', () => {
+    const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
+    expect(ci).toContain('supabase/tests/rbac_recursos_humanos/run.sh')
   })
 
   it('reclasifica categoría sin renombrar claves', () => {
-    expect(sqlRRHH).toMatch(/UPDATE public\.permissions\s+SET category = 'recursos_humanos'/)
-    // Un rename de clave rompería las policies que gatean sobre ellas.
-    for (const clave of ['condominios.tab.tareas_cond', 'condominios.tab.prog_limpieza']) {
-      expect(sqlRRHH).toContain(`'${clave}'`)
-    }
+    expect(sqlRRHH).toMatch(/UPDATE public\.permissions[\s\S]{0,40}SET category = 'recursos_humanos'/)
+    // Un rename rompería las policies que gatean sobre estas claves.
     expect(sqlRRHH).not.toMatch(/UPDATE public\.permissions[\s\S]{0,400}SET key/)
   })
 
-  it('los cuatro tabs que se mudan quedan en la reclasificación', () => {
-    for (const tab of ['personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza']) {
-      expect(sqlRRHH, tab).toContain(`'condominios.tab.${tab}'`)
+  it('los cinco tabs de la sección están nombrados en la migración', () => {
+    for (const tab of TABS_RRHH) {
+      expect(sqlRRHH, tab).toContain(`'${tab}'`)
     }
   })
 
-  it('es idempotente (ON CONFLICT en los INSERT, filtro de categoría en el UPDATE)', () => {
-    const inserts = sqlRRHH.match(/INSERT INTO/g) ?? []
-    const conflicts = sqlRRHH.match(/ON CONFLICT/g) ?? []
-    expect(conflicts.length).toBe(inserts.length)
+  // ── La trampa que motivó el endurecimiento ────────────────────────────────
+  // En `LIKE`, `_` es un COMODÍN de un carácter, y cuatro de los cinco tabs lo
+  // llevan en el nombre: `LIKE 'condominios.tab.actividad_equipo%'` también casa
+  // `condominios.tab.actividadXequipo`. Hoy esa clave no existe y el patrón
+  // parecería inofensivo — por eso es fácil reintroducirlo en una revisión.
+  it('ningún LIKE ejecutable usa un guion bajo sin escapar', () => {
+    const infractores: string[] = []
+    for (const m of sqlRRHH.matchAll(/LIKE\s+'([^']*)'/g)) {
+      const patron = m[1]
+      // `\_` es el guion bajo literal; cualquier otro `_` es comodín.
+      if (/(^|[^\\])_/.test(patron)) infractores.push(patron)
+    }
+    expect(infractores, `patrones con comodín accidental: ${infractores.join(', ')}`).toEqual([])
+  })
+
+  it('es idempotente (ON CONFLICT en los INSERT al catálogo, filtro en el UPDATE)', () => {
+    // Los INSERT a la tabla TEMPORAL no llevan ON CONFLICT y no deben: se
+    // crea vacía en cada corrida. Sólo se exige a los que tocan el catálogo.
+    const aCatalogo = (sqlRRHH.match(/INSERT INTO public\./g) ?? []).length
+    const conflictos = (sqlRRHH.match(/ON CONFLICT/g) ?? []).length
+    expect(conflictos).toBe(aCatalogo)
     expect(sqlRRHH).toMatch(/category IS DISTINCT FROM 'recursos_humanos'/)
+  })
+
+  it('la guarda de postcondición aborta, no sólo avisa', () => {
+    expect(sqlRRHH).toMatch(/RAISE EXCEPTION/)
+    expect(sqlRRHH).toContain('no existen en el catálogo')
+  })
+
+  it('la tabla temporal no sobrevive a la migración', () => {
+    expect(sqlRRHH).toMatch(/DROP TABLE _rrhh_claves/)
   })
 })

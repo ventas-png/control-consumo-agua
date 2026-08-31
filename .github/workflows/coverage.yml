@@ -377,6 +377,22 @@ jobs:
           PGPORT_TEST: 55492
         run: supabase/tests/cierre_consumo_atomico/run.sh
 
+      # 20260907001200 no crea tablas ni policies: mueve una columna de texto
+      # (`permissions.category`) y siembra grants derivados de otros grants. Sus
+      # dos formas de fallar son mudas. Una: en `LIKE` el guion bajo es COMODÍN
+      # y cuatro de los cinco tabs lo llevan en el nombre, así que un patrón
+      # laxo mete una clave vecina en la sección y alguien otorga lo que no
+      # quería. Otra: `actividad_equipo` nace copiando los grants de `personal`
+      # — copiar sólo los `allow` abre un permiso que un administrador había
+      # NEGADO, y copiar de más le da las acciones a quien sólo tenía lectura.
+      # Incluye la NEGATIVA: con un tab renombrado la guarda de postcondición
+      # tiene que abortar, o el paso 6 de la migración es decorativo.
+      - name: Recursos Humanos — reclasificación sin arrastres y herencia fiel
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55493
+        run: supabase/tests/rbac_recursos_humanos/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest
