@@ -31,7 +31,6 @@ const DICTIONARIES = { es, en } as const
 
 // El tipo de las keys lo deriva del diccionario español (default).
 // flatten<Es, 'es' | 'en'> → 'login.title' | 'login.submit' | etc.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DotPath<T, P extends string = ''> = T extends Record<string, any>
   ? {
       [K in keyof T]: T[K] extends string

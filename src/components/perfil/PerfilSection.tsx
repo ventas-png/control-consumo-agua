@@ -1,3 +1,4 @@
+import { QRCodeSVG } from 'qrcode.react'
 import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
@@ -211,7 +212,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [mfaFactors, setMfaFactors] = useState<TotpFactor[]>([])
   const [mfaLoading, setMfaLoading] = useState(false)
   const [mfaFb, setMfaFb] = useState<FeedbackState>(null)
-  const [enrollState, setEnrollState] = useState<{ factorId: string; qrSvg: string; secret: string; challengeId?: string } | null>(null)
+  const [enrollState, setEnrollState] = useState<{ factorId: string; uri: string; secret: string; challengeId?: string } | null>(null)
   const [mfaCode, setMfaCode] = useState('')
 
   const verifiedFactor = mfaFactors.find(f => f.status === 'verified') ?? null
@@ -244,7 +245,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       setMfaLoading(false)
       return
     }
-    setEnrollState({ factorId: data.id, qrSvg: data.totp.qr_code, secret: data.totp.secret })
+    setEnrollState({ factorId: data.id, uri: data.totp.uri, secret: data.totp.secret })
     setMfaLoading(false)
   }
 
@@ -623,12 +624,19 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                 1. Escanea este código con tu app de autenticación (Google Authenticator, Authy, 1Password, etc.).<br />
                 2. Ingresa abajo el código de 6 dígitos que muestra la app.
               </div>
+              {/* Este QR estaba ROTO: `totp.qr_code` es markup SVG crudo, no una URL
+                  (los tipos de supabase-js dicen que hay que anteponerle
+                  `data:image/svg+xml;utf-8,`), así que el <img src> no podía
+                  pintarlo y solo quedaba el texto alternativo. Se dibuja local
+                  desde el otpauth://, igual que en MfaGate. */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-                <img
-                  src={enrollState.qrSvg}
-                  alt="Código QR para configurar autenticación en dos pasos"
-                  style={{ width: '180px', height: '180px', border: '1px solid var(--at-line)', borderRadius: '8px', background: 'white', padding: '8px' }}
-                />
+                <div
+                  role="img"
+                  aria-label="Código QR para configurar autenticación en dos pasos"
+                  style={{ border: '1px solid var(--at-line)', borderRadius: '8px', background: 'white', padding: '8px', lineHeight: 0 }}
+                >
+                  <QRCodeSVG value={enrollState.uri} size={180} level="M" marginSize={2} />
+                </div>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '14px', textAlign: 'center' }}>
                 ¿No puedes escanear?{' '}

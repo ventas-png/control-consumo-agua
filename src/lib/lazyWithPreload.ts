@@ -50,11 +50,9 @@ export function lazySafe<T extends ComponentType<any>>(
 
 // Espeja la firma de React.lazy (`T extends ComponentType<any>`) para no pelear
 // con la contravarianza de props de cada sección.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type PreloadableComponent<T extends ComponentType<any>> =
   LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyWithPreload<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
 ): PreloadableComponent<T> {
