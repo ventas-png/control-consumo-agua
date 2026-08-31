@@ -39,17 +39,26 @@ BEGIN
      OR v_def NOT LIKE '%GET DIAGNOSTICS%' THEN
     RAISE EXCEPTION 'PD-2: el motor perdió el reclamo con lock, el re-chequeo o la validación de tipo';
   END IF;
+  -- 20260907001100: dos decimales exactos y duplicados por uuid NORMALIZADO.
+  IF v_def NOT LIKE '%round(v_cant, 2)%'
+     OR v_def NOT LIKE '%GROUP BY ((j.item ->> ''suministro_id'')::uuid)%' THEN
+    RAISE EXCEPTION 'PD-2c: el motor perdió el corte de decimales o la normalización de duplicados';
+  END IF;
   IF (SELECT p.prosecdef FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
       WHERE ns.nspname = 'public' AND p.proname = 'tarea_bloque_consumir_reclamado') THEN
     RAISE EXCEPTION 'PD-2b: el motor NO debe ser SECURITY DEFINER (hereda el contexto de las RPC)';
   END IF;
 
-  -- 3 · la RPC vieja exige cierre previo.
+  -- 3 · la RPC vieja exige TRABAJO REALIZADO: completada o con_observacion.
+  -- 20260907001100 sacó a 'omitida' de la lista: lo no hecho no gasta insumos.
   SELECT pg_get_functiondef(p.oid) INTO v_def
   FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
   WHERE ns.nspname = 'public' AND p.proname = 'consumir_insumos_tarea';
-  IF v_def NOT LIKE '%NOT IN (''completada'', ''con_observacion'', ''omitida'')%' THEN
-    RAISE EXCEPTION 'PD-3: consumir_insumos_tarea ya no exige una tarea cerrada';
+  IF v_def NOT LIKE '%NOT IN (''completada'', ''con_observacion'')%' THEN
+    RAISE EXCEPTION 'PD-3: consumir_insumos_tarea ya no exige trabajo realizado (completada/con_observacion)';
+  END IF;
+  IF v_def LIKE '%NOT IN (''completada'', ''con_observacion'', ''omitida'')%' THEN
+    RAISE EXCEPTION 'PD-3b: volvió la lista permisiva de 20260907001000 (omitida consumible)';
   END IF;
 
   -- 4 · ACLs: el cliente llama a las RPC y NUNCA al motor directamente.

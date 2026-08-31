@@ -53,6 +53,11 @@ BEGIN
     IF v_wc NOT LIKE '%(' || col || ' IS NULL)%' THEN
       RAISE EXCEPTION 'postdeploy: el WITH CHECK ya no exige % IS NULL: %', col, v_wc; END IF;
   END LOOP;
+  -- 20260907001100: el contrato va PRIMERO y rige a TODOS. Si is_super_admin
+  -- aparece ANTES que el contrato, volvió la forma de 000900 (el rango de
+  -- plataforma exento) aunque todas las cláusulas sigan presentes en el texto.
+  IF position('is_super_admin' IN v_wc) < position('estado = ''pendiente''' IN v_wc) THEN
+    RAISE EXCEPTION 'postdeploy: is_super_admin quedó DELANTE del contrato — el super_admin volvió a estar exento: %', v_wc; END IF;
 
   SELECT pg_get_triggerdef(t.oid) INTO v_trg
     FROM pg_trigger t

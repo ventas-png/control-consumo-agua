@@ -146,7 +146,16 @@ BEGIN
     ('no es un arreglo', '{"suministro_id":"x"}'::jsonb),
     ('elemento que no es objeto', '[42]'::jsonb),
     ('uuid inválido', '[{"suministro_id":"esto-no-es-uuid","cantidad":1}]'::jsonb),
-    ('cantidad no numérica', '[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":true}]'::jsonb)
+    ('cantidad no numérica', '[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":true}]'::jsonb),
+    -- 20260907001100: lo que numeric(10,2) redondearía en silencio se rechaza.
+    ('tres decimales (0.001)',
+     '[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":0.001}]'::jsonb),
+    -- 20260907001100: el MISMO uuid en otra representación (sin guiones; el
+    -- cast acepta ambas — may/min cubierto por lo mismo) no es «otro»
+    -- suministro: el duplicado se agrupa por el uuid NORMALIZADO.
+    ('mismo uuid en dos representaciones',
+     ('[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":1},' ||
+      '{"suministro_id":"' || replace('50000000-0000-0000-0000-000000000001', '-', '') || '","cantidad":2}]')::jsonb)
   ) AS t(nombre, payload) LOOP
     BEGIN
       PERFORM public.cerrar_tarea_y_consumir_insumos(
@@ -167,7 +176,7 @@ BEGIN
   IF v_movs <> 0 THEN
     RAISE EXCEPTION '4b: un payload inválido dejó % movimiento(s)', v_movs;
   END IF;
-  RAISE NOTICE '4 · NaN, negativos, duplicados, ajenos y JSON deforme: 22023 y ni una escritura';
+  RAISE NOTICE '4 · NaN, negativos, duplicados (exactos y may/min), 0.001, ajenos y JSON deforme: 22023 y ni una escritura';
 END $$;
 
 -- ── 5 · el cero es TERMINAL: sella no_usado_en y deja de ser reclamable ─────
@@ -396,4 +405,81 @@ BEGIN
     RAISE EXCEPTION '12c: hay movimientos sin fila que los reclame';
   END IF;
   RAISE NOTICE '12 · 4 filas reclamadas ↔ 4 movimientos, 1:1 y bien trazados';
+END $$;
+
+-- ── 13 · lo OMITIDO no consume por NINGUNA RPC (20260907001100) ─────────────
+DO $$
+DECLARE
+  v_movs int;
+BEGIN
+  PERFORM set_config('app.uid', 'a0000000-0000-0000-0000-00000000000a', true);
+  -- T3 se omite por su camino de siempre (no se hizo el trabajo).
+  UPDATE public.tareas_bloque
+     SET estado = 'omitida', completada_en = now()
+   WHERE id = 'a1000000-0000-0000-0000-000000000003';
+
+  BEGIN
+    PERFORM public.consumir_insumos_tarea(
+      'a1000000-0000-0000-0000-000000000003', '[]'::jsonb);
+    RAISE EXCEPTION '13a: consumir_insumos_tarea aceptó una tarea omitida';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE 'CONSUMO:%omitida%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM public.cerrar_tarea_y_consumir_insumos(
+      'a1000000-0000-0000-0000-000000000003', 'completada');
+    RAISE EXCEPTION '13b: la RPC de cierre re-cerró una tarea omitida';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  SELECT count(*) INTO v_movs FROM public.movimientos_suministro
+   WHERE origen_id = 'a1000000-0000-0000-0000-000000000003';
+  IF v_movs <> 0 THEN
+    RAISE EXCEPTION '13c: la tarea omitida generó % movimiento(s)', v_movs;
+  END IF;
+  RAISE NOTICE '13 · lo que NO se hizo no gasta insumos: omitida rechazada por las dos RPC';
+END $$;
+
+-- ── 14 · cantidades finas EXACTAS: 0.01 y el máximo de numeric(10,2) ────────
+-- En transacción REVERTIDA: T6 tiene que seguir pendiente y sin plan tocado
+-- para la carrera de run.sh, y los totales de 12 no deben moverse.
+BEGIN;
+DO $$
+DECLARE
+  r record;
+  v_001 numeric;
+  v_max numeric;
+BEGIN
+  PERFORM set_config('app.uid', 'a0000000-0000-0000-0000-00000000000a', true);
+  SELECT * INTO r FROM public.cerrar_tarea_y_consumir_insumos(
+    'a1000000-0000-0000-0000-000000000006', 'completada', NULL,
+    '[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":0.01},
+      {"suministro_id":"50000000-0000-0000-0000-000000000002","cantidad":99999999.99}]'::jsonb);
+  IF r.consumidos <> 2 THEN
+    RAISE EXCEPTION '14a: 0.01 y el máximo debían consumirse (consumidos=%)', r.consumidos;
+  END IF;
+  SELECT m.cantidad INTO v_001 FROM public.movimientos_suministro m
+   WHERE m.origen_id = 'a1000000-0000-0000-0000-000000000006'
+     AND m.suministro_id = '50000000-0000-0000-0000-000000000001';
+  SELECT m.cantidad INTO v_max FROM public.movimientos_suministro m
+   WHERE m.origen_id = 'a1000000-0000-0000-0000-000000000006'
+     AND m.suministro_id = '50000000-0000-0000-0000-000000000002';
+  IF v_001 IS DISTINCT FROM 0.01 OR v_max IS DISTINCT FROM 99999999.99 THEN
+    RAISE EXCEPTION '14b: las cantidades no viajaron EXACTAS (0.01→%, max→%)', v_001, v_max;
+  END IF;
+  RAISE NOTICE '14 · 0.01 y 99999999.99 entran y se registran EXACTOS — sin redondeos fantasma';
+END $$;
+ROLLBACK;
+
+-- Tras el ROLLBACK, nada se movió: T6 lista para la carrera y totales de 12.
+DO $$
+BEGIN
+  IF (SELECT estado FROM public.tareas_bloque
+      WHERE id = 'a1000000-0000-0000-0000-000000000006') <> 'pendiente' THEN
+    RAISE EXCEPTION '14c: T6 debía volver a pendiente tras el ROLLBACK';
+  END IF;
+  IF (SELECT count(*) FROM public.movimientos_suministro) <> 4 THEN
+    RAISE EXCEPTION '14d: el ROLLBACK no devolvió los 4 movimientos';
+  END IF;
+  RAISE NOTICE '14 · el ensayo fino se revirtió limpio: T6 pendiente y 4 movimientos';
 END $$;

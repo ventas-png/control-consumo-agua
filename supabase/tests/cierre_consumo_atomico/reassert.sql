@@ -51,3 +51,24 @@ BEGIN
   END IF;
   RAISE NOTICE 'RE · re-aplicar no duplica funciones ni constraints, y no toca datos';
 END $$;
+
+-- Y el replay 001000 → 001100 conserva el ENDURECIMIENTO: si el orden del
+-- re-apply dejara la versión permisiva, lo omitido volvería a consumir.
+DO $$
+BEGIN
+  PERFORM set_config('app.uid', 'a0000000-0000-0000-0000-00000000000a', true);
+  BEGIN
+    PERFORM public.consumir_insumos_tarea(
+      'a1000000-0000-0000-0000-000000000003', '[]'::jsonb);
+    RAISE EXCEPTION 'RE-8: tras el replay, la tarea omitida volvió a poder consumir';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.consumir_insumos_tarea(
+      'a1000000-0000-0000-0000-000000000006',
+      '[{"suministro_id":"50000000-0000-0000-0000-000000000001","cantidad":0.001}]'::jsonb);
+    RAISE EXCEPTION 'RE-9: tras el replay, 0.001 volvió a colarse';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  RAISE NOTICE 'RE · el replay conserva el endurecimiento: omitida y 0.001 siguen fuera';
+END $$;

@@ -24,6 +24,20 @@ billing sync, reportes, route reminders) falla. El beneficio de seguridad es mar
 (nada de pg_net queda expuesto en `public`). **Se acepta el WARN.** Revisar si Supabase
 hace `pg_net` relocatable o publica un path soportado de migración de schema.
 
+### `authenticated … SECURITY DEFINER executable` — RPCs de entrada con scope interno
+El advisor marca TODA función SECURITY DEFINER ejecutable por `authenticated`
+(~119 WARN). Para las RPC de entrada del cliente ese GRANT es **el diseño**, no
+un descuido: existen precisamente para que el cliente NO necesite privilegios
+de tabla, y la autorización vive DENTRO (`assert_company_scope` + familias de
+permisos, fail-closed) — p. ej. `cerrar_tarea_y_consumir_insumos` y
+`consumir_insumos_tarea` (20260907001000/001100), cuyos guards se verifican
+ejecutándolos en `supabase/tests/cierre_consumo_atomico/`. Los motores internos
+que escriben (`tarea_bloque_consumir_reclamado`, las funciones de trigger de
+20260907000800) tienen el `EXECUTE` REVOCADO a `authenticated` y sus postdeploy
+lo comprueban contra el catálogo vivo. **Se acepta el WARN por función de
+entrada**; una función de esta lista SIN guard de scope interno sí sería un
+hallazgo (regla (b) de `migrations-guard` lo caza en CI).
+
 ### `0028/0029` `anon … SECURITY DEFINER executable` — `user_has_permission`, `company_has_feature`
 Son helpers usados **dentro de policies RLS** de ~150 tablas y se evalúan como parte del
 query del propio rol. Revocar su `EXECUTE` a `anon` rompería la evaluación de las policies
