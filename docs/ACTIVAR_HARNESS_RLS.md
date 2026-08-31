@@ -319,9 +319,9 @@ supabase db push
 ```
 
 Si `db push` se queja del historial (el repo arrastra numeraciones paralelas —
-ver `docs/SUPABASE_PREVIEW_BRANCHES.md`), aplicá las migraciones con el workflow
-`apply-migration.yml` apuntando al sandbox, o pegá el SQL por el editor del
-dashboard.
+ver `docs/SUPABASE_PREVIEW_BRANCHES.md`), aplicá el SQL por el editor del
+dashboard del sandbox. (El viejo workflow `apply-migration.yml` ya no existe, y
+`apply-migrations-prod.yml` apunta SOLO a producción: no lo uses para esto.)
 
 ## Paso 3 — Sembrar y verificar
 

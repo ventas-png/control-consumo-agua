@@ -13,7 +13,7 @@ name: Security guard (aislamiento multi-tenant)
 #
 # Gated por presencia de secretos: sin SUPABASE_PROJECT_ID / SUPABASE_ACCESS_TOKEN
 # el job es NO-OP VERDE (no falla CI en forks/sin wiring). Los mismos secretos que
-# apply-migration.yml / apply-migrations-prod.yml.
+# apply-migrations-prod.yml.
 
 # CARRERA CON EL APPLY DE MIGRACIONES — por qué los triggers son así.
 #

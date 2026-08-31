@@ -72,7 +72,7 @@ workflow indicadas por archivo.
 
 | Nombre | Tipo | Consumido por (workflow) | Para qué |
 |---|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migration.yml`, `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml`, `auth-hardening.yml`, `security-guard.yml`, `cleanup-preview-branches.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos, auditar catálogo, borrar previews). **Si expira o se revoca, los siete fallan a la vez** — el 2026-08-01 se cayó entre las 03:05 y las 08:09 UTC y salió a la luz por `cleanup-preview-branches` y `security-guard`, ambos con `401 Unauthorized`. |
+| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml`, `auth-hardening.yml`, `security-guard.yml`, `cleanup-preview-branches.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos, auditar catálogo, borrar previews). **Si expira o se revoca, los seis fallan a la vez** — el 2026-08-01 se cayó entre las 03:05 y las 08:09 UTC y salió a la luz por `cleanup-preview-branches` y `security-guard`, ambos con `401 Unauthorized`. |
 | `SUPABASE_PROJECT_ID` | Sensible (id) | mismos que arriba | Identifica el proyecto destino. No es un secreto fuerte, pero se trata como config protegida. |
 | `SUPABASE_DB_PASSWORD` | **Secreto** | `apply-migrations-prod.yml` (si aplica vía conexión directa) | Password de la base de producción. |
 | `VERCEL_TOKEN` | **Secreto** | `deploy-staging.yml`, `promote-production.yml` | Token de la API de Vercel (build/deploy/alias/promote/rollback). |

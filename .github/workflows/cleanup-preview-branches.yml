@@ -26,7 +26,7 @@ name: Cleanup Supabase preview branches
 # el daño queda acotado y visible en vez de barrer el proyecto entero.
 #
 # Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID (los mismos de
-# apply-migration.yml / apply-migrations-prod.yml). Sin ellos hace no-op con
+# apply-migrations-prod.yml). Sin ellos hace no-op con
 # aviso: este workflow ahorra dinero, no debe romper el tablero de CI si aún no
 # está configurado.
 

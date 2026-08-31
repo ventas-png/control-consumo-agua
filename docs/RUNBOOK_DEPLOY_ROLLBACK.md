@@ -26,7 +26,8 @@
   env del entorno Preview de Vercel. Así pruebas el binario en un esquema que
   refleja prod sin tocar datos reales.
 - **Producción:** el proyecto `control-agua`. Las migraciones llegan por
-  `apply-migration.yml` / el flujo normal; **nunca** `apply_migration` a mano.
+  `apply-migrations-prod.yml` (automático en el push a `main`); **nunca**
+  `apply_migration` a mano.
 
 > No provisionamos el branch persistente desde CI a propósito: es un recurso de
 > pago/duradero — es una decisión del dueño (ver checklist de setup abajo).
@@ -122,9 +123,15 @@ hay "down". Reglas:
    Así un rollback de la app no choca con un esquema que se adelantó.
 4. **Valida en el Preview Branch del PR** (Supabase comenta el estado de
    Migrations en el PR). **No** corras `apply_migration` contra prod a mano.
-5. **Emergencia (corrección puntual en prod):** Actions → *Apply SQL Migration*
-   (`apply-migration.yml`) con un archivo idempotente. Es la vía auditable; evita
-   ejecutar SQL suelto desde un dashboard.
+5. **Emergencia (corrección puntual en prod):** Actions → *Apply Migrations to
+   Production* (`apply-migrations-prod.yml`), dispatch **con `migration_file`
+   explícito** y un archivo idempotente. Es la vía auditable; evita ejecutar SQL
+   suelto desde un dashboard, y pasa por el Environment `production-db`. Dejar
+   `migration_file` VACÍO es el modo reconciliar — leé el aviso de abajo antes.
+
+   > El antiguo *Apply SQL Migration* (`apply-migration.yml`) se eliminó: escribía
+   > al mismo proyecto saltándose el gate de aprobación y el cortafuegos
+   > append-only (auditoría 2026-05-26, I9).
 
 ### ⛔ El dispatch de reconciliación (`migration_file` vacío)
 

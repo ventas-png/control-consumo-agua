@@ -3,11 +3,12 @@ name: Apply Migrations to Production
 # Auto-aplica a PRODUCCIÓN las migraciones SQL que aterrizan en `main`, para que
 # el esquema de Supabase nunca se quede DETRÁS del código. Lección anti-drift:
 # durante junio/2026 varios PRs con migraciones se mergearon a `main` sin que el
-# SQL llegara a prod (había que dispararlo a mano con apply-migration.yml o MCP);
+# SQL llegara a prod (había que dispararlo a mano con el viejo apply-migration.yml
+# —ya eliminado— o por MCP);
 # este workflow cierra ese hueco automáticamente.
 #
 # Mecanismo: Management API de Supabase (POST /v1/projects/{id}/database/query),
-# el MISMO probado en apply-migration.yml. NO usa `supabase db push` a propósito:
+# el MISMO que usaba el viejo apply-migration.yml. NO usa `supabase db push` a propósito:
 # el historial remoto schema_migrations quedó desalineado (algunas migraciones se
 # aplicaron a mano/MCP con versión de apply-time, no la del archivo) y `db push`
 # abortaría por checksum/orden. El SQL de las migraciones es IDEMPOTENTE
@@ -26,8 +27,13 @@ name: Apply Migrations to Production
 # `paths` está acotado a supabase/migrations/** para que la PROPIA introducción
 # de este workflow (un cambio solo en .github/) NO se auto-dispare.
 #
-# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID (los mismos de
-# apply-migration.yml). Sin ellos el job falla con instrucciones.
+# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID. Sin ellos el
+# job falla con instrucciones.
+#
+# Esta es la ÚNICA vía de CI hacia la base de producción. El antiguo
+# apply-migration.yml se eliminó (auditoría 2026-05-26, I9): aplicaba SQL al MISMO
+# proyecto sin `environment: production-db`, sin el cortafuegos append-only y sin
+# MAX_APPLY, e interpolaba la entrada del dispatch directamente en el shell.
 
 on:
   push:
@@ -53,11 +59,18 @@ jobs:
   check-secrets:
     runs-on: ubuntu-latest
     steps:
+      # Los secretos se leen por `env`, NO se interpolan en el `run:`. Interpolados,
+      # el VALOR del token entra en el texto del comando: cualquier `set -x`, traza
+      # de error o `ps` del runner lo expone, y el enmascarado de Actions solo cubre
+      # la salida de los logs. El job `apply` de abajo ya usaba este patrón.
       - name: Verify Supabase secrets are set
+        env:
+          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           missing=""
-          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
-          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
+          if [ -z "$ACCESS_TOKEN" ]; then missing="$missing SUPABASE_ACCESS_TOKEN"; fi
+          if [ -z "$PROJECT_ID" ];   then missing="$missing SUPABASE_PROJECT_ID"; fi
           if [ -n "$missing" ]; then
             echo "::error::Faltan secrets de GitHub:$missing"
             echo "Agrégalos en: Settings → Secrets and variables → Actions."
