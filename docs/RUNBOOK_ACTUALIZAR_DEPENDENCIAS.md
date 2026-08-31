@@ -105,9 +105,18 @@ siguiente, que es lo que parece un problema nuevo y es el mismo hueco.
 
 Añadir la variable **no cambia un despliegue ya construido**. Hace falta un
 build nuevo: un push a la rama, o *Redeploy* **sin** «Use existing Build
-Cache». Y ojo con cuál redeployas: en la lista de Vercel el Preview de la rama
-y el de `main` se llaman igual y sólo se distinguen por `githubCommitRef`.
-Redeployar el de `main` reconstruye **producción**, que no es lo que quieres.
+Cache».
+
+Y ojo con cuál redeployas: en la lista de Vercel el Preview de la rama y el de
+`main` se llaman igual y sólo se distinguen por `githubCommitRef`. Redesplegar
+uno asociado a `main` **reconstruye ese artefacto**, no el Preview del PR. Eso
+por sí solo **no mueve el alias productivo**: el alias sigue donde estaba
+mientras no haya una **promoción explícita**, así que un redeploy equivocado no
+es un incidente de producción.
+
+Lo que sí es, es inútil para lo que querías: ese artefacto declara el
+`commit_sha` de `main`, y el preflight exige el HEAD del PR. Fallará la primera
+validación por SHA aunque lleve bien las variables.
 
 ## 5. Qué NO hacer para poner el E2E en verde
 
