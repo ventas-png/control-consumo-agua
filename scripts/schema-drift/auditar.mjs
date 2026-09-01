@@ -32,10 +32,11 @@
 // compara además contra la baseline de la rama base, para que un PR no pueda
 // agrandarla.
 //
-// NADA DE DATOS. La huella es DDL agregado y hasheado: ni una fila, ni un
-// `count(*)`, ni nada fuera del esquema `public`. Los archivos versionados
-// guardan sólo `clave → md5(12) → nº de objetos`. Hay un guard en
-// `__tests__` que falla si algo con forma de secreto se cuela.
+// NADA DE DATOS, NADA REVERSIBLE. La huella es DDL agregado y hasheado: ni una
+// fila, ni un `count(*)` de negocio, ni nada fuera del esquema `public`. Los
+// archivos versionados guardan sólo `clave → sha256(64 hex):nº de objetos`, y de
+// un SHA-256 no se reconstruye el DDL. Hay un guard en `__tests__` que falla si
+// algo con forma de secreto se cuela.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -45,9 +46,26 @@ import { reconstruir, huella } from './reconstruir.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 export const RUTA_PRODUCCION = join(AQUI, 'huella-produccion.json')
+export const RUTA_FINGERPRINT = join(AQUI, 'fingerprint.sql')
 export const RUTA_BASELINE = join(AQUI, 'drift-conocido.json')
 
 // ── funciones puras (las prueba __tests__/auditar.test.mjs) ─────────────────
+
+/** Marca de «este grupo no existe de ese lado». */
+export const AUSENTE = 'AUSENTE'
+
+/**
+ * Una huella de grupo es un SHA-256 completo más el número de objetos.
+ * 64 hex, minúsculas, sin truncar: un md5 recortado a 12 hex son 48 bits, y una
+ * colisión ahí significa exactamente «drift que el auditor no ve».
+ */
+export const RE_HUELLA = /^[0-9a-f]{64}$/
+export const RE_HUELLA_CON_N = /^[0-9a-f]{64}:\d+$/
+
+/** ¿El valor es una huella válida, o la marca de ausencia? */
+export function esHuellaValida(valor) {
+  return valor === AUSENTE || RE_HUELLA_CON_N.test(String(valor))
+}
 
 /** Texto de huella (`clave\thuella\tn` por línea) → Map clave → {huella, n}. */
 export function parsearHuella(texto) {
@@ -57,6 +75,12 @@ export function parsearHuella(texto) {
     if (!l) continue
     const [clave, h, n] = l.split('\t')
     if (!clave || !h) throw new Error(`Línea de huella mal formada: ${l.slice(0, 120)}`)
+    if (!RE_HUELLA.test(h)) {
+      throw new Error(
+        `Huella que no es un SHA-256 de 64 hex en «${clave}»: «${String(h).slice(0, 80)}». ` +
+        'Una huella truncada o de otro algoritmo no se compara: se aborta.',
+      )
+    }
     mapa.set(clave, { huella: h, n: Number(n ?? 0) })
   }
   return mapa
@@ -76,8 +100,8 @@ export function calcularDrift(produccion, repo) {
     if (p?.huella === r?.huella) continue
     drift.push({
       clave,
-      produccion: p ? `${p.huella} (${p.n})` : 'AUSENTE',
-      repo: r ? `${r.huella} (${r.n})` : 'AUSENTE',
+      produccion: p ? `${p.huella}:${p.n}` : AUSENTE,
+      repo: r ? `${r.huella}:${r.n}` : AUSENTE,
     })
   }
   return drift
@@ -151,6 +175,10 @@ export function validarBaseline(baseline) {
     for (const lado of ['produccion', 'repo']) {
       if (typeof entrada[lado] !== 'string' || !entrada[lado]) {
         problemas.push(`${clave}: falta \`${lado}\` (la huella medida de ese lado).`)
+      } else if (!esHuellaValida(entrada[lado])) {
+        problemas.push(
+          `${clave}: \`${lado}\` no es «<sha256 de 64 hex>:<n>» ni «${AUSENTE}» — vale «${entrada[lado].slice(0, 40)}».`,
+        )
       }
     }
   }
@@ -172,12 +200,31 @@ export function huellaProduccionVersionada(ruta = RUTA_PRODUCCION) {
   return { mapa, doc }
 }
 
+const RUTA_BASELINE_EN_GIT = 'scripts/schema-drift/drift-conocido.json'
+
+/**
+ * La baseline tal como está en la rama base, o `null` si ahí todavía no existe
+ * — el caso del PR que la introduce, donde no hay trinquete que verificar.
+ *
+ * La ausencia se comprueba ANTES con `git cat-file -e`, que no imprime nada
+ * cuando el objeto falta. Envolver el `git show` en un catch mudo tenía dos
+ * problemas: escupía un «fatal: path ... does not exist» que en el log de CI se
+ * lee como un error sin serlo, y —peor— se tragaba por igual un fallo real de
+ * git (repositorio sin la ref por un checkout superficial, objeto corrupto)
+ * haciéndolo pasar por «es la primera vez». Eso desactivaría el trinquete en
+ * silencio, que es justo lo que no puede pasar. Ahora un fallo de git distinto
+ * de «no existe» se propaga.
+ */
 function baselineDeLaBase(ref) {
+  const objeto = `${ref}:${RUTA_BASELINE_EN_GIT}`
   try {
-    return JSON.parse(execFileSync('git', ['show', `${ref}:scripts/schema-drift/drift-conocido.json`], { encoding: 'utf8' }))
+    execFileSync('git', ['cat-file', '-e', objeto], { stdio: 'ignore' })
   } catch {
-    return null
+    return null // no existe en esa ref: es la primera vez
   }
+  // Existe: si `show` falla ahora, es un problema real y debe verse.
+  const crudo = execFileSync('git', ['show', objeto], { encoding: 'utf8' })
+  return JSON.parse(crudo)
 }
 
 function serializarHuella(mapa) {
@@ -198,6 +245,7 @@ async function principal() {
   const sembrarProduccion = bandera('--sembrar-produccion')
   const sembrarBaseline = bandera('--sembrar-baseline')
   const pruebaNegativa = bandera('--prueba-negativa')
+  const verificarHuella = bandera('--verificar-huella')
   const refBase = process.argv.includes('--trinquete-contra')
     ? process.argv[process.argv.indexOf('--trinquete-contra') + 1]
     : null
@@ -205,7 +253,7 @@ async function principal() {
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
   // archivo lo que esta misma corrida va a escribir.
-  const problemas = sembrarBaseline ? [] : validarBaseline(baseline)
+  const problemas = (sembrarBaseline || verificarHuella) ? [] : validarBaseline(baseline)
   if (problemas.length > 0) {
     console.error('✗ drift-conocido.json no es válido:')
     for (const p of problemas) console.error(`    ${p}`)
@@ -239,6 +287,50 @@ async function principal() {
       process.exit(1)
     }
     console.error(`✓ ${db.migraciones.length} migraciones aplicadas sobre una base vacía`)
+
+    if (verificarHuella) {
+      // ── Propiedades de la huella, contra un catálogo real ──────────────
+      // Se prueban aquí y no en vitest porque lo que puede fallar es la
+      // SERIALIZACIÓN EN SQL, no el JavaScript. Probar una reimplementación en
+      // JS sería probar el doble, no la cosa.
+      const a = huella(db.psql)
+      const b = huella(db.psql)
+      if (a !== b) { console.error('✗ DETERMINISMO: dos corridas seguidas dieron huellas distintas.'); process.exit(1) }
+      console.error('✓ determinismo: dos corridas consecutivas, huella byte a byte idéntica')
+
+      // Entradas equivalentes: el mismo catálogo leído con otro plan de
+      // ejecución. Si el orden del agregado dependiera del plan y no del
+      // `ORDER BY ... COLLATE "C"`, esto lo delataría.
+      db.psql(['-q','-c','SET enable_seqscan=off;','-c','SET enable_indexscan=off;'], { stdio: 'pipe' })
+      const c = db.psql(['-tAq','-c','SET enable_seqscan=off; SET enable_hashagg=off;','-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim()
+      if (c !== a) { console.error('✗ EQUIVALENCIA: el mismo catálogo con otro plan dio otra huella.'); process.exit(1) }
+      console.error('✓ equivalencia: mismo catálogo, otro plan de ejecución, misma huella')
+
+      const antes = parsearHuella(a)
+      for (const [clave, v] of antes) {
+        if (!RE_HUELLA.test(v.huella)) { console.error(`✗ FORMATO: ${clave} no es SHA-256 de 64 hex.`); process.exit(1) }
+      }
+      console.error(`✓ formato: ${antes.size}/${antes.size} grupos con SHA-256 de 64 hex`)
+
+      // Un cambio normalizado relevante TIENE que mover la huella. Se elige el
+      // más pequeño que existe: quitar un NOT NULL. No cambia nombres, ni
+      // tipos, ni conteos — sólo un booleano dentro de la serialización.
+      db.psql(['-v','ON_ERROR_STOP=1','-q','-c',
+        'ALTER TABLE public.clientes ALTER COLUMN nombre DROP NOT NULL;'], { stdio: 'pipe' })
+      const despues = parsearHuella(huella(db.psql))
+      const movidos = [...antes.keys()].filter(k => antes.get(k).huella !== despues.get(k)?.huella)
+      if (movidos.length !== 1 || movidos[0] !== 'tabla:clientes/columnas') {
+        console.error(`✗ SENSIBILIDAD: quitar un NOT NULL movió ${movidos.length} grupo(s): ${movidos.join(', ') || '(ninguno)'}`)
+        console.error('  Se esperaba exactamente tabla:clientes/columnas.')
+        process.exit(1)
+      }
+      if (antes.get(movidos[0]).n !== despues.get(movidos[0]).n) {
+        console.error('✗ SENSIBILIDAD: el conteo cambió; el cambio no era sólo del NOT NULL.'); process.exit(1)
+      }
+      console.error('✓ sensibilidad: quitar un NOT NULL mueve exactamente 1 grupo, sin tocar el conteo')
+      console.error('\n✓ La huella es determinista, estable ante entradas equivalentes y sensible al cambio.')
+      return
+    }
 
     if (pruebaNegativa) {
       // Prueba negativa REAL contra el catálogo: se inyecta una columna y una

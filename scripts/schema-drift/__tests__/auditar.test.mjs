@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
 import {
   parsearHuella,
   calcularDrift,
@@ -21,17 +22,28 @@ import {
   verificarTrinquete,
   validarBaseline,
   clavesDeBaseline,
+  esHuellaValida,
+  RE_HUELLA,
+  RE_HUELLA_CON_N,
+  AUSENTE,
 } from '../auditar.mjs'
 
 const RAIZ = resolve('scripts/schema-drift')
 const baselineReal = JSON.parse(readFileSync(resolve(RAIZ, 'drift-conocido.json'), 'utf8'))
 const produccionReal = JSON.parse(readFileSync(resolve(RAIZ, 'huella-produccion.json'), 'utf8'))
 
+/** SHA-256 en hex, como el que produce `encode(sha256(...),'hex')` en Postgres. */
+const sha = (t) => createHash('sha256').update(t, 'utf8').digest('hex')
+
+const H_COLUMNAS = sha('clientes-columnas')
+const H_POLICIES = sha('clientes-policies')
+const H_SECLOGS = sha('securitylogs-policies')
+
 /** Huella mínima de juguete, con una tabla sana. */
 const HUELLA_BASE = [
-  'tabla:clientes/columnas\taaaa11112222\t24',
-  'tabla:clientes/policies\tbbbb11112222\t4',
-  'tabla:security_logs/policies\tcccc11112222\t4',
+  `tabla:clientes/columnas\t${H_COLUMNAS}\t24`,
+  `tabla:clientes/policies\t${H_POLICIES}\t4`,
+  `tabla:security_logs/policies\t${H_SECLOGS}\t4`,
 ].join('\n')
 
 const baselineCon = (grupos) => ({ grupos })
@@ -40,11 +52,36 @@ describe('parsearHuella', () => {
   it('convierte líneas `clave\\thuella\\tn` en un mapa', () => {
     const m = parsearHuella(HUELLA_BASE)
     expect(m.size).toBe(3)
-    expect(m.get('tabla:clientes/columnas')).toEqual({ huella: 'aaaa11112222', n: 24 })
+    expect(m.get('tabla:clientes/columnas')).toEqual({ huella: H_COLUMNAS, n: 24 })
   })
 
   it('ignora líneas vacías y recorta espacios', () => {
-    expect(parsearHuella('\n  \na\tb\t1\n').size).toBe(1)
+    expect(parsearHuella(`\n  \na\t${H_COLUMNAS}\t1\n`).size).toBe(1)
+  })
+
+  // «Estabilidad ante entradas equivalentes», en la capa de parseo: la misma
+  // huella con otro final de línea, espacios sobrantes o líneas en blanco tiene
+  // que dar EXACTAMENTE el mismo mapa. Si no, el auditor reportaría drift por
+  // cómo se transportó el texto, no por lo que dice.
+  it('entradas equivalentes producen el mismo mapa', () => {
+    const canonico = parsearHuella(HUELLA_BASE)
+    const variantes = [
+      HUELLA_BASE + '\n',                                  // salto final
+      HUELLA_BASE.replace(/\n/g, '\r\n'),                  // CRLF
+      HUELLA_BASE.split('\n').map(l => `  ${l}  `).join('\n'), // espacios
+      HUELLA_BASE.split('\n').join('\n\n'),                 // líneas en blanco
+    ]
+    for (const v of variantes) {
+      expect([...parsearHuella(v).entries()]).toEqual([...canonico.entries()])
+    }
+  })
+
+  it('rechaza una huella que no es SHA-256 de 64 hex', () => {
+    // El md5 truncado a 12 hex que usaba la primera versión ya no se acepta:
+    // 48 bits admiten colisiones, y una colisión aquí es drift invisible.
+    expect(() => parsearHuella('tabla:x/columnas\taaaa11112222\t3')).toThrow(/SHA-256 de 64 hex/)
+    expect(() => parsearHuella(`tabla:x/columnas\t${H_COLUMNAS.toUpperCase()}\t3`)).toThrow(/SHA-256/)
+    expect(() => parsearHuella(`tabla:x/columnas\t${H_COLUMNAS}ff\t3`)).toThrow(/SHA-256/)
   })
 
   it('rechaza una línea mal formada en vez de tragársela', () => {
@@ -62,33 +99,36 @@ describe('calcularDrift', () => {
 
   it('detecta una COLUMNA inesperada (la huella del grupo cambia)', () => {
     const prod = parsearHuella(HUELLA_BASE)
-    const repo = parsearHuella(HUELLA_BASE.replace('tabla:clientes/columnas\taaaa11112222\t24',
-                                                   'tabla:clientes/columnas\tZZZZ99998888\t25'))
+    const otro = sha('clientes-columnas-con-una-columna-de-mas')
+    const repo = parsearHuella(HUELLA_BASE.replace(`tabla:clientes/columnas\t${H_COLUMNAS}\t24`,
+                                                   `tabla:clientes/columnas\t${otro}\t25`))
     const d = calcularDrift(prod, repo)
     expect(d).toHaveLength(1)
     expect(d[0].clave).toBe('tabla:clientes/columnas')
-    expect(d[0].produccion).toBe('aaaa11112222 (24)')
-    expect(d[0].repo).toBe('ZZZZ99998888 (25)')
+    expect(d[0].produccion).toBe(`${H_COLUMNAS}:24`)
+    expect(d[0].repo).toBe(`${otro}:25`)
   })
 
   it('detecta una POLICY inesperada', () => {
     const prod = parsearHuella(HUELLA_BASE)
-    const repo = parsearHuella(HUELLA_BASE.replace('tabla:security_logs/policies\tcccc11112222\t4',
-                                                   'tabla:security_logs/policies\tYYYY77776666\t5'))
+    const repo = parsearHuella(HUELLA_BASE.replace(`tabla:security_logs/policies\t${H_SECLOGS}\t4`,
+                                                   `tabla:security_logs/policies\t${sha('mas-una-policy')}\t5`))
     const d = calcularDrift(prod, repo)
     expect(d.map(x => x.clave)).toEqual(['tabla:security_logs/policies'])
   })
 
   it('un grupo que existe sólo de un lado cuenta como diferencia', () => {
-    const prod = parsearHuella(HUELLA_BASE + '\ntabla:solo_prod/columnas\tdddd11112222\t3')
+    const prod = parsearHuella(HUELLA_BASE + `\ntabla:solo_prod/columnas\t${sha('solo-prod')}\t3`)
     const d = calcularDrift(prod, parsearHuella(HUELLA_BASE))
     expect(d).toHaveLength(1)
-    expect(d[0].repo).toBe('AUSENTE')
+    expect(d[0].repo).toBe(AUSENTE)
   })
 })
 
 describe('evaluar', () => {
-  const drift = [{ clave: 'tabla:clientes/columnas', produccion: 'a (24)', repo: 'b (25)' }]
+  const A = `${sha('a')}:24`
+  const B = `${sha('b')}:25`
+  const drift = [{ clave: 'tabla:clientes/columnas', produccion: A, repo: B }]
 
   it('drift no declarado es DRIFT NUEVO y rompe', () => {
     const v = evaluar(drift, baselineCon({}))
@@ -98,7 +138,7 @@ describe('evaluar', () => {
 
   it('drift declarado con las MISMAS huellas no rompe', () => {
     const v = evaluar(drift, baselineCon({
-      'tabla:clientes/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: 'a (24)', repo: 'b (25)' },
+      'tabla:clientes/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: A, repo: B },
     }))
     expect(v.ok).toBe(true)
     expect(v.esperado).toHaveLength(1)
@@ -109,17 +149,17 @@ describe('evaluar', () => {
     // en `security_logs`, que ya estaba en la baseline, no rompía nada. Una
     // baseline por clave apaga la alarma justo donde más importa.
     const v = evaluar(drift, baselineCon({
-      'tabla:clientes/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: 'a (24)', repo: 'OTRA (26)' },
+      'tabla:clientes/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: A, repo: `${sha('otra')}:26` },
     }))
     expect(v.ok).toBe(false)
     expect(v.agravado).toHaveLength(1)
     expect(v.nuevo).toHaveLength(0)
-    expect(v.agravado[0].esperadoRepo).toBe('OTRA (26)')
+    expect(v.agravado[0].esperadoRepo).toBe(`${sha('otra')}:26`)
   })
 
   it('una entrada de la baseline que ya no corresponde a drift rompe, para forzar la poda', () => {
     const v = evaluar([], baselineCon({
-      'tabla:vieja/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: 'a', repo: 'b' },
+      'tabla:vieja/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: A, repo: B },
     }))
     expect(v.ok).toBe(false)
     expect(v.resuelto).toEqual(['tabla:vieja/columnas'])
@@ -131,7 +171,8 @@ describe('evaluar', () => {
 })
 
 describe('trinquete: la baseline sólo puede encoger', () => {
-  const conClaves = (...cs) => baselineCon(Object.fromEntries(cs.map(c => [c, { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: 'a', repo: 'b' }])))
+  const conClaves = (...cs) => baselineCon(Object.fromEntries(cs.map(c =>
+    [c, { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: `${sha(c)}:1`, repo: `${sha(c + 'r')}:1` }])))
 
   it('agregar una entrada rompe', () => {
     const t = verificarTrinquete(conClaves('a', 'b'), conClaves('a'))
@@ -160,8 +201,21 @@ describe('validarBaseline', () => {
   })
 
   it('rechaza un motivo demasiado corto para explicar nada', () => {
-    expect(validarBaseline(baselineCon({ 'k': { motivo: 'porque sí', desde: '2026-09-01', produccion: 'a', repo: 'b' } })))
+    expect(validarBaseline(baselineCon({ k: { motivo: 'porque sí', desde: '2026-09-01', produccion: `${sha('a')}:1`, repo: `${sha('b')}:1` } })))
       .toContainEqual(expect.stringMatching(/motivo/))
+  })
+
+  it('rechaza una huella que no es SHA-256 — incluido el md5 truncado anterior', () => {
+    const p = validarBaseline(baselineCon({
+      k: { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: 'aaaa11112222 (24)', repo: `${sha('b')}:1` },
+    }))
+    expect(p.join(' ')).toMatch(/sha256 de 64 hex/i)
+  })
+
+  it('acepta AUSENTE como lado de una diferencia', () => {
+    expect(validarBaseline(baselineCon({
+      k: { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: `${sha('a')}:1`, repo: AUSENTE },
+    }))).toEqual([])
   })
 })
 
@@ -197,10 +251,31 @@ describe('los archivos versionados', () => {
     }
   })
 
-  it('la huella de producción sólo guarda `md5(12):n` — nunca DDL crudo', () => {
+  it('la huella de producción sólo guarda `sha256:n` — nunca DDL crudo ni nada reversible', () => {
     for (const [clave, valor] of Object.entries(produccionReal.grupos)) {
-      expect(valor, `valor inesperado en ${clave}`).toMatch(/^[0-9a-f]{12}:\d+$/)
+      expect(valor, `valor inesperado en ${clave}`).toMatch(RE_HUELLA_CON_N)
     }
+    expect(produccionReal.algoritmo).toBe('sha256')
+  })
+
+  it('la baseline fija huellas SHA-256 completas en los dos lados', () => {
+    for (const [clave, e] of Object.entries(baselineReal.grupos)) {
+      expect(esHuellaValida(e.produccion), `${clave}.produccion = ${e.produccion}`).toBe(true)
+      expect(esHuellaValida(e.repo), `${clave}.repo = ${e.repo}`).toBe(true)
+      expect(e.produccion, `${clave} no debería estar en la baseline si no difiere`).not.toBe(e.repo)
+    }
+  })
+
+  it('ninguna huella versionada quedó truncada', () => {
+    // `AUSENTE` no lleva `:n`; todo lo demás es `<sha256>:<n>` y se compara
+    // sobre la parte del hash.
+    const soloHash = (v) => (v === AUSENTE ? AUSENTE : String(v).split(':')[0])
+    const truncadas = [
+      ...Object.entries(produccionReal.grupos).map(([k, v]) => [k, soloHash(v)]),
+      ...Object.entries(baselineReal.grupos).flatMap(([k, e]) =>
+        [[`${k}/prod`, soloHash(e.produccion)], [`${k}/repo`, soloHash(e.repo)]]),
+    ].filter(([, h]) => h !== AUSENTE && !RE_HUELLA.test(h))
+    expect(truncadas, 'huellas que no son SHA-256 de 64 hex').toEqual([])
   })
 
   it('declara cuándo se capturó, para que un verde viejo no se lea como fresco', () => {

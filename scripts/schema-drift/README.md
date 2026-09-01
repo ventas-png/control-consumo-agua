@@ -47,6 +47,20 @@ resultado diga *qué* objeto y *qué* aspecto cambió:
 | Grants de `EXECUTE` | `funcion:<firma>/grants` |
 | Vistas, vistas materializadas y enums | `vista:` · `matview:` · `enum:` |
 
+Cada grupo se serializa de forma **canónica** y se hashea con **SHA-256 completo
+(64 hex)**. Las reglas están en `fingerprint.sql` y existen porque sin ellas dos
+bases con el mismo esquema pueden hashear distinto — el peor fallo de un
+auditor, porque el drift falso enseña a ignorar la alarma:
+
+| Regla | Por qué |
+| --- | --- |
+| `ORDER BY … COLLATE "C"` en todo agregado | El orden depende de la collation. La reconstrucción corre con `--locale=C` y producción con la suya: dos catálogos idénticos podían serializar sus columnas en distinto orden. |
+| Separadores `\x1e` (registro) y `\x1f` (campo) | El cuerpo de una policy trae saltos de línea, así que separar con `\n` era ambiguo: una policy multilínea podía serializarse igual que dos policies distintas. |
+| `NULL` explícito `\x1d`, distinto de `''` | `default=NULL` y `default=''` son cosas distintas y deben hashear distinto. |
+| Espacios colapsados en cuerpos de función y vistas | La sangría no cambia la semántica de PL/pgSQL. Sin colapsarla aparecían 11 grupos de drift falso: `enforce_max_units` (603 vs 637 bytes), `touch_updated_at` (49 vs 53) y `refresh_superadmin_kpis` (163 vs 163, mismo largo y distinta disposición) tienen el cuerpo normalizado **idéntico** a ambos lados. |
+| `sha256` de `pg_catalog`, no de `pgcrypto` | La huella no depende de qué extensión esté instalada ni en qué esquema viva. |
+| 64 hex sin truncar | Un md5 recortado a 12 hex son 48 bits. Con ~2 400 grupos el riesgo de colisión es pequeño pero real, y una colisión aquí es exactamente «drift que el auditor no ve». |
+
 Los grants son una dimensión de primera clase a propósito: una policy permisiva
 sólo es peligrosa si el rol además tiene el privilegio, y en Supabase `anon` y
 `authenticated` lo tienen sobre casi todo por los privilegios por defecto. Un
@@ -74,6 +88,10 @@ node scripts/schema-drift/auditar.mjs --trinquete-contra origin/main
 # Sólo valida el archivo de baseline (rápido, sin levantar Postgres).
 node scripts/schema-drift/auditar.mjs --solo-baseline
 
+# Propiedades de la huella contra un catálogo real: determinismo, estabilidad
+# ante el mismo catálogo leído con otro plan, formato y sensibilidad al cambio.
+node scripts/schema-drift/auditar.mjs --verificar-huella
+
 # Prueba negativa: inyecta una columna y una policy que nadie declara.
 # DEBE salir distinto de cero.
 node scripts/schema-drift/auditar.mjs --prueba-negativa
@@ -97,7 +115,7 @@ Requiere el **servidor** de Postgres, no sólo `psql`: hacen falta `initdb` y
 | `fingerprint.sql` | La huella normalizada. **La misma consulta** corre contra la reconstrucción y contra producción. |
 | `reconstruir.mjs` | `initdb` → `bootstrap.sql` → las 449 migraciones en orden, cada una en su transacción con `ON_ERROR_STOP`. |
 | `auditar.mjs` | Comparación, veredicto y códigos de salida. Su lógica es pura y está probada. |
-| `huella-produccion.json` | Instantánea del catálogo de producción. Permite auditar en CI **sin ninguna credencial**. |
+| `huella-produccion.json` | Instantánea del catálogo de producción, `sha256:n` por grupo. Permite auditar en CI **sin ninguna credencial**. |
 | `drift-conocido.json` | La baseline explícita del drift conocido. |
 
 ### Por qué no se usa una rama Preview de Supabase
@@ -121,8 +139,8 @@ cuesta nada, no necesita permisos y es determinista.
   poda acaba siendo un `permitir todo` de facto. Es el mismo criterio que el
   `_README` de `scripts/migraciones-vs-produccion.allowlist.json`.
 - `desde` — cuándo se midió.
-- `produccion` y `repo` — **las huellas concretas**. La baseline declara *esta*
-  diferencia, no «lo que sea que pase en esta tabla».
+- `produccion` y `repo` — **las huellas concretas**, `sha256:n` o `AUSENTE`. La
+  baseline declara *esta* diferencia, no «lo que sea que pase en esta tabla».
 
 El auditor falla en tres casos:
 
@@ -170,13 +188,35 @@ Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
 Mientras tanto el job `live` de `.github/workflows/schema-drift.yml` está apagado
 por `vars.SCHEMA_DRIFT_LIVE_HABILITADO` y documenta exactamente qué falta.
 
+## Cómo se prueban las propiedades de la huella
+
+`--verificar-huella` corre contra un catálogo real, no contra una
+reimplementación en JavaScript: lo que puede fallar es la serialización en SQL, y
+probar el doble no prueba la cosa.
+
+| Propiedad | Cómo se comprueba |
+| --- | --- |
+| **Determinismo** | Dos corridas consecutivas dan la huella byte a byte idéntica. |
+| **Estabilidad ante entradas equivalentes** | El mismo catálogo leído con otro plan de ejecución (`enable_seqscan=off`, `enable_hashagg=off`) da la misma huella. Si el orden del agregado dependiera del plan y no del `ORDER BY … COLLATE "C"`, esto lo delataría. |
+| **Formato** | Los 2 432 grupos con SHA-256 de 64 hex. |
+| **Sensibilidad al cambio** | Quitar un `NOT NULL` —el cambio más pequeño que existe: no toca nombres, ni tipos, ni conteos— mueve **exactamente un** grupo y deja el conteo igual. |
+
+En `vitest` se prueba lo que sí es JavaScript: que el parser rechace una huella
+que no sea SHA-256 de 64 hex (incluido el md5 truncado anterior), que entradas
+equivalentes —CRLF, espacios sobrantes, líneas en blanco— den el mismo mapa, y
+que ningún valor versionado haya quedado truncado.
+
 ## Estado al 2026-09-01
 
 - **449/449** migraciones aplican sobre una base vacía. El repositorio levanta el
   esquema solo.
-- **2 438** grupos comparados, **2 318 coinciden**, **120 difieren**.
+- **2 438** grupos comparados, **2 319 coinciden**, **119 difieren**.
 - Las 260 tablas existen a ambos lados con el mismo estado de RLS.
-- De las 120: 25 índices, 26 definiciones de función, 29 grants de `EXECUTE`,
+- De las 119: 25 índices, 25 definiciones de función, 29 grants de `EXECUTE`,
   16 columnas, 13 constraints, 8 policies y 3 triggers.
+- Al pasar de md5 truncado a SHA-256 canónico la lista **encogió de 120 a 119**:
+  `funcion:set_updated_at()` era un falso positivo — su cuerpo normalizado es
+  idéntico a ambos lados (`f019c2a8…`) y sólo cambiaban 5 bytes de espaciado.
+  No apareció ningún grupo nuevo.
 - Las diferencias de **policies y grants están clasificadas como seguridad
   prioritaria** en #826. Ninguna se corrige aquí: este PR sólo mide.

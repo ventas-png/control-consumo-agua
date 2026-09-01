@@ -73,6 +73,13 @@ jobs:
           fi
           ls -d /usr/lib/postgresql/*/bin | tail -1
 
+      # Las propiedades de la huella se prueban contra un catálogo REAL, no
+      # contra una reimplementación en JavaScript: lo que puede fallar es la
+      # serialización en SQL. Determinismo, estabilidad ante el mismo catálogo
+      # leído con otro plan, formato SHA-256 y sensibilidad a un cambio mínimo.
+      - name: Propiedades de la huella (determinismo, equivalencia, sensibilidad)
+        run: node scripts/schema-drift/auditar.mjs --verificar-huella
+
       - name: Auditar drift (offline, sin credenciales)
         run: |
           node scripts/schema-drift/auditar.mjs \
