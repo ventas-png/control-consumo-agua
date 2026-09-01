@@ -57,9 +57,36 @@ auditor, porque el drift falso enseña a ignorar la alarma:
 | `ORDER BY … COLLATE "C"` en todo agregado | El orden depende de la collation. La reconstrucción corre con `--locale=C` y producción con la suya: dos catálogos idénticos podían serializar sus columnas en distinto orden. |
 | Separadores `\x1e` (registro) y `\x1f` (campo) | El cuerpo de una policy trae saltos de línea, así que separar con `\n` era ambiguo: una policy multilínea podía serializarse igual que dos policies distintas. |
 | `NULL` explícito `\x1d`, distinto de `''` | `default=NULL` y `default=''` son cosas distintas y deben hashear distinto. |
-| Espacios colapsados en cuerpos de función y vistas | La sangría no cambia la semántica de PL/pgSQL. Sin colapsarla aparecían 11 grupos de drift falso: `enforce_max_units` (603 vs 637 bytes), `touch_updated_at` (49 vs 53) y `refresh_superadmin_kpis` (163 vs 163, mismo largo y distinta disposición) tienen el cuerpo normalizado **idéntico** a ambos lados. |
+| **Ninguna normalización de espacios, en ninguna dimensión** | Ver abajo. |
 | `sha256` de `pg_catalog`, no de `pgcrypto` | La huella no depende de qué extensión esté instalada ni en qué esquema viva. |
 | 64 hex sin truncar | Un md5 recortado a 12 hex son 48 bits. Con ~2 400 grupos el riesgo de colisión es pequeño pero real, y una colisión aquí es exactamente «drift que el auditor no ve». |
+
+### Por qué no se normalizan los espacios
+
+Una versión anterior colapsaba espacios con `regexp_replace('\s+',' ')` y `btrim`
+sobre `prosrc` y sobre las definiciones de vista, para evitar 12 grupos de drift
+meramente cosmético. **Estaba mal**, y de la peor manera: un colapso *global* no
+distingue la sangría del contenido, así que borraba diferencias reales dentro de
+
+- **literales SQL** — `SELECT 'a  b'` y `SELECT 'a b'` hasheaban **igual**;
+- **cuerpos PL/pgSQL y dollar-quoted**, donde un salto de línea dentro de una
+  cadena es dato, no formato;
+- **definiciones de vista** con literales;
+- **identificadores entre comillas**.
+
+Eso es un **falso negativo**: drift real que el auditor no ve. Vale
+incomparablemente más conservar una diferencia cosmética declarada en
+`drift-conocido.json` —donde alguien la lee y decide— que perder una diferencia
+semántica en silencio.
+
+Una normalización *correcta* tendría que ser consciente de la sintaxis
+(dollar-quoting anidado, cadenas `E''`, comentarios, comillas dobles): eso es un
+parser, y un parser con bugs reintroduce exactamente el fallo que se quiere
+evitar. Así que todo el DDL se hashea **en crudo**, y los 12 grupos cosméticos
+quedan declarados y marcados como tales.
+
+Las demás dimensiones —defaults (`pg_get_expr`), constraints, índices, policies
+(`qual`/`with_check`) y triggers— nunca se normalizaron.
 
 Los grants son una dimensión de primera clase a propósito: una policy permisiva
 sólo es peligrosa si el rol además tiene el privilegio, y en Supabase `anon` y
@@ -91,6 +118,11 @@ node scripts/schema-drift/auditar.mjs --solo-baseline
 # Propiedades de la huella contra un catálogo real: determinismo, estabilidad
 # ante el mismo catálogo leído con otro plan, formato y sensibilidad al cambio.
 node scripts/schema-drift/auditar.mjs --verificar-huella
+
+# El espaciado dentro del contenido (literales, dollar-quoted, defaults,
+# policies) DEBE mover la huella. Cuatro casos; con la normalización anterior
+# fallaban dos.
+node scripts/schema-drift/auditar.mjs --prueba-espacios
 
 # Prueba negativa: inyecta una columna y una policy que nadie declara.
 # DEBE salir distinto de cero.
@@ -201,6 +233,29 @@ probar el doble no prueba la cosa.
 | **Formato** | Los 2 432 grupos con SHA-256 de 64 hex. |
 | **Sensibilidad al cambio** | Quitar un `NOT NULL` —el cambio más pequeño que existe: no toca nombres, ni tipos, ni conteos— mueve **exactamente un** grupo y deja el conteo igual. |
 
+`--prueba-espacios` cubre los cuatro casos en que el espaciado **es** contenido:
+
+| Caso | Grupo que debe moverse |
+| --- | --- |
+| Función que devuelve `'a  b'` frente a `'a b'` | `funcion:esp_literal()` |
+| `default ' '` frente a `default ''` | `tabla:esp_tabla/columnas` |
+| Policy comparando contra un literal con uno y dos espacios | `tabla:esp_tabla/policies` |
+| Cuerpo dollar-quoted con un salto de línea dentro de la cadena | `funcion:esp_dollar()` |
+
+Reintroduciendo la normalización anterior, los casos 1 y 4 fallan — que es
+exactamente el agujero que cerró quitarla. Los casos 2 y 3 pasan en ambas
+versiones porque esas dimensiones nunca se normalizaron.
+
+### La baseline en la rama base
+
+Sólo la **ausencia comprobada** del archivo cuenta como «primera vez». Un
+`try/catch` alrededor de `git show` fallaba igual con el archivo ausente, con una
+ref inexistente y con un checkout incompleto, y los tres pasaban por «primera
+vez»: bastaba un `fetch-depth: 1` para **apagar el trinquete en silencio**. Ahora
+se separan: `rev-parse --verify` (¿existe la ref?), `cat-file -e <ref>^{tree}`
+(¿están sus objetos?) y sólo entonces `ls-tree` — cuyo resultado vacío, con el
+árbol completo delante, sí es información.
+
 En `vitest` se prueba lo que sí es JavaScript: que el parser rechace una huella
 que no sea SHA-256 de 64 hex (incluido el md5 truncado anterior), que entradas
 equivalentes —CRLF, espacios sobrantes, líneas en blanco— den el mismo mapa, y
@@ -210,13 +265,14 @@ que ningún valor versionado haya quedado truncado.
 
 - **449/449** migraciones aplican sobre una base vacía. El repositorio levanta el
   esquema solo.
-- **2 438** grupos comparados, **2 319 coinciden**, **119 difieren**.
+- **2 438** grupos comparados, **2 307 coinciden**, **131 difieren** — de los
+  cuales **12 son cosméticos** (espaciado en cuerpos de función), marcados como
+  tales en la baseline.
 - Las 260 tablas existen a ambos lados con el mismo estado de RLS.
-- De las 119: 25 índices, 25 definiciones de función, 29 grants de `EXECUTE`,
-  16 columnas, 13 constraints, 8 policies y 3 triggers.
-- Al pasar de md5 truncado a SHA-256 canónico la lista **encogió de 120 a 119**:
-  `funcion:set_updated_at()` era un falso positivo — su cuerpo normalizado es
-  idéntico a ambos lados (`f019c2a8…`) y sólo cambiaban 5 bytes de espaciado.
-  No apareció ningún grupo nuevo.
+- De los 131: 37 definiciones de función (12 de ellas cosméticas), 29 grants de
+  `EXECUTE`, 25 índices, 16 columnas, 13 constraints, 8 policies y 3 triggers.
+- La lista fue 120 → 119 → 131. La subida es **sólo la deuda cosmética que antes
+  estaba oculta** por la normalización; no apareció ninguna diferencia semántica
+  nueva.
 - Las diferencias de **policies y grants están clasificadas como seguridad
   prioritaria** en #826. Ninguna se corrige aquí: este PR sólo mide.

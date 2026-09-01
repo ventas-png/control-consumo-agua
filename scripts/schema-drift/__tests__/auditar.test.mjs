@@ -23,6 +23,8 @@ import {
   validarBaseline,
   clavesDeBaseline,
   esHuellaValida,
+  baselineDeLaBase,
+  RUTA_BASELINE_EN_GIT,
   RE_HUELLA,
   RE_HUELLA_CON_N,
   AUSENTE,
@@ -280,5 +282,60 @@ describe('los archivos versionados', () => {
 
   it('declara cuándo se capturó, para que un verde viejo no se lea como fresco', () => {
     expect(produccionReal.capturada).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+// ── Resolución de la baseline en la rama base ──────────────────────────────
+//
+// Sólo la AUSENCIA COMPROBADA del archivo puede leerse como «primera vez». Un
+// `try/catch` alrededor de `git show` fallaba igual con el archivo ausente, con
+// una ref inexistente y con un checkout incompleto, así que los tres pasaban
+// por «primera vez» y el trinquete se apagaba en silencio: bastaba un
+// `fetch-depth: 1` para que un PR agrandara la baseline sin que nada lo notara.
+describe('baselineDeLaBase: qué cuenta como «primera vez»', () => {
+  const BASELINE = { grupos: { 'tabla:x/columnas': { motivo: 'x'.repeat(20), desde: '2026-09-01', produccion: `${sha('p')}:1`, repo: `${sha('r')}:1` } } }
+
+  /** git falso: `respuestas` mapea el primer argumento a stdout, o a un Error. */
+  const gitFalso = (respuestas) => (args) => {
+    const cmd = args[0]
+    const r = respuestas[cmd]
+    if (r instanceof Error) throw r
+    if (r === undefined) throw new Error(`git ${cmd}: sin respuesta simulada`)
+    return r
+  }
+
+  it('la ref existe, el árbol está y el archivo NO: es la primera vez → null', () => {
+    const git = gitFalso({ 'rev-parse': '', 'cat-file': '', 'ls-tree': '\n' })
+    expect(baselineDeLaBase('origin/main', git)).toBeNull()
+  })
+
+  it('la ref existe, el árbol está y el archivo SÍ: devuelve la baseline', () => {
+    const git = gitFalso({
+      'rev-parse': '', 'cat-file': '',
+      'ls-tree': `${RUTA_BASELINE_EN_GIT}\n`,
+      show: JSON.stringify(BASELINE),
+    })
+    expect(baselineDeLaBase('origin/main', git)).toEqual(BASELINE)
+  })
+
+  it('una ref INEXISTENTE lanza, no se toma por «primera vez»', () => {
+    const git = gitFalso({ 'rev-parse': new Error('fatal: Needed a single revision') })
+    expect(() => baselineDeLaBase('origin/inventada', git)).toThrow(/no existe en este repositorio/)
+  })
+
+  it('un CHECKOUT INCOMPLETO lanza, no se toma por «primera vez»', () => {
+    // La ref resuelve pero el árbol no está: clon superficial (fetch-depth: 1).
+    const git = gitFalso({ 'rev-parse': '', 'cat-file': new Error('fatal: git cat-file: could not get object info') })
+    expect(() => baselineDeLaBase('origin/main', git)).toThrow(/checkout está incompleto/)
+  })
+
+  it('un fallo de `ls-tree` se propaga en vez de convertirse en null', () => {
+    const git = gitFalso({ 'rev-parse': '', 'cat-file': '', 'ls-tree': new Error('fatal: not a tree object') })
+    expect(() => baselineDeLaBase('origin/main', git)).toThrow(/not a tree object/)
+  })
+
+  it('un JSON corrupto en la rama base se propaga', () => {
+    const git = gitFalso({ 'rev-parse': '', 'cat-file': '', 'ls-tree': `${RUTA_BASELINE_EN_GIT}\n`, show: '{ esto no es json' })
+    expect(() => baselineDeLaBase('origin/main', git)).toThrow()
   })
 })

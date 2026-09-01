@@ -3,20 +3,20 @@
   "_HUELLA": "Cada entrada fija el par de huellas medido: `sha256(serialización canónica):nº de objetos`, o `AUSENTE` si el grupo no existe de ese lado. Fijar el par —y no sólo la clave— es lo que impide que un grupo ya declarado se trague cualquier cambio posterior: la baseline declara ESTA diferencia concreta, no barra libre en esa tabla. Lo destapó la primera prueba negativa real, en la que inyectar una policy en `security_logs` no rompía nada.",
   "_TRINQUETE": "Esta lista SÓLO puede encoger. Si un grupo deja de mostrar drift, el auditor falla hasta que se retire la entrada — así el arreglo y la poda viajan en el mismo PR. `--trinquete-contra origin/main` rechaza además cualquier PR que agregue entradas: un drift nuevo se cierra con una migración forward-only, nunca ampliando la baseline.",
   "_COMO_SE_ARREGLA": "Para cada entrada hay que decidir qué lado es el correcto — no se presume que producción ni el repositorio lo sean — y escribir una migración append-only que haga converger al otro. Las entradas marcadas SEGURIDAD van primero. Nada de esto se hace en el PR del auditor: el auditor sólo mide.",
-  "_ESTADO": "119 grupos con drift sobre 2438 comparados: 2319 coinciden exactamente. Las 449 migraciones aplican 449/449 sobre una base vacía. Las 260 tablas existen a ambos lados con el mismo estado de RLS.",
-  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex. Al pasar a SHA-256 completo con serialización canónica quedaron 119: `funcion:set_updated_at()` era un FALSO POSITIVO —su cuerpo normalizado con btrim es idéntico a ambos lados (f019c2a8…), sólo cambiaban 5 bytes de espaciado en crudo—. Ningún grupo nuevo apareció. La lista sólo puede seguir encogiendo.",
+  "_ESTADO": "131 grupos con drift sobre 2438 comparados: 2307 coinciden exactamente. Las 449 migraciones aplican 449/449 sobre una base vacía. Las 260 tablas existen a ambos lados con el mismo estado de RLS. De los 131, DOCE son cosméticos (espaciado en cuerpos de función) y están marcados como tales.",
+  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.",
   "grupos": {
     "funcion:aplicar_mora_cuotas_vencidas()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "bcb6d140c3788d296872e69a810a7acd82b5d6a0096f0d1dddeb09f697b8b1a5:1",
-      "repo": "18f611a30c4dc4d8a354f7d5e7633a57786b58d2c9242654b49a4ca4be4af7a4:1"
+      "produccion": "718ba47fa7ef66087029f9ca875a955a12ea40be5abb6ccc76e7c209adcc99cd:1",
+      "repo": "52ad43c25749c003e43561aa24dcf2c85eede2395f3945ecc3e961881cf151ea:1"
     },
     "funcion:aplicar_mora_facturas_vencidas()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "c02d33f47c589a02a9cf2ca4aa85266ed62f237b798c76f807b4ad20f5bd668a:1",
-      "repo": "d4ea82de2e567c0d00a69058d5e355a2de6dbd8cedd02a79d512fb0d054388f4:1"
+      "produccion": "f7f0f6e079714564b753c8d9ec785a3744a516e4b1a79326979c816e886948de:1",
+      "repo": "302fdca5af4f21de21a1f36712b3ecc3dcdca949647aaac0de19b77ec36fa36f:1"
     },
     "funcion:buscar_cliente_para_onboarding(p_cui_dui text, p_fecha_nac date, p_email text)/grants": {
       "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
@@ -27,20 +27,20 @@
     "funcion:calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "df81bc7a0263db8ed0ee5768e4a8a74a07916aacdbaf0270b092680a26185ca4:1",
-      "repo": "5816d30eaa34e82bae810f21c660c3afc52bfdde5e263fa43499e3164d9d67d1:1"
+      "produccion": "ae53ca7335b8c0f4e449f0ac479f96e2750f9c1aa33513126b192a94b5228dfa:1",
+      "repo": "6865d6eb22472a4cc9888b1c3d3c546475e46b8f5ab94738b4e2810c1b34307c:1"
     },
     "funcion:calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb, p_company_id uuid)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "00f5cd38d8b525072e4e541477d9509c73d0bb97fea57d366309a62e58e0de61:1",
-      "repo": "dd4543b4e14ed9d5ab019357aa8d6c40af95a0e23e2725f2e440c43d3c69e696:1"
+      "produccion": "ef7e7f2ac2a16ffc8531edccd1433f7d0bc188e422f0595454cda8001f85c5d1:1",
+      "repo": "200c6a38e588256fd3301b1f0d98855efe0c1f6e7a3414e5002c07157c65f516:1"
     },
     "funcion:create_default_conversation_access_rules(p_company_id uuid)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "62c6f8aeb1a8c0bc96f5ee7c936ef4837195e47bd6584cbf96032eebf796ad5c:1",
-      "repo": "2b8ff869eba1ebc9a3a5350fa5285723258703717c5c02c1f153fdc8723a022a:1"
+      "produccion": "ccbd27453c6df8a6d6b7a366229fba5d18370c9e99494d2874a3ea5168ab986b:1",
+      "repo": "80a617746978a3fa2168975f1ae6691ba41d653793afc0a5d5ae214d0e43e281:1"
     },
     "funcion:create_default_conversation_access_rules(p_company_id uuid)/grants": {
       "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
@@ -57,14 +57,20 @@
     "funcion:dispatch_scheduled_reports(p_schedule_kind text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "19e6a615f3ddec895cfa84e4582f6eb87e717bb23a8db32054fcfbf2254425f8:1",
-      "repo": "014f349d6b8ee4afa1025243feb4957632254e733b93fb402607cec89bc688b4:1"
+      "produccion": "338799f69d3f844ba7ee6c10b90b2d7a5ca9147a32bdc0da4dc24815cbfe928e:1",
+      "repo": "e5a3c1617c64dc5cd49dab9c1a937a01b613404794ffe621823e6fb7f3e7c0ba:1"
     },
     "funcion:enforce_max_projects()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "0023ac512ceaa2a31ae2fe8cbc7a979e8b1cf19fffce17485007be6020969298:1",
-      "repo": "7284f094744900e0657fc1c7aa873ccf6e5c9feb57f53c50ddc13544bb178ccf:1"
+      "produccion": "0efb5e3c71df5986a3f3cc2b3659d1a591eda999213aee59df703a57fa532c0a:1",
+      "repo": "1b8440471a74ec5202c9925a69b45a9f0be4c7ec75bc667294a3d22d458cd6de:1"
+    },
+    "funcion:enforce_max_units()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "1a9a88605d24d7d1d216a34ae9463fba996820acfd8b00d062e23561268acb0b:1",
+      "repo": "382d2bd78c1381d2ec7227d9c599557a1b621db71c47362868ca5d9db6a15c13:1"
     },
     "funcion:fill_company_id_from_user()/grants": {
       "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
@@ -81,8 +87,8 @@
     "funcion:generar_ocurrencias_rutas(p_dias_adelante integer)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "ef89296c49e484fd6d619560a6a335b9faa6850ac7576e43345f81e3906ed5b2:1",
-      "repo": "37a488c76d512ce67f063aa273f05ba90e0d626e8dde8037d9ac4f09136cf2ee:1"
+      "produccion": "34f49ac52c330b17c0ee2177e93cf7d1eaf48e7169fd2817d2e708ea47f7ac77:1",
+      "repo": "02de94dcb8eeb97409460a7e469ebdc3265876d39c43663c465d443fbcd5c662:1"
     },
     "funcion:get_my_cliente_id()/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -99,14 +105,20 @@
     "funcion:get_my_sessions()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "f886fdc8fef94fc1b29e539f686817240ad73b54e974d91e3859b9d44caf665a:1",
-      "repo": "4b01eba435b52073a6c6fdb8b1dacb9e7ef10226ff2a67de0c12c9166c8fb80c:1"
+      "produccion": "662ae46fb6364faffe8103cf245ed65cc7e7a744a2280b720f15269c371356d2:1",
+      "repo": "8fc6c9bb41f4195e832ce6a51bc7c02b6a119c30520dd07b335914692c921b72:1"
     },
     "funcion:get_my_user_id()/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_admin_company_access(p_company_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "a9db63bf240f45277e2afb7fc73a2fac36275fb09f5355a97b543eb2ae0d1595:1",
+      "repo": "21a882bf9cbd0371b37ffbc99a77517791394e8302f9a676dcb508d1d3ba913e:1"
     },
     "funcion:has_admin_company_access(p_company_id uuid)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -120,17 +132,35 @@
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
     },
+    "funcion:has_admin_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "cbbdfc3dcea34873b8f22a6f9ac4b1719e0218d74ce0c9b4e146537574195add:1",
+      "repo": "250a62695a11a6320dc7c3173897c722df63ca7ced2688f29f8acd9db3d635a4:1"
+    },
     "funcion:has_admin_project_access(p_project_id uuid)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
     },
+    "funcion:has_company_owner_company_access(p_company_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "b33fd9a413d6c20e4fb00fae834fff15c503c1825d0348003781fa5ffc998484:1",
+      "repo": "fac645fa476cb011cda14d13f5e911b659a0b02c97354e114462fcc8e5321e95:1"
+    },
     "funcion:has_company_owner_company_access(p_company_id uuid)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_operator_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "86c4b1973e35298fe62aa84c9170bf6ed671680a6e0e58be6ff2d334e2a26bc6:1",
+      "repo": "afccce87b684bdc05b2181c621612c0bcffdb0f098160de08cef640576a10a19:1"
     },
     "funcion:has_operator_project_access(p_project_id uuid)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -141,7 +171,7 @@
     "funcion:has_role_any(p_roles text[])": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "ae3ed9e90571c1d4c189ce4fcec7279258f6186e6f4e1fdd31973cbc315571b7:1",
+      "produccion": "b71b07a39c96a790e3fe13745961462d64dbbda6f1a2e862e117b51d26a8e717:1",
       "repo": "AUSENTE"
     },
     "funcion:has_role_any(p_roles text[])/grants": {
@@ -159,7 +189,7 @@
     "funcion:has_super_or_owner_access(p_company_id uuid)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "2be30716c4f3fa59388daa7e07907817f1dea80a5c1032b170b8efd956ab2064:1",
+      "produccion": "f6db70ae8f9a6f493ce2644c4ee665527385ee8841993eb950e92bb0f75ad7b7:1",
       "repo": "AUSENTE"
     },
     "funcion:has_super_or_owner_access(p_company_id uuid)/grants": {
@@ -167,6 +197,12 @@
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "AUSENTE"
+    },
+    "funcion:has_viewer_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "016ff4f24a19ebd418a8821d486feddd6ff7271ca1efa985b291eb12fb92a0a5:1",
+      "repo": "fbf796accb327be3708240aede6b18bfa7b961cd6f534a945b8ebf990c11e1de:1"
     },
     "funcion:has_viewer_project_access(p_project_id uuid)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -195,7 +231,7 @@
     "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "c20156088cf0dd9b9536d7c182bfd7a07f5e955c3cc7d4b4d05c303095743ec1:1",
+      "produccion": "9bec92a81d951c09d57f5199e918fed1fd49a61deeabcf2fb21c68599e777f7d:1",
       "repo": "AUSENTE"
     },
     "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])/grants": {
@@ -207,14 +243,14 @@
     "funcion:mark_notification_result(p_id uuid, p_ok boolean, p_error text, p_retriable boolean)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "aceb7001a76f3b49074d101188307fad9fee6576ed85b733ce152700c60bbe6b:1",
-      "repo": "de30be203fd77b989cfb8f1918f51bc752463949969a64e7b04c0fd5ca74ed96:1"
+      "produccion": "0f8414301c42f33e859c38efe697c04868bffbad8c64ee7a86b8fcef14d48445:1",
+      "repo": "043aabda08e9a131524b1aba530d5e66e4c5da45268f7262a37fde91414e5165:1"
     },
     "funcion:migrate_custom_auth_to_supabase_unconfirmed()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "a98b4d2b2d5cb6011d6cdbf6f8046a237c246e3dfc0bc896ec57d035df1cff1f:1",
-      "repo": "ca1bc5ae4b6a9f9bf55dad0d3958fd97a8549056e0b6a30f66413f3d3b322c24:1"
+      "produccion": "ff24afbacb3de16e71c98bd75f80b85ecf00e79333f61246deca8485a470f9b4:1",
+      "repo": "8cf93787e474a476e0b5a6449a2cc46f03b61f037261f527e6bed89d73009d0c:1"
     },
     "funcion:migrate_custom_auth_to_supabase_unconfirmed()/grants": {
       "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
@@ -225,20 +261,32 @@
     "funcion:notification_channel_enabled(p_user_id uuid, p_channel text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "29765db3846dc40e69bfcac77cb6b29ca83d86eccf270f6dc6fe56527336ce4a:1",
-      "repo": "6b12aab0f6f54b3bf72fe9371ea2bdbe10ea5b984507337c3f26bb550366d298:1"
+      "produccion": "52700c2504f8c1ce31eebc00fe3b5b918809a21f48b46d54bc749f44a9b520b4:1",
+      "repo": "d822c8f11461faea8bd2e77b918e3b9bba911a6197a904ceda83286303a43014:1"
+    },
+    "funcion:rate_limit_check(p_user_id uuid, p_action text, p_max_count integer, p_window interval)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "d495606b082e48625b12e9ab3726a31c0e6f2e5770af3592777bb6d7ea64bf32:1",
+      "repo": "3ba62a175ae5f848fb64bc7c6ddd8d9c1cdf7633f98014bfb1bd76004065f0de:1"
     },
     "funcion:record_legal_acceptance(p_doc_type text, p_user_agent text, p_locale text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "5fcc5379a8c7ad4e7226df5b6c883fc3457d647913c81343f7573dd031b70339:1",
-      "repo": "f112183d73aa1e4f97d816bfd88a850f47b370011e8f15041c9bac41fee25b02:1"
+      "produccion": "aea5d29afb240f37f8348219f96637ccdfb742207ab5bd6d6ea3aaa07c1f27fe:1",
+      "repo": "f4ce941c15a974ec33428455e0c98074809ff45ba8470ac1c1d6604c33519d7a:1"
+    },
+    "funcion:refresh_superadmin_kpis()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "66f4e739d77064e163b368c55aa59cc02f4f05f4515c202b8a5609a2f5dfe704:1",
+      "repo": "409ea0ac651163828eaedb6650939d145493533bc6ae0812212fdf715f239053:1"
     },
     "funcion:request_password_reset(email_input character varying, ip_address character varying, user_agent text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "4916cfe23c5c415482d87a40049170739440a7fe5fff72cb9041b0c79fcee816:1",
-      "repo": "8682c3f26602fe598802b8a1ee6274a5b15de9872f81db2efb409ceb56128841:1"
+      "produccion": "52f6c25d9b902ed30e387651a54a20b49f8f0c67c4c0ac16f0797cd9bdcb976c:1",
+      "repo": "ca02858c9b3a25d32baacdfea8b390c667a9bd1a36fdbfc1a801b782a9d6a2aa:1"
     },
     "funcion:request_password_reset(email_input character varying, ip_address character varying, user_agent text)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -255,20 +303,26 @@
     "funcion:revoke_my_session(p_session_id uuid)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "11cb8d4f682e0ceb7602d959db3c77458e264381e937ed9f06d2f0b2b8d9a20a:1",
-      "repo": "8682ee4eddba4c36abbe6a81ae8f075d0890954fa3321ffebabd290627a25c3e:1"
+      "produccion": "7b733d2f77d28537984ef8532c3214e3ffe1eaa073bf653ce8bd3b8c9a0837db:1",
+      "repo": "b548ffbf28fa71a0e466c189353ede4356f14ed9a9d61d5e28a183d41b6a1e5e:1"
     },
     "funcion:revoke_other_my_sessions()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "e00b57d9a7b9adde91e413def0d2a6626edc6f6a71d1353a1570af0fa673e0cb:1",
-      "repo": "37bc741d866bcb94c6a4a0aafbbe2287863237880318d1e890ace7cdfa2bc1ba:1"
+      "produccion": "7c046bf80bf09fc2a3765e87ba0d590c64259bcaa886592af89d36ed96514114:1",
+      "repo": "7f80e2c54c1f8e1d81744fd0f4cdcd2c33ec18946367d06da7a84ca3924870d0:1"
     },
     "funcion:run_route_reminders()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "6530e86fe85a5e0afcff06436faab4b0a1d513a0d6035d444f48eb15a231d43f:1",
-      "repo": "e12ad3e936468097bb428e88f1900ee48818e43491be1ecfb04e0b10390599ac:1"
+      "produccion": "cccbe91ee961d8312a814d38536dccbd496c8e0a59a0b440a518064a4ad11990:1",
+      "repo": "5a6d5d1c2b291f8f00598ccb10fdd4eb1e1f0b6e923e4f71cf3fe60c69210aa9:1"
+    },
+    "funcion:set_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "a8e92d8b7d268e537ebdbd16b16ced6d3af8962fb80b8db48a684870d154e79d:1",
+      "repo": "5f43a5b3312f9453d09244d9fab57d8216594515d1f699536476cd246928dad1:1"
     },
     "funcion:set_updated_at()/grants": {
       "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
@@ -279,26 +333,38 @@
     "funcion:sync_contador_project_from_unidad()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "961aac3c6e4fc97116fd17ee670070575bafc97a5ebfc614fffea34752dfccf3:1",
-      "repo": "c3d77202cc446d70442700703eba788858906b5381d1e2b935c21b052b073fb7:1"
+      "produccion": "8b767010d9af9866a49aa3e52b65db6bca335ad32c470b01b2cb1254b3e8be69:1",
+      "repo": "5c3f90d7ac3d4b8dc41373f78011171f32c991a0e395b9b212bd19803ace6a1a:1"
+    },
+    "funcion:touch_notification_preferences_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "72b793ee133e6e9af0958eac326412626564540a773870da426dd0ef48b03a9c:1",
+      "repo": "6666f06426f460d3f1b12b9e5ae00f05a66c899ae2fc118c7f42b7130c7bc7d5:1"
+    },
+    "funcion:touch_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "08751a45f69aa68040f0041fa6684ecfa19c5ad981122a6c2cd0697bff579cc5:1",
+      "repo": "015b263a160df9372cc87b68908ee8cde4704c4ac4d31dde5de739de5408038b:1"
     },
     "funcion:trg_registros_calidad_cumplimiento()": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "6077b3631b42d64b6dc23be404f03e0be569be90b62b1f04ef21925668342eee:1",
-      "repo": "8f8bec67dbf7f93edc99da51d843e5a6ddbf2c9eaf76d2497d9e3dd8988b75e0:1"
+      "produccion": "5be4706205269c5218c0af3a3d8857411eebce4a7e67d817e6d4b3695721dd19:1",
+      "repo": "37ba6fcc80b2d2dbc0af2d236ec28f2b88fd4b18a6a113c29b47acd816c2125b:1"
     },
     "funcion:update_email_attempt(p_id bigint, p_ok boolean, p_error text)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "e6f4cd6ebb8987a0fb7c096342ad89059d52e8fcee045c0094614d84a9bb38a2:1",
-      "repo": "383d9e7bfa588d66ea31f8b32805ba075b7e052c76a5fe7055f157598c1723ba:1"
+      "produccion": "54039aac310e0f8ce52615b89671dbd6b6bdd93cd928e7781df08b629aa64a35:1",
+      "repo": "08a64230addee307df37e0b7d4fcc3007d888b1a9f89b8c4fac91e6978bdadf1:1"
     },
     "funcion:update_user_password(email_input character varying, new_password character varying)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "1df3909a2eaa420be48c4f1bf2970308bbf0bfbcf33e1b7cbf37255e776ffeec:1",
-      "repo": "d21bdfd483fdb6465a09bcdc1a2226e0c6b92524c3744f4b30f0e2cbeaafa77a:1"
+      "produccion": "218e63367e6620ee08cd79ca23ddc1f9b927cde935d65593984fb4210d422ad3:1",
+      "repo": "2e0038f9ec91dd6fa6a208541d5219fd4a56a313165dee42bc1284d0da1ad49f:1"
     },
     "funcion:update_user_password(email_input character varying, new_password character varying)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
@@ -315,14 +381,20 @@
     "funcion:validate_reset_token(token_input character varying)": {
       "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
-      "produccion": "6706f05dc4f0ad858d2634657c4bec784f85030f5991493a85ec45fe7d630dcf:1",
-      "repo": "03476ee67ca7870c5bab239565b4f840a02628a3a8efd2a3540f4d3c86763945:1"
+      "produccion": "243ef834c115dd4cddae85152502b4ae53500c425c5c675e75354cd271399432:1",
+      "repo": "b09e10cce3f1ad2ee0103af1216818bcf0a21a3c48d3dc5d097f483bdb773514:1"
     },
     "funcion:validate_reset_token(token_input character varying)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
       "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:validate_reset_token(token_input text)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "50dcb9f647a12e561e2bf9e94b1a74ef5c52bcea3641f2caa5802f3fcc461ee3:1",
+      "repo": "b10e09b184651fde3602d147742c8f133d9f5a7a3959d611732a7482123688e6:1"
     },
     "funcion:validate_reset_token(token_input text)/grants": {
       "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",

@@ -50,15 +50,30 @@
 --      huella no depende de que una extensión esté instalada ni de en qué
 --      esquema viva.
 --
---   6. ESPACIOS COLAPSADOS EN LOS CUERPOS DE FUNCIÓN Y EN LAS VISTAS —
---      `regexp_replace(..., '\s+', ' ')` más `btrim`. El espaciado no cambia la
---      semántica de PL/pgSQL, y producción reformateó a mano varias funciones
---      durante marzo-junio 2026. Sin colapsarlo aparecen 11 grupos de drift
---      que no lo son: `enforce_max_units` (603 vs 637 bytes),
---      `touch_updated_at` (49 vs 53) y `refresh_superadmin_kpis` (163 vs 163,
---      mismo largo y distinta disposición) tienen el cuerpo normalizado
---      IDÉNTICO a ambos lados. Un auditor que grite por sangría enseña a
---      ignorarlo.
+--   6. NINGUNA NORMALIZACIÓN DE ESPACIOS. Ni `regexp_replace('\s+',' ')` ni
+--      `btrim`, en ninguna dimensión. Todo el DDL se hashea EN CRUDO.
+--
+--      Una versión anterior sí colapsaba espacios en los cuerpos de función y
+--      en las vistas, para evitar 11 grupos de drift meramente cosmético
+--      (producción reformateó a mano varias funciones durante marzo-junio
+--      2026). Estaba mal, y de la peor manera: un colapso GLOBAL no distingue
+--      la sangría del contenido, así que borraba diferencias reales dentro de
+--      · literales SQL: `SELECT 'a  b'` y `SELECT 'a b'` hasheaban IGUAL;
+--      · cuerpos PL/pgSQL y dollar-quoted, donde un salto de línea dentro de
+--        una cadena es dato, no formato;
+--      · definiciones de vista con literales;
+--      · identificadores entre comillas.
+--
+--      Eso es un FALSO NEGATIVO: drift real que el auditor no ve. Vale
+--      infinitamente más conservar una diferencia cosmética declarada en
+--      drift-conocido.json —donde alguien la lee y decide— que perder una
+--      diferencia semántica en silencio. Una normalización correcta tendría
+--      que ser consciente de la sintaxis (dollar-quoting anidado, cadenas E'',
+--      comentarios, comillas dobles); escribir eso en SQL es un parser, y un
+--      parser con bugs reintroduce exactamente el fallo que se quiere evitar.
+--
+--      Las demás dimensiones —defaults (`pg_get_expr`), constraints, índices,
+--      policies (`qual`/`with_check`) y triggers— nunca se normalizaron.
 --
 -- POR QUÉ `prosrc` Y NO `pg_get_functiondef`. `pg_get_functiondef` reimprime la
 -- definición y su formato cambia entre versiones mayores de Postgres. La
@@ -156,8 +171,7 @@ gf AS ( -- funciones
          'volatility='||p.provolatile::text                                 ||E'\x1f'||
          'leakproof='||p.proleakproof                                       ||E'\x1f'||
          'config='||coalesce(array_to_string(p.proconfig,','), E'\x1d')         ||E'\x1f'||
-         'cuerpo='||encode(sha256(convert_to(
-             btrim(regexp_replace(coalesce(p.prosrc,''), '\s+', ' ', 'g')), 'UTF8')),'hex') AS linea,
+         'cuerpo='||encode(sha256(convert_to(coalesce(p.prosrc,''),'UTF8')),'hex') AS linea,
          1 AS n
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -176,13 +190,11 @@ gfg AS ( -- funciones · grants de EXECUTE
   WHERE n.nspname = 'public'
 ),
 gv AS ( -- vistas
-  SELECT 'vista:'||viewname AS clave,
-         regexp_replace(definition, '\s+', ' ', 'g') AS linea, 1 AS n
+  SELECT 'vista:'||viewname AS clave, definition AS linea, 1 AS n
   FROM pg_views WHERE schemaname = 'public'
 ),
 gm AS ( -- vistas materializadas
-  SELECT 'matview:'||matviewname AS clave,
-         regexp_replace(definition, '\s+', ' ', 'g') AS linea, 1 AS n
+  SELECT 'matview:'||matviewname AS clave, definition AS linea, 1 AS n
   FROM pg_matviews WHERE schemaname = 'public'
 ),
 ge AS ( -- enums

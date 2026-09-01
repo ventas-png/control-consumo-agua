@@ -200,31 +200,53 @@ export function huellaProduccionVersionada(ruta = RUTA_PRODUCCION) {
   return { mapa, doc }
 }
 
-const RUTA_BASELINE_EN_GIT = 'scripts/schema-drift/drift-conocido.json'
+export const RUTA_BASELINE_EN_GIT = 'scripts/schema-drift/drift-conocido.json'
+
+/** Ejecuta git y devuelve stdout; lanza si el comando falla. Inyectable para probar. */
+const gitReal = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
 /**
- * La baseline tal como está en la rama base, o `null` si ahí todavía no existe
- * — el caso del PR que la introduce, donde no hay trinquete que verificar.
+ * La baseline tal como está en la rama base, o `null` SÓLO si se comprueba que
+ * el archivo no existe ahí — el caso del PR que la introduce.
  *
- * La ausencia se comprueba ANTES con `git cat-file -e`, que no imprime nada
- * cuando el objeto falta. Envolver el `git show` en un catch mudo tenía dos
- * problemas: escupía un «fatal: path ... does not exist» que en el log de CI se
- * lee como un error sin serlo, y —peor— se tragaba por igual un fallo real de
- * git (repositorio sin la ref por un checkout superficial, objeto corrupto)
- * haciéndolo pasar por «es la primera vez». Eso desactivaría el trinquete en
- * silencio, que es justo lo que no puede pasar. Ahora un fallo de git distinto
- * de «no existe» se propaga.
+ * POR QUÉ NO ALCANZA CON UN `try/catch` ALREDEDOR DE `git show`. Falla igual
+ * cuando el archivo no está, cuando la ref no existe y cuando el checkout está
+ * incompleto (clon superficial o parcial, objetos ausentes). Tratar los tres
+ * casos como «es la primera vez» DESACTIVA EL TRINQUETE EN SILENCIO: bastaría
+ * un `fetch-depth: 1` para que un PR pudiera agrandar la baseline sin que nada
+ * lo note. El trinquete que se puede apagar sin querer no es un trinquete.
+ *
+ * Por eso se separan los tres:
+ *   1. `rev-parse --verify` — ¿la ref existe? Si no, es un error de
+ *      configuración (nombre equivocado, checkout sin la rama base) y se lanza.
+ *   2. `cat-file -e <ref>^{tree}` — ¿los objetos de ese commit están aquí? En
+ *      un clon superficial la ref puede resolver y el árbol no estar. Se lanza.
+ *   3. `ls-tree` — sólo ahora, la ausencia del archivo es información: el árbol
+ *      está completo y el archivo no está en él. Eso, y sólo eso, es `null`.
  */
-function baselineDeLaBase(ref) {
-  const objeto = `${ref}:${RUTA_BASELINE_EN_GIT}`
+export function baselineDeLaBase(ref, git = gitReal) {
   try {
-    execFileSync('git', ['cat-file', '-e', objeto], { stdio: 'ignore' })
+    git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
   } catch {
-    return null // no existe en esa ref: es la primera vez
+    throw new Error(
+      `La referencia base «${ref}» no existe en este repositorio. No se puede verificar el ` +
+      'trinquete de la baseline, así que se aborta en vez de dar por bueno el PR. ' +
+      'En CI suele significar un checkout sin la rama base: usá `fetch-depth: 0`.',
+    )
   }
-  // Existe: si `show` falla ahora, es un problema real y debe verse.
-  const crudo = execFileSync('git', ['show', objeto], { encoding: 'utf8' })
-  return JSON.parse(crudo)
+  try {
+    git(['cat-file', '-e', `${ref}^{tree}`])
+  } catch {
+    throw new Error(
+      `La referencia «${ref}» resuelve pero su árbol no está presente: el checkout está incompleto ` +
+      '(clon superficial o parcial). Sin el árbol no se puede saber si la baseline existía, y ' +
+      'suponer que no existía apagaría el trinquete. Usá `fetch-depth: 0`.',
+    )
+  }
+  // El árbol está completo: ahora la ausencia del archivo sí es información.
+  const listado = git(['ls-tree', '--name-only', ref, '--', RUTA_BASELINE_EN_GIT])
+  if (listado.trim() === '') return null // ausencia COMPROBADA: es la primera vez
+  return JSON.parse(git(['show', `${ref}:${RUTA_BASELINE_EN_GIT}`]))
 }
 
 function serializarHuella(mapa) {
@@ -246,6 +268,7 @@ async function principal() {
   const sembrarBaseline = bandera('--sembrar-baseline')
   const pruebaNegativa = bandera('--prueba-negativa')
   const verificarHuella = bandera('--verificar-huella')
+  const pruebaEspacios = bandera('--prueba-espacios')
   const refBase = process.argv.includes('--trinquete-contra')
     ? process.argv[process.argv.indexOf('--trinquete-contra') + 1]
     : null
@@ -253,7 +276,7 @@ async function principal() {
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
   // archivo lo que esta misma corrida va a escribir.
-  const problemas = (sembrarBaseline || verificarHuella) ? [] : validarBaseline(baseline)
+  const problemas = (sembrarBaseline || verificarHuella || pruebaEspacios) ? [] : validarBaseline(baseline)
   if (problemas.length > 0) {
     console.error('✗ drift-conocido.json no es válido:')
     for (const p of problemas) console.error(`    ${p}`)
@@ -329,6 +352,70 @@ async function principal() {
       }
       console.error('✓ sensibilidad: quitar un NOT NULL mueve exactamente 1 grupo, sin tocar el conteo')
       console.error('\n✓ La huella es determinista, estable ante entradas equivalentes y sensible al cambio.')
+      return
+    }
+
+    if (pruebaEspacios) {
+      // ── El espaciado dentro del CONTENIDO tiene que mover la huella ─────
+      //
+      // Una versión anterior colapsaba espacios con `regexp_replace('\s+',' ')`
+      // sobre `prosrc` y sobre las definiciones de vista. Eso no distingue la
+      // sangría del contenido: borraba diferencias reales dentro de literales
+      // SQL, cuerpos dollar-quoted y vistas. Estas cuatro pruebas fallarían con
+      // aquella versión, y por eso existen.
+      const casos = [
+        {
+          nombre: 'literal en el cuerpo de una función: \'a  b\' vs \'a b\'',
+          grupo: 'funcion:esp_literal()',
+          crear: "CREATE FUNCTION public.esp_literal() RETURNS text LANGUAGE sql AS $$ SELECT 'a  b' $$;",
+          mutar: "CREATE OR REPLACE FUNCTION public.esp_literal() RETURNS text LANGUAGE sql AS $$ SELECT 'a b' $$;",
+        },
+        {
+          nombre: "default ' ' vs ''",
+          grupo: 'tabla:esp_tabla/columnas',
+          crear: "CREATE TABLE public.esp_tabla (c text DEFAULT ' ');",
+          mutar: "ALTER TABLE public.esp_tabla ALTER COLUMN c SET DEFAULT '';",
+        },
+        {
+          nombre: "policy comparando contra 'a  b' vs 'a b'",
+          grupo: 'tabla:esp_tabla/policies',
+          crear: "ALTER TABLE public.esp_tabla ENABLE ROW LEVEL SECURITY; " +
+                 "CREATE POLICY esp_pol ON public.esp_tabla FOR SELECT USING (c = 'a  b');",
+          mutar: "DROP POLICY esp_pol ON public.esp_tabla; " +
+                 "CREATE POLICY esp_pol ON public.esp_tabla FOR SELECT USING (c = 'a b');",
+        },
+        {
+          nombre: 'cuerpo dollar-quoted con whitespace semántico (salto de línea dentro de la cadena)',
+          grupo: 'funcion:esp_dollar()',
+          crear: "CREATE FUNCTION public.esp_dollar() RETURNS text LANGUAGE plpgsql AS $cuerpo$\nBEGIN\n  RETURN 'linea1\nlinea2';\nEND\n$cuerpo$;",
+          mutar: "CREATE OR REPLACE FUNCTION public.esp_dollar() RETURNS text LANGUAGE plpgsql AS $cuerpo$\nBEGIN\n  RETURN 'linea1 linea2';\nEND\n$cuerpo$;",
+        },
+      ]
+
+      let fallos = 0
+      for (const caso of casos) {
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', caso.crear], { stdio: 'pipe' })
+        const antes = parsearHuella(huella(db.psql)).get(caso.grupo)
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', caso.mutar], { stdio: 'pipe' })
+        const despues = parsearHuella(huella(db.psql)).get(caso.grupo)
+
+        if (!antes || !despues) {
+          console.error(`✗ ${caso.nombre}\n    el grupo ${caso.grupo} no apareció en la huella`)
+          fallos++
+        } else if (antes.huella === despues.huella) {
+          console.error(`✗ ${caso.nombre}\n    la huella NO cambió (${antes.huella.slice(0, 16)}…): ` +
+                        'el espaciado del contenido se está normalizando. Es un falso negativo.')
+          fallos++
+        } else {
+          console.error(`✓ ${caso.nombre}`)
+        }
+      }
+
+      if (fallos > 0) {
+        console.error(`\n✗ ${fallos}/${casos.length} caso(s): la huella ignora espaciado que sí es contenido.`)
+        process.exit(1)
+      }
+      console.error(`\n✓ Los ${casos.length} casos mueven la huella: no hay normalización de espacios que borre contenido.`)
       return
     }
 

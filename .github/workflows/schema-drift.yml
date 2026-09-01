@@ -80,6 +80,14 @@ jobs:
       - name: Propiedades de la huella (determinismo, equivalencia, sensibilidad)
         run: node scripts/schema-drift/auditar.mjs --verificar-huella
 
+      # El espaciado DENTRO del contenido —literales SQL, cuerpos dollar-quoted,
+      # expresiones de policy y default— tiene que mover la huella. Una versión
+      # anterior colapsaba espacios de forma global y borraba esas diferencias:
+      # un falso negativo de seguridad. Estos cuatro casos fallarían con aquella
+      # versión.
+      - name: Espaciado que es contenido, no formato
+        run: node scripts/schema-drift/auditar.mjs --prueba-espacios
+
       - name: Auditar drift (offline, sin credenciales)
         run: |
           node scripts/schema-drift/auditar.mjs \
