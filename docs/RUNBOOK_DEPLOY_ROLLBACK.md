@@ -132,11 +132,31 @@ hay "down". Reglas:
    ejecutar SQL suelto desde un dashboard. Dejar `migration_file` VACÍO es el modo
    reconciliar — leé el aviso de abajo antes.
 
-   > ⚠️ **El gate de aprobación humana todavía NO está activo.** El job declara
-   > `environment: production-db`, pero eso por sí solo no bloquea nada: hace falta
-   > configurar ese Environment con *Required reviewers* en Settings → Environments,
-   > una acción externa al repositorio que sigue **pendiente**. Hasta entonces, un
-   > dispatch escribe en producción sin que nadie lo apruebe.
+   > ✅ **El gate de aprobación humana está ACTIVO.** El Environment
+   > `production-db` quedó protegido con:
+   >
+   > - **Required reviewers** activo, con al menos un revisor: un dispatch (y
+   >   cualquier corrida del job `apply`) queda en espera hasta que una persona lo
+   >   apruebe.
+   > - **Deployment branches and tags** en *Selected branches and tags*, con `main`
+   >   como **única** regla: ninguna otra rama puede desplegar contra este
+   >   Environment.
+   > - **Allow administrators to bypass configured protection rules** DESACTIVADO:
+   >   la aprobación tampoco se salta siendo admin.
+   >
+   > **Procedencia del dato:** esta configuración fue **validada manualmente por el
+   > administrador del repositorio el 2026-09-01**, revisando Settings → Environments
+   > → production-db. **No la verifica CI ni ningún test de este repo**, y no es
+   > comprobable desde una sesión de Claude Code (la API de Environments responde 403
+   > a través del proxy). O sea: es una atestación humana con fecha, no un check
+   > automatizado — si alguien cambia esos ajustes, **nada en el repositorio se
+   > pondrá rojo para avisarlo**.
+   >
+   > La confirmación funcional llega sola: la primera corrida de
+   > `apply-migrations-prod` que quede en estado `waiting` esperando aprobación es la
+   > prueba de que el gate actúa. Hasta el 2026-09-01, ninguna de las últimas 100
+   > corridas había quedado nunca en ese estado — todas anteriores a esta
+   > configuración.
 
    > El antiguo *Apply SQL Migration* (`apply-migration.yml`) se eliminó: escribía
    > al mismo proyecto sin el cortafuegos append-only, sin el tope `MAX_APPLY` y
