@@ -1,0 +1,142 @@
+name: Auditor de drift de esquema
+
+# Reconstruye el esquema desde las 449 migraciones en un Postgres desechable y
+# lo compara, dimensión por dimensión, contra la instantánea del catálogo de
+# producción versionada en scripts/schema-drift/huella-produccion.json.
+#
+# QUÉ PROBLEMA RESUELVE. `src/test/rls/rlsHarness.test.ts` afirma que
+# `payment_requests` no tiene policy de SELECT y que anon no lee ni una fila. El
+# harness corre contra un esquema construido desde el repositorio, así que pasa.
+# Producción tiene `payment_requests_select · SELECT · TO public · USING (true)`,
+# que ninguna migración declara. El test estaba verde y mentía. Mientras el
+# repositorio no describa producción, cualquier garantía verificada contra el
+# repositorio deja de decir nada sobre producción — y ese es el agujero, no las
+# diferencias en sí.
+#
+# CÓMO SE RELACIONA CON LO QUE YA HABÍA. No se solapa:
+#   drift-esquema.yml           → una dirección y una dimensión: que toda columna
+#                                 declarada por una migración aplicada exista en
+#                                 producción. Necesita credenciales.
+#   columnas-vs-migraciones.mjs → app ↔ migraciones.
+#   security-guard.mjs          → aislamiento en producción.
+#   este workflow               → las dos direcciones y nueve dimensiones
+#                                 (tablas, columnas, constraints, índices,
+#                                 policies, grants, triggers, funciones, vistas),
+#                                 SIN credenciales.
+#
+# NO USA `pull_request_target`, NI AQUÍ NI EN NINGÚN JOB. Ese disparador corre
+# con el token y los secretos del repositorio base sobre código que propone
+# quien abre el PR; para un workflow que existe para tocar producción sería
+# regalar la llave. `pull_request` alcanza de sobra porque el job offline no
+# necesita ningún secreto.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/schema-drift/**'
+      - '.github/workflows/schema-drift.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/schema-drift/**'
+  workflow_dispatch:
+
+concurrency:
+  group: schema-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  auditar:
+    name: Reconstruir desde migraciones y comparar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # El trinquete compara esta baseline contra la de la rama base, así que
+          # hace falta más de un commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Comprobar que hay servidor de Postgres (no sólo psql)
+        run: |
+          set -euo pipefail
+          if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+          fi
+          ls -d /usr/lib/postgresql/*/bin | tail -1
+
+      - name: Auditar drift (offline, sin credenciales)
+        run: |
+          node scripts/schema-drift/auditar.mjs \
+            --trinquete-contra "origin/${{ github.base_ref || github.event.repository.default_branch }}"
+
+      # El auditor tiene que ROMPER ante drift que no declara. Un auditor que
+      # siempre diga «todo bien» pasa cualquier prueba positiva, así que la
+      # prueba que importa es ésta: se inyecta una columna que ninguna migración
+      # declara y una policy en una tabla que YA está en la baseline —para que
+      # no pueda esconderse detrás de ella— y se exige salida distinta de cero.
+      - name: Prueba negativa — el auditor debe fallar
+        run: |
+          set +e
+          salida=$(node scripts/schema-drift/auditar.mjs --prueba-negativa 2>&1)
+          codigo=$?
+          set -e
+          echo "$salida"
+          if [ "$codigo" -eq 0 ]; then
+            echo "::error::El auditor NO detectó la columna ni la policy inyectadas. No sirve."
+            exit 1
+          fi
+          echo "$salida" | grep -q 'DRIFT NUEVO'    || { echo "::error::No reportó la columna inesperada."; exit 1; }
+          echo "$salida" | grep -q 'DRIFT AGRAVADO' || { echo "::error::No reportó la policy inesperada dentro de un grupo ya baselineado."; exit 1; }
+          echo "✓ el auditor detecta ambas inyecciones y sale $codigo"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # MODO LIVE — BLOQUEADO A PROPÓSITO
+  # ══════════════════════════════════════════════════════════════════════════
+  #
+  # Refrescaría `huella-produccion.json` leyendo el catálogo real. Mientras no
+  # exista la credencial adecuada NO se conecta a nada, y eso es deliberado:
+  #
+  #   · Credencial DEDICADA de SOLO LECTURA. Un rol de Postgres con USAGE sobre
+  #     `public` y SELECT sobre pg_catalog/information_schema, y nada más.
+  #     NO se reutiliza `SUPABASE_ACCESS_TOKEN`: ese token es de la Management
+  #     API y puede aplicar DDL, crear y borrar ramas y leer secretos. Que
+  #     drift-esquema.yml ya lo use no es razón para extender su alcance — es
+  #     una razón más para no hacerlo.
+  #   · Detrás del environment `production-db`, que desde el 2026-09-01 está
+  #     restringido a `main`, con revisores requeridos y sin bypass de
+  #     administradores. Ahí es donde vive el secreto, no a nivel de repo.
+  #   · NUNCA desde `pull_request` ni `pull_request_target`: sólo
+  #     `workflow_dispatch` y `schedule`, donde la referencia es de confianza.
+  #
+  # Para desbloquearlo: crear el rol de solo lectura en producción, guardar su
+  # cadena de conexión como `SCHEMA_DRIFT_READONLY_URL` en el environment
+  # `production-db`, y quitar el `if:` que apaga este job.
+  live:
+    name: Refrescar la huella de producción (bloqueado — falta credencial de solo lectura)
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true' }}
+    needs: auditar
+    runs-on: ubuntu-latest
+    environment: production-db
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verificar que la credencial es la dedicada y de solo lectura
+        env:
+          URL_SOLO_LECTURA: ${{ secrets.SCHEMA_DRIFT_READONLY_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${URL_SOLO_LECTURA:-}" ]; then
+            echo "::error::Falta SCHEMA_DRIFT_READONLY_URL en el environment production-db."
+            echo "No se reutiliza SUPABASE_ACCESS_TOKEN: es administrativo y puede escribir."
+            exit 1
+          fi
+          echo "Credencial presente. El resto del wiring live se implementa cuando exista el rol."
+          exit 1
