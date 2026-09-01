@@ -181,6 +181,27 @@ describe('evaluarTresVias: las nueve situaciones', () => {
     expect(informe(v).join('\n')).toMatch(/DRIFT NUEVO/)
   })
 
+  // Regresión: el informe imprimía «undefined» en las dos secciones donde la
+  // huella ES el diagnóstico. `nuevo` y `agravado` salen de `evaluar`, que
+  // nombra los lados `produccion`/`repo`; el informe los leía como `p`/`r`. El
+  // veredicto era correcto, así que ningún assert sobre `ok` lo veía, y
+  // comprobar sólo el título tampoco. Se comprueban las huellas.
+  it('5c. el informe imprime las huellas de DRIFT NUEVO, no «undefined»', () => {
+    const Pmovida = mapa({ 'tabla:a/grants': 'g1:28', 'tabla:a/columnas': 'INTRUSO:11', 'tabla:b/indices': 'iprod:5' })
+    const texto = informe(evaluarTresVias({ P: Pmovida, M, R: M, baseline: BASELINE, migraciones: UNA_NUEVA })).join('\n')
+    expect(texto).not.toMatch(/undefined/)
+    expect(texto).toContain(val('INTRUSO', 11))
+    expect(texto).toContain(val('c1', 10))
+  })
+
+  it('5d. el informe imprime las huellas de DRIFT AGRAVADO, no «undefined»', () => {
+    const Pmovida = mapa({ 'tabla:a/grants': 'g1:28', 'tabla:a/columnas': 'c1:10', 'tabla:b/indices': 'OTRA:6' })
+    const texto = informe(evaluarTresVias({ P: Pmovida, M, R: M, baseline: BASELINE, migraciones: NINGUNA })).join('\n')
+    expect(texto).not.toMatch(/undefined/)
+    expect(texto).toContain(val('OTRA', 6))       // lo que hay ahora
+    expect(texto).toContain(val('iprod', 5))      // lo que la baseline esperaba
+  })
+
   it('5b. un grupo baselineado cuyas huellas cambian sigue siendo DRIFT AGRAVADO', () => {
     // La baseline declara UNA diferencia concreta, no barra libre en esa tabla.
     const Pmovida = mapa({ 'tabla:a/grants': 'g1:28', 'tabla:a/columnas': 'c1:10', 'tabla:b/indices': 'OTRA:6' })
@@ -273,6 +294,40 @@ describe('ampliar la baseline sigue prohibido (el trinquete, verificado aparte)'
     const grande = baselineCon({ a: entrada(val('p', 1), val('r', 1)), b: entrada(val('p2', 1), val('r2', 1)) })
     expect(verificarTrinquete(grande, chica).ok).toBe(false)
     expect(verificarTrinquete(chica, grande).ok).toBe(true)
+  })
+})
+
+// ── ninguna sección del informe puede imprimir «undefined» ─────────────────
+//
+// Una red por encima de los casos puntuales: el informe se arma con plantillas,
+// y un nombre de campo equivocado no rompe nada — imprime «undefined» y sigue.
+// El veredicto queda bien y el diagnóstico se pierde, que es la peor
+// combinación: verde o rojo correcto, y nadie puede ver por qué.
+describe('el informe nunca imprime «undefined»', () => {
+  const P = mapa({ a: 'p:1', b: 'p:1', c: 'p:1', d: 'p:1' })
+  const M = mapa({ a: 'p:1', b: 'm:1', c: 'p:1', d: 'm:1' })
+  const R = mapa({ a: 'r:1', b: 'p:1', c: 'x:1', d: 'z:1' })
+  const conTodo = baselineCon({
+    b: entrada(val('p', 1), val('m', 1)),
+    d: entrada(val('p', 1), val('m', 1)),
+  })
+
+  for (const [nombre, migraciones] of [['con migración nueva', UNA_NUEVA], ['sin migración', NINGUNA]]) {
+    it(`cubriendo planificado, resuelto, ambiguo y poda — ${nombre}`, () => {
+      const v = evaluarTresVias({ P, M, R, baseline: conTodo, migraciones })
+      const texto = informe(v).join('\n')
+      expect(texto).not.toMatch(/undefined/)
+      expect(texto).not.toMatch(/\[object Object\]/)
+    })
+  }
+
+  it('cubriendo migraciones eliminadas, modificadas e intercaladas', () => {
+    const migraciones = diffMigraciones(
+      new Map([['20260601000000_a.sql', 'aaa'], ['20260602000000_b.sql', 'bbb']]),
+      new Map([['20260601000000_a.sql', 'REESCRITA'], ['20260101000000_antes.sql', 'zzz']]),
+    )
+    const texto = informe(evaluarTresVias({ P, M, R, baseline: conTodo, migraciones })).join('\n')
+    expect(texto).not.toMatch(/undefined/)
   })
 })
 

@@ -275,7 +275,7 @@ export function informe(v) {
     for (const g of v.agravado) {
       l.push(`    ${g.clave}`)
       l.push(`        esperado: producción=${g.esperadoProduccion}  repo=${g.esperadoRepo}`)
-      l.push(`        ahora   : producción=${g.p}  repo=${g.r}`)
+      l.push(`        ahora   : producción=${g.produccion}  repo=${g.repo}`)
     }
   }
   if (v.podaPendiente.length > 0) {
@@ -285,7 +285,7 @@ export function informe(v) {
   }
   if (v.nuevo.length > 0) {
     l.push(`\n✗ DRIFT NUEVO — ${v.nuevo.length} grupo(s) que este PR no toca y la baseline no declara:`)
-    for (const g of v.nuevo) l.push(`    ${g.clave}\n        producción=${g.p}  repo=${g.r}`)
+    for (const g of v.nuevo) l.push(`    ${g.clave}\n        producción=${g.produccion}  repo=${g.repo}`)
     l.push('\n   Producción y el repositorio dejaron de describir lo mismo en un objeto que')
     l.push('   este PR ni siquiera modifica. Se cierra con una migración forward-only.')
   }
