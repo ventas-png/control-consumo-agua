@@ -3,16 +3,30 @@ name: Apply Migrations to Production
 # Auto-aplica a PRODUCCIÓN las migraciones SQL que aterrizan en `main`, para que
 # el esquema de Supabase nunca se quede DETRÁS del código. Lección anti-drift:
 # durante junio/2026 varios PRs con migraciones se mergearon a `main` sin que el
-# SQL llegara a prod (había que dispararlo a mano con apply-migration.yml o MCP);
+# SQL llegara a prod (había que dispararlo a mano con el viejo apply-migration.yml
+# —ya eliminado— o por MCP);
 # este workflow cierra ese hueco automáticamente.
 #
 # Mecanismo: Management API de Supabase (POST /v1/projects/{id}/database/query),
-# el MISMO probado en apply-migration.yml. NO usa `supabase db push` a propósito:
+# el MISMO que usaba el viejo apply-migration.yml. NO usa `supabase db push` a propósito:
 # el historial remoto schema_migrations quedó desalineado (algunas migraciones se
 # aplicaron a mano/MCP con versión de apply-time, no la del archivo) y `db push`
-# abortaría por checksum/orden. El SQL de las migraciones es IDEMPOTENTE
-# (CREATE ... IF NOT EXISTS, DROP POLICY IF EXISTS → CREATE POLICY), así que
-# reaplicar siempre es seguro.
+# abortaría por checksum/orden.
+#
+# ⚠️ REAPLICAR NO ES SEGURO. Aquí se leía que el SQL de las migraciones es
+# idempotente (CREATE ... IF NOT EXISTS, DROP POLICY IF EXISTS → CREATE POLICY)
+# "así que reaplicar siempre es seguro". Es FALSO, y es la premisa exacta que
+# tumbó producción el 2026-08-03: el reconciliador dio por pendientes 257
+# migraciones ya aplicadas y las reejecutó; entre ellas
+# 20260320000000_fix_superadmin_app_users_uuid, que empieza con
+# `DROP TABLE IF EXISTS public.app_users CASCADE`. Ese `IF EXISTS` es idempotente
+# en la FORMA —no falla si se repite— pero destructivo en el EFECTO: se llevó
+# todos los perfiles y hubo que restaurar el backup.
+#
+# La idempotencia de una sentencia no dice nada sobre si es seguro repetirla con
+# datos dentro. Por eso el historial de `schema_migrations` es la fuente de
+# verdad y su registro es FAIL-CLOSED (ver el paso de aplicación): una versión
+# aplicada y no registrada es justo la que el reconciliador vuelve a ejecutar.
 #
 # Disparadores:
 #   - push a `main` que toque supabase/migrations/** → aplica SOLO los .sql
@@ -26,8 +40,13 @@ name: Apply Migrations to Production
 # `paths` está acotado a supabase/migrations/** para que la PROPIA introducción
 # de este workflow (un cambio solo en .github/) NO se auto-dispare.
 #
-# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID (los mismos de
-# apply-migration.yml). Sin ellos el job falla con instrucciones.
+# Requiere los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_PROJECT_ID. Sin ellos el
+# job falla con instrucciones.
+#
+# Esta es la ÚNICA vía de CI hacia la base de producción. El antiguo
+# apply-migration.yml se eliminó (auditoría 2026-05-26, I9): aplicaba SQL al MISMO
+# proyecto sin `environment: production-db`, sin el cortafuegos append-only y sin
+# MAX_APPLY, e interpolaba la entrada del dispatch directamente en el shell.
 
 on:
   push:
@@ -50,24 +69,23 @@ permissions:
   contents: read
 
 jobs:
-  check-secrets:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify Supabase secrets are set
-        run: |
-          missing=""
-          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
-          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
-          if [ -n "$missing" ]; then
-            echo "::error::Faltan secrets de GitHub:$missing"
-            echo "Agrégalos en: Settings → Secrets and variables → Actions."
-            echo "SUPABASE_ACCESS_TOKEN: Account → Access Tokens (Management API)."
-            echo "SUPABASE_PROJECT_ID: ref del proyecto (Project Settings → General)."
-            exit 1
-          fi
-
+  # La verificación de secretos NO es un job aparte. Lo fue, y eso rompe en cuanto
+  # los secrets se restringen al Environment `production-db` —que es justo lo que
+  # este workflow quiere permitir—: un job sin `environment:` no puede leer
+  # environment secrets, así que `check-secrets` los vería SIEMPRE vacíos y
+  # fallaría el workflow entero antes de llegar al apply, con un mensaje que
+  # además culpa al operador de no haberlos cargado.
+  #
+  # Meterle `environment: production-db` al job de verificación tampoco sirve:
+  # cada job asociado a un Environment con Required reviewers pide su PROPIA
+  # aprobación, así que el operador tendría que aprobar dos veces la misma
+  # ejecución — y la segunda, sobre un job cuya única función es comprobar que
+  # las variables no están vacías.
+  #
+  # Por eso la comprobación vive DENTRO de `apply`, como su primer paso: hereda
+  # el Environment (lee los secrets, estén donde estén), corre después del único
+  # gate de aprobación y sigue abortando antes de cualquier llamada a la API.
   apply:
-    needs: check-secrets
     runs-on: ubuntu-latest
     # P0 #9 (auditoría 2026-07-10): gate de aprobación antes de escribir a prod.
     # Este job aplica SQL a la base de PRODUCCIÓN; asociarlo a un Environment
@@ -80,6 +98,10 @@ jobs:
     env:
       API_URL: https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query
       ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # Se expone aparte del API_URL para poder comprobar que NO está vacío: sin
+      # él la URL queda como .../projects//database/query y el fallo aparecería
+      # más tarde como un 404 críptico en mitad del apply.
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
       EVENT_NAME: ${{ github.event_name }}
       INPUT_FILE: ${{ github.event.inputs.migration_file }}
       PUSH_BEFORE: ${{ github.event.before }}
@@ -89,6 +111,27 @@ jobs:
       # selección disparatada en vez de ejecutarla entera contra producción.
       MAX_APPLY: '10'
     steps:
+      # PRIMER paso del job, antes del checkout: si faltan los secretos no hay
+      # nada que hacer y se aborta sin haber tocado nada. Los valores se leen por
+      # `env` (arriba) y NUNCA se interpolan en el `run:` — interpolados, el valor
+      # del token entra en el texto del comando y cualquier `set -x`, traza de
+      # error o `ps` del runner lo expone; el enmascarado de Actions sólo cubre la
+      # salida de los logs.
+      - name: Verify Supabase secrets are set
+        run: |
+          missing=""
+          if [ -z "${ACCESS_TOKEN:-}" ]; then missing="$missing SUPABASE_ACCESS_TOKEN"; fi
+          if [ -z "${PROJECT_ID:-}" ];   then missing="$missing SUPABASE_PROJECT_ID"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Faltan secrets de GitHub:$missing"
+            echo "Si el repositorio los restringió al Environment 'production-db',"
+            echo "cárgalos ahí: Settings → Environments → production-db → Secrets."
+            echo "Si son secrets de repositorio: Settings → Secrets and variables → Actions."
+            echo "SUPABASE_ACCESS_TOKEN: Account → Access Tokens (Management API)."
+            echo "SUPABASE_PROJECT_ID: ref del proyecto (Project Settings → General)."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -139,8 +182,24 @@ jobs:
           }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${INPUT_FILE:-}" ]; then
-            if [ ! -f "$MIG_DIR/$INPUT_FILE" ]; then
-              echo "::error::No existe $MIG_DIR/$INPUT_FILE"
+            # El dispatch con archivo explícito era la ÚNICA entrada sin filtro:
+            # comprobaba `-f` y nada más. `-f` acepta cualquier ruta que resuelva
+            # a un archivo, así que un `../..` sacaba la selección de
+            # supabase/migrations y mandaba ese contenido al endpoint de
+            # producción; y como el cortafuegos append-only sólo corre en `push`,
+            # este camino podía además REAPLICAR una migración histórica — la
+            # causa raíz del 2026-08-03.
+            #
+            # Ahora se exige historial remoto también aquí (misma llamada fallo-
+            # ruidoso que usa el reconciliador) y se valida el nombre + la versión
+            # con un script probado (scripts/__tests__/validar-migration-dispatch).
+            if ! applied=$(remote_versions); then
+              echo "::error::Abortado antes de tocar producción: sin el historial remoto no se puede saber si $INPUT_FILE ya está aplicada, y reaplicar una histórica es exactamente el incidente 2026-08-03."
+              exit 1
+            fi
+            printf '%s\n' "$applied" > /tmp/applied-versions.txt
+            if ! node scripts/validar-migration-dispatch.mjs \
+                   --file "$INPUT_FILE" --dir "$MIG_DIR" --aplicadas /tmp/applied-versions.txt; then
               exit 1
             fi
             files="$MIG_DIR/$INPUT_FILE"
@@ -295,23 +354,47 @@ jobs:
               echo "- ❌ \`$base\` — $motivo" >> "$GITHUB_STEP_SUMMARY"
               fail=1
               detenida="$base"
+              parada="apply"
               echo "::endgroup::"
               break
             fi
-            # Registrar en el historial (idempotente con ON CONFLICT). Sigue siendo
-            # best-effort —el DDL ya se aplicó, no tiene sentido marcar la migración
-            # como fallida— pero AVISA: sin este registro, la reconciliación de un
-            # dispatch manual volvería a ver la migración como pendiente.
+            # Registrar en el historial (idempotente con ON CONFLICT). FAIL-CLOSED,
+            # ya NO best-effort.
+            #
+            # Esto era un `::warning::` + `continue`, con el cuerpo a /dev/null y
+            # mirando sólo el código HTTP. Tres fallos en uno: el DDL quedaba
+            # aplicado pero SIN registrar, el bucle seguía con la siguiente, y el
+            # job terminaba imprimiendo "Todas las migraciones se aplicaron
+            # correctamente" EN VERDE. Un historial incompleto no es cosmético: es
+            # justo la entrada del modo reconciliar, que vuelve a ver esa migración
+            # como pendiente y la REAPLICA. Es la mecánica del 2026-08-03, cuando
+            # reaplicar migraciones ya aplicadas ejecutó un DROP TABLE ... CASCADE
+            # sobre app_users y hubo que restaurar el backup.
+            #
+            # El criterio es el mismo POSITIVO que el del apply: 2xx Y un array de
+            # filas. El cuerpo NO va a /dev/null — sin leerlo no se distingue un
+            # 200 con un error dentro de un 200 de verdad, ni se puede dar
+            # diagnóstico al operador.
             hist="insert into supabase_migrations.schema_migrations (version, name) values ('$ver', '$name') on conflict (version) do nothing;"
-            hist_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API_URL" \
+            hist_code=$(curl -s -o /tmp/hist-resp.json -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$(jq -Rs '{query: .}' <<<"$hist")")
+            hist_resp=$(cat /tmp/hist-resp.json 2>/dev/null || true)
+            hist_motivo=""
             if [ "$hist_code" -lt 200 ] || [ "$hist_code" -ge 300 ]; then
-              echo "::warning::$base se aplicó pero NO se pudo registrar en schema_migrations (HTTP $hist_code)."
-              echo "- ⚠️ \`$base\` — aplicada, sin registrar en el historial (HTTP $hist_code)" >> "$GITHUB_STEP_SUMMARY"
+              hist_motivo="HTTP $hist_code"
+            elif ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$hist_resp"; then
+              hist_motivo="HTTP $hist_code con cuerpo inesperado (se esperaba un array de filas)"
+            fi
+            if [ -n "$hist_motivo" ]; then
+              echo "::error::$base SE APLICÓ pero NO se pudo registrar en schema_migrations — $hist_motivo: $(head -c 300 /tmp/hist-resp.json 2>/dev/null)"
+              echo "- ⛔ \`$base\` — **DDL aplicado pero SIN registrar** ($hist_motivo)" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+              detenida="$base"
+              parada="registro"
               echo "::endgroup::"
-              continue
+              break
             fi
             echo "- ✅ \`$base\`" >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
@@ -329,7 +412,24 @@ jobs:
               fi
               [ "$b" = "$detenida" ] && visto=1
             done
-            echo "::error::Se detuvo en $detenida sin intentar las posteriores. Corregir el prerrequisito y volver a disparar."
+            if [ "${parada:-apply}" = "registro" ]; then
+              # El DDL de $detenida SÍ corrió: reintentar a ciegas la reaplicaría.
+              {
+                echo ""
+                echo "> ⛔ **\`$detenida\` quedó aplicada en la base pero NO registrada en"
+                echo "> \`supabase_migrations.schema_migrations\`.** El DDL puede haberse ejecutado"
+                echo "> entero; el historial es el que quedó incompleto."
+                echo ">"
+                echo "> **No volver a disparar sin antes reparar/verificar el historial.** Con la"
+                echo "> versión sin registrar, el modo reconciliar la da por pendiente y la REAPLICA:"
+                echo "> es la mecánica del incidente 2026-08-03. Comprobar en la base si el DDL"
+                echo "> está puesto y registrar la versión a mano (o con"
+                echo "> \`scripts/backfill-schema-migrations.sql\`) ANTES de reintentar."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::$detenida se aplicó pero NO se registró en schema_migrations. El DDL puede estar puesto: verificar la base y reparar el historial ANTES de reintentar — reaplicarla es el incidente 2026-08-03. Las posteriores no se intentaron."
+            else
+              echo "::error::Se detuvo en $detenida sin intentar las posteriores. Corregir el prerrequisito y volver a disparar."
+            fi
           fi
 
           if [ "$fail" -ne 0 ]; then

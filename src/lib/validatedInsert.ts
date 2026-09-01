@@ -123,7 +123,6 @@ export async function validatedInsert<TSchema extends z.ZodTypeAny>(
   // `as any` aquí porque el tipo de Supabase para `.from(table)` es genérico
   // sobre la database schema y no podemos resolverlo sin generated types.
   // El runtime es seguro: `parsed.data` ya pasó el schema de Zod.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query = (client.from(table) as any).insert(parsed.data)
   const result = options.returning ? await query.select() : await query
   return {
@@ -148,7 +147,6 @@ export async function validatedInsertMany<TSchema extends z.ZodTypeAny>(
     return { data: null, error: buildValidationError(parsed.error) }
   }
   const client = options.client ?? defaultClient
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query = (client.from(table) as any).insert(parsed.data)
   const result = options.returning ? await query.select() : await query
   return {
@@ -176,7 +174,6 @@ export async function validatedUpdate<TSchema extends z.ZodTypeAny>(
     return { data: null, error: buildValidationError(parsed.error) }
   }
   const client = options.client ?? defaultClient
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (client.from(table) as any).update(parsed.data)
   for (const [col, val] of Object.entries(options.match)) {
     query = query.eq(col, val)

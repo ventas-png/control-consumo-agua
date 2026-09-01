@@ -145,13 +145,39 @@ Protección actual: CORS origin check + `ALLOWED_ORIGINS` secret. Si el secret l
 
 ---
 
-### I9 · 🟠 Alto — `apply-migration` workflow con riesgo de inyección
+### I9 · ✅ Resuelto — ~~`apply-migration` workflow con riesgo de inyección~~
 
-`.github/workflows/apply-migration.yml` usa Supabase Management API y envía `migration_file` como input. Si alguien crea un PR con migración maliciosa y un maintainer la ejecuta sin revisar, se aplica a producción.
+`.github/workflows/apply-migration.yml` usaba la Management API y recibía `migration_file` como input. Además del riesgo original (un maintainer aplicando SQL sin revisar), la revisión de 2026-08-31 encontró que el input se interpolaba SIN escapar dentro del `run:` —`SQL=$(cat "supabase/migrations/${{ github.event.inputs.migration_file }}")`— así que un valor con comillas ejecutaba shell arbitrario en un job que porta `SUPABASE_ACCESS_TOKEN`.
 
-**Recomendación:**
-- Solo aplicar migraciones que estén en `main` y que pasen pre-checks (lint sql, dry-run en proyecto branch de Supabase).
-- Requiere review explícito (CODEOWNERS, branch protection).
+**Resolución: el workflow se eliminó.** `apply-migrations-prod.yml` ya cubría el caso por completo (mismo mecanismo, `workflow_dispatch` con `migration_file` o modo reconciliar) y además tiene lo que a este le faltaba: el cortafuegos append-only del histórico, el tope `MAX_APPLY`, el paso de entradas/secretos por `env` en vez de interpolarlos en el shell, y la declaración `environment: production-db`. Parchear la inyección habría dejado vivo un segundo camino a producción sin esas guardas.
+
+> **Hallazgo tal como se registró (2026-08-31):** de esa lista, la declaración
+> `environment: production-db` era entonces **sólo una referencia en el YAML**. El
+> gate de aprobación humana NO estaba activo: exigía configurar el Environment con
+> *Required reviewers* en Settings → Environments, una acción externa al
+> repositorio que seguía PENDIENTE. Mientras no se hiciera, el job corría sin
+> aprobación. Se deja escrito porque durante meses se dio por hecho lo contrario, y
+> esa suposición es la que hay que no repetir.
+
+> **✅ Resuelto el 2026-09-01 — protección del Environment `production-db`.** El
+> administrador del repositorio configuró y verificó manualmente:
+>
+> - *Deployment branches and tags* en **Selected branches and tags**, con `main`
+>   como **única** regla.
+> - **Required reviewers** activo, con al menos un revisor.
+> - **Allow administrators to bypass configured protection rules** **desactivado**.
+>
+> Con eso, la declaración del YAML pasa a tener efecto real: una corrida del job
+> `apply` queda en espera hasta que una persona la apruebe, y no se puede saltar
+> siendo admin.
+>
+> **Naturaleza de la evidencia:** es una **atestación manual del administrador con
+> fecha**, no una verificación automatizada. La API de Environments no es accesible
+> desde las sesiones de Claude Code (403 por el proxy), así que **ningún test de
+> este repositorio se pondrá rojo si mañana alguien afloja esos ajustes**. La
+> confirmación funcional será la primera corrida de `apply-migrations-prod` que
+> quede en estado `waiting` esperando aprobación; hasta el 2026-09-01 ninguna de
+> las últimas 100 lo había hecho.
 
 ---
 
@@ -487,7 +513,7 @@ Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_use
 | I6  | 🔴   | Topbar PAGE_TITLES/ICONS hard-coded                              | `src/components/layout/Topbar.tsx:250 LOC`                                  | 1    |
 | I7  | ⏳   | ~~CI sin lint / coverage / bundle-size~~ — parcial PR #168 (coverage advisory) | `.github/workflows/ci.yml` + `vite.config.ts` coverage v8       | 4    |
 | I8  | ⏳   | ~~Deploy de edge functions sin tests~~ — parcial PR #168 (deno lint/fmt advisory) | `.github/workflows/deploy-functions.yml` job `lint-functions` | 2    |
-| I9  | 🟠   | `apply-migration` con riesgo de inyección                         | `.github/workflows/apply-migration.yml`                                    | 2    |
+| I9  | ✅   | ~~`apply-migration` con riesgo de inyección~~ — resuelto: workflow eliminado | `apply-migrations-prod.yml` es la única vía a prod                | —    |
 | I10 | ✅   | ~~PostHog sin tagging multi-tenant automático~~ — resuelto PR #169 (`registerSuperProperties`) | `src/lib/analytics.ts`, `src/App.tsx:175` | —    |
 | I11 | ✅   | ~~Sentry sample 10% sin sampling por severity~~ — resuelto PR #169 (`tracesSampler` 100%/10%) | `src/lib/monitoring.ts:21-46` | —    |
 | I12 | 🟠   | Source maps Sentry "best-effort"                                   | `vite.config.ts`                                                           | 4    |

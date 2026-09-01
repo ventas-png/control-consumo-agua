@@ -1,3 +1,4 @@
+import { QRCodeSVG } from 'qrcode.react'
 import { hoyLocalISO } from '../../lib/format'
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import {
@@ -29,7 +30,7 @@ type Phase = 'checking' | 'intro' | 'enrolling'
 
 export function MfaGate({ onSatisfied, onLogout }: Props) {
   const [phase, setPhase] = useState<Phase>('checking')
-  const [enroll, setEnroll] = useState<{ factorId: string; qrSvg: string; secret: string } | null>(null)
+  const [enroll, setEnroll] = useState<{ factorId: string; uri: string; secret: string } | null>(null)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -61,7 +62,9 @@ export function MfaGate({ onSatisfied, onLogout }: Props) {
       setErr(res.error ?? 'No fue posible iniciar el enrolamiento.')
       return
     }
-    setEnroll({ factorId: res.data.id, qrSvg: res.data.totp.qr_code, secret: res.data.totp.secret })
+    // Se guarda el otpauth:// (`uri`), no el SVG que devuelve el servidor: el QR
+    // se dibuja local con <QRCodeSVG>, así no hace falta inyectar HTML ajeno.
+    setEnroll({ factorId: res.data.id, uri: res.data.totp.uri, secret: res.data.totp.secret })
     setPhase('enrolling')
   }, [])
 
@@ -112,8 +115,16 @@ export function MfaGate({ onSatisfied, onLogout }: Props) {
 
       {phase === 'enrolling' && enroll && (
         <>
-          <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid var(--at-line)', display: 'inline-block', marginBottom: 12, lineHeight: 0 }}
-               dangerouslySetInnerHTML={{ __html: enroll.qrSvg }} />
+          {/* QR dibujado en el cliente desde el otpauth://. Antes se inyectaba con
+              dangerouslySetInnerHTML el SVG de `totp.qr_code`: el origen es de fiar
+              (la API de Supabase Auth), pero era el único sink de HTML crudo del
+              repo, en la pantalla de 2FA y con la sesión en sessionStorage al
+              alcance. qrcode.react ya es dependencia y se usa igual en Paquetería y
+              Control de Accesos. El QR resultante es el mismo: `uri` es justo lo que
+              el servidor codificaba dentro de su SVG. */}
+          <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid var(--at-line)', display: 'inline-block', marginBottom: 12, lineHeight: 0 }}>
+            <QRCodeSVG value={enroll.uri} size={200} level="M" marginSize={2} />
+          </div>
           <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>
             ¿No podés escanear? Ingresá esta clave en tu app:
           </div>

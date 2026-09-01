@@ -44,7 +44,6 @@ function emit(level: LogLevel, message: string, context?: LogContext, error?: un
 
   // Consola: text formateado para que sea fácil filtrar en devtools.
   const prefix = `[${level.toUpperCase()}] ${message}`
-  // eslint-disable-next-line no-console
   const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : level === 'info' ? console.info : console.debug
   if (context && error !== undefined) {
     fn(prefix, context, error)

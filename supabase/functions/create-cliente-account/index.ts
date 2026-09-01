@@ -71,10 +71,17 @@ Deno.serve(async (req) => {
     // vector de abuso (enumeración de identidad vía buscar_cliente_para_onboarding + spam de
     // cuentas). Keyeado por IP y por email para que ni una IP rotando correos ni un correo
     // rotando IPs evada el tope. El de IP corta primero (no quema el contador del email).
+    //
+    // failClosed: endpoint ANÓNIMO donde el rate limit es el ÚNICO control. En
+    // fail-open, una caída del RPC `rate_limit_hit` no solo abre el alta de cuentas:
+    // deja sin tope la ENUMERACIÓN de identidades contra
+    // buscar_cliente_para_onboarding (DPI/CUI + fecha de nacimiento + correo), que es
+    // exactamente lo que el IDENTITY_ERROR genérico de arriba existe para frenar.
+    // Regla documentada en _shared/rateLimit.ts.
     const normalizedEmail = email.toLowerCase().trim()
     const rl = await enforceRateLimits(adminClient, [
-      { subject: `ip:${getClientIp(req)}`, action: 'create_cliente_account', max: 10 },
-      { subject: `email:${normalizedEmail}`, action: 'create_cliente_account:email', max: 5 },
+      { subject: `ip:${getClientIp(req)}`, action: 'create_cliente_account', max: 10, failClosed: true },
+      { subject: `email:${normalizedEmail}`, action: 'create_cliente_account:email', max: 5, failClosed: true },
     ], corsHeaders)
     if (rl) return rl
 

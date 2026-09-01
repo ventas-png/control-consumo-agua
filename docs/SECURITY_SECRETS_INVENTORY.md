@@ -72,7 +72,7 @@ workflow indicadas por archivo.
 
 | Nombre | Tipo | Consumido por (workflow) | Para qué |
 |---|---|---|---|
-| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migration.yml`, `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml`, `auth-hardening.yml`, `security-guard.yml`, `cleanup-preview-branches.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos, auditar catálogo, borrar previews). **Si expira o se revoca, los siete fallan a la vez** — el 2026-08-01 se cayó entre las 03:05 y las 08:09 UTC y salió a la luz por `cleanup-preview-branches` y `security-guard`, ambos con `401 Unauthorized`. |
+| `SUPABASE_ACCESS_TOKEN` | **Secreto** | `apply-migrations-prod.yml`, `deploy-functions.yml`, `types-drift.yml`, `auth-hardening.yml`, `security-guard.yml`, `cleanup-preview-branches.yml` | Token de la Management API de Supabase (aplicar SQL, desplegar funciones, generar tipos, auditar catálogo, borrar previews). **Si expira o se revoca, los seis fallan a la vez** — el 2026-08-01 se cayó entre las 03:05 y las 08:09 UTC y salió a la luz por `cleanup-preview-branches` y `security-guard`, ambos con `401 Unauthorized`. |
 | `SUPABASE_PROJECT_ID` | Sensible (id) | mismos que arriba | Identifica el proyecto destino. No es un secreto fuerte, pero se trata como config protegida. |
 | `SUPABASE_DB_PASSWORD` | **Secreto** | `apply-migrations-prod.yml` (si aplica vía conexión directa) | Password de la base de producción. |
 | `VERCEL_TOKEN` | **Secreto** | `deploy-staging.yml`, `promote-production.yml` | Token de la API de Vercel (build/deploy/alias/promote/rollback). |
@@ -235,7 +235,7 @@ quede junto al inventario y no solo en un canal de chat que nadie relee.
 
 | Fecha | Secreto | Motivo | Notas |
 | --- | --- | --- | --- |
-| 2026-08-03 | `SUPABASE_ACCESS_TOKEN` | Expiración o revocación **no planificada** | El token dejó de servir entre las 03:05 y las 08:09 UTC del 2026-08-01: a las 03:04 `apply-migrations-prod` aplicó la migración de #696 en verde y a las 03:05 `security-guard` leyó el catálogo sin problema; a las 08:09 `cleanup-preview-branches` ya daba `401 Unauthorized`. Sin cambios de código en esa ventana. Detectado por CI, no por una persona. Los siete workflows que comparten el token estuvieron caídos ~2 días, `apply-migrations-prod` entre ellos. |
+| 2026-08-03 | `SUPABASE_ACCESS_TOKEN` | Expiración o revocación **no planificada** | El token dejó de servir entre las 03:05 y las 08:09 UTC del 2026-08-01: a las 03:04 `apply-migrations-prod` aplicó la migración de #696 en verde y a las 03:05 `security-guard` leyó el catálogo sin problema; a las 08:09 `cleanup-preview-branches` ya daba `401 Unauthorized`. Sin cambios de código en esa ventana. Detectado por CI, no por una persona. Los siete workflows que ENTONCES compartían el token estuvieron caídos ~2 días, `apply-migrations-prod` entre ellos. (Hoy son seis: `apply-migration.yml` se eliminó al cerrar I9.) |
 
 **Lección de esa caída:** este token no avisa antes de morir y se lleva por
 delante el despliegue de migraciones a producción. Si al generar el reemplazo

@@ -14,9 +14,16 @@ export async function listMfaFactors(): Promise<{
   return { data: data ?? null, error: error?.message ?? null }
 }
 
-/** Inicia el enrolamiento de un factor TOTP; devuelve el QR + secret. */
+/** Inicia el enrolamiento de un factor TOTP; devuelve el otpauth:// + secret. */
 export async function enrollTotpFactor(friendlyName: string): Promise<{
-  data: { id: string; totp: { qr_code: string; secret: string } } | null
+  // `uri` es el otpauth:// que va CODIFICADO dentro del QR: con eso la UI dibuja
+  // el QR localmente (qrcode.react).
+  //
+  // `totp.qr_code` —el SVG ya renderizado que devuelve la API— se omite A
+  // PROPÓSITO: pintarlo exige dangerouslySetInnerHTML, y no exponerlo por esta
+  // frontera es lo que impide que alguien vuelva a ese camino sin darse cuenta.
+  // El objeto en runtime sí lo trae; simplemente no se declara.
+  data: { id: string; totp: { secret: string; uri: string } } | null
   error: string | null
 }> {
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName })

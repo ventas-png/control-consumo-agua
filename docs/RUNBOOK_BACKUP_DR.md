@@ -54,8 +54,21 @@ En caso de corrupción de datos, borrado accidental masivo o incidente:
 3. **Reconciliar migraciones.** Como las migraciones son forward-only, tras el
    restore el schema queda en el estado de ese timestamp. Ejecutar
    `supabase migration list` (o revisar `supabase_migrations.schema_migrations`)
-   y **re-aplicar** cualquier migración posterior al punto restaurado
-   (`.github/workflows/apply-migrations-prod.yml` es idempotente).
+   e identificar las posteriores al punto restaurado.
+
+   > ⚠️ **No las re-apliques en bloque dando por hecho que son idempotentes.** Esa
+   > suposición —que estuvo escrita en `apply-migrations-prod.yml`— es la que
+   > tumbó producción el 2026-08-03: entre las reaplicadas iba una que empieza con
+   > `DROP TABLE IF EXISTS public.app_users CASCADE`, idempotente en la forma y
+   > destructiva en el efecto. Una restauración PITR deja además el historial
+   > `schema_migrations` en el estado de ESE timestamp, así que "lo que falta"
+   > según el historial puede estar ya aplicado en el esquema.
+   >
+   > El orden correcto es: comparar el esquema real contra lo que cada migración
+   > pendiente pretende crear, **revisar una por una** si su DDL ya está puesto, y
+   > aplicar sólo las que de verdad falten —de una en una, con `migration_file`
+   > explícito, nunca con el modo reconciliar (`migration_file` vacío), que es el
+   > que disparó el incidente.
 4. **Verificar (smoke).** Correr los caminos de dinero/auth: login, una lectura→
    cobro, una cuota→pago, y `GET /functions/v1/health` (debe dar `200 status:ok`).
    Reusar los specs E2E de `e2e/` apuntando al proyecto restaurado.

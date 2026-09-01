@@ -15,7 +15,7 @@ name: Auth hardening (GoTrue config)
 #       rate_limit_email_sent  → correos de auth por hora (aplica con SMTP custom).
 #
 # Disparo: manual (workflow_dispatch) con defaults sanos. Reaplicarlo es
-# idempotente. Mismos secrets que apply-migration.yml / security-guard.yml.
+# idempotente. Mismos secrets que apply-migrations-prod.yml / security-guard.yml.
 
 on:
   workflow_dispatch:

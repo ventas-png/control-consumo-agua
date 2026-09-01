@@ -1,25 +1,6 @@
 // domain/shared/mutations.ts — Escrituras para componentes compartidos. T7/PR3.
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-
-/**
- * Extrae el mensaje de error real que devolvió la edge function. El SDK
- * responde "Edge Function returned a non-2xx status code" para cualquier
- * fallo HTTP; el body `{ error }` con la causa (p.ej. "Stripe no
- * configurado…") solo está disponible en `error.context`.
- */
-async function extractFunctionError(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const body = (await error.context.json()) as { error?: string } | null
-      if (body?.error) return body.error
-    } catch {
-      // body no-JSON o ya consumido: cae al mensaje genérico
-    }
-  }
-  const msg = (error as { message?: unknown } | null)?.message
-  return typeof msg === 'string' ? msg : String(error)
-}
+import { extractFunctionError } from '../functionError'
 
 /** Cuerpo para abrir el Stripe Checkout (plat:P36d). */
 export interface CheckoutSessionBody {

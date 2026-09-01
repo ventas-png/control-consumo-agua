@@ -26,7 +26,8 @@
   env del entorno Preview de Vercel. Así pruebas el binario en un esquema que
   refleja prod sin tocar datos reales.
 - **Producción:** el proyecto `control-agua`. Las migraciones llegan por
-  `apply-migration.yml` / el flujo normal; **nunca** `apply_migration` a mano.
+  `apply-migrations-prod.yml` (automático en el push a `main`); **nunca**
+  `apply_migration` a mano.
 
 > No provisionamos el branch persistente desde CI a propósito: es un recurso de
 > pago/duradero — es una decisión del dueño (ver checklist de setup abajo).
@@ -122,9 +123,45 @@ hay "down". Reglas:
    Así un rollback de la app no choca con un esquema que se adelantó.
 4. **Valida en el Preview Branch del PR** (Supabase comenta el estado de
    Migrations en el PR). **No** corras `apply_migration` contra prod a mano.
-5. **Emergencia (corrección puntual en prod):** Actions → *Apply SQL Migration*
-   (`apply-migration.yml`) con un archivo idempotente. Es la vía auditable; evita
-   ejecutar SQL suelto desde un dashboard.
+5. **Emergencia (corrección puntual en prod):** Actions → *Apply Migrations to
+   Production* (`apply-migrations-prod.yml`), dispatch **con `migration_file`
+   explícito**. El workflow valida el nombre (basename dentro de
+   `supabase/migrations`, formato `<14 dígitos>_<nombre>.sql`) y **rechaza una
+   versión ya registrada** en `schema_migrations`: una corrección se hace con una
+   migración NUEVA, nunca reaplicando una histórica. Es la vía auditable y evita
+   ejecutar SQL suelto desde un dashboard. Dejar `migration_file` VACÍO es el modo
+   reconciliar — leé el aviso de abajo antes.
+
+   > ✅ **El gate de aprobación humana está ACTIVO.** El Environment
+   > `production-db` quedó protegido con:
+   >
+   > - **Required reviewers** activo, con al menos un revisor: un dispatch (y
+   >   cualquier corrida del job `apply`) queda en espera hasta que una persona lo
+   >   apruebe.
+   > - **Deployment branches and tags** en *Selected branches and tags*, con `main`
+   >   como **única** regla: ninguna otra rama puede desplegar contra este
+   >   Environment.
+   > - **Allow administrators to bypass configured protection rules** DESACTIVADO:
+   >   la aprobación tampoco se salta siendo admin.
+   >
+   > **Procedencia del dato:** esta configuración fue **validada manualmente por el
+   > administrador del repositorio el 2026-09-01**, revisando Settings → Environments
+   > → production-db. **No la verifica CI ni ningún test de este repo**, y no es
+   > comprobable desde una sesión de Claude Code (la API de Environments responde 403
+   > a través del proxy). O sea: es una atestación humana con fecha, no un check
+   > automatizado — si alguien cambia esos ajustes, **nada en el repositorio se
+   > pondrá rojo para avisarlo**.
+   >
+   > La confirmación funcional llega sola: la primera corrida de
+   > `apply-migrations-prod` que quede en estado `waiting` esperando aprobación es la
+   > prueba de que el gate actúa. Hasta el 2026-09-01, ninguna de las últimas 100
+   > corridas había quedado nunca en ese estado — todas anteriores a esta
+   > configuración.
+
+   > El antiguo *Apply SQL Migration* (`apply-migration.yml`) se eliminó: escribía
+   > al mismo proyecto sin el cortafuegos append-only, sin el tope `MAX_APPLY` y
+   > sin siquiera declarar el Environment, además de interpolar la entrada del
+   > dispatch en el shell (auditoría 2026-05-26, I9).
 
 ### ⛔ El dispatch de reconciliación (`migration_file` vacío)
 
