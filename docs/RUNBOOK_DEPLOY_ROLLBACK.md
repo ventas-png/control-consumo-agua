@@ -125,13 +125,23 @@ hay "down". Reglas:
    Migrations en el PR). **No** corras `apply_migration` contra prod a mano.
 5. **Emergencia (corrección puntual en prod):** Actions → *Apply Migrations to
    Production* (`apply-migrations-prod.yml`), dispatch **con `migration_file`
-   explícito** y un archivo idempotente. Es la vía auditable; evita ejecutar SQL
-   suelto desde un dashboard, y pasa por el Environment `production-db`. Dejar
-   `migration_file` VACÍO es el modo reconciliar — leé el aviso de abajo antes.
+   explícito**. El workflow valida el nombre (basename dentro de
+   `supabase/migrations`, formato `<14 dígitos>_<nombre>.sql`) y **rechaza una
+   versión ya registrada** en `schema_migrations`: una corrección se hace con una
+   migración NUEVA, nunca reaplicando una histórica. Es la vía auditable y evita
+   ejecutar SQL suelto desde un dashboard. Dejar `migration_file` VACÍO es el modo
+   reconciliar — leé el aviso de abajo antes.
+
+   > ⚠️ **El gate de aprobación humana todavía NO está activo.** El job declara
+   > `environment: production-db`, pero eso por sí solo no bloquea nada: hace falta
+   > configurar ese Environment con *Required reviewers* en Settings → Environments,
+   > una acción externa al repositorio que sigue **pendiente**. Hasta entonces, un
+   > dispatch escribe en producción sin que nadie lo apruebe.
 
    > El antiguo *Apply SQL Migration* (`apply-migration.yml`) se eliminó: escribía
-   > al mismo proyecto saltándose el gate de aprobación y el cortafuegos
-   > append-only (auditoría 2026-05-26, I9).
+   > al mismo proyecto sin el cortafuegos append-only, sin el tope `MAX_APPLY` y
+   > sin siquiera declarar el Environment, además de interpolar la entrada del
+   > dispatch en el shell (auditoría 2026-05-26, I9).
 
 ### ⛔ El dispatch de reconciliación (`migration_file` vacío)
 

@@ -11,9 +11,22 @@ name: Apply Migrations to Production
 # el MISMO que usaba el viejo apply-migration.yml. NO usa `supabase db push` a propósito:
 # el historial remoto schema_migrations quedó desalineado (algunas migraciones se
 # aplicaron a mano/MCP con versión de apply-time, no la del archivo) y `db push`
-# abortaría por checksum/orden. El SQL de las migraciones es IDEMPOTENTE
-# (CREATE ... IF NOT EXISTS, DROP POLICY IF EXISTS → CREATE POLICY), así que
-# reaplicar siempre es seguro.
+# abortaría por checksum/orden.
+#
+# ⚠️ REAPLICAR NO ES SEGURO. Aquí se leía que el SQL de las migraciones es
+# idempotente (CREATE ... IF NOT EXISTS, DROP POLICY IF EXISTS → CREATE POLICY)
+# "así que reaplicar siempre es seguro". Es FALSO, y es la premisa exacta que
+# tumbó producción el 2026-08-03: el reconciliador dio por pendientes 257
+# migraciones ya aplicadas y las reejecutó; entre ellas
+# 20260320000000_fix_superadmin_app_users_uuid, que empieza con
+# `DROP TABLE IF EXISTS public.app_users CASCADE`. Ese `IF EXISTS` es idempotente
+# en la FORMA —no falla si se repite— pero destructivo en el EFECTO: se llevó
+# todos los perfiles y hubo que restaurar el backup.
+#
+# La idempotencia de una sentencia no dice nada sobre si es seguro repetirla con
+# datos dentro. Por eso el historial de `schema_migrations` es la fuente de
+# verdad y su registro es FAIL-CLOSED (ver el paso de aplicación): una versión
+# aplicada y no registrada es justo la que el reconciliador vuelve a ejecutar.
 #
 # Disparadores:
 #   - push a `main` que toque supabase/migrations/** → aplica SOLO los .sql
@@ -341,23 +354,47 @@ jobs:
               echo "- ❌ \`$base\` — $motivo" >> "$GITHUB_STEP_SUMMARY"
               fail=1
               detenida="$base"
+              parada="apply"
               echo "::endgroup::"
               break
             fi
-            # Registrar en el historial (idempotente con ON CONFLICT). Sigue siendo
-            # best-effort —el DDL ya se aplicó, no tiene sentido marcar la migración
-            # como fallida— pero AVISA: sin este registro, la reconciliación de un
-            # dispatch manual volvería a ver la migración como pendiente.
+            # Registrar en el historial (idempotente con ON CONFLICT). FAIL-CLOSED,
+            # ya NO best-effort.
+            #
+            # Esto era un `::warning::` + `continue`, con el cuerpo a /dev/null y
+            # mirando sólo el código HTTP. Tres fallos en uno: el DDL quedaba
+            # aplicado pero SIN registrar, el bucle seguía con la siguiente, y el
+            # job terminaba imprimiendo "Todas las migraciones se aplicaron
+            # correctamente" EN VERDE. Un historial incompleto no es cosmético: es
+            # justo la entrada del modo reconciliar, que vuelve a ver esa migración
+            # como pendiente y la REAPLICA. Es la mecánica del 2026-08-03, cuando
+            # reaplicar migraciones ya aplicadas ejecutó un DROP TABLE ... CASCADE
+            # sobre app_users y hubo que restaurar el backup.
+            #
+            # El criterio es el mismo POSITIVO que el del apply: 2xx Y un array de
+            # filas. El cuerpo NO va a /dev/null — sin leerlo no se distingue un
+            # 200 con un error dentro de un 200 de verdad, ni se puede dar
+            # diagnóstico al operador.
             hist="insert into supabase_migrations.schema_migrations (version, name) values ('$ver', '$name') on conflict (version) do nothing;"
-            hist_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API_URL" \
+            hist_code=$(curl -s -o /tmp/hist-resp.json -w "%{http_code}" -X POST "$API_URL" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$(jq -Rs '{query: .}' <<<"$hist")")
+            hist_resp=$(cat /tmp/hist-resp.json 2>/dev/null || true)
+            hist_motivo=""
             if [ "$hist_code" -lt 200 ] || [ "$hist_code" -ge 300 ]; then
-              echo "::warning::$base se aplicó pero NO se pudo registrar en schema_migrations (HTTP $hist_code)."
-              echo "- ⚠️ \`$base\` — aplicada, sin registrar en el historial (HTTP $hist_code)" >> "$GITHUB_STEP_SUMMARY"
+              hist_motivo="HTTP $hist_code"
+            elif ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$hist_resp"; then
+              hist_motivo="HTTP $hist_code con cuerpo inesperado (se esperaba un array de filas)"
+            fi
+            if [ -n "$hist_motivo" ]; then
+              echo "::error::$base SE APLICÓ pero NO se pudo registrar en schema_migrations — $hist_motivo: $(head -c 300 /tmp/hist-resp.json 2>/dev/null)"
+              echo "- ⛔ \`$base\` — **DDL aplicado pero SIN registrar** ($hist_motivo)" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+              detenida="$base"
+              parada="registro"
               echo "::endgroup::"
-              continue
+              break
             fi
             echo "- ✅ \`$base\`" >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
@@ -375,7 +412,24 @@ jobs:
               fi
               [ "$b" = "$detenida" ] && visto=1
             done
-            echo "::error::Se detuvo en $detenida sin intentar las posteriores. Corregir el prerrequisito y volver a disparar."
+            if [ "${parada:-apply}" = "registro" ]; then
+              # El DDL de $detenida SÍ corrió: reintentar a ciegas la reaplicaría.
+              {
+                echo ""
+                echo "> ⛔ **\`$detenida\` quedó aplicada en la base pero NO registrada en"
+                echo "> \`supabase_migrations.schema_migrations\`.** El DDL puede haberse ejecutado"
+                echo "> entero; el historial es el que quedó incompleto."
+                echo ">"
+                echo "> **No volver a disparar sin antes reparar/verificar el historial.** Con la"
+                echo "> versión sin registrar, el modo reconciliar la da por pendiente y la REAPLICA:"
+                echo "> es la mecánica del incidente 2026-08-03. Comprobar en la base si el DDL"
+                echo "> está puesto y registrar la versión a mano (o con"
+                echo "> \`scripts/backfill-schema-migrations.sql\`) ANTES de reintentar."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::$detenida se aplicó pero NO se registró en schema_migrations. El DDL puede estar puesto: verificar la base y reparar el historial ANTES de reintentar — reaplicarla es el incidente 2026-08-03. Las posteriores no se intentaron."
+            else
+              echo "::error::Se detuvo en $detenida sin intentar las posteriores. Corregir el prerrequisito y volver a disparar."
+            fi
           fi
 
           if [ "$fail" -ne 0 ]; then

@@ -141,17 +141,45 @@ export function validarDispatch({ input, dir = null, aplicadas = [], existe = ex
   return base
 }
 
-/** Lee las versiones aplicadas de un archivo (una por línea). Ausente → []. */
+/**
+ * Lee las versiones aplicadas de un archivo (una por línea).
+ *
+ * FAIL-CLOSED: si se pide un archivo y no se puede leer, LANZA. Antes devolvía
+ * `[]` en ese caso, y una lista vacía es indistinguible de "no hay ninguna
+ * migración aplicada": el validador daría por buena cualquier versión y el
+ * dispatch reaplicaría una histórica contra producción — exactamente lo que
+ * este script existe para impedir. El mismo criterio que `remote_versions` en
+ * el workflow, que ya falla ruidosa por esta razón.
+ *
+ * `ruta` nula/vacía significa "no se pidió historial" y sigue devolviendo [];
+ * el workflow SIEMPRE la pasa (ver el paso `Build list of migrations to apply`).
+ */
 export function leerAplicadas(ruta, leer = readFileSync) {
   if (!ruta) return []
+  let crudo
   try {
-    return String(leer(ruta, 'utf8'))
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-  } catch {
-    return []
+    crudo = String(leer(ruta, 'utf8'))
+  } catch (err) {
+    throw new Error(
+      `No se pudo leer el historial de versiones aplicadas (${ruta}): ${err.message}. ` +
+      `Sin historial NO se valida nada: una lista vacía se confundiría con "ninguna aplicada" ` +
+      `y dejaría reaplicar una migración histórica.`,
+    )
   }
+  const lineas = crudo.split('\n').map((l) => l.trim()).filter(Boolean)
+  // Un historial legítimo son versiones de 14 dígitos. Cualquier otra cosa
+  // (HTML de un portal cautivo, un JSON de error volcado al archivo) significa
+  // que lo que se leyó NO es el historial, y tratarlo como vacío es el mismo
+  // fallo abierto.
+  const invalidas = lineas.filter((l) => !/^\d{14}$/.test(l))
+  if (invalidas.length > 0) {
+    throw new Error(
+      `El historial de versiones aplicadas (${ruta}) tiene ${invalidas.length} línea(s) que no son ` +
+      `versiones de 14 dígitos — la primera: "${invalidas[0].slice(0, 80)}". ` +
+      `No es un historial válido y no se puede validar nada con él.`,
+    )
+  }
+  return lineas
 }
 
 function arg(argv, nombre) {
@@ -164,11 +192,17 @@ export function main(argv = process.argv.slice(2), registrar = console.error) {
   const dir = arg(argv, '--dir')
   const rutaAplicadas = arg(argv, '--aplicadas')
 
-  const res = validarDispatch({
-    input,
-    dir,
-    aplicadas: leerAplicadas(rutaAplicadas),
-  })
+  // El historial se lee ANTES de cualquier otra cosa y su fallo es terminal: si
+  // no hay historial fiable, no se valida — se aborta.
+  let aplicadas
+  try {
+    aplicadas = leerAplicadas(rutaAplicadas)
+  } catch (err) {
+    registrar(`::error::${err.message}`)
+    return 1
+  }
+
+  const res = validarDispatch({ input, dir, aplicadas })
 
   if (!res.ok) {
     registrar(`::error::${res.mensaje}`)

@@ -53,10 +53,15 @@ function cuerpoDelPaso(nombre) {
 
 /**
  * Ejecuta el paso de aplicación con un `curl` falso.
- * @param {number[]} codigos código HTTP a devolver por cada migración, en orden.
- * @returns {{estado:number, intentadas:string[], registradas:string[], resumen:string}}
+ * @param {number[]} codigos código HTTP del APPLY de cada migración, en orden.
+ * @param {{histCodigos?:number[], histCuerpos?:string[]}} [op] respuesta del
+ *   REGISTRO en schema_migrations por migración: código HTTP y cuerpo crudo.
+ *   Por defecto 201 con `[]` (lo que devuelve la Management API en un DDL ok).
+ * @returns {{estado:number, intentadas:string[], registradas:string[], resumen:string, salida:string}}
  */
-function aplicar(codigos) {
+function aplicar(codigos, op = {}) {
+  const histCodigos = op.histCodigos ?? codigos.map(() => 201)
+  const histCuerpos = op.histCuerpos ?? codigos.map(() => '[]')
   const dir = mkdtempSync(join(tmpdir(), 'applyprod-'))
   try {
     const migDir = join(dir, 'supabase/migrations')
@@ -83,8 +88,12 @@ for a in "$@"; do
 done
 if grep -q 'insert into supabase_migrations' <<<"$payload"; then
   echo "$payload" | grep -o "values ('[0-9]*'" >> "${dir}/registradas.log"
-  [ -n "$salida" ] && echo '[]' > "$salida"
-  echo 201
+  ver=$(grep -o "values ('[0-9]*'" <<<"$payload" | grep -o '[0-9]*')
+  n=\${ver: -1}
+  hcodigo=$(sed -n "$((n + 1))p" "${dir}/hist-codigos.txt")
+  hcuerpo=$(sed -n "$((n + 1))p" "${dir}/hist-cuerpos.txt")
+  [ -n "$salida" ] && printf '%s' "$hcuerpo" > "$salida"
+  echo "$hcodigo"
   exit 0
 fi
 marca=$(grep -o 'MARCA:paso[0-9]*' <<<"$payload" | head -1)
@@ -100,6 +109,8 @@ echo "$codigo"
 `)
     chmodSync(join(bin, 'curl'), 0o755)
     writeFileSync(join(dir, 'codigos.txt'), codigos.join('\n') + '\n')
+    writeFileSync(join(dir, 'hist-codigos.txt'), histCodigos.join('\n') + '\n')
+    writeFileSync(join(dir, 'hist-cuerpos.txt'), histCuerpos.join('\n') + '\n')
     writeFileSync(join(dir, 'intentadas.log'), '')
     writeFileSync(join(dir, 'registradas.log'), '')
 
@@ -110,8 +121,9 @@ echo "$codigo"
     writeFileSync(resumen, '')
 
     let estado = 0
+    let salida = ''
     try {
-      execFileSync('bash', [guion], {
+      salida = execFileSync('bash', [guion], {
         cwd: dir,
         env: {
           ...process.env,
@@ -125,7 +137,9 @@ echo "$codigo"
       })
     } catch (e) {
       estado = e.status ?? 1
+      salida = `${e.stdout ?? ''}${e.stderr ?? ''}`
     }
+    salida = String(salida)
 
     const leer = f => readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean)
     return {
@@ -133,6 +147,7 @@ echo "$codigo"
       intentadas: leer('intentadas.log'),
       registradas: leer('registradas.log'),
       resumen: readFileSync(resumen, 'utf8'),
+      salida,
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -178,6 +193,88 @@ describe('apply-migrations-prod · aplicación a producción', () => {
 
     expect(r.intentadas).toEqual(['MARCA:paso0', 'MARCA:paso1'])
     expect(r.registradas).toHaveLength(1)
+    expect(r.resumen).toContain('⏭️ `20990101000002_paso2` — no intentada')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// El REGISTRO en schema_migrations es fail-closed
+// ════════════════════════════════════════════════════════════════════════════
+// Era best-effort: `::warning::` + `continue`, con el cuerpo a /dev/null y
+// mirando sólo el código HTTP. Con el registro fallando, el DDL quedaba puesto
+// en la base pero la versión SIN registrar, el bucle seguía con la siguiente y
+// el job terminaba en VERDE diciendo "Todas las migraciones se aplicaron
+// correctamente".
+//
+// Ese verde es peligroso, no sólo impreciso: una versión aplicada y no
+// registrada es exactamente lo que el modo reconciliar vuelve a dar por
+// pendiente, y reaplicarla es la mecánica del incidente 2026-08-03 (un
+// DROP TABLE ... CASCADE sobre app_users).
+describe('apply-migrations-prod · registro en schema_migrations (fail-closed)', () => {
+  const VERDE = 'Todas las migraciones se aplicaron correctamente'
+
+  it.each([
+    [400, '4xx'],
+    [401, '401 (token muerto)'],
+    [403, '4xx sin permiso'],
+    [500, '5xx'],
+    [502, '5xx de gateway'],
+  ])('un %s al registrar (%s) deja el run NO-VERDE', (codigo) => {
+    const r = aplicar([201, 201], { histCodigos: [codigo, 201] })
+    expect(r.estado).not.toBe(0)
+  })
+
+  it('tras fallar el registro NO se intenta la migración siguiente', () => {
+    // El DDL de la primera ya corrió; encadenar la segunda encima produce el
+    // estado híbrido que nadie sabe describir.
+    const r = aplicar([201, 201, 201], { histCodigos: [500, 201, 201] })
+    expect(r.intentadas).toEqual(['MARCA:paso0'])
+  })
+
+  it('NUNCA dice "todas se aplicaron correctamente" si una quedó sin registrar', () => {
+    const r = aplicar([201, 201], { histCodigos: [500, 201] })
+    expect(r.salida).not.toContain(VERDE)
+    expect(r.resumen).not.toContain(VERDE)
+  })
+
+  it('un 2xx con cuerpo INESPERADO también aborta (no basta el código HTTP)', () => {
+    // El 2026-08-03 el apply dio verde con `{"message":"Unauthorized"}`: mirar
+    // sólo el código, o sólo la clave `.error`, deja pasar el fallo peor.
+    for (const cuerpo of ['{"message":"Unauthorized"}', '{"error":"boom"}', '<html>ok</html>', '']) {
+      const r = aplicar([201, 201], { histCodigos: [200, 201], histCuerpos: [cuerpo, '[]'] })
+      expect(r.estado, `cuerpo ${JSON.stringify(cuerpo)} debería abortar`).not.toBe(0)
+      expect(r.intentadas).toEqual(['MARCA:paso0'])
+    }
+  })
+
+  it('un 2xx con un array de filas SÍ es un registro válido', () => {
+    // La forma positiva: la Management API devuelve [] en un DDL correcto.
+    const r = aplicar([201, 201], { histCodigos: [200, 200], histCuerpos: ['[]', '[]'] })
+    expect(r.estado).toBe(0)
+    expect(r.intentadas).toEqual(['MARCA:paso0', 'MARCA:paso1'])
+    expect(r.salida).toContain(VERDE)
+  })
+
+  it('el mensaje avisa de que el DDL puede estar aplicado y manda reparar el historial', () => {
+    const r = aplicar([201, 201], { histCodigos: [500, 201] })
+    const todo = r.salida + r.resumen
+    expect(todo).toMatch(/SE APLICÓ pero NO se pudo registrar|DDL aplicado pero SIN registrar/)
+    expect(todo).toMatch(/reparar|verificar/i)
+    expect(todo).toMatch(/ANTES de reintentar/i)
+    expect(todo).toMatch(/2026-08-03/)
+  })
+
+  it('el resumen marca la fallida y declara las no intentadas', () => {
+    const r = aplicar([201, 201, 201], { histCodigos: [500, 201, 201] })
+    expect(r.resumen).toContain('⛔ `20990101000000_paso0`')
+    expect(r.resumen).toContain('⏭️ `20990101000001_paso1` — no intentada')
+    expect(r.resumen).toContain('⏭️ `20990101000002_paso2` — no intentada')
+  })
+
+  it('el fallo de registro en MEDIO de la serie corta ahí, no al final', () => {
+    const r = aplicar([201, 201, 201], { histCodigos: [201, 500, 201] })
+    expect(r.intentadas).toEqual(['MARCA:paso0', 'MARCA:paso1'])
+    expect(r.estado).not.toBe(0)
     expect(r.resumen).toContain('⏭️ `20990101000002_paso2` — no intentada')
   })
 })

@@ -73,9 +73,13 @@ Por eso `.github/workflows/apply-migrations-prod.yml` usa la Management API y
 
 `apply-migrations-prod.yml` en `workflow_dispatch` **sin input** aplica toda
 migración local cuya versión no esté en el historial remoto. Hoy eso son **242
-migraciones legacy**. El SQL es idempotente por diseño, pero es un disparo mucho
-más grande de lo que sugiere el nombre del botón. Para una migración puntual,
-usa el input `migration_file`.
+migraciones legacy**. Aquí se leía que "el SQL es idempotente por diseño": **no
+lo es en el efecto**, y esa suposición es la que tumbó producción el 2026-08-03
+—entre las reaplicadas iba una que empieza con
+`DROP TABLE IF EXISTS public.app_users CASCADE`, idempotente en la forma y
+destructiva con datos dentro—. Es un disparo mucho más grande de lo que sugiere
+el nombre del botón, y no es seguro. Para una migración puntual, usa el input
+`migration_file` (que además rechaza versiones ya registradas).
 
 ### Cómo reparar el historial, si algún día se quiere
 

@@ -111,7 +111,7 @@ jobs:
           if [ "$code" = "401" ]; then
             echo "::error::SUPABASE_ACCESS_TOKEN inválido, expirado o revocado (HTTP 401): $(head -c 300 /tmp/branches.json)"
             echo "Rotar en Supabase → Account → Access Tokens y actualizarlo en Settings → Secrets and variables → Actions."
-            echo "Comparten el mismo token: apply-migration, apply-migrations-prod, deploy-functions, types-drift, auth-hardening y security-guard."
+            echo "Comparten el mismo token: apply-migrations-prod, deploy-functions, types-drift, auth-hardening y security-guard."
             echo "| — | — | ❌ token inválido (401) — rotar \`SUPABASE_ACCESS_TOKEN\` |" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

@@ -134,8 +134,19 @@ describe('versión ya aplicada (append-only)', () => {
 
   it('tolera espacios y líneas vacías en el historial (viene de un jq -r)', () => {
     expect(versionYaAplicada('20260907001200', ['  20260907001200  '])).toBe(true)
-    expect(leerAplicadas('x', () => 'a\n\n  b  \n')).toEqual(['a', 'b'])
+    expect(leerAplicadas('x', () => '20260317000000\n\n  20260320000000  \n'))
+      .toEqual(['20260317000000', '20260320000000'])
+  })
+
+  it('sin --aplicadas (ruta nula) devuelve [] — no se pidió historial', () => {
     expect(leerAplicadas(null)).toEqual([])
+    expect(leerAplicadas('')).toEqual([])
+  })
+
+  it('un historial remoto legítimamente VACÍO no es un error', () => {
+    // Proyecto recién creado: cero versiones registradas. `printf '%s\n' \"\"`
+    // deja una línea en blanco, que se filtra.
+    expect(leerAplicadas('x', () => '\n')).toEqual([])
   })
 
   it('el orden importa: el traversal se corta ANTES de mirar el historial', () => {
@@ -163,5 +174,61 @@ describe('main (envoltorio de CLI)', () => {
   it('sale 0 con una migración real del repo no aplicada', () => {
     const code = main(['--file', VALIDO, '--dir', 'supabase/migrations'], () => {})
     expect(code).toBe(0)
+  })
+})
+
+
+// ── FAIL-CLOSED del historial ───────────────────────────────────────────────
+//
+// `leerAplicadas` devolvía [] ante cualquier fallo de lectura. Una lista vacía
+// es INDISTINGUIBLE de "no hay ninguna migración aplicada": con el historial
+// caído, el validador daba por buena cualquier versión y el dispatch reaplicaba
+// una histórica contra producción — justo lo que este script existe para
+// impedir. Ahora lanza, y `main` lo traduce a código de salida ≠ 0.
+describe('historial ausente, ilegible o inválido (fail-closed)', () => {
+  const VALIDO = '20260907001200_rbac_seccion_recursos_humanos.sql'
+
+  it('archivo AUSENTE → lanza, nunca lista vacía', () => {
+    const enoent = () => { const e = new Error('ENOENT: no such file or directory'); throw e }
+    expect(() => leerAplicadas('/no/existe.txt', enoent)).toThrow(/No se pudo leer el historial/)
+  })
+
+  it('archivo ILEGIBLE (permisos) → lanza', () => {
+    const eacces = () => { throw new Error('EACCES: permission denied') }
+    expect(() => leerAplicadas('/root/hist.txt', eacces)).toThrow(/EACCES/)
+  })
+
+  it('contenido INVÁLIDO (no son versiones) → lanza en vez de tratarlo como vacío', () => {
+    // El caso realista: un error o HTML volcado al archivo en vez del historial.
+    expect(() => leerAplicadas('x', () => '<html>502 Bad Gateway</html>'))
+      .toThrow(/no son\s+versiones de 14 dígitos|no son versiones/)
+    expect(() => leerAplicadas('x', () => '{"message":"Unauthorized"}'))
+      .toThrow(/no es un historial válido|no son versiones/i)
+  })
+
+  it('una sola línea corrupta entre versiones válidas también aborta', () => {
+    expect(() => leerAplicadas('x', () => '20260317000000\nbasura\n20260320000000'))
+      .toThrow()
+  })
+
+  it('main sale 1 y emite ::error:: cuando el historial no se puede leer', () => {
+    const errores = []
+    const code = main(
+      ['--file', VALIDO, '--dir', 'supabase/migrations', '--aplicadas', '/no/existe/historial.txt'],
+      (m) => errores.push(m),
+    )
+    expect(code).toBe(1)
+    expect(errores[0]).toMatch(/^::error::/)
+    expect(errores[0]).toMatch(/No se pudo leer el historial/)
+  })
+
+  it('el fallo del historial NO se confunde con "versión válida": jamás sale 0', () => {
+    // Con el bug anterior, historial ilegible → [] → la versión "no estaba
+    // aplicada" → exit 0 → producción reaplicaba. Este es el guard de esa regresión.
+    const code = main(
+      ['--file', VALIDO, '--dir', 'supabase/migrations', '--aplicadas', '/no/existe/historial.txt'],
+      () => {},
+    )
+    expect(code).not.toBe(0)
   })
 })
