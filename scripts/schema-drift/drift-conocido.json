@@ -1,0 +1,796 @@
+{
+  "_README": "Baseline EXPLÍCITA del drift conocido entre el esquema que describen supabase/migrations y el catálogo real de producción, medido el 2026-09-01 (issue #826). Cada clave es un grupo `objeto/dimensión` de la huella y lleva `motivo` obligatorio: una lista sin porqués no se poda, y una lista que nadie poda acaba siendo un `permitir todo` de facto. scripts/schema-drift/auditar.mjs falla si aparece un grupo que NO está aquí.",
+  "_HUELLA": "Cada entrada fija el par de huellas medido: `sha256(serialización canónica):nº de objetos`, o `AUSENTE` si el grupo no existe de ese lado. Fijar el par —y no sólo la clave— es lo que impide que un grupo ya declarado se trague cualquier cambio posterior: la baseline declara ESTA diferencia concreta, no barra libre en esa tabla. Lo destapó la primera prueba negativa real, en la que inyectar una policy en `security_logs` no rompía nada.",
+  "_TRINQUETE": "Esta lista SÓLO puede encoger. Si un grupo deja de mostrar drift, el auditor falla hasta que se retire la entrada — así el arreglo y la poda viajan en el mismo PR. `--trinquete-contra origin/main` rechaza además cualquier PR que agregue entradas: un drift nuevo se cierra con una migración forward-only, nunca ampliando la baseline.",
+  "_COMO_SE_ARREGLA": "Para cada entrada hay que decidir qué lado es el correcto — no se presume que producción ni el repositorio lo sean — y escribir una migración append-only que haga converger al otro. Las entradas marcadas SEGURIDAD van primero. Nada de esto se hace en el PR del auditor: el auditor sólo mide.",
+  "_ESTADO": "131 grupos con drift sobre 2438 comparados: 2307 coinciden exactamente. Las 449 migraciones aplican 449/449 sobre una base vacía. Las 260 tablas existen a ambos lados con el mismo estado de RLS. De los 131, DOCE son cosméticos (espaciado en cuerpos de función) y están marcados como tales.",
+  "_HISTORIA": "Sembrada el 2026-09-01 con 120 grupos usando md5 truncado a 12 hex y espacios colapsados. Dos correcciones la movieron:\n(1) md5(12) -> SHA-256 completo sobre serialización canónica: 48 bits admiten colisiones, y una colisión aquí es drift invisible.\n(2) Se ELIMINÓ la normalización de espacios. Colapsaba `regexp_replace('\\\\s+',' ')` de forma global sobre `prosrc` y sobre las definiciones de vista, así que borraba diferencias reales dentro de literales SQL (`SELECT 'a  b'` y `SELECT 'a b'` hasheaban igual), cuerpos PL/pgSQL y dollar-quoted, y vistas con literales. Un falso negativo de seguridad a cambio de 12 entradas cosméticas: mal negocio. Ahora todo se hashea en crudo y las 12 quedan declaradas.\nResultado: 120 -> 119 -> 131. La subida es sólo la deuda cosmética que antes estaba oculta; no apareció ninguna diferencia semántica nueva.",
+  "grupos": {
+    "funcion:aplicar_mora_cuotas_vencidas()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "718ba47fa7ef66087029f9ca875a955a12ea40be5abb6ccc76e7c209adcc99cd:1",
+      "repo": "52ad43c25749c003e43561aa24dcf2c85eede2395f3945ecc3e961881cf151ea:1"
+    },
+    "funcion:aplicar_mora_facturas_vencidas()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f7f0f6e079714564b753c8d9ec785a3744a516e4b1a79326979c816e886948de:1",
+      "repo": "302fdca5af4f21de21a1f36712b3ecc3dcdca949647aaac0de19b77ec36fa36f:1"
+    },
+    "funcion:buscar_cliente_para_onboarding(p_cui_dui text, p_fecha_nac date, p_email text)/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ae53ca7335b8c0f4e449f0ac479f96e2750f9c1aa33513126b192a94b5228dfa:1",
+      "repo": "6865d6eb22472a4cc9888b1c3d3c546475e46b8f5ab94738b4e2810c1b34307c:1"
+    },
+    "funcion:calcular_cumplimiento_calidad(p_tipo_agua text, p_parametros jsonb, p_company_id uuid)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ef7e7f2ac2a16ffc8531edccd1433f7d0bc188e422f0595454cda8001f85c5d1:1",
+      "repo": "200c6a38e588256fd3301b1f0d98855efe0c1f6e7a3414e5002c07157c65f516:1"
+    },
+    "funcion:create_default_conversation_access_rules(p_company_id uuid)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ccbd27453c6df8a6d6b7a366229fba5d18370c9e99494d2874a3ea5168ab986b:1",
+      "repo": "80a617746978a3fa2168975f1ae6691ba41d653793afc0a5d5ae214d0e43e281:1"
+    },
+    "funcion:create_default_conversation_access_rules(p_company_id uuid)/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:current_user_role()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:dispatch_scheduled_reports(p_schedule_kind text)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "338799f69d3f844ba7ee6c10b90b2d7a5ca9147a32bdc0da4dc24815cbfe928e:1",
+      "repo": "e5a3c1617c64dc5cd49dab9c1a937a01b613404794ffe621823e6fb7f3e7c0ba:1"
+    },
+    "funcion:enforce_max_projects()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "0efb5e3c71df5986a3f3cc2b3659d1a591eda999213aee59df703a57fa532c0a:1",
+      "repo": "1b8440471a74ec5202c9925a69b45a9f0be4c7ec75bc667294a3d22d458cd6de:1"
+    },
+    "funcion:enforce_max_units()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "1a9a88605d24d7d1d216a34ae9463fba996820acfd8b00d062e23561268acb0b:1",
+      "repo": "382d2bd78c1381d2ec7227d9c599557a1b621db71c47362868ca5d9db6a15c13:1"
+    },
+    "funcion:fill_company_id_from_user()/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:fn_set_recipient_company_id()/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:generar_ocurrencias_rutas(p_dias_adelante integer)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "34f49ac52c330b17c0ee2177e93cf7d1eaf48e7169fd2817d2e708ea47f7ac77:1",
+      "repo": "02de94dcb8eeb97409460a7e469ebdc3265876d39c43663c465d443fbcd5c662:1"
+    },
+    "funcion:get_my_cliente_id()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:get_my_company_id()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:get_my_sessions()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "662ae46fb6364faffe8103cf245ed65cc7e7a744a2280b720f15269c371356d2:1",
+      "repo": "8fc6c9bb41f4195e832ce6a51bc7c02b6a119c30520dd07b335914692c921b72:1"
+    },
+    "funcion:get_my_user_id()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_admin_company_access(p_company_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "a9db63bf240f45277e2afb7fc73a2fac36275fb09f5355a97b543eb2ae0d1595:1",
+      "repo": "21a882bf9cbd0371b37ffbc99a77517791394e8302f9a676dcb508d1d3ba913e:1"
+    },
+    "funcion:has_admin_company_access(p_company_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_admin_or_owner_access_in_company(p_company_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_admin_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "cbbdfc3dcea34873b8f22a6f9ac4b1719e0218d74ce0c9b4e146537574195add:1",
+      "repo": "250a62695a11a6320dc7c3173897c722df63ca7ced2688f29f8acd9db3d635a4:1"
+    },
+    "funcion:has_admin_project_access(p_project_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_company_owner_company_access(p_company_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "b33fd9a413d6c20e4fb00fae834fff15c503c1825d0348003781fa5ffc998484:1",
+      "repo": "fac645fa476cb011cda14d13f5e911b659a0b02c97354e114462fcc8e5321e95:1"
+    },
+    "funcion:has_company_owner_company_access(p_company_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_operator_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "86c4b1973e35298fe62aa84c9170bf6ed671680a6e0e58be6ff2d334e2a26bc6:1",
+      "repo": "afccce87b684bdc05b2181c621612c0bcffdb0f098160de08cef640576a10a19:1"
+    },
+    "funcion:has_operator_project_access(p_project_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_role_any(p_roles text[])": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "b71b07a39c96a790e3fe13745961462d64dbbda6f1a2e862e117b51d26a8e717:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:has_role_any(p_roles text[])/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:has_super_admin_access()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:has_super_or_owner_access(p_company_id uuid)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f6db70ae8f9a6f493ce2644c4ee665527385ee8841993eb950e92bb0f75ad7b7:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:has_super_or_owner_access(p_company_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:has_viewer_project_access(p_project_id uuid)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "016ff4f24a19ebd418a8821d486feddd6ff7271ca1efa985b291eb12fb92a0a5:1",
+      "repo": "fbf796accb327be3708240aede6b18bfa7b961cd6f534a945b8ebf990c11e1de:1"
+    },
+    "funcion:has_viewer_project_access(p_project_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:is_company_owner()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:is_super_admin()/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:is_user_cliente_with_id(p_cliente_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "9bec92a81d951c09d57f5199e918fed1fd49a61deeabcf2fb21c68599e777f7d:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "AUSENTE"
+    },
+    "funcion:mark_notification_result(p_id uuid, p_ok boolean, p_error text, p_retriable boolean)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "0f8414301c42f33e859c38efe697c04868bffbad8c64ee7a86b8fcef14d48445:1",
+      "repo": "043aabda08e9a131524b1aba530d5e66e4c5da45268f7262a37fde91414e5165:1"
+    },
+    "funcion:migrate_custom_auth_to_supabase_unconfirmed()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ff24afbacb3de16e71c98bd75f80b85ecf00e79333f61246deca8485a470f9b4:1",
+      "repo": "8cf93787e474a476e0b5a6449a2cc46f03b61f037261f527e6bed89d73009d0c:1"
+    },
+    "funcion:migrate_custom_auth_to_supabase_unconfirmed()/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:notification_channel_enabled(p_user_id uuid, p_channel text)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "52700c2504f8c1ce31eebc00fe3b5b918809a21f48b46d54bc749f44a9b520b4:1",
+      "repo": "d822c8f11461faea8bd2e77b918e3b9bba911a6197a904ceda83286303a43014:1"
+    },
+    "funcion:rate_limit_check(p_user_id uuid, p_action text, p_max_count integer, p_window interval)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "d495606b082e48625b12e9ab3726a31c0e6f2e5770af3592777bb6d7ea64bf32:1",
+      "repo": "3ba62a175ae5f848fb64bc7c6ddd8d9c1cdf7633f98014bfb1bd76004065f0de:1"
+    },
+    "funcion:record_legal_acceptance(p_doc_type text, p_user_agent text, p_locale text)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "aea5d29afb240f37f8348219f96637ccdfb742207ab5bd6d6ea3aaa07c1f27fe:1",
+      "repo": "f4ce941c15a974ec33428455e0c98074809ff45ba8470ac1c1d6604c33519d7a:1"
+    },
+    "funcion:refresh_superadmin_kpis()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "66f4e739d77064e163b368c55aa59cc02f4f05f4515c202b8a5609a2f5dfe704:1",
+      "repo": "409ea0ac651163828eaedb6650939d145493533bc6ae0812212fdf715f239053:1"
+    },
+    "funcion:request_password_reset(email_input character varying, ip_address character varying, user_agent text)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "52f6c25d9b902ed30e387651a54a20b49f8f0c67c4c0ac16f0797cd9bdcb976c:1",
+      "repo": "ca02858c9b3a25d32baacdfea8b390c667a9bd1a36fdbfc1a801b782a9d6a2aa:1"
+    },
+    "funcion:request_password_reset(email_input character varying, ip_address character varying, user_agent text)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:request_password_reset(email_input text, ip_address text, user_agent text)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:revoke_my_session(p_session_id uuid)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "7b733d2f77d28537984ef8532c3214e3ffe1eaa073bf653ce8bd3b8c9a0837db:1",
+      "repo": "b548ffbf28fa71a0e466c189353ede4356f14ed9a9d61d5e28a183d41b6a1e5e:1"
+    },
+    "funcion:revoke_other_my_sessions()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "7c046bf80bf09fc2a3765e87ba0d590c64259bcaa886592af89d36ed96514114:1",
+      "repo": "7f80e2c54c1f8e1d81744fd0f4cdcd2c33ec18946367d06da7a84ca3924870d0:1"
+    },
+    "funcion:run_route_reminders()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "cccbe91ee961d8312a814d38536dccbd496c8e0a59a0b440a518064a4ad11990:1",
+      "repo": "5a6d5d1c2b291f8f00598ccb10fdd4eb1e1f0b6e923e4f71cf3fe60c69210aa9:1"
+    },
+    "funcion:set_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "a8e92d8b7d268e537ebdbd16b16ced6d3af8962fb80b8db48a684870d154e79d:1",
+      "repo": "5f43a5b3312f9453d09244d9fab57d8216594515d1f699536476cd246928dad1:1"
+    },
+    "funcion:set_updated_at()/grants": {
+      "motivo": "Difieren los GRANT de EXECUTE. Producción los endureció a mano y el repositorio no registra ese REVOKE. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:sync_contador_project_from_unidad()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "8b767010d9af9866a49aa3e52b65db6bca335ad32c470b01b2cb1254b3e8be69:1",
+      "repo": "5c3f90d7ac3d4b8dc41373f78011171f32c991a0e395b9b212bd19803ace6a1a:1"
+    },
+    "funcion:touch_notification_preferences_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "72b793ee133e6e9af0958eac326412626564540a773870da426dd0ef48b03a9c:1",
+      "repo": "6666f06426f460d3f1b12b9e5ae00f05a66c899ae2fc118c7f42b7130c7bc7d5:1"
+    },
+    "funcion:touch_updated_at()": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "08751a45f69aa68040f0041fa6684ecfa19c5ad981122a6c2cd0697bff579cc5:1",
+      "repo": "015b263a160df9372cc87b68908ee8cde4704c4ac4d31dde5de739de5408038b:1"
+    },
+    "funcion:trg_registros_calidad_cumplimiento()": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "5be4706205269c5218c0af3a3d8857411eebce4a7e67d817e6d4b3695721dd19:1",
+      "repo": "37ba6fcc80b2d2dbc0af2d236ec28f2b88fd4b18a6a113c29b47acd816c2125b:1"
+    },
+    "funcion:update_email_attempt(p_id bigint, p_ok boolean, p_error text)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "54039aac310e0f8ce52615b89671dbd6b6bdd93cd928e7781df08b629aa64a35:1",
+      "repo": "08a64230addee307df37e0b7d4fcc3007d888b1a9f89b8c4fac91e6978bdadf1:1"
+    },
+    "funcion:update_user_password(email_input character varying, new_password character varying)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "218e63367e6620ee08cd79ca23ddc1f9b927cde935d65593984fb4210d422ad3:1",
+      "repo": "2e0038f9ec91dd6fa6a208541d5219fd4a56a313165dee42bc1284d0da1ad49f:1"
+    },
+    "funcion:update_user_password(email_input character varying, new_password character varying)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:user_has_project_access(p_project_id uuid)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:validate_reset_token(token_input character varying)": {
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "243ef834c115dd4cddae85152502b4ae53500c425c5c675e75354cd271399432:1",
+      "repo": "b09e10cce3f1ad2ee0103af1216818bcf0a21a3c48d3dc5d097f483bdb773514:1"
+    },
+    "funcion:validate_reset_token(token_input character varying)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "funcion:validate_reset_token(token_input text)": {
+      "motivo": "COSMÉTICO, DECLARADO A PROPÓSITO. El cuerpo de esta función difiere sólo en espaciado: colapsando espacios, los dos lados son idénticos. Producción reformateó a mano varias funciones durante marzo-junio 2026. Esta entrada existe porque el auditor NO normaliza espacios en ningún sitio: un colapso global borraría también diferencias reales dentro de literales SQL, cuerpos dollar-quoted y definiciones de vista, y eso es un falso negativo de seguridad. Vale más una entrada cosmética que alguien lee y decide, que una diferencia semántica perdida en silencio. Se cierra reformateando el repositorio para que coincida con producción, o al revés — pero es la última prioridad de #826, muy por detrás de las de seguridad.",
+      "desde": "2026-09-01",
+      "produccion": "50dcb9f647a12e561e2bf9e94b1a74ef5c52bcea3641f2caa5802f3fcc461ee3:1",
+      "repo": "b10e09b184651fde3602d147742c8f133d9f5a7a3959d611732a7482123688e6:1"
+    },
+    "funcion:validate_reset_token(token_input text)/grants": {
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+      "repo": "a25280a6070b6f939711e103a4558f85ec53cab35d8a70e2eb7dd7420f5c6632:1"
+    },
+    "tabla:amenidades/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f260906bb41dd35d0c23a9113f3962b67c3ca104fd696baed97ec62a733f7c3a:23",
+      "repo": "409fef5f496ebf456675914018ce625ac933a12234f3bf686dd74be6ff0810d0:23"
+    },
+    "tabla:amenidades_bloqueos/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "0088197927afa338e653073ecd504e93d8d152ef4702068eead158bb4d62df4b:12",
+      "repo": "62c4f352afb05ec7c02cb11b4c1d53bb30d2f187424ce8d719555370a21365e0:12"
+    },
+    "tabla:amenidades_bloqueos/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "916d01336f66b0fca8d9d324f5d4ddde9419e70f61f942ca1b562a208d7b5e4b:4",
+      "repo": "fbde9291f1348ed624f5ccb27fc58b9692e14514843891ac346d9887513caf8b:7"
+    },
+    "tabla:amenidades_bloqueos/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "a03fa118a69d9fb1e68407e348d7db6e91f347d11f6990caa31404ed0c5f1692:4",
+      "repo": "e303ab48e5581507dc1bd14c149430ffc9ff36bb0e162962c4b0fc20f7a49433:5"
+    },
+    "tabla:app_users/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "aa17da0c14c2ebe21bcb32b939b26e0e978d858a71136c7980093f49a5bf38b2:3",
+      "repo": "295f81aae32b116596f9936081b1e3bc41a5cc413e59558f01f70b8a5e42a79e:3"
+    },
+    "tabla:areas_condominio/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "885704df950066d494a908686c115675b4c714dce8c8fe04946fbd4c5431d2f5:9",
+      "repo": "c89b4fdf2cfa9b250983b55fb475bf89663e7f98b55f5f7c7cb9b4e07abbaf6e:9"
+    },
+    "tabla:areas_condominio/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "8c631d0994b23f74524d9fb31a79410ff046308bbb1ecdcd0344edc143e1ba0d:4",
+      "repo": "58d8770c641c43035ca29d3221dbb26385bf7ca9ebffde558bb24d3c8e0114d0:4"
+    },
+    "tabla:areas_condominio/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c9302d57e128cc26de9a4881374c4cba2b8ee8fa663e04645a8aadf818fe5342:5",
+      "repo": "3b546487ade729859f869fa67e01c1d59a97e4039ed1751abe4ec05e12603dbd:5"
+    },
+    "tabla:bloques_turno/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "20190cc829a8bfef79e8ae00869e71fd91671cee76bdeaf4f70d065e70f8bd79:20",
+      "repo": "69c4665d5ae8a76bad2bae6cc2dff670f1f2a85ed16eebe4ac6a554b8b60093c:20"
+    },
+    "tabla:bloques_turno/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "2923b929f0a3533aba1b2dddce72eaddd7676555e90c96887ce3dd8193c34f20:9",
+      "repo": "5ff1608e564662cfab575d5a2ddc44b7f6dd6baa406af04344815fa3989911e3:9"
+    },
+    "tabla:bloques_turno/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "22fd861a430a3e440a7f4f6c5404a4d7f465baed2f7e1029ec40bb4da392cbf1:6",
+      "repo": "3af86a5ae9f7cb6ec375916a29706410d649db39edca08a4a9f9d90344d7713f:6"
+    },
+    "tabla:clientes/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c8c77e94b510f11345967c14f0f90b4eb6de9201024c7504acf78fef618e36bc:4",
+      "repo": "7b66006f81d279d7acb838d486d31f5f40d2b1e92f5f69ca15f547d00638ac20:5"
+    },
+    "tabla:company_payment_secrets/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "466f3dae94b8dc838ec3f74cb9475909874ce18253264a6872667ea37425ee49:3",
+      "repo": "d05cc12191aa76e0fa46b77623a92416412cd9028593e911e4706e1857738ec2:4"
+    },
+    "tabla:comunicados_condominio/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "e416beee3f7e35596c9ff8af112a94446c2b88ab995a1b9c9130acb59ba5d616:5",
+      "repo": "09cf50f9347b8a8d770029be67458a9df3b3a0c79fe672c7f2a2688a792ae1df:6"
+    },
+    "tabla:conta_asiento_lineas/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "da892adbed3a0bcd4afdd5095c3c0373559e14c34633a2617ba1bdb989a59eb0:4",
+      "repo": "15c3301d399a00930289e4404fb6361aab6afb90adc31a831cc12a6453e1475d:3"
+    },
+    "tabla:conta_cierres_anuales/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "46cf4e86dc1ad29a71c7bfb63f994fe1e894a61d99c59f079fda1b9170942111:3",
+      "repo": "0ae2040f8e3c8a4c10b52252e384b3ea42abbc25708292ffd103939cae9c0689:2"
+    },
+    "tabla:contadores/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "18b130cd5096f5df6d0d4171c16d22937ace74a3b7d850747a54c4d6746b190c:31",
+      "repo": "81f169a31e91fb9979835affaed0440b4a14e035942aad71d261eb88f6625ccd:31"
+    },
+    "tabla:contratos_arrendamiento/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "3775471573f1f0d3ac60f872ecbba830e1ba97471b832565baa9db4dc68c1375:5",
+      "repo": "c1c7837fa64cee1f00423ada5c0de5bcfa9a01be8f3f3d0f8ac892290fb83e46:8"
+    },
+    "tabla:conversation_messages/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "e67e0c2b4fbc6d6d6a26991c5fa9a9659a17e56bfe23fa7d0fdb767616b7c638:2",
+      "repo": "070ca803ff99490b2a862656890e507e422586a4a0e03c1ffea2b37ad1b476be:3"
+    },
+    "tabla:empresa/policies": {
+      "motivo": "SEGURIDAD · MEDIA. Producción tiene INSERT/UPDATE/DELETE a `public` guardados sólo por `current_user_role() = 'admin'`, sin acotar por company_id: cualquier admin de cualquier tenant escribe filas de otro. El repositorio sólo declara `empresa_select_authenticated`. Falta decidir la postura correcta antes de tocar nada. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ed2099e041f8efbca40fc5c5b127a3bed3d3815fb1b7bcfa1cd1ed1b595fca73:5",
+      "repo": "5cea41f8566e4575443966a5d93868a11268aaf495db770e5dc5443ad86a9d66:1"
+    },
+    "tabla:fuentes_agua/triggers": {
+      "motivo": "Difieren los triggers de la tabla. Cambian comportamiento en escritura, así que no es cosmético. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ff139129f73e9ed863c20f9567dab9191bcd4e65561fef66c7eec8bc873c2102:2",
+      "repo": "61915cf53c070338759187e0b08cd5fba4c5e6e83dd16fc1ed725c21a12f2dc4:1"
+    },
+    "tabla:infracciones_condominio/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "25e1b6f1c09ba5f23953cae1c1e737775f1fa0007d5c25414a4b36b6eecf84db:16",
+      "repo": "7a5c6a8ba1535d92a042c1a827dbcc9112b8bde3e1d1e82ed66892246c5ff843:15"
+    },
+    "tabla:inspecciones_normativas/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "75298acaa517bb7788a920ebb9ffee9017b239afcdd843fc1a8799c8e92996f2:16",
+      "repo": "327e9cdcac2e144b3185cb2a6e2175c91093034ff8f5f918892999b8ac47d8fc:15"
+    },
+    "tabla:junta_directiva/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "9be5eb4c9d1e42087f0257cacd7c4cc9e9c7f104012371a983c92f6d419bd29a:4",
+      "repo": "2b8da28d7867a9f2b21e2143558edae848e793e1c364398a9472f664fc69b8b2:5"
+    },
+    "tabla:mensajes_portal/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "6fa9a8a8d7e6f91640b0c70d39d6fdba295ed1be58ae2e469e4215eb3a10b4a6:13",
+      "repo": "14fe81a6035d9bbbf3b4eb851b5cdb93da1352fb734b7c1cf917bec5b9e58b71:13"
+    },
+    "tabla:mensajes_portal/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "e91c6b9ab492a15a83bafe2c4bdd3ad756b984af7673f960b83472fa3cf9dd62:6",
+      "repo": "6a5205b07714d3e8bbfb4bc5d8203bbdf30db2f3f417b9d15224e86087502559:4"
+    },
+    "tabla:mensajes_portal/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "45f7243b422441c452e28ecbc1387b160e2bb3a44ecf6726f297d3165f378268:6",
+      "repo": "d274affd8eae92a059121261dc311355fda7be1a356622b76dce4f36d1201819:4"
+    },
+    "tabla:mensajes_portal/policies": {
+      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
+      "desde": "2026-09-01",
+      "produccion": "41f8ffcf7172f043879e557a59604e8577aa3f8981643ba9082dbf4b8dd3cb08:3",
+      "repo": "a7faf51a6a2c4136fc815023a4744ff8fc82153f4945b88363e40a4806c7f230:4"
+    },
+    "tabla:novedades_seguridad/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "0c7254efee5f788dfbb122671c0f7486f94e86119c9d5b940da4e81d8effb639:6",
+      "repo": "92eddfdabd6ea0586bdc82a23d03828eeeb59c4b41f2e524084fa72d4df75e30:6"
+    },
+    "tabla:pagos/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "55b54a2913eb5af99a77833dbbd1a06247f5d6cbe65f8e3fb274e9d0e8285c35:17",
+      "repo": "e405e284d6033dc95fa97e32785890ac3f085c254680051dfa469686672e00c4:17"
+    },
+    "tabla:pagos/triggers": {
+      "motivo": "Difieren los triggers de la tabla. Cambian comportamiento en escritura, así que no es cosmético. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "1fb92b96e7ad2a3ff07212f093f1b8d90de26eff567e69a2b4a9fc5075fdc869:4",
+      "repo": "17ce3010c379bfc2454d4e2bc1e9187ccb84c4582be7ac962f6071884f9de674:3"
+    },
+    "tabla:payment_requests/policies": {
+      "motivo": "SEGURIDAD · ALTA. Producción tiene `payment_requests_select · SELECT · TO public · USING (true)`: lectura sin filtro de toda la tabla, y `anon` conserva el GRANT de SELECT, así que la RLS es el único control y no controla nada. El repositorio NO declara esa policy y su propio harness (src/test/rls/rlsHarness.test.ts) afirma lo contrario: payment_requests está en NO_SELECT_TABLES y en ANON_DENY_TABLES. El repositorio es el lado correcto; producción hay que corregirla. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "355fee1e0ac64b10e9caa82fdf82990246d2f0ff22803258659eb0560b0a69af:3",
+      "repo": "bc099c8f77eda47d7861e4b448ba17d9a0c865eb964178061df5d224985ac8c3:2"
+    },
+    "tabla:plantillas_tarea_cargo/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c3d2bf0e33df30aabb31a934f44ec35a5a8bc03844d3746ffdbcdb8ed4aad926:18",
+      "repo": "3f62ab30263eef527726b41a486ce43bf14e5fb8cd6f0c4cb50c52c20e9a73a4:18"
+    },
+    "tabla:plantillas_tarea_cargo/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "5866476d43cc7382dfee7876e861bcfbe73a5562d2d9937b5a22ec985e24dd7c:8",
+      "repo": "c3f1b2b18fe7349939229b09755c65758cc230ce50a27c000f2d6bee61840e98:9"
+    },
+    "tabla:plantillas_tarea_cargo/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ac204be1e56813f56027c59b568645a876dd7a843fdc49f26218f9b25d5867ce:6",
+      "repo": "9ec0b39fa7f1dc122e78262d87dabb8b2df9cf01b8ab2b4f7dad40febcdef471:6"
+    },
+    "tabla:prestamos_equipo/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "939dcf8f0df9eb9a76df6b174d64d0d891b76acd32220d4d9d62d30d449594b0:4",
+      "repo": "03483ca6398ac436d20e993098497ad60821ddb9f3d08ce14f0d6f2895277e53:5"
+    },
+    "tabla:presupuesto_partidas/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "f165edf206f3c03404759e873cb5676dc6e6316a700b95b75d4b1f20b39a9678:4",
+      "repo": "ad2060841ada820edfe9e194af83e90d86bd0fb94d086d80609147aa384ec630:3"
+    },
+    "tabla:puntos_control_ruta/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "ec38efdae307d2026923a20be5a9824dbe889578910a04a2f8bbc61bc8329048:8",
+      "repo": "2f322d986113a38943913b9236dc5bdd6eeb39e945ca047eb8e651d2c2d14a1c:8"
+    },
+    "tabla:puntos_control_ruta/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "77def85727c981d40711321195edfb9271e495a78613df4d473d911342e05fcc:4",
+      "repo": "200c8491687748b9cba4adf389294aec05aca3029bb38990126c98d787201d21:4"
+    },
+    "tabla:puntos_control_ruta/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "9760c13ee6396fdf209e09d61f1f031c0822804fa2cb50cd9d462439823e242a:3",
+      "repo": "465fe75ca7a332e52d930572749befb536f8ec8ef3c7de2cb3dc5613c649a854:3"
+    },
+    "tabla:puntos_control_ruta/policies": {
+      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
+      "desde": "2026-09-01",
+      "produccion": "27cc5824adabf4b304a0c595a2d8bb94e6e2a4aad6be9e6e9d96ccfe71a5f963:4",
+      "repo": "7f0833089d5db4faac9f9ba81231c25d7b2ddee830e12434301583e7ffa15d68:5"
+    },
+    "tabla:registros/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c70e3f9bec941db083b90e7340f399bb335fa4989dd10a3715db2226693903f5:14",
+      "repo": "72ee911e4aa4d98b9c872e9c7fc4d676b06990acd7f488b80bfe0767a29784f5:13"
+    },
+    "tabla:registros_calidad/triggers": {
+      "motivo": "Difieren los triggers de la tabla. Cambian comportamiento en escritura, así que no es cosmético. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "63e84147ff14b464afb5a2fc01d544c239bc5c9abf24f04846f0c7db2b3f058f:4",
+      "repo": "ffa24b1ef0f841ee317a510585b464e3b6a662aa1651355f0fa852e68d067a77:3"
+    },
+    "tabla:reservas_amenidades/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "9c9a6a2dfe87dfdd9bae8501a16e62303bb89293681dcbd634815fb30632a1e5:38",
+      "repo": "5ac38c9382797298594b2e612aeb3d77c27e73805cb6838ee7526d5eaa2e55e3:38"
+    },
+    "tabla:reservas_amenidades/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "7edb746a4a5f7165f6a0aa03dc4af507aff905047f6ca4303a64b0437afbcab8:12",
+      "repo": "ee1d4e55da08193aa4f173593c758b447454ae9bff12db92934e280eabe61e6f:13"
+    },
+    "tabla:reservas_amenidades/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "46c35aa341f13e5b90896cd6c53d4428d10e6b6c5b5b17de6b5f4313c4cae188:9",
+      "repo": "28319b4ee1a77c296d0c47d5e034441808b0d161d587e34aaf337658a7a91c06:12"
+    },
+    "tabla:reservas_str/policies": {
+      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
+      "desde": "2026-09-01",
+      "produccion": "b1726f22828988289f4cf879c0273f609fe4bff610fa11d759a90c89b0adeae3:4",
+      "repo": "f384e2b75bebe70a36f3d242f09090bf4e411e744eda1627dc193f00dcc90b53:5"
+    },
+    "tabla:rondas_seguridad/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "dc7c340474b9d2bb7a5e706b1fad1f1de80be9cafab55c1cee5ebe81d10fb341:5",
+      "repo": "c4ec5a2dfc611a06f259738ef7a00e7d6e02b64535cb48b94c798d046484ca94:5"
+    },
+    "tabla:rutas_ronda/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "b88dba56c83a5390da0075fe4c6d60be0180d16c191862f4036356c0baeeecf0:9",
+      "repo": "a87501e13652b78e119541e80ee8914056c90f094a59b051a39eeb82450a08b9:9"
+    },
+    "tabla:rutas_ronda/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c49447793792dd4d05465f0b55c7f13e4823d7400d86077b62fd79349f9bbe08:3",
+      "repo": "515cef16e039bd24d4cf393fc5776090ef686b542c122864746ee6c16ec15151:4"
+    },
+    "tabla:rutas_ronda/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "810f3272f6f6befde7c613d043330e27f8d1432e4417873ef3140e560e414619:3",
+      "repo": "46f63ebfe3214b2d40bf5b9f37422f89ce808c5e12ed8971ba3d8ceffd39cbf4:3"
+    },
+    "tabla:rutas_ronda/policies": {
+      "motivo": "Producción tiene 4 policies granulares a `public` acotadas por `is_super_admin() OR company_id = get_my_company_id()`; el repositorio declara una sola `company_rw_rutas_ronda` de tipo ALL. No es explotable por anon (get_my_company_id() da NULL), pero son dos modelos distintos para la misma tabla. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "a80d46ec3faac453965d00c0fd52149f5435ed53eeb8f8b06fbdfca1bd930a32:4",
+      "repo": "8806326157796f10864e2a036ea8ef781f74a0645c44ae8380392edaabbbad00:1"
+    },
+    "tabla:security_logs/policies": {
+      "motivo": "SEGURIDAD · ALTA. Producción tiene tres policies que el repositorio no declara: `security_logs_insert_anon` (INSERT a anon, CHECK sólo `user_id IS NULL`), `security_logs_insert_authenticated` y `security_logs_select_by_role` (SELECT a public con `current_user_role() = 'admin'`, sin filtro por company_id). Los dos únicos escritores reales —log-security-event y create-cliente-account— usan service_role, que ignora la RLS, así que ninguna de las tres hace falta. El repositorio es el lado correcto. Sigue en #826.",
+      "desde": "2026-09-01",
+      "produccion": "c52e0e7b7f15593b93c1b61b13a8b750620d61637e4639802242407ef8bb0584:4",
+      "repo": "4b697a62c5d08be84cee65f9d1da5b31c6589eb67bdae498774bfb61395e1170:1"
+    },
+    "tabla:solicitudes_concierge/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "7a26c1d0b1d3da886de673fb5fd37a0297ce4610dc78f0597edf7c392e1305a3:5",
+      "repo": "53f1adeb241f5b4fad3089e5b19c0d522a0dd4c9482a7a23f1ee9cad8a3b4f95:5"
+    },
+    "tabla:solicitudes_residente/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "1ecc5b07ea3e816efa046be45695aad837568081bc3a4056cf334b7d5f7c50e3:5",
+      "repo": "49ae16a457881eb6c78b9b86f47925b02d0f04d8b38542ad83a771fd72fd7bd6:5"
+    },
+    "tabla:tareas_bloque/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "8e8203055e2efc5ecda3933bca710951a6f14b5f5471984b42a24c20afd9c8eb:32",
+      "repo": "a85d32cd0b391f0cdd92214396acc530e764e02e7b2500131099278cb22d4ccc:30"
+    },
+    "tabla:tareas_bloque/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "7fbde9a92f1f31ddd96b5edaf9eb43a69c29e7866424d4f2bc9fe4e1d49765d3:11",
+      "repo": "d80aac98c8d924538ede1e93e745f6e3120db90b8d0ff75d73091a2341840ff2:11"
+    },
+    "tabla:tareas_bloque/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "d23b0e8d0f2caf45df822b42479f8387411d3678fe21bca73bad5243a0a50f54:6",
+      "repo": "46f3520a7c58f65e23980e3240bf1e035873bc9843b156a6eb2c51bb01a75d3e:7"
+    },
+    "tabla:unidades/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "cc8b7aa069d1f73809aa1548d7ddd444b007bbf5aa790a1e5f8bd0569de503a1:29",
+      "repo": "58b8d0dee7cd9e7e2e25f2c22ad5849240ba454f715703857022a8c8049efaa1:29"
+    },
+    "tabla:unidades/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "b1a87cb09bd6ada77d2da97ebded306db1b2d0f03c93ece6a464954b9d44f459:6",
+      "repo": "02eb4e554b697a19f8d9f55c19b5c80912caccc9bca488dc8a9f49d7db23dc74:7"
+    },
+    "tabla:user_sessions/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "8d899c34a10b649cbab39827278196933fb1c9e2d1451e831e1173c5d6882fd7:3",
+      "repo": "a33f5bf62ae9db9b1185e05f650b32b9a5cdeae23e92ae4b59ebdb24982d1c2d:3"
+    },
+    "tabla:visitas_control/columnas": {
+      "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
+      "desde": "2026-09-01",
+      "produccion": "a8759313bf9a975cb213292c21c05e7d62d0463458cbd7f3e426fe164e7c9366:9",
+      "repo": "8d0b52200a58e05f2846f95bb3645891338c1b78c05682f35f0a5610731a0841:9"
+    },
+    "tabla:visitas_control/constraints": {
+      "motivo": "Difieren constraints (CHECK, FK o su acción ON DELETE). Mismo origen que las columnas: la tabla la creó una migración huérfana con otra forma. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "67f67ba82f7b634b4dc447c29055f6b2b17710bba2052ed39162bca56be379af:6",
+      "repo": "93a9a7ffbcdf8597f31ba5b45077f0e7bdbc57f10c00825c52a3ef754c50c9aa:5"
+    },
+    "tabla:visitas_control/indices": {
+      "motivo": "Difieren los índices, casi siempre en el nombre y a veces en las columnas cubiertas. Es la clase de drift más benigna —no cambia semántica ni permisos— pero se declara igual: un índice ausente en producción es una consulta lenta que el CI nunca ve. Inventario en #826.",
+      "desde": "2026-09-01",
+      "produccion": "4073f968fe99edbf9440845d724aeb3c2596f07b10a2f835565b8119181ffff5:4",
+      "repo": "c759e1c4fc4d97f5f4542c43deae9876cb6f8bf31445c695aa431f6a5afad7e9:4"
+    },
+    "tabla:visitas_control/policies": {
+      "motivo": "Difieren las policies de RLS entre producción y el repositorio. Toda diferencia de RLS es seguridad hasta que alguien demuestre lo contrario: se clasifica y se resuelve en #826, no aquí.",
+      "desde": "2026-09-01",
+      "produccion": "cff45151dd87d9bb30395eadf9fc0346c15816a0ad6dda3620f1bf6777c18083:4",
+      "repo": "e85e7677e6b8327115b0270ea87f5cd576011ea9797da5b5be87c55c0f4ae902:5"
+    }
+  }
+}
