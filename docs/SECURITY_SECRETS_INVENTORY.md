@@ -235,7 +235,7 @@ quede junto al inventario y no solo en un canal de chat que nadie relee.
 
 | Fecha | Secreto | Motivo | Notas |
 | --- | --- | --- | --- |
-| 2026-08-03 | `SUPABASE_ACCESS_TOKEN` | Expiración o revocación **no planificada** | El token dejó de servir entre las 03:05 y las 08:09 UTC del 2026-08-01: a las 03:04 `apply-migrations-prod` aplicó la migración de #696 en verde y a las 03:05 `security-guard` leyó el catálogo sin problema; a las 08:09 `cleanup-preview-branches` ya daba `401 Unauthorized`. Sin cambios de código en esa ventana. Detectado por CI, no por una persona. Los siete workflows que comparten el token estuvieron caídos ~2 días, `apply-migrations-prod` entre ellos. |
+| 2026-08-03 | `SUPABASE_ACCESS_TOKEN` | Expiración o revocación **no planificada** | El token dejó de servir entre las 03:05 y las 08:09 UTC del 2026-08-01: a las 03:04 `apply-migrations-prod` aplicó la migración de #696 en verde y a las 03:05 `security-guard` leyó el catálogo sin problema; a las 08:09 `cleanup-preview-branches` ya daba `401 Unauthorized`. Sin cambios de código en esa ventana. Detectado por CI, no por una persona. Los siete workflows que ENTONCES compartían el token estuvieron caídos ~2 días, `apply-migrations-prod` entre ellos. (Hoy son seis: `apply-migration.yml` se eliminó al cerrar I9.) |
 
 **Lección de esa caída:** este token no avisa antes de morir y se lleva por
 delante el despliegue de migraciones a producción. Si al generar el reemplazo

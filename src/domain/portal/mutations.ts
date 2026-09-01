@@ -4,20 +4,8 @@
 // El residente (rol cliente) invoca estos edges con SU propio JWT: create-charge /
 // confirm-charge lo autorizan por PROPIEDAD del ítem (su unidad/cuota/recibo). La
 // capa de datos aísla el I/O a Supabase de los componentes (boundary T7).
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-
-/** Extrae el mensaje real del edge (el SDK oculta el body `{ error }` en context). */
-async function extractFunctionError(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const body = (await error.context.json()) as { error?: string } | null
-      if (body?.error) return body.error
-    } catch { /* body no-JSON: cae al mensaje genérico */ }
-  }
-  const msg = (error as { message?: unknown } | null)?.message
-  return typeof msg === 'string' ? msg : String(error)
-}
+import { extractFunctionError } from '../functionError'
 
 export interface IniciarPagoResult {
   /** Estado normalizado del provider: aprobado | requiere_accion | pendiente | rechazado | error. */

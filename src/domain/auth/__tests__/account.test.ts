@@ -2,6 +2,7 @@
 // (cliente/empresa/OAuth) y operaciones de auth (reset, updateUser, getSession,
 // signOut). Sin red/React: sólo el mapeo de resultados de supabase a `{ error }`.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 
 const { invoke, resetPasswordForEmail, updateUser, getSession, getUser, signInFn, signOutFn, updateEq } = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -124,6 +125,77 @@ describe('createClienteAccount', () => {
     expect(await createClienteAccount({
       full_name: '', email: '', cui_dui: '', fecha_nacimiento: '', password: '', legal_accepted: true,
     })).toEqual({ data: null, error: null })
+  })
+})
+
+// ── El body { error } de un FunctionsHttpError ──────────────────────────────
+//
+// `functions.invoke` NO devuelve el cuerpo cuando el status es no-2xx:
+// `error.message` es siempre la cadena genérica del SDK y el `{ error }` que la
+// edge escribió queda en `error.context`. Importa justo aquí: desde que
+// signup-company y create-cliente-account son fail-closed, una caída del RPC
+// `rate_limit_hit` devuelve 503 con un mensaje accionable ("intenta de nuevo en
+// unos minutos") que sin extraerlo el usuario nunca ve.
+describe('createClienteAccount / signupCompany · errores HTTP de la edge', () => {
+  const MSG_503 = 'Servicio temporalmente no disponible. Intenta de nuevo en unos minutos.'
+  const GENERICO = 'Edge Function returned a non-2xx status code'
+  const payloadCliente = {
+    full_name: '', email: '', cui_dui: '', fecha_nacimiento: '', password: '', legal_accepted: true,
+  }
+  const payloadEmpresa = {
+    email: '', password: '', full_name: '', company_name: '',
+    servicio_agua: true, servicio_condominios: false, legal_accepted: true,
+  }
+
+  /** FunctionsHttpError real: la clase se comprueba con `instanceof`. */
+  function httpError(status: number, body: unknown) {
+    return new FunctionsHttpError(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+  }
+
+  it('createClienteAccount: un 503 llega a la UI con el mensaje de la edge, no el genérico', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: httpError(503, { error: MSG_503 }) })
+    const res = await createClienteAccount(payloadCliente)
+    expect(res.error).toBe(MSG_503)
+    expect(res.error).not.toBe(GENERICO)
+    expect(res.data).toBeNull()
+  })
+
+  it('signupCompany: un 503 llega a la UI con el mensaje de la edge, no el genérico', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: httpError(503, { error: MSG_503 }) })
+    const res = await signupCompany(payloadEmpresa)
+    expect(res.error).toBe(MSG_503)
+    expect(res.error).not.toBe(GENERICO)
+  })
+
+  it('el 429 del rate limit también se propaga con su mensaje', async () => {
+    const msg = 'Demasiados registros desde esta red. Espera una hora e intenta de nuevo.'
+    invoke.mockResolvedValueOnce({ data: null, error: httpError(429, { error: msg }) })
+    expect((await signupCompany(payloadEmpresa)).error).toBe(msg)
+  })
+
+  it('body sin `error` → cae al message del SDK en vez de romper', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: httpError(500, { otra: 'cosa' }) })
+    const res = await createClienteAccount(payloadCliente)
+    expect(typeof res.error).toBe('string')
+    expect(res.error).toBeTruthy()
+  })
+
+  it('body no-JSON → no lanza y devuelve un mensaje utilizable', async () => {
+    const err = new FunctionsHttpError(new Response('<html>502</html>', { status: 502 }))
+    invoke.mockResolvedValueOnce({ data: null, error: err })
+    const res = await signupCompany(payloadEmpresa)
+    expect(typeof res.error).toBe('string')
+    expect(res.error).toBeTruthy()
+  })
+
+  it('un error que NO es FunctionsHttpError conserva su message (sin regresión)', async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: { message: 'cliente no encontrado' } })
+    expect((await createClienteAccount(payloadCliente)).error).toBe('cliente no encontrado')
   })
 })
 

@@ -5,6 +5,7 @@
 // mapeado a `string` (la convención del dominio) para que la UI no toque tipos
 // de supabase.
 import { reportDegradedQuery } from '../queryFetch'
+import { extractFunctionError } from '../functionError'
 import { supabase } from '../../lib/supabase'
 
 /** Respuesta común de las Edge Functions de cuenta. */
@@ -31,7 +32,15 @@ export async function createClienteAccount(
   payload: CreateClienteAccountPayload,
 ): Promise<{ data: AccountFnResult | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke('create-cliente-account', { body: payload })
-  return { data: (data as AccountFnResult) ?? null, error: error?.message ?? null }
+  // El body `{ error }` se extrae del FunctionsHttpError: `error.message` sería
+  // siempre "Edge Function returned a non-2xx status code". Importa en los dos
+  // status que este endpoint devuelve de verdad — 429 del rate limit y 503
+  // cuando el contador cae (es fail-closed por ser anónimo) —, donde el mensaje
+  // real le dice al usuario que reintente en un rato.
+  return {
+    data: (data as AccountFnResult) ?? null,
+    error: error ? await extractFunctionError(error) : null,
+  }
 }
 
 export interface SignupCompanyPayload {
@@ -55,7 +64,12 @@ export async function signupCompany(
   payload: SignupCompanyPayload,
 ): Promise<{ data: AccountFnResult | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke('signup-company', { body: payload })
-  return { data: (data as AccountFnResult) ?? null, error: error?.message ?? null }
+  // Igual que create-cliente-account: sin esto, el 429/503 del rate limit llega
+  // a la UI como la cadena genérica del SDK. Ver domain/functionError.ts.
+  return {
+    data: (data as AccountFnResult) ?? null,
+    error: error ? await extractFunctionError(error) : null,
+  }
 }
 
 export interface CompleteOAuthOnboardingPayload {
