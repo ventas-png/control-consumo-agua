@@ -131,12 +131,22 @@ const sinComunicacion = (tabs: string[]) => tabs.filter(t => !COMUNICACION_SET.h
 
 // Sección "Recursos Humanos" (espejo de SECTIONS en components/condominios/sections.ts).
 // Igual que COMUNICACION_TABS: SOLO agrupación del editor de roles. El acceso
-// efectivo por rol (CONDOMINIOS_TAB_ACCESS) no cambia — 'tareas_cond' y
-// 'prog_limpieza' siguen dentro de TODAS_OPERACIONES, así que el rol
-// operaciones conserva exactamente los tabs que ya tenía; lo único que se mueve
-// es en qué bloque los ve quien arma un rol personalizado.
+// efectivo por rol (CONDOMINIOS_TAB_ACCESS) no cambia — los tabs siguen dentro
+// de TODAS_OPERACIONES y TODAS_SEGURIDAD, así que los roles operaciones y
+// seguridad conservan exactamente lo que ya tenían; lo único que se mueve es en
+// qué bloque los ve quien arma un rol personalizado.
+//
+// La tanda grande vino de Seguridad: la jornada (turnos, plantillas de cargo,
+// ausencias, horas y extras, presencia, panel de turno), el trabajo asignado
+// (tareas por turno, rutas de ronda) y la medición (desempeño). Estaban ahí
+// porque el guardia es quien más turnos tiene, no porque programar una jornada
+// sea vigilar: quien arma el rol de quien administra al personal necesitaba el
+// bloque de Seguridad entero para llegar a ellos.
 const RECURSOS_HUMANOS_TABS = [
-  'personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza', 'actividad_equipo',
+  'personal', 'capacitacion_personal',
+  'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
+  'tareas_personal', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+  'desempeno_personal', 'actividad_equipo',
 ]
 const RECURSOS_HUMANOS_SET = new Set(RECURSOS_HUMANOS_TABS)
 const sinRRHH = (tabs: string[]) => tabs.filter(t => !RECURSOS_HUMANOS_SET.has(t))
@@ -250,7 +260,7 @@ export const CONDOMINIOS_SECTION_GROUPS: SectionGroup[] = [
   { key: 'residentes',    label: 'Residentes',     tabs: sinComunicacion(TODAS_RESIDENTES) },
   { key: 'operaciones',   label: 'Operaciones',    tabs: sinRRHH(sinComunicacion(TODAS_OPERACIONES)) },
   { key: 'instalaciones', label: 'Instalaciones',  tabs: TODAS_INSTALACIONES },
-  { key: 'seguridad',     label: 'Seguridad',      tabs: sinComunicacion(TODAS_SEGURIDAD) },
+  { key: 'seguridad',     label: 'Seguridad',      tabs: sinRRHH(sinComunicacion(TODAS_SEGURIDAD)) },
   { key: 'comunidad',     label: 'Comunidad',      tabs: sinComunicacion(TODA_COMUNIDAD) },
   { key: 'recursos_humanos', label: 'Recursos Humanos', tabs: RECURSOS_HUMANOS_TABS },
 ]

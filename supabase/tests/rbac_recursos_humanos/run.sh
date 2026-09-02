@@ -18,7 +18,7 @@
 #     acciones a quien sólo tenía lectura. Ninguna de las dos cosas la ve un
 #     test de UI.
 #
-# QUÉ COMPRUEBA (11 invariantes + negativa + idempotencia)
+# QUÉ COMPRUEBA (16 invariantes + negativa + idempotencia)
 #   A · CATÁLOGO   30 claves exactas en `recursos_humanos` (5 tabs × base + 5
 #                  acciones); las cinco claves base conservan su NOMBRE —las
 #                  policies gatean sobre ellas—; `actividad_equipo` estrena sus
@@ -30,6 +30,12 @@
 #                  administra personal no estrena nada.
 #   C · ACCESO     el rol de operaciones conserva tareas y limpieza: agrupar es
 #                  presentación, autorizar es otra cosa. Ningún grant huérfano.
+#   D · JORNADA    la segunda tanda (20260907001400): las 84 claves de la
+#                  sección tras absorber turnos, plantillas, ausencias, horas,
+#                  presencia, panel de turno, tareas por turno, rutas de ronda y
+#                  desempeño; que `revision_tareas` y `bitacora_guardia` se
+#                  QUEDEN en Seguridad; y que un rol de seguridad con jornada a
+#                  cargo no pierda un solo grant ni vea su deny abrirse.
 #   NEGATIVA       con un tab renombrado, la guarda de postcondición ABORTA. Sin
 #                  esta prueba no se sabría si el paso 6 es real o decorativo.
 #   IDEMPOTENCIA   re-aplicar no duplica grants, no ensancha la categoría, no
@@ -45,6 +51,9 @@ set -euo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIG_RRHH="$RAIZ/supabase/migrations/20260907001200_rbac_seccion_recursos_humanos.sql"
+# La segunda tanda: la jornada que venía de Seguridad. Se aplica en orden, como
+# en producción — reclasificar sobre lo ya reclasificado tiene que ser inocuo.
+MIG_JORNADA="$RAIZ/supabase/migrations/20260907001400_rbac_rrhh_absorbe_la_jornada.sql"
 
 for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -81,9 +90,21 @@ echo "── 1/5 · fixture (catálogo previo a la mudanza) ──────�
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$AQUI/fixture.sql" >/dev/null
 echo "  OK    fixture cargado"
 
-echo "── 2/5 · aplicar la migración ──────────────────────────────────────────"
+echo "── 2/5 · aplicar las migraciones, en orden ─────────────────────────────"
 PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$MIG_RRHH" >/dev/null
 echo "  OK    $(basename "$MIG_RRHH")"
+
+# El estado INTERMEDIO se mira antes de seguir: es la única ventana en la que se
+# ve si la primera tanda arrastró a un vecino que la segunda muda después.
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$AQUI/entre_tandas.sql" 2>&1) || {
+  echo "❌ la primera migración dejó un estado intermedio incorrecto:"
+  echo "$SALIDA" | sed -n 's/.*ERROR:  /  /p'
+  exit 1
+}
+echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
+
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$MIG_JORNADA" >/dev/null
+echo "  OK    $(basename "$MIG_JORNADA")"
 
 echo "── 3/5 · invariantes ───────────────────────────────────────────────────"
 # Sin este `|| { … }`, `set -e` aborta con la salida de psql dentro de la
@@ -124,7 +145,9 @@ echo "$SALIDA" | sed -n 's/.*ERROR:  /        /p' | head -2
 
 echo
 echo "── 5/5 · idempotencia (re-aplicar y re-verificar) ──────────────────────"
-PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$MIG_RRHH" >/dev/null
+for m in "$MIG_RRHH" "$MIG_JORNADA"; do
+  PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$m" >/dev/null
+done
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$AQUI/reassert.sql" 2>&1) || {
   echo "❌ la re-aplicación cambió el estado:"
   echo "$SALIDA" | sed -n 's/.*ERROR:  /  /p'
@@ -133,6 +156,6 @@ SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rrhh -f "$AQUI/reassert.sql" 2>&1) || {
 echo "$SALIDA" | sed -n 's/.*NOTICE:  /  /p'
 
 echo
-echo "✅ rbac_recursos_humanos: 11 invariantes (catálogo exacto sin arrastres,"
+echo "✅ rbac_recursos_humanos: 16 invariantes (catálogo exacto sin arrastres,"
 echo "   herencia fiel al effect, acceso por rol intacto), la guarda de"
 echo "   postcondición aborta de verdad, y la migración es idempotente."

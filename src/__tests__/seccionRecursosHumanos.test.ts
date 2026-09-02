@@ -30,8 +30,20 @@ import {
 // ════════════════════════════════════════════════════════════════════════════
 
 const TABS_RRHH = [
-  'personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza', 'actividad_equipo',
+  'personal', 'capacitacion_personal',
+  'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
+  'tareas_personal', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+  'desempeno_personal', 'actividad_equipo',
 ] as const
+
+/** Los nueve que vinieron de Seguridad en la segunda tanda (20260907001400). */
+const TABS_JORNADA = [
+  'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia',
+  'panel_turno', 'tareas_personal', 'rutas_ronda', 'desempeno_personal',
+] as const
+
+const MIGRACION_JORNADA = resolve('supabase/migrations/20260907001400_rbac_rrhh_absorbe_la_jornada.sql')
+const sqlJornada = readFileSync(MIGRACION_JORNADA, 'utf8').replace(/--[^\n]*/g, '')
 
 const MIGRACION = resolve('supabase/migrations/20260907001200_rbac_seccion_recursos_humanos.sql')
 const sqlRRHH = readFileSync(MIGRACION, 'utf8').replace(/--[^\n]*/g, '')
@@ -130,8 +142,9 @@ describe('migración 20260907001200 (catálogo RBAC)', () => {
     expect(sqlRRHH).not.toMatch(/UPDATE public\.permissions[\s\S]{0,400}SET key/)
   })
 
-  it('los cinco tabs de la sección están nombrados en la migración', () => {
-    for (const tab of TABS_RRHH) {
+  it('los cinco tabs de la primera tanda están nombrados en la migración', () => {
+    for (const tab of ['personal', 'capacitacion_personal', 'tareas_cond',
+                       'prog_limpieza', 'actividad_equipo']) {
       expect(sqlRRHH, tab).toContain(`'${tab}'`)
     }
   })
@@ -197,5 +210,67 @@ describe('el riel del sidebar con 11 secciones', () => {
   it('Especiales sigue siendo la última sección del riel', () => {
     expect(SECTIONS[SECTIONS.length - 1].id).toBe('especiales')
     expect(SECTIONS.find(s => s.id === 'especiales')!.tabs).toContain('str')
+  })
+})
+
+describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
+  it('nombra los nueve tabs que se mudan', () => {
+    for (const tab of TABS_JORNADA) {
+      expect(sqlJornada, tab).toContain(`'${tab}'`)
+    }
+  })
+
+  it('NO toca revision_tareas, que se queda en Seguridad', () => {
+    // Es la contraparte de tareas_personal: si algún día se muda, que sea una
+    // decisión, no un arrastre.
+    const sinCabecera = sqlJornada.slice(sqlJornada.indexOf('CREATE TEMP TABLE'))
+    expect(sinCabecera).not.toContain('revision_tareas')
+  })
+
+  it('reclasifica categoría sin renombrar claves ni tocar grants', () => {
+    expect(sqlJornada).toMatch(/UPDATE public\.permissions[\s\S]{0,40}SET category = 'recursos_humanos'/)
+    expect(sqlJornada).not.toMatch(/UPDATE public\.permissions[\s\S]{0,400}SET key/)
+    // Esta tanda no siembra nada: los nueve ya existen con sus acciones.
+    expect(sqlJornada).not.toMatch(/INSERT INTO public\./)
+  })
+
+  it('ningún LIKE ejecutable usa un guion bajo sin escapar', () => {
+    const infractores: string[] = []
+    for (const m of sqlJornada.matchAll(/LIKE\s+'([^']*)'/g)) {
+      if (/(^|[^\\])_/.test(m[1])) infractores.push(m[1])
+    }
+    expect(infractores, `patrones con comodín accidental: ${infractores.join(', ')}`).toEqual([])
+  })
+
+  it('la guarda de postcondición aborta, y la temporal no sobrevive', () => {
+    expect(sqlJornada).toMatch(/RAISE EXCEPTION/)
+    expect(sqlJornada).toContain('no existen en el catálogo')
+    expect(sqlJornada).toMatch(/category IS DISTINCT FROM 'recursos_humanos'/)
+    expect(sqlJornada).toMatch(/DROP TABLE _rrhh_jornada/)
+  })
+
+  it('el harness ejecutable aplica AMBAS migraciones', () => {
+    const run = readFileSync(resolve('supabase/tests/rbac_recursos_humanos/run.sh'), 'utf8')
+    expect(run).toContain('20260907001200_rbac_seccion_recursos_humanos.sql')
+    expect(run).toContain('20260907001400_rbac_rrhh_absorbe_la_jornada.sql')
+    // Y mira el estado intermedio, que es donde se ve el arrastre de la primera.
+    expect(run).toContain('entre_tandas.sql')
+  })
+
+  it('Seguridad conserva su acceso efectivo pese a la mudanza de sección', () => {
+    const acceso = CONDOMINIOS_TAB_ACCESS.seguridad!
+    for (const tab of TABS_JORNADA) {
+      expect(acceso.has(tab), `seguridad perdió ${tab}`).toBe(true)
+    }
+  })
+
+  it('el bloque Seguridad del editor ya no ofrece los tabs de la jornada', () => {
+    const seg = CONDOMINIOS_SECTION_GROUPS.find(g => g.key === 'seguridad')!
+    for (const tab of TABS_JORNADA) {
+      expect(seg.tabs, `${tab} sigue en el bloque de Seguridad`).not.toContain(tab)
+    }
+    // Lo que sí se queda.
+    expect(seg.tabs).toContain('revision_tareas')
+    expect(seg.tabs).toContain('bitacora_guardia')
   })
 })
