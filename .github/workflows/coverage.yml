@@ -181,6 +181,23 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: scripts/rls-evidencias-sandbox.sh
 
+      # payment_requests guarda el camino de dinero del pago en línea. El
+      # fixture monta el estado INSEGURO de producción —policy
+      # `payment_requests_select TO public USING (true)` incluida—, comprueba
+      # que anon SÍ puede leer, aplica la migración REAL y exige el cierre.
+      # Sin ese primer control el resto no probaría nada.
+      - name: payment_requests — sin lectura para anon ni authenticated
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-payment-requests-sandbox.sh
+
+      # Y la que hace que lo anterior valga: quita del archivo el DROP y cada
+      # REVOKE, uno por uno, y exige que los escenarios ROMPAN.
+      - name: payment_requests — los escenarios detectan una migración mutilada
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-payment-requests-negativo.sh
+
       # La migración de mantenimiento valida una constraint y BORRA la única
       # copia de las filas originales de correspondencia. Su valor está en
       # abortar cuando algo no cuadra, así que se ejercita con datos que no
