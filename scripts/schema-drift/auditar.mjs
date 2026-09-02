@@ -381,7 +381,6 @@ async function pruebaTresVias() {
     const v = evaluarTresVias({ P, M, R, baseline, migraciones })
     const planificados = v.planificados.map(g => g.clave).sort()
 
-    comprobar(v.ok, 'una migración append-only con P == M pasa')
     comprobar(planificados.includes(clave), `${clave} se reporta como CAMBIO PLANIFICADO`)
     const deLaTablaNueva = planificados.filter(c => c.startsWith(`tabla:${TABLA_NUEVA}/`))
     comprobar(deLaTablaNueva.length > 0, `la tabla nueva aparece como CAMBIO PLANIFICADO (${deLaTablaNueva.length} grupos)`)
@@ -392,8 +391,43 @@ async function pruebaTresVias() {
     for (const g of v.planificados.filter(x => x.clave.startsWith(`tabla:${TABLA_NUEVA}/`))) {
       comprobar(g.p === AUSENTE && g.m === AUSENTE, `${g.clave}: ausente en producción y en la base`)
     }
-    comprobar(v.nuevo.length === 0, 'ningún DRIFT NUEVO')
-    comprobar(v.ambiguos.length === 0, 'ningún CAMBIO AMBIGUO')
+
+    // ── El veredicto se mira ACOTADO a la migración sintética ──────────────
+    //
+    // No se puede exigir `v.ok` global. M sale de las migraciones de ESTA rama,
+    // así que una migración que la rama ya trae y producción todavía no tiene
+    // está en M y en R por igual: para el auditor es «un objeto que el PR no
+    // toca» con P ≠ R, o sea DRIFT NUEVO — y tiene razón, porque dentro de este
+    // marco sintético eso es exactamente lo que es.
+    //
+    // Exigir `v.ok` ataba esta prueba a «la rama no tiene ningún cambio
+    // pendiente de desplegar». En #829 y en main era cierto por casualidad; en
+    // #828, que existe precisamente para llevar una migración sin desplegar,
+    // es falso. La propiedad que esta prueba existe para demostrar es local a
+    // la migración sintética, así que se comprueba local.
+    const tocados = new Set([clave, ...deLaTablaNueva])
+    const enTocados = (lista) => lista.filter(g => tocados.has(g.clave)).map(g => g.clave)
+
+    comprobar(enTocados(v.nuevo).length === 0,
+              `ningún DRIFT NUEVO entre los grupos que toca la migración sintética`)
+    comprobar(enTocados(v.agravado).length === 0,
+              'ningún DRIFT AGRAVADO entre esos grupos')
+    comprobar(v.ambiguos.length === 0, 'ningún CAMBIO AMBIGUO en ningún grupo')
+    comprobar((migraciones.eliminadas.length + migraciones.modificadas.length +
+               migraciones.desordenadas.length) === 0,
+              'el apéndice sigue siendo limpio')
+
+    // Y lo que quede fuera se nombra, en vez de esconderse: todo DRIFT NUEVO
+    // restante tiene que venir de una migración que la rama ya trae y
+    // producción todavía no. Si apareciera en un grupo que la migración
+    // sintética SÍ toca, la comprobación de arriba ya habría fallado.
+    const ajenos = v.nuevo.filter(g => !tocados.has(g.clave)).map(g => g.clave)
+    if (ajenos.length > 0) {
+      console.error(`· ${ajenos.length} grupo(s) con drift propio de esta rama, ajenos a la prueba:`)
+      for (const c of ajenos) console.error(`    ${c}`)
+      console.error('  Son cambios que la rama trae sin desplegar. La auditoría real los')
+      console.error('  clasifica con M = la rama base; acá M es la rama misma, y por eso se ven así.')
+    }
     const texto = informe(v).join('\n')
     comprobar(texto.includes('CAMBIO PLANIFICADO'), 'el informe lo nombra CAMBIO PLANIFICADO')
     comprobar(texto.includes('NO se agregan a drift-conocido'),
