@@ -93,6 +93,95 @@ sólo es peligrosa si el rol además tiene el privilegio, y en Supabase `anon` y
 `authenticated` lo tienen sobre casi todo por los privilegios por defecto. Un
 grant que se mueva cambia el modelo de amenaza sin tocar una sola policy.
 
+## Las tres vías
+
+El auditor compara **tres** puntos, no dos:
+
+| | Qué es |
+| --- | --- |
+| **P** | La instantánea del catálogo de producción, `huella-produccion.json` |
+| **M** | La reconstrucción de la **rama base** |
+| **R** | La reconstrucción del **HEAD** de este PR |
+
+Grupo por grupo:
+
+| Situación | Qué significa | Resultado |
+| --- | --- | --- |
+| `M == R` | El PR no toca ese objeto | Trinquete estricto contra P |
+| `P == M` y `R ≠ M` | Cambio planificado, pendiente de desplegar | `CAMBIO PLANIFICADO` → **pasa** |
+| `R == P` y `M ≠ P` | El PR converge hacia producción | `DRIFT RESUELTO` → **pasa**, la baseline puede encoger |
+| `P ≠ M ≠ R ≠ P` | Nadie coincide con nadie | `CAMBIO AMBIGUO` → **falla** |
+
+### Por qué hacía falta el tercer punto
+
+Con sólo P y R, estos dos casos son **indistinguibles**, y son opuestos:
+
+- alguien tocó producción por fuera y el repositorio no lo declara — drift no
+  autorizado, tiene que romper;
+- el PR agrega una migración forward-only que todavía no se desplegó — cambio
+  planificado, tiene que pasar.
+
+#828 lo dejó a la vista. Cerrar la lectura sin autenticar de `payment_requests`
+puso el auditor en rojo por hacer exactamente lo que había que hacer, y las
+únicas formas de ponerlo en verde eran declarar la vulnerabilidad como drift
+conocido o refrescar la instantánea como si la migración ya estuviera aplicada.
+Un auditor que castiga la corrección enseña a ampliar la baseline: justo el
+hábito que este auditor existe para impedir.
+
+M dice qué describía el repositorio **antes** del PR, y con eso el caso se
+decide sin adivinar.
+
+### Un cambio planificado no se declara
+
+**No entra en `drift-conocido.json`.** Se reporta como pendiente de despliegue y
+desaparece solo cuando la migración llega a producción y se refresca la
+instantánea con evidencia real. La baseline sigue sin poder crecer — y ahora
+tampoco hay ningún motivo para quererlo.
+
+### El ambiguo falla en falso, a propósito
+
+Si producción, la rama base y el PR dicen tres cosas distintas sobre el mismo
+objeto, no hay con qué decidir si el PR arregla el drift o lo empeora. Adivinar
+en la dirección permisiva es exactamente el fallo que se trata de evitar.
+
+### Un cambio de catálogo exige una migración nueva
+
+R se construye **aplicando** los archivos de migración. Si el esquema
+reconstruido se movió y el PR no agrega ninguna migración, lo que cambió fue el
+andamiaje (`bootstrap.sql`, `fingerprint.sql`) o una migración histórica.
+Ninguna de las dos cosas llega nunca a producción: el repositorio estaría
+describiendo un esquema que nadie va a desplegar. Falla.
+
+Y el apéndice tiene que ser limpio: ninguna migración existente modificada ni
+borrada, y toda migración nueva con versión **posterior** a la última que ya
+existía. Se compara por **hash de blob**, no por nombre — comparar nombres
+dejaría pasar una histórica reescrita en su sitio, que es la forma más limpia de
+cambiar lo que el repositorio dice que pasó sin que se note.
+
+### De dónde sale M
+
+| Evento | M |
+| --- | --- |
+| `pull_request` | El **merge-base** con la rama base. No su punta: si la base avanzó desde que se abrió el PR, comparar contra la punta le atribuiría al PR cambios que no hizo. |
+| `push` a `main` | `github.event.before`, y si no resuelve —push forzado, rama recién creada— el **primer padre**. |
+
+Si M no se puede resolver, el auditor **falla**. No degrada a la comparación de
+dos vías, que es precisamente la que no distingue drift de cambio planificado.
+Lo mismo vale para un checkout superficial: una ref que resuelve sin su árbol
+lanza en vez de pasar por «no hay nada que comparar». Requiere `fetch-depth: 0`.
+
+### Dos clústeres, no uno con mutaciones
+
+M y R salen de dos `initdb` independientes. Cuando las migraciones son las
+mismas, el auditor **exige** que las dos huellas coincidan grupo a grupo: si no,
+algo del clúster —un OID, una marca de tiempo— se está colando en la
+serialización, y toda comparación posterior mentiría. La verificación de
+determinismo corre dos veces sobre el *mismo* clúster y no puede ver eso.
+
+`bootstrap.sql` y `fingerprint.sql` salen siempre de HEAD para los dos lados:
+hashear cada lado con una serialización distinta mediría el cambio del auditor y
+no el del esquema.
+
 ## Qué **no** guarda
 
 - **Ni una fila.** La huella es DDL agregado y hasheado. No hay un solo `SELECT`
@@ -100,17 +189,17 @@ grant que se mueva cambia el modelo de amenaza sin tocar una sola policy.
 - **Nada fuera de `public`.** Ni `auth`, ni `storage`, ni `vault`. El andamiaje
   de `bootstrap.sql` no se compara.
 - **Ni contraseñas, ni tokens, ni cadenas de conexión.** Los archivos versionados
-  contienen sólo `clave → md5(12):n`. Hay un guard en `__tests__` que falla si
+  contienen sólo `clave → sha256(64 hex):n`. Hay un guard en `__tests__` que falla si
   aparece algo con forma de secreto.
 
 ## Cómo se usa
 
 ```bash
-# Audita: reconstruye, saca la huella y compara contra la baseline.
+# Audita en tres vías contra origin/main: reconstruye HEAD (R) y la rama base
+# (M), los compara con la instantánea de producción (P) y rechaza que la
+# baseline haya crecido. `--trinquete-contra` sigue aceptándose como sinónimo.
 node scripts/schema-drift/auditar.mjs
-
-# Igual, y además rechaza que la baseline haya crecido respecto de la rama base.
-node scripts/schema-drift/auditar.mjs --trinquete-contra origin/main
+node scripts/schema-drift/auditar.mjs --base origin/main
 
 # Sólo valida el archivo de baseline (rápido, sin levantar Postgres).
 node scripts/schema-drift/auditar.mjs --solo-baseline
@@ -124,9 +213,18 @@ node scripts/schema-drift/auditar.mjs --verificar-huella
 # fallaban dos.
 node scripts/schema-drift/auditar.mjs --prueba-espacios
 
-# Prueba negativa: inyecta una columna y una policy que nadie declara.
+# Prueba negativa: inyecta una columna y una policy que nadie declara, en
+# AMBOS clústeres (M y R), para que queden como «objeto que el PR no toca».
 # DEBE salir distinto de cero.
 node scripts/schema-drift/auditar.mjs --prueba-negativa
+
+# Las tres vías contra un catálogo real: construye M y R desde dos árboles de
+# migraciones y exige que un apéndice append-only sea CAMBIO PLANIFICADO y nada
+# más, y que el mismo cambio sin migración nueva rompa.
+node scripts/schema-drift/auditar.mjs --prueba-tres-vias
+
+# Qué ref usaría como M en un evento dado (lo que llama el workflow).
+node scripts/schema-drift/base-git.mjs --evento pull_request --rama-base origin/main
 
 # Reescribe la baseline desde la medición actual. Después hay que escribir el
 # `motivo` de cada entrada nueva a mano.
@@ -174,7 +272,8 @@ cuesta nada, no necesita permisos y es determinista.
 - `produccion` y `repo` — **las huellas concretas**, `sha256:n` o `AUSENTE`. La
   baseline declara *esta* diferencia, no «lo que sea que pase en esta tabla».
 
-El auditor falla en tres casos:
+Sobre los objetos que el PR **no toca** (`M == R`), el auditor falla en tres
+casos:
 
 | Situación | Resultado |
 | --- | --- |
@@ -182,16 +281,23 @@ El auditor falla en tres casos:
 | Un grupo declarado cuyas huellas **cambiaron** | `DRIFT AGRAVADO` → falla |
 | Una entrada de la baseline que **ya no** corresponde a drift | falla, pidiendo que se retire |
 
+Sobre los que **sí** toca decide la comparación de tres vías, y ahí un cambio
+planificado pasa **sin** tocar la baseline.
+
 Fijar las huellas no estaba en el diseño original: lo destapó la primera prueba
 negativa real. Inyectar una policy inesperada en `security_logs` no rompía nada,
 porque `security_logs/policies` ya estaba en la lista. Una baseline por clave se
 tragaba cualquier cambio posterior — es decir, apagaba la alarma justo en las
 tablas donde más importa.
 
-**La lista sólo puede encoger.** `--trinquete-contra origin/main` rechaza un PR
-que agregue entradas: un drift nuevo se cierra con una migración forward-only,
-nunca ampliando la baseline. Que la entrada se retire en el mismo PR que la
-arregla es intencional.
+**La lista sólo puede encoger.** El trinquete rechaza un PR que agregue
+entradas: un drift nuevo se cierra con una migración forward-only, nunca
+ampliando la baseline. Que la entrada se retire en el mismo PR que la arregla es
+intencional — eso es lo que `DRIFT RESUELTO` permite.
+
+Son **dos puertas independientes**. Declarar un drift nuevo en la baseline lo
+saca de `DRIFT NUEVO`… y entonces lo detiene el trinquete, que compara contra la
+baseline de la rama base. Ninguna de las dos alcanza sola.
 
 ## Modo live — **bloqueado**
 

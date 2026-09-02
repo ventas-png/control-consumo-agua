@@ -110,8 +110,14 @@ export function listarMigraciones(dir = DIR_MIGRACIONES) {
 /**
  * Levanta el clúster, aplica bootstrap + migraciones y devuelve un manejador
  * con `psql()` para consultarlo y `destruir()` para tirarlo.
+ *
+ * `dirMigraciones` permite reconstruir OTRO árbol de migraciones que el del
+ * repositorio — así se obtiene M, la reconstrucción de la rama base, sin
+ * cambiar de checkout. `bootstrap.sql` y `fingerprint.sql` salen siempre de
+ * HEAD: si M y R se hashearan con serializaciones distintas, la comparación
+ * mediría el cambio del auditor y no el del esquema.
  */
-export function reconstruir({ log = () => {} } = {}) {
+export function reconstruir({ log = () => {}, dirMigraciones = DIR_MIGRACIONES } = {}) {
   const bin = binarios()
   instalarShims(bin)
 
@@ -150,17 +156,17 @@ export function reconstruir({ log = () => {} } = {}) {
     log('· bootstrap')
     psql(['-v', 'ON_ERROR_STOP=1', '-q', '-f', join(AQUI, 'bootstrap.sql')], { stdio: 'pipe' })
 
-    const migraciones = listarMigraciones()
+    const migraciones = listarMigraciones(dirMigraciones)
     log(`· aplicando ${migraciones.length} migraciones`)
     const fallos = []
     for (const m of migraciones) {
       try {
-        psql(['-v', 'ON_ERROR_STOP=1', '-q', '-1', '-f', join(DIR_MIGRACIONES, m)], { stdio: 'pipe' })
+        psql(['-v', 'ON_ERROR_STOP=1', '-q', '-1', '-f', join(dirMigraciones, m)], { stdio: 'pipe' })
       } catch (err) {
         fallos.push({ migracion: m, error: String(err.stderr ?? err.message).trim().split('\n').slice(-3).join('\n') })
       }
     }
-    return { psql, destruir, migraciones, fallos, entorno }
+    return { psql, destruir, migraciones, fallos, entorno, dirMigraciones }
   } catch (err) {
     destruir()
     throw err

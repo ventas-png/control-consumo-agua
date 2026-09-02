@@ -16,21 +16,37 @@
 // producción. El drift no es cosmético: es el mecanismo por el que un CI verde
 // deja de ser evidencia.
 //
-// CÓMO FUNCIONA
-//   1. Reconstruye el esquema desde las 449 migraciones (reconstruir.mjs).
-//   2. Saca la huella normalizada (fingerprint.sql).
-//   3. La compara contra `huella-produccion.json`, la instantánea del catálogo
-//      real de producción.
-//   4. El conjunto de grupos que difieren tiene que estar contenido en
-//      `drift-conocido.json`. Uno nuevo → falla. Uno que ya no difiere → falla
-//      pidiendo que se retire de la baseline.
+// CÓMO FUNCIONA — TRES VÍAS
+//   1. Reconstruye el esquema desde las migraciones del árbol de trabajo (R) y,
+//      en un clúster aparte, desde las de la rama base (M).
+//   2. Saca la huella normalizada de cada uno (fingerprint.sql, el mismo para
+//      los dos: hashear cada lado distinto mediría el auditor, no el esquema).
+//   3. Las compara contra `huella-produccion.json` (P), la instantánea del
+//      catálogo real de producción.
+//   4. Grupo por grupo:
+//        M == R              el PR no lo toca      → trinquete estricto vs P
+//        P == M, R ≠ M       falta desplegarlo     → CAMBIO PLANIFICADO, pasa
+//        R == P, M ≠ P       el PR cierra el drift → DRIFT RESUELTO, pasa
+//        P ≠ M ≠ R ≠ P       nadie coincide        → CAMBIO AMBIGUO, falla
+//      Las reglas viven en tres-vias.mjs, que es puro y se prueba sin Postgres.
+//
+// POR QUÉ HACÍA FALTA EL TERCER PUNTO. Con sólo P y R, «alguien tocó producción
+// por fuera» y «este PR agrega una migración que todavía no se desplegó» se ven
+// exactamente igual. #828 lo dejó a la vista: cerrar la lectura sin autenticar
+// de `payment_requests` puso el auditor en rojo por hacer justo lo que había que
+// hacer. Un auditor que castiga la corrección enseña a ampliar la baseline —el
+// hábito que este auditor existe para impedir.
+//
+// UN CAMBIO PLANIFICADO NO ES DRIFT Y NO SE DECLARA. No entra en
+// `drift-conocido.json`: se reporta como pendiente de despliegue y desaparece
+// solo cuando la migración llega a producción y se refresca la instantánea.
 //
 // LA BASELINE SÓLO PUEDE ENCOGER. Es un trinquete deliberado: si el drift
 // resuelto no obligara a podar la lista, la baseline se volvería un `permitir
 // todo` de facto — el mismo razonamiento que el `_README` de
-// scripts/migraciones-vs-produccion.allowlist.json. `--verificar-trinquete`
-// compara además contra la baseline de la rama base, para que un PR no pueda
-// agrandarla.
+// scripts/migraciones-vs-produccion.allowlist.json. La baseline de la rama base
+// se compara contra la de HEAD, para que un PR no pueda agrandarla; y un cambio
+// planificado pasa SIN tocarla, así que ya no hay incentivo para ampliarla.
 //
 // NADA DE DATOS, NADA REVERSIBLE. La huella es DDL agregado y hasheado: ni una
 // fila, ni un `count(*)` de negocio, ni nada fuera del esquema `public`. Los
@@ -39,10 +55,13 @@
 // algo con forma de secreto se cuela.
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { reconstruir, huella } from './reconstruir.mjs'
+import { reconstruir, huella, listarMigraciones, DIR_MIGRACIONES } from './reconstruir.mjs'
+import { evaluarTresVias, diffMigraciones, informe } from './tres-vias.mjs'
+import { materializarMigraciones, migracionesEnDisco, migracionesEnRef, resolverRefBase } from './base-git.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 export const RUTA_PRODUCCION = join(AQUI, 'huella-produccion.json')
@@ -258,9 +277,164 @@ function serializarHuella(mapa) {
   return grupos
 }
 
+// ── la comparación de tres vías ─────────────────────────────────────────────
+
+/**
+ * Reconstruye la rama base en su propio clúster y devuelve su huella.
+ *
+ * `bootstrap.sql` y `fingerprint.sql` salen de HEAD, no de la base: lo que se
+ * quiere medir es la diferencia entre dos árboles de MIGRACIONES, y hashear
+ * cada lado con una serialización distinta mediría el cambio del auditor.
+ */
+export function huellaDeLaBase(ref, log = () => {}, inyecciones = []) {
+  const dir = mkdtempSync(join(tmpdir(), 'base-migr-'))
+  try {
+    const nombres = materializarMigraciones(ref, dir)
+    log(`· rama base ${ref}: ${nombres.length} migraciones materializadas`)
+    const db = reconstruir({ log: m => log(`  ${m}`), dirMigraciones: dir })
+    try {
+      if (db.fallos.length > 0) {
+        const detalle = db.fallos.map(f => `  ${f.migracion}\n    ${f.error}`).join('\n')
+        throw new Error(
+          `${db.fallos.length} migración(es) de la rama base «${ref}» no aplican sobre una base ` +
+          `limpia. Sin M no hay comparación de tres vías:\n${detalle}`,
+        )
+      }
+      for (const sql of inyecciones) db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], { stdio: 'pipe' })
+      return parsearHuella(huella(db.psql))
+    } finally {
+      db.destruir()
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Prueba de integración de las tres vías contra un catálogo REAL.
+ *
+ * Construye M desde las migraciones tal como están y R desde las mismas más UNA
+ * migración append-only, y comprueba que el auditor llama a eso cambio
+ * planificado y a nada más. Es la contraparte de las pruebas puras: éstas
+ * deciden bien sobre mapas inventados, ésta comprueba que los mapas que salen
+ * de un Postgres de verdad tienen la forma que las reglas suponen.
+ *
+ * DOS RECONSTRUCCIONES, NO UNA CON MUTACIONES. Mutar el catálogo con `psql`
+ * después de reconstruir probaría el comparador contra un estado que ninguna
+ * migración puede producir. Acá la única diferencia entre M y R es un archivo.
+ */
+async function pruebaTresVias() {
+  const TABLA_NUEVA = 'auditor_tres_vias_nueva'
+  const TABLA_TOCADA = 'clientes'
+  const MIGRACION = '29991231235959_auditor_prueba_tres_vias.sql'
+  const SQL = [
+    `-- Migración sintética de la prueba de integración. No se versiona.`,
+    `CREATE TABLE public.${TABLA_NUEVA} (id uuid PRIMARY KEY, etiqueta text NOT NULL);`,
+    `REVOKE ALL ON public.${TABLA_TOCADA} FROM anon;`,
+    '',
+  ].join('\n')
+
+  const dirBase = mkdtempSync(join(tmpdir(), 'tv-base-'))
+  const dirPr = mkdtempSync(join(tmpdir(), 'tv-pr-'))
+  try {
+    for (const nombre of listarMigraciones(DIR_MIGRACIONES)) {
+      const contenido = readFileSync(join(DIR_MIGRACIONES, nombre))
+      writeFileSync(join(dirBase, nombre), contenido)
+      writeFileSync(join(dirPr, nombre), contenido)
+    }
+    writeFileSync(join(dirPr, MIGRACION), SQL)
+    console.error(`· base: ${listarMigraciones(dirBase).length} migraciones · PR: ${listarMigraciones(dirPr).length}`)
+
+    const sacar = (dir, etiqueta) => {
+      const db = reconstruir({ log: m => console.error(`  ${etiqueta} ${m}`), dirMigraciones: dir })
+      try {
+        if (db.fallos.length > 0) throw new Error(`${etiqueta}: ${db.fallos.length} migración(es) fallaron`)
+        return parsearHuella(huella(db.psql))
+      } finally { db.destruir() }
+    }
+
+    const M = sacar(dirBase, 'M')
+    const R = sacar(dirPr, 'R')
+    const { mapa: P } = huellaProduccionVersionada()
+    const baseline = leerJson(RUTA_BASELINE)
+
+    const migraciones = diffMigraciones(
+      new Map(listarMigraciones(dirBase).map(n => [n, 'igual'])),
+      new Map(listarMigraciones(dirPr).map(n => [n, n === MIGRACION ? 'nuevo' : 'igual'])),
+    )
+    if (migraciones.agregadas.length !== 1 || !migraciones.apendiceLimpio) {
+      throw new Error('el diff sintético no quedó como un apéndice limpio de una sola migración')
+    }
+
+    let fallos = 0
+    const comprobar = (cond, texto) => {
+      console.error(`${cond ? '✓' : '✗'} ${texto}`)
+      if (!cond) fallos++
+    }
+
+    // Precondición: el objeto que se va a tocar NO tiene drift hoy. Sin esto,
+    // el caso sería «P ≠ M» y la clasificación esperada sería otra.
+    const clave = `tabla:${TABLA_TOCADA}/grants`
+    const igual = (a, b, c) => a.get(c)?.huella === b.get(c)?.huella
+    comprobar(igual(P, M, clave), `precondición: producción y la rama base coinciden en ${clave}`)
+
+    const v = evaluarTresVias({ P, M, R, baseline, migraciones })
+    const planificados = v.planificados.map(g => g.clave).sort()
+
+    comprobar(v.ok, 'una migración append-only con P == M pasa')
+    comprobar(planificados.includes(clave), `${clave} se reporta como CAMBIO PLANIFICADO`)
+    const deLaTablaNueva = planificados.filter(c => c.startsWith(`tabla:${TABLA_NUEVA}/`))
+    comprobar(deLaTablaNueva.length > 0, `la tabla nueva aparece como CAMBIO PLANIFICADO (${deLaTablaNueva.length} grupos)`)
+    comprobar(
+      planificados.length === deLaTablaNueva.length + 1,
+      `NADA MÁS cambió: ${planificados.length} planificados, ${deLaTablaNueva.length + 1} esperados`,
+    )
+    for (const g of v.planificados.filter(x => x.clave.startsWith(`tabla:${TABLA_NUEVA}/`))) {
+      comprobar(g.p === AUSENTE && g.m === AUSENTE, `${g.clave}: ausente en producción y en la base`)
+    }
+    comprobar(v.nuevo.length === 0, 'ningún DRIFT NUEVO')
+    comprobar(v.ambiguos.length === 0, 'ningún CAMBIO AMBIGUO')
+    const texto = informe(v).join('\n')
+    comprobar(texto.includes('CAMBIO PLANIFICADO'), 'el informe lo nombra CAMBIO PLANIFICADO')
+    comprobar(texto.includes('NO se agregan a drift-conocido'),
+              'el informe dice explícitamente que no se agrega a la baseline')
+    comprobar(clavesDeBaseline(baseline).size === clavesDeBaseline(leerJson(RUTA_BASELINE)).size,
+              'la baseline en disco no se tocó')
+
+    // El mismo par M/R, pero sin migración nueva: tiene que romper. Es el caso
+    // «cambio de SQL sin migración», y no cuesta otra reconstrucción.
+    const sinMigracion = evaluarTresVias({
+      P, M, R, baseline,
+      migraciones: diffMigraciones(new Map([['a.sql', 'x']]), new Map([['a.sql', 'x']])),
+    })
+    comprobar(!sinMigracion.ok, 'el MISMO cambio sin migración nueva falla')
+    comprobar(sinMigracion.cambioSinMigracion.length > 0, 'se reporta como CATÁLOGO CAMBIADO SIN MIGRACIÓN NUEVA')
+
+    // Y con la migración marcada como histórica reescrita: también rompe.
+    const reescrita = evaluarTresVias({
+      P, M, R, baseline,
+      migraciones: diffMigraciones(new Map([['a.sql', 'x']]), new Map([['a.sql', 'REESCRITA']])),
+    })
+    comprobar(!reescrita.ok, 'una migración histórica modificada falla')
+
+    if (fallos > 0) {
+      console.error(`\n\u2717 ${fallos} comprobación(es) de la prueba de tres vías fallaron.`)
+      process.exit(1)
+    }
+    console.error('\n\u2713 Tres vías, contra un catálogo real: un apéndice append-only es un cambio')
+    console.error('  planificado; el mismo cambio sin migración, o con una histórica reescrita, rompe.')
+  } finally {
+    for (const d of [dirBase, dirPr]) rmSync(d, { recursive: true, force: true })
+  }
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 function bandera(nombre) { return process.argv.includes(nombre) }
+function valor(nombre) {
+  const i = process.argv.indexOf(nombre)
+  return i === -1 ? null : process.argv[i + 1]
+}
 
 async function principal() {
   const soloBaseline = bandera('--solo-baseline')
@@ -269,9 +443,11 @@ async function principal() {
   const pruebaNegativa = bandera('--prueba-negativa')
   const verificarHuella = bandera('--verificar-huella')
   const pruebaEspacios = bandera('--prueba-espacios')
-  const refBase = process.argv.includes('--trinquete-contra')
-    ? process.argv[process.argv.indexOf('--trinquete-contra') + 1]
-    : null
+  // `--trinquete-contra` sigue aceptándose: es el nombre que usaba #827 cuando
+  // la comparación era de dos vías, y ahora esa misma ref es además M.
+  const refBase = valor('--base') ?? valor('--trinquete-contra') ?? 'origin/main'
+
+  if (bandera('--prueba-tres-vias')) return pruebaTresVias()
 
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
@@ -284,7 +460,12 @@ async function principal() {
   }
   console.error(`✓ baseline válida — ${clavesDeBaseline(baseline).size} grupo(s) de drift declarados`)
 
-  if (refBase) {
+  // `--verificar-huella` y `--prueba-espacios` sólo ejercitan la serialización
+  // contra un catálogo real: no comparan contra nada versionado y por eso no
+  // piden rama base. Exigirles una haría que fallaran por el checkout.
+  const sinRamaBase = verificarHuella || pruebaEspacios
+
+  if (!sinRamaBase) {
     const base = baselineDeLaBase(refBase)
     if (base === null) {
       console.error(`· sin baseline en ${refBase}: es la primera vez, no hay trinquete que verificar`)
@@ -298,6 +479,19 @@ async function principal() {
         process.exit(1)
       }
     }
+  }
+
+  // ── El diff de migraciones ────────────────────────────────────────────────
+  // Es barato y decide solo casi todo: una migración histórica reescrita o
+  // borrada rompe sin necesidad de levantar un Postgres.
+  const migraciones = sinRamaBase
+    ? null
+    : diffMigraciones(migracionesEnRef(refBase), migracionesEnDisco(DIR_MIGRACIONES))
+  if (migraciones) {
+    console.error(
+      `✓ migraciones: ${migraciones.agregadas.length} nueva(s), ` +
+      `${migraciones.modificadas.length} modificada(s), ${migraciones.eliminadas.length} eliminada(s)`,
+    )
   }
 
   if (soloBaseline) { console.error('✓ sólo se pidió validar la baseline'); return }
@@ -419,34 +613,37 @@ async function principal() {
       return
     }
 
+    // ── La inyección de la prueba negativa ───────────────────────────────
+    //
+    // Va a los DOS clústeres, M y R, a propósito. Inyectarla sólo en R la
+    // haría indistinguible de un cambio planificado —R construye el esquema
+    // desde los archivos, así que todo lo que está en R y no en M viene por
+    // definición de una migración— y la prueba dejaría de probar lo que dice.
+    // Inyectada en ambos, M == R y el objeto queda como «uno que el PR no
+    // toca»: exactamente el caso donde el trinquete estricto tiene que romper.
+    const INYECCIONES = [
+      'ALTER TABLE public.clientes ADD COLUMN auditor_columna_inesperada text;',
+      'CREATE POLICY auditor_policy_inesperada ON public.security_logs FOR SELECT TO anon USING (true);',
+    ]
     if (pruebaNegativa) {
-      // Prueba negativa REAL contra el catálogo: se inyecta una columna y una
-      // policy que ninguna migración declara. Si el auditor no las ve, la huella
-      // no sirve y todo lo demás es teatro.
-      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-        'ALTER TABLE public.clientes ADD COLUMN auditor_columna_inesperada text;'], { stdio: 'pipe' })
-      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-        'CREATE POLICY auditor_policy_inesperada ON public.security_logs FOR SELECT TO anon USING (true);'], { stdio: 'pipe' })
-      console.error('· prueba negativa: inyectadas clientes.auditor_columna_inesperada y security_logs/auditor_policy_inesperada')
+      for (const sql of INYECCIONES) db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], { stdio: 'pipe' })
+      console.error('· prueba negativa: inyectadas clientes.auditor_columna_inesperada y ' +
+                    'security_logs/auditor_policy_inesperada en AMBOS clústeres (M y R)')
     }
 
-    const actual = parsearHuella(huella(db.psql))
-    console.error(`✓ huella del repositorio: ${actual.size} grupos`)
+    const R = parsearHuella(huella(db.psql))
+    console.error(`\u2713 huella del HEAD (R): ${R.size} grupos`)
 
     if (sembrarProduccion) {
-      console.error('✗ --sembrar-produccion sólo tiene sentido en modo live (ver README: el wiring live está bloqueado).')
+      console.error('\u2717 --sembrar-produccion sólo tiene sentido en modo live (ver README: el wiring live está bloqueado).')
       process.exit(1)
     }
 
-    const { mapa: prod, doc } = huellaProduccionVersionada()
-    console.error(`✓ huella de producción versionada: ${prod.size} grupos (capturada ${doc.capturada})`)
-
-    const drift = calcularDrift(prod, actual)
-    console.error(`\n  grupos comparados : ${new Set([...prod.keys(), ...actual.keys()]).size}`)
-    console.error(`  coinciden         : ${new Set([...prod.keys(), ...actual.keys()]).size - drift.length}`)
-    console.error(`  difieren          : ${drift.length}`)
+    const { mapa: P, doc } = huellaProduccionVersionada()
+    console.error(`\u2713 huella de producción versionada (P): ${P.size} grupos (capturada ${doc.capturada})`)
 
     if (sembrarBaseline) {
+      const drift = calcularDrift(P, R)
       const grupos = {}
       for (const d of drift) {
         const previo = baseline.grupos?.[d.clave]
@@ -458,38 +655,44 @@ async function principal() {
         }
       }
       writeFileSync(RUTA_BASELINE, JSON.stringify({ ...baseline, grupos }, null, 2) + '\n')
-      console.error(`\n✓ baseline sembrada con ${drift.length} grupos. Escribí un \`motivo\` en cada uno.`)
+      console.error(`\n\u2713 baseline sembrada con ${drift.length} grupos. Escribí un \`motivo\` en cada uno.`)
       return
     }
 
-    const v = evaluar(drift, baseline)
+    // ── M: la reconstrucción de la rama base ─────────────────────────────
+    const M = huellaDeLaBase(refBase, m => console.error(m), pruebaNegativa ? INYECCIONES : [])
+    console.error(`\u2713 huella de la rama base ${refBase} (M): ${M.size} grupos`)
 
-    if (v.esperado.length > 0) {
-      console.error(`\n  ${v.esperado.length} diferencia(s) declaradas en la baseline (no rompen).`)
-    }
-    if (v.agravado.length > 0) {
-      console.error(`\n✗ DRIFT AGRAVADO — ${v.agravado.length} grupo(s) conocidos cuyas huellas cambiaron:`)
-      for (const d of v.agravado) {
-        console.error(`    ${d.clave}`)
-        console.error(`        esperado: producción=${d.esperadoProduccion}  repo=${d.esperadoRepo}`)
-        console.error(`        ahora   : producción=${d.produccion}  repo=${d.repo}`)
+    // Dos clústeres independientes. Si las migraciones son las mismas y las
+    // huellas NO coinciden, algo del clúster —un OID, una marca de tiempo— se
+    // está colando en la serialización, y toda comparación posterior mentiría.
+    // La verificación de determinismo corre dos veces sobre el MISMO clúster y
+    // no puede ver eso; ésta sí.
+    if (migraciones.agregadas.length === 0 && migraciones.modificadas.length === 0 &&
+        migraciones.eliminadas.length === 0) {
+      const distintos = [...new Set([...M.keys(), ...R.keys()])]
+        .filter(c => (M.get(c)?.huella ?? null) !== (R.get(c)?.huella ?? null))
+      if (distintos.length > 0) {
+        console.error(`\n\u2717 Mismas migraciones, clústeres distintos, ${distintos.length} grupo(s) con huella distinta:`)
+        for (const c of distintos.slice(0, 10)) console.error(`    ${c}`)
+        console.error('\n  La huella depende de algo del clúster y no del esquema. No se compara nada más.')
+        process.exit(1)
       }
-      console.error('\n  La baseline declara UNA diferencia concreta, no barra libre en esa tabla.')
+      console.error('\u2713 sin cambios de migraciones: M y R coinciden grupo a grupo en clústeres independientes')
     }
-    if (v.resuelto.length > 0) {
-      console.error(`\n✗ ${v.resuelto.length} entrada(s) de la baseline YA NO corresponden a drift:`)
-      for (const c of v.resuelto) console.error(`    ${c}`)
-      console.error('\n  Se arregló: retiralas de drift-conocido.json en este mismo PR.')
-    }
-    if (v.nuevo.length > 0) {
-      console.error(`\n✗ DRIFT NUEVO — ${v.nuevo.length} grupo(s) que la baseline no declara:`)
-      for (const d of v.nuevo) console.error(`    ${d.clave}\n        producción=${d.produccion}  repo=${d.repo}`)
-      console.error('\n  Producción y el repositorio dejaron de describir lo mismo. Se cierra con una')
-      console.error('  migración forward-only, no ampliando la baseline.')
-    }
+
+    const v = evaluarTresVias({ P, M, R, baseline, migraciones })
+
+    const universo = new Set([...P.keys(), ...M.keys(), ...R.keys()]).size
+    console.error(`\n  grupos comparados          : ${universo}`)
+    console.error(`  el PR no los toca (M == R) : ${v.grupos.filter(g => g.clase === 'sin-cambio').length}`)
+    console.error(`  cambios planificados       : ${v.planificados.length}`)
+    console.error(`  drift resuelto             : ${v.resueltos.length}`)
+    console.error(`  ambiguos                   : ${v.ambiguos.length}`)
+
+    for (const linea of informe(v)) console.error(linea)
 
     if (!v.ok) process.exit(1)
-    console.error('\n✓ Sin drift nuevo. La baseline describe exactamente las diferencias que hay.')
   } finally {
     db.destruir()
   }
