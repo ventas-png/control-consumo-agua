@@ -75,6 +75,35 @@
 --      Las demás dimensiones —defaults (`pg_get_expr`), constraints, índices,
 --      policies (`qual`/`with_check`) y triggers— nunca se normalizaron.
 --
+--   7. LOS GRANTS SE LEEN DEL ACL (`relacl`/`proacl`), NO de
+--      `information_schema.role_table_grants` ni de `role_routine_grants`.
+--
+--      Esos dos catálogos son RELATIVOS AL ROL: sólo proyectan concesiones en
+--      las que el usuario actual es otorgante, otorgado, o miembro de alguno de
+--      los dos. Un rol DEDICADO DE SOLO LECTURA —el que el modo live necesita—
+--      no es miembro de `anon`, `authenticated` ni `service_role`, así que
+--      vería CERO grants y hashearía la cadena vacía en las ~563 dimensiones
+--      `/grants`. Medido sobre un clúster desechable con el patrón de Supabase:
+--
+--        rol                                        filas visibles
+--        postgres (dueño)                                       28
+--        rol de solo lectura, USAGE sobre public                  0
+--        rol de solo lectura + membresía, INHERIT                28  ← y además
+--                                                                     lee datos
+--        rol de solo lectura + membresía, NOINHERIT                0
+--
+--      No existe configuración que sea a la vez de solo lectura y capaz de ver
+--      los grants por esa vía: las únicas que los ven pueden leer el camino de
+--      dinero. `relacl` y `proacl` son columnas de `pg_class`/`pg_proc`, no son
+--      relativas al rol, y las lee cualquiera que pueda leer el catálogo.
+--
+--      LA SERIALIZACIÓN NO CAMBIA. `information_schema.table_privileges` está
+--      definido sobre `aclexplode(coalesce(relacl, acldefault(...)))`: se lee la
+--      misma fuente, un paso antes del filtro por rol. La equivalencia byte a
+--      byte se comprueba en `--prueba-acl` contra el catálogo real, para que
+--      `huella-produccion.json` —capturada con la formulación anterior— siga
+--      siendo válida sin regenerarla.
+--
 -- POR QUÉ `prosrc` Y NO `pg_get_functiondef`. `pg_get_functiondef` reimprime la
 -- definición y su formato cambia entre versiones mayores de Postgres. La
 -- reconstrucción corre en el Postgres del runner y producción va por su cuenta,
@@ -92,7 +121,7 @@
 -- live, y el orquestador la parte por líneas.
 
 WITH t AS (
-  SELECT c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity
+  SELECT c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity, c.relacl, c.relowner
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
 ),
@@ -146,13 +175,28 @@ gp AS ( -- tabla · policies
   FROM t LEFT JOIN pg_policies p ON p.schemaname = 'public' AND p.tablename = t.relname
   GROUP BY 1
 ),
-gg AS ( -- tabla · grants
+gg AS ( -- tabla · grants  (ver regla 7: se lee el ACL, no information_schema)
   SELECT 'tabla:'||t.relname||'/grants' AS clave,
          coalesce(string_agg(rg.grantee||E'\x1f'||rg.privilege_type,
                              E'\x1e' ORDER BY rg.grantee COLLATE "C", rg.privilege_type COLLATE "C"),'') AS linea,
          count(rg.*) AS n
-  FROM t LEFT JOIN information_schema.role_table_grants rg
-    ON rg.table_schema = 'public' AND rg.table_name = t.relname
+  FROM t LEFT JOIN LATERAL (
+    -- `acldefault` cubre el ACL nulo: una tabla sin GRANT explícito no tiene
+    -- relacl, pero sí los privilegios implícitos de su dueño. Es la misma
+    -- expresión que usa internamente information_schema.table_privileges.
+    SELECT coalesce(r.rolname::text, 'PUBLIC') AS grantee,
+           a.privilege_type::text              AS privilege_type
+    FROM aclexplode(coalesce(t.relacl, acldefault('r', t.relowner))) a
+    -- pg_roles, no pg_authid: pg_authid exige superusuario y este catálogo
+    -- tiene que poder leerse con un rol de solo lectura.
+    LEFT JOIN pg_roles r ON r.oid = a.grantee
+    -- Los siete privilegios de tabla que enumera information_schema. Fijarlos
+    -- explícitamente mantiene la huella estable entre versiones de Postgres:
+    -- 17 agregó MAINTAIN, que aquel catálogo no proyecta y que aparecería como
+    -- drift falso al comparar una reconstrucción en 16 contra producción en 17.
+    WHERE a.privilege_type IN ('SELECT','INSERT','UPDATE','DELETE',
+                               'TRUNCATE','REFERENCES','TRIGGER')
+  ) rg ON true
   GROUP BY 1
 ),
 gt AS ( -- tabla · triggers
@@ -178,13 +222,14 @@ gf AS ( -- funciones
   JOIN pg_language l ON l.oid = p.prolang
   WHERE n.nspname = 'public'
 ),
-gfg AS ( -- funciones · grants de EXECUTE
+gfg AS ( -- funciones · grants de EXECUTE  (ver regla 7)
   SELECT 'funcion:'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')/grants' AS clave,
-         coalesce((SELECT string_agg(grantee||E'\x1f'||privilege_type,
-                                     E'\x1e' ORDER BY grantee COLLATE "C", privilege_type COLLATE "C")
-                   FROM information_schema.role_routine_grants rr
-                   WHERE rr.specific_schema = 'public'
-                     AND rr.specific_name = p.proname||'_'||p.oid),'') AS linea,
+         coalesce((SELECT string_agg(coalesce(r.rolname::text,'PUBLIC')||E'\x1f'||a.privilege_type::text,
+                                     E'\x1e' ORDER BY coalesce(r.rolname::text,'PUBLIC') COLLATE "C",
+                                                      a.privilege_type::text COLLATE "C")
+                   FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                   LEFT JOIN pg_roles r ON r.oid = a.grantee
+                   WHERE a.privilege_type = 'EXECUTE'),'') AS linea,
          1 AS n
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'

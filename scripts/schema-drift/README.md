@@ -213,6 +213,10 @@ node scripts/schema-drift/auditar.mjs --verificar-huella
 # fallaban dos.
 node scripts/schema-drift/auditar.mjs --prueba-espacios
 
+# Los grants salen del ACL y no de information_schema: misma serialización que
+# antes (byte a byte) y alcanzable por un rol dedicado de solo lectura.
+node scripts/schema-drift/auditar.mjs --prueba-acl
+
 # Prueba negativa: inyecta una columna y una policy que nadie declara, en
 # AMBOS clústeres (M y R), para que queden como «objeto que el PR no toca».
 # DEBE salir distinto de cero.
@@ -309,7 +313,9 @@ límite honesto de la garantía que da este auditor hoy.
 Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
 
 1. **Una credencial dedicada de solo lectura.** Un rol de Postgres con `USAGE`
-   sobre `public` y `SELECT` sobre `pg_catalog`/`information_schema`, y nada más.
+   sobre `public`, y nada más. Ese rol ya **alcanza** para sacar la huella
+   completa: lo fija `--prueba-acl` (ver «Los grants se leen del ACL»). Antes no
+   alcanzaba, y el fallo era silencioso — los grants salían vacíos sin error.
    **No se reutiliza `SUPABASE_ACCESS_TOKEN`**: ese token es de la Management API
    y puede aplicar DDL, crear y borrar ramas y leer secretos. Que
    `drift-esquema.yml` ya lo use no es una razón para extender su alcance — es
@@ -351,6 +357,38 @@ probar el doble no prueba la cosa.
 Reintroduciendo la normalización anterior, los casos 1 y 4 fallan — que es
 exactamente el agujero que cerró quitarla. Los casos 2 y 3 pasan en ambas
 versiones porque esas dimensiones nunca se normalizaron.
+
+### Los grants se leen del ACL
+
+`information_schema.role_table_grants` y `role_routine_grants` son **relativos al
+rol**: sólo proyectan concesiones en las que el usuario actual es otorgante,
+otorgado, o miembro de alguno de los dos. Medido sobre un clúster desechable con
+el patrón de roles de Supabase:
+
+| Rol | Filas visibles | ¿Lee datos de negocio? |
+| --- | --- | --- |
+| `postgres` (dueño) | 28 | sí |
+| Rol de solo lectura, `USAGE` sobre `public` | **0** | no |
+| Rol de solo lectura + membresía, `INHERIT` | 28 | **sí** |
+| Rol de solo lectura + membresía, `NOINHERIT` | **0** | no |
+
+No hay configuración que sea a la vez de solo lectura y capaz de ver los grants
+por esa vía: las únicas que los ven pueden leer el camino de dinero. Con la
+credencial que el modo live necesita, la huella habría salido con la cadena
+vacía en las 563 dimensiones `/grants` **sin que nada fallara** — un falso
+negativo que además habría quedado grabado en `huella-produccion.json`.
+
+`relacl` y `proacl` son columnas de `pg_class`/`pg_proc`, no son relativas al rol
+y las lee cualquiera que pueda leer el catálogo. `--prueba-acl` fija las cuatro
+propiedades:
+
+| Propiedad | Cómo se comprueba |
+| --- | --- |
+| **Equivalencia** | Las 260 tablas y 303 funciones serializan idéntico por ACL que por `information_schema` para un rol privilegiado. Es lo que permite que `huella-produccion.json`, capturada con la formulación anterior, siga siendo válida sin regenerarla. |
+| **No vacuidad** | Se exige que haya objetos comparados y con grants no vacíos: dos conjuntos vacíos coinciden siempre. |
+| **Alcanzabilidad** | Un rol con `USAGE` sobre `public` y sin membresías saca los mismos 563 grupos `/grants` que el dueño. |
+| **Contraprueba** | Ese mismo rol ve **0** de las 7 306 concesiones que `information_schema` le muestra al dueño. Si algún día se volviera a leer de ahí, la alcanzabilidad se rompería en silencio. |
+| **Sensibilidad** | Revocar un `SELECT` mueve exactamente un grupo y baja su conteo en uno — si la lectura por ACL devolviera algo constante, todo lo anterior seguiría pasando. |
 
 ### La baseline en la rama base
 

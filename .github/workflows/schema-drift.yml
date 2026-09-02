@@ -104,6 +104,17 @@ jobs:
       - name: Espaciado que es contenido, no formato
         run: node scripts/schema-drift/auditar.mjs --prueba-espacios
 
+      # Los grants salen del ACL (`relacl`/`proacl`), no de information_schema,
+      # que es RELATIVO AL ROL. Se comprueban las dos mitades: que la
+      # serialización no cambió respecto de la formulación anterior —si
+      # cambiara, `huella-produccion.json` dejaría de ser comparable y las ~563
+      # dimensiones `/grants` aparecerían como drift falso—, y que un rol
+      # DEDICADO DE SOLO LECTURA saca exactamente la misma huella. Esa segunda
+      # mitad es la que desbloquea el modo live: con information_schema ese rol
+      # veía CERO grants y habría hasheado la cadena vacía sin que nada fallara.
+      - name: Los grants se leen del ACL y los alcanza un rol de solo lectura
+        run: node scripts/schema-drift/auditar.mjs --prueba-acl
+
       # ── M: qué se compara como «rama base» ─────────────────────────────
       #
       # En `pull_request`, el merge-base con la rama base: si la base avanzó

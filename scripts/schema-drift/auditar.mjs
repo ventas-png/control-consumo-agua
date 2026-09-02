@@ -477,6 +477,7 @@ async function principal() {
   const pruebaNegativa = bandera('--prueba-negativa')
   const verificarHuella = bandera('--verificar-huella')
   const pruebaEspacios = bandera('--prueba-espacios')
+  const pruebaAcl = bandera('--prueba-acl')
   // `--trinquete-contra` sigue aceptándose: es el nombre que usaba #827 cuando
   // la comparación era de dos vías, y ahora esa misma ref es además M.
   const refBase = valor('--base') ?? valor('--trinquete-contra') ?? 'origin/main'
@@ -486,7 +487,7 @@ async function principal() {
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
   // archivo lo que esta misma corrida va a escribir.
-  const problemas = (sembrarBaseline || verificarHuella || pruebaEspacios) ? [] : validarBaseline(baseline)
+  const problemas = (sembrarBaseline || verificarHuella || pruebaEspacios || pruebaAcl) ? [] : validarBaseline(baseline)
   if (problemas.length > 0) {
     console.error('✗ drift-conocido.json no es válido:')
     for (const p of problemas) console.error(`    ${p}`)
@@ -497,7 +498,7 @@ async function principal() {
   // `--verificar-huella` y `--prueba-espacios` sólo ejercitan la serialización
   // contra un catálogo real: no comparan contra nada versionado y por eso no
   // piden rama base. Exigirles una haría que fallaran por el checkout.
-  const sinRamaBase = verificarHuella || pruebaEspacios
+  const sinRamaBase = verificarHuella || pruebaEspacios || pruebaAcl
 
   if (!sinRamaBase) {
     const base = baselineDeLaBase(refBase)
@@ -644,6 +645,174 @@ async function principal() {
         process.exit(1)
       }
       console.error(`\n✓ Los ${casos.length} casos mueven la huella: no hay normalización de espacios que borre contenido.`)
+      return
+    }
+
+    if (pruebaAcl) {
+      // ── Los grants salen del ACL, no de information_schema (regla 7) ────
+      //
+      // Dos propiedades, y hacen falta las dos:
+      //
+      //   A. EQUIVALENCIA — leer el ACL da byte a byte lo mismo que
+      //      information_schema para un rol privilegiado. Sin esto,
+      //      `huella-produccion.json` —capturada con la formulación
+      //      anterior— dejaría de ser comparable y aparecerían ~563 grupos
+      //      de drift falso de golpe.
+      //
+      //   B. ALCANZABILIDAD — un rol DEDICADO DE SOLO LECTURA saca la MISMA
+      //      huella. Es la credencial que el modo live va a usar, y por
+      //      information_schema no podía: esos catálogos son relativos al
+      //      rol y le habrían devuelto cero grants, hasheando la cadena
+      //      vacía sin que nada fallara. Ese es el falso negativo que esta
+      //      prueba existe para impedir.
+
+      // El rol tal como lo prescribe el README: USAGE sobre `public` y nada
+      // más. Sin membresía en anon/authenticated/service_role — justamente
+      // la que lo volvería capaz de leer datos.
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        'CREATE ROLE drift_solo_lectura NOLOGIN; GRANT USAGE ON SCHEMA public TO drift_solo_lectura;',
+      ], { stdio: 'pipe' })
+
+      // A · equivalencia contra la formulación anterior, objeto por objeto.
+      const SQL_EQUIVALENCIA = `
+        WITH t AS (
+          SELECT c.oid, c.relname, c.relacl, c.relowner
+          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+        ),
+        t_viejo AS (
+          SELECT t.relname AS clave,
+                 coalesce(string_agg(rg.grantee||E'\\x1f'||rg.privilege_type,
+                          E'\\x1e' ORDER BY rg.grantee COLLATE "C", rg.privilege_type COLLATE "C"),'') AS linea
+          FROM t LEFT JOIN information_schema.role_table_grants rg
+            ON rg.table_schema = 'public' AND rg.table_name = t.relname
+          GROUP BY 1
+        ),
+        t_nuevo AS (
+          SELECT t.relname AS clave,
+                 coalesce(string_agg(rg.grantee||E'\\x1f'||rg.privilege_type,
+                          E'\\x1e' ORDER BY rg.grantee COLLATE "C", rg.privilege_type COLLATE "C"),'') AS linea
+          FROM t LEFT JOIN LATERAL (
+            SELECT coalesce(r.rolname::text,'PUBLIC') AS grantee, a.privilege_type::text AS privilege_type
+            FROM aclexplode(coalesce(t.relacl, acldefault('r', t.relowner))) a
+            LEFT JOIN pg_roles r ON r.oid = a.grantee
+            WHERE a.privilege_type IN ('SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER')
+          ) rg ON true
+          GROUP BY 1
+        ),
+        f AS (
+          SELECT p.oid, p.proname, p.proacl, p.proowner
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public'
+        ),
+        f_viejo AS (
+          SELECT f.oid AS clave,
+                 coalesce((SELECT string_agg(grantee||E'\\x1f'||privilege_type, E'\\x1e'
+                             ORDER BY grantee COLLATE "C", privilege_type COLLATE "C")
+                           FROM information_schema.role_routine_grants rr
+                           WHERE rr.specific_schema = 'public'
+                             AND rr.specific_name = f.proname||'_'||f.oid),'') AS linea
+          FROM f
+        ),
+        f_nuevo AS (
+          SELECT f.oid AS clave,
+                 coalesce((SELECT string_agg(coalesce(r.rolname::text,'PUBLIC')||E'\\x1f'||a.privilege_type::text, E'\\x1e'
+                             ORDER BY coalesce(r.rolname::text,'PUBLIC') COLLATE "C", a.privilege_type::text COLLATE "C")
+                           FROM aclexplode(coalesce(f.proacl, acldefault('f', f.proowner))) a
+                           LEFT JOIN pg_roles r ON r.oid = a.grantee
+                           WHERE a.privilege_type = 'EXECUTE'),'') AS linea
+          FROM f
+        )
+        SELECT (SELECT count(*) FROM t_viejo)                                                    ||'|'||
+               (SELECT count(*) FROM t_viejo v JOIN t_nuevo x USING (clave)
+                 WHERE v.linea IS DISTINCT FROM x.linea)                                         ||'|'||
+               (SELECT count(*) FROM t_viejo WHERE linea <> '')                                  ||'|'||
+               (SELECT count(*) FROM f_viejo)                                                    ||'|'||
+               (SELECT count(*) FROM f_viejo v JOIN f_nuevo x USING (clave)
+                 WHERE v.linea IS DISTINCT FROM x.linea)                                         ||'|'||
+               (SELECT count(*) FROM f_viejo WHERE linea <> '')`
+      const [nT, difT, llenasT, nF, difF, llenasF] =
+        db.psql(['-tAq', '-c', SQL_EQUIVALENCIA], { stdio: 'pipe' }).trim().split('|').map(Number)
+
+      // Una comparación entre dos conjuntos vacíos coincide siempre. Si el
+      // catálogo no trajera objetos, o si ninguno tuviera grants, la prueba
+      // pasaría sin haber comparado nada.
+      if (nT === 0 || nF === 0 || llenasT === 0 || llenasF === 0) {
+        console.error(`✗ PRUEBA VACUA: ${nT} tabla(s), ${nF} función(es), ` +
+                      `${llenasT} y ${llenasF} con grants no vacíos. No se comparó nada real.`)
+        process.exit(1)
+      }
+      if (difT !== 0 || difF !== 0) {
+        console.error(`✗ EQUIVALENCIA: ${difT} tabla(s) y ${difF} función(es) serializan distinto ` +
+                      'leyendo el ACL que leyendo information_schema.')
+        console.error('  huella-produccion.json se capturó con la formulación anterior: si la ' +
+                      'serialización cambia, hay que regenerarla o todo /grants es drift falso.')
+        process.exit(1)
+      }
+      console.error(`✓ equivalencia: ${nT} tablas y ${nF} funciones serializan IGUAL por ACL que por ` +
+                    `information_schema (${llenasT} y ${llenasF} con grants no vacíos)`)
+
+      // B · la misma huella, leída por el rol de solo lectura.
+      const soloGrants = (texto) =>
+        [...parsearHuella(texto)].filter(([k]) => k.endsWith('/grants'))
+                                 .map(([k, v]) => `${k}\t${v.huella}\t${v.n}`).join('\n')
+
+      const dueno = soloGrants(huella(db.psql))
+      const lector = soloGrants(
+        db.psql(['-tAq', '-c', 'SET ROLE drift_solo_lectura;', '-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim())
+
+      if (dueno !== lector) {
+        const a = dueno.split('\n'); const b = lector.split('\n')
+        const distintas = a.filter((l, i) => l !== b[i]).slice(0, 5)
+        console.error(`✗ ALCANZABILIDAD: el rol de solo lectura saca otra huella en ${
+          a.filter((l, i) => l !== b[i]).length} grupo(s) /grants.`)
+        for (const l of distintas) console.error(`    dueño : ${l}`)
+        console.error('  La credencial del modo live no puede reproducir la huella: se estaría ' +
+                      'refrescando huella-produccion.json con grants incompletos.')
+        process.exit(1)
+      }
+      console.error(`✓ alcanzabilidad: un rol de solo lectura (USAGE sobre public, sin membresías) ` +
+                    `saca los mismos ${dueno.split('\n').length} grupos /grants que el dueño`)
+
+      // Y la contraprueba de por qué hizo falta el cambio: por
+      // information_schema, ese mismo rol no ve NADA. Si algún día volviera a
+      // leerse de ahí, la propiedad B se rompería en silencio — la huella
+      // saldría con la cadena vacía en todo /grants y nada fallaría.
+      const visiblesParaElLector = Number(db.psql(['-tAq', '-c',
+        "SET ROLE drift_solo_lectura; SELECT count(*) FROM information_schema.role_table_grants WHERE table_schema='public';",
+      ], { stdio: 'pipe' }).trim())
+      const visiblesParaElDueno = Number(db.psql(['-tAq', '-c',
+        "SELECT count(*) FROM information_schema.role_table_grants WHERE table_schema='public';",
+      ], { stdio: 'pipe' }).trim())
+      if (visiblesParaElLector !== 0 || visiblesParaElDueno === 0) {
+        console.error(`✗ La contraprueba no se sostiene: el lector ve ${visiblesParaElLector} filas en ` +
+                      `information_schema y el dueño ${visiblesParaElDueno}. Se esperaba 0 y >0.`)
+        process.exit(1)
+      }
+      console.error(`✓ contraprueba: por information_schema ese mismo rol ve 0 de las ` +
+                    `${visiblesParaElDueno} concesiones que ve el dueño — por eso no se lee de ahí`)
+
+      // Sensibilidad: si la lectura por ACL devolviera algo constante, todo lo
+      // anterior seguiría pasando. Revocar UN privilegio tiene que mover
+      // exactamente UN grupo y bajar su conteo en uno.
+      const antesRevoke = parsearHuella(huella(db.psql))
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        'REVOKE SELECT ON public.clientes FROM anon;'], { stdio: 'pipe' })
+      const despuesRevoke = parsearHuella(huella(db.psql))
+      const movidos = [...antesRevoke.keys()].filter(k => antesRevoke.get(k).huella !== despuesRevoke.get(k)?.huella)
+      if (movidos.length !== 1 || movidos[0] !== 'tabla:clientes/grants') {
+        console.error(`✗ SENSIBILIDAD: revocar un SELECT movió ${movidos.length} grupo(s): ${movidos.join(', ') || '(ninguno)'}`)
+        console.error('  Se esperaba exactamente tabla:clientes/grants.')
+        process.exit(1)
+      }
+      if (despuesRevoke.get(movidos[0]).n !== antesRevoke.get(movidos[0]).n - 1) {
+        console.error(`✗ SENSIBILIDAD: el conteo pasó de ${antesRevoke.get(movidos[0]).n} a ` +
+                      `${despuesRevoke.get(movidos[0]).n}; se esperaba uno menos.`)
+        process.exit(1)
+      }
+      console.error('✓ sensibilidad: revocar un SELECT mueve exactamente 1 grupo y baja su conteo en 1')
+
+      console.error('\n✓ Los grants se leen del ACL: misma serialización que antes, y alcanzable ' +
+                    'con una credencial de solo lectura.')
       return
     }
 
