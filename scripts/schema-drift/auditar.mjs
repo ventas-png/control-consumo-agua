@@ -54,7 +54,7 @@
 // un SHA-256 no se reconstruye el DDL. Hay un guard en `__tests__` que falla si
 // algo con forma de secreto se cuela.
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -217,6 +217,114 @@ export function huellaProduccionVersionada(ruta = RUTA_PRODUCCION) {
     mapa.set(clave, { huella: h, n: Number(n ?? 0) })
   }
   return { mapa, doc }
+}
+
+// ── Modo live: refrescar P contra el catálogo real ─────────────────────────
+//
+// Todo lo de esta sección es PURO y se prueba en vitest. Lo que toca la red
+// vive en `sembrarProduccionLive()`, más abajo, y se ejercita en `--prueba-live`
+// contra un clúster desechable que hace de producción.
+
+/** Variable de entorno con la cadena de conexión de SOLO LECTURA. */
+export const VAR_URL_LIVE = 'SCHEMA_DRIFT_READONLY_URL'
+
+/**
+ * Quita de un texto la cadena de conexión y su contraseña.
+ *
+ * libpq mete el host, el usuario y a veces la URL entera en sus mensajes de
+ * error, y esos mensajes se imprimen. Un secreto que llega al log de Actions
+ * es un secreto quemado, así que se recorta ANTES de imprimir, no después.
+ */
+export function sinSecretos(texto, url = '') {
+  let salida = String(texto)
+  if (url) salida = salida.split(url).join('‹url oculta›')
+  // La contraseña, además, por si el mensaje trae la URL troceada.
+  const clave = (() => { try { return new URL(url).password } catch { return '' } })()
+  if (clave) salida = salida.split(clave).join('‹clave oculta›')
+  // Y cualquier `postgres://…@…` que haya quedado suelto.
+  return salida.replace(/postgres(?:ql)?:\/\/[^\s'"]*/gi, '‹url oculta›')
+}
+
+/**
+ * Ref del proyecto Supabase que hay detrás de una URL, o null si no se puede
+ * saber. Dos formas: conexión directa (`db.<ref>.supabase.co`) y pooler, que
+ * lleva el ref en el usuario (`postgres.<ref>`).
+ *
+ * Sirve para un guard concreto: que un refresco no capture el SANDBOX y lo
+ * versione como si fuera producción. Si no se puede determinar, no se adivina.
+ */
+export function refDeUrl(url) {
+  let u
+  try { u = new URL(url) } catch { return null }
+  const host = u.hostname ?? ''
+  const directo = /^db\.([a-z0-9]{20})\.supabase\.(co|com)$/i.exec(host)
+  if (directo) return directo[1]
+  const porUsuario = /^postgres\.([a-z0-9]{20})$/i.exec(decodeURIComponent(u.username ?? ''))
+  if (porUsuario && /supabase/i.test(host)) return porUsuario[1]
+  return null
+}
+
+/**
+ * Guards sobre la huella recién leída, ANTES de escribir nada.
+ *
+ * El peor resultado posible no es un error: es un refresco que se escribe con
+ * datos incompletos y queda versionado como verdad. Cada regla de aquí cubre
+ * una forma concreta de que eso pase.
+ */
+export function validarHuellaLive(mapa, previo = null, { tolerancia = 0.2 } = {}) {
+  const problemas = []
+
+  if (mapa.size === 0) {
+    problemas.push('La huella vino vacía: el catálogo no devolvió un solo grupo.')
+    return problemas
+  }
+
+  for (const [clave, v] of mapa) {
+    if (!RE_HUELLA.test(v.huella)) problemas.push(`«${clave}» no es un SHA-256 de 64 hex.`)
+  }
+
+  // EL GUARD QUE IMPORTA. `information_schema.role_table_grants` es relativo al
+  // rol: con la credencial de solo lectura devolvía CERO filas, y la huella
+  // salía con la cadena vacía en todo /grants sin que nada fallara. Leer del
+  // ACL lo arregla (ver regla 7 de fingerprint.sql y `--prueba-acl`), pero el
+  // fallo era silencioso y por eso se sigue vigilando en el resultado: si
+  // alguna vez vuelve, el refresco se niega en vez de versionar el vacío.
+  const grants = [...mapa].filter(([k]) => k.endsWith('/grants'))
+  const vacios = grants.filter(([, v]) => v.n === 0)
+  if (grants.length === 0) {
+    problemas.push('No hay ni un grupo /grants: el catálogo se leyó sin la dimensión de privilegios.')
+  } else if (vacios.length === grants.length) {
+    problemas.push(
+      `Los ${grants.length} grupos /grants vinieron VACÍOS. Es el síntoma exacto de leer los ` +
+      'privilegios con un catálogo relativo al rol. No se versiona una huella sin grants.',
+    )
+  }
+
+  if (previo && previo.size > 0) {
+    const cambio = Math.abs(mapa.size - previo.size) / previo.size
+    if (cambio > tolerancia) {
+      problemas.push(
+        `El número de grupos pasó de ${previo.size} a ${mapa.size} (${(cambio * 100).toFixed(1)} %). ` +
+        `Por encima del ${(tolerancia * 100).toFixed(0)} % no se refresca solo: o se leyó otra base, ` +
+        'o el esquema cambió tanto que merece revisarse a mano.',
+      )
+    }
+  }
+
+  return problemas
+}
+
+/** Qué cambia entre la huella versionada y la recién leída. */
+export function diffHuellas(previo, nuevo) {
+  const claves = [...new Set([...previo.keys(), ...nuevo.keys()])].sort()
+  const agregados = [], eliminados = [], cambiados = []
+  for (const c of claves) {
+    const a = previo.get(c), b = nuevo.get(c)
+    if (!a) agregados.push(c)
+    else if (!b) eliminados.push(c)
+    else if (a.huella !== b.huella || a.n !== b.n) cambiados.push({ clave: c, antes: `${a.huella}:${a.n}`, ahora: `${b.huella}:${b.n}` })
+  }
+  return { agregados, eliminados, cambiados }
 }
 
 export const RUTA_BASELINE_EN_GIT = 'scripts/schema-drift/drift-conocido.json'
@@ -470,6 +578,334 @@ function valor(nombre) {
   return i === -1 ? null : process.argv[i + 1]
 }
 
+// ── Modo live: la parte que sí toca la red ─────────────────────────────────
+
+/**
+ * psql contra la URL de solo lectura.
+ *
+ * `PGOPTIONS` fuerza la sesión a solo lectura DESDE LA CONEXIÓN, no con un
+ * `SET` posterior: así la garantía no depende de que el rol esté bien
+ * configurado ni de que la primera sentencia sea la correcta. Es defensa en
+ * profundidad — el rol ya debería no poder escribir, y se comprueba aparte.
+ */
+function psqlLive(url, args) {
+  try {
+    return execFileSync('psql', [url, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on', PGCONNECT_TIMEOUT: '15' },
+    })
+  } catch (err) {
+    throw new Error(sinSecretos(String(err.stderr || err.message).trim(), url))
+  }
+}
+
+/**
+ * Lo que hay que comprobar del OTRO lado antes de leer nada.
+ *
+ * El último campo es el menos obvio y el más peligroso: los esquemas del
+ * `search_path` sobre los que el rol NO tiene USAGE. `format_type` y
+ * `pg_get_expr` cualifican un nombre cuando el objeto no es VISIBLE, y la
+ * visibilidad depende del privilegio, no sólo del `search_path`. Un rol sin
+ * USAGE sobre `extensions` serializa `extensions.citext` donde el dueño escribe
+ * `citext` — misma base, otra huella. Medido: exactamente 1 grupo se movía por
+ * eso, y habría quedado versionado como drift permanente.
+ */
+const SQL_CREDENCIAL = `SELECT
+  current_user                                          ||'|'||
+  (SELECT rolsuper     FROM pg_roles WHERE rolname = current_user)::text ||'|'||
+  (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user)::text ||'|'||
+  (SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user)::text ||'|'||
+  (SELECT rolcreatedb  FROM pg_roles WHERE rolname = current_user)::text ||'|'||
+  current_setting('transaction_read_only')              ||'|'||
+  (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+       AND (has_table_privilege(c.oid,'INSERT') OR has_table_privilege(c.oid,'UPDATE')
+            OR has_table_privilege(c.oid,'DELETE') OR has_table_privilege(c.oid,'TRUNCATE')))::text ||'|'||
+  current_setting('server_version')                     ||'|'||
+  current_setting('search_path')                        ||'|'||
+  coalesce((SELECT string_agg(n.nspname, ',' ORDER BY n.nspname)
+            FROM unnest(string_to_array(current_setting('search_path'), ',')) AS x
+            -- JOIN contra pg_namespace, no un EXISTS en el WHERE: el nombre se
+            -- resuelve a OID y las entradas que no son un esquema real —«$user»,
+            -- que además llega escapado como «\\$user»— simplemente no casan.
+            -- Con \`has_schema_privilege(nombre)\` en el WHERE, el planificador
+            -- puede evaluarlo antes del filtro y reventar con «schema does not
+            -- exist»; por OID eso no puede pasar.
+            JOIN pg_namespace n ON n.nspname = btrim(x, '\\ "')
+            WHERE NOT has_schema_privilege(current_user, n.oid, 'USAGE')), '')`
+
+/**
+ * Refresca `huella-produccion.json` leyendo el catálogo real.
+ *
+ * FAIL-CLOSED EN LAS DOS DIRECCIONES. Antes de leer se exige que la credencial
+ * sea de solo lectura de verdad —medido, no declarado—, y antes de escribir se
+ * exige que la huella tenga sentido. Un refresco que se escribe con datos
+ * incompletos es peor que no refrescar: queda versionado como verdad y el
+ * auditor deja de ver el drift que esos grupos taparían.
+ */
+function sembrarProduccionLive({ url, proyectoEsperado, escribir = true }) {
+  if (!url) {
+    console.error(`✗ Falta ${VAR_URL_LIVE}: sin credencial no hay modo live.`)
+    console.error('  Tiene que ser un rol DEDICADO de solo lectura, en el environment `production-db`.')
+    console.error('  NO se reutiliza SUPABASE_ACCESS_TOKEN: es de la Management API y puede escribir.')
+    return 1
+  }
+  if (!/^postgres(ql)?:\/\//i.test(url)) {
+    console.error(`✗ ${VAR_URL_LIVE} no parece una cadena de conexión de Postgres.`)
+    return 1
+  }
+
+  // ── El proyecto, antes que nada ──────────────────────────────────────────
+  // Capturar el SANDBOX y versionarlo como producción sería un desastre
+  // silencioso: la huella quedaría «verde» describiendo otra base.
+  const { mapa: previo, doc } = huellaProduccionVersionada()
+  const esperado = proyectoEsperado ?? doc.proyecto
+  const refUrl = refDeUrl(url)
+  if (refUrl && esperado && refUrl !== esperado) {
+    console.error(`✗ La URL apunta al proyecto «${refUrl}» y la instantánea declara «${esperado}».`)
+    console.error('  No se refresca: sería versionar otra base como si fuera producción.')
+    return 1
+  }
+  if (!refUrl && !proyectoEsperado) {
+    console.error('✗ No se pudo deducir el proyecto desde la URL y no se pasó `--proyecto`.')
+    console.error('  Sin saber qué base se está leyendo no se versiona nada.')
+    return 1
+  }
+  console.error(`· proyecto: ${esperado}${refUrl ? ' (confirmado por la URL)' : ' (declarado con --proyecto)'}`)
+
+  // ── La credencial, medida ────────────────────────────────────────────────
+  const [usuario, superusuario, bypassrls, crearRoles, crearBases, soloLectura, escribibles,
+         version, searchPath, sinUsage] =
+    psqlLive(url, ['-tAq', '-c', SQL_CREDENCIAL]).trim().split('|')
+
+  const pecados = []
+  if (superusuario === 't') pecados.push('es superusuario')
+  if (bypassrls === 't') pecados.push('tiene BYPASSRLS')
+  if (crearRoles === 't') pecados.push('puede crear roles')
+  if (crearBases === 't') pecados.push('puede crear bases')
+  if (Number(escribibles) > 0) pecados.push(`puede escribir en ${escribibles} tabla(s) de public`)
+  if (pecados.length > 0) {
+    console.error(`✗ La credencial no es de solo lectura: ${pecados.join(', ')}.`)
+    console.error('  El modo live lee producción; una credencial que puede escribir no se usa aquí.')
+    return 1
+  }
+  if (soloLectura !== 'on') {
+    console.error('✗ La sesión no quedó en solo lectura pese a PGOPTIONS. Se aborta.')
+    return 1
+  }
+  console.error(`✓ credencial de solo lectura: ${usuario} — sin superusuario, sin BYPASSRLS, ` +
+                'sin permisos de escritura, sesión read-only')
+
+  // EL GUARD MENOS OBVIO. Un esquema del `search_path` sobre el que el rol no
+  // tiene USAGE no lo vuelve ciego: lo vuelve VERBOSO. `format_type` y
+  // `pg_get_expr` cualifican lo que no es visible, así que la misma base
+  // serializa distinto según quién lea, y el refresco quedaría versionado con
+  // nombres cualificados que el auditor vería como drift para siempre.
+  if (sinUsage) {
+    console.error(`✗ El rol no tiene USAGE sobre: ${sinUsage} — y esos esquemas están en el ` +
+                  `search_path (${searchPath}).`)
+    console.error('  Sin USAGE, los nombres de esos esquemas se serializan CUALIFICADOS y la huella')
+    console.error('  deja de coincidir con la del dueño. No se lee: se corregiría con')
+    console.error(`  GRANT USAGE ON SCHEMA ${sinUsage.split(',').join(', ')} TO ${usuario};`)
+    return 1
+  }
+  console.error(`✓ search_path (${searchPath}): el rol tiene USAGE sobre todos sus esquemas`)
+  console.error(`· Postgres ${version}`)
+
+  // ── La huella ────────────────────────────────────────────────────────────
+  const texto = psqlLive(url, ['-tAq', '-f', RUTA_FINGERPRINT]).trim()
+  let mapa
+  try { mapa = parsearHuella(texto) } catch (err) { console.error(`✗ ${sinSecretos(err.message, url)}`); return 1 }
+  console.error(`✓ huella leída de producción: ${mapa.size} grupos`)
+
+  const problemas = validarHuellaLive(mapa, previo)
+  if (problemas.length > 0) {
+    console.error('\n✗ La huella no pasa los controles; NO se escribe nada:')
+    for (const p of problemas) console.error(`    ${p}`)
+    return 1
+  }
+  console.error('✓ controles: SHA-256 completos, grants presentes y tamaño coherente')
+
+  // ── Qué cambia ───────────────────────────────────────────────────────────
+  const d = diffHuellas(previo, mapa)
+  console.error(`\n  grupos: ${previo.size} → ${mapa.size}`)
+  console.error(`  agregados: ${d.agregados.length}   eliminados: ${d.eliminados.length}   ` +
+                `cambiados: ${d.cambiados.length}`)
+  const MUESTRA = 25
+  for (const c of d.agregados.slice(0, MUESTRA)) console.error(`    + ${c}`)
+  for (const c of d.eliminados.slice(0, MUESTRA)) console.error(`    − ${c}`)
+  for (const c of d.cambiados.slice(0, MUESTRA)) {
+    console.error(`    ~ ${c.clave}\n        antes = ${c.antes}\n        ahora = ${c.ahora}`)
+  }
+  const total = d.agregados.length + d.eliminados.length + d.cambiados.length
+  if (total > MUESTRA) console.error(`    … y ${total - MUESTRA} más`)
+  if (total === 0) console.error('    (la instantánea ya estaba al día)')
+
+  if (!escribir) { console.error('\n· --en-seco: no se escribe el archivo'); return 0 }
+
+  // La prosa (`_README`, `_CANONICO`, `_ADVERTENCIA`) se conserva tal cual:
+  // este comando refresca MEDICIONES, no documentación.
+  const salida = {
+    ...doc,
+    capturada: new Date().toISOString().slice(0, 10),
+    proyecto: esperado,
+    postgres: version,
+    algoritmo: 'sha256',
+    grupos: Object.fromEntries([...mapa].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => [k, `${v.huella}:${v.n}`])),
+  }
+  writeFileSync(RUTA_PRODUCCION, JSON.stringify(salida, null, 1) + '\n')
+  console.error(`\n✓ ${RUTA_PRODUCCION} refrescada — ${mapa.size} grupos, capturada ${salida.capturada}`)
+  return 0
+}
+
+/**
+ * El modo live, de punta a punta, contra un clúster desechable que hace de
+ * producción — con conexión por URL y un rol distinto, no con `SET ROLE`.
+ *
+ * Lo que se prueba es el CAMINO COMPLETO: conectar, medir la credencial, leer
+ * el catálogo, validar y escribir. Y lo que más importa: que la huella que saca
+ * la credencial de solo lectura sea EXACTAMENTE la que saca el dueño. Esa
+ * igualdad es lo que hace honesto el refresco, y depende de la regla 7 de
+ * fingerprint.sql: con la formulación anterior, todos los /grants salían vacíos.
+ */
+async function pruebaLive() {
+  const comprobar = (cond, etiqueta) => {
+    console.error(`${cond ? '✓' : '✗'} ${etiqueta}`)
+    if (!cond) process.exitCode = 1
+    return cond
+  }
+
+  const db = reconstruir({ log: m => console.error(`  ${m}`) })
+  const respaldo = readFileSync(RUTA_PRODUCCION, 'utf8')
+  const tmp = mkdtempSync(join(tmpdir(), 'live-'))
+  try {
+    if (db.fallos.length > 0) {
+      console.error(`✗ ${db.fallos.length} migración(es) no aplicaron.`); process.exit(1)
+    }
+
+    // La credencial que el modo live va a usar en producción, tal como la
+    // prescribe el README: USAGE sobre `public` y ninguna membresía.
+    // USAGE sobre `public` Y `extensions`: los dos esquemas del `search_path`.
+    // Sin el segundo, `citext` se serializa `extensions.citext` y la huella
+    // deja de coincidir con la del dueño — el caso negativo lo comprueba.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'CREATE ROLE drift_lector LOGIN; ' +
+      'GRANT USAGE ON SCHEMA public, extensions TO drift_lector;'], { stdio: 'pipe' })
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'CREATE ROLE drift_corto LOGIN; GRANT USAGE ON SCHEMA public TO drift_corto;'], { stdio: 'pipe' })
+    // Y una que sí puede escribir, para comprobar que el guard la rechaza.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      "CREATE ROLE drift_escritor LOGIN; GRANT USAGE ON SCHEMA public TO drift_escritor; " +
+      'GRANT INSERT ON public.clientes TO drift_escritor;'], { stdio: 'pipe' })
+
+    const urlDe = (rol) =>
+      `postgresql://${rol}@/postgres?host=${db.entorno.PGHOST}&port=${db.entorno.PGPORT}`
+
+    // `spawnSync`, no `execFileSync`: hace falta stderr TAMBIÉN cuando el
+    // comando sale 0 —ahí es donde el modo live escribe todo lo que informa— y
+    // execFileSync sólo lo devuelve dentro del error.
+    const correr = (args, entorno = {}) => {
+      const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...args], {
+        encoding: 'utf8', env: { ...process.env, ...entorno },
+      })
+      return { codigo: r.status ?? 1, salida: `${r.stdout ?? ''}${r.stderr ?? ''}` }
+    }
+
+    // ── 1 · sin credencial, no se hace nada ────────────────────────────────
+    const sinUrl = correr(['--sembrar-produccion'], { [VAR_URL_LIVE]: '' })
+    comprobar(sinUrl.codigo !== 0, 'sin la variable de entorno, el modo live se niega a correr')
+    comprobar(/SUPABASE_ACCESS_TOKEN/.test(sinUrl.salida),
+      'y dice explícitamente que no se reutiliza el token administrativo')
+
+    // ── 2 · una credencial que puede escribir se rechaza ───────────────────
+    const escritor = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
+      { [VAR_URL_LIVE]: urlDe('drift_escritor') })
+    comprobar(escritor.codigo !== 0, 'una credencial con permiso de escritura se rechaza')
+    comprobar(/puede escribir en \d+ tabla/.test(escritor.salida),
+      'y el motivo dice en cuántas tablas puede escribir')
+
+    // ── 3 · sin saber qué proyecto es, tampoco ─────────────────────────────
+    const sinProyecto = correr(['--sembrar-produccion'], { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(sinProyecto.codigo !== 0 && /--proyecto/.test(sinProyecto.salida),
+      'sin poder deducir el proyecto y sin --proyecto, no se versiona nada')
+
+    // ── 3 bis · sin USAGE sobre un esquema del search_path, se niega ───────
+    // Es el fallo que más caro sale: no rompe nada, sólo serializa nombres
+    // cualificados, y el refresco quedaría versionado con drift permanente.
+    const corto = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
+      { [VAR_URL_LIVE]: urlDe('drift_corto') })
+    comprobar(corto.codigo !== 0, 'un rol sin USAGE sobre un esquema del search_path se rechaza')
+    comprobar(/extensions/.test(corto.salida) && /GRANT USAGE ON SCHEMA/.test(corto.salida),
+      'y el mensaje nombra el esquema que falta y el GRANT que lo arregla')
+
+    // ── 4 · el camino feliz, en seco ───────────────────────────────────────
+    const seco = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(seco.codigo === 0, '--en-seco corre entero y sale 0')
+    comprobar(/sin superusuario, sin BYPASSRLS/.test(seco.salida), 'la credencial se mide, no se declara')
+    comprobar(readFileSync(RUTA_PRODUCCION, 'utf8') === respaldo, '--en-seco NO tocó el archivo versionado')
+
+    // ── 5 · y escribiendo de verdad ────────────────────────────────────────
+    const real = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(real.codigo === 0, 'el refresco corre y sale 0')
+
+    const escrita = huellaProduccionVersionada(RUTA_PRODUCCION).mapa
+    const delDueno = parsearHuella(huella(db.psql))
+
+    // LA PROPIEDAD CENTRAL: lo que lee la credencial de solo lectura es
+    // exactamente lo que hay. Con la formulación anterior de los grants, los
+    // 563 grupos /grants habrían salido vacíos y esto fallaría.
+    const distintos = [...delDueno].filter(([k, v]) => {
+      const e = escrita.get(k); return !e || e.huella !== v.huella || e.n !== v.n
+    })
+    comprobar(escrita.size === delDueno.size && distintos.length === 0,
+      `la huella del rol de solo lectura es idéntica a la del dueño (${delDueno.size} grupos)`)
+    if (distintos.length > 0) {
+      for (const [k] of distintos.slice(0, 5)) console.error(`    difiere: ${k}`)
+    }
+
+    const grants = [...escrita].filter(([k]) => k.endsWith('/grants'))
+    comprobar(grants.length > 0 && grants.every(([, v]) => v.n > 0),
+      `los ${grants.length} grupos /grants quedaron con contenido, ninguno vacío`)
+
+    // ── 6 · metadatos y ausencia de secretos ───────────────────────────────
+    const docNuevo = leerJson(RUTA_PRODUCCION)
+    comprobar(docNuevo.proyecto === 'prueba', 'el proyecto queda registrado')
+    comprobar(/^\d{4}-\d{2}-\d{2}$/.test(docNuevo.capturada), 'la fecha de captura queda registrada')
+    comprobar(typeof docNuevo.postgres === 'string' && docNuevo.postgres.length > 0,
+      `la versión de Postgres queda registrada (${docNuevo.postgres})`)
+    const docPrevio = JSON.parse(respaldo)
+    comprobar(!!docPrevio._README && docNuevo._README === docPrevio._README &&
+              docNuevo._CANONICO === docPrevio._CANONICO && docNuevo._ADVERTENCIA === docPrevio._ADVERTENCIA,
+      'la prosa del archivo se conserva: este comando refresca mediciones, no documentación')
+
+    const crudo = readFileSync(RUTA_PRODUCCION, 'utf8')
+    comprobar(!/postgres(ql)?:\/\//i.test(crudo), 'el archivo no contiene ninguna cadena de conexión')
+    comprobar(!crudo.includes(db.entorno.PGHOST), 'ni el host de la base')
+    comprobar(!/drift_lector/.test(crudo), 'ni el nombre del rol')
+
+    // ── 7 · el guard de la huella incompleta ───────────────────────────────
+    // Se comprueba sobre la función pura, con el resultado real: si todos los
+    // /grants vinieran vacíos, el refresco tiene que negarse.
+    const mutilada = new Map([...escrita].map(([k, v]) =>
+      [k, k.endsWith('/grants') ? { huella: v.huella, n: 0 } : v]))
+    const quejas = validarHuellaLive(mutilada, escrita)
+    comprobar(quejas.some(q => /VAC/i.test(q)),
+      'una huella con todos los /grants vacíos se rechaza antes de escribirse')
+
+    console.error('\n✓ Modo live: credencial medida, huella idéntica a la del dueño, ' +
+                  'guards activos y nada escrito cuando algo no cuadra.')
+  } finally {
+    writeFileSync(RUTA_PRODUCCION, respaldo)
+    rmSync(tmp, { recursive: true, force: true })
+    db.destruir()
+  }
+}
+
 async function principal() {
   const soloBaseline = bandera('--solo-baseline')
   const sembrarProduccion = bandera('--sembrar-produccion')
@@ -483,6 +919,18 @@ async function principal() {
   const refBase = valor('--base') ?? valor('--trinquete-contra') ?? 'origin/main'
 
   if (bandera('--prueba-tres-vias')) return pruebaTresVias()
+  if (bandera('--prueba-live')) return pruebaLive()
+
+  // El modo live no reconstruye nada: lee producción. Va antes de todo lo
+  // demás para no levantar un Postgres que no hace falta.
+  if (sembrarProduccion) {
+    process.exitCode = sembrarProduccionLive({
+      url: process.env[VAR_URL_LIVE] ?? '',
+      proyectoEsperado: valor('--proyecto'),
+      escribir: !bandera('--en-seco'),
+    })
+    return
+  }
 
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
@@ -836,11 +1284,6 @@ async function principal() {
 
     const R = parsearHuella(huella(db.psql))
     console.error(`\u2713 huella del HEAD (R): ${R.size} grupos`)
-
-    if (sembrarProduccion) {
-      console.error('\u2717 --sembrar-produccion sólo tiene sentido en modo live (ver README: el wiring live está bloqueado).')
-      process.exit(1)
-    }
 
     const { mapa: P, doc } = huellaProduccionVersionada()
     console.error(`\u2713 huella de producción versionada (P): ${P.size} grupos (capturada ${doc.capturada})`)

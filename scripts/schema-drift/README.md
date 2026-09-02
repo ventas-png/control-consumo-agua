@@ -217,6 +217,11 @@ node scripts/schema-drift/auditar.mjs --prueba-espacios
 # antes (byte a byte) y alcanzable por un rol dedicado de solo lectura.
 node scripts/schema-drift/auditar.mjs --prueba-acl
 
+# El modo live de punta a punta contra un clúster desechable que hace de
+# producción: conexión por URL con otro rol, credencial medida, guards y
+# escritura. Sin credenciales y sin red.
+node scripts/schema-drift/auditar.mjs --prueba-live
+
 # Prueba negativa: inyecta una columna y una policy que nadie declara, en
 # AMBOS clústeres (M y R), para que queden como «objeto que el PR no toca».
 # DEBE salir distinto de cero.
@@ -303,14 +308,69 @@ Son **dos puertas independientes**. Declarar un drift nuevo en la baseline lo
 saca de `DRIFT NUEVO`… y entonces lo detiene el trinquete, que compara contra la
 baseline de la rama base. Ninguna de las dos alcanza sola.
 
-## Modo live — **bloqueado**
+## Modo live — implementado, apagado hasta que exista la credencial
 
-Refrescar `huella-produccion.json` contra el catálogo real está implementado a
-medias **a propósito**. La instantánea versionada envejece, y mientras no se
-refresque, un cambio hecho en producción fuera de banda no se ve. Ése es el
-límite honesto de la garantía que da este auditor hoy.
+Refrescar `huella-produccion.json` contra el catálogo real **está implementado y
+probado**: `--prueba-live` lo ejercita de punta a punta contra un clúster
+desechable que hace de producción, con conexión por URL y un rol distinto. Lo
+único que falta para encenderlo es la credencial.
 
-Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
+Mientras no se refresque, la instantánea versionada envejece y un cambio hecho
+en producción fuera de banda no se ve. Ése es el límite honesto de la garantía
+que da este auditor hoy.
+
+```bash
+# Refresca la instantánea leyendo producción. Exige SCHEMA_DRIFT_READONLY_URL.
+node scripts/schema-drift/auditar.mjs --sembrar-produccion
+
+# Lo mismo sin escribir: imprime el diff y sale. Para mirar antes de tocar.
+node scripts/schema-drift/auditar.mjs --sembrar-produccion --en-seco
+```
+
+### Los guards, y qué previene cada uno
+
+El peor resultado posible no es un error: es un refresco que se escribe con
+datos incompletos y queda versionado como verdad. A partir de ahí el auditor
+deja de ver el drift que esos grupos taparían. Por eso todo es fail-closed en
+las dos direcciones — se mide la credencial antes de leer, y la huella antes de
+escribir.
+
+| Guard | Qué previene |
+| --- | --- |
+| Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
+| El rol es superusuario, tiene `BYPASSRLS`, puede crear roles o bases, o puede escribir en alguna tabla de `public` | Leer producción con una credencial que además puede modificarla. Se **mide**, no se declara. |
+| La sesión no quedó en solo lectura | `PGOPTIONS` fuerza `default_transaction_read_only` desde la conexión; si no rigió, se aborta. |
+| El rol no tiene `USAGE` sobre algún esquema del `search_path` | El fallo más caro: no rompe nada, sólo serializa `extensions.citext` donde el dueño escribe `citext`, y el refresco quedaría versionado con drift permanente. |
+| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. Si el ref no se puede deducir de la URL, hay que pasar `--proyecto`: no se adivina. |
+| Algún valor no es SHA-256 de 64 hex | Una lectura truncada o a medias. |
+| **Todos** los grupos `/grants` vinieron vacíos | El síntoma exacto de leer los privilegios con un catálogo relativo al rol. Que algunos estén vacíos es normal; que lo estén todos, no. |
+| El número de grupos cambia más de un 20 % | Haber leído otra base. Un cambio así merece mirarse a mano. |
+
+Y la URL **nunca se imprime**: viaja por el entorno, y el script recorta de sus
+propios mensajes de error cualquier cadena de conexión —y la contraseña por
+separado— antes de escribirlos.
+
+### El job no commitea
+
+`live` es de solo lectura de los dos lados: `contents: read` y una credencial
+sin permisos de escritura. La huella refrescada sale como **artefacto** y con el
+diff en el resumen del job; el PR que la versiona se abre aparte. Darle
+`contents: write` a un job que además tiene acceso a la base de producción sería
+juntar las dos mitades de un problema.
+
+### Qué falta para encenderlo
+
+```sql
+CREATE ROLE drift_readonly LOGIN PASSWORD '…';
+GRANT USAGE ON SCHEMA public, extensions TO drift_readonly;
+```
+
+Los **dos** esquemas: son los del `search_path`, y sin el segundo la huella no
+coincide con la del dueño. Después, en el environment `production-db`, el secret
+`SCHEMA_DRIFT_READONLY_URL` con su cadena de conexión, y la variable de
+repositorio `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
+
+Siguen valiendo las tres condiciones de siempre, y ninguna es opcional:
 
 1. **Una credencial dedicada de solo lectura.** Un rol de Postgres con `USAGE`
    sobre `public`, y nada más. Ese rol ya **alcanza** para sacar la huella
@@ -330,7 +390,9 @@ Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
    necesita ningún secreto.
 
 Mientras tanto el job `live` de `.github/workflows/schema-drift.yml` está apagado
-por `vars.SCHEMA_DRIFT_LIVE_HABILITADO` y documenta exactamente qué falta.
+por `vars.SCHEMA_DRIFT_LIVE_HABILITADO`. Apagado, no sin escribir: el camino
+completo corre en CI en cada PR mediante `--prueba-live`, sin credenciales y sin
+red.
 
 ## Cómo se prueban las propiedades de la huella
 

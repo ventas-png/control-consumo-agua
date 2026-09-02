@@ -115,6 +115,14 @@ jobs:
       - name: Los grants se leen del ACL y los alcanza un rol de solo lectura
         run: node scripts/schema-drift/auditar.mjs --prueba-acl
 
+      # El modo live de punta a punta contra un clúster desechable que hace de
+      # producción: conexión por URL con un rol distinto (no `SET ROLE`),
+      # credencial medida, huella leída, guards y escritura. Corre SIN
+      # credenciales y sin red — de eso se trata: que el camino que va a tocar
+      # producción esté probado antes de que exista el secreto.
+      - name: Modo live de punta a punta (sin credenciales, contra un clúster desechable)
+        run: node scripts/schema-drift/auditar.mjs --prueba-live
+
       # ── M: qué se compara como «rama base» ─────────────────────────────
       #
       # En `pull_request`, el merge-base con la rama base: si la base avanzó
@@ -174,14 +182,20 @@ jobs:
           echo "✓ el auditor detecta ambas inyecciones y sale $codigo"
 
   # ══════════════════════════════════════════════════════════════════════════
-  # MODO LIVE — BLOQUEADO A PROPÓSITO
+  # MODO LIVE — implementado, y apagado hasta que exista la credencial
   # ══════════════════════════════════════════════════════════════════════════
   #
-  # Refrescaría `huella-produccion.json` leyendo el catálogo real. Mientras no
-  # exista la credencial adecuada NO se conecta a nada, y eso es deliberado:
+  # Refresca `huella-produccion.json` leyendo el catálogo real. El camino está
+  # implementado y PROBADO (`--prueba-live`, en el job de arriba, contra un
+  # clúster desechable que hace de producción); lo único que falta para
+  # encenderlo es la credencial. Mientras no exista NO se conecta a nada:
   #
   #   · Credencial DEDICADA de SOLO LECTURA. Un rol de Postgres con USAGE sobre
-  #     `public` y SELECT sobre pg_catalog/information_schema, y nada más.
+  #     `public` y `extensions` —los dos esquemas del `search_path`— y nada más.
+  #     Los dos: sin USAGE sobre `extensions`, `format_type` y `pg_get_expr`
+  #     cualifican los nombres de ahí (`extensions.citext` en vez de `citext`) y
+  #     la huella deja de coincidir con la del dueño. El job lo comprueba y se
+  #     niega en vez de versionar una huella distinta.
   #     NO se reutiliza `SUPABASE_ACCESS_TOKEN`: ese token es de la Management
   #     API y puede aplicar DDL, crear y borrar ramas y leer secretos. Que
   #     drift-esquema.yml ya lo use no es razón para extender su alcance — es
@@ -192,26 +206,68 @@ jobs:
   #   · NUNCA desde `pull_request` ni `pull_request_target`: sólo
   #     `workflow_dispatch` y `schedule`, donde la referencia es de confianza.
   #
-  # Para desbloquearlo: crear el rol de solo lectura en producción, guardar su
-  # cadena de conexión como `SCHEMA_DRIFT_READONLY_URL` en el environment
-  # `production-db`, y quitar el `if:` que apaga este job.
+  # Para encenderlo: crear el rol de solo lectura en producción
+  #
+  #     CREATE ROLE drift_readonly LOGIN PASSWORD '…';
+  #     GRANT USAGE ON SCHEMA public, extensions TO drift_readonly;
+  #
+  # guardar su cadena de conexión como `SCHEMA_DRIFT_READONLY_URL` en el
+  # environment `production-db`, y poner la variable de repositorio
+  # `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
+  #
+  # NO SE COMMITEA NADA DESDE AQUÍ. El job es de solo lectura de los dos lados:
+  # `contents: read` y una credencial sin permisos de escritura. La huella
+  # refrescada sale como ARTEFACTO, y el PR que la versiona se abre aparte, con
+  # el diff a la vista. Darle `contents: write` a un job que además tiene acceso
+  # a la base de producción sería juntar las dos mitades de un problema.
   live:
-    name: Refrescar la huella de producción (bloqueado — falta credencial de solo lectura)
+    name: Refrescar la huella de producción
     if: ${{ github.event_name == 'workflow_dispatch' && vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true' }}
     needs: auditar
     runs-on: ubuntu-latest
     environment: production-db
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Verificar que la credencial es la dedicada y de solo lectura
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # La URL nunca se imprime: viaja por el entorno y el script recorta de
+      # sus propios mensajes de error cualquier cadena de conexión antes de
+      # escribirlos. Un secreto que llega al log de Actions es un secreto
+      # quemado.
+      - name: Refrescar la huella leyendo el catálogo real
         env:
-          URL_SOLO_LECTURA: ${{ secrets.SCHEMA_DRIFT_READONLY_URL }}
+          SCHEMA_DRIFT_READONLY_URL: ${{ secrets.SCHEMA_DRIFT_READONLY_URL }}
+        run: node scripts/schema-drift/auditar.mjs --sembrar-produccion
+
+      # `git diff` sobre el archivo, para que el resumen del job diga qué
+      # cambió sin que haya que descargar nada. Son huellas SHA-256 y conteos:
+      # no hay nada sensible que ocultar aquí.
+      - name: Resumen del refresco
+        if: ${{ always() }}
         run: |
           set -euo pipefail
-          if [ -z "${URL_SOLO_LECTURA:-}" ]; then
-            echo "::error::Falta SCHEMA_DRIFT_READONLY_URL en el environment production-db."
-            echo "No se reutiliza SUPABASE_ACCESS_TOKEN: es administrativo y puede escribir."
-            exit 1
-          fi
-          echo "Credencial presente. El resto del wiring live se implementa cuando exista el rol."
-          exit 1
+          {
+            echo '## Huella de producción'
+            echo
+            if git diff --quiet -- scripts/schema-drift/huella-produccion.json; then
+              echo 'La instantánea ya estaba al día: no cambió ningún grupo.'
+            else
+              echo '```diff'
+              git diff --unified=0 -- scripts/schema-drift/huella-produccion.json | head -200
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar la huella refrescada
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: huella-produccion-${{ github.run_id }}
+          path: scripts/schema-drift/huella-produccion.json
+          retention-days: 14
+          if-no-files-found: error
