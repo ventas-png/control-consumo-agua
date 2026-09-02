@@ -10,10 +10,10 @@ DO $$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM public.permissions WHERE category = 'recursos_humanos';
-  IF n <> 30 THEN
-    RAISE EXCEPTION 'R1: tras re-aplicar hay % claves en recursos_humanos, no 30', n;
+  IF n <> 84 THEN
+    RAISE EXCEPTION 'R1: tras re-aplicar hay % claves en recursos_humanos, no 84', n;
   END IF;
-  RAISE NOTICE 'R1  OK  la categoría sigue teniendo 30 claves';
+  RAISE NOTICE 'R1  OK  la categoría sigue teniendo 84 claves';
 END $$;
 
 DO $$
@@ -63,9 +63,21 @@ BEGIN
   -- corrida en la misma sesión fallaría al recrearla.
   SELECT count(*) INTO sobra
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE c.relname = '_rrhh_claves' AND n.nspname LIKE 'pg_temp%';
+  WHERE c.relname IN ('_rrhh_claves', '_rrhh_jornada') AND n.nspname LIKE 'pg_temp%';
   IF sobra <> 0 THEN
-    RAISE EXCEPTION 'R5: la tabla temporal _rrhh_claves sobrevivió a la migración';
+    RAISE EXCEPTION 'R5: una tabla temporal de las migraciones sobrevivió';
   END IF;
   RAISE NOTICE 'R5  OK  la temporal se limpia sola';
+END $$;
+
+DO $$
+DECLARE n int;
+BEGIN
+  -- La segunda tanda tampoco toca autorización al re-aplicarse.
+  SELECT count(*) INTO n FROM public.role_permissions
+  WHERE role_id = '00000000-0000-0000-0000-0000000000a6';
+  IF n <> 6 THEN
+    RAISE EXCEPTION 'R6: la re-aplicación cambió los grants del rol de seguridad (% en vez de 6)', n;
+  END IF;
+  RAISE NOTICE 'R6  OK  el rol de seguridad sigue intacto';
 END $$;
