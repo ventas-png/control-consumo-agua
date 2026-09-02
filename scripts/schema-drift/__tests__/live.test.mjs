@@ -49,6 +49,26 @@ describe('refDeUrl', () => {
       .toBe('nnsqmeigtgewatameexo')
   })
 
+  // La credencial de este auditor es un rol DEDICADO, así que su usuario en el
+  // pooler no es `postgres.<ref>` sino `drift_readonly.<ref>`. Reconocer sólo
+  // `postgres` dejaba sin deducir justo la URL que se va a usar en producción,
+  // y el modo live se niega a correr cuando no puede deducir el proyecto.
+  it('también con un rol dedicado, no sólo con `postgres`', () => {
+    expect(refDeUrl('postgresql://drift_readonly.nnsqmeigtgewatameexo:p@aws-0-us-east-2.pooler.supabase.com:5432/postgres'))
+      .toBe('nnsqmeigtgewatameexo')
+  })
+
+  it('y con el rol codificado en la URL', () => {
+    expect(refDeUrl('postgresql://drift%5Freadonly.nnsqmeigtgewatameexo:p@aws-0-us-east-2.pooler.supabase.com:5432/postgres'))
+      .toBe('nnsqmeigtgewatameexo')
+  })
+
+  it('no confunde un host que no es de Supabase', () => {
+    // El sufijo con forma de ref no alcanza: el host tiene que ser de Supabase.
+    expect(refDeUrl('postgresql://drift_readonly.nnsqmeigtgewatameexo:p@pooler.ejemplo.com:5432/postgres'))
+      .toBeNull()
+  })
+
   it('devuelve null cuando no se puede saber, en vez de adivinar', () => {
     // Adivinar aquí significaría versionar el sandbox como si fuera producción.
     expect(refDeUrl('postgresql://lector@/postgres?host=/tmp/sock&port=5432')).toBeNull()

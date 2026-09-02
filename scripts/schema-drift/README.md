@@ -341,7 +341,7 @@ escribir.
 | El rol es superusuario, tiene `BYPASSRLS`, puede crear roles o bases, o puede escribir en alguna tabla de `public` | Leer producción con una credencial que además puede modificarla. Se **mide**, no se declara. |
 | La sesión no quedó en solo lectura | `PGOPTIONS` fuerza `default_transaction_read_only` desde la conexión; si no rigió, se aborta. |
 | El rol no tiene `USAGE` sobre algún esquema del `search_path` | El fallo más caro: no rompe nada, sólo serializa `extensions.citext` donde el dueño escribe `citext`, y el refresco quedaría versionado con drift permanente. |
-| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. Si el ref no se puede deducir de la URL, hay que pasar `--proyecto`: no se adivina. |
+| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. El ref se deduce del host (`db.<ref>.supabase.co`) o del usuario del pooler (`<rol>.<ref>`, con cualquier rol, no sólo `postgres`). Si no se puede deducir, hay que pasar `--proyecto`: no se adivina. |
 | Algún valor no es SHA-256 de 64 hex | Una lectura truncada o a medias. |
 | **Todos** los grupos `/grants` vinieron vacíos | El síntoma exacto de leer los privilegios con un catálogo relativo al rol. Que algunos estén vacíos es normal; que lo estén todos, no. |
 | El número de grupos cambia más de un 20 % | Haber leído otra base. Un cambio así merece mirarse a mano. |
@@ -369,6 +369,14 @@ Los **dos** esquemas: son los del `search_path`, y sin el segundo la huella no
 coincide con la del dueño. Después, en el environment `production-db`, el secret
 `SCHEMA_DRIFT_READONLY_URL` con su cadena de conexión, y la variable de
 repositorio `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
+
+**Sobre la cadena de conexión.** Sirve tanto la conexión directa
+(`db.<ref>.supabase.co:5432`) como el pooler en modo sesión
+(`aws-0-<región>.pooler.supabase.com:5432`, usuario `drift_readonly.<ref>`). Con
+el pooler hay que usar el modo **sesión**, no el de transacción: `PGOPTIONS`
+—que es lo que fuerza la sesión a solo lectura— sólo rige en modo sesión. El
+runner de Actions decide cuál hace falta: si su red no alcanza la conexión
+directa, el pooler es la vía.
 
 Siguen valiendo las tres condiciones de siempre, y ninguna es opcional:
 

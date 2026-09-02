@@ -248,7 +248,13 @@ export function sinSecretos(texto, url = '') {
 /**
  * Ref del proyecto Supabase que hay detrás de una URL, o null si no se puede
  * saber. Dos formas: conexión directa (`db.<ref>.supabase.co`) y pooler, que
- * lleva el ref en el usuario (`postgres.<ref>`).
+ * lleva el ref en el usuario, como `<rol>.<ref>`.
+ *
+ * EL ROL DEL POOLER NO ES SIEMPRE `postgres`. La credencial de este auditor es
+ * un rol DEDICADO, así que su usuario en el pooler es `drift_readonly.<ref>`.
+ * Reconocer sólo `postgres.<ref>` dejaba sin deducir justo la URL que se va a
+ * usar — y el modo live se niega a correr cuando no puede deducir el proyecto,
+ * así que habría bloqueado el refresco entero.
  *
  * Sirve para un guard concreto: que un refresco no capture el SANDBOX y lo
  * versione como si fuera producción. Si no se puede determinar, no se adivina.
@@ -259,7 +265,8 @@ export function refDeUrl(url) {
   const host = u.hostname ?? ''
   const directo = /^db\.([a-z0-9]{20})\.supabase\.(co|com)$/i.exec(host)
   if (directo) return directo[1]
-  const porUsuario = /^postgres\.([a-z0-9]{20})$/i.exec(decodeURIComponent(u.username ?? ''))
+  // `<rol>.<ref>`: el ref es el último segmento, y el rol puede ser cualquiera.
+  const porUsuario = /^.+\.([a-z0-9]{20})$/i.exec(decodeURIComponent(u.username ?? ''))
   if (porUsuario && /supabase/i.test(host)) return porUsuario[1]
   return null
 }
