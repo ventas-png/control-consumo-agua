@@ -1,8 +1,24 @@
 name: Auditor de drift de esquema
 
-# Reconstruye el esquema desde las 449 migraciones en un Postgres desechable y
-# lo compara, dimensión por dimensión, contra la instantánea del catálogo de
-# producción versionada en scripts/schema-drift/huella-produccion.json.
+# Reconstruye el esquema en Postgres desechables y lo compara EN TRES VÍAS,
+# dimensión por dimensión:
+#
+#   P  la instantánea del catálogo de producción (huella-produccion.json)
+#   M  la reconstrucción de la rama base
+#   R  la reconstrucción del HEAD de este PR
+#
+#   M == R          el PR no toca el objeto      → trinquete estricto contra P
+#   P == M, R ≠ M   falta desplegarlo            → CAMBIO PLANIFICADO, pasa
+#   R == P, M ≠ P   el PR cierra el drift        → DRIFT RESUELTO, pasa
+#   P ≠ M ≠ R ≠ P   nadie coincide con nadie     → CAMBIO AMBIGUO, falla
+#
+# POR QUÉ TRES Y NO DOS. Con sólo P y R, «alguien tocó producción por fuera» y
+# «este PR agrega una migración que todavía no se desplegó» se ven idénticos.
+# #828 lo dejó a la vista: cerrar la lectura sin autenticar de payment_requests
+# puso este workflow en rojo por hacer exactamente lo que había que hacer. Un
+# auditor que castiga la corrección enseña a ampliar la baseline — el hábito que
+# existe para impedir. La baseline sigue sin poder crecer, y un cambio
+# planificado pasa SIN tocarla.
 #
 # QUÉ PROBLEMA RESUELVE. `src/test/rls/rlsHarness.test.ts` afirma que
 # `payment_requests` no tiene policy de SELECT y que anon no lee ni una fila. El
@@ -19,7 +35,7 @@ name: Auditor de drift de esquema
 #                                 producción. Necesita credenciales.
 #   columnas-vs-migraciones.mjs → app ↔ migraciones.
 #   security-guard.mjs          → aislamiento en producción.
-#   este workflow               → las dos direcciones y nueve dimensiones
+#   este workflow               → tres vías y nueve dimensiones
 #                                 (tablas, columnas, constraints, índices,
 #                                 policies, grants, triggers, funciones, vistas),
 #                                 SIN credenciales.
@@ -88,20 +104,53 @@ jobs:
       - name: Espaciado que es contenido, no formato
         run: node scripts/schema-drift/auditar.mjs --prueba-espacios
 
-      - name: Auditar drift (offline, sin credenciales)
+      # ── M: qué se compara como «rama base» ─────────────────────────────
+      #
+      # En `pull_request`, el merge-base con la rama base: si la base avanzó
+      # desde que se abrió el PR, comparar contra su punta le atribuiría al PR
+      # cambios que no hizo. En `push` a main, `github.event.before`, y si no
+      # resuelve —push forzado, rama recién creada— el primer padre.
+      #
+      # La lógica NO se reimplementa acá en bash: se llama al mismo módulo que
+      # cubren las pruebas, para que CI corra lo que está probado. Si no se
+      # puede resolver M, esto falla: no se degrada a la comparación de dos
+      # vías, que es justamente la que no distingue drift de cambio planificado.
+      - name: Resolver la rama base (M)
+        id: base
         run: |
-          node scripts/schema-drift/auditar.mjs \
-            --trinquete-contra "origin/${{ github.base_ref || github.event.repository.default_branch }}"
+          set -euo pipefail
+          ref=$(node scripts/schema-drift/base-git.mjs \
+            --evento "${{ github.event_name }}" \
+            --rama-base "origin/${{ github.base_ref }}" \
+            --antes "${{ github.event.before }}")
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Auditar drift en tres vías (offline, sin credenciales)
+        run: node scripts/schema-drift/auditar.mjs --base "${{ steps.base.outputs.ref }}"
+
+      # Las cuatro reglas contra un catálogo REAL: se construye M desde las
+      # migraciones tal como están y R desde las mismas más UNA migración
+      # append-only, y se exige que el auditor llame a eso cambio planificado y
+      # a nada más — y que el MISMO cambio sin migración nueva, o con una
+      # histórica reescrita, rompa.
+      - name: Tres vías contra un catálogo real (planificado vs. sin migración)
+        run: node scripts/schema-drift/auditar.mjs --prueba-tres-vias
 
       # El auditor tiene que ROMPER ante drift que no declara. Un auditor que
       # siempre diga «todo bien» pasa cualquier prueba positiva, así que la
       # prueba que importa es ésta: se inyecta una columna que ninguna migración
       # declara y una policy en una tabla que YA está en la baseline —para que
       # no pueda esconderse detrás de ella— y se exige salida distinta de cero.
+      #
+      # La inyección va a los DOS clústeres, M y R. Inyectarla sólo en R la
+      # haría indistinguible de un cambio planificado, y la prueba dejaría de
+      # probar lo que dice: así el objeto queda como «uno que el PR no toca»,
+      # que es donde el trinquete estricto tiene que romper.
       - name: Prueba negativa — el auditor debe fallar
         run: |
           set +e
-          salida=$(node scripts/schema-drift/auditar.mjs --prueba-negativa 2>&1)
+          salida=$(node scripts/schema-drift/auditar.mjs \
+            --base "${{ steps.base.outputs.ref }}" --prueba-negativa 2>&1)
           codigo=$?
           set -e
           echo "$salida"
