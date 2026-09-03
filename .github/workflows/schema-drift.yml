@@ -222,7 +222,27 @@ jobs:
   # a la base de producción sería juntar las dos mitades de un problema.
   live:
     name: Refrescar la huella de producción
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true' }}
+    # `!cancelled()` y NO el encadenamiento normal de `needs`: este job tiene que
+    # poder correr AUNQUE `auditar` haya fallado.
+    #
+    # Con un `if` normal, `needs: auditar` sólo lo dejaría correr si la auditoría
+    # pasa — y eso es circular. La auditoría falla, entre otras razones, cuando
+    # la instantánea versionada envejeció respecto de producción… que es
+    # exactamente la situación que este job existe para arreglar. Gatearlo por el
+    # veredicto de lo que viene a corregir lo vuelve inútil justo cuando hace
+    # falta: el refresco no podría correr hasta que la auditoría pase, y la
+    # auditoría no pasaría hasta que se refresque.
+    #
+    # No aflojar nada: el job sólo LEE producción y publica un artefacto, así que
+    # una auditoría en rojo no vuelve peligrosa esa lectura, y la instantánea
+    # refrescada igual tiene que pasar por un PR donde se revisa el diff. Se
+    # conserva `needs: auditar` por el ORDEN —que las pruebas corran antes y su
+    # salida quede en la misma corrida— y `!cancelled()` en vez de `always()`
+    # para no arrancar si alguien canceló la corrida a mano.
+    if: >-
+      ${{ !cancelled()
+          && github.event_name == 'workflow_dispatch'
+          && vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true' }}
     needs: auditar
     runs-on: ubuntu-latest
     environment: production-db

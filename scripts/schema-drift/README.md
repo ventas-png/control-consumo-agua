@@ -350,6 +350,25 @@ Y la URL **nunca se imprime**: viaja por el entorno, y el script recorta de sus
 propios mensajes de error cualquier cadena de conexión —y la contraseña por
 separado— antes de escribirlos.
 
+### El job corre aunque la auditoría falle
+
+`live` lleva `needs: auditar` por el **orden** —las pruebas corren antes y su
+salida queda en la misma corrida— pero su `if` empieza con `!cancelled()`, así
+que **no** depende del veredicto de la auditoría. Con el encadenamiento normal de
+`needs` habría un bloqueo circular:
+
+> La auditoría falla porque la instantánea envejeció respecto de producción → el
+> refresco no corre porque la auditoría falló → la instantánea sigue vieja.
+
+Y eso no es un caso raro: es exactamente para lo que existe el refresco. Gatearlo
+por el veredicto de lo que viene a corregir lo vuelve inútil justo cuando hace
+falta.
+
+No afloja nada: el job sólo **lee** producción y publica un artefacto, así que
+una auditoría en rojo no vuelve peligrosa esa lectura, y la instantánea
+refrescada igual tiene que pasar por un PR donde se revisa el diff. Se usa
+`!cancelled()` y no `always()` para no arrancar si alguien canceló la corrida.
+
 ### El job no commitea
 
 `live` es de solo lectura de los dos lados: `contents: read` y una credencial
