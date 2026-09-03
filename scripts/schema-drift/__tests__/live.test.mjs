@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
-  juzgarCredencial, SECDEF_PERMITIDAS,
+  juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive,
 } from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
@@ -290,36 +290,199 @@ describe('juzgarCredencial', () => {
 })
 
 describe('juzgarCredencial · SECURITY DEFINER', () => {
+  // Cada elemento llega como `identidad\x1dprocedencia`: por dónde alcanza el
+  // privilegio a esta credencial. PUBLIC, un GRANT directo, o una membresía.
+  const F = (ident, via) => `${ident}\x1d${via}`
   const conSecdef = {
     ...sana,
-    secdef: 'public.update_user_password(text, text)\x1epublic.get_my_company_id()',
+    secdef: [F('public.reindexar(text)', 'PUBLIC'), F('extensions.sd_ext()', 'drift_readonly')]
+      .join('\x1e'),
   }
 
   it('rechaza una función SECURITY DEFINER al alcance de la credencial', () => {
     expect(reglas(conSecdef)).toContain('SECURITY DEFINER')
   })
 
-  it('el motivo nombra las funciones, que es lo que hay que ir a cerrar', () => {
+  it('el motivo nombra las funciones y por dónde le llegan', () => {
     const r = juzgarCredencial(conSecdef).find(x => x.regla === 'SECURITY DEFINER')
-    expect(r.detalle).toContain('public.update_user_password(text, text)')
+    expect(r.detalle).toContain('public.reindexar(text) [vía PUBLIC]')
+    expect(r.detalle).toContain('extensions.sd_ext() [vía drift_readonly]')
+  })
+
+  // EL REMEDIO DEPENDE DE LA PROCEDENCIA, y equivocarlo es peor que no darlo:
+  // `REVOKE … FROM PUBLIC` sobre una función concedida directamente al auditor
+  // no hace absolutamente nada, y deja creer que el agujero se cerró.
+  it('propone revocar a PUBLIC cuando el privilegio viene de PUBLIC', () => {
+    const r = juzgarCredencial({ ...sana, secdef: F('public.reindexar(text)', 'PUBLIC') })[0]
+    expect(r.remedio).toContain('REVOKE EXECUTE ON FUNCTION public.reindexar(text) FROM PUBLIC;')
+  })
+
+  it('propone revocar AL AUDITOR cuando el GRANT es directo', () => {
+    const r = juzgarCredencial({ ...sana, secdef: F('public.reindexar(text)', 'drift_readonly') })[0]
+    expect(r.remedio).toContain('REVOKE EXECUTE ON FUNCTION public.reindexar(text) FROM drift_readonly;')
+    expect(r.remedio).not.toContain('FROM PUBLIC')
+  })
+
+  // Y cuando llega por una membresía, NO se revoca al rol intermedio: puede ser
+  // `authenticated`, y revocarle rompe la aplicación. Se quita la membresía.
+  it('cuando llega por una membresía propone quitar la membresía, no tocar el rol', () => {
+    const r = juzgarCredencial({
+      ...sana, membresias: 'authenticated', secdef: F('public.get_my_company_id()', 'authenticated'),
+    }).find(x => x.regla === 'SECURITY DEFINER')
+    expect(r.remedio).toContain('REVOKE authenticated FROM drift_readonly;')
+    expect(r.remedio).not.toContain('REVOKE EXECUTE ON FUNCTION public.get_my_company_id() FROM authenticated')
   })
 
   it('una allowlist explícita levanta el rechazo SÓLO de lo que declara', () => {
     const permitidas = new Map([['public.get_my_company_id()', 'ayudante de RLS, no toca datos']])
-    expect(reglas(conSecdef, { permitidas })).toContain('SECURITY DEFINER')
-    expect(reglas({ ...conSecdef, secdef: 'public.get_my_company_id()' }, { permitidas })).toEqual([])
+    const dos = { ...sana, secdef: [F('public.reindexar(text)', 'PUBLIC'),
+                                    F('public.get_my_company_id()', 'PUBLIC')].join('\x1e') }
+    expect(reglas(dos, { permitidas })).toContain('SECURITY DEFINER')
+    expect(reglas({ ...sana, secdef: F('public.get_my_company_id()', 'PUBLIC') }, { permitidas }))
+      .toEqual([])
   })
 
   // TRIPWIRE. Que la lista esté vacía no es un detalle de implementación: es la
   // postura. Llenarla es afirmar que esa función, corriendo como su dueño, no
   // le da a esta credencial nada que no debería tener — y eso lo firma quien
-  // revisa el PR que agrega la línea, no el auditor. Medido en producción el
-  // 2026-09-03: 26 funciones SECURITY DEFINER de `public` son ejecutables por
-  // PUBLIC, entre ellas `update_user_password` y `request_password_reset`.
+  // revisa el PR que agrega la línea, no el auditor.
   it('la allowlist por defecto está vacía', () => {
     expect([...SECDEF_PERMITIDAS.keys()]).toEqual([])
   })
 })
+
+// ── La cadena de conexión ───────────────────────────────────────────────────
+//
+// La lista blanca del hostname NO alcanza. libpq acepta parámetros en la URI y
+// varios mandan sobre el destino: con `hostaddr` se conecta a esa IP y usa
+// `host` sólo para el certificado, así que una URL con un host oficial habla
+// con otra máquina. `options=` deshace por URL el read-only que `PGOPTIONS`
+// fija por entorno. Por eso la lista blanca es de PARÁMETROS.
+
+const DIRECTA = 'postgresql://drift_readonly:s3creto@db.nnsqmeigtgewatameexo.supabase.co:5432/postgres'
+const POOLER = 'postgresql://drift_readonly.nnsqmeigtgewatameexo:s3creto@aws-1-us-east-2.pooler.supabase.com:5432/postgres'
+const problemas = (url) => validarUrlLive(url).problemas
+
+describe('validarUrlLive · lo que se acepta', () => {
+  it('la conexión directa con sslmode=require', () => {
+    expect(problemas(`${DIRECTA}?sslmode=require`)).toEqual([])
+  })
+
+  it('el Session Pooler con sslmode=require', () => {
+    expect(problemas(`${POOLER}?sslmode=require`)).toEqual([])
+  })
+
+  it('verify-full con su sslrootcert, sin un solo aviso', () => {
+    const r = validarUrlLive(`${DIRECTA}?sslmode=verify-full&sslrootcert=/etc/ssl/supabase.crt`)
+    expect(r.problemas).toEqual([])
+    expect(r.avisos).toEqual([])
+  })
+
+  it('y los parámetros documentados que no cambian el destino', () => {
+    expect(problemas(`${POOLER}?sslmode=require&connect_timeout=15&application_name=drift`)).toEqual([])
+  })
+
+  // El socket de dominio Unix no puede alcanzar otra máquina: es lo que usa
+  // `--prueba-live` contra su clúster desechable, y no es un bypass — que eso
+  // no termine versionado como producción lo cuida el guard del proyecto.
+  it('un socket local, que no puede salir de la máquina', () => {
+    expect(problemas('postgresql://drift_lector@/postgres?host=/tmp/live-x&port=55432')).toEqual([])
+  })
+})
+
+describe('validarUrlLive · redirección del destino', () => {
+  it('rechaza hostaddr: libpq se conecta a ESA IP y el host queda de fachada', () => {
+    const p = problemas(`${DIRECTA}?sslmode=require&hostaddr=203.0.113.9`)
+    expect(p.some(x => /hostaddr/.test(x))).toBe(true)
+  })
+
+  it('rechaza host= en la query, aunque el hostname sea oficial', () => {
+    expect(problemas(`${DIRECTA}?sslmode=require&host=otro-host.ejemplo.com`)
+      .some(x => /«host»/.test(x))).toBe(true)
+  })
+
+  it('rechaza una lista de varios hosts', () => {
+    expect(problemas('postgresql://u:p@aws-1-us-east-2.pooler.supabase.com:5432,evil.example:5432/postgres?sslmode=require')
+      .some(x => /VARIOS hosts/.test(x))).toBe(true)
+  })
+
+  it('rechaza un host que no es oficial', () => {
+    expect(problemas('postgresql://u:p@pooler.supabase.com.atacante.net:5432/postgres?sslmode=require')
+      .some(x => /no es ninguno de los dos oficiales/.test(x))).toBe(true)
+  })
+
+  for (const clave of ['port', 'dbname', 'user', 'password', 'service', 'servicefile', 'options']) {
+    it(`rechaza «${clave}», que cambia a qué base o con qué identidad se conecta`, () => {
+      expect(problemas(`${DIRECTA}?sslmode=require&${clave}=x`)
+        .some(x => x.includes(`«${clave}»`))).toBe(true)
+    })
+  }
+
+  it('rechaza un parámetro que no esté documentado', () => {
+    expect(problemas(`${DIRECTA}?sslmode=require&target_session_attrs=any`)
+      .some(x => /no está en la lista documentada/.test(x))).toBe(true)
+  })
+
+  // libpq se queda con el ÚLTIMO valor, así que `verify-full&…=disable` se lee
+  // seguro y se conecta inseguro. Un duplicado nunca es un descuido inocuo.
+  it('rechaza parámetros repetidos', () => {
+    expect(problemas(`${DIRECTA}?sslmode=verify-full&sslmode=disable`)
+      .some(x => /repetido/.test(x))).toBe(true)
+  })
+})
+
+describe('validarUrlLive · TLS', () => {
+  it('rechaza la conexión sin sslmode', () => {
+    expect(problemas(DIRECTA).some(x => /falta «sslmode»/.test(x))).toBe(true)
+  })
+
+  for (const modo of ['disable', 'allow', 'prefer']) {
+    it(`rechaza sslmode=${modo}, que deja caer la conexión a texto plano`, () => {
+      expect(problemas(`${DIRECTA}?sslmode=${modo}`).some(x => x.includes(`sslmode=${modo}`))).toBe(true)
+    })
+  }
+
+  it('acepta verify-ca y verify-full', () => {
+    for (const modo of ['verify-ca', 'verify-full']) {
+      expect(problemas(`${DIRECTA}?sslmode=${modo}&sslrootcert=/etc/ssl/supabase.crt`)).toEqual([])
+    }
+  })
+
+  // `require` cifra pero no verifica el certificado: protege del que escucha,
+  // no del que se hace pasar por la base. Se acepta, y se recomienda subir.
+  it('con require acepta y recomienda verify-full', () => {
+    const r = validarUrlLive(`${DIRECTA}?sslmode=require`)
+    expect(r.problemas).toEqual([])
+    expect(r.avisos.some(a => /verify-full/.test(a))).toBe(true)
+  })
+
+  it('con verify-full sin sslrootcert acepta y avisa', () => {
+    const r = validarUrlLive(`${DIRECTA}?sslmode=verify-full`)
+    expect(r.problemas).toEqual([])
+    expect(r.avisos.some(a => /sslrootcert/.test(a))).toBe(true)
+  })
+})
+
+describe('validarUrlLive · lo que nunca puede salir en un mensaje', () => {
+  // Estos textos van al log de Actions. Un host se puede nombrar; una
+  // contraseña, jamás.
+  it('ningún mensaje contiene la contraseña', () => {
+    const sucias = [
+      DIRECTA, `${DIRECTA}?sslmode=disable`, `${DIRECTA}?sslmode=require&hostaddr=203.0.113.9`,
+      `${POOLER}?sslmode=require&options=-c%20x`, `${POOLER}?sslmode=a&sslmode=b`,
+    ]
+    for (const url of sucias) {
+      const r = validarUrlLive(url)
+      for (const linea of [...r.problemas, ...r.avisos]) expect(linea).not.toContain('s3creto')
+    }
+  })
+
+  it('lo que no es una cadena de Postgres se rechaza sin más', () => {
+    expect(problemas('https://db.nnsqmeigtgewatameexo.supabase.co').length).toBe(1)
+    expect(problemas('').length).toBe(1)
+  })
+})
+
 
 describe('juzgarCredencial · la medición tiene que estar completa', () => {
   // Un campo que no llegó se lee `undefined`, `cierto(undefined)` es falso y la

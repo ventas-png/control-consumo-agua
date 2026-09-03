@@ -246,17 +246,181 @@ export function sinSecretos(texto, url = '') {
 }
 
 /**
- * Ref del proyecto Supabase que hay detrás de una URL, o null si no se puede
- * saber. Dos formas, y sólo esas dos:
+ * ¿Es uno de los dos hosts oficiales de Supabase? Dos formas, y sólo esas dos:
  *
  *   db.<ref>.supabase.co           conexión directa, el ref va en el host
- *   <algo>.pooler.supabase.com     pooler, el ref va en el usuario `<rol>.<ref>`
+ *   <región>.pooler.supabase.com   pooler, el ref va en el usuario `<rol>.<ref>`
  *
- * EL HOST SE VALIDA CONTRA UNA LISTA BLANCA, no por «contiene supabase». Una
- * comprobación laxa aceptaría `pooler.supabase.com.atacante.net` o
- * `supabase.ejemplo.com`, y este ref es lo único que impide que un refresco
- * capture OTRA base y la versione como si fuera producción. Si el host no es uno
- * de los dos oficiales, no se deduce nada: no se adivina.
+ * SE COMPRUEBA CONTRA UNA LISTA BLANCA, no por «contiene supabase». Una
+ * comprobación laxa acepta `pooler.supabase.com.atacante.net` o
+ * `supabase.ejemplo.com`, y los dos los registra cualquiera.
+ */
+export function esHostOficial(host) {
+  const h = (host ?? '').toLowerCase()
+  if (/^db\.[a-z0-9]{20}\.supabase\.co$/.test(h)) return true
+  // Una etiqueta por delante como mínimo: `pooler.supabase.com` pelado no es
+  // un host de conexión, y aceptarlo sólo ampliaría la superficie.
+  return /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.pooler\.supabase\.com$/.test(h)
+}
+
+/** Parámetros que pueden cambiar el DESTINO o la IDENTIDAD de la conexión. */
+export const PARAMETROS_PROHIBIDOS = new Set([
+  'host', 'hostaddr', 'port', 'dbname', 'user', 'password', 'service', 'servicefile', 'options',
+])
+
+/** Los únicos que se aceptan, documentados uno por uno. */
+export const PARAMETROS_PERMITIDOS = new Map([
+  ['sslmode', 'exigido; require, verify-ca o verify-full'],
+  ['sslrootcert', 'el certificado de la CA, necesario para verify-ca y verify-full'],
+  ['connect_timeout', 'cuánto esperar antes de rendirse'],
+  ['application_name', 'para reconocer la sesión en pg_stat_activity'],
+])
+
+const SSLMODE_ACEPTADOS = new Set(['require', 'verify-ca', 'verify-full'])
+
+/**
+ * La cadena de conexión, antes de dársela a psql.
+ *
+ * POR QUÉ NO ALCANZA CON MIRAR EL HOSTNAME. libpq acepta parámetros en la URI,
+ * y varios de ellos MANDAN SOBRE EL HOST. `hostaddr` es el peor: si está, libpq
+ * se conecta a ESA dirección IP y usa `host` sólo para el SNI y la verificación
+ * del certificado. Es decir:
+ *
+ *     postgresql://u:p@db.<ref>.supabase.co:5432/postgres?hostaddr=203.0.113.9
+ *
+ * pasa cualquier lista blanca de hostname y habla con otra máquina. `host=` en
+ * la query hace lo mismo por la vía directa, y `options=` puede deshacer el
+ * `default_transaction_read_only` que `PGOPTIONS` fija — que es justamente el
+ * guard que se apoya en el entorno.
+ *
+ * Por eso la lista blanca es de PARÁMETROS y no sólo de hosts: se acepta lo que
+ * está documentado y se rechaza todo lo demás, incluidos los repetidos (libpq
+ * se queda con el último, así que `sslmode=verify-full&sslmode=disable` se lee
+ * bien y se conecta mal).
+ *
+ * EL SOCKET LOCAL ES LA ÚNICA EXCEPCIÓN, y no es un bypass: un socket de
+ * dominio Unix no puede alcanzar otra máquina, sólo un Postgres del mismo
+ * sistema de archivos. Es lo que usa `--prueba-live` contra su clúster
+ * desechable. Que eso no termine versionado como producción no lo cuida esta
+ * función sino el guard del proyecto: de una URL de socket no se deduce ningún
+ * ref, y sin ref el refresco exige `--proyecto` a mano.
+ *
+ * Devuelve `{ problemas, avisos }`. `problemas` no vacío significa NO CONECTAR.
+ * Ningún mensaje incluye la contraseña — hay una prueba que lo fija.
+ */
+export function validarUrlLive(url) {
+  const problemas = [], avisos = []
+  const rechazar = (m) => problemas.push(m)
+
+  const m = /^(postgres(?:ql)?):\/\/([\s\S]*)$/i.exec(url ?? '')
+  if (!m) {
+    rechazar('no es una cadena de conexión de Postgres: tiene que empezar con postgres:// o postgresql://')
+    return { problemas, avisos }
+  }
+
+  // Se parsea a mano y no con `new URL`: hace falta ver la autoridad EN CRUDO
+  // para detectar la lista de varios hosts (`a:5432,b:5432`), que `new URL`
+  // rechaza como puerto inválido y confundiría el diagnóstico.
+  let resto = m[2]
+  const iq = resto.indexOf('?')
+  const consulta = iq === -1 ? '' : resto.slice(iq + 1)
+  if (iq !== -1) resto = resto.slice(0, iq)
+  const ib = resto.indexOf('/')
+  const autoridad = ib === -1 ? resto : resto.slice(0, ib)
+  const ia = autoridad.lastIndexOf('@')
+  const hostspec = ia === -1 ? autoridad : autoridad.slice(ia + 1)
+
+  // ── Los parámetros ────────────────────────────────────────────────────────
+  const vistos = new Map()
+  for (const trozo of consulta.split('&')) {
+    if (trozo === '') continue
+    const j = trozo.indexOf('=')
+    let clave, valor
+    try {
+      clave = decodeURIComponent(j === -1 ? trozo : trozo.slice(0, j)).trim().toLowerCase()
+      valor = j === -1 ? '' : decodeURIComponent(trozo.slice(j + 1))
+    } catch {
+      rechazar('la query trae un escape %xx inválido')
+      continue
+    }
+    if (vistos.has(clave)) {
+      rechazar(`parámetro repetido «${clave}»: libpq se queda con el ÚLTIMO, así que una URL que ` +
+               'se lee bien puede conectarse mal')
+    }
+    vistos.set(clave, valor)
+  }
+
+  // ── ¿Socket local o red? ──────────────────────────────────────────────────
+  const socketLocal = hostspec === '' && (vistos.get('host') ?? '').startsWith('/')
+  const permitidos = socketLocal
+    ? new Set([...PARAMETROS_PERMITIDOS.keys(), 'host', 'port'])
+    : new Set(PARAMETROS_PERMITIDOS.keys())
+
+  for (const clave of vistos.keys()) {
+    if (permitidos.has(clave)) continue
+    if (PARAMETROS_PROHIBIDOS.has(clave)) {
+      rechazar(`parámetro «${clave}»: puede cambiar a qué base o con qué identidad se conecta, ` +
+               'y entonces la lista blanca del host deja de significar nada')
+    } else {
+      rechazar(`parámetro «${clave}» no está en la lista documentada ` +
+               `(${[...permitidos].sort().join(', ')})`)
+    }
+  }
+
+  if (socketLocal) {
+    if (vistos.has('hostaddr')) rechazar('un socket local no lleva «hostaddr»')
+    return { problemas, avisos }
+  }
+
+  // ── Red: un único host, y oficial ─────────────────────────────────────────
+  if (hostspec.includes(',')) {
+    rechazar('la URL declara VARIOS hosts: libpq prueba uno por uno y basta con que el ' +
+             'primero no responda para terminar hablando con otro')
+    return { problemas, avisos }
+  }
+  const host = hostspec.replace(/^\[(.*)\]$/, '$1').split(':')[0].toLowerCase()
+  if (host === '') {
+    rechazar('la URL no declara host')
+  } else if (!esHostOficial(host)) {
+    rechazar(`el host «${host}» no es ninguno de los dos oficiales de Supabase ` +
+             '(db.<ref>.supabase.co o <región>.pooler.supabase.com)')
+  }
+
+  // ── TLS ───────────────────────────────────────────────────────────────────
+  const sslmode = (vistos.get('sslmode') ?? '').trim().toLowerCase()
+  if (!vistos.has('sslmode')) {
+    rechazar('falta «sslmode»: sin él libpq negocia y ACEPTA texto plano si el servidor lo ofrece, ' +
+             'así que la contraseña y el catálogo viajan sin cifrar ante un intermediario')
+  } else if (!SSLMODE_ACEPTADOS.has(sslmode)) {
+    rechazar(`sslmode=${sslmode}: sólo se aceptan ${[...SSLMODE_ACEPTADOS].join(', ')}. ` +
+             '«disable», «allow» y «prefer» dejan que la conexión caiga a texto plano')
+  } else if (sslmode === 'require') {
+    // `require` cifra pero NO verifica el certificado: protege del que escucha,
+    // no del que se hace pasar por el servidor.
+    avisos.push('sslmode=require cifra pero no verifica el certificado del servidor. Si el runner ' +
+                'tiene el certificado de la CA de Supabase, usar sslmode=verify-full con ' +
+                'sslrootcert=<ruta>: es lo único que impide un intermediario que se haga pasar ' +
+                'por la base.')
+  }
+  if ((sslmode === 'verify-ca' || sslmode === 'verify-full') && !vistos.has('sslrootcert')) {
+    avisos.push(`sslmode=${sslmode} sin «sslrootcert»: libpq usará el almacén por defecto ` +
+                '(~/.postgresql/root.crt o el del sistema). Conviene apuntarlo al certificado de ' +
+                'Supabase de forma explícita.')
+  }
+
+  return { problemas, avisos }
+}
+
+/**
+ * Ref del proyecto Supabase que hay detrás de una URL, o null si no se puede
+ * saber.
+ *
+ *   db.<ref>.supabase.co           el ref va en el host
+ *   <región>.pooler.supabase.com   el ref va en el usuario, como `<rol>.<ref>`
+ *
+ * El host se valida con `esHostOficial`, la misma lista blanca que usa
+ * `validarUrlLive`: este ref es lo único que impide que un refresco capture
+ * OTRA base y la versione como si fuera producción, así que no se adivina.
  *
  * EL ROL DEL POOLER NO ES SIEMPRE `postgres`. La credencial de este auditor es
  * un rol DEDICADO, así que su usuario en el pooler es `drift_readonly.<ref>`.
@@ -268,16 +432,11 @@ export function refDeUrl(url) {
   let u
   try { u = new URL(url) } catch { return null }
   const host = (u.hostname ?? '').toLowerCase()
+  if (!esHostOficial(host)) return null
 
-  // Conexión directa: el ref está en el propio host.
   const directo = /^db\.([a-z0-9]{20})\.supabase\.co$/.exec(host)
   if (directo) return directo[1]
 
-  // Pooler: el host es `<algo>.pooler.supabase.com` y el ref va en el usuario,
-  // como `<rol>.<ref>`. El rol puede ser cualquiera —la credencial de este
-  // auditor es un rol dedicado, no `postgres`—, pero el HOST no: tiene que
-  // terminar exactamente en `.pooler.supabase.com`, con una etiqueta delante.
-  if (!/^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.pooler\.supabase\.com$/.test(host)) return null
   const porUsuario = /^.+\.([a-z0-9]{20})$/i.exec(decodeURIComponent(u.username ?? ''))
   return porUsuario ? porUsuario[1].toLowerCase() : null
 }
@@ -620,43 +779,30 @@ function psqlLive(url, args) {
 }
 
 /**
- * Los esquemas EXPUESTOS: los que PostgREST publica como API HTTP.
- *
- * Importa para una sola regla, la más costosa de las de abajo: una función
- * SECURITY DEFINER de acá corre con los privilegios de SU DUEÑO y es alcanzable
- * por cualquiera que tenga EXECUTE. Si la credencial del auditor puede
- * ejecutarla, entonces el «solo lectura» que se acaba de medir es de mentira:
- * la función es un camino de escritura con otro sombrero.
- */
-export const ESQUEMAS_EXPUESTOS = ['public', 'graphql_public']
-
-/**
  * Funciones SECURITY DEFINER que la credencial PUEDE ejecutar sin que el
  * refresco se niegue, con su justificación al lado.
  *
+ * POR QUÉ IMPORTAN. Una función SECURITY DEFINER corre con los privilegios de
+ * SU DUEÑO. Si la credencial del auditor puede ejecutar una, el «solo lectura»
+ * que se mide sobre el rol describe lo que ese rol puede hacer *directamente*,
+ * y hay un camino al lado. Por eso la regla mira el privilegio EFECTIVO
+ * —`has_function_privilege(current_user, …)`— y no el nombre del esquema ni el
+ * de la función.
+ *
  * ESTÁ VACÍA A PROPÓSITO, y llenarla no es un trámite. Cada entrada declara
  * «esta función, corriendo como su dueño, no le da a esta credencial nada que
- * no debería tener». Eso es una afirmación de seguridad sobre el cuerpo de la
+ * no debería tener». Eso es una afirmación de seguridad sobre el CUERPO de la
  * función, no sobre su nombre, y no la puede firmar el auditor: la firma quien
- * revisa el PR que agrega la línea.
+ * revisa el PR que agrega la línea. Hay una prueba que falla si deja de estar
+ * vacía, para que agregar una entrada sea un acto visible.
  *
- * MEDIDO EN PRODUCCIÓN (2026-09-03): 26 de las 246 funciones SECURITY DEFINER
- * de `public` son ejecutables por PUBLIC —y por lo tanto por `anon`, y por lo
- * tanto por esta credencial—. La mayoría son ayudantes de RLS que las policies
- * llaman como el rol invocante y que por eso NECESITAN ser ejecutables
- * (`get_my_company_id`, `is_super_admin`, `current_user_role`, …), pero varias
- * no tienen ninguna razón para estar abiertas a `anon`:
- * `update_user_password`, `request_password_reset`, `validate_reset_token`,
- * `migrate_custom_auth_to_supabase_unconfirmed`, `buscar_cliente_para_onboarding`.
- *
- * Así que hoy esta regla BLOQUEA el refresco, y está bien que bloquee: el
- * arreglo correcto es cerrar en producción lo que no debería estar abierto
- *
- *     REVOKE EXECUTE ON FUNCTION public.update_user_password(text, text) FROM PUBLIC;
- *     GRANT  EXECUTE ON FUNCTION public.<ayudante de RLS> TO authenticated;   -- no a PUBLIC
- *
- * y no ampliar esta lista para que el auditor se calle. Ampliarla por comodidad
- * es exactamente el hábito que la baseline de drift existe para impedir.
+ * QUÉ NO ES ESTA REGLA. No es un juicio sobre los privilegios de `anon` o de
+ * `authenticated`: esos roles son otra conversación, función por función, y no
+ * se resuelve desde acá. La credencial del auditor es un rol INDEPENDIENTE sin
+ * membresías —lo exige la regla MEMBRESÍA—, así que un GRANT explícito a
+ * `anon` o a `authenticated` NO la alcanza. Lo que la alcanza es un EXECUTE a
+ * PUBLIC, un GRANT directo a ella, o una membresía; y de las tres, el
+ * diagnóstico dice cuál.
  */
 export const SECDEF_PERMITIDAS = new Map()
 
@@ -666,14 +812,20 @@ export const SECDEF_PERMITIDAS = new Map()
  * Se mide, no se declara: la única afirmación aceptable sobre una credencial es
  * la que sale de `pg_roles` y de `has_*_privilege` en la sesión que se va a
  * usar. Devuelve pares `clave → valor`; las listas vienen separadas por \x1e
- * porque una identidad de función lleva comas adentro y `,` sería ambiguo.
+ * porque una identidad de función lleva comas adentro y `,` sería ambiguo, y
+ * los campos dentro de un elemento por \x1d.
  */
-const SQL_CREDENCIAL = `WITH no_sistema AS (
+const SQL_CREDENCIAL = `WITH no_interno AS (
+  -- Todos los esquemas del usuario, no sólo los que publica PostgREST: la
+  -- credencial se conecta a POSTGRES, no a la API HTTP. Un esquema propio o
+  -- \`extensions\` es tan alcanzable como \`public\` — más, porque nadie lo mira.
+  -- Se descartan sólo los internos del motor, cuyas funciones no son de este
+  -- proyecto y harían saltar la regla siempre.
   SELECT oid, nspname FROM pg_namespace
    WHERE nspname NOT LIKE 'pg\\_%' AND nspname <> 'information_schema'
 ), rel AS (
   SELECT c.oid, n.nspname||'.'||c.relname AS nombre
-    FROM pg_class c JOIN no_sistema n ON n.oid = c.relnamespace
+    FROM pg_class c JOIN no_interno n ON n.oid = c.relnamespace
    WHERE c.relkind IN ('r','p','v','m','f')
 ), escribibles AS (
   SELECT nombre FROM rel
@@ -688,10 +840,28 @@ const SQL_CREDENCIAL = `WITH no_sistema AS (
   SELECT nombre FROM rel
    WHERE has_any_column_privilege(oid,'SELECT') AND NOT has_table_privilege(oid,'SELECT')
 ), secdef AS (
-  SELECT n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident
-    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = ANY (ARRAY[${ESQUEMAS_EXPUESTOS.map(s => `'${s}'`).join(',')}])
-     AND p.prosecdef AND has_function_privilege(current_user, p.oid, 'EXECUTE')
+  -- ALCANZABLE = USAGE sobre el esquema Y EXECUTE efectivo sobre la función.
+  -- Las dos condiciones: sin USAGE la función no se puede nombrar, y \`EXECUTE
+  -- a PUBLIC\` sobre algo en un esquema cerrado no le sirve a nadie.
+  --
+  -- Y se registra DE DÓNDE viene el privilegio, porque el remedio depende de
+  -- eso: revocarle a PUBLIC no hace nada si el GRANT es directo al auditor, y
+  -- revocarle al rol intermedio rompería la aplicación cuando ese rol es
+  -- \`authenticated\`. Sale de aclexplode, quedándose con los otorgados que
+  -- ALCANZAN a current_user: PUBLIC (grantee 0) o un rol que current_user es.
+  SELECT n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')'
+         ||E'\\x1d'||
+         coalesce((SELECT string_agg(DISTINCT coalesce(r.rolname::text,'PUBLIC'), '+')
+                     FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                     LEFT JOIN pg_roles r ON r.oid = a.grantee
+                    WHERE a.privilege_type = 'EXECUTE'
+                      AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                  CASE WHEN p.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+                       THEN 'dueño' ELSE '?' END) AS ident
+    FROM pg_proc p JOIN no_interno n ON n.oid = p.pronamespace
+   WHERE p.prosecdef
+     AND has_schema_privilege(current_user, n.oid, 'USAGE')
+     AND has_function_privilege(current_user, p.oid, 'EXECUTE')
 ), yo AS (
   SELECT * FROM pg_roles WHERE rolname = current_user
 ), lista AS (
@@ -700,7 +870,7 @@ const SQL_CREDENCIAL = `WITH no_sistema AS (
   UNION ALL SELECT 'leibles',            nombre FROM leibles
   UNION ALL SELECT 'leibles_columna',    nombre FROM leibles_por_columna
   UNION ALL SELECT 'secdef',             ident  FROM secdef
-  UNION ALL SELECT 'crear_esquemas',     nspname FROM no_sistema
+  UNION ALL SELECT 'crear_esquemas',     nspname FROM no_interno
              WHERE has_schema_privilege(current_user, oid, 'CREATE')
   UNION ALL SELECT 'membresias',         r.rolname FROM pg_roles r
              WHERE r.rolname <> current_user AND pg_has_role(current_user, r.oid, 'MEMBER')
@@ -833,13 +1003,33 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       membresias.map(r => `REVOKE ${r} FROM ${usuario};`).join(' '))
   }
 
-  const secdef = lista('secdef').filter(f => !permitidas.has(f))
+  // Cada elemento viene como `identidad\x1dprocedencia`, y la procedencia
+  // decide el remedio: revocarle a PUBLIC no hace NADA si el GRANT es directo
+  // al auditor, y revocarle al rol intermedio rompería la aplicación cuando ese
+  // rol es `authenticated`. Un diagnóstico que propone el REVOKE equivocado se
+  // gasta un ciclo y, peor, deja creer que el agujero se cerró.
+  const secdef = lista('secdef')
+    .map(x => { const [ident, via = '?'] = x.split('\x1d'); return { ident, via } })
+    .filter(f => !permitidas.has(f.ident))
   if (secdef.length > 0) {
-    rechazar('SECURITY DEFINER', `puede ejecutar ${secdef.length} función(es) SECURITY DEFINER en ` +
-      `${ESQUEMAS_EXPUESTOS.join('/')}: ${muestra(secdef, 12)} — corren como su dueño, así que el ` +
-      '«solo lectura» medido arriba no vale nada mientras estén al alcance',
-      `REVOKE EXECUTE ON FUNCTION ${secdef[0]} FROM PUBLIC;   -- y así con cada una; ` +
-      'o declararla en SECDEF_PERMITIDAS con su justificación')
+    const remedio = (f) => {
+      const fuentes = f.via.split('+').filter(Boolean)
+      if (fuentes.includes('PUBLIC')) return `REVOKE EXECUTE ON FUNCTION ${f.ident} FROM PUBLIC;`
+      if (fuentes.includes(usuario)) return `REVOKE EXECUTE ON FUNCTION ${f.ident} FROM ${usuario};`
+      if (fuentes.includes('dueño')) {
+        return `ALTER FUNCTION ${f.ident} OWNER TO <otro rol>;   -- la ejecuta por ser su dueño`
+      }
+      // Llega por una membresía. NO se revoca al rol intermedio —puede ser
+      // `authenticated`, y romperlo rompe la aplicación—: se quita la
+      // membresía, que además ya la rechaza la regla MEMBRESÍA.
+      return `REVOKE ${fuentes.join(', ')} FROM ${usuario};   -- llega por membresía, no por un GRANT propio`
+    }
+    rechazar('SECURITY DEFINER',
+      `puede ejecutar ${secdef.length} función(es) SECURITY DEFINER —corren como su dueño, así que ` +
+      'el «solo lectura» medido arriba no describe lo que puede hacer—: ' +
+      muestra(secdef.map(f => `${f.ident} [vía ${f.via}]`), 12),
+      [...new Set(secdef.slice(0, 12).map(remedio))].join('\n      ') +
+      '\n      (o declarar la función en SECDEF_PERMITIDAS con su justificación)')
   }
 
   if (!cierto(m.solo_lectura)) {
@@ -880,10 +1070,19 @@ function sembrarProduccionLive({ url, proyectoEsperado, escribir = true }) {
     console.error('  NO se reutiliza SUPABASE_ACCESS_TOKEN: es de la Management API y puede escribir.')
     return 1
   }
-  if (!/^postgres(ql)?:\/\//i.test(url)) {
-    console.error(`✗ ${VAR_URL_LIVE} no parece una cadena de conexión de Postgres.`)
+
+  // ── La cadena de conexión, antes de abrirla ──────────────────────────────
+  // El hostname solo no alcanza: `hostaddr`, `host=` en la query y `options=`
+  // mandan sobre el destino y sobre la sesión, así que una URL con un host
+  // oficial puede hablar con otra máquina. Ver `validarUrlLive`.
+  const urlRevisada = validarUrlLive(url)
+  if (urlRevisada.problemas.length > 0) {
+    console.error(`✗ ${VAR_URL_LIVE} no pasa la revisión de la cadena de conexión:`)
+    for (const p of urlRevisada.problemas) console.error(`    · ${sinSecretos(p, url)}`)
+    console.error('  No se conecta a nada.')
     return 1
   }
+  for (const a of urlRevisada.avisos) console.error(`· aviso: ${sinSecretos(a, url)}`)
 
   // ── El proyecto, antes que nada ──────────────────────────────────────────
   // Capturar el SANDBOX y versionarlo como producción sería un desastre
@@ -1048,25 +1247,30 @@ async function pruebaLive() {
       console.error(`✗ ${db.fallos.length} migración(es) no aplicaron.`); process.exit(1)
     }
 
-    // ── Lo que producción tiene que hacer para que el refresco sea posible ──
+    // ── Poner el clúster desechable en el estado que tiene producción ───────
     //
-    // Se revoca EXECUTE de PUBLIC sobre las funciones SECURITY DEFINER de los
-    // esquemas expuestos. NO es una comodidad del test: es exactamente el
-    // estado que el guard exige, escrito en SQL para que se vea qué hay que
-    // arreglar. Una función SECURITY DEFINER corre como su dueño, así que
-    // mientras `anon` —y con él cualquier credencial— pueda ejecutarla, el
-    // «solo lectura» que se mide arriba no significa nada.
+    // Se revoca EXECUTE de PUBLIC sobre TODAS las funciones SECURITY DEFINER.
     //
-    // MEDIDO EN PRODUCCIÓN (2026-09-03): 26 de las 246 funciones SECURITY
-    // DEFINER de `public` son ejecutables por PUBLIC. Sin este REVOKE, este
-    // mismo camino feliz falla — y el caso negativo de más abajo lo prueba.
+    // POR QUÉ HACE FALTA ACÁ Y NO EN PRODUCCIÓN. Esto reconstruye el esquema
+    // desde las migraciones, y una `CREATE FUNCTION` sin `REVOKE` posterior
+    // deja el ACL por defecto, que incluye EXECUTE a PUBLIC. Producción NO está
+    // así: una consulta de solo lectura al catálogo real (2026-09-03 17:29 UTC)
+    // dio 249 funciones SECURITY DEFINER en `public`, 0 con proacl nulo o por
+    // defecto y 0 con EXECUTE efectivo procedente de PUBLIC — los permisos
+    // están concedidos explícitamente (1 a `anon`, 118 a `authenticated`), que
+    // es otra conversación y no alcanza a un rol sin membresías.
+    //
+    // Así que este REVOKE no «arregla» nada del test: alinea el clúster con
+    // producción en la única dimensión donde la reconstrucción difiere. Que
+    // difieran es en sí mismo drift —del que el auditor ya declara 29 grupos de
+    // grants de EXECUTE en su baseline—, y no es asunto de esta prueba.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
       DO $revocar$
       DECLARE f record;
       BEGIN
         FOR f IN SELECT p.oid::regprocedure AS firma
                    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-                  WHERE n.nspname = ANY (ARRAY[${ESQUEMAS_EXPUESTOS.map(s => `'${s}'`).join(',')}])
+                  WHERE n.nspname NOT LIKE 'pg\\_%' AND n.nspname <> 'information_schema'
                     AND p.prosecdef
         LOOP
           EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f.firma);
@@ -1092,13 +1296,37 @@ async function pruebaLive() {
     // Todos reciben el mismo USAGE que el rol bueno: si les faltara, se los
     // rechazaría por el search_path y la prueba no probaría nada.
     //
-    // La función SECURITY DEFINER se crea acá a propósito: el REVOKE de arriba
-    // deja el clúster limpio, así que sin volver a abrir una a mano el caso
-    // negativo no tendría nada que detectar y pasaría por vacuo.
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      'CREATE FUNCTION public.drift_sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$; ' +
-      'REVOKE EXECUTE ON FUNCTION public.drift_sd() FROM PUBLIC; ' +
-      'CREATE ROLE drift_grupo NOLOGIN;'], { stdio: 'pipe' })
+    // Las funciones SECURITY DEFINER se crean acá a propósito: el REVOKE de
+    // arriba deja el clúster limpio, así que sin volver a abrir alguna a mano
+    // los casos negativos no tendrían nada que detectar y pasarían por vacuos.
+    //
+    // Y se reparten en esquemas PROPIOS, no en `public`, por dos razones. La
+    // credencial se conecta a Postgres y no a PostgREST, así que un esquema
+    // cualquiera es tan alcanzable como `public` — el guard tiene que mirarlos
+    // todos, y acá se prueba que los mira. Y separándolos, el USAGE de cada
+    // esquema se le da sólo al rol de su caso: el rol bueno no los ve, y su
+    // camino feliz sigue siendo el camino feliz.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      CREATE ROLE drift_grupo NOLOGIN;
+
+      -- a) en public, con GRANT DIRECTO al auditor (sin PUBLIC de por medio)
+      CREATE FUNCTION public.drift_sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
+      REVOKE EXECUTE ON FUNCTION public.drift_sd() FROM PUBLIC;
+
+      -- b) en un esquema PROPIO, alcanzable por EXECUTE a PUBLIC
+      CREATE SCHEMA drift_esq_pub;
+      CREATE FUNCTION drift_esq_pub.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
+
+      -- c) en \`extensions\`, con GRANT directo: el esquema no es «expuesto» por
+      --    la API y da exactamente igual, porque acá no hay API de por medio
+      CREATE FUNCTION extensions.drift_sd_ext() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
+      REVOKE EXECUTE ON FUNCTION extensions.drift_sd_ext() FROM PUBLIC;
+
+      -- d) EXECUTE a PUBLIC pero en un esquema SIN USAGE: no es alcanzable, y
+      --    el guard no tiene que inventarse un rechazo
+      CREATE SCHEMA drift_esq_cerrado;
+      CREATE FUNCTION drift_esq_cerrado.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;`,
+    ], { stdio: 'pipe' })
     const NEGATIVOS = [
       // Los cuatro atributos del rol. Estaban «comprobados» desde el primer
       // día y NINGUNO funcionaba: el SQL devolvía 'true' y el JavaScript
@@ -1124,8 +1352,16 @@ async function pruebaLive() {
         pecado: 'GRANT CREATE ON SCHEMA public TO drift_creador;' },
       { rol: 'drift_miembro',    regla: 'MEMBRESÍA',
         pecado: 'GRANT drift_grupo TO drift_miembro;' },
-      { rol: 'drift_secdef',     regla: 'SECURITY DEFINER',
+      // Las cuatro formas de alcanzar —o no— una SECURITY DEFINER.
+      { rol: 'drift_secdef',     regla: 'SECURITY DEFINER', via: 'drift_secdef',
+        que: 'un GRANT EXECUTE directo al auditor, en public',
         pecado: 'GRANT EXECUTE ON FUNCTION public.drift_sd() TO drift_secdef;' },
+      { rol: 'drift_sd_publico', regla: 'SECURITY DEFINER', via: 'PUBLIC',
+        que: 'EXECUTE a PUBLIC en un esquema propio con USAGE',
+        pecado: 'GRANT USAGE ON SCHEMA drift_esq_pub TO drift_sd_publico;' },
+      { rol: 'drift_sd_ext',     regla: 'SECURITY DEFINER', via: 'drift_sd_ext',
+        que: 'un GRANT directo sobre una función de `extensions`',
+        pecado: 'GRANT EXECUTE ON FUNCTION extensions.drift_sd_ext() TO drift_sd_ext;' },
     ]
     for (const n of NEGATIVOS) {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
@@ -1166,10 +1402,46 @@ async function pruebaLive() {
       const r = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
         { [VAR_URL_LIVE]: urlDe(n.rol) })
       comprobar(r.codigo !== 0 && new RegExp(`✗ ${n.regla}:`).test(r.salida),
-        `${n.rol}: se rechaza por ${n.regla}`)
+        `${n.rol}: se rechaza por ${n.regla}${n.que ? ` — ${n.que}` : ''}`)
       comprobar(!/huella leída de producción/.test(r.salida),
         `${n.rol}: y se rechaza ANTES de leer el catálogo`)
+      // Cuando la regla depende de POR DÓNDE llega el privilegio, se exige que
+      // el diagnóstico lo diga: el remedio no es el mismo, y proponer el REVOKE
+      // equivocado deja creer que el agujero se cerró.
+      if (n.via) {
+        comprobar(new RegExp(`vía ${n.via}\\]`).test(r.salida),
+          `${n.rol}: y el diagnóstico dice que llega vía ${n.via}`)
+        const remedio = n.via === 'PUBLIC' ? 'FROM PUBLIC;' : `FROM ${n.rol};`
+        comprobar(r.salida.includes(remedio),
+          `${n.rol}: y propone revocarle a quien corresponde (${remedio})`)
+      }
     }
+
+    // ── 2 bis · lo que NO es alcanzable no se rechaza ───────────────────────
+    //
+    // La otra mitad de la regla, y la que evita que se vuelva ruido: hay una
+    // SECURITY DEFINER con EXECUTE a PUBLIC en `drift_esq_cerrado`, y este rol
+    // no tiene USAGE sobre ese esquema. `has_function_privilege` dice que sí
+    // puede ejecutarla; sin USAGE no puede ni nombrarla. Un guard que rechazara
+    // por eso obligaría a limpiar funciones que nadie alcanza, y a la tercera
+    // vez alguien lo apaga.
+    const cerrado = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(cerrado.codigo === 0 && !/✗ SECURITY DEFINER/.test(cerrado.salida),
+      'una SECURITY DEFINER con EXECUTE a PUBLIC en un esquema SIN USAGE no es alcanzable, y no se rechaza')
+
+    // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────
+    //
+    // El guard vive en `validarUrlLive` y se prueba exhaustivamente en vitest;
+    // acá se comprueba que está CONECTADO al camino real. `options=` es el caso
+    // que más importa: deshace por URL el `default_transaction_read_only` que
+    // `PGOPTIONS` fija por entorno.
+    const conOptions = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
+      { [VAR_URL_LIVE]: `${urlDe('drift_lector')}&options=-c%20default_transaction_read_only%3Doff` })
+    comprobar(conOptions.codigo !== 0 && /«options»/.test(conOptions.salida),
+      'una URL con `options=` se rechaza antes de conectarse')
+    comprobar(!/credencial de solo lectura/.test(conOptions.salida),
+      'y se rechaza sin haber abierto la conexión')
     // El mensaje del caso de escritura sigue diciendo en cuántas tablas, que es
     // lo que hace accionable el rechazo.
     const escritor = correr(['--sembrar-produccion', '--proyecto', 'prueba'],

@@ -271,8 +271,15 @@ jobs:
   #     niega en vez de versionar una huella distinta.
   #     Se MIDE, no se declara: superusuario, BYPASSRLS, CREATEROLE, CREATEDB,
   #     REPLICATION, escritura, SELECT de tabla, SELECT por columna, CREATE
-  #     sobre esquemas, membresías y funciones SECURITY DEFINER al alcance. Cada
-  #     una de esas reglas tiene su rol culpable en `--prueba-live`.
+  #     sobre esquemas, membresías y funciones SECURITY DEFINER alcanzables —en
+  #     cualquier esquema no interno, porque esto se conecta a Postgres y no a
+  #     PostgREST—. Cada una de esas reglas tiene su rol culpable en
+  #     `--prueba-live`.
+  #   · Y la CADENA DE CONEXIÓN se revisa antes de abrirla. El hostname solo no
+  #     alcanza: con `?hostaddr=` libpq se conecta a esa IP y usa el host sólo
+  #     para el certificado, y con `?options=` se deshace por URL el
+  #     `default_transaction_read_only` que PGOPTIONS fija por entorno. Lista
+  #     blanca de parámetros, sin repetidos, y `sslmode` obligatorio.
   #     NO se reutiliza `SUPABASE_ACCESS_TOKEN`: ese token es de la Management
   #     API y puede aplicar DDL, crear y borrar ramas y leer secretos. Que
   #     drift-esquema.yml ya lo use no es razón para extender su alcance — es
@@ -292,7 +299,8 @@ jobs:
   #     CREATE ROLE drift_readonly LOGIN PASSWORD '…';
   #     GRANT USAGE ON SCHEMA public, extensions TO drift_readonly;
   #
-  # guardar su cadena de conexión como `SCHEMA_DRIFT_READONLY_URL` en el
+  # guardar su cadena de conexión —con `?sslmode=require` como mínimo, y nada
+  # más en la query— como `SCHEMA_DRIFT_READONLY_URL` en el
   # environment `production-db`, y poner la variable de repositorio
   # `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
   #

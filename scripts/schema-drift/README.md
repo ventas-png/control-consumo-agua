@@ -346,7 +346,8 @@ escribir.
 | El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
 | El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
 | El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
-| El rol puede ejecutar una función `SECURITY DEFINER` de un esquema expuesto | Esa función corre con los privilegios de **su dueño**: mientras esté al alcance, el «solo lectura» medido arriba no vale nada. Ver «Las funciones `SECURITY DEFINER` bloquean el refresco». |
+| El rol puede ejecutar una función `SECURITY DEFINER` **alcanzable** | Esa función corre con los privilegios de **su dueño**: mientras esté al alcance, el «solo lectura» medido arriba describe lo que el rol hace *directamente* y hay un camino al lado. Alcanzable = `USAGE` sobre el esquema **y** `EXECUTE` efectivo, en **cualquier** esquema no interno. Ver «`SECURITY DEFINER`: qué mira el guard y qué no». |
+| La URL puede redirigirse o viajar sin cifrar | Ver «La cadena de conexión, antes de abrirla». |
 | La sesión no quedó en solo lectura | `PGOPTIONS` fuerza `default_transaction_read_only` desde la conexión; si no rigió, se aborta. |
 | El rol no tiene `USAGE` sobre algún esquema del `search_path` | El fallo más caro: no rompe nada, sólo serializa `extensions.citext` donde el dueño escribe `citext`, y el refresco quedaría versionado con drift permanente. |
 | La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. El ref se deduce del host (`db.<ref>.supabase.co`) o del usuario del pooler (`<rol>.<ref>`, con cualquier rol, no sólo `postgres`). El host se valida contra esas **dos formas oficiales**, no por «contiene supabase»: `pooler.supabase.com.atacante.net` lo registra cualquiera. Si no se puede deducir, hay que pasar `--proyecto`: no se adivina. |
@@ -430,50 +431,118 @@ El modo de fallo que se evita es el peor de todos: alguien encuentra un
 artefacto en una corrida roja, lo da por bueno y versiona la instantánea vieja
 como si fuera producción de hoy.
 
-### Las funciones `SECURITY DEFINER` bloquean el refresco
+### `SECURITY DEFINER`: qué mira el guard y qué no
 
 Una función `SECURITY DEFINER` corre con los privilegios de **su dueño**. Si la
 credencial del auditor puede ejecutar una, el «solo lectura» que se mide sobre
 el rol no describe lo que ese rol puede hacer: describe lo que puede hacer
 *directamente*, y hay un camino al lado.
 
-Medido en producción el **2026-09-03**: de las 246 funciones `SECURITY DEFINER`
-de `public`, **26 son ejecutables por `PUBLIC`** — y por lo tanto por `anon`, y
-por lo tanto por cualquier credencial que se cree. La mayoría son ayudantes de
-RLS que las policies llaman como el rol invocante y que por eso *necesitan* ser
-ejecutables (`get_my_company_id`, `is_super_admin`, `current_user_role`, …).
-Varias no:
+**Alcanzable** son dos condiciones, y hacen falta las dos:
 
-```
-update_user_password(text, text)
-request_password_reset(...)
-validate_reset_token(...)
-migrate_custom_auth_to_supabase_unconfirmed()
-buscar_cliente_para_onboarding(...)
+```sql
+has_schema_privilege(current_user, n.oid, 'USAGE')     -- se puede nombrar
+has_function_privilege(current_user, p.oid, 'EXECUTE') -- se puede ejecutar
 ```
 
-**Así que hoy este guard bloquea el refresco, y está bien que bloquee.** Hay dos
-salidas, y no son equivalentes:
+en **cualquier** esquema que no sea interno del motor — no sólo `public` y
+`graphql_public`. La credencial se conecta a **PostgreSQL**, no a PostgREST: un
+esquema propio o `extensions` es tan alcanzable como `public`, y menos mirado.
+La otra mitad importa igual: una función con `EXECUTE` a `PUBLIC` en un esquema
+sobre el que el rol no tiene `USAGE` **no** se rechaza, porque no puede ni
+nombrarla — un guard que ladrara por eso se vuelve ruido y a la tercera vez
+alguien lo apaga.
 
-1. **Cerrar en producción lo que no debería estar abierto** — la correcta:
+#### El diagnóstico dice por dónde llega, porque el remedio depende de eso
 
-   ```sql
-   REVOKE EXECUTE ON FUNCTION public.update_user_password(text, text) FROM PUBLIC;
-   GRANT  EXECUTE ON FUNCTION public.get_my_company_id() TO authenticated;  -- no a PUBLIC
-   ```
+Hay tres formas de que el privilegio alcance a la credencial, y el `REVOKE` que
+las cierra es distinto:
 
-   Es DDL sobre producción: va por migración, no a mano.
+| Procedencia | Remedio |
+| --- | --- |
+| `EXECUTE` a `PUBLIC` | `REVOKE EXECUTE ON FUNCTION f FROM PUBLIC;` |
+| `GRANT` directo al auditor | `REVOKE EXECUTE ON FUNCTION f FROM <auditor>;` |
+| Una membresía | **Quitar la membresía**, no tocar el rol intermedio: puede ser `authenticated`, y revocarle rompe la aplicación. La regla MEMBRESÍA ya lo rechaza aparte. |
 
-2. **Declararlas en `SECDEF_PERMITIDAS`**, la allowlist de `auditar.mjs`. Está
-   **vacía**, y llenarla no es un trámite: cada entrada afirma que esa función,
-   corriendo como su dueño, no le da a esta credencial nada que no debería
-   tener. Eso es una afirmación de seguridad sobre el **cuerpo** de la función,
-   y la firma quien revisa el PR que agrega la línea. Hay una prueba que falla
-   si la lista deja de estar vacía, justamente para que agregar una entrada sea
-   un acto visible.
+Proponer el `REVOKE` equivocado es peor que no proponer ninguno: `… FROM PUBLIC`
+sobre una función concedida directamente al auditor no hace **nada**, y deja
+creer que el agujero se cerró. Por eso el mensaje trae `[vía …]` en cada
+función.
 
-Ampliar la allowlist para que el auditor se calle es el mismo hábito que la
-baseline de drift existe para impedir.
+#### Qué NO es esta regla
+
+**No es un juicio sobre los privilegios de `anon` o de `authenticated`.** La
+credencial del auditor es un rol independiente sin membresías —lo exige la regla
+MEMBRESÍA—, y un rol así **no hereda** permisos concedidos explícitamente a
+`anon` o a `authenticated`.
+
+Los hechos, de una consulta de solo lectura al catálogo real de producción del
+**2026-09-03 17:29 UTC**:
+
+| | |
+| --- | --- |
+| `SECURITY DEFINER` en `public` | 249 |
+| con `proacl` nulo o por defecto (`EXECUTE` a `PUBLIC`) | **0** |
+| con `EXECUTE` efectivo procedente de `PUBLIC` | **0** |
+| ejecutables explícitamente por `anon` | 1 |
+| ejecutables explícitamente por `authenticated` | 118 |
+
+Es decir: **producción no tiene ninguna `SECURITY DEFINER` abierta a `PUBLIC`**,
+y por lo tanto este guard **no bloquea el refresco**. Lo que hay son permisos
+explícitos a `anon` y `authenticated`, que son otra conversación —función por
+función, con los advisors de Supabase delante— y que no se resuelve desde acá ni
+con un `REVOKE` masivo.
+
+> Una versión anterior de este documento afirmaba «26 de 246 ejecutables por
+> `PUBLIC` en producción». Era **falso**: ese 26 salió de la reconstrucción local
+> desde migraciones, donde una `CREATE FUNCTION` sin `REVOKE` posterior deja el
+> ACL por defecto, y se atribuyó a producción sin medirla. Que la reconstrucción
+> y producción difieran ahí es en sí mismo drift, y el auditor ya lo declara
+> —29 de los 131 grupos de la baseline son grants de `EXECUTE`—.
+
+#### La allowlist
+
+`SECDEF_PERMITIDAS`, en `auditar.mjs`, está **vacía** y no es un trámite
+llenarla: cada entrada afirma que esa función, corriendo como su dueño, no le da
+a esta credencial nada que no debería tener. Es una afirmación sobre el **cuerpo**
+de la función, y la firma quien revisa el PR que agrega la línea. Hay una prueba
+que falla si deja de estar vacía, para que agregarla sea un acto visible.
+
+### La cadena de conexión, antes de abrirla
+
+La lista blanca del hostname **no alcanza**. libpq acepta parámetros en la URI y
+varios mandan sobre el destino:
+
+```
+postgresql://u:p@db.<ref>.supabase.co:5432/postgres?hostaddr=203.0.113.9
+```
+
+pasa cualquier comprobación de hostname y **habla con otra máquina**: con
+`hostaddr` libpq se conecta a esa IP y usa `host` sólo para el SNI y el
+certificado. `host=` en la query hace lo mismo por la vía directa, y `options=`
+puede deshacer el `default_transaction_read_only` que `PGOPTIONS` fija por
+entorno — el guard que se apoya en el entorno, desactivado desde la URL.
+
+Por eso `validarUrlLive()` es una lista blanca **de parámetros**:
+
+| Regla | |
+| --- | --- |
+| Un solo host, y oficial | `db.<ref>.supabase.co` o `<región>.pooler.supabase.com`. Una lista `a:5432,b:5432` se rechaza: libpq prueba uno por uno. |
+| Prohibidos | `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `options`. |
+| Permitidos, y sólo éstos | `sslmode`, `sslrootcert`, `connect_timeout`, `application_name`. |
+| Sin repetidos | libpq se queda con el **último**: `sslmode=verify-full&sslmode=disable` se lee seguro y se conecta inseguro. |
+| `sslmode` exigido | `require`, `verify-ca` o `verify-full`. Sin él libpq negocia y **acepta texto plano**; `disable`, `allow` y `prefer` también lo permiten. |
+
+Con `sslmode=require` la conexión se cifra pero **no** se verifica el
+certificado: protege del que escucha, no del que se hace pasar por la base. Se
+acepta y se **recomienda** subir a `verify-full` con `sslrootcert=<ruta>` cuando
+el runner tenga el certificado de la CA de Supabase.
+
+La única excepción es un **socket de dominio Unix** (`?host=/…`), que no puede
+alcanzar otra máquina: es lo que usa `--prueba-live` contra su clúster
+desechable. No es un bypass — que un socket no termine versionado como
+producción lo cuida el guard del proyecto, porque de esa URL no se deduce ningún
+ref y sin ref el refresco exige `--proyecto` a mano.
 
 ### El job no commitea
 
@@ -498,17 +567,24 @@ guard. Después, en el environment `production-db`, el secret
 `SCHEMA_DRIFT_READONLY_URL` con su cadena de conexión, y la variable de
 repositorio `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
 
-Falta además cerrar las funciones `SECURITY DEFINER` ejecutables por `PUBLIC`
-(ver la sección de arriba): con el rol recién creado, el guard rechaza el
-refresco hasta que eso se resuelva.
+**Sobre la cadena de conexión.** Sirve tanto la conexión directa como el pooler
+en modo sesión, y en los dos casos **`sslmode` es obligatorio**:
 
-**Sobre la cadena de conexión.** Sirve tanto la conexión directa
-(`db.<ref>.supabase.co:5432`) como el pooler en modo sesión
-(`aws-0-<región>.pooler.supabase.com:5432`, usuario `drift_readonly.<ref>`). Con
-el pooler hay que usar el modo **sesión**, no el de transacción: `PGOPTIONS`
-—que es lo que fuerza la sesión a solo lectura— sólo rige en modo sesión. El
-runner de Actions decide cuál hace falta: si su red no alcanza la conexión
-directa, el pooler es la vía.
+```
+postgresql://drift_readonly:<clave>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+postgresql://drift_readonly.<ref>:<clave>@aws-1-<región>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Con el pooler hay que usar el modo **sesión** (5432), no el de transacción
+(6543): `PGOPTIONS` —que es lo que fuerza la sesión a solo lectura— sólo rige en
+modo sesión. El runner de Actions decide cuál hace falta: si su red no alcanza
+la conexión directa, el pooler es la vía.
+
+Y **nada más en la query**: `hostaddr`, `host`, `port`, `dbname`, `user`,
+`password`, `service`, `servicefile` y `options` se rechazan, igual que
+cualquier parámetro repetido o no documentado (ver «La cadena de conexión, antes
+de abrirla»). Si el runner tiene el certificado de la CA de Supabase, conviene
+`sslmode=verify-full&sslrootcert=<ruta>` en lugar de `require`.
 
 Siguen valiendo las tres condiciones de siempre, y ninguna es opcional:
 
