@@ -41,13 +41,23 @@ el cliente, con JWTs de distinto rol/empresa.
    visible / PGRST — nunca un resultado exitoso). Regresa-guarda el agujero de
    #378 (RPCs SECURITY DEFINER ejecutables por `anon` vía DEFAULT PRIVILEGES).
 
-## Por qué está credencial-gated
+## Por qué está credencial-gated (y por qué eso ya no deja verde a CI)
 
 Necesita una base real + usuarios sembrados, cosa que el runner unitario de CI no
-tiene. Si faltan las env vars, el bloque se **skipea** (la suite queda verde) y se
-deja un test `.skip` marcador para que el reporte muestre que RLS server-side NO
-se verificó en esa corrida. Cuando hay credenciales (job E2E/preview), corre de
-verdad.
+tiene, así que el bloque vive bajo `describe.skipIf(!ENABLED)`: sin las variables
+no se abre una sola conexión.
+
+Lo que **no** hay es un verde por omisión. En CI el job `rls-harness` es
+**fail-closed**: `scripts/rls-preflight.mjs` exige las **siete** variables y que
+el destino esté declarado, y falla el job antes de instalar nada. Después,
+`scripts/assert-rls-ejecutado.mjs` lee el reporte JSON y exige pruebas > 0, cero
+fallos y **cero skips**.
+
+Tampoco queda ya el `it.skip('omitido — …')` que hubo como marcador: vitest
+incluye las pruebas *skipped* en el reporte JSON, así que aparecía **siempre**
+—también con credenciales— y el verificador lo leía como «harness omitido». El
+job no podía ponerse verde ni con el sandbox montado. La constancia de la
+omisión la da ahora el preflight, que es quien tiene la información.
 
 ## Cómo correrlo
 
@@ -56,6 +66,10 @@ Contra el **preview branch del PR** o un **sandbox** (NUNCA producción):
 ```bash
 export RLS_SUPABASE_URL="https://<preview-ref>.supabase.co"
 export RLS_SUPABASE_ANON_KEY="<anon-key-del-preview>"
+# Declaración del destino: sin ella el harness aborta sin conectarse, y si no
+# coincide con el ref de la URL también. Es lo que impide que exportar la URL
+# equivocada mande los negative-write al proyecto que no es.
+export RLS_EXPECTED_PROJECT_REF="<preview-ref>"
 
 # Dos usuarios YA sembrados, de empresas DISTINTAS:
 export RLS_USER_A_EMAIL="qa-a@example.com"
@@ -90,6 +104,9 @@ export RLS_USER_OWNER_PASSWORD="********"
 npx vitest run src/test/rls/rlsHarness.test.ts
 ```
 
+Las **quince** son obligatorias: quien corre `vitest` a mano no pasa por el
+preflight, así que el propio harness repite la validación del destino.
+
 El bloque de clase es **no destructivo**: siembra sus propias filas desechables
 con quien sí tiene el permiso y las limpia al terminar. Empieza afirmando las
 precondiciones (misma empresa, roles esperados, permisos efectivos disjuntos)
@@ -114,7 +131,9 @@ cualquier residente del condominio podía leer, sustituir y borrar la firma de
 acuse de su vecino.
 
 En CI se cablea como job aparte (ver `.github/workflows/coverage.yml`, job
-`rls-harness`), que sólo se activa cuando los secretos del repo están presentes.
+`rls-harness`). Estado hoy: **corre de verdad** — 146 pruebas pasadas, 0
+omitidas, contra el sandbox. Detalle y evidencia en
+`docs/ACTIVAR_HARNESS_RLS.md`.
 
 ## Sembrado de datos
 
