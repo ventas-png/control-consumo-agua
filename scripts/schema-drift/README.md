@@ -342,6 +342,7 @@ escribir.
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
 | El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
 | El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. |
+| El rol alcanza alguna **secuencia** | Quedaban fuera del escaneo, que sólo miraba tablas y vistas. `USAGE` o `UPDATE` **mueven el contador** —escritura de estado compartido, y un salto de correlativo se nota en la facturación—; `SELECT` dice cuántas filas hubo. Se pregunta con `has_sequence_privilege`, porque `has_table_privilege` ni siquiera responde por `USAGE`. |
 | El rol tiene `SELECT` sobre alguna tabla **alcanzable** | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. **Alcanzable** son dos condiciones, igual que para las funciones: `USAGE` sobre el esquema **y** el privilegio. El escaneo mira **todos** los esquemas no internos, y el remedio sale de la **procedencia real** (ver abajo). |
 | El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
 | El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
@@ -460,6 +461,32 @@ No hay nada que quitarle: la línea se pega, no cambia nada, y el diagnóstico
 habría dicho que el agujero se cerró. Hay una prueba que aplica el remedio tal
 como sale y exige que el rechazo desaparezca — para las cuatro vías.
 
+### `net` (pg_net): el bloqueo que hoy impide el paso 3
+
+Medido contra el catálogo real: el esquema **`net` concede `USAGE` a `PUBLIC`**,
+y **`net._http_response`** y **`net.http_request_queue`** conceden a `PUBLIC`
+`SELECT`, `INSERT`, `UPDATE`, `DELETE` y `TRUNCATE`. Son grants de la
+instalación gestionada de Supabase: ninguna migración de este repositorio los
+declara, y la reconstrucción local no los reproduce.
+
+Con eso, una credencial provisionada **exactamente** como prescribe este
+documento las alcanza igual — el privilegio no se lo dio nadie, lo tiene por ser
+`PUBLIC`. **El guard la rechaza, y está bien que rechace**: `_http_response`
+guarda el cuerpo y las cabeceras de cada respuesta HTTP que recibió la base
+—webhooks, pasarelas de pago— y `http_request_queue` las peticiones pendientes
+con sus cabeceras, que es donde vive un `Authorization: Bearer`. Con `UPDATE` e
+`INSERT` encima.
+
+**No se agrega `net` a `LECTURA_TOLERADA` ni se afloja el guard.** La propuesta
+de migración para retirar esa vía, con su análisis de impacto, está en
+[`propuesta-net-publico.md`](propuesta-net-publico.md) — **preparada y no
+aplicada**: va en su propio PR, y la decide quien opera la base.
+
+El rechazo está fijado por `--prueba-live`, que construye esa misma forma en un
+clúster desechable, exige el rechazo, aplica los `REVOKE` que el propio
+diagnóstico propone y comprueba que la credencial vuelve a servir **sin tocar el
+`USAGE` del esquema**.
+
 ### `pg_stat_statements`: una decisión, no un olvido
 
 Supabase instala `pg_stat_statements` en `extensions`, y la extensión concede
@@ -487,7 +514,13 @@ Por qué se tolera:
 el privilegio llega por un `GRANT` directo, por una membresía o por propiedad,
 bloquea —eso ya no es «la extensión dejó su default»—; si el objeto **no**
 pertenece a una extensión aunque se llame igual, bloquea; y cualquier otra vista
-de extensión bloquea, porque la lista son esas dos y no una categoría.
+de extensión bloquea, porque la lista son esas dos y no una categoría. Una
+**secuencia** tampoco entra: la tolerancia es de lecturas de tabla.
+
+> ⚠ **Pendiente de aprobación del propietario.** Esta tolerancia es una
+> propuesta del auditor, no un hecho consumado, y hay que aprobarla **antes de
+> fusionar**. Si no se aprueba, se borran las dos entradas de `LECTURA_TOLERADA`
+> y el guard vuelve a bloquear — que es el estado seguro.
 
 ### `SECURITY DEFINER`: qué mira el guard y qué no
 

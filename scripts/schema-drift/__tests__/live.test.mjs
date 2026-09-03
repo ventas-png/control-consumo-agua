@@ -809,3 +809,82 @@ describe('avisarCredencial · lo tolerado se dice en voz alta', () => {
     expect(avisarCredencial({ ...sana, leibles: T('mio.t', 'mio', 'PUBLIC') })).toEqual([])
   })
 })
+
+// ── Secuencias ──────────────────────────────────────────────────────────────
+//
+// Quedaban fuera del escaneo, que sólo miraba 'r','p','v','m','f'. Y no es un
+// detalle: `USAGE` o `UPDATE` sobre una secuencia dejan MOVER el contador
+// —escritura de estado compartido, y un salto de correlativo se nota en la
+// facturación—, y `SELECT` deja leer el último valor. `has_table_privilege` ni
+// siquiera responde por USAGE.
+
+describe('juzgarCredencial · secuencias', () => {
+  // El cuarto campo son los privilegios que efectivamente tiene.
+  const S = (nombre, esquema, via, privs) => `${nombre}\x1d${esquema}\x1d${via}\x1d${privs}`
+  const lineas = (m) =>
+    juzgarCredencial(m).find(x => x.regla === 'SECUENCIA').remedio.split('\n').map(l => l.trim())
+
+  it('rechaza una secuencia alcanzable', () => {
+    expect(juzgarCredencial({ ...sana, secuencias: S('mio.s', 'mio', 'PUBLIC', 'SELECT') })
+      .map(r => r.regla)).toContain('SECUENCIA')
+  })
+
+  it('el detalle dice qué privilegios tiene y por dónde llegan', () => {
+    const r = juzgarCredencial({
+      ...sana, secuencias: S('mio.s', 'mio', 'PUBLIC', 'SELECT, USAGE, UPDATE'),
+    })[0]
+    expect(r.detalle).toContain('mio.s [SELECT, USAGE, UPDATE, vía PUBLIC]')
+  })
+
+  // De PUBLIC: `ON SEQUENCE`, y NUNCA `FROM <auditor>` — no hay nada que
+  // quitarle.
+  it('de PUBLIC: REVOKE … ON SEQUENCE … FROM PUBLIC, marcado como política', () => {
+    const l = lineas({ ...sana, secuencias: S('mio.s', 'mio', 'PUBLIC', 'SELECT, USAGE, UPDATE') })
+    expect(l.some(x => x.startsWith(
+      'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE mio.s FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => /decisión de POLÍTICA/.test(x))).toBe(true)
+    expect(l.some(x => /FROM drift_readonly;/.test(x))).toBe(false)
+  })
+
+  it('de un grant directo: ON ALL SEQUENCES IN SCHEMA', () => {
+    const l = lineas({ ...sana, secuencias: S('mio.s', 'mio', 'drift_readonly', 'USAGE') })
+    expect(l).toContain('REVOKE USAGE ON ALL SEQUENCES IN SCHEMA mio FROM drift_readonly;')
+  })
+
+  it('de una membresía: quita la membresía y no toca el rol intermedio', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated',
+      secuencias: S('mio.s', 'mio', 'authenticated', 'USAGE'),
+    })
+    expect(l.some(x => x.startsWith('REVOKE authenticated FROM drift_readonly;'))).toBe(true)
+    expect(l.some(x => /ON SEQUENCE mio\.s FROM authenticated;/.test(x))).toBe(false)
+  })
+
+  it('de la propiedad: ALTER SEQUENCE … OWNER TO', () => {
+    const l = lineas({ ...sana, secuencias: S('mio.s', 'mio', 'dueño', 'SELECT') })
+    expect(l.some(x => x.startsWith('ALTER SEQUENCE mio.s OWNER TO'))).toBe(true)
+  })
+
+  it('acumula las cuatro vías', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated',
+      secuencias: S('mio.s', 'mio', 'PUBLIC+drift_readonly+authenticated+dueño', 'SELECT, USAGE'),
+    })
+    expect(l).toContain('REVOKE SELECT, USAGE ON ALL SEQUENCES IN SCHEMA mio FROM drift_readonly;')
+    expect(l.some(x => x.startsWith('REVOKE SELECT, USAGE ON SEQUENCE mio.s FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => x.startsWith('ALTER SEQUENCE mio.s OWNER TO'))).toBe(true)
+    expect(l.some(x => x.startsWith('REVOKE authenticated FROM drift_readonly;'))).toBe(true)
+  })
+
+  it('sin secuencias alcanzables no dice nada', () => {
+    expect(juzgarCredencial(sana).map(r => r.regla)).not.toContain('SECUENCIA')
+  })
+
+  // Las secuencias NO entran en la tolerancia de pg_stat_statements: esa lista
+  // es de lecturas de tabla, y de dos objetos concretos.
+  it('una secuencia nunca se tolera, aunque venga sólo de PUBLIC', () => {
+    expect(juzgarCredencial({
+      ...sana, secuencias: S('extensions.s', 'extensions', 'PUBLIC', 'SELECT'),
+    }).map(r => r.regla)).toContain('SECUENCIA')
+  })
+})

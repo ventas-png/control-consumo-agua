@@ -894,6 +894,13 @@ export const SECDEF_PERMITIDAS = new Map()
  * por una membresía o por propiedad, bloquea: eso ya no es «la extensión dejó
  * su default», es alguien dándole acceso a esta credencial. Y si aparece un
  * objeto con ese nombre que NO pertenece a una extensión, también.
+ *
+ * ⚠ PENDIENTE DE APROBACIÓN DEL PROPIETARIO. Esta tolerancia es una propuesta,
+ * no un hecho consumado: la escribió el auditor y la tiene que aprobar quien
+ * opera la base ANTES de fusionar. Si no se aprueba, se borran las dos entradas
+ * y el guard vuelve a bloquear —que es el estado seguro—. Y no se amplía a
+ * otras vistas ni a otras extensiones sin pasar por lo mismo: hay una prueba
+ * que falla si la lista deja de ser exactamente estas dos.
  */
 export const LECTURA_TOLERADA = new Map([
   ['extensions.pg_stat_statements',
@@ -1038,6 +1045,40 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
          CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
     FROM rel_via
    WHERE has_any_column_privilege(oid,'SELECT') AND NOT has_table_privilege(oid,'SELECT')
+), sec AS (
+  -- SECUENCIAS. \`rel\` sólo mira 'r','p','v','m','f', así que quedaban fuera —y
+  -- una secuencia no es un detalle de implementación: \`USAGE\` o \`UPDATE\`
+  -- sobre ella deja MOVER el contador, que es escritura de estado compartido,
+  -- y \`SELECT\` deja leer el último valor, que filtra cuántas filas hubo.
+  -- Se preguntan con \`has_sequence_privilege\`, que es lo que corresponde:
+  -- \`has_table_privilege\` no responde por USAGE.
+  SELECT c.oid, c.relacl, c.relowner,
+         format('%I.%I', n.nspname, c.relname) AS nombre,
+         format('%I', n.nspname) AS esquema
+    FROM pg_class c JOIN no_interno n ON n.oid = c.relnamespace
+   WHERE c.relkind = 'S'
+     AND has_schema_privilege(current_user, n.oid, 'USAGE')
+), secuencias AS (
+  SELECT s.nombre||E'\\x1d'||s.esquema||E'\\x1d'||
+         (SELECT array_to_string(
+                   coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                                                            ELSE format('%I', g.rolname) END)
+                               FROM aclexplode(coalesce(s.relacl, acldefault('S', s.relowner))) a
+                               LEFT JOIN pg_roles g ON g.oid = a.grantee
+                              WHERE a.privilege_type IN ('SELECT','USAGE','UPDATE')
+                                AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                            ARRAY[]::text[])
+                   || CASE WHEN s.relowner = (SELECT oid FROM yo_oid)
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+'))||E'\\x1d'||
+         -- El cuarto campo son los privilegios que EFECTIVAMENTE tiene, para
+         -- que el REVOKE nombre exactamente esos y no un barrido a ciegas.
+         concat_ws(', ', CASE WHEN has_sequence_privilege(s.oid,'SELECT') THEN 'SELECT' END,
+                         CASE WHEN has_sequence_privilege(s.oid,'USAGE')  THEN 'USAGE'  END,
+                         CASE WHEN has_sequence_privilege(s.oid,'UPDATE') THEN 'UPDATE' END) AS nombre
+    FROM sec s
+   WHERE has_sequence_privilege(s.oid,'SELECT')
+      OR has_sequence_privilege(s.oid,'USAGE')
+      OR has_sequence_privilege(s.oid,'UPDATE')
 ), secdef AS (
   -- ALCANZABLE = USAGE sobre el esquema Y EXECUTE efectivo sobre la función.
   -- Las dos condiciones: sin USAGE la función no se puede nombrar, y \`EXECUTE
@@ -1078,6 +1119,7 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   SELECT 'escribibles'         AS k, nombre AS v FROM escribibles
   UNION ALL SELECT 'leibles',            nombre FROM leibles
   UNION ALL SELECT 'leibles_columna',    nombre FROM leibles_por_columna
+  UNION ALL SELECT 'secuencias',         nombre FROM secuencias
   UNION ALL SELECT 'secdef',             ident  FROM secdef
   UNION ALL SELECT 'crear_esquemas',     format('%I', nspname) FROM no_interno
              WHERE has_schema_privilege(current_user, oid, 'CREATE')
@@ -1197,19 +1239,24 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
     return { nombre, esquema, via, fuentes: via.split('+').filter(Boolean), flags }
   })
 
-  const remediosDeTabla = (items, privs, revocaEnTabla) => {
+  // Un solo constructor para tablas, columnas y secuencias: la forma del
+  // remedio cambia (`ON ALL TABLES` vs `ON ALL SEQUENCES`, `ALTER TABLE` vs
+  // `ALTER SEQUENCE`, la palabra `SEQUENCE` en el REVOKE puntual), pero la
+  // regla —a quién hay que revocarle— es la misma para los tres.
+  const remediosDeObjeto = (items, { privs, palabra = '', todos, alter }) => {
     const directos = new Set(), lineas = []
+    const privsDe = (it) => (typeof privs === 'function' ? privs(it) : privs)
     for (const it of items) {
       if (it.fuentes.includes(usuarioSql)) directos.add(it.esquema)
       if (it.fuentes.includes('PUBLIC')) {
         // NO se propone `FROM <auditor>`: el privilegio es de PUBLIC, y
         // quitárselo a PUBLIC es una DECISIÓN DE POLÍTICA que afecta a todos
         // los roles de la base. No la toma el auditor.
-        lineas.push(`REVOKE ${privs} ON ${it.nombre} FROM PUBLIC;   -- viene de PUBLIC: es una ` +
-                    'decisión de POLÍTICA, afecta a TODOS los roles')
+        lineas.push(`REVOKE ${privsDe(it)} ON ${palabra}${it.nombre} FROM PUBLIC;   -- viene de ` +
+                    'PUBLIC: es una decisión de POLÍTICA, afecta a TODOS los roles')
       }
       if (it.fuentes.includes('dueño')) {
-        lineas.push(`ALTER TABLE ${it.nombre} OWNER TO <otro rol>;   -- lo alcanza por ser su dueño`)
+        lineas.push(`${alter} ${it.nombre} OWNER TO <otro rol>;   -- lo alcanza por ser su dueño`)
       }
       for (const rol of it.fuentes.filter(x => x !== 'PUBLIC' && x !== usuarioSql && x !== 'dueño')) {
         lineas.push(`REVOKE ${rol} FROM ${usuarioSql};   -- llega por membresía en ${rol}; ` +
@@ -1217,15 +1264,14 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       }
     }
     // El grant directo sí se puede barrer por esquema, que es lo que se quiere
-    // para un rol dedicado.
-    const porEsquema = [...directos].sort().map(e =>
-      revocaEnTabla ? null : `REVOKE ${privs} ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`)
-      .filter(Boolean)
-    const porTabla = revocaEnTabla
-      ? items.filter(it => it.fuentes.includes(usuarioSql))
-             .map(it => `REVOKE ${privs} ON ${it.nombre} FROM ${usuarioSql};`)
-      : []
-    const todas = [...new Set([...porEsquema, ...porTabla, ...lineas])].slice(0, 14)
+    // para un rol dedicado. Cuando no hay forma «ON ALL …» que sirva —el GRANT
+    // por columna se revoca nombrando la columna— se va objeto por objeto.
+    const directas = todos
+      ? [...directos].sort().map(e =>
+          `REVOKE ${privsDe(items[0])} ON ${todos} IN SCHEMA ${e} FROM ${usuarioSql};`)
+      : items.filter(it => it.fuentes.includes(usuarioSql))
+             .map(it => `REVOKE ${privsDe(it)} ON ${palabra}${it.nombre} FROM ${usuarioSql};`)
+    const todas = [...new Set([...directas, ...lineas])].slice(0, 14)
     return todas.length > 0
       ? todas.join('\n      ')
       : '-- no se pudo determinar la procedencia; revisar el ACL de esos objetos a mano'
@@ -1236,7 +1282,8 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
     rechazar('ESCRITURA',
       `puede escribir en ${escribibles.length} tabla(s): ` +
       muestra(escribibles.map(t => `${t.nombre} [vía ${t.via || '?'}]`)),
-      remediosDeTabla(escribibles, 'INSERT, UPDATE, DELETE, TRUNCATE', false))
+      remediosDeObjeto(escribibles, { privs: 'INSERT, UPDATE, DELETE, TRUNCATE',
+                                      todos: 'ALL TABLES', alter: 'ALTER TABLE' }))
   }
 
   // El SELECT se parte en dos: lo que bloquea y lo que está clasificado como
@@ -1248,7 +1295,7 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       `puede leer ${bloquean.length} tabla(s): ` +
       `${muestra(bloquean.map(t => `${t.nombre} [vía ${t.via || '?'}]`))} — ` +
       'la huella sale del catálogo, así que leer datos no le sirve y sí lo vuelve peligroso',
-      remediosDeTabla(bloquean, 'SELECT', false))
+      remediosDeObjeto(bloquean, { privs: 'SELECT', todos: 'ALL TABLES', alter: 'ALTER TABLE' }))
   }
 
   const porColumna = tablas('leibles_columna')
@@ -1259,7 +1306,30 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       `tiene SELECT por columna en ${porColumna.length} tabla(s): ` +
       `${muestra(porColumna.map(t => `${t.nombre} [vía ${t.via || '?'}]`))} — ` +
       'no aparece en has_table_privilege y alcanza igual para leer datos',
-      remediosDeTabla(porColumna, 'SELECT (<columnas>)', true))
+      remediosDeObjeto(porColumna, { privs: 'SELECT (<columnas>)', alter: 'ALTER TABLE' }))
+  }
+
+  // ── Secuencias ────────────────────────────────────────────────────────────
+  //
+  // Quedaban fuera del escaneo, que sólo miraba 'r','p','v','m','f'. Y no es un
+  // detalle: `USAGE` o `UPDATE` sobre una secuencia dejan MOVER el contador
+  // —escritura de estado compartido, y un salto de correlativo se nota en la
+  // facturación—, y `SELECT` deja leer el último valor, que dice cuántas filas
+  // hubo. `has_table_privilege` ni siquiera responde por USAGE: hay que
+  // preguntar con `has_sequence_privilege`, que es lo que se hace.
+  //
+  // El cuarto campo del elemento trae los privilegios que EFECTIVAMENTE tiene,
+  // para que el REVOKE nombre esos y no barra a ciegas.
+  const secuencias = tablas('secuencias')
+  if (secuencias.length > 0) {
+    rechazar('SECUENCIA',
+      `alcanza ${secuencias.length} secuencia(s): ` +
+      muestra(secuencias.map(s => `${s.nombre} [${s.flags}, vía ${s.via || '?'}]`)) +
+      ' — USAGE o UPDATE mueven el contador, y SELECT dice cuántas filas hubo',
+      remediosDeObjeto(secuencias, {
+        privs: (s) => s.flags || 'SELECT, USAGE, UPDATE',
+        palabra: 'SEQUENCE ', todos: 'ALL SEQUENCES', alter: 'ALTER SEQUENCE',
+      }))
   }
 
   const crearEsquemas = lista('crear_esquemas')
@@ -1661,7 +1731,17 @@ async function pruebaLive() {
 
       -- k) una tabla cuya propiedad se le cede al auditor
       CREATE SCHEMA drift_tab_duenio;
-      CREATE TABLE drift_tab_duenio.t (id int);`,
+      CREATE TABLE drift_tab_duenio.t (id int);
+
+      -- ── SECUENCIAS, que el escaneo no miraba ──────────────────────────────
+      -- l) una secuencia con GRANT directo, y otra que llega por un rol
+      CREATE SEQUENCE drift_esq_otro.sec;
+      CREATE ROLE drift_grupo_seq NOLOGIN;
+      GRANT SELECT, USAGE ON SEQUENCE drift_esq_otro.sec TO drift_grupo_seq;
+
+      -- m) una secuencia cuya propiedad se le cede al auditor
+      CREATE SCHEMA drift_seq_duenio_esq;
+      CREATE SEQUENCE drift_seq_duenio_esq.sec;`,
     ], { stdio: 'pipe' })
 
     // ── pg_stat_statements, el caso que obligó a decidir ─────────────────────
@@ -1784,6 +1864,29 @@ async function pruebaLive() {
         pecado: 'GRANT USAGE, CREATE ON SCHEMA drift_tab_duenio TO drift_tab_duenio_rol; ' +
                 'ALTER TABLE drift_tab_duenio.t OWNER TO drift_tab_duenio_rol; ' +
                 'REVOKE CREATE ON SCHEMA drift_tab_duenio FROM drift_tab_duenio_rol;' },
+
+      // ── Y las mismas vías sobre SECUENCIAS ────────────────────────────────
+      { rol: 'drift_seq_directo', regla: 'SECUENCIA',
+        que: 'un GRANT directo de SELECT y USAGE sobre una secuencia',
+        contiene: ['drift_esq_otro.sec [SELECT, USAGE',
+                   'ON ALL SEQUENCES IN SCHEMA drift_esq_otro FROM drift_seq_directo;'],
+        cura: true,
+        pecado: 'GRANT USAGE ON SCHEMA drift_esq_otro TO drift_seq_directo; ' +
+                'GRANT SELECT, USAGE ON SEQUENCE drift_esq_otro.sec TO drift_seq_directo;' },
+      { rol: 'drift_seq_grupo', regla: 'SECUENCIA',
+        que: 'una secuencia que llega por una membresía',
+        contiene: ['REVOKE drift_grupo_seq FROM drift_seq_grupo;'],
+        noContiene: ['FROM drift_grupo_seq;'],
+        cura: true,
+        pecado: 'GRANT drift_grupo_seq TO drift_seq_grupo; ' +
+                'GRANT USAGE ON SCHEMA drift_esq_otro TO drift_seq_grupo;' },
+      { rol: 'drift_seq_duenio', regla: 'SECUENCIA',
+        que: 'ser DUEÑO de la secuencia',
+        contiene: ['dueño]', 'ALTER SEQUENCE drift_seq_duenio_esq.sec OWNER TO'],
+        cura: true,
+        pecado: 'GRANT USAGE, CREATE ON SCHEMA drift_seq_duenio_esq TO drift_seq_duenio; ' +
+                'ALTER SEQUENCE drift_seq_duenio_esq.sec OWNER TO drift_seq_duenio; ' +
+                'REVOKE CREATE ON SCHEMA drift_seq_duenio_esq FROM drift_seq_duenio;' },
     ]
     for (const n of NEGATIVOS) {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
@@ -1932,6 +2035,69 @@ async function pruebaLive() {
       { [VAR_URL_LIVE]: urlDe('drift_stat') })
     comprobar(statDirecto.codigo !== 0 && /✗ SELECT DE TABLA:/.test(statDirecto.salida),
       'con un GRANT DIRECTO sobre pg_stat_statements, la tolerancia no aplica y bloquea')
+
+
+    // ── 2 sexies · el bloqueo REAL de producción: `net` con USAGE a PUBLIC ───
+    //
+    // Medido contra el catálogo real: el esquema `net` (pg_net, que instala
+    // Supabase) concede USAGE a PUBLIC, y `net._http_response` y
+    // `net.http_request_queue` conceden a PUBLIC SELECT, INSERT, UPDATE, DELETE
+    // y TRUNCATE. Con eso, una credencial provisionada EXACTAMENTE como
+    // prescribe el README —USAGE sobre `public` y `extensions`, y nada más— las
+    // alcanza igual: el privilegio no se lo dio nadie, lo tiene por ser PUBLIC.
+    //
+    // El guard TIENE que rechazarla, y esta prueba lo fija. No se agrega `net`
+    // a ninguna tolerancia: `_http_response` guarda los CUERPOS de las
+    // respuestas HTTP que hace la base —webhooks, llamadas a pasarelas de
+    // pago—, y `http_request_queue` las peticiones pendientes con sus cabeceras.
+    // Eso no son métricas: es el contenido de las integraciones, y con INSERT y
+    // UPDATE encima. Tolerarlo sería declarar aceptable justo lo que este
+    // auditor existe para no dejar pasar.
+    //
+    // La reconstrucción NO reproduce esos grants —son de la instalación
+    // gestionada, no de las migraciones del repositorio—, así que la forma se
+    // construye acá tal cual, y se desarma al terminar para no contaminar el
+    // resto de la prueba.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      CREATE SCHEMA drift_net;
+      GRANT USAGE ON SCHEMA drift_net TO PUBLIC;
+      CREATE TABLE drift_net._http_response (id bigint, content text);
+      CREATE TABLE drift_net.http_request_queue (id bigint, headers jsonb);
+      GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE
+        ON drift_net._http_response, drift_net.http_request_queue TO PUBLIC;
+      -- Y la secuencia en un esquema con USAGE público, con las tres:
+      CREATE SEQUENCE drift_net._http_response_id_seq;
+      GRANT SELECT, USAGE, UPDATE ON SEQUENCE drift_net._http_response_id_seq TO PUBLIC;`,
+    ], { stdio: 'pipe' })
+
+    const conNet = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(conNet.codigo !== 0, 'con un esquema que concede USAGE a PUBLIC, la credencial correcta se RECHAZA')
+    for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
+      comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
+    }
+    comprobar(/drift_net\._http_response \[vía PUBLIC\]/.test(conNet.salida),
+      '  nombrando la tabla y diciendo que llega vía PUBLIC')
+    comprobar(conNet.salida.includes(
+      'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE drift_net._http_response_id_seq FROM PUBLIC;'),
+      '  y la secuencia, con los tres privilegios y su REVOKE ON SEQUENCE … FROM PUBLIC')
+    comprobar(!/FROM drift_lector;/.test(conNet.salida),
+      '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
+
+    // Los remedios que propone son los que hacen falta: se aplican tal cual y
+    // la credencial vuelve a servir. Es la evidencia de que la migración
+    // propuesta en `propuesta-net-publico.md` cierra la vía.
+    for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
+      for (const s of remediosDe(conNet.salida, regla)) {
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
+      }
+    }
+    const netCurado = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(netCurado.codigo === 0,
+      '  aplicar sus remedios cierra la vía sin tocar el USAGE del esquema')
+
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', 'DROP SCHEMA drift_net CASCADE;'], { stdio: 'pipe' })
 
     // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────
     //
