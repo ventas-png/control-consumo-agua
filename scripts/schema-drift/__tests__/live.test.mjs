@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest'
 import {
   sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
   juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive, tipoDeHost,
+  avisarCredencial, clasificarLectura, LECTURA_TOLERADA,
 } from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
@@ -223,8 +224,10 @@ const sana = {
   crear_bases: 'false', replicacion: 'false',
   solo_lectura: 'on', version: '17.6.1', search_path: '"$user", public, extensions',
 }
-// Una tabla llega como `nombre\x1desquema`: los dos ya citados desde SQL.
-const T = (nombre, esquema) => `${nombre}\x1d${esquema}`
+// Una tabla llega como `nombre\x1desquema\x1dprocedencia\x1dflags`: los dos
+// primeros ya citados desde SQL, la procedencia con `+` entre fuentes.
+const T = (nombre, esquema, via = 'drift_readonly', flags = '') =>
+  `${nombre}\x1d${esquema}\x1d${via}\x1d${flags}`
 const reglas = (m, opciones) => juzgarCredencial(m, opciones).map(r => r.regla)
 
 describe('juzgarCredencial', () => {
@@ -593,7 +596,7 @@ describe('juzgarCredencial · los remedios salen de lo que se detectó', () => {
     const r = juzgarCredencial({
       ...sana,
       usuario: 'Drift Readonly', usuario_sql: '"Drift Readonly"',
-      leibles: T('"mi esquema"."mi.tabla"', '"mi esquema"'),
+      leibles: T('"mi esquema"."mi.tabla"', '"mi esquema"', '"Drift Readonly"'),
     })[0]
     expect(r.remedio).toBe('REVOKE SELECT ON ALL TABLES IN SCHEMA "mi esquema" FROM "Drift Readonly";')
     expect(r.detalle).toContain('"mi esquema"."mi.tabla"')
@@ -659,5 +662,150 @@ describe('juzgarCredencial · SECURITY DEFINER, fuentes acumuladas', () => {
   it('sin procedencia reconocible lo dice, en vez de callarse', () => {
     const l = lineas({ ...sana, secdef: F('mio.f()', '') })
     expect(l.some(x => /no se pudo determinar la procedencia/.test(x))).toBe(true)
+  })
+})
+
+describe('juzgarCredencial · tablas, remedio según la procedencia REAL', () => {
+  const lineas = (m, regla) =>
+    juzgarCredencial(m).find(x => x.regla === regla).remedio.split('\n').map(l => l.trim())
+
+  // EL CASO QUE MOTIVA TODO ESTO. Si el SELECT viene de PUBLIC, un
+  // `REVOKE … FROM drift_readonly` NO LO ELIMINA —no hay nada que quitarle— y
+  // el diagnóstico habría dicho que estaba resuelto.
+  it('de PUBLIC: revoca a PUBLIC y NUNCA al auditor', () => {
+    const l = lineas({ ...sana, leibles: T('mio.t', 'mio', 'PUBLIC') }, 'SELECT DE TABLA')
+    expect(l.some(x => x.startsWith('REVOKE SELECT ON mio.t FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => /FROM drift_readonly;/.test(x))).toBe(false)
+  })
+
+  it('y lo marca como decisión de política, porque afecta a todos los roles', () => {
+    const l = lineas({ ...sana, leibles: T('mio.t', 'mio', 'PUBLIC') }, 'SELECT DE TABLA')
+    expect(l.some(x => /decisión de POLÍTICA/.test(x))).toBe(true)
+  })
+
+  it('de un grant directo: barre el esquema entero, que es lo que se quiere para un rol dedicado', () => {
+    const l = lineas({ ...sana, leibles: T('mio.t', 'mio', 'drift_readonly') }, 'SELECT DE TABLA')
+    expect(l).toContain('REVOKE SELECT ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+  })
+
+  it('de una membresía: quita la membresía y NO toca el rol intermedio', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated', leibles: T('mio.t', 'mio', 'authenticated'),
+    }, 'SELECT DE TABLA')
+    expect(l.some(x => x.startsWith('REVOKE authenticated FROM drift_readonly;'))).toBe(true)
+    expect(l.some(x => /ON mio\.t FROM authenticated;/.test(x))).toBe(false)
+  })
+
+  it('de la propiedad: propone ceder el dueño', () => {
+    const l = lineas({ ...sana, leibles: T('mio.t', 'mio', 'dueño') }, 'SELECT DE TABLA')
+    expect(l.some(x => x.startsWith('ALTER TABLE mio.t OWNER TO'))).toBe(true)
+  })
+
+  // Y las cuatro a la vez: cerrar una sola deja abiertas las otras tres.
+  it('acumula: PUBLIC + directo + membresía + propiedad, las cuatro líneas', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated',
+      leibles: T('mio.t', 'mio', 'PUBLIC+drift_readonly+authenticated+dueño'),
+    }, 'SELECT DE TABLA')
+    expect(l).toContain('REVOKE SELECT ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+    expect(l.some(x => x.startsWith('REVOKE SELECT ON mio.t FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => x.startsWith('ALTER TABLE mio.t OWNER TO'))).toBe(true)
+    expect(l.some(x => x.startsWith('REVOKE authenticated FROM drift_readonly;'))).toBe(true)
+  })
+
+  it('el detalle dice la procedencia de cada tabla', () => {
+    const r = juzgarCredencial({ ...sana, escribibles: T('mio.t', 'mio', 'PUBLIC') })[0]
+    expect(r.regla).toBe('ESCRITURA')
+    expect(r.detalle).toContain('mio.t [vía PUBLIC]')
+  })
+
+  it('sin procedencia reconocible lo dice, en vez de proponer algo que no sirve', () => {
+    const l = lineas({ ...sana, leibles: T('mio.t', 'mio', '') }, 'SELECT DE TABLA')
+    expect(l.some(x => /no se pudo determinar la procedencia/.test(x))).toBe(true)
+  })
+})
+
+// ── pg_stat_statements ──────────────────────────────────────────────────────
+//
+// La credencial NECESITA `USAGE` sobre `extensions` —sin él la huella no
+// coincide con la del dueño—, y la extensión concede `SELECT` a `PUBLIC` sobre
+// sus dos vistas. Quedan alcanzables por un requisito de corrección, no por un
+// grant que alguien le haya dado a esta credencial. La decisión: no bloquear y
+// AVISAR en cada corrida. Tres condiciones, y las tres tienen que darse.
+
+describe('clasificarLectura · la tolerancia es estrecha y explícita', () => {
+  const item = (nombre, via, flags) => ({
+    nombre, esquema: 'extensions', via, fuentes: via.split('+').filter(Boolean), flags,
+  })
+
+  it('tolera pg_stat_statements cuando es de una extensión y viene sólo de PUBLIC', () => {
+    const { bloquean, tolerados } = clasificarLectura([
+      item('extensions.pg_stat_statements', 'PUBLIC', 'ext'),
+      item('extensions.pg_stat_statements_info', 'PUBLIC', 'ext'),
+    ])
+    expect(bloquean).toEqual([])
+    expect(tolerados).toHaveLength(2)
+  })
+
+  // Un GRANT directo ya no es «la extensión dejó su default»: es alguien
+  // dándole acceso a ESTA credencial.
+  it('bloquea si además hay un grant directo', () => {
+    const { bloquean } = clasificarLectura([
+      item('extensions.pg_stat_statements', 'PUBLIC+drift_readonly', 'ext'),
+    ])
+    expect(bloquean).toHaveLength(1)
+  })
+
+  it('bloquea si llega por una membresía', () => {
+    const { bloquean } = clasificarLectura([
+      item('extensions.pg_stat_statements', 'authenticated', 'ext'),
+    ])
+    expect(bloquean).toHaveLength(1)
+  })
+
+  // El nombre no alcanza: una tabla que se llame así y no pertenezca a una
+  // extensión es una tabla cualquiera.
+  it('bloquea si el objeto NO pertenece a una extensión, aunque se llame igual', () => {
+    const { bloquean } = clasificarLectura([
+      item('extensions.pg_stat_statements', 'PUBLIC', ''),
+    ])
+    expect(bloquean).toHaveLength(1)
+  })
+
+  it('bloquea cualquier otra vista de extensión: la lista es de dos, no una categoría', () => {
+    const { bloquean } = clasificarLectura([item('extensions.otra_vista', 'PUBLIC', 'ext')])
+    expect(bloquean).toHaveLength(1)
+  })
+
+  it('la lista es exactamente esas dos, y cada una trae su justificación', () => {
+    expect([...LECTURA_TOLERADA.keys()].sort()).toEqual([
+      'extensions.pg_stat_statements', 'extensions.pg_stat_statements_info',
+    ])
+    for (const razon of LECTURA_TOLERADA.values()) expect(razon.length).toBeGreaterThan(80)
+  })
+})
+
+describe('avisarCredencial · lo tolerado se dice en voz alta', () => {
+  const conStat = {
+    ...sana,
+    leibles: T('extensions.pg_stat_statements', 'extensions', 'PUBLIC', 'ext'),
+  }
+
+  it('no bloquea', () => {
+    expect(juzgarCredencial(conStat)).toEqual([])
+  })
+
+  // Un guard que tolera algo en silencio deja de ser un guard: a los tres meses
+  // nadie recuerda qué está tolerado ni por qué.
+  it('pero lo nombra, con su procedencia y su justificación', () => {
+    const [aviso] = avisarCredencial(conStat)
+    expect(aviso).toContain('extensions.pg_stat_statements [vía PUBLIC]')
+    expect(aviso).toContain('pg_stat_statements')
+    expect(aviso).toContain('REVOKE SELECT ON extensions.pg_stat_statements FROM PUBLIC;')
+    expect(aviso).toContain('decisión de política')
+  })
+
+  it('y no avisa de lo que sí bloquea', () => {
+    expect(avisarCredencial({ ...sana, leibles: T('mio.t', 'mio', 'PUBLIC') })).toEqual([])
   })
 })

@@ -31,11 +31,23 @@
 --      distinto. Es un fallo latente que no se ve hasta que un nombre con
 --      acento o guion bajo cae en el sitio equivocado.
 --
---   2. SEPARADORES QUE NO PUEDEN APARECER EN EL CONTENIDO —
---      registro \x1e, campo \x1f. El cuerpo de una policy contiene saltos de
---      línea (`pg_get_expr` los mete), así que separar registros con `\n` era
---      ambiguo: una policy multilínea podía serializarse igual que dos policies
---      distintas. Los caracteres de control C0 no aparecen en DDL.
+--   2. SEPARADORES DE REGISTRO Y CAMPO — registro \x1e, campo \x1f. El cuerpo
+--      de una policy contiene saltos de línea (`pg_get_expr` los mete), así que
+--      separar registros con `\n` era ambiguo: una policy multilínea podía
+--      serializarse igual que dos policies distintas.
+--
+--      NO ES CIERTO QUE LOS CONTROLES C0 «NO APAREZCAN EN DDL», y este comentario
+--      lo afirmaba. Un identificador entre comillas admite cualquier carácter
+--      menos NUL —`CREATE TABLE "a<0x1e>b"` es SQL válido—, y un literal dentro
+--      de una expresión de policy o de un default puede llevarlos con `E'\x1e'`.
+--      Con eso, dos catálogos DISTINTOS pueden serializar igual: es una colisión
+--      construible, no un accidente, y sería drift invisible.
+--
+--      Cambiar el separador rompería `huella-produccion.json`. Así que en vez de
+--      eso hay un GUARD FAIL-CLOSED al principio del archivo: si algún campo
+--      trae \x1d, \x1e o \x1f, o si un componente de clave trae TAB o salto de
+--      línea —que son los separadores de la SALIDA—, la huella no se emite: se
+--      aborta con un error que nombra el objeto. Preferir no medir a medir mal.
 --
 --   3. NULL EXPLÍCITO — \x1d, distinto de la cadena vacía. `default=NULL` y
 --      `default=''` son cosas distintas y tienen que hashear distinto.
@@ -137,6 +149,137 @@
 -- SALIDA. Una sola fila, un solo texto: líneas `clave<TAB>sha256<TAB>n`.
 -- Una sola fila mantiene manejable la respuesta de la Management API en modo
 -- live, y el orquestador la parte por líneas.
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- GUARD FAIL-CLOSED: ningún separador dentro del contenido
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- La serialización usa \x1e entre registros, \x1f entre campos y \x1d para el
+-- NULL explícito; la SALIDA usa TAB entre las tres columnas y \n entre líneas.
+-- Nada de eso está reservado por Postgres: un identificador entre comillas
+-- admite cualquier carácter menos NUL, y un literal dentro de un default o de
+-- una expresión de policy también. Un objeto llamado `a<0x1e>b` hace que dos
+-- catálogos distintos hasheen igual, y uno con un TAB en el nombre parte la
+-- línea de salida en columnas que el parser lee mal.
+--
+-- Cambiar los separadores rompería `huella-produccion.json`, así que en vez de
+-- eso: si aparece uno, NO SE EMITE HUELLA. Se aborta nombrando el objeto.
+-- Preferir no medir a medir mal — una colisión aquí es drift invisible, que es
+-- el único fallo que este auditor no se puede permitir.
+--
+-- `ON_ERROR_STOP` va acá dentro y no en el llamador: el guard tiene que ser
+-- fail-closed para CUALQUIERA que corra este archivo, no sólo para quien se
+-- acuerde de pasar la bandera.
+\set ON_ERROR_STOP on
+
+DO $centinela$
+DECLARE
+  culpables text;
+BEGIN
+  -- ── 1 · separadores de la serialización dentro de un campo ───────────────
+  SELECT string_agg(DISTINCT donde, ', ' ORDER BY donde) INTO culpables
+  FROM (
+    SELECT 'tabla '||c.relname AS donde, c.relname AS valor
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    UNION ALL
+    SELECT 'columna '||c.relname||'.'||a.attname, a.attname
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    UNION ALL
+    SELECT 'tipo de '||c.relname||'.'||a.attname, format_type(a.atttypid, a.atttypmod)
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    UNION ALL
+    SELECT 'default de '||c.relname||'.'||a.attname, pg_get_expr(d.adbin, d.adrelid)
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+      JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    UNION ALL
+    SELECT 'constraint '||x.conname, x.conname || pg_get_constraintdef(x.oid)
+      FROM pg_constraint x JOIN pg_class c ON c.oid = x.conrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public'
+    UNION ALL
+    SELECT 'índice '||i.indexname, i.indexname || i.indexdef
+      FROM pg_indexes i WHERE i.schemaname = 'public'
+    UNION ALL
+    SELECT 'policy '||p.policyname||' en '||p.tablename,
+           p.policyname || p.cmd || array_to_string(p.roles, ',') || p.permissive ||
+           coalesce(p.qual,'') || coalesce(p.with_check,'')
+      FROM pg_policies p WHERE p.schemaname = 'public'
+    UNION ALL
+    SELECT 'trigger '||tg.tgname, tg.tgname || pg_get_triggerdef(tg.oid)
+      FROM pg_trigger tg JOIN pg_class c ON c.oid = tg.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND NOT tg.tgisinternal
+    UNION ALL
+    SELECT 'función '||p.proname,
+           p.proname || pg_get_function_identity_arguments(p.oid) ||
+           pg_get_function_result(p.oid) || l.lanname ||
+           coalesce(array_to_string(p.proconfig, ','), '')
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      JOIN pg_language l ON l.oid = p.prolang
+     WHERE n.nspname = 'public'
+    UNION ALL
+    SELECT 'vista '||v.viewname, v.viewname || v.definition
+      FROM pg_views v WHERE v.schemaname = 'public'
+    UNION ALL
+    SELECT 'matview '||m.matviewname, m.matviewname || m.definition
+      FROM pg_matviews m WHERE m.schemaname = 'public'
+    UNION ALL
+    SELECT 'enum '||ty.typname, ty.typname || e.enumlabel
+      FROM pg_type ty JOIN pg_namespace n ON n.oid = ty.typnamespace
+      JOIN pg_enum e ON e.enumtypid = ty.oid
+     WHERE n.nspname = 'public' AND ty.typtype = 'e'
+    UNION ALL
+    -- Los nombres de rol entran en las dos dimensiones de grants.
+    SELECT 'rol '||r.rolname, r.rolname FROM pg_roles r
+  ) s
+  WHERE valor IS NOT NULL AND valor ~ E'[\\x1d\\x1e\\x1f]';
+
+  IF culpables IS NOT NULL THEN
+    RAISE EXCEPTION 'SEPARADOR DE LA HUELLA DENTRO DEL CONTENIDO: %', culpables
+      USING HINT = 'La serialización usa \x1d, \x1e y \x1f como separadores. Un valor que '
+                   'los contenga hace que dos catálogos distintos hasheen igual. No se emite '
+                   'huella: renombrar el objeto o corregir la expresión.';
+  END IF;
+
+  -- ── 2 · TAB o salto de línea en un componente de clave ───────────────────
+  --
+  -- La salida es `clave<TAB>sha256<TAB>n`, una línea por grupo. Un TAB o un
+  -- salto de línea en la clave parte la línea donde no debe y el parser lee
+  -- otra cosa —con suerte falla, sin suerte mide mal—.
+  SELECT string_agg(DISTINCT donde, ', ' ORDER BY donde) INTO culpables
+  FROM (
+    SELECT 'tabla '||c.relname AS donde, c.relname AS valor
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+    UNION ALL
+    SELECT 'función '||p.proname, p.proname || pg_get_function_identity_arguments(p.oid)
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+    UNION ALL
+    SELECT 'vista '||v.viewname, v.viewname FROM pg_views v WHERE v.schemaname = 'public'
+    UNION ALL
+    SELECT 'matview '||m.matviewname, m.matviewname FROM pg_matviews m WHERE m.schemaname = 'public'
+    UNION ALL
+    SELECT 'enum '||ty.typname, ty.typname
+      FROM pg_type ty JOIN pg_namespace n ON n.oid = ty.typnamespace
+     WHERE n.nspname = 'public' AND ty.typtype = 'e'
+  ) s
+  WHERE valor IS NOT NULL AND valor ~ E'[\\t\\n\\r]';
+
+  IF culpables IS NOT NULL THEN
+    RAISE EXCEPTION 'TAB O SALTO DE LÍNEA EN UN COMPONENTE DE CLAVE: %', culpables
+      USING HINT = 'La salida es `clave<TAB>sha256<TAB>n`, una línea por grupo. Un TAB o un '
+                   'salto de línea en la clave rompe esa estructura. No se emite huella.';
+  END IF;
+END
+$centinela$;
 
 WITH t AS (
   SELECT c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity, c.relacl, c.relowner

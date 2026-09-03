@@ -341,8 +341,8 @@ escribir.
 | --- | --- |
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
 | El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
-| El rol puede escribir en alguna tabla | Lo obvio, y por eso el primero que hubo. |
-| El rol tiene `SELECT` sobre alguna tabla | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. El escaneo mira **todos** los esquemas no internos, y el remedio nombra los que se detectaron —no `public` por defecto, que sería un `REVOKE` que no cambia nada—. Los identificadores los cita Postgres con `format('%I')`, no una plantilla de JavaScript. |
+| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. |
+| El rol tiene `SELECT` sobre alguna tabla **alcanzable** | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. **Alcanzable** son dos condiciones, igual que para las funciones: `USAGE` sobre el esquema **y** el privilegio. El escaneo mira **todos** los esquemas no internos, y el remedio sale de la **procedencia real** (ver abajo). |
 | El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
 | El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
 | El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
@@ -430,6 +430,64 @@ El paso de refresco tiene `id`, y de ahí cuelga todo lo demás:
 El modo de fallo que se evita es el peor de todos: alguien encuentra un
 artefacto en una corrida roja, lo da por bueno y versiona la instantánea vieja
 como si fuera producción de hoy.
+
+### Tablas y columnas: alcanzables de verdad, y de dónde viene el privilegio
+
+**Alcanzable** son dos condiciones, y hacen falta las dos:
+
+```sql
+has_schema_privilege(current_user, n.oid, 'USAGE')   -- se puede nombrar
+has_table_privilege(c.oid, 'SELECT')                 -- se puede leer
+```
+
+Un `GRANT SELECT … TO PUBLIC` sobre una tabla de un esquema sobre el que el rol
+no tiene `USAGE` **no** se rechaza: `has_table_privilege` dice que sí, pero sin
+`USAGE` no puede ni nombrarla. Un guard que ladrara por eso obligaría a limpiar
+objetos que nadie alcanza, y a la tercera vez alguien lo apaga.
+
+Y se conserva **de dónde viene** cada privilegio, porque el remedio depende de
+eso — las cuatro fuentes se **acumulan**:
+
+| Procedencia | Remedio |
+| --- | --- |
+| `PUBLIC` | `REVOKE <privs> ON <tabla> FROM PUBLIC;` — y se marca como **decisión de política**: afecta a todos los roles de la base, y no la toma el auditor. |
+| `GRANT` directo al auditor | `REVOKE <privs> ON ALL TABLES IN SCHEMA <esquema> FROM <auditor>;` |
+| Una membresía | **Quitar la membresía**. Nunca revocarle al rol intermedio: si es `authenticated`, arregla el auditor y rompe el producto. |
+| Ser **dueño** | `ALTER TABLE <tabla> OWNER TO <otro rol>;` |
+
+**Si el privilegio viene de `PUBLIC`, NO se propone `REVOKE … FROM <auditor>`.**
+No hay nada que quitarle: la línea se pega, no cambia nada, y el diagnóstico
+habría dicho que el agujero se cerró. Hay una prueba que aplica el remedio tal
+como sale y exige que el rechazo desaparezca — para las cuatro vías.
+
+### `pg_stat_statements`: una decisión, no un olvido
+
+Supabase instala `pg_stat_statements` en `extensions`, y la extensión concede
+`SELECT` a `PUBLIC` sobre sus dos vistas. La credencial **necesita** `USAGE`
+sobre `extensions` —sin él `format_type` y `pg_get_expr` cualifican los nombres
+de ahí y la huella deja de coincidir con la del dueño—, así que esas vistas le
+quedan alcanzables **como consecuencia de un requisito de corrección**, no de un
+grant que alguien le haya dado.
+
+**La decisión: no bloquean, y se avisa en cada corrida.** Está escrita en
+`LECTURA_TOLERADA`, con su justificación por entrada, y sale en el diagnóstico
+del modo live cada vez — no en un `if` escondido.
+
+Por qué se tolera:
+
+* No son datos de negocio: son contadores y tiempos por sentencia.
+* Postgres enmascara el texto de las sentencias de **otros** roles con
+  `<insufficient privilege>` salvo para miembros de `pg_read_all_stats`, y esta
+  credencial se rechaza si tiene **cualquier** membresía.
+* Cerrarlo es `REVOKE … FROM PUBLIC`: una decisión de política que afecta a
+  todos los roles. Bloquear el refresco hasta que alguien la tome sería forzar
+  una decisión ajena.
+
+**Qué sigue bloqueando**, y son tres condiciones que tienen que darse juntas: si
+el privilegio llega por un `GRANT` directo, por una membresía o por propiedad,
+bloquea —eso ya no es «la extensión dejó su default»—; si el objeto **no**
+pertenece a una extensión aunque se llame igual, bloquea; y cualquier otra vista
+de extensión bloquea, porque la lista son esas dos y no una categoría.
 
 ### `SECURITY DEFINER`: qué mira el guard y qué no
 
@@ -686,6 +744,32 @@ propiedades:
 serializaban igual. Conceder la facultad de **re-conceder** un privilegio —el
 paso previo a que un rol reparta acceso por su cuenta— era invisible para el
 auditor.
+
+### El guard de separadores en la huella
+
+`fingerprint.sql` afirmaba que «los caracteres de control C0 no aparecen en
+DDL». **Es falso.** Un identificador entre comillas admite cualquier carácter
+menos NUL —`CREATE TABLE "a<0x1e>b"` es SQL válido— y un literal dentro de un
+default o de una expresión de policy también. Con eso:
+
+* un `\x1e` o `\x1f` dentro de un campo hace que **dos catálogos distintos
+  serialicen igual** — una colisión construible, no un accidente;
+* un `\x1d` dentro de un default hace que `default=<algo>` deje de distinguirse
+  de `default=NULL`;
+* un TAB o un salto de línea en un nombre parte la línea de salida
+  (`clave<TAB>sha256<TAB>n`) donde no debe.
+
+Cambiar los separadores rompería `huella-produccion.json`, así que en vez de eso
+hay un **guard fail-closed** al principio del archivo: si aparece alguno, **no
+se emite huella**; se aborta con un error que nombra el objeto. `ON_ERROR_STOP`
+va dentro del propio `.sql` para que sea fail-closed con cualquier llamador, no
+sólo con el que se acuerde de pasar la bandera.
+
+`--verificar-huella` lo ejercita con nombres **citados** que llevan esos
+caracteres —tabla con `\x1e`, columna con `\x1f`, default con `\x1d`, tabla con
+TAB, vista con salto de línea— y comprueba además que, retirado el objeto, la
+huella vuelve a emitirse: un guard que se quedara pegado sería peor que no
+tenerlo.
 
 ### La baseline en la rama base
 

@@ -866,6 +866,80 @@ function psqlLive(url, args) {
 export const SECDEF_PERMITIDAS = new Map()
 
 /**
+ * Lecturas que NO bloquean el refresco, con su justificación y su remedio.
+ *
+ * ES UNA DECISIÓN, NO UNA COMODIDAD, y por eso está escrita acá y no escondida
+ * en un `if`. Se aplica a dos vistas concretas y sólo cuando se cumplen LAS
+ * TRES condiciones de `clasificarLectura`; y no se calla: cada corrida imprime
+ * un aviso nombrándolas.
+ *
+ * EL CASO. Supabase instala `pg_stat_statements` en el esquema `extensions`, y
+ * la extensión concede `SELECT` a `PUBLIC` sobre sus dos vistas. La credencial
+ * del auditor necesita `USAGE` sobre `extensions` —no por conveniencia: sin él
+ * `format_type` y `pg_get_expr` cualifican los nombres de ahí y la huella deja
+ * de coincidir con la del dueño—, así que esas vistas le quedan alcanzables
+ * como CONSECUENCIA de un requisito de corrección, no de un grant que alguien
+ * le haya dado.
+ *
+ * POR QUÉ SE TOLERA:
+ *   · No son datos de negocio: son contadores y tiempos por sentencia.
+ *   · Postgres enmascara el texto de las sentencias de OTROS roles con
+ *     `<insufficient privilege>` salvo para miembros de `pg_read_all_stats`, y
+ *     esta credencial se rechaza si tiene CUALQUIER membresía.
+ *   · Cerrarlo es `REVOKE … FROM PUBLIC`: una decisión de POLÍTICA que afecta a
+ *     todos los roles de la base. No la toma el auditor, y bloquear el refresco
+ *     hasta que alguien la tome sería obligar a una decisión ajena.
+ *
+ * QUÉ SIGUE BLOQUEANDO. Si el privilegio llega por un GRANT directo al auditor,
+ * por una membresía o por propiedad, bloquea: eso ya no es «la extensión dejó
+ * su default», es alguien dándole acceso a esta credencial. Y si aparece un
+ * objeto con ese nombre que NO pertenece a una extensión, también.
+ */
+export const LECTURA_TOLERADA = new Map([
+  ['extensions.pg_stat_statements',
+   'vista de la extensión pg_stat_statements: métricas por sentencia, sin filas de negocio, ' +
+   'y con el texto de otros roles enmascarado. Alcanzable porque la credencial necesita USAGE ' +
+   'sobre `extensions` para que la huella coincida con la del dueño.'],
+  ['extensions.pg_stat_statements_info',
+   'vista de la extensión pg_stat_statements: sólo la marca del último reset y el conteo de ' +
+   'sentencias descartadas. Mismo caso que la anterior.'],
+])
+
+/**
+ * Parte las lecturas detectadas en las que bloquean y las toleradas.
+ *
+ * Las TRES condiciones tienen que darse juntas. Cualquiera que falte y vuelve a
+ * bloquear: la tolerancia describe un caso concreto, no una categoría.
+ */
+export function clasificarLectura(items) {
+  const bloquean = [], tolerados = []
+  for (const it of items) {
+    const razon = LECTURA_TOLERADA.get(it.nombre)
+    const soloDePublic = it.fuentes.length > 0 && it.fuentes.every(f => f === 'PUBLIC')
+    if (razon && it.flags.includes('ext') && soloDePublic) tolerados.push({ ...it, razon })
+    else bloquean.push(it)
+  }
+  return { bloquean, tolerados }
+}
+
+/**
+ * Lo que la credencial alcanza y no bloquea, para decirlo en voz alta.
+ *
+ * Un guard que tolera algo en silencio deja de ser un guard: a los tres meses
+ * nadie recuerda qué está tolerado ni por qué. Esto se imprime en cada corrida
+ * del modo live, junto al resto del diagnóstico.
+ */
+export function avisarCredencial(m) {
+  const items = (m.leibles ?? '').split('\x1e').filter(Boolean).map(x => {
+    const [nombre, esquema = '', via = '', flags = ''] = x.split('\x1d')
+    return { nombre, esquema, via, fuentes: via.split('+').filter(Boolean), flags }
+  })
+  return clasificarLectura(items).tolerados.map(t =>
+    `lectura TOLERADA — ${t.nombre} [vía ${t.via}]: ${t.razon} ` +
+    `Para cerrarla: REVOKE SELECT ON ${t.nombre} FROM PUBLIC; (decisión de política, afecta a todos los roles).`)
+}
+
+/**
  * Lo que hay que medir del OTRO lado antes de leer nada.
  *
  * Se mide, no se declara: la única afirmación aceptable sobre una credencial es
@@ -882,30 +956,87 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   -- proyecto y harían saltar la regla siempre.
   SELECT oid, nspname FROM pg_namespace
    WHERE nspname NOT LIKE 'pg\\_%' AND nspname <> 'information_schema'
+), yo_oid AS (
+  SELECT oid FROM pg_roles WHERE rolname = current_user
 ), rel AS (
+  -- ALCANZABLE = USAGE sobre el esquema Y el privilegio. Las dos condiciones,
+  -- igual que para las funciones: sin USAGE la tabla no se puede nombrar, así
+  -- que un \`GRANT SELECT … TO PUBLIC\` sobre algo en un esquema cerrado no le
+  -- sirve a nadie. Rechazar por eso obligaría a limpiar objetos que nadie
+  -- alcanza, y a la tercera vez alguien apaga el guard.
+  --
   -- \`format('%I', …)\` y no \`nspname||'.'||relname\`: los nombres vuelven en
   -- remedios que alguien va a pegar en un psql, así que los cita POSTGRES —que
-  -- sabe cuándo hace falta— y no una concatenación de JavaScript. Un esquema
-  -- llamado \`mi esquema\` o \`"raro"\` sale bien citado, y de paso deja de ser
-  -- ambiguo un punto dentro de un nombre.
-  --
-  -- Van el objeto y su ESQUEMA por separado, con \x1d en medio: el remedio de
-  -- ESCRITURA y SELECT es por esquema, y hay que saber cuáles son de verdad.
-  SELECT c.oid,
-         format('%I.%I', n.nspname, c.relname)||E'\\x1d'||format('%I', n.nspname) AS nombre
+  -- sabe cuándo hace falta— y no una concatenación de JavaScript.
+  SELECT c.oid, c.relacl, c.relowner,
+         format('%I.%I', n.nspname, c.relname) AS nombre,
+         format('%I', n.nspname) AS esquema,
+         -- ¿El objeto lo instaló una EXTENSIÓN? Decide cómo se trata un
+         -- \`pg_stat_statements\` (ver LECTURA_TOLERADA en auditar.mjs).
+         EXISTS (SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+                    AND d.deptype = 'e') AS de_extension
     FROM pg_class c JOIN no_interno n ON n.oid = c.relnamespace
    WHERE c.relkind IN ('r','p','v','m','f')
+     AND has_schema_privilege(current_user, n.oid, 'USAGE')
+), rel_via AS (
+  -- DE DÓNDE viene cada privilegio, porque el remedio depende de eso: si el
+  -- SELECT llega por PUBLIC, un \`REVOKE … FROM <auditor>\` no lo quita —no hay
+  -- nada que quitarle— y el diagnóstico habría dicho que estaba resuelto.
+  -- Las fuentes se ACUMULAN: PUBLIC, grant directo, membresía y propiedad
+  -- pueden darse a la vez.
+  SELECT r.*,
+         (SELECT array_to_string(
+                   coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                                                            ELSE format('%I', g.rolname) END)
+                               FROM aclexplode(coalesce(r.relacl, acldefault('r', r.relowner))) a
+                               LEFT JOIN pg_roles g ON g.oid = a.grantee
+                              WHERE a.privilege_type = 'SELECT'
+                                AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                            ARRAY[]::text[])
+                   || CASE WHEN r.relowner = (SELECT oid FROM yo_oid)
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_select,
+         (SELECT array_to_string(
+                   coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                                                            ELSE format('%I', g.rolname) END)
+                               FROM aclexplode(coalesce(r.relacl, acldefault('r', r.relowner))) a
+                               LEFT JOIN pg_roles g ON g.oid = a.grantee
+                              WHERE a.privilege_type IN ('INSERT','UPDATE','DELETE','TRUNCATE')
+                                AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                            ARRAY[]::text[])
+                   || CASE WHEN r.relowner = (SELECT oid FROM yo_oid)
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_escritura,
+         -- El SELECT por COLUMNA vive en \`pg_attribute.attacl\`, no en relacl.
+         (SELECT array_to_string(
+                   coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                                                            ELSE format('%I', g.rolname) END)
+                               FROM pg_attribute at
+                               CROSS JOIN LATERAL aclexplode(at.attacl) a
+                               LEFT JOIN pg_roles g ON g.oid = a.grantee
+                              WHERE at.attrelid = r.oid AND at.attnum > 0 AND NOT at.attisdropped
+                                AND a.privilege_type = 'SELECT'
+                                AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                            ARRAY[]::text[])
+                   || CASE WHEN r.relowner = (SELECT oid FROM yo_oid)
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_columna
+    FROM rel r
 ), escribibles AS (
-  SELECT nombre FROM rel
+  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_escritura||E'\\x1d'||
+         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
+    FROM rel_via
    WHERE has_table_privilege(oid,'INSERT') OR has_table_privilege(oid,'UPDATE')
       OR has_table_privilege(oid,'DELETE') OR has_table_privilege(oid,'TRUNCATE')
 ), leibles AS (
-  SELECT nombre FROM rel WHERE has_table_privilege(oid,'SELECT')
+  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_select||E'\\x1d'||
+         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
+    FROM rel_via WHERE has_table_privilege(oid,'SELECT')
 ), leibles_por_columna AS (
   -- SELECT por COLUMNA. \`has_table_privilege\` no lo ve: un GRANT
   -- SELECT(columna) no concede el privilegio a nivel tabla, y sin embargo
   -- alcanza para leer datos. Se pregunta aparte, con has_any_column_privilege.
-  SELECT nombre FROM rel
+  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_columna||E'\\x1d'||
+         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
+    FROM rel_via
    WHERE has_any_column_privilege(oid,'SELECT') AND NOT has_table_privilege(oid,'SELECT')
 ), secdef AS (
   -- ALCANZABLE = USAGE sobre el esquema Y EXECUTE efectivo sobre la función.
@@ -1055,48 +1186,80 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       `ALTER ROLE ${usuarioSql} NOREPLICATION;`)
   }
 
-  // ── Tablas: el remedio sale de los esquemas REALMENTE detectados ──────────
+  // ── Tablas: alcanzables de verdad, y el remedio según de dónde viene ──────
   //
-  // El escaneo mira todos los esquemas no internos, así que un remedio fijado a
-  // `public` es directamente falso cuando la tabla está en `auth` o en un
-  // esquema propio: se pega, no cambia nada, y el guard vuelve a saltar. Se
-  // agrupa por esquema —tal como vino, ya citado por Postgres— y se emite una
-  // línea por cada uno.
-  const tablas = (clave) => {
-    const items = lista(clave).map(partes)
-    return {
-      nombres: items.map(([nombre]) => nombre),
-      esquemas: [...new Set(items.map(([, esquema]) => esquema).filter(Boolean))],
+  // Cada elemento llega como `nombre\x1desquema\x1dprocedencia\x1dflags`. La
+  // procedencia decide el remedio, y equivocarlo es peor que no darlo: si el
+  // SELECT viene de PUBLIC, un `REVOKE … FROM <auditor>` no quita nada —no hay
+  // nada que quitarle— y deja creer que el agujero se cerró.
+  const tablas = (clave) => lista(clave).map(x => {
+    const [nombre, esquema = '', via = '', flags = ''] = partes(x)
+    return { nombre, esquema, via, fuentes: via.split('+').filter(Boolean), flags }
+  })
+
+  const remediosDeTabla = (items, privs, revocaEnTabla) => {
+    const directos = new Set(), lineas = []
+    for (const it of items) {
+      if (it.fuentes.includes(usuarioSql)) directos.add(it.esquema)
+      if (it.fuentes.includes('PUBLIC')) {
+        // NO se propone `FROM <auditor>`: el privilegio es de PUBLIC, y
+        // quitárselo a PUBLIC es una DECISIÓN DE POLÍTICA que afecta a todos
+        // los roles de la base. No la toma el auditor.
+        lineas.push(`REVOKE ${privs} ON ${it.nombre} FROM PUBLIC;   -- viene de PUBLIC: es una ` +
+                    'decisión de POLÍTICA, afecta a TODOS los roles')
+      }
+      if (it.fuentes.includes('dueño')) {
+        lineas.push(`ALTER TABLE ${it.nombre} OWNER TO <otro rol>;   -- lo alcanza por ser su dueño`)
+      }
+      for (const rol of it.fuentes.filter(x => x !== 'PUBLIC' && x !== usuarioSql && x !== 'dueño')) {
+        lineas.push(`REVOKE ${rol} FROM ${usuarioSql};   -- llega por membresía en ${rol}; ` +
+                    `NO se le revoca a ${rol}, que es de la aplicación`)
+      }
     }
+    // El grant directo sí se puede barrer por esquema, que es lo que se quiere
+    // para un rol dedicado.
+    const porEsquema = [...directos].sort().map(e =>
+      revocaEnTabla ? null : `REVOKE ${privs} ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`)
+      .filter(Boolean)
+    const porTabla = revocaEnTabla
+      ? items.filter(it => it.fuentes.includes(usuarioSql))
+             .map(it => `REVOKE ${privs} ON ${it.nombre} FROM ${usuarioSql};`)
+      : []
+    const todas = [...new Set([...porEsquema, ...porTabla, ...lineas])].slice(0, 14)
+    return todas.length > 0
+      ? todas.join('\n      ')
+      : '-- no se pudo determinar la procedencia; revisar el ACL de esos objetos a mano'
   }
-  const porEsquema = (esquemas, plantilla) =>
-    esquemas.map(plantilla).join('\n      ') || '(ningún esquema identificado)'
 
   const escribibles = tablas('escribibles')
-  if (escribibles.nombres.length > 0) {
+  if (escribibles.length > 0) {
     rechazar('ESCRITURA',
-      `puede escribir en ${escribibles.nombres.length} tabla(s): ${muestra(escribibles.nombres)}`,
-      porEsquema(escribibles.esquemas,
-        e => `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`))
+      `puede escribir en ${escribibles.length} tabla(s): ` +
+      muestra(escribibles.map(t => `${t.nombre} [vía ${t.via || '?'}]`)),
+      remediosDeTabla(escribibles, 'INSERT, UPDATE, DELETE, TRUNCATE', false))
   }
 
-  const leibles = tablas('leibles')
-  if (leibles.nombres.length > 0) {
+  // El SELECT se parte en dos: lo que bloquea y lo que está clasificado como
+  // tolerado (ver `LECTURA_TOLERADA`). Lo tolerado NO se calla: sale como aviso
+  // en cada corrida.
+  const { bloquean, tolerados } = clasificarLectura(tablas('leibles'))
+  if (bloquean.length > 0) {
     rechazar('SELECT DE TABLA',
-      `puede leer ${leibles.nombres.length} tabla(s): ${muestra(leibles.nombres)} — ` +
+      `puede leer ${bloquean.length} tabla(s): ` +
+      `${muestra(bloquean.map(t => `${t.nombre} [vía ${t.via || '?'}]`))} — ` +
       'la huella sale del catálogo, así que leer datos no le sirve y sí lo vuelve peligroso',
-      porEsquema(leibles.esquemas, e => `REVOKE SELECT ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`))
+      remediosDeTabla(bloquean, 'SELECT', false))
   }
 
   const porColumna = tablas('leibles_columna')
-  if (porColumna.nombres.length > 0) {
+  if (porColumna.length > 0) {
     // Acá no sirve `ON ALL TABLES`: un GRANT por columna se revoca nombrando la
-    // columna. Se listan las tablas concretas, que es lo accionable.
+    // columna, así que el remedio va tabla por tabla.
     rechazar('SELECT POR COLUMNA',
-      `tiene SELECT por columna en ${porColumna.nombres.length} tabla(s): ` +
-      `${muestra(porColumna.nombres)} — no aparece en has_table_privilege y alcanza igual para leer datos`,
-      porColumna.nombres.slice(0, 12)
-        .map(n => `REVOKE SELECT (<columnas>) ON ${n} FROM ${usuarioSql};`).join('\n      '))
+      `tiene SELECT por columna en ${porColumna.length} tabla(s): ` +
+      `${muestra(porColumna.map(t => `${t.nombre} [vía ${t.via || '?'}]`))} — ` +
+      'no aparece en has_table_privilege y alcanza igual para leer datos',
+      remediosDeTabla(porColumna, 'SELECT (<columnas>)', true))
   }
 
   const crearEsquemas = lista('crear_esquemas')
@@ -1249,6 +1412,9 @@ function sembrarProduccionLive({ url, proyectoEsperado, escribir = true }) {
     }
     return 1
   }
+  // Lo tolerado se dice en voz alta, siempre: un guard que calla lo que deja
+  // pasar deja de ser un guard a los tres meses.
+  for (const a of avisarCredencial(medidas)) console.error(`· ${a}`)
   console.error(`✓ credencial de solo lectura: ${medidas.usuario} — sin superusuario, sin BYPASSRLS, ` +
                 'sin REPLICATION, sin permisos de escritura ni de SELECT, sin CREATE ni membresías, ' +
                 'sin SECURITY DEFINER al alcance, sesión read-only')
@@ -1474,8 +1640,40 @@ async function pruebaLive() {
       --    que veríamos sería el de CREATE SOBRE ESQUEMA y no el que se prueba.
       CREATE SCHEMA drift_esq_duenio;
       CREATE FUNCTION drift_esq_duenio.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
-      REVOKE EXECUTE ON FUNCTION drift_esq_duenio.sd() FROM PUBLIC;`,
+      REVOKE EXECUTE ON FUNCTION drift_esq_duenio.sd() FROM PUBLIC;
+
+      -- ── Y lo mismo para TABLAS, que es donde están los datos ──────────────
+      -- h) SELECT a PUBLIC en un esquema CERRADO: no es alcanzable
+      CREATE SCHEMA drift_tab_cerrado;
+      CREATE TABLE drift_tab_cerrado.t (id int);
+      GRANT SELECT ON drift_tab_cerrado.t TO PUBLIC;
+
+      -- i) SELECT a PUBLIC en un esquema que sí se abre
+      CREATE SCHEMA drift_tab_pub;
+      CREATE TABLE drift_tab_pub.t (id int);
+      GRANT SELECT ON drift_tab_pub.t TO PUBLIC;
+
+      -- j) SELECT que llega por un rol intermedio
+      CREATE ROLE drift_grupo_tab NOLOGIN;
+      CREATE SCHEMA drift_tab_grupo;
+      CREATE TABLE drift_tab_grupo.t (id int);
+      GRANT SELECT ON drift_tab_grupo.t TO drift_grupo_tab;
+
+      -- k) una tabla cuya propiedad se le cede al auditor
+      CREATE SCHEMA drift_tab_duenio;
+      CREATE TABLE drift_tab_duenio.t (id int);`,
     ], { stdio: 'pipe' })
+
+    // ── pg_stat_statements, el caso que obligó a decidir ─────────────────────
+    //
+    // Supabase la instala en \`extensions\`, y la extensión concede SELECT a
+    // PUBLIC sobre sus dos vistas. La credencial NECESITA USAGE sobre
+    // \`extensions\` —sin él la huella no coincide con la del dueño—, así que le
+    // quedan alcanzables por un requisito de corrección, no por un grant que
+    // alguien le haya dado. La decisión está en \`LECTURA_TOLERADA\`: no bloquea,
+    // pero se avisa en cada corrida. Acá se prueba con la extensión REAL.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'CREATE EXTENSION IF NOT EXISTS pg_stat_statements SCHEMA extensions;'], { stdio: 'pipe' })
     const NEGATIVOS = [
       // Los cuatro atributos del rol. Estaban «comprobados» desde el primer
       // día y NINGUNO funcionaba: el SQL devolvía 'true' y el JavaScript
@@ -1503,9 +1701,11 @@ async function pruebaLive() {
         pecado: 'GRANT drift_grupo TO drift_miembro;' },
       // Las cuatro formas de alcanzar —o no— una SECURITY DEFINER.
       { rol: 'drift_secdef',     regla: 'SECURITY DEFINER', via: 'drift_secdef',
+        cura: true,
         que: 'un GRANT EXECUTE directo al auditor, en public',
         pecado: 'GRANT EXECUTE ON FUNCTION public.drift_sd() TO drift_secdef;' },
       { rol: 'drift_sd_publico', regla: 'SECURITY DEFINER', via: 'PUBLIC',
+        cura: true,
         que: 'EXECUTE a PUBLIC en un esquema propio con USAGE',
         pecado: 'GRANT USAGE ON SCHEMA drift_esq_pub TO drift_sd_publico;' },
       { rol: 'drift_sd_ext',     regla: 'SECURITY DEFINER', via: 'drift_sd_ext',
@@ -1514,15 +1714,18 @@ async function pruebaLive() {
 
       // ── Fuera de `public`: el remedio tiene que nombrar el esquema real ────
       { rol: 'drift_selector_otro', regla: 'SELECT DE TABLA',
+        cura: true,
         que: 'SELECT sobre una tabla de un esquema que no es public',
         contiene: ['REVOKE SELECT ON ALL TABLES IN SCHEMA drift_esq_otro FROM drift_selector_otro;'],
         noContiene: ['IN SCHEMA public'],
-        pecado: 'GRANT SELECT ON drift_esq_otro.tabla TO drift_selector_otro;' },
+        pecado: 'GRANT USAGE ON SCHEMA drift_esq_otro TO drift_selector_otro; ' +
+                'GRANT SELECT ON drift_esq_otro.tabla TO drift_selector_otro;' },
       { rol: 'drift_escritor_otro', regla: 'ESCRITURA',
         que: 'INSERT sobre una tabla de un esquema que no es public',
         contiene: ['ON ALL TABLES IN SCHEMA drift_esq_otro FROM drift_escritor_otro;'],
         noContiene: ['IN SCHEMA public'],
-        pecado: 'GRANT INSERT ON drift_esq_otro.tabla TO drift_escritor_otro;' },
+        pecado: 'GRANT USAGE ON SCHEMA drift_esq_otro TO drift_escritor_otro; ' +
+                'GRANT INSERT ON drift_esq_otro.tabla TO drift_escritor_otro;' },
 
       // ── Fuentes ACUMULADAS: cerrar una sola deja el camino abierto ─────────
       { rol: 'drift_sd_doble', regla: 'SECURITY DEFINER',
@@ -1553,6 +1756,34 @@ async function pruebaLive() {
         pecado: 'GRANT USAGE, CREATE ON SCHEMA drift_esq_duenio TO drift_sd_duenio; ' +
                 'ALTER FUNCTION drift_esq_duenio.sd() OWNER TO drift_sd_duenio; ' +
                 'REVOKE CREATE ON SCHEMA drift_esq_duenio FROM drift_sd_duenio;' },
+
+      // ── Las mismas cuatro vías, sobre TABLAS ──────────────────────────────
+      //
+      // Y con la exigencia que las hace accionables: el remedio tiene que
+      // apuntar a QUIEN TIENE el privilegio. Un `REVOKE … FROM <auditor>` sobre
+      // algo concedido a PUBLIC no quita nada y deja creer que se cerró.
+      { rol: 'drift_tab_publico', regla: 'SELECT DE TABLA',
+        que: 'SELECT a PUBLIC sobre una tabla, con USAGE del esquema',
+        contiene: ['[vía PUBLIC]', 'REVOKE SELECT ON drift_tab_pub.t FROM PUBLIC;',
+                   'decisión de POLÍTICA'],
+        noContiene: ['FROM drift_tab_publico;'],
+        cura: true,
+        pecado: 'GRANT USAGE ON SCHEMA drift_tab_pub TO drift_tab_publico;' },
+      { rol: 'drift_tab_grupo_rol', regla: 'SELECT DE TABLA',
+        que: 'SELECT que llega por una membresía',
+        contiene: ['REVOKE drift_grupo_tab FROM drift_tab_grupo_rol;'],
+        // Nunca al rol intermedio: si fuera `authenticated`, romper el producto.
+        noContiene: ['SELECT ON drift_tab_grupo.t FROM drift_grupo_tab;'],
+        cura: true,
+        pecado: 'GRANT drift_grupo_tab TO drift_tab_grupo_rol; ' +
+                'GRANT USAGE ON SCHEMA drift_tab_grupo TO drift_tab_grupo_rol;' },
+      { rol: 'drift_tab_duenio_rol', regla: 'SELECT DE TABLA',
+        que: 'ser DUEÑO de la tabla',
+        contiene: ['dueño]', 'ALTER TABLE drift_tab_duenio.t OWNER TO'],
+        cura: true,
+        pecado: 'GRANT USAGE, CREATE ON SCHEMA drift_tab_duenio TO drift_tab_duenio_rol; ' +
+                'ALTER TABLE drift_tab_duenio.t OWNER TO drift_tab_duenio_rol; ' +
+                'REVOKE CREATE ON SCHEMA drift_tab_duenio FROM drift_tab_duenio_rol;' },
     ]
     for (const n of NEGATIVOS) {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
@@ -1626,6 +1857,81 @@ async function pruebaLive() {
       { [VAR_URL_LIVE]: urlDe('drift_lector') })
     comprobar(cerrado.codigo === 0 && !/✗ SECURITY DEFINER/.test(cerrado.salida),
       'una SECURITY DEFINER con EXECUTE a PUBLIC en un esquema SIN USAGE no es alcanzable, y no se rechaza')
+    // Y lo mismo para TABLAS: `drift_tab_cerrado.t` tiene SELECT a PUBLIC y
+    // este rol no tiene USAGE sobre su esquema. `has_table_privilege` dice que
+    // sí; sin USAGE no puede ni nombrarla.
+    comprobar(!/drift_tab_cerrado/.test(cerrado.salida),
+      'una tabla con SELECT a PUBLIC en un esquema SIN USAGE tampoco se marca alcanzable')
+
+
+    // ── 2 quater · el remedio tiene que ELIMINAR la vía, no describirla ──────
+    //
+    // La prueba que faltaba. Un diagnóstico puede nombrar la regla correcta,
+    // decir la procedencia correcta y proponer un SQL que no cambia nada — es
+    // exactamente lo que pasaba con `REVOKE … FROM <auditor>` sobre un
+    // privilegio de PUBLIC—. Acá se APLICA lo que el auditor propone, tal cual
+    // sale, y se exige que el rechazo desaparezca.
+    const remediosDe = (salida, regla) => {
+      const lineas = salida.split('\n')
+      const i = lineas.findIndex(l => l.startsWith(`  ✗ ${regla}:`))
+      if (i === -1) return []
+      const sql = []
+      for (const l of lineas.slice(i + 1)) {
+        if (!l.startsWith('      ')) break
+        const limpio = l.trim().replace(/\s+--.*$/, '').trim()
+        // Las líneas que son sólo comentario, y las que dejan un hueco para que
+        // lo llene una persona, no se aplican solas.
+        if (limpio === '' || limpio.startsWith('--')) continue
+        sql.push(limpio.replace('<otro rol>', 'postgres'))
+      }
+      // Sólo lo que ES una sentencia: el bloque trae además una línea en prosa
+      // («o declarar la función en SECDEF_PERMITIDAS…») que no se ejecuta.
+      return sql.filter(s => s.endsWith(';') && !/<[^>]+>/.test(s))
+    }
+
+    for (const n of NEGATIVOS.filter(x => x.cura)) {
+      const antes = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+        { [VAR_URL_LIVE]: urlDe(n.rol) })
+      const sql = remediosDe(antes.salida, n.regla)
+      if (sql.length === 0) {
+        comprobar(false, `${n.rol}: el diagnóstico de ${n.regla} no trae ningún SQL aplicable`)
+        continue
+      }
+      for (const s of sql) db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
+      const despues = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+        { [VAR_URL_LIVE]: urlDe(n.rol) })
+      comprobar(!new RegExp(`✗ ${n.regla}:`).test(despues.salida),
+        `${n.rol}: aplicar el remedio de ${n.regla} (${sql.length} sentencia(s)) elimina la vía`)
+    }
+
+    // ── 2 quinquies · pg_stat_statements: tolerada, y dicha en voz alta ──────
+    //
+    // La extensión real está instalada en `extensions`, y concede SELECT a
+    // PUBLIC sobre sus dos vistas. La credencial necesita USAGE sobre ese
+    // esquema para que la huella coincida con la del dueño, así que las alcanza
+    // por un requisito de corrección. La decisión —documentada en
+    // `LECTURA_TOLERADA`— es no bloquear y avisar en cada corrida.
+    const conStat = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(/pg_stat_statements/.test(conStat.salida),
+      'pg_stat_statements es alcanzable con USAGE sobre `extensions` y el auditor lo detecta')
+    comprobar(conStat.codigo === 0 && !/✗ SELECT DE TABLA/.test(conStat.salida),
+      'y NO bloquea el refresco: está clasificada, no descubierta')
+    comprobar(/lectura TOLERADA — extensions\.pg_stat_statements \[vía PUBLIC\]/.test(conStat.salida),
+      'y se dice en voz alta, con su procedencia, en vez de callarse')
+    comprobar(/REVOKE SELECT ON extensions\.pg_stat_statements FROM PUBLIC;/.test(conStat.salida),
+      'y con el remedio por si se quiere cerrar (decisión de política)')
+
+    // Pero si el privilegio deja de venir SÓLO de PUBLIC, vuelve a bloquear:
+    // un GRANT directo a esta credencial ya no es «la extensión dejó su
+    // default», es alguien dándole acceso.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'CREATE ROLE drift_stat LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_stat; ' +
+      'GRANT SELECT ON extensions.pg_stat_statements TO drift_stat;'], { stdio: 'pipe' })
+    const statDirecto = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_stat') })
+    comprobar(statDirecto.codigo !== 0 && /✗ SELECT DE TABLA:/.test(statDirecto.salida),
+      'con un GRANT DIRECTO sobre pg_stat_statements, la tolerancia no aplica y bloquea')
 
     // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────
     //
@@ -1857,6 +2163,79 @@ async function principal() {
         console.error('✗ SENSIBILIDAD: el conteo cambió; el cambio no era sólo del NOT NULL.'); process.exit(1)
       }
       console.error('✓ sensibilidad: quitar un NOT NULL mueve exactamente 1 grupo, sin tocar el conteo')
+
+      // ── El guard de separadores, contra un catálogo real ────────────────
+      //
+      // El comentario del fingerprint afirmaba que «los caracteres de control
+      // C0 no aparecen en DDL». Es FALSO: un identificador entre comillas
+      // admite cualquier carácter menos NUL, y un literal dentro de un default
+      // o de una policy también. Con eso, dos catálogos DISTINTOS serializan
+      // igual —una colisión construible, no un accidente— o parten la línea de
+      // salida donde no debe.
+      //
+      // Cambiar el separador rompería `huella-produccion.json`, así que el
+      // guard aborta en vez de emitir. Estas regresiones lo ejercitan con
+      // nombres CITADOS que llevan esos caracteres: sin el guard, las tres
+      // primeras devuelven una huella tan tranquilas.
+      const rompe = (etiqueta, sql, patron) => {
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], { stdio: 'pipe' })
+        let salida = ''
+        try {
+          huella(db.psql)
+        } catch (err) {
+          salida = String(err.stderr ?? err.message)
+        }
+        if (!patron.test(salida)) {
+          console.error(`✗ GUARD: ${etiqueta} — la huella se emitió igual, o falló por otra cosa.`)
+          console.error(`    ${salida.split('\n').slice(0, 3).join(' | ') || '(sin error: devolvió huella)'}`)
+          process.exit(1)
+        }
+        console.error(`✓ guard: ${etiqueta}`)
+      }
+      const CTRL = { rs: 'chr(30)', us: 'chr(31)', gs: 'chr(29)', tab: 'chr(9)', nl: 'chr(10)' }
+      const crear = (sql) => `DO $g$ BEGIN EXECUTE ${sql}; END $g$;`
+
+      rompe('un nombre de tabla con \\x1e adentro',
+        crear(`format('CREATE TABLE public.%I (c int)', 'ctrl'||${CTRL.rs}||'tabla')`),
+        /SEPARADOR DE LA HUELLA/)
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        crear(`format('DROP TABLE public.%I', 'ctrl'||${CTRL.rs}||'tabla')`)], { stdio: 'pipe' })
+
+      rompe('un nombre de columna con \\x1f adentro',
+        crear(`format('CREATE TABLE public.ctrl_col (%I int)', 'c'||${CTRL.us}||'x')`),
+        /SEPARADOR DE LA HUELLA/)
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', 'DROP TABLE public.ctrl_col;'], { stdio: 'pipe' })
+
+      // El \x1d es el NULL explícito: un default que lo contenga hace que
+      // `default=<algo>` y `default=NULL` dejen de distinguirse.
+      rompe('un default que contiene \\x1d',
+        crear(`format('CREATE TABLE public.ctrl_def (c text DEFAULT %L)', 'a'||${CTRL.gs}||'b')`),
+        /SEPARADOR DE LA HUELLA/)
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', 'DROP TABLE public.ctrl_def;'], { stdio: 'pipe' })
+
+      // TAB y salto de línea no rompen la serialización sino la SALIDA: la
+      // línea es `clave<TAB>sha256<TAB>n`. Por eso son un guard aparte.
+      rompe('un nombre de tabla con un TAB adentro',
+        crear(`format('CREATE TABLE public.%I (c int)', 'ctrl'||${CTRL.tab}||'tab')`),
+        /TAB O SALTO DE LÍNEA EN UN COMPONENTE DE CLAVE/)
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        crear(`format('DROP TABLE public.%I', 'ctrl'||${CTRL.tab}||'tab')`)], { stdio: 'pipe' })
+
+      rompe('un nombre de vista con un salto de línea adentro',
+        crear(`format('CREATE VIEW public.%I AS SELECT 1 AS x', 'ctrl'||${CTRL.nl}||'vista')`),
+        /TAB O SALTO DE LÍNEA EN UN COMPONENTE DE CLAVE/)
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        crear(`format('DROP VIEW public.%I', 'ctrl'||${CTRL.nl}||'vista')`)], { stdio: 'pipe' })
+
+      // Y la contraprueba: quitado el objeto, la huella vuelve a emitirse. Un
+      // guard que se quedara pegado sería peor que no tenerlo.
+      const despuesDelGuard = parsearHuella(huella(db.psql))
+      if (despuesDelGuard.size !== despues.size) {
+        console.error(`✗ GUARD: tras limpiar quedaron ${despuesDelGuard.size} grupos y había ${despues.size}.`)
+        process.exit(1)
+      }
+      console.error(`✓ guard: retirado el objeto, la huella vuelve a emitirse (${despuesDelGuard.size} grupos)`)
+
       console.error('\n✓ La huella es determinista, estable ante entradas equivalentes y sensible al cambio.')
       return
     }
