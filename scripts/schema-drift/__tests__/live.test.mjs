@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
-  juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive,
+  juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive, tipoDeHost,
 } from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
@@ -217,10 +217,14 @@ describe('refDeUrl · refs que no tienen forma de ref', () => {
 
 const sana = {
   usuario: 'drift_readonly',
+  // Citado por Postgres con `quote_ident`, no por una plantilla de JavaScript.
+  usuario_sql: 'drift_readonly',
   superusuario: 'false', bypassrls: 'false', crear_roles: 'false',
   crear_bases: 'false', replicacion: 'false',
   solo_lectura: 'on', version: '17.6.1', search_path: '"$user", public, extensions',
 }
+// Una tabla llega como `nombre\x1desquema`: los dos ya citados desde SQL.
+const T = (nombre, esquema) => `${nombre}\x1d${esquema}`
 const reglas = (m, opciones) => juzgarCredencial(m, opciones).map(r => r.regla)
 
 describe('juzgarCredencial', () => {
@@ -247,16 +251,16 @@ describe('juzgarCredencial', () => {
   }
 
   it('rechaza que pueda escribir', () => {
-    expect(reglas({ ...sana, escribibles: 'public.clientes' })).toContain('ESCRITURA')
+    expect(reglas({ ...sana, escribibles: T('public.clientes', 'public') })).toContain('ESCRITURA')
   })
 
   it('rechaza SELECT a nivel tabla: la huella sale del catálogo, no de los datos', () => {
-    expect(reglas({ ...sana, leibles: 'public.clientes\x1epublic.facturas' }))
+    expect(reglas({ ...sana, leibles: [T('public.clientes', 'public'), T('public.facturas', 'public')].join('\x1e') }))
       .toContain('SELECT DE TABLA')
   })
 
   it('rechaza SELECT por columna, que has_table_privilege no ve', () => {
-    expect(reglas({ ...sana, leibles_columna: 'public.usuarios' })).toContain('SELECT POR COLUMNA')
+    expect(reglas({ ...sana, leibles_columna: T('public.usuarios', 'public') })).toContain('SELECT POR COLUMNA')
   })
 
   it('rechaza CREATE sobre un esquema', () => {
@@ -283,7 +287,7 @@ describe('juzgarCredencial', () => {
   })
 
   it('cada motivo trae un remedio en SQL, no sólo un reproche', () => {
-    for (const r of juzgarCredencial({ ...sana, bypassrls: 'true', leibles: 'public.clientes' })) {
+    for (const r of juzgarCredencial({ ...sana, bypassrls: 'true', leibles: T('public.clientes', 'public') })) {
       expect(r.remedio.length).toBeGreaterThan(0)
     }
   })
@@ -496,4 +500,164 @@ describe('juzgarCredencial · la medición tiene que estar completa', () => {
       expect(reglas(incompleta)).toEqual(['MEDICIÓN INCOMPLETA'])
     })
   }
+})
+
+describe('validarUrlLive · la base viaja en el path, no en un parámetro', () => {
+  // Rechazar `?dbname=` no alcanza: en una URI normal el nombre de la base ES
+  // el path. `…/otra_base` cambia qué se mide sin tocar un solo parámetro, y un
+  // refresco que midiera otra base la versionaría como si fuera producción.
+  it('acepta /postgres en la conexión directa', () => {
+    expect(problemas(`${DIRECTA}?sslmode=require`)).toEqual([])
+  })
+
+  it('acepta /postgres en el Session Pooler', () => {
+    expect(problemas(`${POOLER}?sslmode=require`)).toEqual([])
+  })
+
+  const sinPath = 'postgresql://drift_readonly:s3creto@db.nnsqmeigtgewatameexo.supabase.co:5432'
+  const casos = [
+    ['otra base', `${sinPath}/otra_base?sslmode=require`, /se espera exactamente/],
+    ['base vacía', `${sinPath}/?sslmode=require`, /no declara base/],
+    ['sin path', `${sinPath}?sslmode=require`, /no declara base/],
+    ['segmento de más', `${sinPath}/postgres/extra?sslmode=require`, /se espera exactamente/],
+    ['barra final', `${sinPath}/postgres/?sslmode=require`, /se espera exactamente/],
+    // `%70ostgres` decodifica a `postgres` y libpq lo acepta. Un secreto
+    // legítimo no se escribe así: aceptarlo sólo daría formas de esconder algo
+    // a la vista, y la comparación es en crudo por eso.
+    ['path codificado', `${sinPath}/%70ostgres?sslmode=require`, /escapes %xx/],
+  ]
+  for (const [nombre, url, patron] of casos) {
+    it(`rechaza ${nombre}`, () => expect(problemas(url).some(x => patron.test(x))).toBe(true))
+  }
+})
+
+describe('validarUrlLive · el puerto es parte del destino', () => {
+  const conPuerto = (p) =>
+    `postgresql://drift_readonly.nnsqmeigtgewatameexo:s3creto@aws-1-us-east-2.pooler.supabase.com:${p}/postgres?sslmode=require`
+
+  it('acepta 5432, que es el modo sesión', () => {
+    expect(problemas(conPuerto(5432))).toEqual([])
+  })
+
+  // 6543 es el modo TRANSACCIÓN del pooler, y ahí `PGOPTIONS` no rige: el guard
+  // de solo lectura se caería sin que nada avise. Por eso no se soporta.
+  it('rechaza 6543: en modo transacción PGOPTIONS no rige', () => {
+    expect(problemas(conPuerto(6543)).some(x => /modo SESIÓN/.test(x))).toBe(true)
+  })
+
+  it('rechaza un puerto arbitrario', () => {
+    expect(problemas(conPuerto(31337)).some(x => /no está soportado/.test(x))).toBe(true)
+  })
+
+  it('rechaza un puerto que no es un número', () => {
+    expect(problemas(conPuerto('54a32')).some(x => /no es un número/.test(x))).toBe(true)
+  })
+
+  it('exige el puerto explícito, no el implícito de libpq', () => {
+    expect(problemas('postgresql://u:p@db.nnsqmeigtgewatameexo.supabase.co/postgres?sslmode=require')
+      .some(x => /no declara puerto/.test(x))).toBe(true)
+  })
+
+  // El puerto no puede descartarse al sacar el hostname: es parte del destino.
+  it('el host se reconoce igual con puerto', () => {
+    expect(tipoDeHost('db.nnsqmeigtgewatameexo.supabase.co')).toBe('directo')
+    expect(tipoDeHost('aws-1-us-east-2.pooler.supabase.com')).toBe('pooler')
+    expect(tipoDeHost('pooler.supabase.com.atacante.net')).toBeNull()
+  })
+})
+
+describe('juzgarCredencial · los remedios salen de lo que se detectó', () => {
+  // El escaneo mira TODOS los esquemas no internos, así que un remedio fijado a
+  // `public` es falso cuando la tabla está en `auth` o en un esquema propio: se
+  // pega, no cambia nada, y el guard vuelve a saltar.
+  it('nombra el esquema real, no public', () => {
+    const r = juzgarCredencial({ ...sana, leibles: T('auth.users', 'auth') })[0]
+    expect(r.remedio).toBe('REVOKE SELECT ON ALL TABLES IN SCHEMA auth FROM drift_readonly;')
+  })
+
+  it('emite una línea por cada esquema detectado, sin repetir', () => {
+    const r = juzgarCredencial({
+      ...sana,
+      escribibles: [T('auth.users', 'auth'), T('auth.sessions', 'auth'), T('mio.t', 'mio')].join('\x1e'),
+    })[0]
+    expect(r.remedio.split('\n').map(l => l.trim())).toEqual([
+      'REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA auth FROM drift_readonly;',
+      'REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA mio FROM drift_readonly;',
+    ])
+  })
+
+  // Los nombres los cita Postgres con `format('%I')`/`quote_ident`, así que
+  // llegan listos para pegar. Lo que se comprueba aquí es que el remedio los
+  // use TAL CUAL y no vuelva a envolverlos ni los parta por el punto.
+  it('respeta las comillas que puso Postgres en nombres raros', () => {
+    const r = juzgarCredencial({
+      ...sana,
+      usuario: 'Drift Readonly', usuario_sql: '"Drift Readonly"',
+      leibles: T('"mi esquema"."mi.tabla"', '"mi esquema"'),
+    })[0]
+    expect(r.remedio).toBe('REVOKE SELECT ON ALL TABLES IN SCHEMA "mi esquema" FROM "Drift Readonly";')
+    expect(r.detalle).toContain('"mi esquema"."mi.tabla"')
+  })
+
+  it('el SELECT por columna nombra las tablas: `ON ALL TABLES` no lo revoca', () => {
+    const r = juzgarCredencial({ ...sana, leibles_columna: T('auth.users', 'auth') })[0]
+    expect(r.remedio).toContain('REVOKE SELECT (<columnas>) ON auth.users FROM drift_readonly;')
+  })
+
+  it('los remedios de atributo usan el nombre citado del rol', () => {
+    const r = juzgarCredencial({
+      ...sana, usuario: 'Drift Readonly', usuario_sql: '"Drift Readonly"', bypassrls: 'true',
+    })[0]
+    expect(r.remedio).toBe('ALTER ROLE "Drift Readonly" NOBYPASSRLS;')
+  })
+})
+
+describe('juzgarCredencial · SECURITY DEFINER, fuentes acumuladas', () => {
+  const F = (ident, via) => `${ident}\x1d${via}`
+  const lineas = (m) =>
+    juzgarCredencial(m).find(x => x.regla === 'SECURITY DEFINER').remedio.split('\n').map(l => l.trim())
+
+  // PUBLIC, un GRANT directo, una membresía y la propiedad pueden darse A LA
+  // VEZ. Cerrar sólo la primera deja el camino abierto por las otras, y el
+  // diagnóstico habría dicho que estaba resuelto.
+  it('PUBLIC + grant directo: las dos líneas', () => {
+    const l = lineas({ ...sana, secdef: F('public.f()', 'PUBLIC+drift_readonly') })
+    expect(l).toContain('REVOKE EXECUTE ON FUNCTION public.f() FROM PUBLIC;')
+    expect(l).toContain('REVOKE EXECUTE ON FUNCTION public.f() FROM drift_readonly;')
+  })
+
+  it('membresía + grant directo: se revoca el grant y se quita la membresía', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated', secdef: F('public.f()', 'authenticated+drift_readonly'),
+    })
+    expect(l).toContain('REVOKE EXECUTE ON FUNCTION public.f() FROM drift_readonly;')
+    expect(l.some(x => x.startsWith('REVOKE authenticated FROM drift_readonly;'))).toBe(true)
+  })
+
+  // LA REGLA QUE NO SE NEGOCIA: el rol intermedio es de la aplicación.
+  // Revocarle `authenticated` el EXECUTE arregla el auditor y rompe el producto.
+  it('NUNCA propone revocarle el privilegio al rol intermedio', () => {
+    const l = lineas({
+      ...sana, membresias: 'authenticated', secdef: F('public.get_my_company_id()', 'authenticated'),
+    })
+    expect(l.some(x => /FROM authenticated;/.test(x))).toBe(false)
+    expect(l).toContain('REVOKE authenticated FROM drift_readonly;   -- llega por membresía en ' +
+                        'authenticated; NO se le revoca a authenticated, que es de la aplicación')
+  })
+
+  it('propiedad + grant directo: ceder la propiedad Y revocar el grant', () => {
+    const l = lineas({ ...sana, secdef: F('mio.f()', 'drift_readonly+dueño') })
+    expect(l).toContain('REVOKE EXECUTE ON FUNCTION mio.f() FROM drift_readonly;')
+    expect(l.some(x => x.startsWith('ALTER FUNCTION mio.f() OWNER TO'))).toBe(true)
+  })
+
+  it('la propiedad sola también trae su remedio', () => {
+    const l = lineas({ ...sana, secdef: F('mio.f()', 'dueño') })
+    expect(l.some(x => x.startsWith('ALTER FUNCTION mio.f() OWNER TO'))).toBe(true)
+  })
+
+  it('sin procedencia reconocible lo dice, en vez de callarse', () => {
+    const l = lineas({ ...sana, secdef: F('mio.f()', '') })
+    expect(l.some(x => /no se pudo determinar la procedencia/.test(x))).toBe(true)
+  })
 })

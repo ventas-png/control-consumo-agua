@@ -246,7 +246,7 @@ export function sinSecretos(texto, url = '') {
 }
 
 /**
- * ¿Es uno de los dos hosts oficiales de Supabase? Dos formas, y sólo esas dos:
+ * ¿Qué clase de host oficial de Supabase es? `null` si no es ninguno.
  *
  *   db.<ref>.supabase.co           conexión directa, el ref va en el host
  *   <región>.pooler.supabase.com   pooler, el ref va en el usuario `<rol>.<ref>`
@@ -255,13 +255,33 @@ export function sinSecretos(texto, url = '') {
  * comprobación laxa acepta `pooler.supabase.com.atacante.net` o
  * `supabase.ejemplo.com`, y los dos los registra cualquiera.
  */
-export function esHostOficial(host) {
+export function tipoDeHost(host) {
   const h = (host ?? '').toLowerCase()
-  if (/^db\.[a-z0-9]{20}\.supabase\.co$/.test(h)) return true
+  if (/^db\.[a-z0-9]{20}\.supabase\.co$/.test(h)) return 'directo'
   // Una etiqueta por delante como mínimo: `pooler.supabase.com` pelado no es
   // un host de conexión, y aceptarlo sólo ampliaría la superficie.
-  return /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.pooler\.supabase\.com$/.test(h)
+  if (/^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.pooler\.supabase\.com$/.test(h)) return 'pooler'
+  return null
 }
+
+/** ¿Es uno de los dos hosts oficiales? */
+export function esHostOficial(host) { return tipoDeHost(host) !== null }
+
+/**
+ * Las combinaciones host + puerto que este auditor soporta.
+ *
+ * Las dos son el modo SESIÓN, y no por gusto: `PGOPTIONS` —que es lo que fuerza
+ * `default_transaction_read_only` desde la conexión— sólo rige en modo sesión.
+ * El 6543 del pooler es modo TRANSACCIÓN: ahí el guard de solo lectura no se
+ * aplicaría, y el fallo sería silencioso hasta que alguien mire.
+ */
+export const PUERTOS_OFICIALES = new Map([
+  ['directo', new Set([5432])],
+  ['pooler', new Set([5432])],
+])
+
+/** La única base que este auditor lee. */
+export const BASE_ESPERADA = 'postgres'
 
 /** Parámetros que pueden cambiar el DESTINO o la IDENTIDAD de la conexión. */
 export const PARAMETROS_PROHIBIDOS = new Set([
@@ -327,6 +347,9 @@ export function validarUrlLive(url) {
   if (iq !== -1) resto = resto.slice(0, iq)
   const ib = resto.indexOf('/')
   const autoridad = ib === -1 ? resto : resto.slice(0, ib)
+  // La ruta EN CRUDO, sin decodificar: es donde viaja el nombre de la base en
+  // una URI normal, y se compara byte a byte (ver más abajo).
+  const rutaCruda = ib === -1 ? '' : resto.slice(ib)
   const ia = autoridad.lastIndexOf('@')
   const hostspec = ia === -1 ? autoridad : autoridad.slice(ia + 1)
 
@@ -367,23 +390,59 @@ export function validarUrlLive(url) {
     }
   }
 
+  // ── La BASE, que viaja en el path y no en un parámetro ────────────────────
+  //
+  // Rechazar `?dbname=` no alcanza: en una URI normal el nombre de la base es
+  // el path, y `…/otra_base` cambia qué se lee sin tocar un solo parámetro. Un
+  // refresco que midiera otra base la versionaría como si fuera producción.
+  //
+  // Se compara EN CRUDO contra `/postgres`, sin decodificar. `/%70ostgres`
+  // decodifica a lo mismo y libpq lo acepta, pero un secreto legítimo no se
+  // escribe así: aceptar variantes codificadas sólo daría formas distintas de
+  // escribir lo mismo, y con ellas formas de esconder algo a la vista.
+  if (rutaCruda !== `/${BASE_ESPERADA}`) {
+    if (rutaCruda === '' || rutaCruda === '/') {
+      rechazar(`la URL no declara base: se espera exactamente «/${BASE_ESPERADA}» en el path`)
+    } else {
+      rechazar(`el path es «${rutaCruda}» y se espera exactamente «/${BASE_ESPERADA}» ` +
+               '(sin segmentos de más, sin barra final y sin escapes %xx)')
+    }
+  }
+
   if (socketLocal) {
     if (vistos.has('hostaddr')) rechazar('un socket local no lleva «hostaddr»')
     return { problemas, avisos }
   }
 
-  // ── Red: un único host, y oficial ─────────────────────────────────────────
+  // ── Red: un único host, oficial, y en su puerto ───────────────────────────
   if (hostspec.includes(',')) {
     rechazar('la URL declara VARIOS hosts: libpq prueba uno por uno y basta con que el ' +
              'primero no responda para terminar hablando con otro')
     return { problemas, avisos }
   }
-  const host = hostspec.replace(/^\[(.*)\]$/, '$1').split(':')[0].toLowerCase()
+  // El puerto NO se descarta al sacar el hostname: es parte del destino, y en
+  // el pooler además decide el MODO —y con él, si el guard de solo lectura
+  // rige o no—.
+  const ipv6 = /^\[([^\]]*)\](?::(.*))?$/.exec(hostspec)
+  const host = (ipv6 ? ipv6[1] : hostspec.split(':')[0]).toLowerCase()
+  const puertoCrudo = ipv6 ? (ipv6[2] ?? '') : (hostspec.includes(':') ? hostspec.slice(hostspec.indexOf(':') + 1) : '')
+  const tipo = tipoDeHost(host)
+
   if (host === '') {
     rechazar('la URL no declara host')
-  } else if (!esHostOficial(host)) {
+  } else if (tipo === null) {
     rechazar(`el host «${host}» no es ninguno de los dos oficiales de Supabase ` +
              '(db.<ref>.supabase.co o <región>.pooler.supabase.com)')
+  } else if (puertoCrudo === '') {
+    rechazar(`la URL no declara puerto: se exige explícito, y para ${tipo} sólo ` +
+             `${[...PUERTOS_OFICIALES.get(tipo)].join(' o ')}`)
+  } else if (!/^\d+$/.test(puertoCrudo)) {
+    rechazar(`el puerto «${puertoCrudo}» no es un número`)
+  } else if (!PUERTOS_OFICIALES.get(tipo).has(Number(puertoCrudo))) {
+    const admitidos = [...PUERTOS_OFICIALES.get(tipo)].join(' o ')
+    rechazar(`el puerto ${puertoCrudo} no está soportado para ${tipo}: sólo ${admitidos}, que es el ` +
+             'modo SESIÓN. En modo transacción (6543) `PGOPTIONS` no rige, y con él se cae el guard ' +
+             'de solo lectura sin que nada avise')
   }
 
   // ── TLS ───────────────────────────────────────────────────────────────────
@@ -824,7 +883,16 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   SELECT oid, nspname FROM pg_namespace
    WHERE nspname NOT LIKE 'pg\\_%' AND nspname <> 'information_schema'
 ), rel AS (
-  SELECT c.oid, n.nspname||'.'||c.relname AS nombre
+  -- \`format('%I', …)\` y no \`nspname||'.'||relname\`: los nombres vuelven en
+  -- remedios que alguien va a pegar en un psql, así que los cita POSTGRES —que
+  -- sabe cuándo hace falta— y no una concatenación de JavaScript. Un esquema
+  -- llamado \`mi esquema\` o \`"raro"\` sale bien citado, y de paso deja de ser
+  -- ambiguo un punto dentro de un nombre.
+  --
+  -- Van el objeto y su ESQUEMA por separado, con \x1d en medio: el remedio de
+  -- ESCRITURA y SELECT es por esquema, y hay que saber cuáles son de verdad.
+  SELECT c.oid,
+         format('%I.%I', n.nspname, c.relname)||E'\\x1d'||format('%I', n.nspname) AS nombre
     FROM pg_class c JOIN no_interno n ON n.oid = c.relnamespace
    WHERE c.relkind IN ('r','p','v','m','f')
 ), escribibles AS (
@@ -849,15 +917,25 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   -- revocarle al rol intermedio rompería la aplicación cuando ese rol es
   -- \`authenticated\`. Sale de aclexplode, quedándose con los otorgados que
   -- ALCANZAN a current_user: PUBLIC (grantee 0) o un rol que current_user es.
-  SELECT n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')'
+  --
+  -- LA PROPIEDAD SE MIRA APARTE, no como el \`else\` de que aclexplode no
+  -- devuelva nada: el dueño puede además tener un GRANT, o estar dentro de un
+  -- ACL materializado, y en ese caso el \`coalesce\` anterior lo tapaba. Y las
+  -- fuentes se ACUMULAN —PUBLIC, grant directo, membresía, propiedad pueden
+  -- darse a la vez— porque cerrar una sola deja el camino abierto por la otra.
+  SELECT format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
          ||E'\\x1d'||
-         coalesce((SELECT string_agg(DISTINCT coalesce(r.rolname::text,'PUBLIC'), '+')
-                     FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-                     LEFT JOIN pg_roles r ON r.oid = a.grantee
-                    WHERE a.privilege_type = 'EXECUTE'
-                      AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
-                  CASE WHEN p.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
-                       THEN 'dueño' ELSE '?' END) AS ident
+         array_to_string(
+           coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+                                                    ELSE format('%I', r.rolname) END)
+                       FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                       LEFT JOIN pg_roles r ON r.oid = a.grantee
+                      WHERE a.privilege_type = 'EXECUTE'
+                        AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
+                    ARRAY[]::text[])
+           || CASE WHEN p.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+                   THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END,
+           '+') AS ident
     FROM pg_proc p JOIN no_interno n ON n.oid = p.pronamespace
    WHERE p.prosecdef
      AND has_schema_privilege(current_user, n.oid, 'USAGE')
@@ -870,9 +948,9 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   UNION ALL SELECT 'leibles',            nombre FROM leibles
   UNION ALL SELECT 'leibles_columna',    nombre FROM leibles_por_columna
   UNION ALL SELECT 'secdef',             ident  FROM secdef
-  UNION ALL SELECT 'crear_esquemas',     nspname FROM no_interno
+  UNION ALL SELECT 'crear_esquemas',     format('%I', nspname) FROM no_interno
              WHERE has_schema_privilege(current_user, oid, 'CREATE')
-  UNION ALL SELECT 'membresias',         r.rolname FROM pg_roles r
+  UNION ALL SELECT 'membresias',         format('%I', r.rolname) FROM pg_roles r
              WHERE r.rolname <> current_user AND pg_has_role(current_user, r.oid, 'MEMBER')
   UNION ALL SELECT 'sin_usage',          n.nspname
              FROM unnest(string_to_array(current_setting('search_path'), ',')) AS x
@@ -890,6 +968,7 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
 )
 SELECT k||E'\\x1f'||v FROM (
             SELECT 'usuario'        AS k, current_user::text AS v
+  UNION ALL SELECT 'usuario_sql',      quote_ident(current_user)
   UNION ALL SELECT 'superusuario',    (SELECT rolsuper::text        FROM yo)
   UNION ALL SELECT 'bypassrls',       (SELECT rolbypassrls::text    FROM yo)
   UNION ALL SELECT 'crear_roles',     (SELECT rolcreaterole::text   FROM yo)
@@ -943,6 +1022,13 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
   const muestra = (xs, n = 8) =>
     xs.slice(0, n).join(', ') + (xs.length > n ? `, … y ${xs.length - n} más` : '')
   const usuario = m.usuario || '<rol>'
+  // El nombre del rol tal como hay que escribirlo EN SQL: lo cita Postgres con
+  // `quote_ident`, no una plantilla de JavaScript. Un rol `Drift Readonly` sin
+  // comillas produce un remedio que no corre; con comillas de más, tampoco.
+  const usuarioSql = m.usuario_sql || usuario
+  // Los nombres de esquema y objeto ya vienen citados desde SQL (`format('%I')`),
+  // así que aquí sólo se separan los campos del elemento.
+  const partes = (x) => x.split('\x1d')
   const rechazos = []
   const rechazar = (regla, detalle, remedio) => rechazos.push({ regla, detalle, remedio })
 
@@ -950,8 +1036,8 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
   // lee como `undefined`, `cierto(undefined)` es falso y la regla que lo mira
   // deja de rechazar — otra vez el fallo abierto. Si falta algo, no se juzga:
   // se rechaza.
-  const OBLIGATORIAS = ['usuario', 'superusuario', 'bypassrls', 'crear_roles', 'crear_bases',
-                        'replicacion', 'solo_lectura', 'version', 'search_path']
+  const OBLIGATORIAS = ['usuario', 'usuario_sql', 'superusuario', 'bypassrls', 'crear_roles',
+                        'crear_bases', 'replicacion', 'solo_lectura', 'version', 'search_path']
   const faltantes = OBLIGATORIAS.filter(k => !(k in m))
   if (faltantes.length > 0) {
     rechazar('MEDICIÓN INCOMPLETA', `la consulta no devolvió ${faltantes.join(', ')}, así que hay ` +
@@ -960,75 +1046,119 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
     return rechazos
   }
 
-  if (cierto(m.superusuario)) rechazar('SUPERUSUARIO', 'es superusuario', `ALTER ROLE ${usuario} NOSUPERUSER;`)
-  if (cierto(m.bypassrls)) rechazar('BYPASSRLS', 'tiene BYPASSRLS', `ALTER ROLE ${usuario} NOBYPASSRLS;`)
-  if (cierto(m.crear_roles)) rechazar('CREATEROLE', 'puede crear roles', `ALTER ROLE ${usuario} NOCREATEROLE;`)
-  if (cierto(m.crear_bases)) rechazar('CREATEDB', 'puede crear bases', `ALTER ROLE ${usuario} NOCREATEDB;`)
+  if (cierto(m.superusuario)) rechazar('SUPERUSUARIO', 'es superusuario', `ALTER ROLE ${usuarioSql} NOSUPERUSER;`)
+  if (cierto(m.bypassrls)) rechazar('BYPASSRLS', 'tiene BYPASSRLS', `ALTER ROLE ${usuarioSql} NOBYPASSRLS;`)
+  if (cierto(m.crear_roles)) rechazar('CREATEROLE', 'puede crear roles', `ALTER ROLE ${usuarioSql} NOCREATEROLE;`)
+  if (cierto(m.crear_bases)) rechazar('CREATEDB', 'puede crear bases', `ALTER ROLE ${usuarioSql} NOCREATEDB;`)
   if (cierto(m.replicacion)) {
     rechazar('REPLICATION', 'tiene REPLICATION: puede llevarse la base por el stream, sin un solo SELECT',
-      `ALTER ROLE ${usuario} NOREPLICATION;`)
+      `ALTER ROLE ${usuarioSql} NOREPLICATION;`)
   }
 
-  const escribibles = lista('escribibles')
-  if (escribibles.length > 0) {
-    rechazar('ESCRITURA', `puede escribir en ${escribibles.length} tabla(s): ${muestra(escribibles)}`,
-      `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM ${usuario};`)
+  // ── Tablas: el remedio sale de los esquemas REALMENTE detectados ──────────
+  //
+  // El escaneo mira todos los esquemas no internos, así que un remedio fijado a
+  // `public` es directamente falso cuando la tabla está en `auth` o en un
+  // esquema propio: se pega, no cambia nada, y el guard vuelve a saltar. Se
+  // agrupa por esquema —tal como vino, ya citado por Postgres— y se emite una
+  // línea por cada uno.
+  const tablas = (clave) => {
+    const items = lista(clave).map(partes)
+    return {
+      nombres: items.map(([nombre]) => nombre),
+      esquemas: [...new Set(items.map(([, esquema]) => esquema).filter(Boolean))],
+    }
+  }
+  const porEsquema = (esquemas, plantilla) =>
+    esquemas.map(plantilla).join('\n      ') || '(ningún esquema identificado)'
+
+  const escribibles = tablas('escribibles')
+  if (escribibles.nombres.length > 0) {
+    rechazar('ESCRITURA',
+      `puede escribir en ${escribibles.nombres.length} tabla(s): ${muestra(escribibles.nombres)}`,
+      porEsquema(escribibles.esquemas,
+        e => `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`))
   }
 
-  const leibles = lista('leibles')
-  if (leibles.length > 0) {
-    rechazar('SELECT DE TABLA', `puede leer ${leibles.length} tabla(s): ${muestra(leibles)} — ` +
+  const leibles = tablas('leibles')
+  if (leibles.nombres.length > 0) {
+    rechazar('SELECT DE TABLA',
+      `puede leer ${leibles.nombres.length} tabla(s): ${muestra(leibles.nombres)} — ` +
       'la huella sale del catálogo, así que leer datos no le sirve y sí lo vuelve peligroso',
-      `REVOKE SELECT ON ALL TABLES IN SCHEMA public FROM ${usuario};`)
+      porEsquema(leibles.esquemas, e => `REVOKE SELECT ON ALL TABLES IN SCHEMA ${e} FROM ${usuarioSql};`))
   }
 
-  const porColumna = lista('leibles_columna')
-  if (porColumna.length > 0) {
-    rechazar('SELECT POR COLUMNA', `tiene SELECT por columna en ${porColumna.length} tabla(s): ` +
-      `${muestra(porColumna)} — no aparece en has_table_privilege y alcanza igual para leer datos`,
-      `REVOKE SELECT (…) ON <tabla> FROM ${usuario};   -- por columna, tabla por tabla`)
+  const porColumna = tablas('leibles_columna')
+  if (porColumna.nombres.length > 0) {
+    // Acá no sirve `ON ALL TABLES`: un GRANT por columna se revoca nombrando la
+    // columna. Se listan las tablas concretas, que es lo accionable.
+    rechazar('SELECT POR COLUMNA',
+      `tiene SELECT por columna en ${porColumna.nombres.length} tabla(s): ` +
+      `${muestra(porColumna.nombres)} — no aparece en has_table_privilege y alcanza igual para leer datos`,
+      porColumna.nombres.slice(0, 12)
+        .map(n => `REVOKE SELECT (<columnas>) ON ${n} FROM ${usuarioSql};`).join('\n      '))
   }
 
   const crearEsquemas = lista('crear_esquemas')
   if (crearEsquemas.length > 0) {
     rechazar('CREATE SOBRE ESQUEMA', `puede crear objetos en: ${muestra(crearEsquemas)} — crear es ` +
       'escribir, y una función propia en un esquema del search_path secuestra la resolución de nombres',
-      `REVOKE CREATE ON SCHEMA ${crearEsquemas.join(', ')} FROM ${usuario};`)
+      `REVOKE CREATE ON SCHEMA ${crearEsquemas.join(', ')} FROM ${usuarioSql};`)
   }
 
   const membresias = lista('membresias')
   if (membresias.length > 0) {
     rechazar('MEMBRESÍA', `es miembro de: ${muestra(membresias)} — un rol dedicado no necesita ninguna, ` +
       'y con NOINHERIT una membresía sigue alcanzable con SET ROLE',
-      membresias.map(r => `REVOKE ${r} FROM ${usuario};`).join(' '))
+      membresias.map(r => `REVOKE ${r} FROM ${usuarioSql};`).join(' '))
   }
 
-  // Cada elemento viene como `identidad\x1dprocedencia`, y la procedencia
-  // decide el remedio: revocarle a PUBLIC no hace NADA si el GRANT es directo
-  // al auditor, y revocarle al rol intermedio rompería la aplicación cuando ese
-  // rol es `authenticated`. Un diagnóstico que propone el REVOKE equivocado se
-  // gasta un ciclo y, peor, deja creer que el agujero se cerró.
+  // Cada elemento viene como `identidad\x1dprocedencia`, y la procedencia decide
+  // el remedio: revocarle a PUBLIC no hace NADA si el GRANT es directo al
+  // auditor. Un diagnóstico que propone el REVOKE equivocado se gasta un ciclo
+  // y, peor, deja creer que el agujero se cerró.
+  //
+  // LAS FUENTES SE ACUMULAN. `PUBLIC`, un GRANT directo, una membresía y la
+  // propiedad de la función pueden darse A LA VEZ, y cerrar sólo la primera
+  // deja el camino abierto por las otras. Así que se emiten TODAS las líneas
+  // que hagan falta, no la del primer caso que coincida.
   const secdef = lista('secdef')
-    .map(x => { const [ident, via = '?'] = x.split('\x1d'); return { ident, via } })
+    .map(x => {
+      const [ident, via = ''] = partes(x)
+      return { ident, via, fuentes: via.split('+').filter(Boolean) }
+    })
     .filter(f => !permitidas.has(f.ident))
   if (secdef.length > 0) {
-    const remedio = (f) => {
-      const fuentes = f.via.split('+').filter(Boolean)
-      if (fuentes.includes('PUBLIC')) return `REVOKE EXECUTE ON FUNCTION ${f.ident} FROM PUBLIC;`
-      if (fuentes.includes(usuario)) return `REVOKE EXECUTE ON FUNCTION ${f.ident} FROM ${usuario};`
-      if (fuentes.includes('dueño')) {
-        return `ALTER FUNCTION ${f.ident} OWNER TO <otro rol>;   -- la ejecuta por ser su dueño`
+    const remedios = (f) => {
+      const lineas = []
+      if (f.fuentes.includes('PUBLIC')) {
+        lineas.push(`REVOKE EXECUTE ON FUNCTION ${f.ident} FROM PUBLIC;`)
       }
-      // Llega por una membresía. NO se revoca al rol intermedio —puede ser
-      // `authenticated`, y romperlo rompe la aplicación—: se quita la
-      // membresía, que además ya la rechaza la regla MEMBRESÍA.
-      return `REVOKE ${fuentes.join(', ')} FROM ${usuario};   -- llega por membresía, no por un GRANT propio`
+      if (f.fuentes.includes(usuarioSql)) {
+        lineas.push(`REVOKE EXECUTE ON FUNCTION ${f.ident} FROM ${usuarioSql};`)
+      }
+      if (f.fuentes.includes('dueño')) {
+        lineas.push(`ALTER FUNCTION ${f.ident} OWNER TO <otro rol>;   -- la ejecuta por ser su dueño`)
+      }
+      // Las membresías: TODO lo que no sea PUBLIC, el propio auditor, ni la
+      // propiedad. NUNCA se propone revocarle el privilegio al rol intermedio
+      // —puede ser `authenticated`, y revocárselo rompe la aplicación—: se
+      // quita la MEMBRESÍA, que además ya la rechaza la regla MEMBRESÍA.
+      const intermedios = f.fuentes.filter(x => x !== 'PUBLIC' && x !== usuarioSql && x !== 'dueño')
+      for (const rol of intermedios) {
+        lineas.push(`REVOKE ${rol} FROM ${usuarioSql};   -- llega por membresía en ${rol}; ` +
+                    `NO se le revoca a ${rol}, que es de la aplicación`)
+      }
+      if (lineas.length === 0) {
+        lineas.push(`-- no se pudo determinar la procedencia de ${f.ident}; revisar su ACL a mano`)
+      }
+      return lineas
     }
     rechazar('SECURITY DEFINER',
       `puede ejecutar ${secdef.length} función(es) SECURITY DEFINER —corren como su dueño, así que ` +
       'el «solo lectura» medido arriba no describe lo que puede hacer—: ' +
-      muestra(secdef.map(f => `${f.ident} [vía ${f.via}]`), 12),
-      [...new Set(secdef.slice(0, 12).map(remedio))].join('\n      ') +
+      muestra(secdef.map(f => `${f.ident} [vía ${f.via || '?'}]`), 12),
+      [...new Set(secdef.slice(0, 12).flatMap(remedios))].join('\n      ') +
       '\n      (o declarar la función en SECDEF_PERMITIDAS con su justificación)')
   }
 
@@ -1325,7 +1455,26 @@ async function pruebaLive() {
       -- d) EXECUTE a PUBLIC pero en un esquema SIN USAGE: no es alcanzable, y
       --    el guard no tiene que inventarse un rechazo
       CREATE SCHEMA drift_esq_cerrado;
-      CREATE FUNCTION drift_esq_cerrado.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;`,
+      CREATE FUNCTION drift_esq_cerrado.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
+
+      -- e) una TABLA fuera de \`public\`: el escaneo mira todos los esquemas no
+      --    internos, así que el remedio tiene que nombrar ESE esquema y no
+      --    \`public\`, que es donde estaba fijado
+      CREATE SCHEMA drift_esq_otro;
+      CREATE TABLE drift_esq_otro.tabla (id int);
+
+      -- f) el rol intermedio de una membresía, con EXECUTE propio
+      CREATE ROLE drift_grupo_sd NOLOGIN;
+      GRANT EXECUTE ON FUNCTION public.drift_sd() TO drift_grupo_sd;
+
+      -- g) una SECURITY DEFINER de la que el AUDITOR es DUEÑO. Es la fuente que
+      --    no sale del ACL: se detecta por proowner, y el ACL puede no
+      --    mencionarlo. Se le da CREATE al rol sólo para poder cederle la
+      --    propiedad, y se le quita en el acto — si se lo dejara, el rechazo
+      --    que veríamos sería el de CREATE SOBRE ESQUEMA y no el que se prueba.
+      CREATE SCHEMA drift_esq_duenio;
+      CREATE FUNCTION drift_esq_duenio.sd() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;
+      REVOKE EXECUTE ON FUNCTION drift_esq_duenio.sd() FROM PUBLIC;`,
     ], { stdio: 'pipe' })
     const NEGATIVOS = [
       // Los cuatro atributos del rol. Estaban «comprobados» desde el primer
@@ -1362,6 +1511,48 @@ async function pruebaLive() {
       { rol: 'drift_sd_ext',     regla: 'SECURITY DEFINER', via: 'drift_sd_ext',
         que: 'un GRANT directo sobre una función de `extensions`',
         pecado: 'GRANT EXECUTE ON FUNCTION extensions.drift_sd_ext() TO drift_sd_ext;' },
+
+      // ── Fuera de `public`: el remedio tiene que nombrar el esquema real ────
+      { rol: 'drift_selector_otro', regla: 'SELECT DE TABLA',
+        que: 'SELECT sobre una tabla de un esquema que no es public',
+        contiene: ['REVOKE SELECT ON ALL TABLES IN SCHEMA drift_esq_otro FROM drift_selector_otro;'],
+        noContiene: ['IN SCHEMA public'],
+        pecado: 'GRANT SELECT ON drift_esq_otro.tabla TO drift_selector_otro;' },
+      { rol: 'drift_escritor_otro', regla: 'ESCRITURA',
+        que: 'INSERT sobre una tabla de un esquema que no es public',
+        contiene: ['ON ALL TABLES IN SCHEMA drift_esq_otro FROM drift_escritor_otro;'],
+        noContiene: ['IN SCHEMA public'],
+        pecado: 'GRANT INSERT ON drift_esq_otro.tabla TO drift_escritor_otro;' },
+
+      // ── Fuentes ACUMULADAS: cerrar una sola deja el camino abierto ─────────
+      { rol: 'drift_sd_doble', regla: 'SECURITY DEFINER',
+        que: 'EXECUTE a PUBLIC **y** un GRANT directo sobre la misma función',
+        contiene: ['[vía PUBLIC+drift_sd_doble]',
+                   'REVOKE EXECUTE ON FUNCTION drift_esq_pub.sd() FROM PUBLIC;',
+                   'REVOKE EXECUTE ON FUNCTION drift_esq_pub.sd() FROM drift_sd_doble;'],
+        pecado: 'GRANT USAGE ON SCHEMA drift_esq_pub TO drift_sd_doble; ' +
+                'GRANT EXECUTE ON FUNCTION drift_esq_pub.sd() TO drift_sd_doble;' },
+      { rol: 'drift_sd_grupo', regla: 'SECURITY DEFINER',
+        que: 'una membresía **y** un GRANT directo sobre la misma función',
+        contiene: ['REVOKE EXECUTE ON FUNCTION public.drift_sd() FROM drift_sd_grupo;',
+                   'REVOKE drift_grupo_sd FROM drift_sd_grupo;'],
+        // Y JAMÁS tocar el rol intermedio: si fuera `authenticated`, revocarle
+        // el EXECUTE rompe la aplicación entera.
+        noContiene: ['FROM drift_grupo_sd;'],
+        pecado: 'GRANT drift_grupo_sd TO drift_sd_grupo; ' +
+                'GRANT EXECUTE ON FUNCTION public.drift_sd() TO drift_sd_grupo;' },
+      // Ceder la propiedad MATERIALIZA el ACL como `{dueño=X/dueño}`, así que
+      // esta función llega por DOS caminos a la vez —el grant que quedó escrito
+      // y la propiedad— y el diagnóstico tiene que decir los dos. Es
+      // exactamente el caso que el `return` en la primera fuente se comía.
+      { rol: 'drift_sd_duenio', regla: 'SECURITY DEFINER',
+        que: 'ser DUEÑO de la función, que no se deduce del ACL',
+        contiene: ['dueño]',
+                   'REVOKE EXECUTE ON FUNCTION drift_esq_duenio.sd() FROM drift_sd_duenio;',
+                   'ALTER FUNCTION drift_esq_duenio.sd() OWNER TO'],
+        pecado: 'GRANT USAGE, CREATE ON SCHEMA drift_esq_duenio TO drift_sd_duenio; ' +
+                'ALTER FUNCTION drift_esq_duenio.sd() OWNER TO drift_sd_duenio; ' +
+                'REVOKE CREATE ON SCHEMA drift_esq_duenio FROM drift_sd_duenio;' },
     ]
     for (const n of NEGATIVOS) {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
@@ -1414,6 +1605,12 @@ async function pruebaLive() {
         const remedio = n.via === 'PUBLIC' ? 'FROM PUBLIC;' : `FROM ${n.rol};`
         comprobar(r.salida.includes(remedio),
           `${n.rol}: y propone revocarle a quien corresponde (${remedio})`)
+      }
+      for (const trozo of n.contiene ?? []) {
+        comprobar(r.salida.includes(trozo), `${n.rol}: el diagnóstico incluye «${trozo}»`)
+      }
+      for (const trozo of n.noContiene ?? []) {
+        comprobar(!r.salida.includes(trozo), `${n.rol}: y NO incluye «${trozo}»`)
       }
     }
 

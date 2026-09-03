@@ -390,19 +390,35 @@ jobs:
       # `git diff` sobre el archivo, para que el resumen del job diga qué
       # cambió sin que haya que descargar nada. Son huellas SHA-256 y conteos:
       # no hay nada sensible que ocultar aquí.
+      #
+      # `git diff` A UN ARCHIVO Y DESPUÉS `head` SOBRE EL ARCHIVO, no
+      # `git diff | head -200`. Con la tubería, `head` cierra su extremo al
+      # llegar a 200 líneas, git muere con SIGPIPE (141) y `set -o pipefail`
+      # convierte eso en el estado del paso: `set -e` aborta el resumen justo
+      # cuando el refresco fue GRANDE, que es cuando más falta hace verlo.
+      # Reproducido con un diff de 6 005 líneas: la forma vieja sale 141, ésta
+      # sale 0 y publica las 200 primeras más el total.
       - name: Resumen del refresco
         if: ${{ steps.refresco.outcome == 'success' }}
         run: |
           set -euo pipefail
+          huella=scripts/schema-drift/huella-produccion.json
+          diff_completo="$RUNNER_TEMP/huella-produccion.diff"
           {
             echo '## Huella de producción'
             echo
-            if git diff --quiet -- scripts/schema-drift/huella-produccion.json; then
+            if git diff --quiet -- "$huella"; then
               echo 'La instantánea ya estaba al día: no cambió ningún grupo.'
             else
+              git diff --unified=0 -- "$huella" > "$diff_completo"
+              total=$(wc -l < "$diff_completo")
               echo '```diff'
-              git diff --unified=0 -- scripts/schema-drift/huella-produccion.json | head -200
+              head -200 "$diff_completo"
               echo '```'
+              if [ "$total" -gt 200 ]; then
+                echo
+                echo "_Diff recortado: $total líneas en total; se muestran las primeras 200._"
+              fi
             fi
             echo
             echo 'El artefacto de esta corrida es la huella refrescada. Versionarla va por PR aparte.'

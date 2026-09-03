@@ -342,7 +342,7 @@ escribir.
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
 | El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
 | El rol puede escribir en alguna tabla | Lo obvio, y por eso el primero que hubo. |
-| El rol tiene `SELECT` sobre alguna tabla | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. |
+| El rol tiene `SELECT` sobre alguna tabla | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. El escaneo mira **todos** los esquemas no internos, y el remedio nombra los que se detectaron —no `public` por defecto, que sería un `REVOKE` que no cambia nada—. Los identificadores los cita Postgres con `format('%I')`, no una plantilla de JavaScript. |
 | El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
 | El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
 | El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
@@ -463,11 +463,17 @@ las cierra es distinto:
 | `EXECUTE` a `PUBLIC` | `REVOKE EXECUTE ON FUNCTION f FROM PUBLIC;` |
 | `GRANT` directo al auditor | `REVOKE EXECUTE ON FUNCTION f FROM <auditor>;` |
 | Una membresía | **Quitar la membresía**, no tocar el rol intermedio: puede ser `authenticated`, y revocarle rompe la aplicación. La regla MEMBRESÍA ya lo rechaza aparte. |
+| Ser **dueño** de la función | `ALTER FUNCTION f OWNER TO <otro rol>;`. Se detecta por `proowner`, aparte del ACL: el dueño puede además tener un `GRANT`, y mirarlo sólo cuando el ACL no dice nada lo tapaba. |
+
+**Las fuentes se acumulan.** Las cuatro pueden darse a la vez, y cerrar una sola
+deja el camino abierto por las otras — con el agravante de que el diagnóstico
+habría dicho que estaba resuelto. Así que se emiten **todas** las líneas que
+hagan falta, no la del primer caso que coincida. Ceder la propiedad de una
+función, por ejemplo, materializa su ACL: a partir de ahí llega por dos caminos.
 
 Proponer el `REVOKE` equivocado es peor que no proponer ninguno: `… FROM PUBLIC`
-sobre una función concedida directamente al auditor no hace **nada**, y deja
-creer que el agujero se cerró. Por eso el mensaje trae `[vía …]` en cada
-función.
+sobre una función concedida directamente al auditor no hace **nada**. Por eso el
+mensaje trae `[vía …]` en cada función.
 
 #### Qué NO es esta regla
 
@@ -528,6 +534,8 @@ Por eso `validarUrlLive()` es una lista blanca **de parámetros**:
 | Regla | |
 | --- | --- |
 | Un solo host, y oficial | `db.<ref>.supabase.co` o `<región>.pooler.supabase.com`. Una lista `a:5432,b:5432` se rechaza: libpq prueba uno por uno. |
+| Puerto explícito, y soportado | **5432** en las dos formas, que es el modo **sesión**. El 6543 del pooler es modo transacción, y ahí `PGOPTIONS` no rige: el guard de solo lectura se caería sin que nada avise. El puerto no se descarta al sacar el hostname — es parte del destino. |
+| La base, exactamente `/postgres` | Rechazar `?dbname=` **no alcanza**: en una URI normal el nombre de la base es el **path**. `…/otra_base` cambia qué se mide sin tocar un parámetro. Se compara en crudo, así que `/%70ostgres`, `/postgres/` y `/postgres/extra` también se rechazan. |
 | Prohibidos | `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `options`. |
 | Permitidos, y sólo éstos | `sslmode`, `sslrootcert`, `connect_timeout`, `application_name`. |
 | Sin repetidos | libpq se queda con el **último**: `sslmode=verify-full&sslmode=disable` se lee seguro y se conecta inseguro. |
@@ -575,10 +583,11 @@ postgresql://drift_readonly:<clave>@db.<ref>.supabase.co:5432/postgres?sslmode=r
 postgresql://drift_readonly.<ref>:<clave>@aws-1-<región>.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
-Con el pooler hay que usar el modo **sesión** (5432), no el de transacción
-(6543): `PGOPTIONS` —que es lo que fuerza la sesión a solo lectura— sólo rige en
-modo sesión. El runner de Actions decide cuál hace falta: si su red no alcanza
-la conexión directa, el pooler es la vía.
+Las dos formas, tal cual: **puerto 5432 explícito** y **`/postgres`** como path.
+El modo **sesión** (5432) y no el de transacción (6543) porque `PGOPTIONS` —lo
+que fuerza la sesión a solo lectura— sólo rige en modo sesión; el validador
+rechaza el 6543 por eso. El runner de Actions decide cuál de las dos hace falta:
+si su red no alcanza la conexión directa, el pooler es la vía.
 
 Y **nada más en la query**: `hostaddr`, `host`, `port`, `dbname`, `user`,
 `password`, `service`, `servicefile` y `options` se rechazan, igual que
