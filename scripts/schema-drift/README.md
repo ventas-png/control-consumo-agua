@@ -214,12 +214,14 @@ node scripts/schema-drift/auditar.mjs --verificar-huella
 node scripts/schema-drift/auditar.mjs --prueba-espacios
 
 # Los grants salen del ACL y no de information_schema: misma serialización que
-# antes (byte a byte) y alcanzable por un rol dedicado de solo lectura.
+# antes (byte a byte), alcanzable por un rol dedicado de solo lectura, y con
+# WITH GRANT OPTION moviendo la huella sin mover el conteo.
 node scripts/schema-drift/auditar.mjs --prueba-acl
 
 # El modo live de punta a punta contra un clúster desechable que hace de
-# producción: conexión por URL con otro rol, credencial medida, guards y
-# escritura. Sin credenciales y sin red.
+# producción: conexión por URL con otro rol, credencial medida —un rol culpable
+# por cada privilegio que se rechaza—, guards y escritura atómica. Sin
+# credenciales y sin red.
 node scripts/schema-drift/auditar.mjs --prueba-live
 
 # Prueba negativa: inyecta una columna y una policy que nadie declara, en
@@ -338,10 +340,17 @@ escribir.
 | Guard | Qué previene |
 | --- | --- |
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
-| El rol es superusuario, tiene `BYPASSRLS`, puede crear roles o bases, o puede escribir en alguna tabla de `public` | Leer producción con una credencial que además puede modificarla. Se **mide**, no se declara. |
+| El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
+| El rol puede escribir en alguna tabla | Lo obvio, y por eso el primero que hubo. |
+| El rol tiene `SELECT` sobre alguna tabla | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. |
+| El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
+| El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
+| El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
+| El rol puede ejecutar una función `SECURITY DEFINER` de un esquema expuesto | Esa función corre con los privilegios de **su dueño**: mientras esté al alcance, el «solo lectura» medido arriba no vale nada. Ver «Las funciones `SECURITY DEFINER` bloquean el refresco». |
 | La sesión no quedó en solo lectura | `PGOPTIONS` fuerza `default_transaction_read_only` desde la conexión; si no rigió, se aborta. |
 | El rol no tiene `USAGE` sobre algún esquema del `search_path` | El fallo más caro: no rompe nada, sólo serializa `extensions.citext` donde el dueño escribe `citext`, y el refresco quedaría versionado con drift permanente. |
-| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. El ref se deduce del host (`db.<ref>.supabase.co`) o del usuario del pooler (`<rol>.<ref>`, con cualquier rol, no sólo `postgres`). Si no se puede deducir, hay que pasar `--proyecto`: no se adivina. |
+| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. El ref se deduce del host (`db.<ref>.supabase.co`) o del usuario del pooler (`<rol>.<ref>`, con cualquier rol, no sólo `postgres`). El host se valida contra esas **dos formas oficiales**, no por «contiene supabase»: `pooler.supabase.com.atacante.net` lo registra cualquiera. Si no se puede deducir, hay que pasar `--proyecto`: no se adivina. |
+| El archivo recién escrito no se relee igual que lo medido | Se escribe en un temporal, se **relee del disco** y sólo entonces se reemplaza con `rename(2)`, que es atómico. Un `writeFileSync` sobre la ruta versionada trunca primero y escribe después: si el proceso muere en el medio queda un JSON cortado que no es ni la instantánea vieja ni la nueva, y el workflow lo publicaría como artefacto. |
 | Algún valor no es SHA-256 de 64 hex | Una lectura truncada o a medias. |
 | **Todos** los grupos `/grants` vinieron vacíos | El síntoma exacto de leer los privilegios con un catálogo relativo al rol. Que algunos estén vacíos es normal; que lo estén todos, no. |
 | El número de grupos cambia más de un 20 % | Haber leído otra base. Un cambio así merece mirarse a mano. |
@@ -350,24 +359,121 @@ Y la URL **nunca se imprime**: viaja por el entorno, y el script recorta de sus
 propios mensajes de error cualquier cadena de conexión —y la contraseña por
 separado— antes de escribirlos.
 
-### El job corre aunque la auditoría falle
+### Tres jobs, y por qué no son uno
 
-`live` lleva `needs: auditar` por el **orden** —las pruebas corren antes y su
-salida queda en la misma corrida— pero su `if` empieza con `!cancelled()`, así
-que **no** depende del veredicto de la auditoría. Con el encadenamiento normal de
-`needs` habría un bloqueo circular:
+El workflow está partido en tres, y el corte no es cosmético:
+
+| Job | Qué hace | De qué depende |
+| --- | --- | --- |
+| `verificar` | **Todas** las pruebas del auditor: `--verificar-huella`, `--prueba-espacios`, `--prueba-acl`, `--prueba-live`, `--prueba-tres-vias` y la prueba negativa. | De nada. |
+| `veredicto` | Lo que el workflow existe para decir: comparar P, M y R y fallar si hay drift que nadie declaró. | `needs: verificar`. |
+| `live` | Refrescar la instantánea leyendo producción. | `needs: verificar`. **No** de `veredicto`. |
+
+Dos cosas que arregla esta separación.
+
+**El veredicto apagaba las pruebas.** Los pasos de un job no corren si uno
+anterior falló. Con todo junto, cada vez que producción y la instantánea
+divergían —un hecho del mundo, no un defecto del código— el veredicto se ponía
+rojo y las pruebas que venían detrás quedaban en *skipped*. Justo cuando hay
+algo que auditar, el auditor se quedaba sin la evidencia de que funciona. Ahora
+el veredicto vive en su propio job, y dentro de `verificar` cada paso lleva
+`if: !cancelled()`: una prueba que falla no saltea a las siguientes, así que lo
+que se ve es el cuadro completo y no el primer error.
+
+**`live` gateado por el veredicto era circular.**
 
 > La auditoría falla porque la instantánea envejeció respecto de producción → el
 > refresco no corre porque la auditoría falló → la instantánea sigue vieja.
 
-Y eso no es un caso raro: es exactamente para lo que existe el refresco. Gatearlo
-por el veredicto de lo que viene a corregir lo vuelve inútil justo cuando hace
-falta.
+Y eso no es un caso raro: es exactamente para lo que existe el refresco. Por eso
+`live` depende de `verificar` y no de `veredicto`. De `verificar` sí depende en
+la forma normal —si las pruebas del auditor fallan, el job no corre—: lo que no
+se puede exigir es el veredicto, no la corrección del código que va a conectarse
+a producción.
 
-No afloja nada: el job sólo **lee** producción y publica un artefacto, así que
-una auditoría en rojo no vuelve peligrosa esa lectura, y la instantánea
-refrescada igual tiene que pasar por un PR donde se revisa el diff. Se usa
-`!cancelled()` y no `always()` para no arrancar si alguien canceló la corrida.
+### Cómo está protegido el job `live`
+
+Cuatro condiciones, y las cuatro tienen que darse:
+
+| Condición | Por qué |
+| --- | --- |
+| `github.event_name == 'workflow_dispatch'` | La única referencia de confianza. En `pull_request` el código lo propone quien abre el PR. Nunca `pull_request_target`. |
+| `github.ref == 'refs/heads/main'` | Se despacha sobre una rama, y una rama cualquiera puede traer un `auditar.mjs` modificado. |
+| `vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true'` | Encender el modo live tiene que ser un acto deliberado, no el efecto colateral de que aparezca un secreto. |
+| `needs: verificar` | Un auditor cuyas pruebas fallan no se acerca a producción. |
+
+Y además, del lado de GitHub y no del archivo:
+
+* `environment: production-db`, restringido a `main`, con revisores requeridos y
+  sin bypass de administradores. **El `if` repite esa restricción, no la
+  reemplaza**: un `if` lo cambia cualquiera que pueda editar este archivo; la
+  regla del environment la hace cumplir GitHub aunque el archivo mienta.
+* `permissions: contents: read`.
+* Checkout **explícito** de `${{ github.sha }}`, con `persist-credentials: false`.
+  Entre el despacho y el arranque del job —que puede esperar la aprobación del
+  environment— `main` avanza; sin `ref`, se ejecutaría código que nadie miró al
+  aprobar.
+
+### Nunca se publica un resultado fallido
+
+El paso de refresco tiene `id`, y de ahí cuelga todo lo demás:
+
+* El resumen con el diff y el artefacto se generan **sólo** si el refresco
+  terminó bien.
+* Si no, el resumen dice con todas las letras que esta corrida **no publica
+  ningún artefacto** y que la instantánea del repositorio quedó intacta.
+* Antes de publicar se comprueba que la fecha `capturada` del archivo sea la de
+  hoy: lo que se sube es la lectura de esta corrida, no la instantánea
+  versionada de siempre.
+
+El modo de fallo que se evita es el peor de todos: alguien encuentra un
+artefacto en una corrida roja, lo da por bueno y versiona la instantánea vieja
+como si fuera producción de hoy.
+
+### Las funciones `SECURITY DEFINER` bloquean el refresco
+
+Una función `SECURITY DEFINER` corre con los privilegios de **su dueño**. Si la
+credencial del auditor puede ejecutar una, el «solo lectura» que se mide sobre
+el rol no describe lo que ese rol puede hacer: describe lo que puede hacer
+*directamente*, y hay un camino al lado.
+
+Medido en producción el **2026-09-03**: de las 246 funciones `SECURITY DEFINER`
+de `public`, **26 son ejecutables por `PUBLIC`** — y por lo tanto por `anon`, y
+por lo tanto por cualquier credencial que se cree. La mayoría son ayudantes de
+RLS que las policies llaman como el rol invocante y que por eso *necesitan* ser
+ejecutables (`get_my_company_id`, `is_super_admin`, `current_user_role`, …).
+Varias no:
+
+```
+update_user_password(text, text)
+request_password_reset(...)
+validate_reset_token(...)
+migrate_custom_auth_to_supabase_unconfirmed()
+buscar_cliente_para_onboarding(...)
+```
+
+**Así que hoy este guard bloquea el refresco, y está bien que bloquee.** Hay dos
+salidas, y no son equivalentes:
+
+1. **Cerrar en producción lo que no debería estar abierto** — la correcta:
+
+   ```sql
+   REVOKE EXECUTE ON FUNCTION public.update_user_password(text, text) FROM PUBLIC;
+   GRANT  EXECUTE ON FUNCTION public.get_my_company_id() TO authenticated;  -- no a PUBLIC
+   ```
+
+   Es DDL sobre producción: va por migración, no a mano.
+
+2. **Declararlas en `SECDEF_PERMITIDAS`**, la allowlist de `auditar.mjs`. Está
+   **vacía**, y llenarla no es un trámite: cada entrada afirma que esa función,
+   corriendo como su dueño, no le da a esta credencial nada que no debería
+   tener. Eso es una afirmación de seguridad sobre el **cuerpo** de la función,
+   y la firma quien revisa el PR que agrega la línea. Hay una prueba que falla
+   si la lista deja de estar vacía, justamente para que agregar una entrada sea
+   un acto visible.
+
+Ampliar la allowlist para que el auditor se calle es el mismo hábito que la
+baseline de drift existe para impedir.
 
 ### El job no commitea
 
@@ -385,9 +491,16 @@ GRANT USAGE ON SCHEMA public, extensions TO drift_readonly;
 ```
 
 Los **dos** esquemas: son los del `search_path`, y sin el segundo la huella no
-coincide con la del dueño. Después, en el environment `production-db`, el secret
+coincide con la del dueño. Y **nada más**: sin `SELECT` sobre ninguna tabla, sin
+membresías, sin `CREATE`. El rol así, pelado, ya alcanza para sacar la huella
+completa —lo fija `--prueba-acl`—, y cualquier privilegio de más lo rechaza el
+guard. Después, en el environment `production-db`, el secret
 `SCHEMA_DRIFT_READONLY_URL` con su cadena de conexión, y la variable de
 repositorio `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
+
+Falta además cerrar las funciones `SECURITY DEFINER` ejecutables por `PUBLIC`
+(ver la sección de arriba): con el rol recién creado, el guard rechaza el
+refresco hasta que eso se resuelva.
 
 **Sobre la cadena de conexión.** Sirve tanto la conexión directa
 (`db.<ref>.supabase.co:5432`) como el pooler en modo sesión
@@ -468,7 +581,7 @@ vacía en las 563 dimensiones `/grants` **sin que nada fallara** — un falso
 negativo que además habría quedado grabado en `huella-produccion.json`.
 
 `relacl` y `proacl` son columnas de `pg_class`/`pg_proc`, no son relativas al rol
-y las lee cualquiera que pueda leer el catálogo. `--prueba-acl` fija las cuatro
+y las lee cualquiera que pueda leer el catálogo. `--prueba-acl` fija estas
 propiedades:
 
 | Propiedad | Cómo se comprueba |
@@ -478,6 +591,16 @@ propiedades:
 | **Alcanzabilidad** | Un rol con `USAGE` sobre `public` y sin membresías saca los mismos 563 grupos `/grants` que el dueño. |
 | **Contraprueba** | Ese mismo rol ve **0** de las 7 306 concesiones que `information_schema` le muestra al dueño. Si algún día se volviera a leer de ahí, la alcanzabilidad se rompería en silencio. |
 | **Sensibilidad** | Revocar un `SELECT` mueve exactamente un grupo y baja su conteo en uno — si la lectura por ACL devolviera algo constante, todo lo anterior seguiría pasando. |
+| **Compatibilidad de la marca** | Hoy no hay **ni un** aclitem con grant option en el catálogo, así que la marca de la regla 8 no puede mover ninguna huella ya capturada. Se mide antes de nada; si dejara de ser cierto, la prueba falla. |
+| **La marca se ve** | `GRANT SELECT … WITH GRANT OPTION` mueve exactamente el grupo de esa tabla, y `GRANT EXECUTE … WITH GRANT OPTION` el de esa función. |
+| **Y no se cuenta dos veces** | El conteo **no** cambia: `aclexplode` devuelve una fila por privilegio con `is_grantable` al lado, y la marca se agrega a esa fila. |
+| **Ida y vuelta** | Al quitar la grant option, el grupo vuelve **byte a byte** a su huella anterior: un ACL sin grant option serializa como antes de la regla 8. Es la mitad que mantiene comparable la instantánea versionada. |
+
+**Por qué hacía falta la marca.** La formulación anterior descartaba
+`is_grantable`: `authenticated=r/postgres` y `authenticated=r*/postgres`
+serializaban igual. Conceder la facultad de **re-conceder** un privilegio —el
+paso previo a que un rol reparta acceso por su cuenta— era invisible para el
+auditor.
 
 ### La baseline en la rama base
 

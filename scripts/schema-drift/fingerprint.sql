@@ -97,6 +97,24 @@
 --      dinero. `relacl` y `proacl` son columnas de `pg_class`/`pg_proc`, no son
 --      relativas al rol, y las lee cualquiera que pueda leer el catálogo.
 --
+--   8. `WITH GRANT OPTION` SE MARCA, Y SÓLO CUANDO EXISTE.
+--
+--      Un `GRANT SELECT … WITH GRANT OPTION` deja al otorgado repartir ese
+--      privilegio a quien quiera. Es un cambio del modelo de amenaza sin tocar
+--      ninguna policy ni agregar ninguna concesión visible en el conteo, así
+--      que tiene que mover la huella.
+--
+--      La marca es un tercer campo `*` DETRÁS del privilegio, y se agrega
+--      ÚNICAMENTE si `is_grantable`. Medido sobre la reconstrucción: hoy no hay
+--      un solo aclitem con grant option —ni en tablas ni en funciones—, así que
+--      la serialización de todo lo existente queda idéntica y
+--      `huella-produccion.json` sigue siendo comparable sin regenerarla. Si en
+--      cambio se hubiera puesto un campo fijo `grantable=false`, las 563
+--      dimensiones `/grants` se habrían movido de golpe.
+--
+--      El ORDEN no depende de la marca: se sigue ordenando por otorgado y
+--      privilegio, así que un grant option no reordena nada.
+--
 --      LA SERIALIZACIÓN NO CAMBIA. `information_schema.table_privileges` está
 --      definido sobre `aclexplode(coalesce(relacl, acldefault(...)))`: se lee la
 --      misma fuente, un paso antes del filtro por rol. La equivalencia byte a
@@ -185,7 +203,11 @@ gg AS ( -- tabla · grants  (ver regla 7: se lee el ACL, no information_schema)
     -- relacl, pero sí los privilegios implícitos de su dueño. Es la misma
     -- expresión que usa internamente information_schema.table_privileges.
     SELECT coalesce(r.rolname::text, 'PUBLIC') AS grantee,
-           a.privilege_type::text              AS privilege_type
+           -- La marca `*` de WITH GRANT OPTION se AGREGA sólo cuando existe
+           -- (ver regla 8): así la serialización de un ACL sin grant option no
+           -- se mueve y `huella-produccion.json` sigue siendo comparable.
+           a.privilege_type::text || CASE WHEN a.is_grantable THEN E'\x1f*' ELSE '' END
+                                               AS privilege_type
     FROM aclexplode(coalesce(t.relacl, acldefault('r', t.relowner))) a
     -- pg_roles, no pg_authid: pg_authid exige superusuario y este catálogo
     -- tiene que poder leerse con un rol de solo lectura.
@@ -224,7 +246,8 @@ gf AS ( -- funciones
 ),
 gfg AS ( -- funciones · grants de EXECUTE  (ver regla 7)
   SELECT 'funcion:'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')/grants' AS clave,
-         coalesce((SELECT string_agg(coalesce(r.rolname::text,'PUBLIC')||E'\x1f'||a.privilege_type::text,
+         coalesce((SELECT string_agg(coalesce(r.rolname::text,'PUBLIC')||E'\x1f'||a.privilege_type::text||
+                                     CASE WHEN a.is_grantable THEN E'\x1f*' ELSE '' END,
                                      E'\x1e' ORDER BY coalesce(r.rolname::text,'PUBLIC') COLLATE "C",
                                                       a.privilege_type::text COLLATE "C")
                    FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a

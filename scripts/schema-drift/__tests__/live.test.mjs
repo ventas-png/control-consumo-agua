@@ -11,7 +11,10 @@
 // deja de ver el drift que esos grupos taparían.
 
 import { describe, it, expect } from 'vitest'
-import { sinSecretos, refDeUrl, validarHuellaLive, diffHuellas } from '../auditar.mjs'
+import {
+  sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
+  juzgarCredencial, SECDEF_PERMITIDAS,
+} from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
 const mapa = (pares) => new Map(pares)
@@ -154,4 +157,180 @@ describe('diffHuellas', () => {
     const m = mapa([['a', H(1)]])
     expect(diffHuellas(m, m)).toEqual({ agregados: [], eliminados: [], cambiados: [] })
   })
+})
+
+describe('refDeUrl · hosts impostores', () => {
+  // El ref es lo ÚNICO que impide que un refresco lea otra base y la versione
+  // como si fuera producción. Una comprobación laxa —«el host contiene
+  // supabase»— acepta cualquiera de estos, y todos son registrables por
+  // cualquiera. Por eso la comprobación es una lista blanca de dos formas.
+  const impostores = [
+    'postgresql://postgres.nnsqmeigtgewatameexo:p@pooler.supabase.com.atacante.net:5432/postgres',
+    'postgresql://postgres.nnsqmeigtgewatameexo:p@aws-0-us-east-2.pooler.supabase.com.evil.io:5432/postgres',
+    'postgresql://postgres.nnsqmeigtgewatameexo:p@supabase.ejemplo.com:5432/postgres',
+    'postgresql://postgres.nnsqmeigtgewatameexo:p@pooler-supabase.com:5432/postgres',
+    'postgresql://postgres.nnsqmeigtgewatameexo:p@mipooler.supabase.com:5432/postgres',
+    'postgresql://u:p@db.nnsqmeigtgewatameexo.supabase.co.atacante.net:5432/postgres',
+    'postgresql://u:p@db.nnsqmeigtgewatameexo.supabase.com:5432/postgres',
+    'postgresql://u:p@notdb.nnsqmeigtgewatameexo.supabase.co:5432/postgres',
+    'postgresql://u:p@db.nnsqmeigtgewatameexo.supabase.co.evil:5432/postgres',
+  ]
+  for (const url of impostores) {
+    it(`rechaza ${new URL(url).hostname}`, () => expect(refDeUrl(url)).toBeNull())
+  }
+
+  it('acepta el host oficial del pooler, con la etiqueta de región delante', () => {
+    expect(refDeUrl('postgresql://d.nnsqmeigtgewatameexo:p@aws-1-us-east-2.pooler.supabase.com:5432/x'))
+      .toBe('nnsqmeigtgewatameexo')
+  })
+
+  it('no acepta `pooler.supabase.com` pelado: la forma oficial lleva región', () => {
+    expect(refDeUrl('postgresql://d.nnsqmeigtgewatameexo:p@pooler.supabase.com:5432/x')).toBeNull()
+  })
+})
+
+describe('refDeUrl · refs que no tienen forma de ref', () => {
+  // Un ref de Supabase son 20 caracteres alfanuméricos. Deducir uno de otra
+  // longitud sería inventar un proyecto, y con él la autorización para escribir
+  // la instantánea.
+  const casos = [
+    ['19 caracteres, host directo', 'postgresql://u:p@db.nnsqmeigtgewatameex.supabase.co:5432/x'],
+    ['21 caracteres, host directo', 'postgresql://u:p@db.nnsqmeigtgewatameexoo.supabase.co:5432/x'],
+    ['con guion, host directo',     'postgresql://u:p@db.nnsqmeigt-gewatameexo.supabase.co:5432/x'],
+    ['usuario sin punto',           'postgresql://postgres:p@aws-0-us-east-2.pooler.supabase.com:5432/x'],
+    ['ref corto en el usuario',     'postgresql://postgres.corto:p@aws-0-us-east-2.pooler.supabase.com:5432/x'],
+    ['sin usuario',                 'postgresql://:p@aws-0-us-east-2.pooler.supabase.com:5432/x'],
+  ]
+  for (const [nombre, url] of casos) {
+    it(`no deduce nada con ${nombre}`, () => expect(refDeUrl(url)).toBeNull())
+  }
+})
+
+// ── El veredicto sobre la credencial, regla por regla ───────────────────────
+//
+// El camino de punta a punta —rol real, conexión por URL, un rol por
+// privilegio— se prueba en `auditar.mjs --prueba-live`. Acá se prueba la
+// DECISIÓN, que es donde vivió el bug que importaba: la primera versión
+// comparaba `=== 't'` contra un SQL que devolvía 'true', así que los controles
+// de superusuario, BYPASSRLS, CREATEROLE y CREATEDB no rechazaban nada. Un
+// guard roto de esa forma no rompe ninguna prueba: falla ABIERTO y calla.
+
+const sana = {
+  usuario: 'drift_readonly',
+  superusuario: 'false', bypassrls: 'false', crear_roles: 'false',
+  crear_bases: 'false', replicacion: 'false',
+  solo_lectura: 'on', version: '17.6.1', search_path: '"$user", public, extensions',
+}
+const reglas = (m, opciones) => juzgarCredencial(m, opciones).map(r => r.regla)
+
+describe('juzgarCredencial', () => {
+  it('acepta una credencial que sólo puede leer el catálogo', () => {
+    expect(juzgarCredencial(sana)).toEqual([])
+  })
+
+  // LA REGRESIÓN. Las dos grafías tienen que rechazar; aceptar sólo una es
+  // exactamente el bug, y no se nota hasta que alguien conecta un superusuario.
+  for (const grafia of ['true', 't']) {
+    it(`rechaza un superusuario escrito «${grafia}»`, () => {
+      expect(reglas({ ...sana, superusuario: grafia })).toContain('SUPERUSUARIO')
+    })
+  }
+
+  const atributos = [
+    ['bypassrls', 'BYPASSRLS'],
+    ['crear_roles', 'CREATEROLE'],
+    ['crear_bases', 'CREATEDB'],
+    ['replicacion', 'REPLICATION'],
+  ]
+  for (const [campo, regla] of atributos) {
+    it(`rechaza ${regla}`, () => expect(reglas({ ...sana, [campo]: 'true' })).toContain(regla))
+  }
+
+  it('rechaza que pueda escribir', () => {
+    expect(reglas({ ...sana, escribibles: 'public.clientes' })).toContain('ESCRITURA')
+  })
+
+  it('rechaza SELECT a nivel tabla: la huella sale del catálogo, no de los datos', () => {
+    expect(reglas({ ...sana, leibles: 'public.clientes\x1epublic.facturas' }))
+      .toContain('SELECT DE TABLA')
+  })
+
+  it('rechaza SELECT por columna, que has_table_privilege no ve', () => {
+    expect(reglas({ ...sana, leibles_columna: 'public.usuarios' })).toContain('SELECT POR COLUMNA')
+  })
+
+  it('rechaza CREATE sobre un esquema', () => {
+    expect(reglas({ ...sana, crear_esquemas: 'public' })).toContain('CREATE SOBRE ESQUEMA')
+  })
+
+  it('rechaza cualquier membresía: con NOINHERIT sigue alcanzable por SET ROLE', () => {
+    expect(reglas({ ...sana, membresias: 'authenticated' })).toContain('MEMBRESÍA')
+  })
+
+  it('rechaza la sesión que no quedó en solo lectura', () => {
+    expect(reglas({ ...sana, solo_lectura: 'off' })).toContain('SESIÓN DE ESCRITURA')
+  })
+
+  it('rechaza un esquema del search_path sin USAGE, y dice el GRANT que lo arregla', () => {
+    const r = juzgarCredencial({ ...sana, sin_usage: 'extensions' })
+    expect(r.map(x => x.regla)).toContain('SIN USAGE EN EL SEARCH_PATH')
+    expect(r[0].remedio).toBe('GRANT USAGE ON SCHEMA extensions TO drift_readonly;')
+  })
+
+  it('junta TODOS los motivos, no se planta en el primero', () => {
+    const r = reglas({ ...sana, superusuario: 'true', replicacion: 'true', crear_esquemas: 'public' })
+    expect(r).toEqual(expect.arrayContaining(['SUPERUSUARIO', 'REPLICATION', 'CREATE SOBRE ESQUEMA']))
+  })
+
+  it('cada motivo trae un remedio en SQL, no sólo un reproche', () => {
+    for (const r of juzgarCredencial({ ...sana, bypassrls: 'true', leibles: 'public.clientes' })) {
+      expect(r.remedio.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('juzgarCredencial · SECURITY DEFINER', () => {
+  const conSecdef = {
+    ...sana,
+    secdef: 'public.update_user_password(text, text)\x1epublic.get_my_company_id()',
+  }
+
+  it('rechaza una función SECURITY DEFINER al alcance de la credencial', () => {
+    expect(reglas(conSecdef)).toContain('SECURITY DEFINER')
+  })
+
+  it('el motivo nombra las funciones, que es lo que hay que ir a cerrar', () => {
+    const r = juzgarCredencial(conSecdef).find(x => x.regla === 'SECURITY DEFINER')
+    expect(r.detalle).toContain('public.update_user_password(text, text)')
+  })
+
+  it('una allowlist explícita levanta el rechazo SÓLO de lo que declara', () => {
+    const permitidas = new Map([['public.get_my_company_id()', 'ayudante de RLS, no toca datos']])
+    expect(reglas(conSecdef, { permitidas })).toContain('SECURITY DEFINER')
+    expect(reglas({ ...conSecdef, secdef: 'public.get_my_company_id()' }, { permitidas })).toEqual([])
+  })
+
+  // TRIPWIRE. Que la lista esté vacía no es un detalle de implementación: es la
+  // postura. Llenarla es afirmar que esa función, corriendo como su dueño, no
+  // le da a esta credencial nada que no debería tener — y eso lo firma quien
+  // revisa el PR que agrega la línea, no el auditor. Medido en producción el
+  // 2026-09-03: 26 funciones SECURITY DEFINER de `public` son ejecutables por
+  // PUBLIC, entre ellas `update_user_password` y `request_password_reset`.
+  it('la allowlist por defecto está vacía', () => {
+    expect([...SECDEF_PERMITIDAS.keys()]).toEqual([])
+  })
+})
+
+describe('juzgarCredencial · la medición tiene que estar completa', () => {
+  // Un campo que no llegó se lee `undefined`, `cierto(undefined)` es falso y la
+  // regla que lo mira deja de rechazar. Es la misma forma de fallar abierto que
+  // el 't' contra 'true', por otro camino: acá el guard no se equivoca, no se
+  // entera. Si falta algo, no se juzga.
+  for (const campo of ['superusuario', 'bypassrls', 'replicacion', 'solo_lectura']) {
+    it(`rechaza si no llegó «${campo}» en vez de darlo por falso`, () => {
+      const incompleta = { ...sana }
+      delete incompleta[campo]
+      expect(reglas(incompleta)).toEqual(['MEDICIÓN INCOMPLETA'])
+    })
+  }
 })
