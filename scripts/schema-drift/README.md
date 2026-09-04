@@ -213,6 +213,17 @@ node scripts/schema-drift/auditar.mjs --verificar-huella
 # fallaban dos.
 node scripts/schema-drift/auditar.mjs --prueba-espacios
 
+# Los grants salen del ACL y no de information_schema: misma serialización que
+# antes (byte a byte), alcanzable por un rol dedicado de solo lectura, y con
+# WITH GRANT OPTION moviendo la huella sin mover el conteo.
+node scripts/schema-drift/auditar.mjs --prueba-acl
+
+# El modo live de punta a punta contra un clúster desechable que hace de
+# producción: conexión por URL con otro rol, credencial medida —un rol culpable
+# por cada privilegio que se rechaza—, guards y escritura atómica. Sin
+# credenciales y sin red.
+node scripts/schema-drift/auditar.mjs --prueba-live
+
 # Prueba negativa: inyecta una columna y una policy que nadie declara, en
 # AMBOS clústeres (M y R), para que queden como «objeto que el PR no toca».
 # DEBE salir distinto de cero.
@@ -299,17 +310,497 @@ Son **dos puertas independientes**. Declarar un drift nuevo en la baseline lo
 saca de `DRIFT NUEVO`… y entonces lo detiene el trinquete, que compara contra la
 baseline de la rama base. Ninguna de las dos alcanza sola.
 
-## Modo live — **bloqueado**
+## Modo live — implementado, apagado hasta que exista la credencial
 
-Refrescar `huella-produccion.json` contra el catálogo real está implementado a
-medias **a propósito**. La instantánea versionada envejece, y mientras no se
-refresque, un cambio hecho en producción fuera de banda no se ve. Ése es el
-límite honesto de la garantía que da este auditor hoy.
+Refrescar `huella-produccion.json` contra el catálogo real **está implementado y
+probado**: `--prueba-live` lo ejercita de punta a punta contra un clúster
+desechable que hace de producción, con conexión por URL y un rol distinto. Lo
+único que falta para encenderlo es la credencial.
 
-Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
+Mientras no se refresque, la instantánea versionada envejece y un cambio hecho
+en producción fuera de banda no se ve. Ése es el límite honesto de la garantía
+que da este auditor hoy.
+
+```bash
+# Refresca la instantánea leyendo producción. Exige SCHEMA_DRIFT_READONLY_URL.
+node scripts/schema-drift/auditar.mjs --sembrar-produccion
+
+# Lo mismo sin escribir: imprime el diff y sale. Para mirar antes de tocar.
+node scripts/schema-drift/auditar.mjs --sembrar-produccion --en-seco
+```
+
+### Los guards, y qué previene cada uno
+
+El peor resultado posible no es un error: es un refresco que se escribe con
+datos incompletos y queda versionado como verdad. A partir de ahí el auditor
+deja de ver el drift que esos grupos taparían. Por eso todo es fail-closed en
+las dos direcciones — se mide la credencial antes de leer, y la huella antes de
+escribir.
+
+| Guard | Qué previene |
+| --- | --- |
+| Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
+| El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
+| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. Se preguntan **los ocho** privilegios de tabla (ver más abajo), no los cinco de siempre. El `REVOKE` nombra **los que se detectaron**, no un `ALL` a ciegas. |
+| El rol alcanza alguna **secuencia** | Quedaban fuera del escaneo, que sólo miraba tablas y vistas. `USAGE` o `UPDATE` **mueven el contador** —escritura de estado compartido, y un salto de correlativo se nota en la facturación—; `SELECT` dice cuántas filas hubo. Se pregunta con `has_sequence_privilege`, porque `has_table_privilege` ni siquiera responde por `USAGE`. |
+| El rol tiene `SELECT` sobre alguna tabla **alcanzable** | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. **Alcanzable** son dos condiciones, igual que para las funciones: `USAGE` sobre el esquema **y** el privilegio. El escaneo mira **todos** los esquemas no internos, y el remedio sale de la **procedencia real** (ver abajo). |
+| El rol tiene algún privilegio **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Y no es sólo `SELECT`: `INSERT`, `UPDATE` y `REFERENCES` también se conceden por columna —`GRANT INSERT (saldo)` escribe, `REFERENCES (id)` deja colgar una FK—. Se preguntan los cuatro, aparte, con `has_any_column_privilege`, y el remedio trae **los nombres reales de las columnas**, citados por Postgres, para poder pegarse tal cual. |
+| El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
+| El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
+| El rol puede ejecutar una función `SECURITY DEFINER` **alcanzable** | Esa función corre con los privilegios de **su dueño**: mientras esté al alcance, el «solo lectura» medido arriba describe lo que el rol hace *directamente* y hay un camino al lado. Alcanzable = `USAGE` sobre el esquema **y** `EXECUTE` efectivo, en **cualquier** esquema no interno. Ver «`SECURITY DEFINER`: qué mira el guard y qué no». |
+| La URL puede redirigirse o viajar sin cifrar | Ver «La cadena de conexión, antes de abrirla». |
+| La sesión no quedó en solo lectura | `PGOPTIONS` fuerza `default_transaction_read_only` desde la conexión; si no rigió, se aborta. |
+| El rol no tiene `USAGE` sobre algún esquema del `search_path` | El fallo más caro: no rompe nada, sólo serializa `extensions.citext` donde el dueño escribe `citext`, y el refresco quedaría versionado con drift permanente. |
+| La URL apunta a otro proyecto que el declarado | Capturar el **sandbox** y versionarlo como producción. El ref se deduce del host (`db.<ref>.supabase.co`) o del usuario del pooler (`<rol>.<ref>`, con cualquier rol, no sólo `postgres`). El host se valida contra esas **dos formas oficiales**, no por «contiene supabase»: `pooler.supabase.com.atacante.net` lo registra cualquiera. Si no se puede deducir, hay que pasar `--proyecto`: no se adivina. |
+| El archivo recién escrito no se relee igual que lo medido | Se escribe en un temporal, se **relee del disco** y sólo entonces se reemplaza con `rename(2)`, que es atómico. Un `writeFileSync` sobre la ruta versionada trunca primero y escribe después: si el proceso muere en el medio queda un JSON cortado que no es ni la instantánea vieja ni la nueva, y el workflow lo publicaría como artefacto. |
+| Algún valor no es SHA-256 de 64 hex | Una lectura truncada o a medias. |
+| **Todos** los grupos `/grants` vinieron vacíos | El síntoma exacto de leer los privilegios con un catálogo relativo al rol. Que algunos estén vacíos es normal; que lo estén todos, no. |
+| El número de grupos cambia más de un 20 % | Haber leído otra base. Un cambio así merece mirarse a mano. |
+
+Y la URL **nunca se imprime**: viaja por el entorno, y el script recorta de sus
+propios mensajes de error cualquier cadena de conexión —y la contraseña por
+separado— antes de escribirlos.
+
+### Tres jobs, y por qué no son uno
+
+El workflow está partido en tres, y el corte no es cosmético:
+
+| Job | Qué hace | De qué depende |
+| --- | --- | --- |
+| `verificar` | **Todas** las pruebas del auditor: `--verificar-huella`, `--prueba-espacios`, `--prueba-acl`, `--prueba-live`, `--prueba-tres-vias` y la prueba negativa. | De nada. |
+| `veredicto` | Lo que el workflow existe para decir: comparar P, M y R y fallar si hay drift que nadie declaró. | `needs: verificar`. |
+| `live` | Refrescar la instantánea leyendo producción. | `needs: verificar`. **No** de `veredicto`. |
+
+Dos cosas que arregla esta separación.
+
+**El veredicto apagaba las pruebas.** Los pasos de un job no corren si uno
+anterior falló. Con todo junto, cada vez que producción y la instantánea
+divergían —un hecho del mundo, no un defecto del código— el veredicto se ponía
+rojo y las pruebas que venían detrás quedaban en *skipped*. Justo cuando hay
+algo que auditar, el auditor se quedaba sin la evidencia de que funciona. Ahora
+el veredicto vive en su propio job, y dentro de `verificar` cada paso lleva
+`if: !cancelled()`: una prueba que falla no saltea a las siguientes, así que lo
+que se ve es el cuadro completo y no el primer error.
+
+**`live` gateado por el veredicto era circular.**
+
+> La auditoría falla porque la instantánea envejeció respecto de producción → el
+> refresco no corre porque la auditoría falló → la instantánea sigue vieja.
+
+Y eso no es un caso raro: es exactamente para lo que existe el refresco. Por eso
+`live` depende de `verificar` y no de `veredicto`. De `verificar` sí depende en
+la forma normal —si las pruebas del auditor fallan, el job no corre—: lo que no
+se puede exigir es el veredicto, no la corrección del código que va a conectarse
+a producción.
+
+### Cómo está protegido el job `live`
+
+Cuatro condiciones, y las cuatro tienen que darse:
+
+| Condición | Por qué |
+| --- | --- |
+| `github.event_name == 'workflow_dispatch'` | La única referencia de confianza. En `pull_request` el código lo propone quien abre el PR. Nunca `pull_request_target`. |
+| `github.ref == 'refs/heads/main'` | Se despacha sobre una rama, y una rama cualquiera puede traer un `auditar.mjs` modificado. |
+| `vars.SCHEMA_DRIFT_LIVE_HABILITADO == 'true'` | Encender el modo live tiene que ser un acto deliberado, no el efecto colateral de que aparezca un secreto. |
+| `needs: verificar` | Un auditor cuyas pruebas fallan no se acerca a producción. |
+
+Y además, del lado de GitHub y no del archivo:
+
+* `environment: production-db`, restringido a `main`, con revisores requeridos y
+  sin bypass de administradores. **El `if` repite esa restricción, no la
+  reemplaza**: un `if` lo cambia cualquiera que pueda editar este archivo; la
+  regla del environment la hace cumplir GitHub aunque el archivo mienta.
+* `permissions: contents: read`.
+* Checkout **explícito** de `${{ github.sha }}`, con `persist-credentials: false`.
+  Entre el despacho y el arranque del job —que puede esperar la aprobación del
+  environment— `main` avanza; sin `ref`, se ejecutaría código que nadie miró al
+  aprobar.
+
+### Nunca se publica un resultado fallido
+
+El paso de refresco tiene `id`, y de ahí cuelga todo lo demás:
+
+* El resumen con el diff y el artefacto se generan **sólo** si el refresco
+  terminó bien.
+* Si no, el resumen dice con todas las letras que esta corrida **no publica
+  ningún artefacto** y que la instantánea del repositorio quedó intacta.
+* Antes de publicar se comprueba que la fecha `capturada` del archivo sea la de
+  hoy: lo que se sube es la lectura de esta corrida, no la instantánea
+  versionada de siempre.
+
+El modo de fallo que se evita es el peor de todos: alguien encuentra un
+artefacto en una corrida roja, lo da por bueno y versiona la instantánea vieja
+como si fuera producción de hoy.
+
+### Los ocho privilegios de tabla, y el que sólo existe en 17
+
+`SELECT` va por su propia regla. Los otros siete —ocho en producción— los mide
+la regla de **ESCRITURA**:
+
+| Privilegio | Desde | Qué habilita |
+| --- | --- | --- |
+| `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` | siempre | Lo obvio. |
+| `REFERENCES` | siempre | Colgar una clave foránea de la tabla ajena, y con eso condicionar sus borrados desde afuera. |
+| `TRIGGER` | siempre | El que se olvida, y el peor: **instalar código que corre con las escrituras de otro**. |
+| `MAINTAIN` | **PostgreSQL 17** | `VACUUM`, `ANALYZE`, `REINDEX`, `CLUSTER` y `REFRESH MATERIALIZED VIEW` sobre la tabla ajena. |
+
+`MAINTAIN` no existe antes de 17, y **producción va por 17 mientras las pruebas
+corren sobre el Postgres del runner, que hoy es 16**. Pasarle ese nombre a
+`has_table_privilege` en 16 no devuelve `false`: lanza «unrecognized privilege
+type» y tumba la medición entera. Y dentro de un `GRANT` sería un error de
+sintaxis, antes siquiera de ejecutarse.
+
+Por eso el nombre **nunca** aparece en un texto que un servidor 16 vaya a
+analizar. La lista se arma en tiempo de ejecución, en una constante única
+(`SQL_PRIVS_TABLA`) que usan la consulta de la credencial, la precondición de la
+propuesta de `net` y el fixture de `--prueba-live`:
+
+```sql
+ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
+ || CASE WHEN current_setting('server_version_num')::int >= 170000
+         THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END
+```
+
+y los nombres entran por `unnest` **como valores**, no como literales. En 16 el
+motor nunca llega a ver `'MAINTAIN'`.
+
+En un servidor 16 se omite **una sola** cosa: la prueba que hace un `GRANT
+MAINTAIN` de verdad. Se declara en la salida, con esas palabras. Lo demás sí
+corre: la lista versionada se comprueba contra `server_version_num`, y la
+detección, el nombrado y el remedio los fija la prueba pura de
+`juzgarCredencial`, que no necesita servidor.
+
+### Tablas y columnas: alcanzables de verdad, y de dónde viene el privilegio
+
+**Alcanzable** son dos condiciones, y hacen falta las dos:
+
+```sql
+has_schema_privilege(current_user, n.oid, 'USAGE')   -- se puede nombrar
+has_table_privilege(c.oid, 'SELECT')                 -- se puede leer
+```
+
+Un `GRANT SELECT … TO PUBLIC` sobre una tabla de un esquema sobre el que el rol
+no tiene `USAGE` **no** se rechaza: `has_table_privilege` dice que sí, pero sin
+`USAGE` no puede ni nombrarla. Un guard que ladrara por eso obligaría a limpiar
+objetos que nadie alcanza, y a la tercera vez alguien lo apaga.
+
+Y se conserva **de dónde viene** cada privilegio, porque el remedio depende de
+eso — las cuatro fuentes se **acumulan**:
+
+| Procedencia | Remedio |
+| --- | --- |
+| `PUBLIC` | `REVOKE <privs> ON <tabla> FROM PUBLIC;` — y se marca como **decisión de política**: afecta a todos los roles de la base, y no la toma el auditor. |
+| `GRANT` directo al auditor | `REVOKE <privs> ON ALL TABLES IN SCHEMA <esquema> FROM <auditor>;` |
+| Una membresía | **Quitar la membresía**. Nunca revocarle al rol intermedio: si es `authenticated`, arregla el auditor y rompe el producto. |
+| Ser **dueño** | `ALTER TABLE <tabla> OWNER TO <otro rol>;` |
+
+**Si el privilegio viene de `PUBLIC`, NO se propone `REVOKE … FROM <auditor>`.**
+No hay nada que quitarle: la línea se pega, no cambia nada, y el diagnóstico
+habría dicho que el agujero se cerró. Hay una prueba que aplica el remedio tal
+como sale y exige que el rechazo desaparezca — para las cuatro vías.
+
+### `net` (pg_net): el bloqueo que hoy impide el paso 3
+
+Medido contra el catálogo real: el esquema **`net` concede `USAGE` a `PUBLIC`**,
+y **`net._http_response`** y **`net.http_request_queue`** conceden a `PUBLIC`
+los **ocho** privilegios de tabla: `SELECT`, `INSERT`, `UPDATE`, `DELETE`,
+`TRUNCATE`, `REFERENCES`, `TRIGGER` y —producción va por 17— `MAINTAIN`. Con
+ellas viene la única secuencia que hay ahí:
+**`net.http_request_queue_id_seq`**, la del `id` de la cola —`_http_response` no
+tiene secuencia propia, su `id` es el de la petición—. Son grants de la
+instalación gestionada de Supabase: ninguna migración de este repositorio los
+declara, y la reconstrucción local no los reproduce.
+
+Con eso, una credencial provisionada **exactamente** como prescribe este
+documento las alcanza igual — el privilegio no se lo dio nadie, lo tiene por ser
+`PUBLIC`. Ése es el **riesgo confirmado**: una credencial que habla Postgres
+directo. El acceso por `anon` desde el SPA o la Data API está **por verificar**,
+no confirmado: `anon` es parte de `PUBLIC` y tiene el privilegio en el catálogo,
+pero PostgREST sólo sirve los esquemas declarados en *Data API → Exposed
+schemas*, y `net` normalmente no está ahí. **El guard la rechaza, y está bien que rechace**: `_http_response`
+guarda el cuerpo y las cabeceras de cada respuesta HTTP que recibió la base
+—webhooks, pasarelas de pago— y `http_request_queue` las peticiones pendientes
+con sus cabeceras, que es donde vive un `Authorization: Bearer`. Con `UPDATE` e
+`INSERT` encima.
+
+**No se agrega `net` a `LECTURA_TOLERADA` ni se afloja el guard.**
+
+Y hay una segunda razón para no apurarse: **el pipeline no puede ejecutar el
+`REVOKE`**. Los tres objetos y sus grants pertenecen a `supabase_admin`,
+mientras que el ejecutor de las migraciones es `postgres`, que ahí no es
+superusuario, no es miembro de ese rol y no tiene grant option. Un `REVOKE` sin
+autoridad **no falla en PostgreSQL**: emite un `WARNING` y sale 0 — la migración
+quedaría registrada como aplicada, el pipeline en verde y `PUBLIC`
+conservándolo todo.
+
+La propuesta está en [`propuesta-net-publico.md`](propuesta-net-publico.md)
+— **preparada y no aplicada**. Es **un solo lote, en una sola transacción**:
+
+```
+BEGIN;
+  [precondición sobre los tres objetos]
+  [REVOKE]
+  [regrants explícitos, aprobados de antemano — hoy vacío, sin placeholders]
+  [postcondición sobre exactamente los tres objetos]
+COMMIT;
+```
+
+Y va entero: la postcondición sólo protege si puede **revertir** los `REVOKE`
+de arriba, así que fuera de la transacción no sirve de nada. Se ejecuta con
+`ON_ERROR_STOP` activo — sin él `psql` sigue después del error y **sale 0**,
+aunque la transacción se haya revertido.
+
+**Autoridad suficiente: tres cosas, y `WITH GRANT OPTION` no es una.** Sólo ser
+superusuario, ser el propietario, o tener membresía efectiva en el rol
+propietario. El grant option habilita a *conceder* y a revocar lo que uno mismo
+concedió; **no alcanza el grant que hizo otro otorgante**, así que un migrador
+con los ocho privilegios `WITH GRANT OPTION` seguiría sin poder tocar lo que
+concedió `supabase_admin`. La precondición lo mira y lo informa, pero no lo
+cuenta.
+
+**Las DOS capas del ACL.** Un `GRANT SELECT (headers) … TO PUBLIC` **no aparece
+en `pg_class.relacl`**: vive en `pg_attribute.attacl`, y alcanza igual para leer
+las cabeceras de cada petición saliente. La precondición y la postcondición
+miran las dos — `relacl` sobre los tres objetos, y `attacl` sobre **todas** las
+columnas no eliminadas de las dos tablas.
+
+**Y el otorgante decide, no sólo informa.** De cada grant a `PUBLIC` se lee
+objeto, columna, privilegio y **otorgante**, y se exige poder **actuar como** él
+(`pg_has_role(current_user, grantor, 'USAGE')`, o superusuario). Un grant hecho
+por un tercero sobrevive al `REVOKE`, que sale 0 igual; si aparece uno que no se
+puede asumir, la precondición **aborta antes del primer `REVOKE`** y lo nombra.
+
+Necesita una operación soportada con autoridad del propietario (en la práctica,
+Supabase Support), y la decide quien opera la base.
+
+El rechazo está fijado por `--prueba-live`, que construye esa misma forma en un
+clúster desechable, exige el rechazo, aplica los `REVOKE` que el propio
+diagnóstico propone y comprueba que la credencial vuelve a servir **sin tocar el
+`USAGE` del esquema**.
+
+Y el bloqueo de autoridad está fijado igual, no supuesto. La misma prueba pone
+los tres objetos en manos de otro rol y corre **el lote completo** en cinco
+escenarios:
+
+| Escenario | Qué se exige |
+| --- | --- |
+| Ni dueño ni miembro (la forma de producción) | El `REVOKE` **sale 0** con la **ACL intacta**; la precondición **aborta** nombrando dueño y ejecutor. |
+| **Falta uno** de los tres objetos | Aborta **aun siendo superusuario**, nombrando cuál falta; **ningún `REVOKE` se ejecuta**. |
+| Los ocho privilegios **`WITH GRANT OPTION`**, grants de `PUBLIC` hechos por otro | **Rechazado igual**, nombrando al otorgante; su `REVOKE` deja la ACL **byte por byte** intacta. |
+| Un grant **por columna** a `PUBLIC` otorgado por un **tercero** (`A` da grant option a `B`; `B` concede a `PUBLIC`), ejecutado por el dueño `A` | La precondición **aborta**, identificando objeto, **columna**, privilegio y otorgante; `relacl` **y** `attacl` byte por byte iguales. |
+| El mismo grant por columna, pero **concedido por el dueño** (contraprueba) | El lote **lo elimina**: `attacl` vacío, `PUBLIC` sin nada, postcondición **pasa**. |
+| **Propietarios asimétricos**: manda sobre las tablas, no sobre la secuencia | El lote **falla en la precondición**, señalando la secuencia; las **tres ACL idénticas** — ni la mitad que sí podía. |
+| La **postcondición falla** (lote sin el `REVOKE` de la secuencia) | Los `REVOKE` de las tablas **se revierten**: ACL idénticas. Y sin `ON_ERROR_STOP`, `psql` **sale 0** igual. |
+
+Con las dos contrapruebas: con la autoridad del dueño la precondición pasa, y
+con las tres vías cerradas la postcondición pasa — para que «falla siempre» y
+«detecta lo que hay» no se vean igual desde afuera.
+
+### `pg_stat_statements`: una decisión, no un olvido
+
+Supabase instala `pg_stat_statements` en `extensions`, y la extensión concede
+`SELECT` a `PUBLIC` sobre sus dos vistas. La credencial **necesita** `USAGE`
+sobre `extensions` —sin él `format_type` y `pg_get_expr` cualifican los nombres
+de ahí y la huella deja de coincidir con la del dueño—, así que esas vistas le
+quedan alcanzables **como consecuencia de un requisito de corrección**, no de un
+grant que alguien le haya dado.
+
+**La decisión: no bloquean, y se avisa en cada corrida.** Está escrita en
+`LECTURA_TOLERADA`, con su justificación por entrada, y sale en el diagnóstico
+del modo live cada vez — no en un `if` escondido.
+
+Por qué se tolera:
+
+* No son datos de negocio: son contadores y tiempos por sentencia.
+* Postgres enmascara el texto de las sentencias de **otros** roles con
+  `<insufficient privilege>` salvo para miembros de `pg_read_all_stats`, y esta
+  credencial se rechaza si tiene **cualquier** membresía.
+* Cerrarlo es `REVOKE … FROM PUBLIC`: una decisión de política que afecta a
+  todos los roles. Bloquear el refresco hasta que alguien la tome sería forzar
+  una decisión ajena.
+
+**Qué sigue bloqueando**, y son tres condiciones que tienen que darse juntas: si
+el privilegio llega por un `GRANT` directo, por una membresía o por propiedad,
+bloquea —eso ya no es «la extensión dejó su default»—; si el objeto **no**
+pertenece a una extensión aunque se llame igual, bloquea; y cualquier otra vista
+de extensión bloquea, porque la lista son esas dos y no una categoría. Una
+**secuencia** tampoco entra: la tolerancia es de lecturas de tabla.
+
+> ⚠ **Pendiente de aprobación del propietario.** Esta tolerancia es una
+> propuesta del auditor, no un hecho consumado, y hay que aprobarla **antes de
+> fusionar**. Si no se aprueba, se borran las dos entradas de `LECTURA_TOLERADA`
+> y el guard vuelve a bloquear — que es el estado seguro.
+
+### `SECURITY DEFINER`: qué mira el guard y qué no
+
+Una función `SECURITY DEFINER` corre con los privilegios de **su dueño**. Si la
+credencial del auditor puede ejecutar una, el «solo lectura» que se mide sobre
+el rol no describe lo que ese rol puede hacer: describe lo que puede hacer
+*directamente*, y hay un camino al lado.
+
+**Alcanzable** son dos condiciones, y hacen falta las dos:
+
+```sql
+has_schema_privilege(current_user, n.oid, 'USAGE')     -- se puede nombrar
+has_function_privilege(current_user, p.oid, 'EXECUTE') -- se puede ejecutar
+```
+
+en **cualquier** esquema que no sea interno del motor — no sólo `public` y
+`graphql_public`. La credencial se conecta a **PostgreSQL**, no a PostgREST: un
+esquema propio o `extensions` es tan alcanzable como `public`, y menos mirado.
+La otra mitad importa igual: una función con `EXECUTE` a `PUBLIC` en un esquema
+sobre el que el rol no tiene `USAGE` **no** se rechaza, porque no puede ni
+nombrarla — un guard que ladrara por eso se vuelve ruido y a la tercera vez
+alguien lo apaga.
+
+#### El diagnóstico dice por dónde llega, porque el remedio depende de eso
+
+Hay tres formas de que el privilegio alcance a la credencial, y el `REVOKE` que
+las cierra es distinto:
+
+| Procedencia | Remedio |
+| --- | --- |
+| `EXECUTE` a `PUBLIC` | `REVOKE EXECUTE ON FUNCTION f FROM PUBLIC;` |
+| `GRANT` directo al auditor | `REVOKE EXECUTE ON FUNCTION f FROM <auditor>;` |
+| Una membresía | **Quitar la membresía**, no tocar el rol intermedio: puede ser `authenticated`, y revocarle rompe la aplicación. La regla MEMBRESÍA ya lo rechaza aparte. |
+| Ser **dueño** de la función | `ALTER FUNCTION f OWNER TO <otro rol>;`. Se detecta por `proowner`, aparte del ACL: el dueño puede además tener un `GRANT`, y mirarlo sólo cuando el ACL no dice nada lo tapaba. |
+
+**Las fuentes se acumulan.** Las cuatro pueden darse a la vez, y cerrar una sola
+deja el camino abierto por las otras — con el agravante de que el diagnóstico
+habría dicho que estaba resuelto. Así que se emiten **todas** las líneas que
+hagan falta, no la del primer caso que coincida. Ceder la propiedad de una
+función, por ejemplo, materializa su ACL: a partir de ahí llega por dos caminos.
+
+Proponer el `REVOKE` equivocado es peor que no proponer ninguno: `… FROM PUBLIC`
+sobre una función concedida directamente al auditor no hace **nada**. Por eso el
+mensaje trae `[vía …]` en cada función.
+
+#### Qué NO es esta regla
+
+**No es un juicio sobre los privilegios de `anon` o de `authenticated`.** La
+credencial del auditor es un rol independiente sin membresías —lo exige la regla
+MEMBRESÍA—, y un rol así **no hereda** permisos concedidos explícitamente a
+`anon` o a `authenticated`.
+
+Los hechos, de una consulta de solo lectura al catálogo real de producción del
+**2026-09-03 17:29 UTC**:
+
+| | |
+| --- | --- |
+| `SECURITY DEFINER` en `public` | 249 |
+| con `proacl` nulo o por defecto (`EXECUTE` a `PUBLIC`) | **0** |
+| con `EXECUTE` efectivo procedente de `PUBLIC` | **0** |
+| ejecutables explícitamente por `anon` | 1 |
+| ejecutables explícitamente por `authenticated` | 118 |
+
+Es decir: **producción no tiene ninguna `SECURITY DEFINER` abierta a `PUBLIC`**,
+y por lo tanto este guard **no bloquea el refresco**. Lo que hay son permisos
+explícitos a `anon` y `authenticated`, que son otra conversación —función por
+función, con los advisors de Supabase delante— y que no se resuelve desde acá ni
+con un `REVOKE` masivo.
+
+> Una versión anterior de este documento afirmaba «26 de 246 ejecutables por
+> `PUBLIC` en producción». Era **falso**: ese 26 salió de la reconstrucción local
+> desde migraciones, donde una `CREATE FUNCTION` sin `REVOKE` posterior deja el
+> ACL por defecto, y se atribuyó a producción sin medirla. Que la reconstrucción
+> y producción difieran ahí es en sí mismo drift, y el auditor ya lo declara
+> —29 de los 131 grupos de la baseline son grants de `EXECUTE`—.
+
+#### La allowlist
+
+`SECDEF_PERMITIDAS`, en `auditar.mjs`, está **vacía** y no es un trámite
+llenarla: cada entrada afirma que esa función, corriendo como su dueño, no le da
+a esta credencial nada que no debería tener. Es una afirmación sobre el **cuerpo**
+de la función, y la firma quien revisa el PR que agrega la línea. Hay una prueba
+que falla si deja de estar vacía, para que agregarla sea un acto visible.
+
+### La cadena de conexión, antes de abrirla
+
+La lista blanca del hostname **no alcanza**. libpq acepta parámetros en la URI y
+varios mandan sobre el destino:
+
+```
+postgresql://u:p@db.<ref>.supabase.co:5432/postgres?hostaddr=203.0.113.9
+```
+
+pasa cualquier comprobación de hostname y **habla con otra máquina**: con
+`hostaddr` libpq se conecta a esa IP y usa `host` sólo para el SNI y el
+certificado. `host=` en la query hace lo mismo por la vía directa, y `options=`
+puede deshacer el `default_transaction_read_only` que `PGOPTIONS` fija por
+entorno — el guard que se apoya en el entorno, desactivado desde la URL.
+
+Por eso `validarUrlLive()` es una lista blanca **de parámetros**:
+
+| Regla | |
+| --- | --- |
+| Un solo host, y oficial | `db.<ref>.supabase.co` o `<región>.pooler.supabase.com`. Una lista `a:5432,b:5432` se rechaza: libpq prueba uno por uno. |
+| Puerto explícito, y soportado | **5432** en las dos formas, que es el modo **sesión**. El 6543 del pooler es modo transacción, y ahí `PGOPTIONS` no rige: el guard de solo lectura se caería sin que nada avise. El puerto no se descarta al sacar el hostname — es parte del destino. |
+| La base, exactamente `/postgres` | Rechazar `?dbname=` **no alcanza**: en una URI normal el nombre de la base es el **path**. `…/otra_base` cambia qué se mide sin tocar un parámetro. Se compara en crudo, así que `/%70ostgres`, `/postgres/` y `/postgres/extra` también se rechazan. |
+| Prohibidos | `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `options`. |
+| Permitidos, y sólo éstos | `sslmode`, `sslrootcert`, `connect_timeout`, `application_name`. |
+| Sin repetidos | libpq se queda con el **último**: `sslmode=verify-full&sslmode=disable` se lee seguro y se conecta inseguro. |
+| `sslmode` exigido | `require`, `verify-ca` o `verify-full`. Sin él libpq negocia y **acepta texto plano**; `disable`, `allow` y `prefer` también lo permiten. |
+
+Con `sslmode=require` la conexión se cifra pero **no** se verifica el
+certificado: protege del que escucha, no del que se hace pasar por la base. Se
+acepta y se **recomienda** subir a `verify-full` con `sslrootcert=<ruta>` cuando
+el runner tenga el certificado de la CA de Supabase.
+
+La única excepción es un **socket de dominio Unix** (`?host=/…`), que no puede
+alcanzar otra máquina: es lo que usa `--prueba-live` contra su clúster
+desechable. No es un bypass — que un socket no termine versionado como
+producción lo cuida el guard del proyecto, porque de esa URL no se deduce ningún
+ref y sin ref el refresco exige `--proyecto` a mano.
+
+### El job no commitea
+
+`live` es de solo lectura de los dos lados: `contents: read` y una credencial
+sin permisos de escritura. La huella refrescada sale como **artefacto** y con el
+diff en el resumen del job; el PR que la versiona se abre aparte. Darle
+`contents: write` a un job que además tiene acceso a la base de producción sería
+juntar las dos mitades de un problema.
+
+### Qué falta para encenderlo
+
+```sql
+CREATE ROLE drift_readonly LOGIN PASSWORD '…';
+GRANT USAGE ON SCHEMA public, extensions TO drift_readonly;
+```
+
+Los **dos** esquemas: son los del `search_path`, y sin el segundo la huella no
+coincide con la del dueño. Y **nada más**: sin `SELECT` sobre ninguna tabla, sin
+membresías, sin `CREATE`. El rol así, pelado, ya alcanza para sacar la huella
+completa —lo fija `--prueba-acl`—, y cualquier privilegio de más lo rechaza el
+guard. Después, en el environment `production-db`, el secret
+`SCHEMA_DRIFT_READONLY_URL` con su cadena de conexión, y la variable de
+repositorio `SCHEMA_DRIFT_LIVE_HABILITADO` en `true`.
+
+**Sobre la cadena de conexión.** Sirve tanto la conexión directa como el pooler
+en modo sesión, y en los dos casos **`sslmode` es obligatorio**:
+
+```
+postgresql://drift_readonly:<clave>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+postgresql://drift_readonly.<ref>:<clave>@aws-1-<región>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Las dos formas, tal cual: **puerto 5432 explícito** y **`/postgres`** como path.
+El modo **sesión** (5432) y no el de transacción (6543) porque `PGOPTIONS` —lo
+que fuerza la sesión a solo lectura— sólo rige en modo sesión; el validador
+rechaza el 6543 por eso. El runner de Actions decide cuál de las dos hace falta:
+si su red no alcanza la conexión directa, el pooler es la vía.
+
+Y **nada más en la query**: `hostaddr`, `host`, `port`, `dbname`, `user`,
+`password`, `service`, `servicefile` y `options` se rechazan, igual que
+cualquier parámetro repetido o no documentado (ver «La cadena de conexión, antes
+de abrirla»). Si el runner tiene el certificado de la CA de Supabase, conviene
+`sslmode=verify-full&sslrootcert=<ruta>` en lugar de `require`.
+
+Siguen valiendo las tres condiciones de siempre, y ninguna es opcional:
 
 1. **Una credencial dedicada de solo lectura.** Un rol de Postgres con `USAGE`
-   sobre `public` y `SELECT` sobre `pg_catalog`/`information_schema`, y nada más.
+   sobre `public`, y nada más. Ese rol ya **alcanza** para sacar la huella
+   completa: lo fija `--prueba-acl` (ver «Los grants se leen del ACL»). Antes no
+   alcanzaba, y el fallo era silencioso — los grants salían vacíos sin error.
    **No se reutiliza `SUPABASE_ACCESS_TOKEN`**: ese token es de la Management API
    y puede aplicar DDL, crear y borrar ramas y leer secretos. Que
    `drift-esquema.yml` ya lo use no es una razón para extender su alcance — es
@@ -324,7 +815,9 @@ Para desbloquearlo hacen falta tres cosas, y ninguna es opcional:
    necesita ningún secreto.
 
 Mientras tanto el job `live` de `.github/workflows/schema-drift.yml` está apagado
-por `vars.SCHEMA_DRIFT_LIVE_HABILITADO` y documenta exactamente qué falta.
+por `vars.SCHEMA_DRIFT_LIVE_HABILITADO`. Apagado, no sin escribir: el camino
+completo corre en CI en cada PR mediante `--prueba-live`, sin credenciales y sin
+red.
 
 ## Cómo se prueban las propiedades de la huella
 
@@ -351,6 +844,74 @@ probar el doble no prueba la cosa.
 Reintroduciendo la normalización anterior, los casos 1 y 4 fallan — que es
 exactamente el agujero que cerró quitarla. Los casos 2 y 3 pasan en ambas
 versiones porque esas dimensiones nunca se normalizaron.
+
+### Los grants se leen del ACL
+
+`information_schema.role_table_grants` y `role_routine_grants` son **relativos al
+rol**: sólo proyectan concesiones en las que el usuario actual es otorgante,
+otorgado, o miembro de alguno de los dos. Medido sobre un clúster desechable con
+el patrón de roles de Supabase:
+
+| Rol | Filas visibles | ¿Lee datos de negocio? |
+| --- | --- | --- |
+| `postgres` (dueño) | 28 | sí |
+| Rol de solo lectura, `USAGE` sobre `public` | **0** | no |
+| Rol de solo lectura + membresía, `INHERIT` | 28 | **sí** |
+| Rol de solo lectura + membresía, `NOINHERIT` | **0** | no |
+
+No hay configuración que sea a la vez de solo lectura y capaz de ver los grants
+por esa vía: las únicas que los ven pueden leer el camino de dinero. Con la
+credencial que el modo live necesita, la huella habría salido con la cadena
+vacía en las 563 dimensiones `/grants` **sin que nada fallara** — un falso
+negativo que además habría quedado grabado en `huella-produccion.json`.
+
+`relacl` y `proacl` son columnas de `pg_class`/`pg_proc`, no son relativas al rol
+y las lee cualquiera que pueda leer el catálogo. `--prueba-acl` fija estas
+propiedades:
+
+| Propiedad | Cómo se comprueba |
+| --- | --- |
+| **Equivalencia** | Las 260 tablas y 303 funciones serializan idéntico por ACL que por `information_schema` para un rol privilegiado. Es lo que permite que `huella-produccion.json`, capturada con la formulación anterior, siga siendo válida sin regenerarla. |
+| **No vacuidad** | Se exige que haya objetos comparados y con grants no vacíos: dos conjuntos vacíos coinciden siempre. |
+| **Alcanzabilidad** | Un rol con `USAGE` sobre `public` y sin membresías saca los mismos 563 grupos `/grants` que el dueño. |
+| **Contraprueba** | Ese mismo rol ve **0** de las 7 306 concesiones que `information_schema` le muestra al dueño. Si algún día se volviera a leer de ahí, la alcanzabilidad se rompería en silencio. |
+| **Sensibilidad** | Revocar un `SELECT` mueve exactamente un grupo y baja su conteo en uno — si la lectura por ACL devolviera algo constante, todo lo anterior seguiría pasando. |
+| **Compatibilidad de la marca** | Hoy no hay **ni un** aclitem con grant option en el catálogo, así que la marca de la regla 8 no puede mover ninguna huella ya capturada. Se mide antes de nada; si dejara de ser cierto, la prueba falla. |
+| **La marca se ve** | `GRANT SELECT … WITH GRANT OPTION` mueve exactamente el grupo de esa tabla, y `GRANT EXECUTE … WITH GRANT OPTION` el de esa función. |
+| **Y no se cuenta dos veces** | El conteo **no** cambia: `aclexplode` devuelve una fila por privilegio con `is_grantable` al lado, y la marca se agrega a esa fila. |
+| **Ida y vuelta** | Al quitar la grant option, el grupo vuelve **byte a byte** a su huella anterior: un ACL sin grant option serializa como antes de la regla 8. Es la mitad que mantiene comparable la instantánea versionada. |
+
+**Por qué hacía falta la marca.** La formulación anterior descartaba
+`is_grantable`: `authenticated=r/postgres` y `authenticated=r*/postgres`
+serializaban igual. Conceder la facultad de **re-conceder** un privilegio —el
+paso previo a que un rol reparta acceso por su cuenta— era invisible para el
+auditor.
+
+### El guard de separadores en la huella
+
+`fingerprint.sql` afirmaba que «los caracteres de control C0 no aparecen en
+DDL». **Es falso.** Un identificador entre comillas admite cualquier carácter
+menos NUL —`CREATE TABLE "a<0x1e>b"` es SQL válido— y un literal dentro de un
+default o de una expresión de policy también. Con eso:
+
+* un `\x1e` o `\x1f` dentro de un campo hace que **dos catálogos distintos
+  serialicen igual** — una colisión construible, no un accidente;
+* un `\x1d` dentro de un default hace que `default=<algo>` deje de distinguirse
+  de `default=NULL`;
+* un TAB o un salto de línea en un nombre parte la línea de salida
+  (`clave<TAB>sha256<TAB>n`) donde no debe.
+
+Cambiar los separadores rompería `huella-produccion.json`, así que en vez de eso
+hay un **guard fail-closed** al principio del archivo: si aparece alguno, **no
+se emite huella**; se aborta con un error que nombra el objeto. `ON_ERROR_STOP`
+va dentro del propio `.sql` para que sea fail-closed con cualquier llamador, no
+sólo con el que se acuerde de pasar la bandera.
+
+`--verificar-huella` lo ejercita con nombres **citados** que llevan esos
+caracteres —tabla con `\x1e`, columna con `\x1f`, default con `\x1d`, tabla con
+TAB, vista con salto de línea— y comprueba además que, retirado el objeto, la
+huella vuelve a emitirse: un guard que se quedara pegado sería peor que no
+tenerlo.
 
 ### La baseline en la rama base
 
