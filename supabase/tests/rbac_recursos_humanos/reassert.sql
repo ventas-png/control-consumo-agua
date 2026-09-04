@@ -10,10 +10,10 @@ DO $$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM public.permissions WHERE category = 'recursos_humanos';
-  IF n <> 84 THEN
-    RAISE EXCEPTION 'R1: tras re-aplicar hay % claves en recursos_humanos, no 84', n;
+  IF n <> 90 THEN
+    RAISE EXCEPTION 'R1: tras re-aplicar hay % claves en recursos_humanos, no 90', n;
   END IF;
-  RAISE NOTICE 'R1  OK  la categoría sigue teniendo 84 claves';
+  RAISE NOTICE 'R1  OK  la categoría sigue teniendo 90 claves';
 END $$;
 
 DO $$

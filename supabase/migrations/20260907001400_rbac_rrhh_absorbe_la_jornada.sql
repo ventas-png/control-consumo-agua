@@ -7,25 +7,24 @@
 -- jornada entera. Turnos, plantillas de cargo, ausencias, horas y extras,
 -- presencia y panel de turno estaban ahí porque el guardia es quien más turnos
 -- tiene — no porque programar una jornada sea vigilar. Con ellos se mudan el
--- trabajo que se asigna al personal (tareas por turno, rutas de ronda) y la
--- vara con la que se le mide (desempeño).
+-- trabajo que se asigna al personal (tareas por turno con su revisión, rutas de
+-- ronda) y la vara con la que se le mide (desempeño).
 --
 -- El efecto práctico es el mismo que motivó la sección: quien armaba el rol de
 -- la persona que administra al personal tenía que abrir el bloque de Seguridad
 -- entero —visitantes, paquetería, incidentes, bitácora de guardia— para llegar
--- a las ausencias. Nueve tabs, 54 claves con sus acciones.
+-- a las ausencias. Diez tabs, 60 claves con sus acciones.
 --
 -- QUÉ SE MUDA (y qué NO)
 --   turnos              programar la cobertura        plantillas_cargo   los cargos que la definen
 --   ausencias           vacaciones y permisos         horas_extra        el cómputo para planilla
 --   presencia           asistencia                    panel_turno        el tablero de la jornada
 --   tareas_personal     el trabajo del turno          rutas_ronda        el recorrido asignado
---   desempeno_personal  la medición
+--   revision_tareas     su revisión administrativa    desempeno_personal la medición
 --
--- `revision_tareas` (Revisión Admin) NO se mueve: no estaba en la petición. Es
--- la contraparte de `tareas_personal`, así que el flujo queda repartido entre
--- dos secciones a propósito, no por descuido. Si más adelante se decide
--- moverlo, es una línea aquí y otra en sections.ts.
+-- `revision_tareas` (Revisión Admin) viaja con `tareas_personal`: es su
+-- contraparte, y dejarlo en Seguridad habría partido un mismo flujo entre dos
+-- secciones — se asigna en RRHH y se revisa en otro sitio.
 --
 -- LAS CLAVES NO CAMBIAN, SOLO SU CATEGORÍA — igual que en 20260907001200, y por
 -- la misma razón: hay policies que gatean sobre estos nombres. `turnos`,
@@ -59,6 +58,7 @@
 --       OR key LIKE 'condominios.tab.presencia.%'
 --       OR key LIKE 'condominios.tab.panel\_turno.%'
 --       OR key LIKE 'condominios.tab.tareas\_personal.%'
+--       OR key LIKE 'condominios.tab.revision\_tareas.%'
 --       OR key LIKE 'condominios.tab.rutas\_ronda.%'
 --       OR key LIKE 'condominios.tab.desempeno\_personal.%';
 --
@@ -66,7 +66,7 @@
 -- a pasar en la segunda corrida.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- ── 0. Las 54 claves que se mudan, explícitas y sin comodines ───────────────
+-- ── 0. Las 60 claves que se mudan, explícitas y sin comodines ───────────────
 CREATE TEMP TABLE _rrhh_jornada (
   tab    text NOT NULL,
   accion text,
@@ -86,6 +86,7 @@ FROM (VALUES
   ('presencia'),
   ('panel_turno'),
   ('tareas_personal'),
+  ('revision_tareas'),
   ('rutas_ronda'),
   ('desempeno_personal')
 ) AS t(tab)
@@ -135,7 +136,7 @@ BEGIN
   END IF;
 
   RAISE NOTICE
-    'RRHH/jornada: 54 claves reclasificadas; ninguna renombrada.';
+    'RRHH/jornada: 60 claves reclasificadas; ninguna renombrada.';
 END $$;
 
 DROP TABLE _rrhh_jornada;

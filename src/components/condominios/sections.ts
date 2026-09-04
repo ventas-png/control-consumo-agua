@@ -54,7 +54,6 @@ export const SECTIONS: SectionDef[] = [
   ]},
   { id: 'seguridad', label: 'Seguridad', tabs: [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad',
-    'revision_tareas',
     'paqueteria', 'objetos', 'incidentes', 'bitacora_guardia', 'emergencias',
   ]},
   { id: 'comunidad', label: 'Comunidad', tabs: [
@@ -79,8 +78,8 @@ export const SECTIONS: SectionDef[] = [
     'personal', 'capacitacion_personal',
     // La jornada: quién cubre qué, cuándo, y quién falta
     'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
-    // El trabajo que se les asigna
-    'tareas_personal', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+    // El trabajo que se les asigna, y quien lo revisa
+    'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
     // Con qué se les mide
     'desempeno_personal', 'actividad_equipo',
   ]},

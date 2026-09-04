@@ -25,7 +25,8 @@ BEGIN
     'condominios.tab.turnos', 'condominios.tab.plantillas_cargo',
     'condominios.tab.ausencias', 'condominios.tab.horas_extra',
     'condominios.tab.presencia', 'condominios.tab.panel_turno',
-    'condominios.tab.rutas_ronda', 'condominios.tab.desempeno_personal'
+    'condominios.tab.rutas_ronda', 'condominios.tab.desempeno_personal',
+    'condominios.tab.revision_tareas'
   ] LOOP
     SELECT category INTO cat FROM public.permissions WHERE key = falta;
     IF cat <> 'seguridad' THEN

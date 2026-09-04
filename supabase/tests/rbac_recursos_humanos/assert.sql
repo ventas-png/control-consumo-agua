@@ -247,12 +247,12 @@ END $$;
 DO $$
 DECLARE n int;
 BEGIN
-  -- 9 tabs × (base + 5 acciones) = 54, más las 30 de la primera tanda = 84.
+  -- 10 tabs × (base + 5 acciones) = 60, más las 30 de la primera tanda = 90.
   SELECT count(*) INTO n FROM public.permissions WHERE category = 'recursos_humanos';
-  IF n <> 84 THEN
-    RAISE EXCEPTION 'D1: se esperaban 84 claves en recursos_humanos (30 + 54 de la jornada), hay %', n;
+  IF n <> 90 THEN
+    RAISE EXCEPTION 'D1: se esperaban 90 claves en recursos_humanos (30 + 60 de la jornada), hay %', n;
   END IF;
-  RAISE NOTICE 'D1  OK  84 claves: la sección absorbió la jornada completa';
+  RAISE NOTICE 'D1  OK  90 claves: la sección absorbió la jornada completa';
 END $$;
 
 DO $$
@@ -266,6 +266,7 @@ BEGIN
     'condominios.tab.presencia',
     'condominios.tab.panel_turno',
     'condominios.tab.tareas_personal',
+    'condominios.tab.revision_tareas',
     'condominios.tab.rutas_ronda',
     'condominios.tab.desempeno_personal'
   ] LOOP
@@ -276,25 +277,21 @@ BEGIN
       RAISE EXCEPTION 'D2: % no llegó a recursos_humanos (o dejó de existir)', falta;
     END IF;
   END LOOP;
-  RAISE NOTICE 'D2  OK  los nueve tabs de la jornada están en la sección, con su nombre intacto';
+  RAISE NOTICE 'D2  OK  los diez tabs de la jornada están en la sección, con su nombre intacto';
 END $$;
 
 DO $$
 DECLARE cat text;
 BEGIN
-  -- Control negativo de la segunda tanda: lo que se queda en Seguridad.
-  -- `revision_tareas` es la contraparte de `tareas_personal`; que NO se haya
-  -- mudado es deliberado, y si algún día se muda, este assert lo dirá.
-  SELECT category INTO cat FROM public.permissions WHERE key = 'condominios.tab.revision_tareas';
-  IF cat <> 'seguridad' THEN
-    RAISE EXCEPTION 'D3: revision_tareas se movió a % — no estaba en la petición', cat;
-  END IF;
-
+  -- Control negativo de la segunda tanda: lo que se queda en Seguridad. Con
+  -- `revision_tareas` ya mudado, el vigilante es `bitacora_guardia`, que
+  -- comparte el prefijo `bitacora` con `bitacora_acciones` (Administración) y
+  -- es de los que un patrón laxo se llevaría por delante.
   SELECT category INTO cat FROM public.permissions WHERE key = 'condominios.tab.bitacora_guardia';
   IF cat <> 'seguridad' THEN
     RAISE EXCEPTION 'D3: bitacora_guardia se movió a % — la reclasificación arrastró de más', cat;
   END IF;
-  RAISE NOTICE 'D3  OK  revision_tareas y bitacora_guardia siguen en Seguridad';
+  RAISE NOTICE 'D3  OK  bitacora_guardia sigue en Seguridad';
 END $$;
 
 DO $$

@@ -32,14 +32,15 @@ import {
 const TABS_RRHH = [
   'personal', 'capacitacion_personal',
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
-  'tareas_personal', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+  'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
   'desempeno_personal', 'actividad_equipo',
 ] as const
 
-/** Los nueve que vinieron de Seguridad en la segunda tanda (20260907001400). */
+/** Los diez que vinieron de Seguridad en la segunda tanda (20260907001400). */
 const TABS_JORNADA = [
   'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia',
-  'panel_turno', 'tareas_personal', 'rutas_ronda', 'desempeno_personal',
+  'panel_turno', 'tareas_personal', 'revision_tareas', 'rutas_ronda',
+  'desempeno_personal',
 ] as const
 
 const MIGRACION_JORNADA = resolve('supabase/migrations/20260907001400_rbac_rrhh_absorbe_la_jornada.sql')
@@ -214,17 +215,27 @@ describe('el riel del sidebar con 11 secciones', () => {
 })
 
 describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
-  it('nombra los nueve tabs que se mudan', () => {
+  it('nombra los diez tabs que se mudan', () => {
     for (const tab of TABS_JORNADA) {
       expect(sqlJornada, tab).toContain(`'${tab}'`)
     }
   })
 
-  it('NO toca revision_tareas, que se queda en Seguridad', () => {
-    // Es la contraparte de tareas_personal: si algún día se muda, que sea una
-    // decisión, no un arrastre.
+  it('revision_tareas viaja con tareas_personal, su contraparte', () => {
+    // Se movió en una segunda pasada, ya con el flujo completo a la vista:
+    // asignar el trabajo del turno y revisarlo son el mismo circuito, y
+    // partirlo entre dos secciones era lo que había que evitar.
     const sinCabecera = sqlJornada.slice(sqlJornada.indexOf('CREATE TEMP TABLE'))
-    expect(sinCabecera).not.toContain('revision_tareas')
+    expect(sinCabecera).toContain("('revision_tareas')")
+  })
+
+  it('bitacora_guardia se queda en Seguridad (control negativo)', () => {
+    // Comparte prefijo con `bitacora_acciones`, de Administración: es el vecino
+    // que un patrón laxo se llevaría por delante.
+    const sinCabecera = sqlJornada.slice(sqlJornada.indexOf('CREATE TEMP TABLE'))
+    expect(sinCabecera).not.toContain('bitacora_guardia')
+    const seg = CONDOMINIOS_SECTION_GROUPS.find(g => g.key === 'seguridad')!
+    expect(seg.tabs).toContain('bitacora_guardia')
   })
 
   it('reclasifica categoría sin renombrar claves ni tocar grants', () => {
@@ -270,7 +281,7 @@ describe('migración 20260907001400 (la jornada, desde Seguridad)', () => {
       expect(seg.tabs, `${tab} sigue en el bloque de Seguridad`).not.toContain(tab)
     }
     // Lo que sí se queda.
-    expect(seg.tabs).toContain('revision_tareas')
     expect(seg.tabs).toContain('bitacora_guardia')
+    expect(seg.tabs).toContain('visitantes')
   })
 })

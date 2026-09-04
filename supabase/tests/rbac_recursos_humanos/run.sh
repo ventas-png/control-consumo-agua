@@ -30,12 +30,12 @@
 #                  administra personal no estrena nada.
 #   C · ACCESO     el rol de operaciones conserva tareas y limpieza: agrupar es
 #                  presentación, autorizar es otra cosa. Ningún grant huérfano.
-#   D · JORNADA    la segunda tanda (20260907001400): las 84 claves de la
+#   D · JORNADA    la segunda tanda (20260907001400): las 90 claves de la
 #                  sección tras absorber turnos, plantillas, ausencias, horas,
-#                  presencia, panel de turno, tareas por turno, rutas de ronda y
-#                  desempeño; que `revision_tareas` y `bitacora_guardia` se
-#                  QUEDEN en Seguridad; y que un rol de seguridad con jornada a
-#                  cargo no pierda un solo grant ni vea su deny abrirse.
+#                  presencia, panel de turno, tareas por turno con su revisión,
+#                  rutas de ronda y desempeño; que `bitacora_guardia` se QUEDE
+#                  en Seguridad; y que un rol de seguridad con jornada a cargo
+#                  no pierda un solo grant ni vea su deny abrirse.
 #   NEGATIVA       con un tab renombrado, la guarda de postcondición ABORTA. Sin
 #                  esta prueba no se sabría si el paso 6 es real o decorativo.
 #   IDEMPOTENCIA   re-aplicar no duplica grants, no ensancha la categoría, no
