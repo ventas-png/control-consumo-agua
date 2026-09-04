@@ -28,10 +28,10 @@ SPA— y a cualquier credencial dedicada que se cree después, como
 
 Y lo que hay del otro lado no son métricas:
 
-| Tabla | Qué guarda |
+| Objeto | Qué guarda |
 | --- | --- |
-| `net._http_response` | El **cuerpo** y las cabeceras de cada respuesta HTTP que recibió la base |
-| `net.http_request_queue` | Las peticiones pendientes, con su URL, sus cabeceras y su cuerpo |
+| `net._http_response` | El **cuerpo** y las cabeceras de cada respuesta HTTP que recibió la base. No tiene secuencia propia: su `id` viene del de la petición. |
+| `net.http_request_queue` | Las peticiones pendientes, con su URL, sus cabeceras y su cuerpo. Su `id` sale de **`net.http_request_queue_id_seq`**. |
 
 Las cabeceras de una petición saliente son el sitio natural de una clave de API
 o de un `Authorization: Bearer`, y el cuerpo de una respuesta es lo que devolvió
@@ -61,15 +61,27 @@ desechable y exige el rechazo.
 -- NO APLICAR sin el análisis de impacto de más abajo.
 
 -- 1 · Quitar el acceso público a las dos tablas de pg_net.
-REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON net._http_response      FROM PUBLIC;
-REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON net.http_request_queue  FROM PUBLIC;
+--
+--     ALL PRIVILEGES y no la lista de cinco: además de SELECT, INSERT, UPDATE,
+--     DELETE y TRUNCATE hay que retirar REFERENCES y TRIGGER —y MAINTAIN, que
+--     existe desde Postgres 17 y producción va por 17—. TRIGGER es el peor de
+--     los tres: deja instalar código que corre con las escrituras de pg_net.
+--     Enumerarlos a mano es una lista que se queda vieja en el próximo mayor.
+REVOKE ALL PRIVILEGES ON TABLE
+  net._http_response,
+  net.http_request_queue
+FROM PUBLIC;
 
--- 2 · Y a su secuencia, si también la concede.
-REVOKE SELECT, USAGE, UPDATE ON SEQUENCE net._http_response_id_seq FROM PUBLIC;
+-- 2 · Y la secuencia de la cola, que es la única que hay: `_http_response` no
+--     tiene secuencia propia.
+REVOKE ALL PRIVILEGES ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;
 
--- 3 · Devolver a quien SÍ lo necesita, explícitamente.
+-- 3 · Devolver a quien SÍ lo necesita, explícitamente y con el mínimo.
 --     Medir antes quién usa net.http_get/http_post y con qué rol; ver abajo.
--- GRANT SELECT ON net._http_response TO <rol que lee las respuestas>;
+--     Sin este paso, cualquier consumidor legítimo que dependiera del grant a
+--     PUBLIC deja de funcionar: es la parte que NO se puede saltear.
+-- GRANT SELECT ON net._http_response      TO <rol que lee las respuestas>;
+-- GRANT SELECT ON net.http_request_queue  TO <rol que inspecciona la cola>;
 ```
 
 El `USAGE` del esquema **no se toca**: quitarlo rompería `net.http_get()` y
@@ -89,22 +101,25 @@ los `REVOKE` de arriba, la credencial vuelve a pasar el guard.
 2. **Quién escribe.** `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` desde `PUBLIC` no
    tiene ningún uso legítimo conocido; `pg_net` mantiene sus tablas con su
    propio rol. Confirmarlo antes de revocar.
-3. **La limpieza periódica.** Si hay un job que purga `net._http_response`,
+3. **La secuencia.** `net.http_request_queue_id_seq` la usa `pg_net` al encolar
+   una petición, con su propio rol. Si algún consumidor legítimo encola desde
+   otro rol, necesita `USAGE` explícito sobre ella — comprobarlo antes.
+4. **La limpieza periódica.** Si hay un job que purga `net._http_response`,
    comprobar con qué rol corre. `service_role` tiene `BYPASSRLS` pero **no**
    privilegios implícitos sobre tablas: si dependía del grant a `PUBLIC`, hay
    que concederle explícitamente.
-4. **Que el `REVOKE` es idempotente y reversible.** Lo es: se revierte con el
+5. **Que el `REVOKE` es idempotente y reversible.** Lo es: se revierte con el
    `GRANT` simétrico, y no toca datos.
-5. **Que no lo reponga la próxima actualización de `pg_net`.** Un
+6. **Que no lo reponga la próxima actualización de `pg_net`.** Un
    `ALTER EXTENSION pg_net UPDATE` puede reejecutar el script de instalación y
    volver a conceder. Hay que dejarlo anotado y, si vuelve, el auditor lo
    detectará: los grants son una dimensión de la huella.
-6. **Ventana y observabilidad.** Aplicar fuera del pico de las integraciones y
+7. **Ventana y observabilidad.** Aplicar fuera del pico de las integraciones y
    mirar los logs de las Edge Functions de pago durante la hora siguiente.
 
 ## Qué queda pendiente de decisión del propietario
 
-* Ejecutar los puntos 1 a 3 del análisis y, con el resultado, decidir si hace
+* Ejecutar los puntos 1 a 4 del análisis y, con el resultado, decidir si hace
   falta el `GRANT` explícito y a qué rol.
 * Abrir la migración en su propio PR, con la evidencia de esas mediciones.
 * **Hasta entonces, el modo live queda bloqueado por este motivo**, y es el

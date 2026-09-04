@@ -225,7 +225,9 @@ const sana = {
   solo_lectura: 'on', version: '17.6.1', search_path: '"$user", public, extensions',
 }
 // Una tabla llega como `nombre\x1desquema\x1dprocedencia\x1dflags`: los dos
-// primeros ya citados desde SQL, la procedencia con `+` entre fuentes.
+// primeros ya citados desde SQL, la procedencia con `+` entre fuentes. El
+// cuarto campo depende de la dimensión: los privilegios detectados en
+// `escribientes`/`secuencias`/`columnas`, y el marcador `ext` en `leibles`.
 const T = (nombre, esquema, via = 'drift_readonly', flags = '') =>
   `${nombre}\x1d${esquema}\x1d${via}\x1d${flags}`
 const reglas = (m, opciones) => juzgarCredencial(m, opciones).map(r => r.regla)
@@ -254,7 +256,8 @@ describe('juzgarCredencial', () => {
   }
 
   it('rechaza que pueda escribir', () => {
-    expect(reglas({ ...sana, escribibles: T('public.clientes', 'public') })).toContain('ESCRITURA')
+    expect(reglas({ ...sana, escribibles: T('public.clientes', 'public', 'drift_readonly', 'INSERT') }))
+      .toContain('ESCRITURA')
   })
 
   it('rechaza SELECT a nivel tabla: la huella sale del catálogo, no de los datos', () => {
@@ -262,8 +265,9 @@ describe('juzgarCredencial', () => {
       .toContain('SELECT DE TABLA')
   })
 
-  it('rechaza SELECT por columna, que has_table_privilege no ve', () => {
-    expect(reglas({ ...sana, leibles_columna: T('public.usuarios', 'public') })).toContain('SELECT POR COLUMNA')
+  it('rechaza privilegios por columna, que has_table_privilege no ve', () => {
+    expect(reglas({ ...sana, columnas: T('public.usuarios', 'public', 'drift_readonly', 'SELECT (email)') }))
+      .toContain('PRIVILEGIO POR COLUMNA')
   })
 
   it('rechaza CREATE sobre un esquema', () => {
@@ -581,7 +585,9 @@ describe('juzgarCredencial · los remedios salen de lo que se detectó', () => {
   it('emite una línea por cada esquema detectado, sin repetir', () => {
     const r = juzgarCredencial({
       ...sana,
-      escribibles: [T('auth.users', 'auth'), T('auth.sessions', 'auth'), T('mio.t', 'mio')].join('\x1e'),
+      escribibles: [T('auth.users', 'auth', 'drift_readonly', 'INSERT, UPDATE, DELETE, TRUNCATE'),
+                    T('auth.sessions', 'auth', 'drift_readonly', 'INSERT, UPDATE, DELETE, TRUNCATE'),
+                    T('mio.t', 'mio', 'drift_readonly', 'INSERT, UPDATE, DELETE, TRUNCATE')].join('\x1e'),
     })[0]
     expect(r.remedio.split('\n').map(l => l.trim())).toEqual([
       'REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA auth FROM drift_readonly;',
@@ -602,9 +608,15 @@ describe('juzgarCredencial · los remedios salen de lo que se detectó', () => {
     expect(r.detalle).toContain('"mi esquema"."mi.tabla"')
   })
 
-  it('el SELECT por columna nombra las tablas: `ON ALL TABLES` no lo revoca', () => {
-    const r = juzgarCredencial({ ...sana, leibles_columna: T('auth.users', 'auth') })[0]
-    expect(r.remedio).toContain('REVOKE SELECT (<columnas>) ON auth.users FROM drift_readonly;')
+  // `ON ALL TABLES` no revoca un GRANT por columna, y un marcador `<columnas>`
+  // no es SQL: el remedio nombra las columnas REALES, ya citadas por Postgres.
+  it('el privilegio por columna nombra la tabla y las columnas reales', () => {
+    const r = juzgarCredencial({
+      ...sana, columnas: T('auth.users', 'auth', 'drift_readonly', 'SELECT (email, "raro nombre")'),
+    })[0]
+    expect(r.remedio).toContain(
+      'REVOKE SELECT (email, "raro nombre") ON auth.users FROM drift_readonly;')
+    expect(r.remedio).not.toContain('<columnas>')
   })
 
   it('los remedios de atributo usan el nombre citado del rol', () => {
@@ -714,9 +726,9 @@ describe('juzgarCredencial · tablas, remedio según la procedencia REAL', () =>
   })
 
   it('el detalle dice la procedencia de cada tabla', () => {
-    const r = juzgarCredencial({ ...sana, escribibles: T('mio.t', 'mio', 'PUBLIC') })[0]
+    const r = juzgarCredencial({ ...sana, escribibles: T('mio.t', 'mio', 'PUBLIC', 'INSERT') })[0]
     expect(r.regla).toBe('ESCRITURA')
-    expect(r.detalle).toContain('mio.t [vía PUBLIC]')
+    expect(r.detalle).toContain('mio.t [INSERT, vía PUBLIC]')
   })
 
   it('sin procedencia reconocible lo dice, en vez de proponer algo que no sirve', () => {
@@ -886,5 +898,95 @@ describe('juzgarCredencial · secuencias', () => {
     expect(juzgarCredencial({
       ...sana, secuencias: S('extensions.s', 'extensions', 'PUBLIC', 'SELECT'),
     }).map(r => r.regla)).toContain('SECUENCIA')
+  })
+})
+
+// ── Privilegios de tabla: los detectados, y sólo ésos ───────────────────────
+//
+// El cuarto campo de una tabla «escribible» trae los privilegios que NO son
+// SELECT y que efectivamente tiene: INSERT, UPDATE, DELETE, TRUNCATE,
+// REFERENCES, TRIGGER y —desde Postgres 17— MAINTAIN. El REVOKE nombra ésos:
+// un `REVOKE ALL` revocaría de más, y uno fijo revocaría de menos.
+
+describe('juzgarCredencial · privilegios de tabla detectados', () => {
+  const lineas = (m, regla = 'ESCRITURA') =>
+    juzgarCredencial(m).find(x => x.regla === regla).remedio.split('\n').map(l => l.trim())
+
+  it('revoca exactamente los privilegios detectados, no un ALL', () => {
+    const l = lineas({ ...sana, escribibles: T('mio.t', 'mio', 'drift_readonly', 'TRIGGER') })
+    expect(l).toContain('REVOKE TRIGGER ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+    expect(l.some(x => /ALL PRIVILEGES/.test(x))).toBe(false)
+  })
+
+  it('REFERENCES y TRIGGER cuentan, aunque no sean escritura de filas', () => {
+    const r = juzgarCredencial({
+      ...sana, escribibles: T('mio.t', 'mio', 'PUBLIC', 'REFERENCES, TRIGGER'),
+    })[0]
+    expect(r.detalle).toContain('mio.t [REFERENCES, TRIGGER, vía PUBLIC]')
+    expect(r.remedio).toContain('REVOKE REFERENCES, TRIGGER ON mio.t FROM PUBLIC;')
+  })
+
+  // MAINTAIN existe desde Postgres 17 y el runner corre 16, así que la mitad
+  // que toca la base se declara omitida allá; ésta la cubre entera.
+  it('MAINTAIN (Postgres 17) se nombra y se revoca como cualquier otro', () => {
+    const l = lineas({
+      ...sana, escribibles: T('mio.t', 'mio', 'drift_readonly', 'INSERT, MAINTAIN'),
+    })
+    expect(l).toContain('REVOKE INSERT, MAINTAIN ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+  })
+
+  it('de PUBLIC, con MAINTAIN, revoca a PUBLIC y no al auditor', () => {
+    const l = lineas({ ...sana, escribibles: T('mio.t', 'mio', 'PUBLIC', 'MAINTAIN') })
+    expect(l.some(x => x.startsWith('REVOKE MAINTAIN ON mio.t FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => /FROM drift_readonly;/.test(x))).toBe(false)
+  })
+
+  // Dos tablas del mismo esquema con privilegios distintos necesitan dos
+  // REVOKE distintos: usar los de la primera revoca de más en una y de menos
+  // en la otra.
+  it('agrupa por (privilegios, esquema), no sólo por esquema', () => {
+    const l = lineas({
+      ...sana,
+      escribibles: [T('mio.a', 'mio', 'drift_readonly', 'INSERT'),
+                    T('mio.b', 'mio', 'drift_readonly', 'UPDATE, DELETE')].join('\x1e'),
+    })
+    expect(l).toContain('REVOKE INSERT ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+    expect(l).toContain('REVOKE UPDATE, DELETE ON ALL TABLES IN SCHEMA mio FROM drift_readonly;')
+  })
+})
+
+describe('juzgarCredencial · privilegios por columna', () => {
+  const C = (nombre, esquema, via, privCols) => T(nombre, esquema, via, privCols)
+  const lineas = (m) =>
+    juzgarCredencial(m).find(x => x.regla === 'PRIVILEGIO POR COLUMNA')
+      .remedio.split('\n').map(l => l.trim())
+
+  for (const [priv, cols] of [['SELECT', '(email)'], ['INSERT', '(id, nombre)'],
+                              ['UPDATE', '(saldo)'], ['REFERENCES', '(id)']]) {
+    it(`${priv} por columna: el remedio se puede pegar tal cual`, () => {
+      const l = lineas({ ...sana, columnas: C('mio.t', 'mio', 'drift_readonly', `${priv} ${cols}`) })
+      expect(l).toContain(`REVOKE ${priv} ${cols} ON mio.t FROM drift_readonly;`)
+    })
+  }
+
+  it('de PUBLIC: revoca a PUBLIC, con las columnas, y no al auditor', () => {
+    const l = lineas({ ...sana, columnas: C('mio.t', 'mio', 'PUBLIC', 'UPDATE (saldo)') })
+    expect(l.some(x => x.startsWith('REVOKE UPDATE (saldo) ON mio.t FROM PUBLIC;'))).toBe(true)
+    expect(l.some(x => /FROM drift_readonly;/.test(x))).toBe(false)
+  })
+
+  it('varios privilegios sobre la misma tabla salen como líneas distintas', () => {
+    const l = lineas({
+      ...sana,
+      columnas: [C('mio.t', 'mio', 'drift_readonly', 'INSERT (a)'),
+                 C('mio.t', 'mio', 'drift_readonly', 'UPDATE (b)')].join('\x1e'),
+    })
+    expect(l).toContain('REVOKE INSERT (a) ON mio.t FROM drift_readonly;')
+    expect(l).toContain('REVOKE UPDATE (b) ON mio.t FROM drift_readonly;')
+  })
+
+  it('nunca usa `ON ALL TABLES`, que no revoca un grant por columna', () => {
+    const l = lineas({ ...sana, columnas: C('mio.t', 'mio', 'drift_readonly', 'SELECT (email)') })
+    expect(l.some(x => /ON ALL TABLES/.test(x))).toBe(false)
   })
 })

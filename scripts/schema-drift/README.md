@@ -341,10 +341,10 @@ escribir.
 | --- | --- |
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
 | El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
-| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. |
+| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. Se preguntan **los siete** privilegios de tabla que no son `SELECT` —`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER`— y, cuando `server_version_num >= 170000`, también `MAINTAIN`. `TRIGGER` es el que se olvida: deja instalar código que corre con las escrituras ajenas. El `REVOKE` nombra **los que se detectaron**, no un `ALL` a ciegas. |
 | El rol alcanza alguna **secuencia** | Quedaban fuera del escaneo, que sólo miraba tablas y vistas. `USAGE` o `UPDATE` **mueven el contador** —escritura de estado compartido, y un salto de correlativo se nota en la facturación—; `SELECT` dice cuántas filas hubo. Se pregunta con `has_sequence_privilege`, porque `has_table_privilege` ni siquiera responde por `USAGE`. |
 | El rol tiene `SELECT` sobre alguna tabla **alcanzable** | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. **Alcanzable** son dos condiciones, igual que para las funciones: `USAGE` sobre el esquema **y** el privilegio. El escaneo mira **todos** los esquemas no internos, y el remedio sale de la **procedencia real** (ver abajo). |
-| El rol tiene `SELECT` **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Se pregunta aparte, con `has_any_column_privilege`. |
+| El rol tiene algún privilegio **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Y no es sólo `SELECT`: `INSERT`, `UPDATE` y `REFERENCES` también se conceden por columna —`GRANT INSERT (saldo)` escribe, `REFERENCES (id)` deja colgar una FK—. Se preguntan los cuatro, aparte, con `has_any_column_privilege`, y el remedio trae **los nombres reales de las columnas**, citados por Postgres, para poder pegarse tal cual. |
 | El rol tiene `CREATE` sobre algún esquema | Crear es escribir. Y con una función propia en un esquema del `search_path` se secuestra la resolución de nombres. |
 | El rol es miembro de algún rol | `has_table_privilege` ya cuenta lo que se hereda, pero un rol `NOINHERIT` llega a lo mismo con `SET ROLE`. Un rol dedicado no necesita ninguna membresía, así que cualquiera sobra. |
 | El rol puede ejecutar una función `SECURITY DEFINER` **alcanzable** | Esa función corre con los privilegios de **su dueño**: mientras esté al alcance, el «solo lectura» medido arriba describe lo que el rol hace *directamente* y hay un camino al lado. Alcanzable = `USAGE` sobre el esquema **y** `EXECUTE` efectivo, en **cualquier** esquema no interno. Ver «`SECURITY DEFINER`: qué mira el guard y qué no». |
@@ -465,9 +465,11 @@ como sale y exige que el rechazo desaparezca — para las cuatro vías.
 
 Medido contra el catálogo real: el esquema **`net` concede `USAGE` a `PUBLIC`**,
 y **`net._http_response`** y **`net.http_request_queue`** conceden a `PUBLIC`
-`SELECT`, `INSERT`, `UPDATE`, `DELETE` y `TRUNCATE`. Son grants de la
-instalación gestionada de Supabase: ninguna migración de este repositorio los
-declara, y la reconstrucción local no los reproduce.
+`SELECT`, `INSERT`, `UPDATE`, `DELETE` y `TRUNCATE`. Con ellas viene la única
+secuencia que hay ahí: **`net.http_request_queue_id_seq`**, la del `id` de la
+cola —`_http_response` no tiene secuencia propia, su `id` es el de la petición—.
+Son grants de la instalación gestionada de Supabase: ninguna migración de este
+repositorio los declara, y la reconstrucción local no los reproduce.
 
 Con eso, una credencial provisionada **exactamente** como prescribe este
 documento las alcanza igual — el privilegio no se lo dio nadie, lo tiene por ser

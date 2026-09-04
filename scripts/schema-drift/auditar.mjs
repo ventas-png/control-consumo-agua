@@ -965,6 +965,23 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
    WHERE nspname NOT LIKE 'pg\\_%' AND nspname <> 'information_schema'
 ), yo_oid AS (
   SELECT oid FROM pg_roles WHERE rolname = current_user
+), privs_tabla AS (
+  -- Los privilegios de tabla que existen EN ESTE SERVIDOR.
+  --
+  -- Postgres 17 agregó MAINTAIN (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH
+  -- MATERIALIZED VIEW). Pasarle ese nombre a \`has_table_privilege\` en 16 NO
+  -- devuelve falso: lanza «unrecognized privilege type». Y la reconstrucción
+  -- corre en 16 mientras producción va por 17, así que la lista se arma según
+  -- la versión y el nombre viaja como VALOR, no como literal en la consulta:
+  -- en 16 el motor nunca llega a ver 'MAINTAIN'.
+  SELECT ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
+         || CASE WHEN current_setting('server_version_num')::int >= 170000
+                 THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END AS lista
+), privs_columna AS (
+  -- Los cuatro que Postgres deja conceder POR COLUMNA. No es sólo SELECT:
+  -- \`GRANT INSERT (saldo)\` deja escribir esa columna, y \`REFERENCES (id)\`
+  -- deja crear una FK que apunta a ella —y con eso bloquear borrados—.
+  SELECT unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) AS p
 ), rel AS (
   -- ALCANZABLE = USAGE sobre el esquema Y el privilegio. Las dos condiciones,
   -- igual que para las funciones: sin USAGE la tabla no se puede nombrar, así
@@ -993,6 +1010,13 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   -- Las fuentes se ACUMULAN: PUBLIC, grant directo, membresía y propiedad
   -- pueden darse a la vez.
   SELECT r.*,
+         -- Los privilegios de tabla que NO son SELECT y que efectivamente
+         -- tiene, en el orden de la lista. Es lo que el REVOKE va a nombrar:
+         -- barrer a ciegas con un ALL revocaría de más.
+         (SELECT coalesce(string_agg(p, ', ' ORDER BY array_position(t.lista, p)), '')
+            FROM privs_tabla t, unnest(t.lista) p
+           WHERE p <> 'SELECT' AND has_table_privilege(r.oid, p)) AS privs_no_select,
+         has_table_privilege(r.oid, 'SELECT') AS lee,
          (SELECT array_to_string(
                    coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
                                                             ELSE format('%I', g.rolname) END)
@@ -1008,43 +1032,49 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
                                                             ELSE format('%I', g.rolname) END)
                                FROM aclexplode(coalesce(r.relacl, acldefault('r', r.relowner))) a
                                LEFT JOIN pg_roles g ON g.oid = a.grantee
-                              WHERE a.privilege_type IN ('INSERT','UPDATE','DELETE','TRUNCATE')
+                              WHERE a.privilege_type <> 'SELECT'
                                 AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
                             ARRAY[]::text[])
                    || CASE WHEN r.relowner = (SELECT oid FROM yo_oid)
-                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_escritura,
-         -- El SELECT por COLUMNA vive en \`pg_attribute.attacl\`, no en relacl.
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_escritura
+    FROM rel r
+), escribibles AS (
+  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_escritura||E'\\x1d'||privs_no_select AS nombre
+    FROM rel_via WHERE privs_no_select <> ''
+), leibles AS (
+  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_select||E'\\x1d'||
+         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
+    FROM rel_via WHERE lee
+), por_columna AS (
+  -- PRIVILEGIOS POR COLUMNA. \`has_table_privilege\` no los ve: un
+  -- \`GRANT INSERT (saldo)\` no concede el privilegio a nivel tabla y sin
+  -- embargo deja escribir esa columna. Se preguntan aparte, uno por uno, y se
+  -- devuelven LOS NOMBRES REALES de las columnas: el remedio tiene que poder
+  -- pegarse tal cual, y \`REVOKE INSERT (<columnas>)\` no es SQL.
+  SELECT r.nombre, r.esquema, r.oid, r.relowner, c.p,
+         (SELECT string_agg(format('%I', a.attname), ', ' ORDER BY a.attnum)
+            FROM pg_attribute a
+           WHERE a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
+             AND has_column_privilege(r.oid, a.attnum, c.p)) AS columnas
+    FROM rel r CROSS JOIN privs_columna c
+   WHERE has_any_column_privilege(r.oid, c.p) AND NOT has_table_privilege(r.oid, c.p)
+), columnas AS (
+  SELECT c.nombre||E'\\x1d'||c.esquema||E'\\x1d'||
          (SELECT array_to_string(
                    coalesce((SELECT array_agg(DISTINCT CASE WHEN a.grantee = 0 THEN 'PUBLIC'
                                                             ELSE format('%I', g.rolname) END)
                                FROM pg_attribute at
                                CROSS JOIN LATERAL aclexplode(at.attacl) a
                                LEFT JOIN pg_roles g ON g.oid = a.grantee
-                              WHERE at.attrelid = r.oid AND at.attnum > 0 AND NOT at.attisdropped
-                                AND a.privilege_type = 'SELECT'
+                              WHERE at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+                                AND a.privilege_type = c.p
                                 AND (a.grantee = 0 OR pg_has_role(current_user, a.grantee, 'USAGE'))),
                             ARRAY[]::text[])
-                   || CASE WHEN r.relowner = (SELECT oid FROM yo_oid)
-                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+')) AS via_columna
-    FROM rel r
-), escribibles AS (
-  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_escritura||E'\\x1d'||
-         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
-    FROM rel_via
-   WHERE has_table_privilege(oid,'INSERT') OR has_table_privilege(oid,'UPDATE')
-      OR has_table_privilege(oid,'DELETE') OR has_table_privilege(oid,'TRUNCATE')
-), leibles AS (
-  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_select||E'\\x1d'||
-         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
-    FROM rel_via WHERE has_table_privilege(oid,'SELECT')
-), leibles_por_columna AS (
-  -- SELECT por COLUMNA. \`has_table_privilege\` no lo ve: un GRANT
-  -- SELECT(columna) no concede el privilegio a nivel tabla, y sin embargo
-  -- alcanza para leer datos. Se pregunta aparte, con has_any_column_privilege.
-  SELECT nombre||E'\\x1d'||esquema||E'\\x1d'||via_columna||E'\\x1d'||
-         CASE WHEN de_extension THEN 'ext' ELSE '' END AS nombre
-    FROM rel_via
-   WHERE has_any_column_privilege(oid,'SELECT') AND NOT has_table_privilege(oid,'SELECT')
+                   || CASE WHEN c.relowner = (SELECT oid FROM yo_oid)
+                           THEN ARRAY['dueño'] ELSE ARRAY[]::text[] END, '+'))||E'\\x1d'||
+         c.p||' ('||c.columnas||')' AS nombre
+    FROM por_columna c
+   WHERE c.columnas IS NOT NULL
 ), sec AS (
   -- SECUENCIAS. \`rel\` sólo mira 'r','p','v','m','f', así que quedaban fuera —y
   -- una secuencia no es un detalle de implementación: \`USAGE\` o \`UPDATE\`
@@ -1118,7 +1148,7 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   -- Un solo lugar donde se recortan y se pegan las listas.
   SELECT 'escribibles'         AS k, nombre AS v FROM escribibles
   UNION ALL SELECT 'leibles',            nombre FROM leibles
-  UNION ALL SELECT 'leibles_columna',    nombre FROM leibles_por_columna
+  UNION ALL SELECT 'columnas',           nombre FROM columnas
   UNION ALL SELECT 'secuencias',         nombre FROM secuencias
   UNION ALL SELECT 'secdef',             ident  FROM secdef
   UNION ALL SELECT 'crear_esquemas',     format('%I', nspname) FROM no_interno
@@ -1244,10 +1274,9 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
   // `ALTER SEQUENCE`, la palabra `SEQUENCE` en el REVOKE puntual), pero la
   // regla —a quién hay que revocarle— es la misma para los tres.
   const remediosDeObjeto = (items, { privs, palabra = '', todos, alter }) => {
-    const directos = new Set(), lineas = []
+    const lineas = []
     const privsDe = (it) => (typeof privs === 'function' ? privs(it) : privs)
     for (const it of items) {
-      if (it.fuentes.includes(usuarioSql)) directos.add(it.esquema)
       if (it.fuentes.includes('PUBLIC')) {
         // NO se propone `FROM <auditor>`: el privilegio es de PUBLIC, y
         // quitárselo a PUBLIC es una DECISIÓN DE POLÍTICA que afecta a todos
@@ -1266,9 +1295,12 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
     // El grant directo sí se puede barrer por esquema, que es lo que se quiere
     // para un rol dedicado. Cuando no hay forma «ON ALL …» que sirva —el GRANT
     // por columna se revoca nombrando la columna— se va objeto por objeto.
+    // Agrupado por (privilegios, esquema): dos tablas del mismo esquema con
+    // privilegios distintos necesitan dos REVOKE distintos, y usar los de la
+    // primera revocaría de más en una y de menos en otra.
     const directas = todos
-      ? [...directos].sort().map(e =>
-          `REVOKE ${privsDe(items[0])} ON ${todos} IN SCHEMA ${e} FROM ${usuarioSql};`)
+      ? [...new Set(items.filter(it => it.fuentes.includes(usuarioSql))
+          .map(it => `REVOKE ${privsDe(it)} ON ${todos} IN SCHEMA ${it.esquema} FROM ${usuarioSql};`))]
       : items.filter(it => it.fuentes.includes(usuarioSql))
              .map(it => `REVOKE ${privsDe(it)} ON ${palabra}${it.nombre} FROM ${usuarioSql};`)
     const todas = [...new Set([...directas, ...lineas])].slice(0, 14)
@@ -1277,12 +1309,15 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       : '-- no se pudo determinar la procedencia; revisar el ACL de esos objetos a mano'
   }
 
+  // El cuarto campo trae los privilegios de tabla que NO son SELECT y que
+  // efectivamente tiene: INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+  // y —en Postgres 17— MAINTAIN. El REVOKE nombra ESOS, no un ALL a ciegas.
   const escribibles = tablas('escribibles')
   if (escribibles.length > 0) {
     rechazar('ESCRITURA',
-      `puede escribir en ${escribibles.length} tabla(s): ` +
-      muestra(escribibles.map(t => `${t.nombre} [vía ${t.via || '?'}]`)),
-      remediosDeObjeto(escribibles, { privs: 'INSERT, UPDATE, DELETE, TRUNCATE',
+      `tiene ${escribibles.length} tabla(s) con privilegios que no son de solo lectura: ` +
+      muestra(escribibles.map(t => `${t.nombre} [${t.flags}, vía ${t.via || '?'}]`)),
+      remediosDeObjeto(escribibles, { privs: (t) => t.flags || 'INSERT, UPDATE, DELETE, TRUNCATE',
                                       todos: 'ALL TABLES', alter: 'ALTER TABLE' }))
   }
 
@@ -1298,15 +1333,20 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
       remediosDeObjeto(bloquean, { privs: 'SELECT', todos: 'ALL TABLES', alter: 'ALTER TABLE' }))
   }
 
-  const porColumna = tablas('leibles_columna')
+  // Y por COLUMNA, que no es sólo SELECT: `GRANT INSERT (saldo)` deja escribir
+  // esa columna y `REFERENCES (id)` deja crear una FK que apunta a ella. El
+  // cuarto campo trae el privilegio con LOS NOMBRES REALES de las columnas
+  // —citados por Postgres—, porque `REVOKE INSERT (<columnas>)` no es SQL: el
+  // remedio tiene que poder pegarse tal cual.
+  const porColumna = tablas('columnas')
   if (porColumna.length > 0) {
     // Acá no sirve `ON ALL TABLES`: un GRANT por columna se revoca nombrando la
-    // columna, así que el remedio va tabla por tabla.
-    rechazar('SELECT POR COLUMNA',
-      `tiene SELECT por columna en ${porColumna.length} tabla(s): ` +
-      `${muestra(porColumna.map(t => `${t.nombre} [vía ${t.via || '?'}]`))} — ` +
-      'no aparece en has_table_privilege y alcanza igual para leer datos',
-      remediosDeObjeto(porColumna, { privs: 'SELECT (<columnas>)', alter: 'ALTER TABLE' }))
+    // columna, así que el remedio va objeto por objeto.
+    rechazar('PRIVILEGIO POR COLUMNA',
+      `tiene ${porColumna.length} privilegio(s) por columna: ` +
+      `${muestra(porColumna.map(t => `${t.nombre} ${t.flags} [vía ${t.via || '?'}]`))} — ` +
+      'no aparecen en has_table_privilege y alcanzan igual',
+      remediosDeObjeto(porColumna, { privs: (t) => t.flags, alter: 'ALTER TABLE' }))
   }
 
   // ── Secuencias ────────────────────────────────────────────────────────────
@@ -1771,8 +1811,45 @@ async function pruebaLive() {
         pecado: 'GRANT INSERT ON public.clientes TO drift_escritor;' },
       { rol: 'drift_selector',   regla: 'SELECT DE TABLA',
         pecado: 'GRANT SELECT ON public.clientes TO drift_selector;' },
-      { rol: 'drift_columnista', regla: 'SELECT POR COLUMNA',
+      // Por COLUMNA, y no sólo SELECT: los cuatro que Postgres deja conceder
+      // así. El remedio tiene que traer los NOMBRES REALES de las columnas —un
+      // `REVOKE INSERT (<columnas>)` no es SQL— y poder pegarse tal cual.
+      { rol: 'drift_columnista', regla: 'PRIVILEGIO POR COLUMNA',
+        que: 'SELECT sobre una columna',
+        contiene: ['SELECT (id)', 'REVOKE SELECT (id) ON public.clientes FROM drift_columnista;'],
+        cura: true,
         pecado: 'GRANT SELECT (id) ON public.clientes TO drift_columnista;' },
+      { rol: 'drift_col_insert', regla: 'PRIVILEGIO POR COLUMNA',
+        que: 'INSERT sobre columnas',
+        contiene: ['INSERT (id, nombre)',
+                   'REVOKE INSERT (id, nombre) ON public.clientes FROM drift_col_insert;'],
+        cura: true,
+        pecado: 'GRANT INSERT (id, nombre) ON public.clientes TO drift_col_insert;' },
+      { rol: 'drift_col_update', regla: 'PRIVILEGIO POR COLUMNA',
+        que: 'UPDATE sobre una columna',
+        contiene: ['UPDATE (nombre)',
+                   'REVOKE UPDATE (nombre) ON public.clientes FROM drift_col_update;'],
+        cura: true,
+        pecado: 'GRANT UPDATE (nombre) ON public.clientes TO drift_col_update;' },
+      { rol: 'drift_col_ref', regla: 'PRIVILEGIO POR COLUMNA',
+        que: 'REFERENCES sobre una columna',
+        contiene: ['REFERENCES (id)',
+                   'REVOKE REFERENCES (id) ON public.clientes FROM drift_col_ref;'],
+        cura: true,
+        pecado: 'GRANT REFERENCES (id) ON public.clientes TO drift_col_ref;' },
+      // Y los privilegios de tabla que no son de escritura pero tampoco de
+      // lectura: TRIGGER instala código que corre con las escrituras ajenas.
+      { rol: 'drift_trigger', regla: 'ESCRITURA',
+        que: 'TRIGGER, que no es escritura pero instala código',
+        contiene: ['[TRIGGER, vía drift_trigger]',
+                   'REVOKE TRIGGER ON ALL TABLES IN SCHEMA public FROM drift_trigger;'],
+        cura: true,
+        pecado: 'GRANT TRIGGER ON public.clientes TO drift_trigger;' },
+      { rol: 'drift_references', regla: 'ESCRITURA',
+        que: 'REFERENCES a nivel tabla',
+        contiene: ['[REFERENCES, vía drift_references]'],
+        cura: true,
+        pecado: 'GRANT REFERENCES ON public.clientes TO drift_references;' },
       { rol: 'drift_replicante', regla: 'REPLICATION',
         pecado: 'ALTER ROLE drift_replicante REPLICATION;' },
       { rol: 'drift_creador',    regla: 'CREATE SOBRE ESQUEMA',
@@ -2058,16 +2135,17 @@ async function pruebaLive() {
     // gestionada, no de las migraciones del repositorio—, así que la forma se
     // construye acá tal cual, y se desarma al terminar para no contaminar el
     // resto de la prueba.
+    //
+    // CON LOS NOMBRES REALES y la forma real: `http_request_queue` es la que
+    // tiene secuencia propia —su `id` es bigserial—, y `_http_response` NO
+    // tiene ninguna. El esquema `net` ya existe en la reconstrucción; lo que no
+    // existen son los grants, que son de la instalación gestionada.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      CREATE SCHEMA drift_net;
-      GRANT USAGE ON SCHEMA drift_net TO PUBLIC;
-      CREATE TABLE drift_net._http_response (id bigint, content text);
-      CREATE TABLE drift_net.http_request_queue (id bigint, headers jsonb);
+      GRANT USAGE ON SCHEMA net TO PUBLIC;
+      CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
       GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE
-        ON drift_net._http_response, drift_net.http_request_queue TO PUBLIC;
-      -- Y la secuencia en un esquema con USAGE público, con las tres:
-      CREATE SEQUENCE drift_net._http_response_id_seq;
-      GRANT SELECT, USAGE, UPDATE ON SEQUENCE drift_net._http_response_id_seq TO PUBLIC;`,
+        ON net._http_response, net.http_request_queue TO PUBLIC;
+      GRANT SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq TO PUBLIC;`,
     ], { stdio: 'pipe' })
 
     const conNet = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
@@ -2076,28 +2154,81 @@ async function pruebaLive() {
     for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
       comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
     }
-    comprobar(/drift_net\._http_response \[vía PUBLIC\]/.test(conNet.salida),
-      '  nombrando la tabla y diciendo que llega vía PUBLIC')
+    comprobar(/net\._http_response \[INSERT, UPDATE, DELETE, TRUNCATE, vía PUBLIC\]/.test(conNet.salida),
+      '  nombrando la tabla, los privilegios exactos y que llegan vía PUBLIC')
     comprobar(conNet.salida.includes(
-      'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE drift_net._http_response_id_seq FROM PUBLIC;'),
-      '  y la secuencia, con los tres privilegios y su REVOKE ON SEQUENCE … FROM PUBLIC')
+      'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;'),
+      '  y la secuencia REAL —la de http_request_queue— con sus tres privilegios')
+    comprobar(!/_http_response_id_seq/.test(conNet.salida),
+      '  y no inventa una secuencia para _http_response, que no tiene')
     comprobar(!/FROM drift_lector;/.test(conNet.salida),
       '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
 
-    // Los remedios que propone son los que hacen falta: se aplican tal cual y
-    // la credencial vuelve a servir. Es la evidencia de que la migración
-    // propuesta en `propuesta-net-publico.md` cierra la vía.
-    for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
+    // EL GUARD PASA SÓLO DESPUÉS DE CERRAR TODAS LAS VÍAS. Se aplican los
+    // remedios regla por regla y se exige que siga rechazando hasta la última:
+    // un guard que se conformara con cerrar una dejaría abiertas las otras.
+    const reglasNet = ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']
+    for (const [i, regla] of reglasNet.entries()) {
       for (const s of remediosDe(conNet.salida, regla)) {
         db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
       }
+      const parcial = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+        { [VAR_URL_LIVE]: urlDe('drift_lector') })
+      const ultima = i === reglasNet.length - 1
+      comprobar(ultima ? parcial.codigo === 0 : parcial.codigo !== 0,
+        ultima
+          ? '  y sólo con las TRES cerradas el guard pasa, sin tocar el USAGE del esquema'
+          : `  cerrada ${regla}, sigue rechazando: falta ${reglasNet.slice(i + 1).join(' y ')}`)
     }
-    const netCurado = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(netCurado.codigo === 0,
-      '  aplicar sus remedios cierra la vía sin tocar el USAGE del esquema')
 
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', 'DROP SCHEMA drift_net CASCADE;'], { stdio: 'pipe' })
+    // Teardown: se deshace lo que se agregó, sin tocar lo que trae la
+    // reconstrucción.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'DROP TABLE net.http_request_queue; ' +
+      'REVOKE ALL PRIVILEGES ON TABLE net._http_response FROM PUBLIC; ' +
+      'REVOKE USAGE ON SCHEMA net FROM PUBLIC;'], { stdio: 'pipe' })
+
+
+    // ── 2 septies · MAINTAIN, que sólo existe desde Postgres 17 ─────────────
+    //
+    // Producción va por 17 y la reconstrucción por el Postgres del runner. La
+    // lista de privilegios se arma según `server_version_num` y el nombre viaja
+    // como VALOR: en 16, `has_table_privilege` nunca llega a ver 'MAINTAIN' —si
+    // lo viera no devolvería falso, lanzaría «unrecognized privilege type» y la
+    // medición entera fallaría—.
+    //
+    // Se comprueban las dos mitades: que la lista corresponda a la versión del
+    // servidor, y —donde el servidor lo soporta— que un GRANT MAINTAIN real se
+    // detecte y se revoque. En 16 esa segunda mitad se declara omitida, y la
+    // cubre la prueba pura de vitest.
+    const versionNum = Number(db.psql(['-tAq', '-c', "SELECT current_setting('server_version_num')"],
+      { stdio: 'pipe' }).trim())
+    const listaPrivs = db.psql(['-tAq', '-c',
+      `SELECT array_to_string(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
+              || CASE WHEN current_setting('server_version_num')::int >= 170000
+                      THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END, ',')`], { stdio: 'pipe' }).trim()
+    comprobar(listaPrivs.includes('MAINTAIN') === (versionNum >= 170000),
+      `la lista de privilegios de tabla incluye MAINTAIN si y sólo si el servidor es >= 17 ` +
+      `(acá ${versionNum}: ${listaPrivs.includes('MAINTAIN') ? 'sí' : 'no'})`)
+
+    if (versionNum >= 170000) {
+      db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+        'CREATE ROLE drift_maintain LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_maintain; ' +
+        'GRANT MAINTAIN ON public.clientes TO drift_maintain;'], { stdio: 'pipe' })
+      const conMaintain = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+        { [VAR_URL_LIVE]: urlDe('drift_maintain') })
+      comprobar(conMaintain.codigo !== 0 && /public\.clientes \[MAINTAIN, vía drift_maintain\]/
+        .test(conMaintain.salida), 'un GRANT MAINTAIN se detecta y se nombra')
+      for (const s of remediosDe(conMaintain.salida, 'ESCRITURA')) {
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
+      }
+      const sinMaintain = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+        { [VAR_URL_LIVE]: urlDe('drift_maintain') })
+      comprobar(sinMaintain.codigo === 0, 'y su remedio lo elimina')
+    } else {
+      console.error(`· MAINTAIN: omitido DECLARADO — el servidor es ${versionNum} y el privilegio ` +
+                    'existe desde 170000. Lo cubre la prueba pura de `juzgarCredencial`.')
+    }
 
     // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────
     //
@@ -2111,12 +2242,14 @@ async function pruebaLive() {
       'una URL con `options=` se rechaza antes de conectarse')
     comprobar(!/credencial de solo lectura/.test(conOptions.salida),
       'y se rechaza sin haber abierto la conexión')
-    // El mensaje del caso de escritura sigue diciendo en cuántas tablas, que es
-    // lo que hace accionable el rechazo.
+    // El mensaje del caso de escritura nombra los privilegios EXACTOS, que es
+    // lo que hace accionable el rechazo: un `REVOKE ALL` revocaría de más.
     const escritor = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
       { [VAR_URL_LIVE]: urlDe('drift_escritor') })
-    comprobar(/puede escribir en \d+ tabla/.test(escritor.salida),
-      'y el motivo dice en cuántas tablas puede escribir')
+    comprobar(/public\.clientes \[INSERT, vía drift_escritor\]/.test(escritor.salida),
+      'y el motivo nombra el privilegio exacto y su procedencia')
+    comprobar(escritor.salida.includes('REVOKE INSERT ON ALL TABLES IN SCHEMA public FROM drift_escritor;'),
+      'y el remedio revoca sólo ese privilegio, no un ALL a ciegas')
 
     // ── 3 · sin saber qué proyecto es, tampoco ─────────────────────────────
     const sinProyecto = correr(['--sembrar-produccion'], { [VAR_URL_LIVE]: urlDe('drift_lector') })
