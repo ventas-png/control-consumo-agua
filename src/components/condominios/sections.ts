@@ -53,11 +53,8 @@ export const SECTIONS: SectionDef[] = [
     'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
   ]},
   { id: 'seguridad', label: 'Seguridad', tabs: [
-    'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
-    'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
-    'turnos', 'ausencias', 'horas_extra',
-    'paqueteria', 'objetos', 'incidentes', 'bitacora_guardia', 'presencia',
-    'panel_turno', 'emergencias',
+    'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad',
+    'paqueteria', 'objetos', 'incidentes', 'bitacora_guardia', 'emergencias',
   ]},
   { id: 'comunidad', label: 'Comunidad', tabs: [
     'asambleas', 'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos',
@@ -77,8 +74,14 @@ export const SECTIONS: SectionDef[] = [
   // limpieza) para que el permiso de "quién administra al personal" no venga
   // pegado al de "quién administra los documentos del condominio".
   { id: 'recursos_humanos', label: 'Recursos Humanos', tabs: [
-    'personal', 'capacitacion_personal', 'tareas_cond', 'prog_limpieza',
-    'actividad_equipo',
+    // Expediente y formación
+    'personal', 'capacitacion_personal',
+    // La jornada: quién cubre qué, cuándo, y quién falta
+    'turnos', 'plantillas_cargo', 'ausencias', 'horas_extra', 'presencia', 'panel_turno',
+    // El trabajo que se les asigna, y quien lo revisa
+    'tareas_personal', 'revision_tareas', 'tareas_cond', 'prog_limpieza', 'rutas_ronda',
+    // Con qué se les mide
+    'desempeno_personal', 'actividad_equipo',
   ]},
   { id: 'especiales', label: 'Especiales', tabs: [
     'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'sostenibilidad',

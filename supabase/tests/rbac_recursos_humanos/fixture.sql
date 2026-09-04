@@ -45,7 +45,19 @@ INSERT INTO public.permissions (key, category, label, description) VALUES
   -- moverse) y `documentos` cubre el caso del prefijo compartido.
   ('condominios.tab.documentos',            'administracion', 'Documentos',      'Documentos'),
   ('condominios.tab.inventario',            'operaciones',    'Inventario',      'Inventario'),
-  ('condominios.tab.tareas_personal',       'seguridad',      'Tareas personal', 'Tareas del personal de seguridad');
+  ('condominios.tab.tareas_personal',       'seguridad',      'Tareas por turno','Tareas del turno'),
+  -- La jornada, que 20260907001400 muda a Recursos Humanos.
+  ('condominios.tab.turnos',                'seguridad',      'Asignación turnos','Jornadas y reglas de asignación'),
+  ('condominios.tab.plantillas_cargo',      'seguridad',      'Plantillas',      'Plantillas por cargo'),
+  ('condominios.tab.ausencias',             'seguridad',      'Ausencias',       'Vacaciones, permisos y suspensiones'),
+  ('condominios.tab.horas_extra',           'seguridad',      'Horas y extras',  'Cómputo de jornada y horas extras'),
+  ('condominios.tab.presencia',             'seguridad',      'Presencia',       'Asistencia del personal'),
+  ('condominios.tab.panel_turno',           'seguridad',      'Panel turno',     'Tablero de la jornada'),
+  ('condominios.tab.rutas_ronda',           'seguridad',      'Rutas Ronda',     'Recorridos asignados'),
+  ('condominios.tab.desempeno_personal',    'seguridad',      'Desempeño',       'Medición del personal'),
+  -- Vecinos de Seguridad que NO se mudan: control negativo de la segunda tanda.
+  ('condominios.tab.revision_tareas',       'seguridad',      'Revisión Admin',  'Revisión administrativa de tareas'),
+  ('condominios.tab.bitacora_guardia',      'seguridad',      'Bitácora Guardia','Bitácora del guardia');
 
 -- ── Acciones derivadas (réplica de 20260703000000 parte 3) ──────────────────
 INSERT INTO public.permissions (key, category, label, description)
@@ -79,7 +91,10 @@ INSERT INTO public.roles (id, name, is_system) VALUES
   -- mudanza de sección.
   ('00000000-0000-0000-0000-0000000000a4', 'Operaciones',          false),
   -- Rol sin nada que ver con personal: no debe ganar nada.
-  ('00000000-0000-0000-0000-0000000000a5', 'Documentalista',       false);
+  ('00000000-0000-0000-0000-0000000000a5', 'Documentalista',       false),
+  -- Rol de seguridad con jornada a cargo: la mudanza de sección no puede
+  -- quitarle ni un grant, ni convertir su deny en allow.
+  ('00000000-0000-0000-0000-0000000000a6', 'Seguridad con jornada',false);
 
 INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('00000000-0000-0000-0000-0000000000a1', 'condominios.tab.personal',               'allow'),
@@ -101,4 +116,11 @@ INSERT INTO public.role_permissions (role_id, permission_key, effect) VALUES
   ('00000000-0000-0000-0000-0000000000a4', 'condominios.tab.inventario',             'allow'),
 
   ('00000000-0000-0000-0000-0000000000a5', 'condominios.tab.documentos',             'allow'),
-  ('00000000-0000-0000-0000-0000000000a5', 'condominios.tab.documentos.edit',        'allow');
+  ('00000000-0000-0000-0000-0000000000a5', 'condominios.tab.documentos.edit',        'allow'),
+
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.turnos',                 'allow'),
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.turnos.edit',            'allow'),
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.ausencias',              'allow'),
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.rutas_ronda',            'allow'),
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.bitacora_guardia',       'allow'),
+  ('00000000-0000-0000-0000-0000000000a6', 'condominios.tab.revision_tareas',        'deny');
