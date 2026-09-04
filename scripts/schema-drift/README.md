@@ -529,24 +529,54 @@ autoridad **no falla en PostgreSQL**: emite un `WARNING` y sale 0 — la migraci
 quedaría registrada como aplicada, el pipeline en verde y `PUBLIC`
 conservándolo todo.
 
-La propuesta para retirar esa vía, con su análisis de impacto, su precondición
-de autoridad y su postcondición fail-closed, está en
-[`propuesta-net-publico.md`](propuesta-net-publico.md) — **preparada y no
-aplicada**: necesita una operación soportada con autoridad del propietario
-(en la práctica, Supabase Support), y la decide quien opera la base.
+La propuesta está en [`propuesta-net-publico.md`](propuesta-net-publico.md)
+— **preparada y no aplicada**. Es **un solo lote, en una sola transacción**:
+
+```
+BEGIN;
+  [precondición sobre los tres objetos]
+  [REVOKE]
+  [regrants explícitos, aprobados de antemano — hoy vacío, sin placeholders]
+  [postcondición sobre exactamente los tres objetos]
+COMMIT;
+```
+
+Y va entero: la postcondición sólo protege si puede **revertir** los `REVOKE`
+de arriba, así que fuera de la transacción no sirve de nada. Se ejecuta con
+`ON_ERROR_STOP` activo — sin él `psql` sigue después del error y **sale 0**,
+aunque la transacción se haya revertido.
+
+**Autoridad suficiente: tres cosas, y `WITH GRANT OPTION` no es una.** Sólo ser
+superusuario, ser el propietario, o tener membresía efectiva en el rol
+propietario. El grant option habilita a *conceder* y a revocar lo que uno mismo
+concedió; **no alcanza el grant que hizo otro otorgante**, así que un migrador
+con los ocho privilegios `WITH GRANT OPTION` seguiría sin poder tocar lo que
+concedió `supabase_admin`. La precondición lo mira y lo informa —junto con el
+otorgante real de cada grant a `PUBLIC`— pero no lo cuenta.
+
+Necesita una operación soportada con autoridad del propietario (en la práctica,
+Supabase Support), y la decide quien opera la base.
 
 El rechazo está fijado por `--prueba-live`, que construye esa misma forma en un
 clúster desechable, exige el rechazo, aplica los `REVOKE` que el propio
 diagnóstico propone y comprueba que la credencial vuelve a servir **sin tocar el
 `USAGE` del esquema**.
 
-Y el bloqueo de autoridad está fijado igual, no supuesto: la misma prueba pone
-los tres objetos en manos de otro rol, corre el `REVOKE` como un rol equivalente
-a `postgres` —con `LOGIN`, sin superusuario, sin membresía, sin grant option— y
-exige que salga **0** con la **ACL intacta**, que la precondición **aborte** y
-que la postcondición **falle** enumerando lo que sobrevivió. Con la
-contraprueba: con la autoridad del dueño la precondición pasa, y con las tres
-vías cerradas la postcondición pasa.
+Y el bloqueo de autoridad está fijado igual, no supuesto. La misma prueba pone
+los tres objetos en manos de otro rol y corre **el lote completo** en cinco
+escenarios:
+
+| Escenario | Qué se exige |
+| --- | --- |
+| Ni dueño ni miembro (la forma de producción) | El `REVOKE` **sale 0** con la **ACL intacta**; la precondición **aborta** nombrando dueño y ejecutor. |
+| **Falta uno** de los tres objetos | Aborta **aun siendo superusuario**, nombrando cuál falta; **ningún `REVOKE` se ejecuta**. |
+| Los ocho privilegios **`WITH GRANT OPTION`**, grants de `PUBLIC` hechos por otro | **Rechazado igual**, nombrando al otorgante; su `REVOKE` deja la ACL **byte por byte** intacta. |
+| **Propietarios asimétricos**: manda sobre las tablas, no sobre la secuencia | El lote **falla en la precondición**, señalando la secuencia; las **tres ACL idénticas** — ni la mitad que sí podía. |
+| La **postcondición falla** (lote sin el `REVOKE` de la secuencia) | Los `REVOKE` de las tablas **se revierten**: ACL idénticas. Y sin `ON_ERROR_STOP`, `psql` **sale 0** igual. |
+
+Con las dos contrapruebas: con la autoridad del dueño la precondición pasa, y
+con las tres vías cerradas la postcondición pasa — para que «falla siempre» y
+«detecta lo que hay» no se vean igual desde afuera.
 
 ### `pg_stat_statements`: una decisión, no un olvido
 

@@ -114,20 +114,66 @@ al auditor no quitaría nada, porque nunca se le concedió nada.
 Está fijado por `--prueba-live`, que construye esa misma forma en un clúster
 desechable y exige el rechazo.
 
-## La propuesta
+## La propuesta: UN SOLO LOTE, UNA SOLA TRANSACCIÓN
 
-Las tres partes van **en una sola transacción**, y en este orden. Sin la
-precondición y la postcondición, la parte del medio puede no hacer nada y salir
-0.
+**Supabase Support tiene que ejecutar el lote completo como una única
+transacción.** No dividido en partes, no por pasos, no «primero las tablas y
+después la secuencia». Es la condición que sostiene todo lo demás:
 
-### 1 · Precondición — ¿quien ejecuta tiene autoridad?
+* la **precondición** aborta antes de que se ejecute un solo `REVOKE` si quien
+  ejecuta no tiene autoridad sobre **los tres** objetos;
+* la **postcondición** sólo protege si puede **revertir** los `REVOKE` de arriba.
+  Fuera de la transacción ya no puede, y un lote a medio aplicar —tablas
+  cerradas, secuencia abierta— es peor que no haber empezado, porque el registro
+  dice que se hizo.
 
-Comprueba las cuatro cosas que deciden si el `REVOKE` va a servir de algo:
-**quién ejecuta** (`current_user`), **quién es el dueño**, si hay **membresía**
-heredada, y si hay **grant option**. Si ninguna alcanza, aborta antes de tocar
-nada — porque el `REVOKE` no lo haría.
+**Ejecutar con `ON_ERROR_STOP` activo** (en `psql`, `-v ON_ERROR_STOP=1`). Sin
+él, `psql` sigue después del error y **sale 0**: la transacción se revierte
+igual —el `COMMIT` de un bloque abortado es un `ROLLBACK`— pero el código de
+salida diría que salió bien. Está probado en los dos modos.
+
+La **sección de regrants va vacía**, y a propósito no lleva placeholders: un
+`<rol>` sin sustituir es un error de sintaxis en el mejor caso y un rol
+inventado en el peor. Si el análisis de impacto identifica algún consumidor
+legítimo que dependa del grant a `PUBLIC`, se agregan ahí líneas `GRANT`
+concretas, con el rol real, **antes** de enviar el lote.
+
+### Autoridad suficiente: tres cosas, y `WITH GRANT OPTION` no es una
+
+La precondición acepta **sólo**:
+
+1. ser **superusuario**;
+2. `current_user` = el **propietario** del objeto;
+3. **membresía efectiva** en el rol propietario (`pg_has_role(…, 'USAGE')`).
+
+`WITH GRANT OPTION` **no cuenta**, y no es un descuido. Un `REVOKE` retira los
+privilegios que otorgó **el rol que lo ejecuta** (o un rol del que sea
+miembro). El grant option habilita a *conceder*, y a revocar lo que uno mismo
+concedió; no alcanza el grant que hizo otro otorgante. Un migrador con los ocho
+privilegios `WITH GRANT OPTION` sobre estas tablas seguiría sin poder tocar los
+grants que hizo `supabase_admin`: el `REVOKE` saldría 0 sin revocar nada — el
+mismo falso negativo, con mejor disfraz.
+
+Por eso la precondición **mira e informa** el grant option **y el otorgante
+real** de cada grant a `PUBLIC`, pero ninguno de los dos participa de la
+decisión. Y hay una regresión que lo fija: el migrador recibe los ocho
+privilegios `WITH GRANT OPTION`, la precondición lo rechaza igual, y su `REVOKE`
+deja la ACL **byte por byte** intacta.
+
+### El lote
 
 ```sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- pg_net · retirar el acceso de PUBLIC a los tres objetos de la extensión.
+--
+-- ENVIAR Y EJECUTAR COMO UNA SOLA TRANSACCIÓN. No dividir en partes: la
+-- postcondición del final sólo protege si puede revertir los REVOKE de arriba.
+--
+-- Requiere autoridad de propietario (supabase_admin). La precondición aborta
+-- si quien ejecuta no la tiene — ver el mensaje que emite.
+-- ═══════════════════════════════════════════════════════════════════════════
+BEGIN;
+
 DO $precondicion$
 DECLARE
   yo        text    := current_user;
@@ -135,74 +181,141 @@ DECLARE
   privs     text[]  := ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
    || CASE WHEN current_setting('server_version_num')::int >= 170000
            THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END;
-  vistos    int     := 0;
+  esperados text[]  := ARRAY['net._http_response', 'net.http_request_queue', 'net.http_request_queue_id_seq'];
+  tablas    text[]  := ARRAY['net._http_response', 'net.http_request_queue'];
+  vistos    text[]  := ARRAY[]::text[];
+  ausentes  text[];
   faltan    text[]  := ARRAY[]::text[];
+  gopt      boolean;
   r         record;
 BEGIN
   FOR r IN
-    SELECT n.nspname || '.' || c.relname          AS objeto,
-           pg_get_userbyid(c.relowner)            AS duenio,
-           pg_has_role(yo, c.relowner, 'USAGE')   AS soy_miembro,
-           (SELECT bool_and(has_table_privilege(yo, c.oid, p || ' WITH GRANT OPTION'))
-              FROM unnest(privs) p)               AS con_grant_option
+    SELECT n.nspname || '.' || c.relname                AS objeto,
+           c.oid                                        AS oid,
+           c.relkind                                    AS relkind,
+           pg_get_userbyid(c.relowner)                  AS duenio,
+           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro,
+           (SELECT string_agg(DISTINCT pg_get_userbyid(a.grantor), ', ')
+              FROM aclexplode(c.relacl) AS a
+             WHERE a.grantee = 0)                       AS otorgantes_publico
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'net'
-       AND c.relname IN ('_http_response', 'http_request_queue')
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
      ORDER BY 1
   LOOP
-    vistos := vistos + 1;
-    RAISE NOTICE '% · dueño=% · ejecuta=% · miembro=% · grant option=% · superusuario=%',
-      r.objeto, r.duenio, yo, r.soy_miembro, r.con_grant_option, soy_super;
-    IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro OR r.con_grant_option) THEN
+    vistos := vistos || r.objeto;
+
+    -- LA FORMA: dos tablas y una secuencia. Si el relkind no es el esperado,
+    -- el objeto de producción no es el que este lote cree estar tocando, y el
+    -- REVOKE de más abajo estaría escrito para otra cosa.
+    IF r.objeto = ANY (tablas) AND r.relkind <> 'r' THEN
+      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una tabla (relkind «r») y es «%».',
+                      r.objeto, r.relkind;
+    END IF;
+    IF r.objeto = 'net.http_request_queue_id_seq' AND r.relkind <> 'S' THEN
+      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una secuencia (relkind «S») y es «%».',
+                      r.objeto, r.relkind;
+    END IF;
+
+    -- Grant option: se mide con la función que corresponde al tipo de objeto
+    -- —has_sequence_privilege para la secuencia, NUNCA has_table_privilege— y
+    -- se informa junto con el otorgante real. NO decide nada: ver el comentario
+    -- de esta constante.
+    gopt := CASE WHEN r.relkind = 'S'
+                 THEN (SELECT bool_and(has_sequence_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
+                         FROM unnest(ARRAY['SELECT','USAGE','UPDATE']) p)
+                 ELSE (SELECT bool_and(has_table_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
+                         FROM unnest(privs) p)
+            END;
+
+    RAISE NOTICE '% (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grants a PUBLIC otorgados por: % · grant option: % (informativo, NO es autoridad)',
+      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super,
+      coalesce(r.otorgantes_publico, '(nadie: PUBLIC no tiene nada)'), gopt;
+
+    IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN
       faltan := faltan || r.objeto;
     END IF;
   END LOOP;
 
-  -- Fail-closed también cuando no se encontró nada: un filtro que no empareja
-  -- se parece demasiado a un permiso que sí está.
-  IF vistos = 0 THEN
-    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: no se encontró ninguna de las tablas de pg_net. '
-                    'Sin objeto que medir no se puede afirmar que la vía quedó cerrada.';
+  -- EXACTAMENTE los tres. Un objeto ausente aborta ANTES de cualquier REVOKE:
+  -- un filtro que no empareja se parece demasiado a un permiso que sí está, y
+  -- la postcondición daría por cerrada una vía que ni siquiera se miró.
+  SELECT array_agg(e ORDER BY e) INTO ausentes
+    FROM unnest(esperados) e WHERE NOT (e = ANY (vistos));
+  IF ausentes IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: falta(n) % de los % objeto(s) esperados. Encontrados: %. '
+                    'Sin los tres no se puede afirmar que la vía quedó cerrada.',
+                    array_to_string(ausentes, ', '), array_length(esperados, 1),
+                    coalesce(array_to_string(vistos, ', '), '(ninguno)');
+  END IF;
+  IF array_length(vistos, 1) <> array_length(esperados, 1) THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: se esperaban EXACTAMENTE % objetos y se encontraron %: %.',
+                    array_length(esperados, 1), array_length(vistos, 1), array_to_string(vistos, ', ');
   END IF;
 
   IF array_length(faltan, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
-                    'No es el dueño, no hereda su rol, no tiene grant option y no es superusuario. '
-                    'El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la ACL intacta.',
+                    'No es superusuario, no es el dueño y no hereda su rol. Tener los privilegios '
+                    'WITH GRANT OPTION no alcanza: un REVOKE sólo retira lo que otorgó quien lo '
+                    'ejecuta. El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la '
+                    'ACL intacta.',
                     yo, array_to_string(faltan, ', ');
   END IF;
 END
 $precondicion$;
-```
 
-### 2 · El `REVOKE`
-
-```sql
--- NO APLICAR suelto: va entre la precondición y la postcondición, en la misma
--- transacción, y sólo con la autoridad del propietario (ver arriba).
-
--- 2a · Quitar el acceso público a las dos tablas de pg_net.
---
---      ALL PRIVILEGES y no una lista a mano: cubre los OCHO —SELECT, INSERT,
---      UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER y MAINTAIN— y tambien los
---      que agregue el proximo mayor. Una lista enumerada se queda vieja, y el
---      privilegio que falte es el que quede abierto.
+-- ── REVOKE ────────────────────────────────────────────────────────────────
+-- ALL PRIVILEGES y no una lista a mano: cubre los ocho privilegios de tabla
+-- —SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER y MAINTAIN—
+-- y también los que agregue el próximo mayor.
 REVOKE ALL PRIVILEGES ON TABLE
   net._http_response,
   net.http_request_queue
 FROM PUBLIC;
 
--- 2b · Y la secuencia de la cola, que es la unica que hay: _http_response no
---      tiene secuencia propia.
+-- La secuencia de la cola, que es la única que hay: _http_response no tiene
+-- secuencia propia.
 REVOKE ALL PRIVILEGES ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;
 
--- 2c · Devolver a quien SI lo necesita, explicitamente y con el minimo.
---      Medir antes quien usa net.http_get/http_post y con que rol; ver abajo.
---      Sin este paso, cualquier consumidor legitimo que dependiera del grant a
---      PUBLIC deja de funcionar: es la parte que NO se puede saltear.
--- GRANT SELECT ON net._http_response      TO <rol que lee las respuestas>;
--- GRANT SELECT ON net.http_request_queue  TO <rol que inspecciona la cola>;
+-- ── REGRANTS EXPLÍCITOS (aprobados de antemano) ───────────────────────────
+-- Vacío: el análisis de impacto todavía no identificó ningún consumidor
+-- legítimo que dependa del grant a PUBLIC. Si lo identifica, acá van líneas
+-- GRANT concretas, con el rol real, ANTES de enviar el lote. Sin placeholders.
+-- (fin de la sección)
+
+DO $postcondicion$
+DECLARE
+  esperados text[] := ARRAY['net._http_response', 'net.http_request_queue', 'net.http_request_queue_id_seq'];
+  hallados  int;
+  restante  text;
+BEGIN
+  SELECT count(*) INTO hallados
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname || '.' || c.relname = ANY (esperados);
+  IF hallados <> array_length(esperados, 1) THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: se esperaban % objetos de pg_net y hay %. '
+                    'No se puede afirmar que la vía quedó cerrada sobre un objeto que no está.',
+                    array_length(esperados, 1), hallados;
+  END IF;
+
+  SELECT string_agg(format('%s.%s → %s', n.nspname, c.relname, a.privilege_type), ', '
+                    ORDER BY n.nspname, c.relname, a.privilege_type)
+    INTO restante
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+   WHERE n.nspname || '.' || c.relname = ANY (esperados)
+     AND a.grantee = 0;   -- 0 es PUBLIC
+
+  IF restante IS NOT NULL THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva privilegios sobre pg_net: %. '
+                    'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
+                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.', restante;
+  END IF;
+END
+$postcondicion$;
+
+COMMIT;
 ```
 
 El `USAGE` del esquema **no se toca**: quitarlo rompería `net.http_get()` y
@@ -210,53 +323,19 @@ El `USAGE` del esquema **no se toca**: quitarlo rompería `net.http_get()` y
 las tablas, el `USAGE` del esquema no alcanza nada. Verificado: aplicando sólo
 los `REVOKE` de arriba, la credencial vuelve a pasar el guard.
 
-### 3 · Postcondición fail-closed — ¿quedó algo?
-
-Se lee del ACL, que es donde está la verdad y no depende del rol que pregunta.
-Si sobrevive **un solo** privilegio de `PUBLIC` sobre cualquiera de los tres
-objetos, lanza una excepción y **la transacción entera se revierte**.
-
-Es la única defensa contra el éxito silencioso: sin esto, un `REVOKE` que no
-revocó nada es indistinguible de uno que revocó todo.
-
-```sql
-DO $postcondicion$
-DECLARE
-  restante text;
-BEGIN
-  SELECT string_agg(format('%s.%s → %s', n.nspname, c.relname, a.privilege_type), ', '
-                    ORDER BY n.nspname, c.relname, a.privilege_type)
-    INTO restante
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-   WHERE n.nspname = 'net'
-     AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
-     AND a.grantee = 0;   -- 0 es PUBLIC
-
-  IF restante IS NOT NULL THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva privilegios sobre pg_net: %. '
-                    'Se revierte la transacción entera: un REVOKE que no revoca sale 0 y no '
-                    'se distingue de uno que sí.', restante;
-  END IF;
-END
-$postcondicion$;
-```
-
 ### Está probado, no supuesto
 
-`--prueba-live` reproduce la forma de producción en un clúster desechable —los
-tres objetos de `net` en manos de otro rol— y ejecuta el `REVOKE` como un rol
-equivalente a `postgres`: con `LOGIN`, sin superusuario, sin membresía y sin
-grant option. Exige que:
+`--prueba-live` reproduce la forma de producción en un clúster desechable y
+ejecuta **el lote completo** en cada escenario. Exige que:
 
-* el `REVOKE` **salga 0** y sólo deje un `WARNING` — el éxito silencioso, tal cual;
-* la **ACL quede intacta**, y el auditor siga rechazando con los mismos privilegios;
-* la **precondición aborte**, nombrando al dueño real y al que ejecuta;
-* la **postcondición falle**, enumerando qué privilegio sobrevivió en qué objeto;
-* y, como contraprueba, que con la autoridad del dueño la precondición **pase**,
-  y que con las tres vías cerradas la postcondición **pase** — para que «falla
-  siempre» y «detecta lo que hay» no se vean igual desde afuera.
+| Escenario | Qué se exige |
+| --- | --- |
+| El migrador **no es dueño ni miembro** (la forma de producción) | El `REVOKE` suelto **sale 0** y sólo deja un `WARNING`; la **ACL queda intacta**; el auditor sigue rechazando con los mismos privilegios; la precondición **aborta** nombrando dueño y ejecutor. |
+| **Falta uno** de los tres objetos | La precondición **aborta aun siendo superusuario**, nombrando cuál falta, y el lote se detiene ahí: **ningún `REVOKE` se ejecuta**. |
+| El migrador tiene los ocho privilegios **`WITH GRANT OPTION`**, pero los grants a `PUBLIC` los hizo otro propietario | La precondición lo **rechaza igual**, nombrando al otorgante real; y su `REVOKE` deja la ACL **byte por byte** intacta. |
+| **Propietarios asimétricos**: autoridad sobre las dos tablas, no sobre la secuencia | El lote completo **falla en la precondición**, señalando exactamente la secuencia; las **tres ACL quedan idénticas** — no se aplica ni la mitad que sí podía. |
+| La **postcondición falla** (lote sin el `REVOKE` de la secuencia, con autoridad de sobra) | Los `REVOKE` de las tablas **se revierten**: ACL idénticas. Y sin `ON_ERROR_STOP`, `psql` **sale 0** igual — por eso la propuesta lo exige. |
+| **Contrapruebas** | Con la autoridad del dueño la precondición **pasa**; con las tres vías cerradas la postcondición **pasa**. Para que «falla siempre» y «detecta lo que hay» no se vean igual desde afuera. |
 
 ## Análisis de impacto — qué hay que comprobar antes
 
@@ -266,7 +345,7 @@ grant option. Exige que:
    buscar en `supabase/functions/**`, en las migraciones y en los cron jobs toda
    referencia a `net._http_response` y ver con qué rol corre cada una.
    *Si alguna corre como `authenticated` o `anon`, retirarle el acceso la rompe*
-   — y entonces el `GRANT` explícito del paso 2c es obligatorio, no opcional.
+   — y entonces la sección de regrants del lote es obligatoria, no opcional.
 2. **Quién escribe.** `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` desde `PUBLIC` no
    tiene ningún uso legítimo conocido; `pg_net` mantiene sus tablas con su
    propio rol. Confirmarlo antes de revocar.

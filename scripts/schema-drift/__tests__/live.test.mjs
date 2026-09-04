@@ -18,7 +18,8 @@ import {
   sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
   juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive, tipoDeHost,
   avisarCredencial, clasificarLectura, LECTURA_TOLERADA,
-  SQL_PRIVS_TABLA, SQL_NET_PRECONDICION, SQL_NET_POSTCONDICION,
+  SQL_PRIVS_TABLA, SQL_NET_PRECONDICION, SQL_NET_POSTCONDICION, SQL_NET_LOTE,
+  NET_OBJETOS, NET_TABLAS, NET_SECUENCIA,
 } from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
@@ -1005,11 +1006,12 @@ describe('propuesta-net-publico.md · el documento y lo probado son lo mismo', (
   const doc = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), '..', 'propuesta-net-publico.md'), 'utf8')
 
-  it('trae la PRECONDICIÓN textualmente, la misma que corre la prueba', () => {
-    expect(doc).toContain(SQL_NET_PRECONDICION)
+  it('trae el LOTE COMPLETO textualmente, el mismo que corre la prueba', () => {
+    expect(doc).toContain(SQL_NET_LOTE.trim())
   })
 
-  it('trae la POSTCONDICIÓN textualmente, la misma que corre la prueba', () => {
+  it('y con él, la precondición y la postcondición', () => {
+    expect(doc).toContain(SQL_NET_PRECONDICION)
     expect(doc).toContain(SQL_NET_POSTCONDICION)
   })
 
@@ -1017,16 +1019,29 @@ describe('propuesta-net-publico.md · el documento y lo probado son lo mismo', (
     expect(doc).toMatch(/NO APLICADA, y NO aplicable como una migración normal/)
   })
 
+  it('exige que Supabase Support mande el lote como UNA SOLA transacción', () => {
+    expect(doc).toMatch(/Supabase Support tiene que ejecutar el lote completo como una única\s+transacción/)
+    expect(doc).toMatch(/No dividido en partes/)
+  })
+
+  it('exige ON_ERROR_STOP y explica por qué', () => {
+    expect(doc).toContain('ON_ERROR_STOP')
+    expect(doc).toMatch(/sale 0/)
+  })
+
   it('dice que hace falta autoridad del propietario, vía Supabase Support', () => {
     expect(doc).toMatch(/Supabase Support/)
     expect(doc).toMatch(/no es superusuario/)
     expect(doc).toMatch(/no es miembro de .?`?supabase_admin/)
-    expect(doc).toMatch(/no tiene grant option/)
   })
 
   it('advierte que el REVOKE sin autoridad SALE 0 en vez de fallar', () => {
     expect(doc).toMatch(/no privileges could be revoked/)
-    expect(doc).toMatch(/Sale \*\*0\*\*/)
+  })
+
+  it('declara que WITH GRANT OPTION NO es autoridad suficiente', () => {
+    expect(doc).toMatch(/`WITH GRANT OPTION` \*\*no cuenta\*\*/)
+    expect(doc).toMatch(/no alcanza el grant que hizo otro otorgante/)
   })
 
   it('prohíbe los cuatro atajos, por nombre', () => {
@@ -1034,20 +1049,128 @@ describe('propuesta-net-publico.md · el documento y lo probado son lo mismo', (
                          'SECURITY DEFINER', 'ALTER EXTENSION pg_net']) {
       expect(doc).toContain(atajo)
     }
-    expect(doc).toMatch(/Atajos PROHIBIDOS/)
   })
 
   it('enumera los OCHO privilegios de tabla', () => {
+    expect(doc).toMatch(/los \*\*ocho\*\* privilegios de tabla/)
     for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE',
                         'REFERENCES', 'TRIGGER', 'MAINTAIN']) {
       expect(doc).toContain(priv)
     }
-    expect(doc).toMatch(/los \*\*ocho\*\* privilegios de tabla/)
   })
 
   it('usa la secuencia real y nunca inventa una para _http_response', () => {
-    expect(doc).toContain('net.http_request_queue_id_seq')
+    expect(doc).toContain(NET_SECUENCIA)
     expect(doc).not.toContain('_http_response_id_seq')
+  })
+})
+
+// ── El LOTE: una transacción, tres objetos, cero placeholders ─────────────
+describe('SQL_NET_LOTE · la plantilla ejecutable', () => {
+  it('abre con BEGIN y cierra con COMMIT', () => {
+    const sentencias = SQL_NET_LOTE.split('\n').map(l => l.trim()).filter(Boolean)
+    expect(sentencias.filter(l => l === 'BEGIN;')).toHaveLength(1)
+    expect(sentencias.filter(l => l === 'COMMIT;')).toHaveLength(1)
+    expect(sentencias.indexOf('BEGIN;')).toBeLessThan(sentencias.indexOf('COMMIT;'))
+  })
+
+  it('lleva la precondición ANTES de cualquier REVOKE', () => {
+    expect(SQL_NET_LOTE.indexOf(SQL_NET_PRECONDICION))
+      .toBeLessThan(SQL_NET_LOTE.indexOf('REVOKE ALL PRIVILEGES'))
+  })
+
+  it('y la postcondición DESPUÉS del último REVOKE, antes del COMMIT', () => {
+    const post = SQL_NET_LOTE.indexOf(SQL_NET_POSTCONDICION)
+    expect(post).toBeGreaterThan(SQL_NET_LOTE.lastIndexOf('REVOKE ALL PRIVILEGES'))
+    expect(post).toBeLessThan(SQL_NET_LOTE.lastIndexOf('COMMIT;'))
+  })
+
+  it('revoca sobre los tres objetos y sobre ningún otro', () => {
+    for (const t of NET_TABLAS) expect(SQL_NET_LOTE).toContain(t)
+    expect(SQL_NET_LOTE).toContain(`ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC`)
+    // La secuencia va por ON SEQUENCE, nunca colada en el ON TABLE.
+    const onTable = SQL_NET_LOTE.slice(SQL_NET_LOTE.indexOf('ON TABLE'),
+                                       SQL_NET_LOTE.indexOf('FROM PUBLIC'))
+    expect(onTable).not.toContain(NET_SECUENCIA)
+  })
+
+  it('no lleva NINGÚN placeholder sin sustituir', () => {
+    expect(SQL_NET_LOTE).not.toMatch(/<[a-zA-ZñáéíóúÁÉÍÓÚ][^>\n]*>/)
+  })
+
+  it('no toca el USAGE del esquema, que la propuesta conserva a propósito', () => {
+    expect(SQL_NET_LOTE).not.toMatch(/REVOKE[^;]*ON SCHEMA net/)
+  })
+
+  it('no contiene ninguno de los atajos prohibidos', () => {
+    for (const atajo of ['SET ROLE', 'OWNER TO', 'SECURITY DEFINER', 'ALTER EXTENSION']) {
+      expect(SQL_NET_LOTE).not.toContain(atajo)
+    }
+  })
+})
+
+// ── Autoridad: tres formas, y el grant option no es una ───────────────────
+describe('SQL_NET_PRECONDICION · qué cuenta como autoridad', () => {
+  it('enumera EXACTAMENTE los tres objetos', () => {
+    for (const o of NET_OBJETOS) expect(SQL_NET_PRECONDICION).toContain(`'${o}'`)
+    expect(NET_OBJETOS).toHaveLength(3)
+  })
+
+  it('valida la forma: dos tablas (relkind r) y una secuencia (relkind S)', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(/relkind <> 'r'/)
+    expect(SQL_NET_PRECONDICION).toMatch(/relkind <> 'S'/)
+  })
+
+  it('aborta si falta alguno de los tres', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(/ausentes IS NOT NULL/)
+    expect(SQL_NET_PRECONDICION).toMatch(/PRECONDICIÓN FALLIDA: falta\(n\)/)
+  })
+
+  it('acepta sólo superusuario, propietario o membresía', () => {
+    expect(SQL_NET_PRECONDICION).toContain('IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN')
+  })
+
+  it('NO usa el grant option para decidir: sólo lo informa', () => {
+    // La única aparición de `gopt` en una condición sería un IF/AND; se exige
+    // que no haya ninguna. Si alguien lo reintroduce como autoridad, rompe.
+    expect(SQL_NET_PRECONDICION).not.toMatch(/OR\s+(r\.)?gopt/)
+    expect(SQL_NET_PRECONDICION).not.toMatch(/OR\s+r\.con_grant_option/)
+    expect(SQL_NET_PRECONDICION).toMatch(/informativo, NO es autoridad/)
+  })
+
+  it('inspecciona el OTORGANTE real de cada grant a PUBLIC', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(/pg_get_userbyid\(a\.grantor\)/)
+    expect(SQL_NET_PRECONDICION).toMatch(/otorgantes_publico/)
+  })
+
+  it('mide la secuencia con has_sequence_privilege, nunca con has_table_privilege', () => {
+    // La rama de relkind 'S' usa la función de secuencias…
+    expect(SQL_NET_PRECONDICION).toMatch(
+      /WHEN r\.relkind = 'S'\s+THEN \(SELECT bool_and\(has_sequence_privilege/)
+    // …y has_table_privilege queda del otro lado del CASE, en el ELSE.
+    const iSeq = SQL_NET_PRECONDICION.indexOf('has_sequence_privilege')
+    const iTab = SQL_NET_PRECONDICION.indexOf('has_table_privilege')
+    expect(iSeq).toBeGreaterThan(-1)
+    expect(iTab).toBeGreaterThan(iSeq)
+  })
+})
+
+describe('SQL_NET_POSTCONDICION · exactamente los tres objetos', () => {
+  it('los enumera a los tres', () => {
+    for (const o of NET_OBJETOS) expect(SQL_NET_POSTCONDICION).toContain(`'${o}'`)
+  })
+
+  it('exige que los tres sigan existiendo', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(/hallados <> array_length\(esperados, 1\)/)
+  })
+
+  it('lee del ACL y falla si PUBLIC (grantee 0) conserva algo', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(/a\.grantee = 0/)
+    expect(SQL_NET_POSTCONDICION).toMatch(/RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA/)
+  })
+
+  it('dice que revierte la transacción entera, incluidos los REVOKE que sí fueron', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(/revierte la transacción ENTERA/)
   })
 })
 
