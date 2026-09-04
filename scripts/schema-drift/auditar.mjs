@@ -59,7 +59,7 @@ import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { reconstruir, huella, listarMigraciones, DIR_MIGRACIONES } from './reconstruir.mjs'
+import { reconstruir, huella, listarMigraciones, binarios, DIR_MIGRACIONES } from './reconstruir.mjs'
 import { evaluarTresVias, diffMigraciones, informe } from './tres-vias.mjs'
 import { materializarMigraciones, migracionesEnDisco, migracionesEnRef, resolverRefBase } from './base-git.mjs'
 
@@ -947,6 +947,114 @@ export function avisarCredencial(m) {
 }
 
 /**
+ * Los ocho privilegios de tabla que se miden, en el orden en que se nombran.
+ *
+ * `MAINTAIN` existe desde PostgreSQL 17 y producción va por 17; las pruebas
+ * corren sobre el Postgres del runner, que hoy es 16. El nombre nunca puede
+ * aparecer en un texto que un servidor 16 vaya a analizar —ni como literal de
+ * `has_table_privilege`, ni dentro de un `GRANT`—, así que el array se arma
+ * SIEMPRE en tiempo de ejecución mirando `server_version_num`.
+ */
+export const SQL_PRIVS_TABLA =
+  `ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
+   || CASE WHEN current_setting('server_version_num')::int >= 170000
+           THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END`
+
+/**
+ * PRECONDICIÓN de la propuesta de `net`: ¿quien ejecuta puede revocar?
+ *
+ * En producción los objetos de `pg_net` y sus grants a `PUBLIC` pertenecen a
+ * `supabase_admin`. El ejecutor habitual de las migraciones es `postgres`, que
+ * ahí NO es superusuario, NO es miembro de `supabase_admin` y NO tiene grant
+ * option sobre esos objetos.
+ *
+ * Y ése es el modo de fallo caro: un `REVOKE` emitido por un rol sin autoridad
+ * NO falla. PostgreSQL emite un `WARNING: no privileges could be revoked` y la
+ * sentencia SALE 0. La migración quedaría marcada como aplicada, el pipeline
+ * en verde, y `PUBLIC` conservando todo. Por eso esto va ANTES, y aborta.
+ */
+export const SQL_NET_PRECONDICION = `DO $precondicion$
+DECLARE
+  yo        text    := current_user;
+  soy_super boolean := coalesce((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false);
+  privs     text[]  := ${SQL_PRIVS_TABLA};
+  vistos    int     := 0;
+  faltan    text[]  := ARRAY[]::text[];
+  r         record;
+BEGIN
+  FOR r IN
+    SELECT n.nspname || '.' || c.relname          AS objeto,
+           pg_get_userbyid(c.relowner)            AS duenio,
+           pg_has_role(yo, c.relowner, 'USAGE')   AS soy_miembro,
+           (SELECT bool_and(has_table_privilege(yo, c.oid, p || ' WITH GRANT OPTION'))
+              FROM unnest(privs) p)               AS con_grant_option
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'net'
+       AND c.relname IN ('_http_response', 'http_request_queue')
+     ORDER BY 1
+  LOOP
+    vistos := vistos + 1;
+    RAISE NOTICE '% · dueño=% · ejecuta=% · miembro=% · grant option=% · superusuario=%',
+      r.objeto, r.duenio, yo, r.soy_miembro, r.con_grant_option, soy_super;
+    IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro OR r.con_grant_option) THEN
+      faltan := faltan || r.objeto;
+    END IF;
+  END LOOP;
+
+  -- Fail-closed también cuando no se encontró nada: un filtro que no empareja
+  -- se parece demasiado a un permiso que sí está.
+  IF vistos = 0 THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: no se encontró ninguna de las tablas de pg_net. '
+                    'Sin objeto que medir no se puede afirmar que la vía quedó cerrada.';
+  END IF;
+
+  IF array_length(faltan, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
+                    'No es el dueño, no hereda su rol, no tiene grant option y no es superusuario. '
+                    'El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la ACL intacta.',
+                    yo, array_to_string(faltan, ', ');
+  END IF;
+END
+$precondicion$;`
+
+/**
+ * POSTCONDICIÓN de la propuesta de `net`: ¿quedó algo de `PUBLIC`?
+ *
+ * Se lee del ACL, que es donde está la verdad y no depende del rol que
+ * pregunta. Si sobrevive UN solo privilegio de `PUBLIC` sobre cualquiera de los
+ * tres objetos, se lanza una excepción y la transacción entera se revierte.
+ *
+ * Es la única defensa contra el «éxito silencioso»: sin esto, un `REVOKE` que
+ * no revocó nada es indistinguible de uno que revocó todo.
+ *
+ * El `USAGE` del ESQUEMA queda deliberadamente fuera: la propuesta no lo toca
+ * —quitarlo rompería `net.http_get()`/`net.http_post()` para todo el mundo— y
+ * sin privilegios sobre las tablas no alcanza nada.
+ */
+export const SQL_NET_POSTCONDICION = `DO $postcondicion$
+DECLARE
+  restante text;
+BEGIN
+  SELECT string_agg(format('%s.%s → %s', n.nspname, c.relname, a.privilege_type), ', '
+                    ORDER BY n.nspname, c.relname, a.privilege_type)
+    INTO restante
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+   WHERE n.nspname = 'net'
+     AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+     AND a.grantee = 0;   -- 0 es PUBLIC
+
+  IF restante IS NOT NULL THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva privilegios sobre pg_net: %. '
+                    'Se revierte la transacción entera: un REVOKE que no revoca sale 0 y no '
+                    'se distingue de uno que sí.', restante;
+  END IF;
+END
+$postcondicion$;`
+
+/**
  * Lo que hay que medir del OTRO lado antes de leer nada.
  *
  * Se mide, no se declara: la única afirmación aceptable sobre una credencial es
@@ -974,9 +1082,7 @@ const SQL_CREDENCIAL = `WITH no_interno AS (
   -- corre en 16 mientras producción va por 17, así que la lista se arma según
   -- la versión y el nombre viaja como VALOR, no como literal en la consulta:
   -- en 16 el motor nunca llega a ver 'MAINTAIN'.
-  SELECT ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
-         || CASE WHEN current_setting('server_version_num')::int >= 170000
-                 THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END AS lista
+  SELECT ${SQL_PRIVS_TABLA} AS lista
 ), privs_columna AS (
   -- Los cuatro que Postgres deja conceder POR COLUMNA. No es sólo SELECT:
   -- \`GRANT INSERT (saldo)\` deja escribir esa columna, y \`REFERENCES (id)\`
@@ -2114,6 +2220,11 @@ async function pruebaLive() {
       'con un GRANT DIRECTO sobre pg_stat_statements, la tolerancia no aplica y bloquea')
 
 
+    // La versión del servidor decide qué privilegios existen. Se lee UNA vez y
+    // manda tanto en el fixture como en lo que se le exige al diagnóstico.
+    const versionServidor = Number(db.psql(
+      ['-tAq', '-c', "SELECT current_setting('server_version_num')"], { stdio: 'pipe' }).trim())
+
     // ── 2 sexies · el bloqueo REAL de producción: `net` con USAGE a PUBLIC ───
     //
     // Medido contra el catálogo real: el esquema `net` (pg_net, que instala
@@ -2140,13 +2251,28 @@ async function pruebaLive() {
     // tiene secuencia propia —su `id` es bigserial—, y `_http_response` NO
     // tiene ninguna. El esquema `net` ya existe en la reconstrucción; lo que no
     // existen son los grants, que son de la instalación gestionada.
+    //
+    // Y con los OCHO privilegios de tabla, no con cinco: producción concede
+    // también REFERENCES y TRIGGER —y MAINTAIN, que existe desde Postgres 17—.
+    // El GRANT se arma dentro del servidor, porque en 16 el texto `GRANT
+    // MAINTAIN` ni siquiera se puede analizar: sería un error de sintaxis antes
+    // de llegar a ejecutarse.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
       GRANT USAGE ON SCHEMA net TO PUBLIC;
       CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
-      GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE
-        ON net._http_response, net.http_request_queue TO PUBLIC;
+      DO $conceder$
+      DECLARE privs text := array_to_string(${SQL_PRIVS_TABLA}, ', ');
+      BEGIN
+        EXECUTE format('GRANT %s ON net._http_response, net.http_request_queue TO PUBLIC', privs);
+      END
+      $conceder$;
       GRANT SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq TO PUBLIC;`,
     ], { stdio: 'pipe' })
+
+    // Los privilegios que el diagnóstico TIENE que enumerar, en el orden en que
+    // los nombra: todos menos SELECT, que va por su propia regla.
+    const privsNet = ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']
+      .concat(versionServidor >= 170000 ? ['MAINTAIN'] : [])
 
     const conNet = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
       { [VAR_URL_LIVE]: urlDe('drift_lector') })
@@ -2154,15 +2280,154 @@ async function pruebaLive() {
     for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
       comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
     }
-    comprobar(/net\._http_response \[INSERT, UPDATE, DELETE, TRUNCATE, vía PUBLIC\]/.test(conNet.salida),
-      '  nombrando la tabla, los privilegios exactos y que llegan vía PUBLIC')
+    // El diagnóstico tiene que enumerar los OCHO, no los cinco de siempre. Se
+    // exige la cadena COMPLETA —así un privilegio de más o de menos rompe— y
+    // además, uno por uno, los tres que se agregaron.
+    const flagsNet = `net._http_response [${privsNet.join(', ')}, vía PUBLIC]`
+    comprobar(conNet.salida.includes(flagsNet),
+      `  nombrando la tabla, los privilegios exactos y que llegan vía PUBLIC: «${flagsNet}»`)
+    for (const priv of ['REFERENCES', 'TRIGGER']) {
+      comprobar(new RegExp(`REVOKE [^\n]*\\b${priv}\\b[^\n]*ON net\\._http_response FROM PUBLIC;`)
+        .test(conNet.salida), `  y el remedio retira ${priv}, que antes se escapaba`)
+    }
+    comprobar(versionServidor >= 170000
+      ? /REVOKE [^\n]*\bMAINTAIN\b[^\n]*ON net\._http_response FROM PUBLIC;/.test(conNet.salida)
+      : !/MAINTAIN/.test(conNet.salida),
+      versionServidor >= 170000
+        ? '  y MAINTAIN, que en 17 también se concede'
+        : '  y en 16 NO nombra MAINTAIN, que en este servidor no existe')
     comprobar(conNet.salida.includes(
       'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;'),
       '  y la secuencia REAL —la de http_request_queue— con sus tres privilegios')
+    // La reconstrucción local SÍ tiene un `net._http_response_id_seq` —su `id`
+    // ahí es serial— pero SIN grants a PUBLIC, así que es inalcanzable y no
+    // puede aparecer. Producción no tiene esa secuencia en absoluto. La
+    // aserción vale en los dos casos, y es la que impediría mandar a alguien a
+    // ejecutar un REVOKE sobre un objeto que no existe.
     comprobar(!/_http_response_id_seq/.test(conNet.salida),
-      '  y no inventa una secuencia para _http_response, que no tiene')
+      '  y no inventa una secuencia para _http_response, que en producción no tiene')
     comprobar(!/FROM drift_lector;/.test(conNet.salida),
       '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
+
+    // ── 2 sexies bis · el REVOKE NO lo puede ejecutar el pipeline ───────────
+    //
+    // Medido contra el catálogo real: `net._http_response`,
+    // `net.http_request_queue` y `net.http_request_queue_id_seq` pertenecen a
+    // `supabase_admin`, y los grants a `PUBLIC` los hizo ese rol. El ejecutor
+    // habitual de las migraciones es `postgres`, que en Supabase NO es
+    // superusuario, NO es miembro de `supabase_admin` y NO tiene grant option
+    // sobre esos objetos.
+    //
+    // Y acá está el modo de fallo que hace falta fijar con una prueba: en
+    // PostgreSQL, un REVOKE emitido por un rol sin autoridad NO FALLA. Emite un
+    // `WARNING: no privileges could be revoked` y la sentencia SALE 0. Una
+    // migración normal quedaría marcada como aplicada, el pipeline en verde y
+    // PUBLIC conservándolo todo. Es un falso negativo de seguridad perfecto:
+    // el registro dice que se cerró la vía, y la vía sigue abierta.
+    //
+    // Se reproduce esa forma exacta —dueño distinto del ejecutor— y se exige
+    // que el proceso NO pueda declarar éxito.
+    const psqlComo = (rol, sql) => {
+      const r = spawnSync(join(binarios(), 'psql'),
+        ['-U', rol, '-v', 'ON_ERROR_STOP=1', '-q', '-c', sql],
+        { encoding: 'utf8', env: db.entorno })
+      return { codigo: r.status ?? 1, salida: `${r.stdout ?? ''}${r.stderr ?? ''}` }
+    }
+    const aclNet = () => db.psql(['-tAq', '-c', `
+      SELECT c.relname || ' = ' || coalesce(c.relacl::text, '(por defecto)')
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'net'
+         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+       ORDER BY c.relname`], { stdio: 'pipe' }).trim()
+    // Lo que PUBLIC tiene, leído del ACL. A diferencia de `relacl::text`, esto
+    // NO cambia cuando cambia el dueño: ahí sólo se reescribe el otorgante.
+    const publicoNet = () => db.psql(['-tAq', '-c', `
+      SELECT c.relname || ' → ' || a.privilege_type
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+       WHERE n.nspname = 'net'
+         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+         AND a.grantee = 0
+       ORDER BY 1`], { stdio: 'pipe' }).trim()
+
+    // `drift_net_duenio` hace de supabase_admin y `drift_migrador` de postgres:
+    // con LOGIN, sin superusuario, sin membresía y sin grant option. Cambiar el
+    // dueño reescribe el otorgante de los grants ya existentes, así que después
+    // de esto PUBLIC tiene lo que le dio `drift_net_duenio`, como en producción.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      CREATE ROLE drift_net_duenio NOLOGIN;
+      CREATE ROLE drift_migrador LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB;
+      GRANT USAGE ON SCHEMA net TO drift_migrador;
+      ALTER TABLE    net._http_response            OWNER TO drift_net_duenio;
+      ALTER TABLE    net.http_request_queue        OWNER TO drift_net_duenio;
+      ALTER SEQUENCE net.http_request_queue_id_seq OWNER TO drift_net_duenio;`],
+      { stdio: 'pipe' })
+
+    const propiedad = db.psql(['-tAq', '-c', `
+      SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'net'
+         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+         AND pg_get_userbyid(c.relowner) = 'drift_net_duenio'`],
+      { stdio: 'pipe' }).trim()
+    comprobar(propiedad === '3', '  la forma de producción: los 3 objetos de net son de OTRO rol (3 de 3)')
+    comprobar(db.psql(['-tAq', '-c',
+      "SELECT pg_has_role('drift_migrador', 'drift_net_duenio', 'USAGE')"], { stdio: 'pipe' }).trim() === 'f',
+      '  y el que ejecuta las migraciones NO es miembro de ese rol')
+
+    // 1 · El REVOKE tal cual, como lo correría una migración normal.
+    const aclAntes = aclNet()
+    const publicoAntes = publicoNet()
+    const revocado = psqlComo('drift_migrador',
+      'REVOKE ALL PRIVILEGES ON TABLE net._http_response, net.http_request_queue FROM PUBLIC;')
+    comprobar(revocado.codigo === 0,
+      '  el REVOKE de un NO dueño SALE 0 — no falla, que es justamente el problema')
+    comprobar(/no privileges could be revoked/i.test(revocado.salida),
+      '  y todo lo que deja es un WARNING, que un runner de migraciones ignora')
+    comprobar(aclNet() === aclAntes,
+      '  la ACL queda INTACTA: PUBLIC conserva todo lo que tenía')
+
+    // 2 · Y el guard del auditor lo confirma desde el otro lado: la credencial
+    //     sigue siendo rechazada por los mismos tres motivos.
+    const trasRevoke = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
+      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    comprobar(trasRevoke.codigo !== 0 && conNet.salida.includes(flagsNet)
+      && trasRevoke.salida.includes(flagsNet),
+      '  y el auditor lo ve: mismo rechazo, mismos privilegios, como si nada hubiera pasado')
+
+    // 3 · La PRECONDICIÓN de la propuesta lo detiene ANTES de tocar nada.
+    const pre = psqlComo('drift_migrador', SQL_NET_PRECONDICION)
+    comprobar(pre.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(pre.salida),
+      '  la PRECONDICIÓN aborta: nombra al ejecutor y por qué no tiene autoridad')
+    comprobar(/drift_net_duenio/.test(pre.salida) && /drift_migrador/.test(pre.salida),
+      '  y nombra al dueño real y al que ejecuta, que es lo accionable')
+
+    // 4 · Y la POSTCONDICIÓN convierte el éxito silencioso en un fallo.
+    const post = psqlComo('drift_migrador', SQL_NET_POSTCONDICION)
+    comprobar(post.codigo !== 0 && /POSTCONDICIÓN FALLIDA/.test(post.salida),
+      '  la POSTCONDICIÓN falla y revierte: el éxito silencioso deja de ser silencioso')
+    comprobar(/net\._http_response → SELECT/.test(post.salida),
+      '  enumerando qué sobrevivió, objeto por objeto y privilegio por privilegio')
+
+    // 5 · CONTRAPRUEBA: los dos guards no son «siempre falla». Con el dueño
+    //     verdadero, la precondición pasa —es el único camino soportado—.
+    const preDuenio = db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      `SET ROLE drift_net_duenio; ${SQL_NET_PRECONDICION}`], { stdio: 'pipe' })
+    comprobar(typeof preDuenio === 'string',
+      '  contraprueba: con la autoridad del DUEÑO la precondición pasa, no es un «siempre falla»')
+
+    // Se devuelve la propiedad para que el resto del bloque —los remedios por
+    // regla— corra como antes, y se retiran los dos roles de utilería.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      ALTER TABLE    net._http_response            OWNER TO postgres;
+      ALTER TABLE    net.http_request_queue        OWNER TO postgres;
+      ALTER SEQUENCE net.http_request_queue_id_seq OWNER TO postgres;
+      REVOKE USAGE ON SCHEMA net FROM drift_migrador;
+      DROP ROLE drift_migrador; DROP ROLE drift_net_duenio;`], { stdio: 'pipe' })
+    // Cambiar el dueño reescribe el OTORGANTE dentro del aclitem, así que
+    // `relacl::text` no puede ser la vara acá: lo que tiene que seguir idéntico
+    // es lo que PUBLIC alcanza, que es lo único que este bloque mide.
+    comprobar(publicoNet() === publicoAntes && publicoAntes !== '',
+      '  y devolver la propiedad no cambió lo que PUBLIC alcanza: se sigue midiendo lo mismo')
 
     // EL GUARD PASA SÓLO DESPUÉS DE CERRAR TODAS LAS VÍAS. Se aplican los
     // remedios regla por regla y se exige que siga rechazando hasta la última:
@@ -2180,6 +2445,13 @@ async function pruebaLive() {
           ? '  y sólo con las TRES cerradas el guard pasa, sin tocar el USAGE del esquema'
           : `  cerrada ${regla}, sigue rechazando: falta ${reglasNet.slice(i + 1).join(' y ')}`)
     }
+
+    // Y con TODO cerrado, la postcondición pasa. Es la otra mitad de la
+    // contraprueba: sin esto, «falla siempre» y «detecta lo que hay» se ven
+    // igual desde afuera.
+    const postFinal = psqlComo('postgres', SQL_NET_POSTCONDICION)
+    comprobar(postFinal.codigo === 0,
+      '  y con las tres vías cerradas la POSTCONDICIÓN pasa: detecta lo que hay, no falla siempre')
 
     // Teardown: se deshace lo que se agregó, sin tocar lo que trae la
     // reconstrucción.
@@ -2201,17 +2473,13 @@ async function pruebaLive() {
     // servidor, y —donde el servidor lo soporta— que un GRANT MAINTAIN real se
     // detecte y se revoque. En 16 esa segunda mitad se declara omitida, y la
     // cubre la prueba pura de vitest.
-    const versionNum = Number(db.psql(['-tAq', '-c', "SELECT current_setting('server_version_num')"],
-      { stdio: 'pipe' }).trim())
     const listaPrivs = db.psql(['-tAq', '-c',
-      `SELECT array_to_string(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
-              || CASE WHEN current_setting('server_version_num')::int >= 170000
-                      THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END, ',')`], { stdio: 'pipe' }).trim()
-    comprobar(listaPrivs.includes('MAINTAIN') === (versionNum >= 170000),
+      `SELECT array_to_string(${SQL_PRIVS_TABLA}, ',')`], { stdio: 'pipe' }).trim()
+    comprobar(listaPrivs.includes('MAINTAIN') === (versionServidor >= 170000),
       `la lista de privilegios de tabla incluye MAINTAIN si y sólo si el servidor es >= 17 ` +
-      `(acá ${versionNum}: ${listaPrivs.includes('MAINTAIN') ? 'sí' : 'no'})`)
+      `(acá ${versionServidor}: ${listaPrivs.includes('MAINTAIN') ? 'sí' : 'no'})`)
 
-    if (versionNum >= 170000) {
+    if (versionServidor >= 170000) {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
         'CREATE ROLE drift_maintain LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_maintain; ' +
         'GRANT MAINTAIN ON public.clientes TO drift_maintain;'], { stdio: 'pipe' })
@@ -2226,8 +2494,18 @@ async function pruebaLive() {
         { [VAR_URL_LIVE]: urlDe('drift_maintain') })
       comprobar(sinMaintain.codigo === 0, 'y su remedio lo elimina')
     } else {
-      console.error(`· MAINTAIN: omitido DECLARADO — el servidor es ${versionNum} y el privilegio ` +
-                    'existe desde 170000. Lo cubre la prueba pura de `juzgarCredencial`.')
+      // Se declara EXACTAMENTE qué se omitió y qué no. Lo omitido es UNA cosa:
+      // el `GRANT MAINTAIN` real contra este servidor. Todo lo demás de MAINTAIN
+      // sí corrió — la lista versionada se comprobó arriba, y la detección, el
+      // nombrado y el remedio los fija la prueba PURA de `juzgarCredencial`, que
+      // no necesita servidor y corre en CI en `vitest scripts/schema-drift`.
+      console.error(
+        `· MAINTAIN: omitida SÓLO la prueba REAL (GRANT MAINTAIN contra el servidor): ` +
+        `este servidor es ${versionServidor} y el privilegio existe desde 170000 ` +
+        `(producción va por 17, y ahí sí corre).\n` +
+        `  NO se omitió: la lista versionada de privilegios (comprobada arriba) ni la prueba ` +
+        `pura «juzgarCredencial · privilegios de tabla detectados», que exige que MAINTAIN se ` +
+        `nombre en el motivo y en el REVOKE.`)
     }
 
     // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────

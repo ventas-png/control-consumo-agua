@@ -341,7 +341,7 @@ escribir.
 | --- | --- |
 | Falta `SCHEMA_DRIFT_READONLY_URL` | Que alguien «arregle» el modo live reutilizando el token administrativo. El mensaje lo dice por su nombre. |
 | El rol es superusuario, tiene `BYPASSRLS`, `CREATEROLE`, `CREATEDB` o `REPLICATION` | Leer producción con una credencial que además puede modificarla. `REPLICATION` es el que se olvida: se lleva la base entera por el stream sin ejecutar un solo `SELECT`. Se **mide**, no se declara. |
-| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. Se preguntan **los siete** privilegios de tabla que no son `SELECT` —`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER`— y, cuando `server_version_num >= 170000`, también `MAINTAIN`. `TRIGGER` es el que se olvida: deja instalar código que corre con las escrituras ajenas. El `REVOKE` nombra **los que se detectaron**, no un `ALL` a ciegas. |
+| El rol puede escribir en alguna tabla **alcanzable** | Lo obvio, y por eso el primero que hubo. Mismas dos condiciones. Se preguntan **los ocho** privilegios de tabla (ver más abajo), no los cinco de siempre. El `REVOKE` nombra **los que se detectaron**, no un `ALL` a ciegas. |
 | El rol alcanza alguna **secuencia** | Quedaban fuera del escaneo, que sólo miraba tablas y vistas. `USAGE` o `UPDATE` **mueven el contador** —escritura de estado compartido, y un salto de correlativo se nota en la facturación—; `SELECT` dice cuántas filas hubo. Se pregunta con `has_sequence_privilege`, porque `has_table_privilege` ni siquiera responde por `USAGE`. |
 | El rol tiene `SELECT` sobre alguna tabla **alcanzable** | La huella sale del **catálogo**, no de los datos: leer filas no le sirve de nada al auditor y convierte el secreto de `production-db` en una filtración esperando un log. **Alcanzable** son dos condiciones, igual que para las funciones: `USAGE` sobre el esquema **y** el privilegio. El escaneo mira **todos** los esquemas no internos, y el remedio sale de la **procedencia real** (ver abajo). |
 | El rol tiene algún privilegio **por columna** | La variante que se escapa: un `GRANT SELECT (email)` no aparece en `has_table_privilege` y alcanza igual para leer datos. Y no es sólo `SELECT`: `INSERT`, `UPDATE` y `REFERENCES` también se conceden por columna —`GRANT INSERT (saldo)` escribe, `REFERENCES (id)` deja colgar una FK—. Se preguntan los cuatro, aparte, con `has_any_column_privilege`, y el remedio trae **los nombres reales de las columnas**, citados por Postgres, para poder pegarse tal cual. |
@@ -432,6 +432,44 @@ El modo de fallo que se evita es el peor de todos: alguien encuentra un
 artefacto en una corrida roja, lo da por bueno y versiona la instantánea vieja
 como si fuera producción de hoy.
 
+### Los ocho privilegios de tabla, y el que sólo existe en 17
+
+`SELECT` va por su propia regla. Los otros siete —ocho en producción— los mide
+la regla de **ESCRITURA**:
+
+| Privilegio | Desde | Qué habilita |
+| --- | --- | --- |
+| `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` | siempre | Lo obvio. |
+| `REFERENCES` | siempre | Colgar una clave foránea de la tabla ajena, y con eso condicionar sus borrados desde afuera. |
+| `TRIGGER` | siempre | El que se olvida, y el peor: **instalar código que corre con las escrituras de otro**. |
+| `MAINTAIN` | **PostgreSQL 17** | `VACUUM`, `ANALYZE`, `REINDEX`, `CLUSTER` y `REFRESH MATERIALIZED VIEW` sobre la tabla ajena. |
+
+`MAINTAIN` no existe antes de 17, y **producción va por 17 mientras las pruebas
+corren sobre el Postgres del runner, que hoy es 16**. Pasarle ese nombre a
+`has_table_privilege` en 16 no devuelve `false`: lanza «unrecognized privilege
+type» y tumba la medición entera. Y dentro de un `GRANT` sería un error de
+sintaxis, antes siquiera de ejecutarse.
+
+Por eso el nombre **nunca** aparece en un texto que un servidor 16 vaya a
+analizar. La lista se arma en tiempo de ejecución, en una constante única
+(`SQL_PRIVS_TABLA`) que usan la consulta de la credencial, la precondición de la
+propuesta de `net` y el fixture de `--prueba-live`:
+
+```sql
+ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']
+ || CASE WHEN current_setting('server_version_num')::int >= 170000
+         THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END
+```
+
+y los nombres entran por `unnest` **como valores**, no como literales. En 16 el
+motor nunca llega a ver `'MAINTAIN'`.
+
+En un servidor 16 se omite **una sola** cosa: la prueba que hace un `GRANT
+MAINTAIN` de verdad. Se declara en la salida, con esas palabras. Lo demás sí
+corre: la lista versionada se comprueba contra `server_version_num`, y la
+detección, el nombrado y el remedio los fija la prueba pura de
+`juzgarCredencial`, que no necesita servidor.
+
 ### Tablas y columnas: alcanzables de verdad, y de dónde viene el privilegio
 
 **Alcanzable** son dos condiciones, y hacen falta las dos:
@@ -465,11 +503,13 @@ como sale y exige que el rechazo desaparezca — para las cuatro vías.
 
 Medido contra el catálogo real: el esquema **`net` concede `USAGE` a `PUBLIC`**,
 y **`net._http_response`** y **`net.http_request_queue`** conceden a `PUBLIC`
-`SELECT`, `INSERT`, `UPDATE`, `DELETE` y `TRUNCATE`. Con ellas viene la única
-secuencia que hay ahí: **`net.http_request_queue_id_seq`**, la del `id` de la
-cola —`_http_response` no tiene secuencia propia, su `id` es el de la petición—.
-Son grants de la instalación gestionada de Supabase: ninguna migración de este
-repositorio los declara, y la reconstrucción local no los reproduce.
+los **ocho** privilegios de tabla: `SELECT`, `INSERT`, `UPDATE`, `DELETE`,
+`TRUNCATE`, `REFERENCES`, `TRIGGER` y —producción va por 17— `MAINTAIN`. Con
+ellas viene la única secuencia que hay ahí:
+**`net.http_request_queue_id_seq`**, la del `id` de la cola —`_http_response` no
+tiene secuencia propia, su `id` es el de la petición—. Son grants de la
+instalación gestionada de Supabase: ninguna migración de este repositorio los
+declara, y la reconstrucción local no los reproduce.
 
 Con eso, una credencial provisionada **exactamente** como prescribe este
 documento las alcanza igual — el privilegio no se lo dio nadie, lo tiene por ser
@@ -479,15 +519,34 @@ guarda el cuerpo y las cabeceras de cada respuesta HTTP que recibió la base
 con sus cabeceras, que es donde vive un `Authorization: Bearer`. Con `UPDATE` e
 `INSERT` encima.
 
-**No se agrega `net` a `LECTURA_TOLERADA` ni se afloja el guard.** La propuesta
-de migración para retirar esa vía, con su análisis de impacto, está en
+**No se agrega `net` a `LECTURA_TOLERADA` ni se afloja el guard.**
+
+Y hay una segunda razón para no apurarse: **el pipeline no puede ejecutar el
+`REVOKE`**. Los tres objetos y sus grants pertenecen a `supabase_admin`,
+mientras que el ejecutor de las migraciones es `postgres`, que ahí no es
+superusuario, no es miembro de ese rol y no tiene grant option. Un `REVOKE` sin
+autoridad **no falla en PostgreSQL**: emite un `WARNING` y sale 0 — la migración
+quedaría registrada como aplicada, el pipeline en verde y `PUBLIC`
+conservándolo todo.
+
+La propuesta para retirar esa vía, con su análisis de impacto, su precondición
+de autoridad y su postcondición fail-closed, está en
 [`propuesta-net-publico.md`](propuesta-net-publico.md) — **preparada y no
-aplicada**: va en su propio PR, y la decide quien opera la base.
+aplicada**: necesita una operación soportada con autoridad del propietario
+(en la práctica, Supabase Support), y la decide quien opera la base.
 
 El rechazo está fijado por `--prueba-live`, que construye esa misma forma en un
 clúster desechable, exige el rechazo, aplica los `REVOKE` que el propio
 diagnóstico propone y comprueba que la credencial vuelve a servir **sin tocar el
 `USAGE` del esquema**.
+
+Y el bloqueo de autoridad está fijado igual, no supuesto: la misma prueba pone
+los tres objetos en manos de otro rol, corre el `REVOKE` como un rol equivalente
+a `postgres` —con `LOGIN`, sin superusuario, sin membresía, sin grant option— y
+exige que salga **0** con la **ACL intacta**, que la precondición **aborte** y
+que la postcondición **falle** enumerando lo que sobrevivió. Con la
+contraprueba: con la autoridad del dueño la precondición pasa, y con las tres
+vías cerradas la postcondición pasa.
 
 ### `pg_stat_statements`: una decisión, no un olvido
 

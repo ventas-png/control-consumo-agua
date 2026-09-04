@@ -10,11 +10,15 @@
 // no rompe nada: queda versionado como verdad, y a partir de ahí el auditor
 // deja de ver el drift que esos grupos taparían.
 
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import {
   sinSecretos, refDeUrl, validarHuellaLive, diffHuellas,
   juzgarCredencial, SECDEF_PERMITIDAS, validarUrlLive, tipoDeHost,
   avisarCredencial, clasificarLectura, LECTURA_TOLERADA,
+  SQL_PRIVS_TABLA, SQL_NET_PRECONDICION, SQL_NET_POSTCONDICION,
 } from '../auditar.mjs'
 
 const H = (n = 1) => ({ huella: 'a'.repeat(64), n })
@@ -988,5 +992,91 @@ describe('juzgarCredencial · privilegios por columna', () => {
   it('nunca usa `ON ALL TABLES`, que no revoca un grant por columna', () => {
     const l = lineas({ ...sana, columnas: C('mio.t', 'mio', 'drift_readonly', 'SELECT (email)') })
     expect(l.some(x => /ON ALL TABLES/.test(x))).toBe(false)
+  })
+})
+
+// ── La propuesta de `net` y el código no se pueden separar ─────────────────
+//
+// Los dos bloques SQL que la propuesta le pide a quien opere la base son los
+// MISMOS que `--prueba-live` ejecuta contra un clúster real. Si alguien edita
+// uno de los dos lados, esto rompe: un documento que dice una cosa y una prueba
+// que verifica otra es peor que no tener ninguno de los dos.
+describe('propuesta-net-publico.md · el documento y lo probado son lo mismo', () => {
+  const doc = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'propuesta-net-publico.md'), 'utf8')
+
+  it('trae la PRECONDICIÓN textualmente, la misma que corre la prueba', () => {
+    expect(doc).toContain(SQL_NET_PRECONDICION)
+  })
+
+  it('trae la POSTCONDICIÓN textualmente, la misma que corre la prueba', () => {
+    expect(doc).toContain(SQL_NET_POSTCONDICION)
+  })
+
+  it('sigue marcada como NO APLICADA y no aplicable como migración normal', () => {
+    expect(doc).toMatch(/NO APLICADA, y NO aplicable como una migración normal/)
+  })
+
+  it('dice que hace falta autoridad del propietario, vía Supabase Support', () => {
+    expect(doc).toMatch(/Supabase Support/)
+    expect(doc).toMatch(/no es superusuario/)
+    expect(doc).toMatch(/no es miembro de .?`?supabase_admin/)
+    expect(doc).toMatch(/no tiene grant option/)
+  })
+
+  it('advierte que el REVOKE sin autoridad SALE 0 en vez de fallar', () => {
+    expect(doc).toMatch(/no privileges could be revoked/)
+    expect(doc).toMatch(/Sale \*\*0\*\*/)
+  })
+
+  it('prohíbe los cuatro atajos, por nombre', () => {
+    for (const atajo of ['SET ROLE supabase_admin', 'OWNER TO postgres',
+                         'SECURITY DEFINER', 'ALTER EXTENSION pg_net']) {
+      expect(doc).toContain(atajo)
+    }
+    expect(doc).toMatch(/Atajos PROHIBIDOS/)
+  })
+
+  it('enumera los OCHO privilegios de tabla', () => {
+    for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE',
+                        'REFERENCES', 'TRIGGER', 'MAINTAIN']) {
+      expect(doc).toContain(priv)
+    }
+    expect(doc).toMatch(/los \*\*ocho\*\* privilegios de tabla/)
+  })
+
+  it('usa la secuencia real y nunca inventa una para _http_response', () => {
+    expect(doc).toContain('net.http_request_queue_id_seq')
+    expect(doc).not.toContain('_http_response_id_seq')
+  })
+})
+
+// ── MAINTAIN sólo existe desde Postgres 17 ────────────────────────────────
+//
+// El nombre no puede aparecer en NINGÚN texto que un servidor 16 vaya a
+// analizar: ni como literal de `has_table_privilege` —ahí no devuelve falso,
+// lanza «unrecognized privilege type»— ni dentro de un `GRANT`, donde sería un
+// error de sintaxis. La única forma segura es armar el array en tiempo de
+// ejecución, y eso es lo que se fija acá.
+describe('SQL_PRIVS_TABLA · la lista versionada de privilegios', () => {
+  it('trae los siete que existen en toda versión soportada', () => {
+    for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE',
+                        'REFERENCES', 'TRIGGER']) {
+      expect(SQL_PRIVS_TABLA).toContain(`'${priv}'`)
+    }
+  })
+
+  it('condiciona MAINTAIN a server_version_num >= 170000, sin excepción', () => {
+    expect(SQL_PRIVS_TABLA).toMatch(
+      /CASE WHEN current_setting\('server_version_num'\)::int >= 170000\s+THEN ARRAY\['MAINTAIN'\]/)
+    // MAINTAIN aparece UNA sola vez, y siempre dentro de esa rama: si alguien
+    // lo agregara al array incondicional, esto rompe.
+    expect(SQL_PRIVS_TABLA.match(/MAINTAIN/g)).toHaveLength(1)
+    expect(SQL_PRIVS_TABLA.indexOf('MAINTAIN'))
+      .toBeGreaterThan(SQL_PRIVS_TABLA.indexOf('170000'))
+  })
+
+  it('la precondición usa esa misma lista, no una copia a mano', () => {
+    expect(SQL_NET_PRECONDICION).toContain(SQL_PRIVS_TABLA)
   })
 })
