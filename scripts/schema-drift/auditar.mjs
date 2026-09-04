@@ -1006,18 +1006,18 @@ DECLARE
   vistos    text[]  := ARRAY[]::text[];
   ausentes  text[];
   faltan    text[]  := ARRAY[]::text[];
+  ajenos    text[]  := ARRAY[]::text[];
   gopt      boolean;
   r         record;
+  g         record;
 BEGIN
+  -- ── 1 · Los objetos: que estén los tres, y que sean lo que decimos ───────
   FOR r IN
     SELECT n.nspname || '.' || c.relname                AS objeto,
            c.oid                                        AS oid,
            c.relkind                                    AS relkind,
            pg_get_userbyid(c.relowner)                  AS duenio,
-           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro,
-           (SELECT string_agg(DISTINCT pg_get_userbyid(a.grantor), ', ')
-              FROM aclexplode(c.relacl) AS a
-             WHERE a.grantee = 0)                       AS otorgantes_publico
+           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname || '.' || c.relname = ANY (esperados)
@@ -1039,8 +1039,7 @@ BEGIN
 
     -- Grant option: se mide con la función que corresponde al tipo de objeto
     -- —has_sequence_privilege para la secuencia, NUNCA has_table_privilege— y
-    -- se informa junto con el otorgante real. NO decide nada: ver el comentario
-    -- de esta constante.
+    -- se informa. NO decide nada: ver el comentario de esta constante.
     gopt := CASE WHEN r.relkind = 'S'
                  THEN (SELECT bool_and(has_sequence_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
                          FROM unnest(ARRAY['SELECT','USAGE','UPDATE']) p)
@@ -1048,9 +1047,8 @@ BEGIN
                          FROM unnest(privs) p)
             END;
 
-    RAISE NOTICE '% (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grants a PUBLIC otorgados por: % · grant option: % (informativo, NO es autoridad)',
-      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super,
-      coalesce(r.otorgantes_publico, '(nadie: PUBLIC no tiene nada)'), gopt;
+    RAISE NOTICE 'OBJETO % (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grant option: % (informativo, NO es autoridad)',
+      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super, gopt;
 
     IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN
       faltan := faltan || r.objeto;
@@ -1073,6 +1071,58 @@ BEGIN
                     array_length(esperados, 1), array_length(vistos, 1), array_to_string(vistos, ', ');
   END IF;
 
+  -- ── 2 · El inventario COMPLETO de lo que tiene PUBLIC ────────────────────
+  --
+  -- Las dos capas, porque son dos ACL distintas y la segunda no se ve desde la
+  -- primera: \`pg_class.relacl\` para los tres objetos, y \`pg_attribute.attacl\`
+  -- para TODAS las columnas no eliminadas de las dos tablas. Un
+  -- \`GRANT SELECT (headers) … TO PUBLIC\` no aparece en relacl y alcanza igual.
+  --
+  -- Y de cada grant se mira EL OTORGANTE, que es lo que decide si el REVOKE va
+  -- a servir: PostgreSQL retira lo que otorgó quien ejecuta, o un rol del que
+  -- sea miembro. Un grant hecho por un tercero sobrevive al REVOKE, que sale 0
+  -- igual. Por eso no basta con mostrarlo: si aparece un otorgante que no se
+  -- puede asumir, esto aborta ANTES del primer REVOKE.
+  FOR g IN
+    SELECT n.nspname || '.' || c.relname                 AS objeto,
+           NULL::text                                    AS columna,
+           a.privilege_type                              AS priv,
+           pg_get_userbyid(a.grantor)                    AS otorgante,
+           pg_has_role(yo, a.grantor, 'USAGE')           AS puedo_asumir
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor),
+           pg_has_role(yo, a.grantor, 'USAGE')
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+     ORDER BY 1, 2 NULLS FIRST, 3
+  LOOP
+    RAISE NOTICE 'PUBLIC · % · columna=% · privilegio=% · otorgado por=% · ¿puedo actuar como ese otorgante?=%',
+      g.objeto, coalesce(g.columna, '(nivel de objeto)'), g.priv, g.otorgante,
+      (soy_super OR g.puedo_asumir);
+
+    IF NOT (soy_super OR g.puedo_asumir) THEN
+      ajenos := ajenos || format('%s%s → %s (otorgado por %s)',
+                                 g.objeto, coalesce('.' || g.columna, ''), g.priv, g.otorgante);
+    END IF;
+  END LOOP;
+
+  -- ── 3 · Los abortos, juntos y al final ──────────────────────────────────
+  --
+  -- Después del inventario a propósito: quien opere la base ve de UNA corrida
+  -- todo lo que hay que arreglar —qué objetos, qué columnas, qué otorgantes— en
+  -- vez de descubrirlo de a uno por intento.
   IF array_length(faltan, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
                     'No es superusuario, no es el dueño y no hereda su rol. Tener los privilegios '
@@ -1081,30 +1131,46 @@ BEGIN
                     'ACL intacta.',
                     yo, array_to_string(faltan, ', ');
   END IF;
+
+  IF array_length(ajenos, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no puede actuar como el otorgante de % grant(s) de '
+                    'PUBLIC: %. Un REVOKE sólo retira lo que otorgó quien lo ejecuta (o un rol del '
+                    'que sea miembro): esos grants sobrevivirían, el REVOKE saldría 0 igual y la '
+                    'vía quedaría abierta. Hace falta que lo ejecute el otorgante, o alguien que '
+                    'pueda asumirlo.',
+                    yo, array_length(ajenos, 1), array_to_string(ajenos, '; ');
+  END IF;
 END
 $precondicion$;`
 
 /**
- * POSTCONDICIÓN de la propuesta de `net`: ¿quedó algo de `PUBLIC`?
+ * POSTCONDICIÓN de la propuesta de \`net\`: ¿quedó algo de \`PUBLIC\`?
  *
  * Se lee del ACL, que es donde está la verdad y no depende del rol que
- * pregunta. Cubre EXACTAMENTE los tres objetos, y exige que los tres sigan
- * existiendo: si uno desapareció, no se puede afirmar nada sobre él. Si
- * sobrevive UN solo privilegio de `PUBLIC`, lanza una excepción y —dentro de la
- * transacción del lote— revierte TODO lo anterior, incluidos los REVOKE que sí
- * habían funcionado.
+ * pregunta, y de las DOS capas: \`pg_class.relacl\` para los tres objetos y
+ * \`pg_attribute.attacl\` para todas las columnas no eliminadas de las dos
+ * tablas. Un \`GRANT SELECT (headers) … TO PUBLIC\` vive sólo en la segunda y
+ * alcanza igual para leer las cabeceras de cada petición saliente.
  *
- * Es la única defensa contra el «éxito silencioso»: sin esto, un `REVOKE` que
+ * Exige además que los tres objetos sigan existiendo: si uno desapareció, no se
+ * puede afirmar nada sobre él. Si sobrevive UN solo privilegio de \`PUBLIC\`,
+ * lanza una excepción identificando objeto, columna, privilegio y otorgante, y
+ * —dentro de la transacción del lote— revierte TODO lo anterior, incluidos los
+ * REVOKE que sí habían funcionado.
+ *
+ * Es la única defensa contra el «éxito silencioso»: sin esto, un \`REVOKE\` que
  * no revocó nada es indistinguible de uno que revocó todo.
  *
- * El `USAGE` del ESQUEMA queda deliberadamente fuera: la propuesta no lo toca
- * —quitarlo rompería `net.http_get()`/`net.http_post()` para todo el mundo— y
+ * El \`USAGE\` del ESQUEMA queda deliberadamente fuera: la propuesta no lo toca
+ * —quitarlo rompería \`net.http_get()\`/\`net.http_post()\` para todo el mundo— y
  * sin privilegios sobre las tablas no alcanza nada.
  */
 export const SQL_NET_POSTCONDICION = `DO $postcondicion$
 DECLARE
   esperados text[] := ARRAY[${listaSql(NET_OBJETOS)}];
+  tablas    text[] := ARRAY[${listaSql(NET_TABLAS)}];
   hallados  int;
+  cuantos   int;
   restante  text;
 BEGIN
   SELECT count(*) INTO hallados
@@ -1116,19 +1182,43 @@ BEGIN
                     array_length(esperados, 1), hallados;
   END IF;
 
-  SELECT string_agg(format('%s.%s → %s', n.nspname, c.relname, a.privilege_type), ', '
-                    ORDER BY n.nspname, c.relname, a.privilege_type)
-    INTO restante
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-   WHERE n.nspname || '.' || c.relname = ANY (esperados)
-     AND a.grantee = 0;   -- 0 es PUBLIC
+  WITH publico AS (
+    -- Capa 1 · pg_class.relacl: los privilegios de nivel de objeto.
+    SELECT n.nspname || '.' || c.relname AS objeto,
+           NULL::text                    AS columna,
+           a.privilege_type              AS priv,
+           pg_get_userbyid(a.grantor)    AS otorgante
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    -- Capa 2 · pg_attribute.attacl: SELECT, INSERT, UPDATE y REFERENCES por
+    -- COLUMNA, que no aparecen en relacl y alcanzan igual.
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor)
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+  )
+  SELECT count(*),
+         string_agg(format('%s%s → %s (otorgado por %s)',
+                           objeto, coalesce('.' || columna, ''), priv, otorgante),
+                    ', ' ORDER BY objeto, columna NULLS FIRST, priv)
+    INTO cuantos, restante
+    FROM publico;
 
-  IF restante IS NOT NULL THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva privilegios sobre pg_net: %. '
+  IF cuantos > 0 THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre pg_net: %. '
                     'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
-                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.', restante;
+                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.',
+                    cuantos, restante;
   END IF;
 END
 $postcondicion$;`
@@ -2386,17 +2476,22 @@ async function pruebaLive() {
     // El GRANT se arma dentro del servidor, porque en 16 el texto `GRANT
     // MAINTAIN` ni siquiera se puede analizar: sería un error de sintaxis antes
     // de llegar a ejecutarse.
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      GRANT USAGE ON SCHEMA net TO PUBLIC;
-      CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
+    //
+    // Los GRANT van a una constante porque hay que REPONERLOS: la contraprueba
+    // del lote completo los retira de verdad, y el resto del bloque —los
+    // remedios regla por regla— necesita la forma de producción otra vez.
+    const grantsNet = `
       DO $conceder$
       DECLARE privs text := array_to_string(${SQL_PRIVS_TABLA}, ', ');
       BEGIN
-        EXECUTE format('GRANT %s ON net._http_response, net.http_request_queue TO PUBLIC', privs);
+        EXECUTE format('GRANT %s ON ${NET_TABLAS.join(', ')} TO PUBLIC', privs);
       END
       $conceder$;
-      GRANT SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq TO PUBLIC;`,
-    ], { stdio: 'pipe' })
+      GRANT SELECT, USAGE, UPDATE ON SEQUENCE ${NET_SECUENCIA} TO PUBLIC;`
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      GRANT USAGE ON SCHEMA net TO PUBLIC;
+      CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
+      ${grantsNet}`], { stdio: 'pipe' })
 
     // Los privilegios que el diagnóstico TIENE que enumerar, en el orden en que
     // los nombra: todos menos SELECT, que va por su propia regla.
@@ -2501,7 +2596,7 @@ async function pruebaLive() {
     // dueño reescribe el otorgante de los grants ya existentes, así que después
     // de esto PUBLIC tiene lo que le dio `drift_net_duenio`, como en producción.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      CREATE ROLE drift_net_duenio NOLOGIN;
+      CREATE ROLE drift_net_duenio LOGIN NOSUPERUSER;   -- con LOGIN: ejecuta el lote como «A»
       CREATE ROLE drift_migrador LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB;
       GRANT USAGE ON SCHEMA net TO drift_migrador;
       ALTER TABLE    net._http_response            OWNER TO drift_net_duenio;
@@ -2599,7 +2694,7 @@ async function pruebaLive() {
       '  y AUN ASÍ la precondición lo rechaza: grant option no es autoridad')
     comprobar(/WITH GRANT OPTION no alcanza/.test(preGopt.salida),
       '  diciéndolo con todas las letras, para que nadie lo relaje después')
-    comprobar(/otorgados por: drift_net_duenio/.test(preGopt.salida),
+    comprobar(/otorgado por=drift_net_duenio/.test(preGopt.salida),
       '  y nombrando al OTORGANTE real de los grants a PUBLIC, que es el quid')
 
     const revokeGopt = psqlComo('drift_migrador',
@@ -2612,6 +2707,79 @@ async function pruebaLive() {
       REVOKE ALL PRIVILEGES ON TABLE ${NET_TABLAS.join(', ')} FROM drift_migrador;
       REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM drift_migrador;
       RESET ROLE;`], { stdio: 'pipe' })
+
+    // 5 bis · UN GRANT POR COLUMNA HECHO POR UN TERCERO. La capa que no se ve
+    //         desde `relacl`: `GRANT SELECT (url) … TO PUBLIC` vive en
+    //         `pg_attribute.attacl`. Y acá lo concede B, a quien el dueño A le
+    //         dio grant option — así que el REVOKE de A NO lo alcanza: Postgres
+    //         retira lo que otorgó quien ejecuta, o un rol del que sea miembro.
+    //         A ejecutaría el lote, saldría 0, y la columna seguiría abierta.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      CREATE ROLE drift_b_net LOGIN NOSUPERUSER;
+      GRANT USAGE ON SCHEMA net TO drift_b_net;
+      SET ROLE drift_net_duenio;
+      GRANT SELECT (url) ON net.http_request_queue TO drift_b_net WITH GRANT OPTION;
+      RESET ROLE;
+      SET ROLE drift_b_net;
+      GRANT SELECT (url) ON net.http_request_queue TO PUBLIC;
+      RESET ROLE;`], { stdio: 'pipe' })
+
+    const attNet = () => db.psql(['-tAq', '-c', `
+      SELECT c.relname || '.' || at.attname || ' = ' || at.attacl::text
+        FROM pg_attribute at
+        JOIN pg_class c ON c.oid = at.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'net' AND at.attnum > 0 AND NOT at.attisdropped
+         AND at.attacl IS NOT NULL
+       ORDER BY 1`], { stdio: 'pipe' }).trim()
+
+    comprobar(/drift_b_net/.test(attNet()),
+      '  montado: un GRANT SELECT(url) a PUBLIC otorgado por B, no por el dueño')
+
+    const relAntesCol = aclNet()
+    const attAntesCol = attNet()
+    const loteTercero = psqlLoteComo('drift_net_duenio', SQL_NET_LOTE)
+    comprobar(loteTercero.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(loteTercero.salida),
+      '  el lote, ejecutado por el DUEÑO A, aborta en la precondición')
+    comprobar(/net\.http_request_queue\.url → SELECT \(otorgado por drift_b_net\)/
+      .test(loteTercero.salida),
+      '  identificando objeto, COLUMNA, privilegio y otorgante del grant ajeno')
+    comprobar(/no puede actuar como el otorgante/.test(loteTercero.salida),
+      '  y diciendo por qué: no puede actuar como ese otorgante')
+    comprobar(aclNet() === relAntesCol && attNet() === attAntesCol,
+      '  y relacl Y attacl quedan byte por byte iguales: ningún REVOKE se ejecutó')
+
+    // 5 ter · CONTRAPRUEBA: la MISMA vía por columna, pero concedida por el
+    //         dueño. Ahora el lote completo sí la cierra, y la postcondición
+    //         —que mira las dos capas— pasa.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      SET ROLE drift_b_net;
+      REVOKE SELECT (url) ON net.http_request_queue FROM PUBLIC;
+      RESET ROLE;
+      SET ROLE drift_net_duenio;
+      REVOKE ALL PRIVILEGES ON TABLE net.http_request_queue FROM drift_b_net;
+      GRANT SELECT (url), INSERT (headers) ON net.http_request_queue TO PUBLIC;
+      RESET ROLE;`], { stdio: 'pipe' })
+    comprobar(/url = .*=r\/drift_net_duenio/.test(attNet()) && !/drift_b_net/.test(attNet()),
+      '  ahora la vía por columna la concede el DUEÑO, y hay dos (SELECT y INSERT)')
+
+    const loteDuenio = psqlLoteComo('drift_net_duenio', SQL_NET_LOTE)
+    comprobar(loteDuenio.codigo === 0,
+      '  el lote completo, con la autoridad del dueño, PASA de punta a punta')
+    comprobar(attNet() === '',
+      '  y no queda NINGUNA ACL por columna: attacl vacío en todo el esquema net')
+    comprobar(db.psql(['-tAq', '-c', `
+      SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL aclexplode(c.relacl) a
+       WHERE n.nspname = 'net' AND a.grantee = 0`], { stdio: 'pipe' }).trim() === '0',
+      '  ni ninguna de nivel de objeto: PUBLIC no conserva nada en net')
+
+    // Y se repone la forma de producción para el resto del bloque.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      `REVOKE USAGE ON SCHEMA net FROM drift_b_net; DROP ROLE drift_b_net; ${grantsNet}`],
+      { stdio: 'pipe' })
+    comprobar(aclNet() === relAntesCol && attNet() === '',
+      '  repuesta la forma de producción (sin la vía por columna, que era del caso)')
 
     // 6 · PROPIETARIOS ASIMÉTRICOS: autoridad sobre las DOS TABLAS y no sobre
     //     la secuencia. Es el caso que más fácil se cuela, porque «casi todo»

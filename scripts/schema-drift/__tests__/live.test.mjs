@@ -1138,9 +1138,29 @@ describe('SQL_NET_PRECONDICION · qué cuenta como autoridad', () => {
     expect(SQL_NET_PRECONDICION).toMatch(/informativo, NO es autoridad/)
   })
 
-  it('inspecciona el OTORGANTE real de cada grant a PUBLIC', () => {
-    expect(SQL_NET_PRECONDICION).toMatch(/pg_get_userbyid\(a\.grantor\)/)
-    expect(SQL_NET_PRECONDICION).toMatch(/otorgantes_publico/)
+  it('inventaría los grants de PUBLIC en las DOS capas', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(/aclexplode\(c\.relacl\)/)
+    expect(SQL_NET_PRECONDICION).toContain('pg_attribute')
+    expect(SQL_NET_PRECONDICION).toMatch(/aclexplode\(at\.attacl\)/)
+    expect(SQL_NET_PRECONDICION).toMatch(/at\.attnum > 0 AND NOT at\.attisdropped/)
+  })
+
+  it('enumera objeto, columna, privilegio y otorgante de cada grant a PUBLIC', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(
+      /RAISE NOTICE 'PUBLIC · % · columna=% · privilegio=% · otorgado por=%/)
+  })
+
+  // El otorgante no está para mirarlo: decide. Un REVOKE sólo retira lo que
+  // otorgó quien lo ejecuta (o un rol del que sea miembro).
+  it('USA el otorgante: exige poder actuar como él, y aborta si no', () => {
+    expect(SQL_NET_PRECONDICION).toMatch(/pg_has_role\(yo, a\.grantor, 'USAGE'\)/)
+    expect(SQL_NET_PRECONDICION).toMatch(/IF NOT \(soy_super OR g\.puedo_asumir\) THEN/)
+    expect(SQL_NET_PRECONDICION).toMatch(/no puede actuar como el otorgante/)
+  })
+
+  it('y ese aborto ocurre ANTES de que el lote llegue a ningún REVOKE', () => {
+    expect(SQL_NET_LOTE.indexOf('no puede actuar como el otorgante'))
+      .toBeLessThan(SQL_NET_LOTE.indexOf('REVOKE ALL PRIVILEGES'))
   })
 
   it('mide la secuencia con has_sequence_privilege, nunca con has_table_privilege', () => {
@@ -1167,6 +1187,28 @@ describe('SQL_NET_POSTCONDICION · exactamente los tres objetos', () => {
   it('lee del ACL y falla si PUBLIC (grantee 0) conserva algo', () => {
     expect(SQL_NET_POSTCONDICION).toMatch(/a\.grantee = 0/)
     expect(SQL_NET_POSTCONDICION).toMatch(/RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA/)
+  })
+
+  // `grantee = 0` sola no distingue las DOS capas: un GRANT SELECT (col) vive
+  // en pg_attribute.attacl y no aparece en pg_class.relacl. Acá se exige que
+  // estén las dos, y que attacl mire TODAS las columnas no eliminadas.
+  it('mira las DOS capas: pg_class.relacl Y pg_attribute.attacl', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(/aclexplode\(c\.relacl\)/)
+    expect(SQL_NET_POSTCONDICION).toContain('pg_attribute')
+    expect(SQL_NET_POSTCONDICION).toMatch(/aclexplode\(at\.attacl\)/)
+  })
+
+  it('recorre todas las columnas no eliminadas de las dos tablas', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(/at\.attnum > 0 AND NOT at\.attisdropped/)
+    // El barrido por columnas se limita a las TABLAS: una secuencia no las tiene.
+    expect(SQL_NET_POSTCONDICION).toMatch(
+      /JOIN pg_attribute at[\s\S]*?ANY \(tablas\)/)
+  })
+
+  it('el error identifica objeto, columna, privilegio y otorgante', () => {
+    expect(SQL_NET_POSTCONDICION).toMatch(
+      /format\('%s%s → %s \(otorgado por %s\)',\s*\n?\s*objeto, coalesce\('\.' \|\| columna, ''\), priv, otorgante\)/)
+    expect(SQL_NET_POSTCONDICION).toMatch(/pg_get_userbyid\(a\.grantor\)/)
   })
 
   it('dice que revierte la transacción entera, incluidos los REVOKE que sí fueron', () => {

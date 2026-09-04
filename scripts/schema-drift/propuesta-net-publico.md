@@ -81,9 +81,22 @@ medidos hasta este PR:
 ## Qué implica
 
 `PUBLIC` incluye a **todo rol de la base**, presente y futuro, sin necesidad de
-que nadie le conceda nada. Incluye a `anon` —la clave que viaja en el bundle del
-SPA— y a cualquier credencial dedicada que se cree después, como
-`drift_readonly`.
+que nadie le conceda nada. Pero «tener el privilegio en el catálogo» y «poder
+usarlo desde afuera» no son lo mismo, y conviene no mezclarlos:
+
+| Vía | Estado | Por qué |
+| --- | --- | --- |
+| **Credencial directa a Postgres** (`drift_readonly`, o cualquier rol que se cree después) | 🔴 **RIESGO CONFIRMADO** | Se conecta al puerto de Postgres, no a la API HTTP. El privilegio de `PUBLIC` le alcanza sin más: está medido, y es exactamente por esto que el guard del auditor **rechaza** una credencial provisionada según el README. |
+| **`anon` / `authenticated` por el SPA o la Data API** | 🟠 **A VERIFICAR, no confirmado** | `anon` **es** parte de `PUBLIC` en PostgreSQL, así que tiene el privilegio en el catálogo. Pero PostgREST sólo sirve los esquemas declarados en **Data API → Exposed schemas**, y `net` normalmente **no** está ahí. Si no lo está, la vía HTTP no se abre — el privilegio queda latente, no explotable por esa ruta. |
+
+**Qué hay que comprobar, y no dar por hecho:** abrir el panel de Supabase en
+*Project Settings → Data API → Exposed schemas* y ver si `net` figura. Si figura,
+la fila naranja pasa a roja y la urgencia cambia de categoría. Si no figura,
+sigue habiendo que cerrar la vía —el riesgo confirmado de la primera fila no
+depende de la Data API— pero sin el agravante de exposición pública por HTTP.
+
+No se afirma acá que el SPA lea `net`: no está medido. Lo que sí está medido es
+el catálogo, y el catálogo dice que cualquier rol de la base llega.
 
 Y lo que hay del otro lado no son métricas:
 
@@ -160,6 +173,38 @@ decisión. Y hay una regresión que lo fija: el migrador recibe los ocho
 privilegios `WITH GRANT OPTION`, la precondición lo rechaza igual, y su `REVOKE`
 deja la ACL **byte por byte** intacta.
 
+### Las DOS capas del ACL
+
+Un `GRANT SELECT (headers) ON net.http_request_queue TO PUBLIC` **no aparece en
+`pg_class.relacl`**: vive en `pg_attribute.attacl`, y alcanza igual para leer
+las cabeceras de cada petición saliente —que es donde vive un
+`Authorization: Bearer`—. Por eso la precondición y la postcondición miran las
+dos:
+
+* **`pg_class.relacl`** — los privilegios de nivel de objeto, sobre los tres;
+* **`pg_attribute.attacl`** — `SELECT`, `INSERT`, `UPDATE` y `REFERENCES` por
+  columna, sobre **todas** las columnas no eliminadas (`attnum > 0 AND NOT
+  attisdropped`) de las dos tablas.
+
+El `REVOKE ALL PRIVILEGES ON TABLE` del lote **sí** retira también los grants por
+columna —PostgreSQL los revoca en cascada al revocar a nivel de tabla—, pero eso
+es precisamente lo que la postcondición tiene que comprobar en vez de suponer.
+Verificado en el clúster desechable: `attacl` queda vacío.
+
+### El otorgante decide, no sólo informa
+
+De cada grant a `PUBLIC` se lee **objeto, columna, privilegio y otorgante**. El
+otorgante no está de adorno: un `REVOKE` retira lo que otorgó **quien lo
+ejecuta**, o un rol del que sea miembro. Un grant hecho por un tercero
+**sobrevive** al `REVOKE`, que sale 0 igual.
+
+Así que la precondición exige poder **actuar como** cada otorgante
+(`pg_has_role(current_user, grantor, 'USAGE')`, o ser superusuario). Si aparece
+uno que no puede asumir, **aborta antes del primer `REVOKE`** y lo nombra. El
+caso real que esto atrapa: el dueño `A` le dio grant option a `B`, y `B` le
+concedió a `PUBLIC`; `A` ejecuta el lote de buena fe, y sin este control saldría
+0 dejando la columna abierta.
+
 ### El lote
 
 ```sql
@@ -186,18 +231,18 @@ DECLARE
   vistos    text[]  := ARRAY[]::text[];
   ausentes  text[];
   faltan    text[]  := ARRAY[]::text[];
+  ajenos    text[]  := ARRAY[]::text[];
   gopt      boolean;
   r         record;
+  g         record;
 BEGIN
+  -- ── 1 · Los objetos: que estén los tres, y que sean lo que decimos ───────
   FOR r IN
     SELECT n.nspname || '.' || c.relname                AS objeto,
            c.oid                                        AS oid,
            c.relkind                                    AS relkind,
            pg_get_userbyid(c.relowner)                  AS duenio,
-           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro,
-           (SELECT string_agg(DISTINCT pg_get_userbyid(a.grantor), ', ')
-              FROM aclexplode(c.relacl) AS a
-             WHERE a.grantee = 0)                       AS otorgantes_publico
+           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname || '.' || c.relname = ANY (esperados)
@@ -219,8 +264,7 @@ BEGIN
 
     -- Grant option: se mide con la función que corresponde al tipo de objeto
     -- —has_sequence_privilege para la secuencia, NUNCA has_table_privilege— y
-    -- se informa junto con el otorgante real. NO decide nada: ver el comentario
-    -- de esta constante.
+    -- se informa. NO decide nada: ver el comentario de esta constante.
     gopt := CASE WHEN r.relkind = 'S'
                  THEN (SELECT bool_and(has_sequence_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
                          FROM unnest(ARRAY['SELECT','USAGE','UPDATE']) p)
@@ -228,9 +272,8 @@ BEGIN
                          FROM unnest(privs) p)
             END;
 
-    RAISE NOTICE '% (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grants a PUBLIC otorgados por: % · grant option: % (informativo, NO es autoridad)',
-      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super,
-      coalesce(r.otorgantes_publico, '(nadie: PUBLIC no tiene nada)'), gopt;
+    RAISE NOTICE 'OBJETO % (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grant option: % (informativo, NO es autoridad)',
+      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super, gopt;
 
     IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN
       faltan := faltan || r.objeto;
@@ -253,6 +296,58 @@ BEGIN
                     array_length(esperados, 1), array_length(vistos, 1), array_to_string(vistos, ', ');
   END IF;
 
+  -- ── 2 · El inventario COMPLETO de lo que tiene PUBLIC ────────────────────
+  --
+  -- Las dos capas, porque son dos ACL distintas y la segunda no se ve desde la
+  -- primera: `pg_class.relacl` para los tres objetos, y `pg_attribute.attacl`
+  -- para TODAS las columnas no eliminadas de las dos tablas. Un
+  -- `GRANT SELECT (headers) … TO PUBLIC` no aparece en relacl y alcanza igual.
+  --
+  -- Y de cada grant se mira EL OTORGANTE, que es lo que decide si el REVOKE va
+  -- a servir: PostgreSQL retira lo que otorgó quien ejecuta, o un rol del que
+  -- sea miembro. Un grant hecho por un tercero sobrevive al REVOKE, que sale 0
+  -- igual. Por eso no basta con mostrarlo: si aparece un otorgante que no se
+  -- puede asumir, esto aborta ANTES del primer REVOKE.
+  FOR g IN
+    SELECT n.nspname || '.' || c.relname                 AS objeto,
+           NULL::text                                    AS columna,
+           a.privilege_type                              AS priv,
+           pg_get_userbyid(a.grantor)                    AS otorgante,
+           pg_has_role(yo, a.grantor, 'USAGE')           AS puedo_asumir
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor),
+           pg_has_role(yo, a.grantor, 'USAGE')
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+     ORDER BY 1, 2 NULLS FIRST, 3
+  LOOP
+    RAISE NOTICE 'PUBLIC · % · columna=% · privilegio=% · otorgado por=% · ¿puedo actuar como ese otorgante?=%',
+      g.objeto, coalesce(g.columna, '(nivel de objeto)'), g.priv, g.otorgante,
+      (soy_super OR g.puedo_asumir);
+
+    IF NOT (soy_super OR g.puedo_asumir) THEN
+      ajenos := ajenos || format('%s%s → %s (otorgado por %s)',
+                                 g.objeto, coalesce('.' || g.columna, ''), g.priv, g.otorgante);
+    END IF;
+  END LOOP;
+
+  -- ── 3 · Los abortos, juntos y al final ──────────────────────────────────
+  --
+  -- Después del inventario a propósito: quien opere la base ve de UNA corrida
+  -- todo lo que hay que arreglar —qué objetos, qué columnas, qué otorgantes— en
+  -- vez de descubrirlo de a uno por intento.
   IF array_length(faltan, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
                     'No es superusuario, no es el dueño y no hereda su rol. Tener los privilegios '
@@ -260,6 +355,15 @@ BEGIN
                     'ejecuta. El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la '
                     'ACL intacta.',
                     yo, array_to_string(faltan, ', ');
+  END IF;
+
+  IF array_length(ajenos, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no puede actuar como el otorgante de % grant(s) de '
+                    'PUBLIC: %. Un REVOKE sólo retira lo que otorgó quien lo ejecuta (o un rol del '
+                    'que sea miembro): esos grants sobrevivirían, el REVOKE saldría 0 igual y la '
+                    'vía quedaría abierta. Hace falta que lo ejecute el otorgante, o alguien que '
+                    'pueda asumirlo.',
+                    yo, array_length(ajenos, 1), array_to_string(ajenos, '; ');
   END IF;
 END
 $precondicion$;
@@ -286,7 +390,9 @@ REVOKE ALL PRIVILEGES ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;
 DO $postcondicion$
 DECLARE
   esperados text[] := ARRAY['net._http_response', 'net.http_request_queue', 'net.http_request_queue_id_seq'];
+  tablas    text[] := ARRAY['net._http_response', 'net.http_request_queue'];
   hallados  int;
+  cuantos   int;
   restante  text;
 BEGIN
   SELECT count(*) INTO hallados
@@ -298,19 +404,43 @@ BEGIN
                     array_length(esperados, 1), hallados;
   END IF;
 
-  SELECT string_agg(format('%s.%s → %s', n.nspname, c.relname, a.privilege_type), ', '
-                    ORDER BY n.nspname, c.relname, a.privilege_type)
-    INTO restante
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-   WHERE n.nspname || '.' || c.relname = ANY (esperados)
-     AND a.grantee = 0;   -- 0 es PUBLIC
+  WITH publico AS (
+    -- Capa 1 · pg_class.relacl: los privilegios de nivel de objeto.
+    SELECT n.nspname || '.' || c.relname AS objeto,
+           NULL::text                    AS columna,
+           a.privilege_type              AS priv,
+           pg_get_userbyid(a.grantor)    AS otorgante
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    -- Capa 2 · pg_attribute.attacl: SELECT, INSERT, UPDATE y REFERENCES por
+    -- COLUMNA, que no aparecen en relacl y alcanzan igual.
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor)
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+  )
+  SELECT count(*),
+         string_agg(format('%s%s → %s (otorgado por %s)',
+                           objeto, coalesce('.' || columna, ''), priv, otorgante),
+                    ', ' ORDER BY objeto, columna NULLS FIRST, priv)
+    INTO cuantos, restante
+    FROM publico;
 
-  IF restante IS NOT NULL THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva privilegios sobre pg_net: %. '
+  IF cuantos > 0 THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre pg_net: %. '
                     'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
-                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.', restante;
+                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.',
+                    cuantos, restante;
   END IF;
 END
 $postcondicion$;
@@ -333,6 +463,8 @@ ejecuta **el lote completo** en cada escenario. Exige que:
 | El migrador **no es dueño ni miembro** (la forma de producción) | El `REVOKE` suelto **sale 0** y sólo deja un `WARNING`; la **ACL queda intacta**; el auditor sigue rechazando con los mismos privilegios; la precondición **aborta** nombrando dueño y ejecutor. |
 | **Falta uno** de los tres objetos | La precondición **aborta aun siendo superusuario**, nombrando cuál falta, y el lote se detiene ahí: **ningún `REVOKE` se ejecuta**. |
 | El migrador tiene los ocho privilegios **`WITH GRANT OPTION`**, pero los grants a `PUBLIC` los hizo otro propietario | La precondición lo **rechaza igual**, nombrando al otorgante real; y su `REVOKE` deja la ACL **byte por byte** intacta. |
+| Un grant **por columna** a `PUBLIC` otorgado por un **tercero** (`A` da grant option a `B`; `B` concede a `PUBLIC`), ejecutado por el dueño `A` | La precondición **aborta**, identificando **objeto, columna, privilegio y otorgante**; `relacl` **y** `attacl` quedan **byte por byte** iguales. |
+| El mismo grant por columna, pero **concedido por el dueño** (contraprueba) | El lote completo **lo elimina**: `attacl` queda vacío, `PUBLIC` no conserva nada, y la **postcondición pasa**. |
 | **Propietarios asimétricos**: autoridad sobre las dos tablas, no sobre la secuencia | El lote completo **falla en la precondición**, señalando exactamente la secuencia; las **tres ACL quedan idénticas** — no se aplica ni la mitad que sí podía. |
 | La **postcondición falla** (lote sin el `REVOKE` de la secuencia, con autoridad de sobra) | Los `REVOKE` de las tablas **se revierten**: ACL idénticas. Y sin `ON_ERROR_STOP`, `psql` **sale 0** igual — por eso la propuesta lo exige. |
 | **Contrapruebas** | Con la autoridad del dueño la precondición **pasa**; con las tres vías cerradas la postcondición **pasa**. Para que «falla siempre» y «detecta lo que hay» no se vean igual desde afuera. |
@@ -374,6 +506,9 @@ ejecuta **el lote completo** en cada escenario. Exige que:
 * **Abrir el caso con Supabase Support.** Es el paso que desbloquea todo lo
   demás: sin la autoridad de `supabase_admin` no hay `REVOKE` que sirva, y una
   migración normal saldría verde sin haber hecho nada.
+* **Verificar en *Data API → Exposed schemas* si `net` está expuesto.** Decide si
+  la vía por `anon`/HTTP es real o sólo latente, y con eso la urgencia. El riesgo
+  por credencial directa a Postgres no depende de esto y ya está confirmado.
 * Ejecutar los puntos 1 a 5 del análisis y, con el resultado, decidir si hace
   falta el `GRANT` explícito y a qué rol.
 * **Hasta entonces, el modo live queda bloqueado por este motivo**, y es el

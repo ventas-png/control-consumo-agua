@@ -513,7 +513,11 @@ declara, y la reconstrucción local no los reproduce.
 
 Con eso, una credencial provisionada **exactamente** como prescribe este
 documento las alcanza igual — el privilegio no se lo dio nadie, lo tiene por ser
-`PUBLIC`. **El guard la rechaza, y está bien que rechace**: `_http_response`
+`PUBLIC`. Ése es el **riesgo confirmado**: una credencial que habla Postgres
+directo. El acceso por `anon` desde el SPA o la Data API está **por verificar**,
+no confirmado: `anon` es parte de `PUBLIC` y tiene el privilegio en el catálogo,
+pero PostgREST sólo sirve los esquemas declarados en *Data API → Exposed
+schemas*, y `net` normalmente no está ahí. **El guard la rechaza, y está bien que rechace**: `_http_response`
 guarda el cuerpo y las cabeceras de cada respuesta HTTP que recibió la base
 —webhooks, pasarelas de pago— y `http_request_queue` las peticiones pendientes
 con sus cabeceras, que es donde vive un `Authorization: Bearer`. Con `UPDATE` e
@@ -551,8 +555,20 @@ superusuario, ser el propietario, o tener membresía efectiva en el rol
 propietario. El grant option habilita a *conceder* y a revocar lo que uno mismo
 concedió; **no alcanza el grant que hizo otro otorgante**, así que un migrador
 con los ocho privilegios `WITH GRANT OPTION` seguiría sin poder tocar lo que
-concedió `supabase_admin`. La precondición lo mira y lo informa —junto con el
-otorgante real de cada grant a `PUBLIC`— pero no lo cuenta.
+concedió `supabase_admin`. La precondición lo mira y lo informa, pero no lo
+cuenta.
+
+**Las DOS capas del ACL.** Un `GRANT SELECT (headers) … TO PUBLIC` **no aparece
+en `pg_class.relacl`**: vive en `pg_attribute.attacl`, y alcanza igual para leer
+las cabeceras de cada petición saliente. La precondición y la postcondición
+miran las dos — `relacl` sobre los tres objetos, y `attacl` sobre **todas** las
+columnas no eliminadas de las dos tablas.
+
+**Y el otorgante decide, no sólo informa.** De cada grant a `PUBLIC` se lee
+objeto, columna, privilegio y **otorgante**, y se exige poder **actuar como** él
+(`pg_has_role(current_user, grantor, 'USAGE')`, o superusuario). Un grant hecho
+por un tercero sobrevive al `REVOKE`, que sale 0 igual; si aparece uno que no se
+puede asumir, la precondición **aborta antes del primer `REVOKE`** y lo nombra.
 
 Necesita una operación soportada con autoridad del propietario (en la práctica,
 Supabase Support), y la decide quien opera la base.
@@ -571,6 +587,8 @@ escenarios:
 | Ni dueño ni miembro (la forma de producción) | El `REVOKE` **sale 0** con la **ACL intacta**; la precondición **aborta** nombrando dueño y ejecutor. |
 | **Falta uno** de los tres objetos | Aborta **aun siendo superusuario**, nombrando cuál falta; **ningún `REVOKE` se ejecuta**. |
 | Los ocho privilegios **`WITH GRANT OPTION`**, grants de `PUBLIC` hechos por otro | **Rechazado igual**, nombrando al otorgante; su `REVOKE` deja la ACL **byte por byte** intacta. |
+| Un grant **por columna** a `PUBLIC` otorgado por un **tercero** (`A` da grant option a `B`; `B` concede a `PUBLIC`), ejecutado por el dueño `A` | La precondición **aborta**, identificando objeto, **columna**, privilegio y otorgante; `relacl` **y** `attacl` byte por byte iguales. |
+| El mismo grant por columna, pero **concedido por el dueño** (contraprueba) | El lote **lo elimina**: `attacl` vacío, `PUBLIC` sin nada, postcondición **pasa**. |
 | **Propietarios asimétricos**: manda sobre las tablas, no sobre la secuencia | El lote **falla en la precondición**, señalando la secuencia; las **tres ACL idénticas** — ni la mitad que sí podía. |
 | La **postcondición falla** (lote sin el `REVOKE` de la secuencia) | Los `REVOKE` de las tablas **se revierten**: ACL idénticas. Y sin `ON_ERROR_STOP`, `psql` **sale 0** igual. |
 
