@@ -92,7 +92,7 @@
 --
 --      Esos dos catálogos son RELATIVOS AL ROL: sólo proyectan concesiones en
 --      las que el usuario actual es otorgante, otorgado, o miembro de alguno de
---      los dos. Un rol DEDICADO DE SOLO LECTURA —el que el modo live necesita—
+--      los dos. Un rol DEDICADO DE SOLO LECTURA
 --      no es miembro de `anon`, `authenticated` ni `service_role`, así que
 --      vería CERO grants y hashearía la cadena vacía en las ~563 dimensiones
 --      `/grants`. Medido sobre un clúster desechable con el patrón de Supabase:

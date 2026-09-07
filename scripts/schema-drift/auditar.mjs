@@ -55,7 +55,7 @@
 // algo con forma de secreto se cuela.
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -219,349 +219,12 @@ export function huellaProduccionVersionada(ruta = RUTA_PRODUCCION) {
   return { mapa, doc }
 }
 
-// ── Modo live: refrescar P contra el catálogo real ─────────────────────────
+// ── El auditor de credenciales ─────────────────────────────────────────────
 //
-// Todo lo de esta sección es PURO y se prueba en vitest. Lo que toca la red
-// vive en `sembrarProduccionLive()`, más abajo, y se ejercita en `--prueba-live`
-// contra un clúster desechable que hace de producción.
-
-/** Variable de entorno con la cadena de conexión de SOLO LECTURA. */
-export const VAR_URL_LIVE = 'SCHEMA_DRIFT_READONLY_URL'
-
-/**
- * Quita de un texto la cadena de conexión y su contraseña.
- *
- * libpq mete el host, el usuario y a veces la URL entera en sus mensajes de
- * error, y esos mensajes se imprimen. Un secreto que llega al log de Actions
- * es un secreto quemado, así que se recorta ANTES de imprimir, no después.
- */
-export function sinSecretos(texto, url = '') {
-  let salida = String(texto)
-  if (url) salida = salida.split(url).join('‹url oculta›')
-  // La contraseña, además, por si el mensaje trae la URL troceada.
-  const clave = (() => { try { return new URL(url).password } catch { return '' } })()
-  if (clave) salida = salida.split(clave).join('‹clave oculta›')
-  // Y cualquier `postgres://…@…` que haya quedado suelto.
-  return salida.replace(/postgres(?:ql)?:\/\/[^\s'"]*/gi, '‹url oculta›')
-}
-
-/**
- * ¿Qué clase de host oficial de Supabase es? `null` si no es ninguno.
- *
- *   db.<ref>.supabase.co           conexión directa, el ref va en el host
- *   <región>.pooler.supabase.com   pooler, el ref va en el usuario `<rol>.<ref>`
- *
- * SE COMPRUEBA CONTRA UNA LISTA BLANCA, no por «contiene supabase». Una
- * comprobación laxa acepta `pooler.supabase.com.atacante.net` o
- * `supabase.ejemplo.com`, y los dos los registra cualquiera.
- */
-export function tipoDeHost(host) {
-  const h = (host ?? '').toLowerCase()
-  if (/^db\.[a-z0-9]{20}\.supabase\.co$/.test(h)) return 'directo'
-  // Una etiqueta por delante como mínimo: `pooler.supabase.com` pelado no es
-  // un host de conexión, y aceptarlo sólo ampliaría la superficie.
-  if (/^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.pooler\.supabase\.com$/.test(h)) return 'pooler'
-  return null
-}
-
-/** ¿Es uno de los dos hosts oficiales? */
-export function esHostOficial(host) { return tipoDeHost(host) !== null }
-
-/**
- * Las combinaciones host + puerto que este auditor soporta.
- *
- * Las dos son el modo SESIÓN, y no por gusto: `PGOPTIONS` —que es lo que fuerza
- * `default_transaction_read_only` desde la conexión— sólo rige en modo sesión.
- * El 6543 del pooler es modo TRANSACCIÓN: ahí el guard de solo lectura no se
- * aplicaría, y el fallo sería silencioso hasta que alguien mire.
- */
-export const PUERTOS_OFICIALES = new Map([
-  ['directo', new Set([5432])],
-  ['pooler', new Set([5432])],
-])
-
-/** La única base que este auditor lee. */
-export const BASE_ESPERADA = 'postgres'
-
-/** Parámetros que pueden cambiar el DESTINO o la IDENTIDAD de la conexión. */
-export const PARAMETROS_PROHIBIDOS = new Set([
-  'host', 'hostaddr', 'port', 'dbname', 'user', 'password', 'service', 'servicefile', 'options',
-])
-
-/** Los únicos que se aceptan, documentados uno por uno. */
-export const PARAMETROS_PERMITIDOS = new Map([
-  ['sslmode', 'exigido; require, verify-ca o verify-full'],
-  ['sslrootcert', 'el certificado de la CA, necesario para verify-ca y verify-full'],
-  ['connect_timeout', 'cuánto esperar antes de rendirse'],
-  ['application_name', 'para reconocer la sesión en pg_stat_activity'],
-])
-
-const SSLMODE_ACEPTADOS = new Set(['require', 'verify-ca', 'verify-full'])
-
-/**
- * La cadena de conexión, antes de dársela a psql.
- *
- * POR QUÉ NO ALCANZA CON MIRAR EL HOSTNAME. libpq acepta parámetros en la URI,
- * y varios de ellos MANDAN SOBRE EL HOST. `hostaddr` es el peor: si está, libpq
- * se conecta a ESA dirección IP y usa `host` sólo para el SNI y la verificación
- * del certificado. Es decir:
- *
- *     postgresql://u:p@db.<ref>.supabase.co:5432/postgres?hostaddr=203.0.113.9
- *
- * pasa cualquier lista blanca de hostname y habla con otra máquina. `host=` en
- * la query hace lo mismo por la vía directa, y `options=` puede deshacer el
- * `default_transaction_read_only` que `PGOPTIONS` fija — que es justamente el
- * guard que se apoya en el entorno.
- *
- * Por eso la lista blanca es de PARÁMETROS y no sólo de hosts: se acepta lo que
- * está documentado y se rechaza todo lo demás, incluidos los repetidos (libpq
- * se queda con el último, así que `sslmode=verify-full&sslmode=disable` se lee
- * bien y se conecta mal).
- *
- * EL SOCKET LOCAL ES LA ÚNICA EXCEPCIÓN, y no es un bypass: un socket de
- * dominio Unix no puede alcanzar otra máquina, sólo un Postgres del mismo
- * sistema de archivos. Es lo que usa `--prueba-live` contra su clúster
- * desechable. Que eso no termine versionado como producción no lo cuida esta
- * función sino el guard del proyecto: de una URL de socket no se deduce ningún
- * ref, y sin ref el refresco exige `--proyecto` a mano.
- *
- * Devuelve `{ problemas, avisos }`. `problemas` no vacío significa NO CONECTAR.
- * Ningún mensaje incluye la contraseña — hay una prueba que lo fija.
- */
-export function validarUrlLive(url) {
-  const problemas = [], avisos = []
-  const rechazar = (m) => problemas.push(m)
-
-  const m = /^(postgres(?:ql)?):\/\/([\s\S]*)$/i.exec(url ?? '')
-  if (!m) {
-    rechazar('no es una cadena de conexión de Postgres: tiene que empezar con postgres:// o postgresql://')
-    return { problemas, avisos }
-  }
-
-  // Se parsea a mano y no con `new URL`: hace falta ver la autoridad EN CRUDO
-  // para detectar la lista de varios hosts (`a:5432,b:5432`), que `new URL`
-  // rechaza como puerto inválido y confundiría el diagnóstico.
-  let resto = m[2]
-  const iq = resto.indexOf('?')
-  const consulta = iq === -1 ? '' : resto.slice(iq + 1)
-  if (iq !== -1) resto = resto.slice(0, iq)
-  const ib = resto.indexOf('/')
-  const autoridad = ib === -1 ? resto : resto.slice(0, ib)
-  // La ruta EN CRUDO, sin decodificar: es donde viaja el nombre de la base en
-  // una URI normal, y se compara byte a byte (ver más abajo).
-  const rutaCruda = ib === -1 ? '' : resto.slice(ib)
-  const ia = autoridad.lastIndexOf('@')
-  const hostspec = ia === -1 ? autoridad : autoridad.slice(ia + 1)
-
-  // ── Los parámetros ────────────────────────────────────────────────────────
-  const vistos = new Map()
-  for (const trozo of consulta.split('&')) {
-    if (trozo === '') continue
-    const j = trozo.indexOf('=')
-    let clave, valor
-    try {
-      clave = decodeURIComponent(j === -1 ? trozo : trozo.slice(0, j)).trim().toLowerCase()
-      valor = j === -1 ? '' : decodeURIComponent(trozo.slice(j + 1))
-    } catch {
-      rechazar('la query trae un escape %xx inválido')
-      continue
-    }
-    if (vistos.has(clave)) {
-      rechazar(`parámetro repetido «${clave}»: libpq se queda con el ÚLTIMO, así que una URL que ` +
-               'se lee bien puede conectarse mal')
-    }
-    vistos.set(clave, valor)
-  }
-
-  // ── ¿Socket local o red? ──────────────────────────────────────────────────
-  const socketLocal = hostspec === '' && (vistos.get('host') ?? '').startsWith('/')
-  const permitidos = socketLocal
-    ? new Set([...PARAMETROS_PERMITIDOS.keys(), 'host', 'port'])
-    : new Set(PARAMETROS_PERMITIDOS.keys())
-
-  for (const clave of vistos.keys()) {
-    if (permitidos.has(clave)) continue
-    if (PARAMETROS_PROHIBIDOS.has(clave)) {
-      rechazar(`parámetro «${clave}»: puede cambiar a qué base o con qué identidad se conecta, ` +
-               'y entonces la lista blanca del host deja de significar nada')
-    } else {
-      rechazar(`parámetro «${clave}» no está en la lista documentada ` +
-               `(${[...permitidos].sort().join(', ')})`)
-    }
-  }
-
-  // ── La BASE, que viaja en el path y no en un parámetro ────────────────────
-  //
-  // Rechazar `?dbname=` no alcanza: en una URI normal el nombre de la base es
-  // el path, y `…/otra_base` cambia qué se lee sin tocar un solo parámetro. Un
-  // refresco que midiera otra base la versionaría como si fuera producción.
-  //
-  // Se compara EN CRUDO contra `/postgres`, sin decodificar. `/%70ostgres`
-  // decodifica a lo mismo y libpq lo acepta, pero un secreto legítimo no se
-  // escribe así: aceptar variantes codificadas sólo daría formas distintas de
-  // escribir lo mismo, y con ellas formas de esconder algo a la vista.
-  if (rutaCruda !== `/${BASE_ESPERADA}`) {
-    if (rutaCruda === '' || rutaCruda === '/') {
-      rechazar(`la URL no declara base: se espera exactamente «/${BASE_ESPERADA}» en el path`)
-    } else {
-      rechazar(`el path es «${rutaCruda}» y se espera exactamente «/${BASE_ESPERADA}» ` +
-               '(sin segmentos de más, sin barra final y sin escapes %xx)')
-    }
-  }
-
-  if (socketLocal) {
-    if (vistos.has('hostaddr')) rechazar('un socket local no lleva «hostaddr»')
-    return { problemas, avisos }
-  }
-
-  // ── Red: un único host, oficial, y en su puerto ───────────────────────────
-  if (hostspec.includes(',')) {
-    rechazar('la URL declara VARIOS hosts: libpq prueba uno por uno y basta con que el ' +
-             'primero no responda para terminar hablando con otro')
-    return { problemas, avisos }
-  }
-  // El puerto NO se descarta al sacar el hostname: es parte del destino, y en
-  // el pooler además decide el MODO —y con él, si el guard de solo lectura
-  // rige o no—.
-  const ipv6 = /^\[([^\]]*)\](?::(.*))?$/.exec(hostspec)
-  const host = (ipv6 ? ipv6[1] : hostspec.split(':')[0]).toLowerCase()
-  const puertoCrudo = ipv6 ? (ipv6[2] ?? '') : (hostspec.includes(':') ? hostspec.slice(hostspec.indexOf(':') + 1) : '')
-  const tipo = tipoDeHost(host)
-
-  if (host === '') {
-    rechazar('la URL no declara host')
-  } else if (tipo === null) {
-    rechazar(`el host «${host}» no es ninguno de los dos oficiales de Supabase ` +
-             '(db.<ref>.supabase.co o <región>.pooler.supabase.com)')
-  } else if (puertoCrudo === '') {
-    rechazar(`la URL no declara puerto: se exige explícito, y para ${tipo} sólo ` +
-             `${[...PUERTOS_OFICIALES.get(tipo)].join(' o ')}`)
-  } else if (!/^\d+$/.test(puertoCrudo)) {
-    rechazar(`el puerto «${puertoCrudo}» no es un número`)
-  } else if (!PUERTOS_OFICIALES.get(tipo).has(Number(puertoCrudo))) {
-    const admitidos = [...PUERTOS_OFICIALES.get(tipo)].join(' o ')
-    rechazar(`el puerto ${puertoCrudo} no está soportado para ${tipo}: sólo ${admitidos}, que es el ` +
-             'modo SESIÓN. En modo transacción (6543) `PGOPTIONS` no rige, y con él se cae el guard ' +
-             'de solo lectura sin que nada avise')
-  }
-
-  // ── TLS ───────────────────────────────────────────────────────────────────
-  const sslmode = (vistos.get('sslmode') ?? '').trim().toLowerCase()
-  if (!vistos.has('sslmode')) {
-    rechazar('falta «sslmode»: sin él libpq negocia y ACEPTA texto plano si el servidor lo ofrece, ' +
-             'así que la contraseña y el catálogo viajan sin cifrar ante un intermediario')
-  } else if (!SSLMODE_ACEPTADOS.has(sslmode)) {
-    rechazar(`sslmode=${sslmode}: sólo se aceptan ${[...SSLMODE_ACEPTADOS].join(', ')}. ` +
-             '«disable», «allow» y «prefer» dejan que la conexión caiga a texto plano')
-  } else if (sslmode === 'require') {
-    // `require` cifra pero NO verifica el certificado: protege del que escucha,
-    // no del que se hace pasar por el servidor.
-    avisos.push('sslmode=require cifra pero no verifica el certificado del servidor. Si el runner ' +
-                'tiene el certificado de la CA de Supabase, usar sslmode=verify-full con ' +
-                'sslrootcert=<ruta>: es lo único que impide un intermediario que se haga pasar ' +
-                'por la base.')
-  }
-  if ((sslmode === 'verify-ca' || sslmode === 'verify-full') && !vistos.has('sslrootcert')) {
-    avisos.push(`sslmode=${sslmode} sin «sslrootcert»: libpq usará el almacén por defecto ` +
-                '(~/.postgresql/root.crt o el del sistema). Conviene apuntarlo al certificado de ' +
-                'Supabase de forma explícita.')
-  }
-
-  return { problemas, avisos }
-}
-
-/**
- * Ref del proyecto Supabase que hay detrás de una URL, o null si no se puede
- * saber.
- *
- *   db.<ref>.supabase.co           el ref va en el host
- *   <región>.pooler.supabase.com   el ref va en el usuario, como `<rol>.<ref>`
- *
- * El host se valida con `esHostOficial`, la misma lista blanca que usa
- * `validarUrlLive`: este ref es lo único que impide que un refresco capture
- * OTRA base y la versione como si fuera producción, así que no se adivina.
- *
- * EL ROL DEL POOLER NO ES SIEMPRE `postgres`. La credencial de este auditor es
- * un rol DEDICADO, así que su usuario en el pooler es `drift_readonly.<ref>`.
- * Reconocer sólo `postgres.<ref>` dejaba sin deducir justo la URL que se va a
- * usar — y el modo live se niega a correr cuando no puede deducir el proyecto,
- * así que habría bloqueado el refresco entero.
- */
-export function refDeUrl(url) {
-  let u
-  try { u = new URL(url) } catch { return null }
-  const host = (u.hostname ?? '').toLowerCase()
-  if (!esHostOficial(host)) return null
-
-  const directo = /^db\.([a-z0-9]{20})\.supabase\.co$/.exec(host)
-  if (directo) return directo[1]
-
-  const porUsuario = /^.+\.([a-z0-9]{20})$/i.exec(decodeURIComponent(u.username ?? ''))
-  return porUsuario ? porUsuario[1].toLowerCase() : null
-}
-
-/**
- * Guards sobre la huella recién leída, ANTES de escribir nada.
- *
- * El peor resultado posible no es un error: es un refresco que se escribe con
- * datos incompletos y queda versionado como verdad. Cada regla de aquí cubre
- * una forma concreta de que eso pase.
- */
-export function validarHuellaLive(mapa, previo = null, { tolerancia = 0.2 } = {}) {
-  const problemas = []
-
-  if (mapa.size === 0) {
-    problemas.push('La huella vino vacía: el catálogo no devolvió un solo grupo.')
-    return problemas
-  }
-
-  for (const [clave, v] of mapa) {
-    if (!RE_HUELLA.test(v.huella)) problemas.push(`«${clave}» no es un SHA-256 de 64 hex.`)
-  }
-
-  // EL GUARD QUE IMPORTA. `information_schema.role_table_grants` es relativo al
-  // rol: con la credencial de solo lectura devolvía CERO filas, y la huella
-  // salía con la cadena vacía en todo /grants sin que nada fallara. Leer del
-  // ACL lo arregla (ver regla 7 de fingerprint.sql y `--prueba-acl`), pero el
-  // fallo era silencioso y por eso se sigue vigilando en el resultado: si
-  // alguna vez vuelve, el refresco se niega en vez de versionar el vacío.
-  const grants = [...mapa].filter(([k]) => k.endsWith('/grants'))
-  const vacios = grants.filter(([, v]) => v.n === 0)
-  if (grants.length === 0) {
-    problemas.push('No hay ni un grupo /grants: el catálogo se leyó sin la dimensión de privilegios.')
-  } else if (vacios.length === grants.length) {
-    problemas.push(
-      `Los ${grants.length} grupos /grants vinieron VACÍOS. Es el síntoma exacto de leer los ` +
-      'privilegios con un catálogo relativo al rol. No se versiona una huella sin grants.',
-    )
-  }
-
-  if (previo && previo.size > 0) {
-    const cambio = Math.abs(mapa.size - previo.size) / previo.size
-    if (cambio > tolerancia) {
-      problemas.push(
-        `El número de grupos pasó de ${previo.size} a ${mapa.size} (${(cambio * 100).toFixed(1)} %). ` +
-        `Por encima del ${(tolerancia * 100).toFixed(0)} % no se refresca solo: o se leyó otra base, ` +
-        'o el esquema cambió tanto que merece revisarse a mano.',
-      )
-    }
-  }
-
-  return problemas
-}
-
-/** Qué cambia entre la huella versionada y la recién leída. */
-export function diffHuellas(previo, nuevo) {
-  const claves = [...new Set([...previo.keys(), ...nuevo.keys()])].sort()
-  const agregados = [], eliminados = [], cambiados = []
-  for (const c of claves) {
-    const a = previo.get(c), b = nuevo.get(c)
-    if (!a) agregados.push(c)
-    else if (!b) eliminados.push(c)
-    else if (a.huella !== b.huella || a.n !== b.n) cambiados.push({ clave: c, antes: `${a.huella}:${a.n}`, ahora: `${b.huella}:${b.n}` })
-  }
-  return { agregados, eliminados, cambiados }
-}
+// Mide qué puede hacer un rol de Postgres y dice por qué no serviría para leer
+// un catálogo sin poder tocarlo. NO se conecta a ninguna base remota: no hay
+// modo live —ver `decision-net-pg_net.md`— y la medición se ejercita contra un
+// clúster desechable en `--prueba-credencial`.
 
 export const RUTA_BASELINE_EN_GIT = 'scripts/schema-drift/drift-conocido.json'
 
@@ -817,26 +480,6 @@ function valor(nombre) {
 // ── Modo live: la parte que sí toca la red ─────────────────────────────────
 
 /**
- * psql contra la URL de solo lectura.
- *
- * `PGOPTIONS` fuerza la sesión a solo lectura DESDE LA CONEXIÓN, no con un
- * `SET` posterior: así la garantía no depende de que el rol esté bien
- * configurado ni de que la primera sentencia sea la correcta. Es defensa en
- * profundidad — el rol ya debería no poder escribir, y se comprueba aparte.
- */
-function psqlLive(url, args) {
-  try {
-    return execFileSync('psql', [url, ...args], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on', PGCONNECT_TIMEOUT: '15' },
-    })
-  } catch (err) {
-    throw new Error(sinSecretos(String(err.stderr || err.message).trim(), url))
-  }
-}
-
 /**
  * Funciones SECURITY DEFINER que la credencial PUEDE ejecutar sin que el
  * refresco se niegue, con su justificación al lado.
@@ -866,51 +509,22 @@ function psqlLive(url, args) {
 export const SECDEF_PERMITIDAS = new Map()
 
 /**
- * Lecturas que NO bloquean el refresco, con su justificación y su remedio.
+ * Lecturas que NO bloquean, con su justificación y su remedio.
  *
- * ES UNA DECISIÓN, NO UNA COMODIDAD, y por eso está escrita acá y no escondida
- * en un `if`. Se aplica a dos vistas concretas y sólo cuando se cumplen LAS
- * TRES condiciones de `clasificarLectura`; y no se calla: cada corrida imprime
- * un aviso nombrándolas.
+ * ESTÁ VACÍA, y eso es el estado seguro. Hubo una propuesta de tolerar las dos
+ * vistas de `pg_stat_statements` —son contadores, y la credencial las alcanza
+ * como consecuencia de necesitar `USAGE` sobre `extensions`—, pero era una
+ * propuesta del auditor y **nunca fue aprobada por quien opera la base**.
+ * Vacía, el guard vuelve a bloquear ante cualquier lectura alcanzable, que es
+ * el comportamiento correcto mientras nadie firme lo contrario.
  *
- * EL CASO. Supabase instala `pg_stat_statements` en el esquema `extensions`, y
- * la extensión concede `SELECT` a `PUBLIC` sobre sus dos vistas. La credencial
- * del auditor necesita `USAGE` sobre `extensions` —no por conveniencia: sin él
- * `format_type` y `pg_get_expr` cualifican los nombres de ahí y la huella deja
- * de coincidir con la del dueño—, así que esas vistas le quedan alcanzables
- * como CONSECUENCIA de un requisito de corrección, no de un grant que alguien
- * le haya dado.
- *
- * POR QUÉ SE TOLERA:
- *   · No son datos de negocio: son contadores y tiempos por sentencia.
- *   · Postgres enmascara el texto de las sentencias de OTROS roles con
- *     `<insufficient privilege>` salvo para miembros de `pg_read_all_stats`, y
- *     esta credencial se rechaza si tiene CUALQUIER membresía.
- *   · Cerrarlo es `REVOKE … FROM PUBLIC`: una decisión de POLÍTICA que afecta a
- *     todos los roles de la base. No la toma el auditor, y bloquear el refresco
- *     hasta que alguien la tome sería obligar a una decisión ajena.
- *
- * QUÉ SIGUE BLOQUEANDO. Si el privilegio llega por un GRANT directo al auditor,
- * por una membresía o por propiedad, bloquea: eso ya no es «la extensión dejó
- * su default», es alguien dándole acceso a esta credencial. Y si aparece un
- * objeto con ese nombre que NO pertenece a una extensión, también.
- *
- * ⚠ PENDIENTE DE APROBACIÓN DEL PROPIETARIO. Esta tolerancia es una propuesta,
- * no un hecho consumado: la escribió el auditor y la tiene que aprobar quien
- * opera la base ANTES de fusionar. Si no se aprueba, se borran las dos entradas
- * y el guard vuelve a bloquear —que es el estado seguro—. Y no se amplía a
- * otras vistas ni a otras extensiones sin pasar por lo mismo: hay una prueba
- * que falla si la lista deja de ser exactamente estas dos.
+ * Cada entrada futura declara «este objeto, alcanzable por esta vía, no le da a
+ * esta credencial nada que no debería tener». Eso es una afirmación de
+ * seguridad, y no la puede firmar el auditor: la firma quien revisa el PR que
+ * agrega la línea. Hay una prueba que falla si deja de estar vacía, para que
+ * agregar una entrada sea un acto visible.
  */
-export const LECTURA_TOLERADA = new Map([
-  ['extensions.pg_stat_statements',
-   'vista de la extensión pg_stat_statements: métricas por sentencia, sin filas de negocio, ' +
-   'y con el texto de otros roles enmascarado. Alcanzable porque la credencial necesita USAGE ' +
-   'sobre `extensions` para que la huella coincida con la del dueño.'],
-  ['extensions.pg_stat_statements_info',
-   'vista de la extensión pg_stat_statements: sólo la marca del último reset y el conteo de ' +
-   'sentencias descartadas. Mismo caso que la anterior.'],
-])
+export const LECTURA_TOLERADA = new Map()
 
 /**
  * Parte las lecturas detectadas en las que bloquean y las toleradas.
@@ -934,7 +548,7 @@ export function clasificarLectura(items) {
  *
  * Un guard que tolera algo en silencio deja de ser un guard: a los tres meses
  * nadie recuerda qué está tolerado ni por qué. Esto se imprime en cada corrida
- * del modo live, junto al resto del diagnóstico.
+ * junto al resto del diagnóstico de la credencial.
  */
 export function avisarCredencial(m) {
   const items = (m.leibles ?? '').split('\x1e').filter(Boolean).map(x => {
@@ -960,318 +574,19 @@ export const SQL_PRIVS_TABLA =
    || CASE WHEN current_setting('server_version_num')::int >= 170000
            THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END`
 
-/** Los TRES objetos de `pg_net`, enumerados. Dos tablas y una secuencia. */
+/**
+ * Los objetos de `pg_net` cuyos grants a `PUBLIC` bloquean una credencial
+ * dedicada. Se conservan SÓLO como datos de las regresiones: nombran la forma
+ * que el fixture reproduce.
+ *
+ * NO HAY REMEDIO APLICABLE, y por eso acá no hay ningún SQL de retirada.
+ * Supabase Support confirmó que estos grants son gestionados, intencionales y
+ * necesarios, que todo rol LOGIN propio los hereda, y que quitarlos no es una
+ * remediación soportada. Ver `decision-net-pg_net.md`.
+ */
 export const NET_TABLAS   = ['net._http_response', 'net.http_request_queue']
 export const NET_SECUENCIA = 'net.http_request_queue_id_seq'
 export const NET_OBJETOS  = [...NET_TABLAS, NET_SECUENCIA]
-
-const listaSql = (xs) => xs.map(x => `'${x}'`).join(', ')
-
-/**
- * PRECONDICIÓN de la propuesta de `net`: ¿quien ejecuta puede revocar?
- *
- * En producción los tres objetos de `pg_net` y sus grants a `PUBLIC`
- * pertenecen a `supabase_admin`. El ejecutor habitual de las migraciones es
- * `postgres`, que ahí NO es superusuario y NO es miembro de `supabase_admin`.
- *
- * Y ése es el modo de fallo caro: un `REVOKE` emitido por un rol sin autoridad
- * NO falla. PostgreSQL emite un `WARNING: no privileges could be revoked` y la
- * sentencia SALE 0. La migración quedaría marcada como aplicada, el pipeline
- * en verde, y `PUBLIC` conservando todo. Por eso esto va ANTES, y aborta.
- *
- * AUTORIDAD SUFICIENTE — sólo estas tres, y ninguna más:
- *
- *   1. ser superusuario;
- *   2. `current_user` = el propietario del objeto;
- *   3. membresía efectiva en el rol propietario (`pg_has_role(…, 'USAGE')`).
- *
- * `WITH GRANT OPTION` **no** cuenta, y no es un descuido. En PostgreSQL un
- * `REVOKE` retira los privilegios que otorgó EL ROL QUE LO EJECUTA (o un rol
- * del que sea miembro). El grant option habilita a CONCEDER y a revocar lo que
- * uno mismo concedió; no alcanza el grant que hizo otro otorgante. Un migrador
- * con los ocho privilegios `WITH GRANT OPTION` sobre estas tablas seguiría sin
- * poder tocar los grants que hizo `supabase_admin`: el `REVOKE` saldría 0 sin
- * revocar nada — el mismo falso negativo, con mejor disfraz.
- *
- * Por eso el grant option se MIRA y se INFORMA junto con el OTORGANTE real de
- * cada grant a `PUBLIC`, pero no participa de la decisión.
- */
-export const SQL_NET_PRECONDICION = `DO $precondicion$
-DECLARE
-  yo        text    := current_user;
-  soy_super boolean := coalesce((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false);
-  privs     text[]  := ${SQL_PRIVS_TABLA};
-  esperados text[]  := ARRAY[${listaSql(NET_OBJETOS)}];
-  tablas    text[]  := ARRAY[${listaSql(NET_TABLAS)}];
-  vistos    text[]  := ARRAY[]::text[];
-  ausentes  text[];
-  faltan    text[]  := ARRAY[]::text[];
-  ajenos    text[]  := ARRAY[]::text[];
-  gopt      boolean;
-  r         record;
-  g         record;
-BEGIN
-  -- ── 1 · Los objetos: que estén los tres, y que sean lo que decimos ───────
-  FOR r IN
-    SELECT n.nspname || '.' || c.relname                AS objeto,
-           c.oid                                        AS oid,
-           c.relkind                                    AS relkind,
-           pg_get_userbyid(c.relowner)                  AS duenio,
-           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname || '.' || c.relname = ANY (esperados)
-     ORDER BY 1
-  LOOP
-    vistos := vistos || r.objeto;
-
-    -- LA FORMA: dos tablas y una secuencia. Si el relkind no es el esperado,
-    -- el objeto de producción no es el que este lote cree estar tocando, y el
-    -- REVOKE de más abajo estaría escrito para otra cosa.
-    IF r.objeto = ANY (tablas) AND r.relkind <> 'r' THEN
-      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una tabla (relkind «r») y es «%».',
-                      r.objeto, r.relkind;
-    END IF;
-    IF r.objeto = '${NET_SECUENCIA}' AND r.relkind <> 'S' THEN
-      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una secuencia (relkind «S») y es «%».',
-                      r.objeto, r.relkind;
-    END IF;
-
-    -- Grant option: se mide con la función que corresponde al tipo de objeto
-    -- —has_sequence_privilege para la secuencia, NUNCA has_table_privilege— y
-    -- se informa. NO decide nada: ver el comentario de esta constante.
-    gopt := CASE WHEN r.relkind = 'S'
-                 THEN (SELECT bool_and(has_sequence_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
-                         FROM unnest(ARRAY['SELECT','USAGE','UPDATE']) p)
-                 ELSE (SELECT bool_and(has_table_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
-                         FROM unnest(privs) p)
-            END;
-
-    RAISE NOTICE 'OBJETO % (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grant option: % (informativo, NO es autoridad)',
-      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super, gopt;
-
-    IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN
-      faltan := faltan || r.objeto;
-    END IF;
-  END LOOP;
-
-  -- EXACTAMENTE los tres. Un objeto ausente aborta ANTES de cualquier REVOKE:
-  -- un filtro que no empareja se parece demasiado a un permiso que sí está, y
-  -- la postcondición daría por cerrada una vía que ni siquiera se miró.
-  SELECT array_agg(e ORDER BY e) INTO ausentes
-    FROM unnest(esperados) e WHERE NOT (e = ANY (vistos));
-  IF ausentes IS NOT NULL THEN
-    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: falta(n) % de los % objeto(s) esperados. Encontrados: %. '
-                    'Sin los tres no se puede afirmar que la vía quedó cerrada.',
-                    array_to_string(ausentes, ', '), array_length(esperados, 1),
-                    coalesce(array_to_string(vistos, ', '), '(ninguno)');
-  END IF;
-  IF array_length(vistos, 1) <> array_length(esperados, 1) THEN
-    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: se esperaban EXACTAMENTE % objetos y se encontraron %: %.',
-                    array_length(esperados, 1), array_length(vistos, 1), array_to_string(vistos, ', ');
-  END IF;
-
-  -- ── 2 · El inventario COMPLETO de lo que tiene PUBLIC ────────────────────
-  --
-  -- Las dos capas, porque son dos ACL distintas y la segunda no se ve desde la
-  -- primera: \`pg_class.relacl\` para los tres objetos, y \`pg_attribute.attacl\`
-  -- para TODAS las columnas no eliminadas de las dos tablas. Un
-  -- \`GRANT SELECT (headers) … TO PUBLIC\` no aparece en relacl y alcanza igual.
-  --
-  -- Y de cada grant se mira EL OTORGANTE, que es lo que decide si el REVOKE va
-  -- a servir: PostgreSQL retira lo que otorgó quien ejecuta, o un rol del que
-  -- sea miembro. Un grant hecho por un tercero sobrevive al REVOKE, que sale 0
-  -- igual. Por eso no basta con mostrarlo: si aparece un otorgante que no se
-  -- puede asumir, esto aborta ANTES del primer REVOKE.
-  FOR g IN
-    SELECT n.nspname || '.' || c.relname                 AS objeto,
-           NULL::text                                    AS columna,
-           a.privilege_type                              AS priv,
-           pg_get_userbyid(a.grantor)                    AS otorgante,
-           pg_has_role(yo, a.grantor, 'USAGE')           AS puedo_asumir
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-     WHERE n.nspname || '.' || c.relname = ANY (esperados)
-       AND a.grantee = 0            -- 0 es PUBLIC
-    UNION ALL
-    SELECT n.nspname || '.' || c.relname,
-           at.attname,
-           a.privilege_type,
-           pg_get_userbyid(a.grantor),
-           pg_has_role(yo, a.grantor, 'USAGE')
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
-      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
-     WHERE n.nspname || '.' || c.relname = ANY (tablas)
-       AND a.grantee = 0
-     ORDER BY 1, 2 NULLS FIRST, 3
-  LOOP
-    RAISE NOTICE 'PUBLIC · % · columna=% · privilegio=% · otorgado por=% · ¿puedo actuar como ese otorgante?=%',
-      g.objeto, coalesce(g.columna, '(nivel de objeto)'), g.priv, g.otorgante,
-      (soy_super OR g.puedo_asumir);
-
-    IF NOT (soy_super OR g.puedo_asumir) THEN
-      ajenos := ajenos || format('%s%s → %s (otorgado por %s)',
-                                 g.objeto, coalesce('.' || g.columna, ''), g.priv, g.otorgante);
-    END IF;
-  END LOOP;
-
-  -- ── 3 · Los abortos, juntos y al final ──────────────────────────────────
-  --
-  -- Después del inventario a propósito: quien opere la base ve de UNA corrida
-  -- todo lo que hay que arreglar —qué objetos, qué columnas, qué otorgantes— en
-  -- vez de descubrirlo de a uno por intento.
-  IF array_length(faltan, 1) IS NOT NULL THEN
-    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
-                    'No es superusuario, no es el dueño y no hereda su rol. Tener los privilegios '
-                    'WITH GRANT OPTION no alcanza: un REVOKE sólo retira lo que otorgó quien lo '
-                    'ejecuta. El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la '
-                    'ACL intacta.',
-                    yo, array_to_string(faltan, ', ');
-  END IF;
-
-  IF array_length(ajenos, 1) IS NOT NULL THEN
-    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no puede actuar como el otorgante de % grant(s) de '
-                    'PUBLIC: %. Un REVOKE sólo retira lo que otorgó quien lo ejecuta (o un rol del '
-                    'que sea miembro): esos grants sobrevivirían, el REVOKE saldría 0 igual y la '
-                    'vía quedaría abierta. Hace falta que lo ejecute el otorgante, o alguien que '
-                    'pueda asumirlo.',
-                    yo, array_length(ajenos, 1), array_to_string(ajenos, '; ');
-  END IF;
-END
-$precondicion$;`
-
-/**
- * POSTCONDICIÓN de la propuesta de \`net\`: ¿quedó algo de \`PUBLIC\`?
- *
- * Se lee del ACL, que es donde está la verdad y no depende del rol que
- * pregunta, y de las DOS capas: \`pg_class.relacl\` para los tres objetos y
- * \`pg_attribute.attacl\` para todas las columnas no eliminadas de las dos
- * tablas. Un \`GRANT SELECT (headers) … TO PUBLIC\` vive sólo en la segunda y
- * alcanza igual para leer las cabeceras de cada petición saliente.
- *
- * Exige además que los tres objetos sigan existiendo: si uno desapareció, no se
- * puede afirmar nada sobre él. Si sobrevive UN solo privilegio de \`PUBLIC\`,
- * lanza una excepción identificando objeto, columna, privilegio y otorgante, y
- * —dentro de la transacción del lote— revierte TODO lo anterior, incluidos los
- * REVOKE que sí habían funcionado.
- *
- * Es la única defensa contra el «éxito silencioso»: sin esto, un \`REVOKE\` que
- * no revocó nada es indistinguible de uno que revocó todo.
- *
- * El \`USAGE\` del ESQUEMA queda deliberadamente fuera: la propuesta no lo toca
- * —quitarlo rompería \`net.http_get()\`/\`net.http_post()\` para todo el mundo— y
- * sin privilegios sobre las tablas no alcanza nada.
- */
-export const SQL_NET_POSTCONDICION = `DO $postcondicion$
-DECLARE
-  esperados text[] := ARRAY[${listaSql(NET_OBJETOS)}];
-  tablas    text[] := ARRAY[${listaSql(NET_TABLAS)}];
-  hallados  int;
-  cuantos   int;
-  restante  text;
-BEGIN
-  SELECT count(*) INTO hallados
-    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname || '.' || c.relname = ANY (esperados);
-  IF hallados <> array_length(esperados, 1) THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: se esperaban % objetos de pg_net y hay %. '
-                    'No se puede afirmar que la vía quedó cerrada sobre un objeto que no está.',
-                    array_length(esperados, 1), hallados;
-  END IF;
-
-  WITH publico AS (
-    -- Capa 1 · pg_class.relacl: los privilegios de nivel de objeto.
-    SELECT n.nspname || '.' || c.relname AS objeto,
-           NULL::text                    AS columna,
-           a.privilege_type              AS priv,
-           pg_get_userbyid(a.grantor)    AS otorgante
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-     WHERE n.nspname || '.' || c.relname = ANY (esperados)
-       AND a.grantee = 0            -- 0 es PUBLIC
-    UNION ALL
-    -- Capa 2 · pg_attribute.attacl: SELECT, INSERT, UPDATE y REFERENCES por
-    -- COLUMNA, que no aparecen en relacl y alcanzan igual.
-    SELECT n.nspname || '.' || c.relname,
-           at.attname,
-           a.privilege_type,
-           pg_get_userbyid(a.grantor)
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
-      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
-     WHERE n.nspname || '.' || c.relname = ANY (tablas)
-       AND a.grantee = 0
-  )
-  SELECT count(*),
-         string_agg(format('%s%s → %s (otorgado por %s)',
-                           objeto, coalesce('.' || columna, ''), priv, otorgante),
-                    ', ' ORDER BY objeto, columna NULLS FIRST, priv)
-    INTO cuantos, restante
-    FROM publico;
-
-  IF cuantos > 0 THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre pg_net: %. '
-                    'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
-                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.',
-                    cuantos, restante;
-  END IF;
-END
-$postcondicion$;`
-
-/**
- * EL LOTE: una sola transacción, para enviar tal cual.
- *
- * Supabase Support tiene que ejecutar **todo esto junto**, en una única
- * transacción. Enviado por partes pierde su única garantía: si la postcondición
- * corre fuera de la transacción de los `REVOKE`, ya no puede revertirlos, y un
- * lote a medio aplicar —tablas cerradas, secuencia abierta— es peor que no
- * haber empezado, porque el registro dice que se hizo.
- *
- * La sección de regrants va VACÍA a propósito. No hay placeholders: un
- * `<rol>` sin sustituir es un error de sintaxis en el mejor caso y un rol
- * inventado en el peor. Si el análisis de impacto identifica consumidores
- * legítimos, se agregan ahí líneas `GRANT` concretas ANTES de enviar el lote.
- */
-export const SQL_NET_LOTE = `-- ═══════════════════════════════════════════════════════════════════════════
--- pg_net · retirar el acceso de PUBLIC a los tres objetos de la extensión.
---
--- ENVIAR Y EJECUTAR COMO UNA SOLA TRANSACCIÓN. No dividir en partes: la
--- postcondición del final sólo protege si puede revertir los REVOKE de arriba.
---
--- Requiere autoridad de propietario (supabase_admin). La precondición aborta
--- si quien ejecuta no la tiene — ver el mensaje que emite.
--- ═══════════════════════════════════════════════════════════════════════════
-BEGIN;
-
-${SQL_NET_PRECONDICION}
-
--- ── REVOKE ────────────────────────────────────────────────────────────────
--- ALL PRIVILEGES y no una lista a mano: cubre los ocho privilegios de tabla
--- —SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER y MAINTAIN—
--- y también los que agregue el próximo mayor.
-REVOKE ALL PRIVILEGES ON TABLE
-  ${NET_TABLAS.join(',\n  ')}
-FROM PUBLIC;
-
--- La secuencia de la cola, que es la única que hay: _http_response no tiene
--- secuencia propia.
-REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC;
-
--- ── REGRANTS EXPLÍCITOS (aprobados de antemano) ───────────────────────────
--- Vacío: el análisis de impacto todavía no identificó ningún consumidor
--- legítimo que dependa del grant a PUBLIC. Si lo identifica, acá van líneas
--- GRANT concretas, con el rol real, ANTES de enviar el lote. Sin placeholders.
--- (fin de la sección)
-
-${SQL_NET_POSTCONDICION}
-
-COMMIT;
-`
 
 /**
  * Lo que hay que medir del OTRO lado antes de leer nada.
@@ -1522,8 +837,7 @@ WHERE v IS NOT NULL AND v <> ''`
  *
  *   · SELECT sobre tablas y SELECT POR COLUMNA — la huella se saca del
  *     catálogo, no de las tablas. Poder leer datos no le sirve de nada al
- *     auditor y convierte el secreto de `production-db` en una filtración
- *     esperando un log. La variante por columna es la que se olvida: un GRANT
+ *     auditor y leer filas sería exposición sin contrapartida. La variante por columna es la que se olvida: un GRANT
  *     SELECT(email) no aparece en `has_table_privilege` y alcanza igual.
  *   · REPLICATION — un rol con replicación se conecta al stream y se lleva la
  *     base entera, tabla por tabla, sin ejecutar un SELECT.
@@ -1535,7 +849,7 @@ WHERE v IS NOT NULL AND v <> ''`
  *   · SECURITY DEFINER ejecutables — ver `SECDEF_PERMITIDAS`.
  *   · La sesión en solo lectura y el USAGE del `search_path` se conservan tal
  *     como estaban; el segundo no es de seguridad sino de corrección, y es el
- *     menos obvio de todos (ver `sembrarProduccionLive`).
+ *     menos obvio de todos.
  */
 export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
   // `boolean::text` en Postgres da 'true'/'false'; el tipo boolean impreso sin
@@ -1783,187 +1097,19 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
 }
 
 /**
- * Refresca `huella-produccion.json` leyendo el catálogo real.
+ * Regresiones del auditor de credenciales, contra un Postgres DESECHABLE.
  *
- * FAIL-CLOSED EN LAS DOS DIRECCIONES. Antes de leer se exige que la credencial
- * sea de solo lectura de verdad —medido, no declarado—, y antes de escribir se
- * exige que la huella tenga sentido. Un refresco que se escribe con datos
- * incompletos es peor que no refrescar: queda versionado como verdad y el
- * auditor deja de ver el drift que esos grupos taparían.
- */
-function sembrarProduccionLive({ url, proyectoEsperado, escribir = true }) {
-  if (!url) {
-    console.error(`✗ Falta ${VAR_URL_LIVE}: sin credencial no hay modo live.`)
-    console.error('  Tiene que ser un rol DEDICADO de solo lectura, en el environment `production-db`.')
-    console.error('  NO se reutiliza SUPABASE_ACCESS_TOKEN: es de la Management API y puede escribir.')
-    return 1
-  }
-
-  // ── La cadena de conexión, antes de abrirla ──────────────────────────────
-  // El hostname solo no alcanza: `hostaddr`, `host=` en la query y `options=`
-  // mandan sobre el destino y sobre la sesión, así que una URL con un host
-  // oficial puede hablar con otra máquina. Ver `validarUrlLive`.
-  const urlRevisada = validarUrlLive(url)
-  if (urlRevisada.problemas.length > 0) {
-    console.error(`✗ ${VAR_URL_LIVE} no pasa la revisión de la cadena de conexión:`)
-    for (const p of urlRevisada.problemas) console.error(`    · ${sinSecretos(p, url)}`)
-    console.error('  No se conecta a nada.')
-    return 1
-  }
-  for (const a of urlRevisada.avisos) console.error(`· aviso: ${sinSecretos(a, url)}`)
-
-  // ── El proyecto, antes que nada ──────────────────────────────────────────
-  // Capturar el SANDBOX y versionarlo como producción sería un desastre
-  // silencioso: la huella quedaría «verde» describiendo otra base.
-  const { mapa: previo, doc } = huellaProduccionVersionada()
-  const esperado = proyectoEsperado ?? doc.proyecto
-  const refUrl = refDeUrl(url)
-  if (refUrl && esperado && refUrl !== esperado) {
-    console.error(`✗ La URL apunta al proyecto «${refUrl}» y la instantánea declara «${esperado}».`)
-    console.error('  No se refresca: sería versionar otra base como si fuera producción.')
-    return 1
-  }
-  if (!refUrl && !proyectoEsperado) {
-    console.error('✗ No se pudo deducir el proyecto desde la URL y no se pasó `--proyecto`.')
-    console.error('  Sin saber qué base se está leyendo no se versiona nada.')
-    return 1
-  }
-  console.error(`· proyecto: ${esperado}${refUrl ? ' (confirmado por la URL)' : ' (declarado con --proyecto)'}`)
-
-  // ── La credencial, medida ────────────────────────────────────────────────
-  const medidas = Object.fromEntries(
-    psqlLive(url, ['-tAq', '-c', SQL_CREDENCIAL]).trim().split('\n')
-      .filter(Boolean)
-      .map(l => { const i = l.indexOf('\x1f'); return [l.slice(0, i), l.slice(i + 1)] }),
-  )
-
-  const rechazos = juzgarCredencial(medidas)
-  if (rechazos.length > 0) {
-    console.error(`\n✗ La credencial no sirve para leer producción: ${rechazos.length} motivo(s).`)
-    console.error('  No se lee nada. El modo live existe para MEDIR producción, no para tener acceso a ella.')
-    for (const r of rechazos) {
-      console.error(`\n  ✗ ${r.regla}: ${r.detalle}.`)
-      console.error(`      ${r.remedio}`)
-    }
-    return 1
-  }
-  // Lo tolerado se dice en voz alta, siempre: un guard que calla lo que deja
-  // pasar deja de ser un guard a los tres meses.
-  for (const a of avisarCredencial(medidas)) console.error(`· ${a}`)
-  console.error(`✓ credencial de solo lectura: ${medidas.usuario} — sin superusuario, sin BYPASSRLS, ` +
-                'sin REPLICATION, sin permisos de escritura ni de SELECT, sin CREATE ni membresías, ' +
-                'sin SECURITY DEFINER al alcance, sesión read-only')
-  console.error(`✓ search_path (${medidas.search_path}): el rol tiene USAGE sobre todos sus esquemas`)
-  console.error(`· Postgres ${medidas.version}`)
-
-  // ── La huella ────────────────────────────────────────────────────────────
-  const texto = psqlLive(url, ['-tAq', '-f', RUTA_FINGERPRINT]).trim()
-  let mapa
-  try { mapa = parsearHuella(texto) } catch (err) { console.error(`✗ ${sinSecretos(err.message, url)}`); return 1 }
-  console.error(`✓ huella leída de producción: ${mapa.size} grupos`)
-
-  const problemas = validarHuellaLive(mapa, previo)
-  if (problemas.length > 0) {
-    console.error('\n✗ La huella no pasa los controles; NO se escribe nada:')
-    for (const p of problemas) console.error(`    ${p}`)
-    return 1
-  }
-  console.error('✓ controles: SHA-256 completos, grants presentes y tamaño coherente')
-
-  // ── Qué cambia ───────────────────────────────────────────────────────────
-  const d = diffHuellas(previo, mapa)
-  console.error(`\n  grupos: ${previo.size} → ${mapa.size}`)
-  console.error(`  agregados: ${d.agregados.length}   eliminados: ${d.eliminados.length}   ` +
-                `cambiados: ${d.cambiados.length}`)
-  const MUESTRA = 25
-  for (const c of d.agregados.slice(0, MUESTRA)) console.error(`    + ${c}`)
-  for (const c of d.eliminados.slice(0, MUESTRA)) console.error(`    − ${c}`)
-  for (const c of d.cambiados.slice(0, MUESTRA)) {
-    console.error(`    ~ ${c.clave}\n        antes = ${c.antes}\n        ahora = ${c.ahora}`)
-  }
-  const total = d.agregados.length + d.eliminados.length + d.cambiados.length
-  if (total > MUESTRA) console.error(`    … y ${total - MUESTRA} más`)
-  if (total === 0) console.error('    (la instantánea ya estaba al día)')
-
-  if (!escribir) { console.error('\n· --en-seco: no se escribe el archivo'); return 0 }
-
-  // La prosa (`_README`, `_CANONICO`, `_ADVERTENCIA`) se conserva tal cual:
-  // este comando refresca MEDICIONES, no documentación.
-  const salida = {
-    ...doc,
-    capturada: new Date().toISOString().slice(0, 10),
-    proyecto: esperado,
-    postgres: medidas.version,
-    algoritmo: 'sha256',
-    grupos: Object.fromEntries([...mapa].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([k, v]) => [k, `${v.huella}:${v.n}`])),
-  }
-
-  // ── Temporal, validado, y sólo entonces rename ───────────────────────────
-  //
-  // POR QUÉ NO SE ESCRIBE EN EL ARCHIVO DIRECTAMENTE. Un `writeFileSync` sobre
-  // la ruta versionada trunca primero y escribe después: si el proceso se muere
-  // en el medio —OOM, cancelación del job, disco lleno— lo que queda es un JSON
-  // cortado que ya no es ni la instantánea vieja ni la nueva, y el paso
-  // siguiente lo publicaría como artefacto. `rename(2)` dentro del mismo
-  // directorio es atómico: o está la vieja completa, o está la nueva completa.
-  //
-  // Y ANTES DEL RENAME SE RELEE. Se valida lo que quedó EN DISCO, no el objeto
-  // que se acaba de serializar: eso es lo único que prueba que el archivo que
-  // se va a publicar se parsea, trae los mismos grupos que se midieron y pasa
-  // los mismos controles. Si algo no cuadra, el temporal se borra y la
-  // instantánea versionada no se tocó.
-  const temporal = `${RUTA_PRODUCCION}.nueva.${process.pid}`
-  try {
-    writeFileSync(temporal, JSON.stringify(salida, null, 1) + '\n')
-
-    const relectura = huellaProduccionVersionada(temporal)
-    const fallas = validarHuellaLive(relectura.mapa, mapa, { tolerancia: 0 })
-    const distintos = [...mapa].filter(([k, v]) => {
-      const r = relectura.mapa.get(k); return !r || r.huella !== v.huella || r.n !== v.n
-    })
-    if (distintos.length > 0) {
-      fallas.push(`${distintos.length} grupo(s) no sobrevivieron la serialización: ` +
-                  distintos.slice(0, 5).map(([k]) => k).join(', '))
-    }
-    if (relectura.doc.proyecto !== esperado) {
-      fallas.push(`el archivo quedó con proyecto «${relectura.doc.proyecto}» y se midió «${esperado}»`)
-    }
-    if (relectura.doc.capturada !== salida.capturada) {
-      fallas.push('la fecha de captura no quedó registrada')
-    }
-    // El mismo guard que el test de `__tests__`, acá también: lo que se publica
-    // no puede llevar una cadena de conexión adentro.
-    if (/postgres(?:ql)?:\/\//i.test(readFileSync(temporal, 'utf8'))) {
-      fallas.push('el archivo contiene algo con forma de cadena de conexión')
-    }
-    if (fallas.length > 0) {
-      console.error('\n✗ El archivo temporal no pasa la relectura; NO se reemplaza nada:')
-      for (const f of fallas) console.error(`    ${f}`)
-      return 1
-    }
-
-    renameSync(temporal, RUTA_PRODUCCION)
-  } finally {
-    rmSync(temporal, { force: true })
-  }
-
-  console.error(`✓ relectura: ${mapa.size} grupos leídos del archivo nuevo, idénticos a los medidos`)
-  console.error(`\n✓ ${RUTA_PRODUCCION} refrescada — ${mapa.size} grupos, capturada ${salida.capturada}`)
-  return 0
-}
-
-/**
- * El modo live, de punta a punta, contra un clúster desechable que hace de
- * producción — con conexión por URL y un rol distinto, no con `SET ROLE`.
+ * NO ES UN CAMINO A PRODUCCIÓN, y no puede confundirse con uno: levanta su
+ * propio clúster con `initdb`, habla por su socket unix, no lee ninguna
+ * variable de entorno con credenciales y no abre una sola conexión de red. No
+ * existe un modo live — ver `decision-net-pg_net.md`.
  *
- * Lo que se prueba es el CAMINO COMPLETO: conectar, medir la credencial, leer
- * el catálogo, validar y escribir. Y lo que más importa: que la huella que saca
- * la credencial de solo lectura sea EXACTAMENTE la que saca el dueño. Esa
- * igualdad es lo que hace honesto el refresco, y depende de la regla 7 de
- * fingerprint.sql: con la formulación anterior, todos los /grants salían vacíos.
+ * Lo que fija: cómo se leen las DOS capas del ACL (`pg_class.relacl` y
+ * `pg_attribute.attacl`), los privilegios por columna, las secuencias, los
+ * otorgantes, las comprobaciones de autoridad, el rollback de una transacción
+ * y la diferencia de privilegios entre PostgreSQL 16 y 17.
  */
-async function pruebaLive() {
+async function pruebaCredencial() {
   const comprobar = (cond, etiqueta) => {
     console.error(`${cond ? '✓' : '✗'} ${etiqueta}`)
     if (!cond) process.exitCode = 1
@@ -1971,8 +1117,7 @@ async function pruebaLive() {
   }
 
   const db = reconstruir({ log: m => console.error(`  ${m}`) })
-  const respaldo = readFileSync(RUTA_PRODUCCION, 'utf8')
-  const tmp = mkdtempSync(join(tmpdir(), 'live-'))
+  const tmp = mkdtempSync(join(tmpdir(), 'cred-'))
   try {
     if (db.fallos.length > 0) {
       console.error(`✗ ${db.fallos.length} migración(es) no aplicaron.`); process.exit(1)
@@ -2009,7 +1154,7 @@ async function pruebaLive() {
       END
       $revocar$;`], { stdio: 'pipe' })
 
-    // La credencial que el modo live va a usar en producción, tal como la
+    // La credencial tal como la
     // prescribe el README: USAGE sobre `public` y ninguna membresía.
     // USAGE sobre `public` Y `extensions`: los dos esquemas del `search_path`.
     // Sin el segundo, `citext` se serializa `extensions.citext` y la huella
@@ -2296,24 +1441,306 @@ async function pruebaLive() {
       ], { stdio: 'pipe' })
     }
 
-    const urlDe = (rol) =>
-      `postgresql://${rol}@/postgres?host=${db.entorno.PGHOST}&port=${db.entorno.PGPORT}`
-
-    // `spawnSync`, no `execFileSync`: hace falta stderr TAMBIÉN cuando el
-    // comando sale 0 —ahí es donde el modo live escribe todo lo que informa— y
-    // execFileSync sólo lo devuelve dentro del error.
-    const correr = (args, entorno = {}) => {
-      const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...args], {
-        encoding: 'utf8', env: { ...process.env, ...entorno },
-      })
-      return { codigo: r.status ?? 1, salida: `${r.stdout ?? ''}${r.stderr ?? ''}` }
+    // MIDE un rol contra ESTE clúster desechable y lo somete al juez.
+    //
+    // Sin URL, sin variable de entorno y sin red: psql habla por el socket unix
+    // del clúster que esta misma prueba levantó con `initdb`. `PGOPTIONS` fija
+    // la sesión en solo lectura DESDE LA CONEXIÓN —no con un `SET` posterior—,
+    // que es la forma en que la medición tiene sentido: la garantía no depende
+    // de que la primera sentencia sea la correcta.
+    const medir = (rol) => {
+      let filas
+      try {
+        filas = execFileSync(join(binarios(), 'psql'), ['-U', rol, '-tAq', '-c', SQL_CREDENCIAL], {
+          encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+          env: { ...db.entorno, PGOPTIONS: '-c default_transaction_read_only=on' },
+        })
+      } catch (err) {
+        return { codigo: 1, salida: String(err.stderr ?? err.message), medidas: {}, rechazos: [] }
+      }
+      const m = Object.fromEntries(filas.trim().split('\n').filter(Boolean)
+        .map(l => { const i = l.indexOf('\x1f'); return [l.slice(0, i), l.slice(i + 1)] }))
+      const rechazos = juzgarCredencial(m)
+      const lineas = []
+      if (rechazos.length > 0) {
+        lineas.push(`\n✗ La credencial no sirve para leer el catálogo: ${rechazos.length} motivo(s).`)
+        for (const r of rechazos) {
+          lineas.push(`\n  ✗ ${r.regla}: ${r.detalle}.`)
+          lineas.push(`      ${r.remedio}`)
+        }
+      } else {
+        // Lo tolerado se dice en voz alta, siempre: un guard que calla lo que
+        // deja pasar deja de ser un guard a los tres meses.
+        for (const a of avisarCredencial(m)) lineas.push(`· ${a}`)
+        lineas.push(`✓ credencial de solo lectura: ${m.usuario} — sin superusuario, sin BYPASSRLS, ` +
+                    'sin REPLICATION, sin permisos de escritura ni de SELECT, sin CREATE ni ' +
+                    'membresías, sin SECURITY DEFINER al alcance, sesión read-only')
+        lineas.push(`✓ search_path (${m.search_path}): el rol tiene USAGE sobre todos sus esquemas`)
+      }
+      return { codigo: rechazos.length > 0 ? 1 : 0, salida: lineas.join('\n'), medidas: m, rechazos }
     }
 
-    // ── 1 · sin credencial, no se hace nada ────────────────────────────────
-    const sinUrl = correr(['--sembrar-produccion'], { [VAR_URL_LIVE]: '' })
-    comprobar(sinUrl.codigo !== 0, 'sin la variable de entorno, el modo live se niega a correr')
-    comprobar(/SUPABASE_ACCESS_TOKEN/.test(sinUrl.salida),
-      'y dice explícitamente que no se reutiliza el token administrativo')
+    const listaSql = (xs) => xs.map(x => `'${x}'`).join(', ')
+
+    // ── Fixtures SQL de las regresiones de ACL ──────────────────────────────
+    //
+    // ESTO NO ES UN REMEDIO, Y NO HAY NINGUNO APLICABLE. Supabase Support
+    // confirmó que los grants de `pg_net` a `PUBLIC` son gestionados,
+    // intencionales y necesarios, que todo rol LOGIN propio los hereda, y que
+    // retirarlos NO es una remediación soportada. Ver `decision-net-pg_net.md`.
+    //
+    // Estos tres bloques viven acá dentro, sin exportarse y sin publicarse en
+    // ningún documento, porque son lo que las pruebas necesitan para fijar
+    // semántica de PostgreSQL que el auditor da por cierta:
+    //
+    //   · un REVOKE retira lo que otorgó QUIEN LO EJECUTA (o un rol del que sea
+    //     miembro); el grant de un tercero sobrevive y la sentencia sale 0;
+    //   · `WITH GRANT OPTION` no alcanza para revocar lo ajeno;
+    //   · los privilegios por columna viven en `pg_attribute.attacl` y no se
+    //     ven desde `pg_class.relacl`;
+    //   · una excepción dentro de la transacción revierte los REVOKE anteriores.
+    //
+    // Se corren SÓLO contra el clúster desechable de esta prueba.
+    const SQL_FIXTURE_AUTORIDAD = `DO $precondicion$
+DECLARE
+  yo        text    := current_user;
+  soy_super boolean := coalesce((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false);
+  privs     text[]  := ${SQL_PRIVS_TABLA};
+  esperados text[]  := ARRAY[${listaSql(NET_OBJETOS)}];
+  tablas    text[]  := ARRAY[${listaSql(NET_TABLAS)}];
+  vistos    text[]  := ARRAY[]::text[];
+  ausentes  text[];
+  faltan    text[]  := ARRAY[]::text[];
+  ajenos    text[]  := ARRAY[]::text[];
+  gopt      boolean;
+  r         record;
+  g         record;
+BEGIN
+  -- ── 1 · Los objetos: que estén los tres, y que sean lo que decimos ───────
+  FOR r IN
+    SELECT n.nspname || '.' || c.relname                AS objeto,
+           c.oid                                        AS oid,
+           c.relkind                                    AS relkind,
+           pg_get_userbyid(c.relowner)                  AS duenio,
+           pg_has_role(yo, c.relowner, 'USAGE')         AS soy_miembro
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+     ORDER BY 1
+  LOOP
+    vistos := vistos || r.objeto;
+
+    -- LA FORMA: dos tablas y una secuencia. Si el relkind no es el esperado,
+    -- el objeto de producción no es el que este lote cree estar tocando, y el
+    -- REVOKE de más abajo estaría escrito para otra cosa.
+    IF r.objeto = ANY (tablas) AND r.relkind <> 'r' THEN
+      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una tabla (relkind «r») y es «%».',
+                      r.objeto, r.relkind;
+    END IF;
+    IF r.objeto = '${NET_SECUENCIA}' AND r.relkind <> 'S' THEN
+      RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una secuencia (relkind «S») y es «%».',
+                      r.objeto, r.relkind;
+    END IF;
+
+    -- Grant option: se mide con la función que corresponde al tipo de objeto
+    -- —has_sequence_privilege para la secuencia, NUNCA has_table_privilege— y
+    -- se informa. NO decide nada: ver el comentario de esta constante.
+    gopt := CASE WHEN r.relkind = 'S'
+                 THEN (SELECT bool_and(has_sequence_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
+                         FROM unnest(ARRAY['SELECT','USAGE','UPDATE']) p)
+                 ELSE (SELECT bool_and(has_table_privilege(yo, r.oid, p || ' WITH GRANT OPTION'))
+                         FROM unnest(privs) p)
+            END;
+
+    RAISE NOTICE 'OBJETO % (relkind %) · dueño=% · ejecuta=% · miembro=% · superusuario=% · grant option: % (informativo, NO es autoridad)',
+      r.objeto, r.relkind, r.duenio, yo, r.soy_miembro, soy_super, gopt;
+
+    IF NOT (soy_super OR r.duenio = yo OR r.soy_miembro) THEN
+      faltan := faltan || r.objeto;
+    END IF;
+  END LOOP;
+
+  -- EXACTAMENTE los tres. Un objeto ausente aborta ANTES de cualquier REVOKE:
+  -- un filtro que no empareja se parece demasiado a un permiso que sí está, y
+  -- la postcondición daría por cerrada una vía que ni siquiera se miró.
+  SELECT array_agg(e ORDER BY e) INTO ausentes
+    FROM unnest(esperados) e WHERE NOT (e = ANY (vistos));
+  IF ausentes IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: falta(n) % de los % objeto(s) esperados. Encontrados: %. '
+                    'Sin los tres no se puede afirmar que la vía quedó cerrada.',
+                    array_to_string(ausentes, ', '), array_length(esperados, 1),
+                    coalesce(array_to_string(vistos, ', '), '(ninguno)');
+  END IF;
+  IF array_length(vistos, 1) <> array_length(esperados, 1) THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: se esperaban EXACTAMENTE % objetos y se encontraron %: %.',
+                    array_length(esperados, 1), array_length(vistos, 1), array_to_string(vistos, ', ');
+  END IF;
+
+  -- ── 2 · El inventario COMPLETO de lo que tiene PUBLIC ────────────────────
+  --
+  -- Las dos capas, porque son dos ACL distintas y la segunda no se ve desde la
+  -- primera: \`pg_class.relacl\` para los tres objetos, y \`pg_attribute.attacl\`
+  -- para TODAS las columnas no eliminadas de las dos tablas. Un
+  -- \`GRANT SELECT (headers) … TO PUBLIC\` no aparece en relacl y alcanza igual.
+  --
+  -- Y de cada grant se mira EL OTORGANTE, que es lo que decide si el REVOKE va
+  -- a servir: PostgreSQL retira lo que otorgó quien ejecuta, o un rol del que
+  -- sea miembro. Un grant hecho por un tercero sobrevive al REVOKE, que sale 0
+  -- igual. Por eso no basta con mostrarlo: si aparece un otorgante que no se
+  -- puede asumir, esto aborta ANTES del primer REVOKE.
+  FOR g IN
+    SELECT n.nspname || '.' || c.relname                 AS objeto,
+           NULL::text                                    AS columna,
+           a.privilege_type                              AS priv,
+           pg_get_userbyid(a.grantor)                    AS otorgante,
+           pg_has_role(yo, a.grantor, 'USAGE')           AS puedo_asumir
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor),
+           pg_has_role(yo, a.grantor, 'USAGE')
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+     ORDER BY 1, 2 NULLS FIRST, 3
+  LOOP
+    RAISE NOTICE 'PUBLIC · % · columna=% · privilegio=% · otorgado por=% · ¿puedo actuar como ese otorgante?=%',
+      g.objeto, coalesce(g.columna, '(nivel de objeto)'), g.priv, g.otorgante,
+      (soy_super OR g.puedo_asumir);
+
+    IF NOT (soy_super OR g.puedo_asumir) THEN
+      ajenos := ajenos || format('%s%s → %s (otorgado por %s)',
+                                 g.objeto, coalesce('.' || g.columna, ''), g.priv, g.otorgante);
+    END IF;
+  END LOOP;
+
+  -- ── 3 · Los abortos, juntos y al final ──────────────────────────────────
+  --
+  -- Después del inventario a propósito: quien opere la base ve de UNA corrida
+  -- todo lo que hay que arreglar —qué objetos, qué columnas, qué otorgantes— en
+  -- vez de descubrirlo de a uno por intento.
+  IF array_length(faltan, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no tiene autoridad para revocar sobre %. '
+                    'No es superusuario, no es el dueño y no hereda su rol. Tener los privilegios '
+                    'WITH GRANT OPTION no alcanza: un REVOKE sólo retira lo que otorgó quien lo '
+                    'ejecuta. El REVOKE NO fallaría: emitiría un WARNING, saldría 0 y dejaría la '
+                    'ACL intacta.',
+                    yo, array_to_string(faltan, ', ');
+  END IF;
+
+  IF array_length(ajenos, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: «%» no puede actuar como el otorgante de % grant(s) de '
+                    'PUBLIC: %. Un REVOKE sólo retira lo que otorgó quien lo ejecuta (o un rol del '
+                    'que sea miembro): esos grants sobrevivirían, el REVOKE saldría 0 igual y la '
+                    'vía quedaría abierta. Hace falta que lo ejecute el otorgante, o alguien que '
+                    'pueda asumirlo.',
+                    yo, array_length(ajenos, 1), array_to_string(ajenos, '; ');
+  END IF;
+END
+$precondicion$;`
+
+    const SQL_FIXTURE_SIN_PUBLICO = `DO $postcondicion$
+DECLARE
+  esperados text[] := ARRAY[${listaSql(NET_OBJETOS)}];
+  tablas    text[] := ARRAY[${listaSql(NET_TABLAS)}];
+  hallados  int;
+  cuantos   int;
+  restante  text;
+BEGIN
+  SELECT count(*) INTO hallados
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname || '.' || c.relname = ANY (esperados);
+  IF hallados <> array_length(esperados, 1) THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: se esperaban % objetos de pg_net y hay %. '
+                    'No se puede afirmar que la vía quedó cerrada sobre un objeto que no está.',
+                    array_length(esperados, 1), hallados;
+  END IF;
+
+  WITH publico AS (
+    -- Capa 1 · pg_class.relacl: los privilegios de nivel de objeto.
+    SELECT n.nspname || '.' || c.relname AS objeto,
+           NULL::text                    AS columna,
+           a.privilege_type              AS priv,
+           pg_get_userbyid(a.grantor)    AS otorgante
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (esperados)
+       AND a.grantee = 0            -- 0 es PUBLIC
+    UNION ALL
+    -- Capa 2 · pg_attribute.attacl: SELECT, INSERT, UPDATE y REFERENCES por
+    -- COLUMNA, que no aparecen en relacl y alcanzan igual.
+    SELECT n.nspname || '.' || c.relname,
+           at.attname,
+           a.privilege_type,
+           pg_get_userbyid(a.grantor)
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute at ON at.attrelid = c.oid AND at.attnum > 0 AND NOT at.attisdropped
+      CROSS JOIN LATERAL aclexplode(at.attacl) AS a
+     WHERE n.nspname || '.' || c.relname = ANY (tablas)
+       AND a.grantee = 0
+  )
+  SELECT count(*),
+         string_agg(format('%s%s → %s (otorgado por %s)',
+                           objeto, coalesce('.' || columna, ''), priv, otorgante),
+                    ', ' ORDER BY objeto, columna NULLS FIRST, priv)
+    INTO cuantos, restante
+    FROM publico;
+
+  IF cuantos > 0 THEN
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre pg_net: %. '
+                    'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
+                    'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.',
+                    cuantos, restante;
+  END IF;
+END
+$postcondicion$;`
+
+    const SQL_FIXTURE_LOTE = `-- ═══════════════════════════════════════════════════════════════════════════
+-- pg_net · retirar el acceso de PUBLIC a los tres objetos de la extensión.
+--
+-- ENVIAR Y EJECUTAR COMO UNA SOLA TRANSACCIÓN. No dividir en partes: la
+-- postcondición del final sólo protege si puede revertir los REVOKE de arriba.
+--
+-- Requiere autoridad de propietario (supabase_admin). La precondición aborta
+-- si quien ejecuta no la tiene — ver el mensaje que emite.
+-- ═══════════════════════════════════════════════════════════════════════════
+BEGIN;
+
+${SQL_FIXTURE_AUTORIDAD}
+
+-- ── REVOKE ────────────────────────────────────────────────────────────────
+-- ALL PRIVILEGES y no una lista a mano: cubre los ocho privilegios de tabla
+-- —SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER y MAINTAIN—
+-- y también los que agregue el próximo mayor.
+REVOKE ALL PRIVILEGES ON TABLE
+  ${NET_TABLAS.join(',\n  ')}
+FROM PUBLIC;
+
+-- La secuencia de la cola, que es la única que hay: _http_response no tiene
+-- secuencia propia.
+REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC;
+
+-- ── REGRANTS EXPLÍCITOS (aprobados de antemano) ───────────────────────────
+-- Vacío: el análisis de impacto todavía no identificó ningún consumidor
+-- legítimo que dependa del grant a PUBLIC. Si lo identifica, acá van líneas
+-- GRANT concretas, con el rol real, ANTES de enviar el lote. Sin placeholders.
+-- (fin de la sección)
+
+${SQL_FIXTURE_SIN_PUBLICO}
+
+COMMIT;
+`
 
     // ── 2 · un privilegio de más, un rechazo ───────────────────────────────
     //
@@ -2326,8 +1753,7 @@ async function pruebaLive() {
     // olvida: rechazar después de haber leído no sirve de nada si lo que
     // importaba era no darle a esa credencial acceso a producción.
     for (const n of NEGATIVOS) {
-      const r = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
-        { [VAR_URL_LIVE]: urlDe(n.rol) })
+      const r = medir(n.rol)
       comprobar(r.codigo !== 0 && new RegExp(`✗ ${n.regla}:`).test(r.salida),
         `${n.rol}: se rechaza por ${n.regla}${n.que ? ` — ${n.que}` : ''}`)
       comprobar(!/huella leída de producción/.test(r.salida),
@@ -2358,9 +1784,8 @@ async function pruebaLive() {
     // puede ejecutarla; sin USAGE no puede ni nombrarla. Un guard que rechazara
     // por eso obligaría a limpiar funciones que nadie alcanza, y a la tercera
     // vez alguien lo apaga.
-    const cerrado = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(cerrado.codigo === 0 && !/✗ SECURITY DEFINER/.test(cerrado.salida),
+    const cerrado = medir('drift_lector')
+    comprobar(!/✗ SECURITY DEFINER/.test(cerrado.salida),
       'una SECURITY DEFINER con EXECUTE a PUBLIC en un esquema SIN USAGE no es alcanzable, y no se rechaza')
     // Y lo mismo para TABLAS: `drift_tab_cerrado.t` tiene SELECT a PUBLIC y
     // este rol no tiene USAGE sobre su esquema. `has_table_privilege` dice que
@@ -2394,50 +1819,53 @@ async function pruebaLive() {
       return sql.filter(s => s.endsWith(';') && !/<[^>]+>/.test(s))
     }
 
+    // ── 2 quinquies · pg_stat_statements: FAIL-CLOSED, sin tolerancia ───────
+    //
+    // La extensión real está instalada en `extensions` y concede SELECT a
+    // PUBLIC sobre sus dos vistas. Un rol necesita USAGE sobre ese esquema para
+    // que la huella coincida con la del dueño, así que las alcanza por un
+    // requisito de corrección, no por un grant que alguien le diera.
+    //
+    // Hubo una propuesta de tolerarlo. NUNCA FUE APROBADA por quien opera la
+    // base, así que `LECTURA_TOLERADA` está vacía y el guard BLOQUEA. Ése es el
+    // estado seguro, y esta prueba lo fija: si alguien agrega la entrada sin la
+    // aprobación, esto rompe.
+    comprobar(LECTURA_TOLERADA.size === 0,
+      'LECTURA_TOLERADA está vacía: ninguna lectura tolerada sin aprobación explícita')
+    const conStat = medir('drift_lector')
+    comprobar(/pg_stat_statements/.test(conStat.salida),
+      'pg_stat_statements es alcanzable con USAGE sobre `extensions` y el auditor lo detecta')
+    comprobar(conStat.codigo !== 0 && /✗ SELECT DE TABLA:/.test(conStat.salida),
+      'y BLOQUEA, porque no hay tolerancia aprobada: fail-closed')
+    comprobar(!/lectura TOLERADA/.test(conStat.salida),
+      'y no se anuncia como tolerada: no hay nada tolerado')
+    comprobar(/REVOKE SELECT ON extensions\.pg_stat_statements FROM PUBLIC;/.test(conStat.salida),
+      'y el remedio dice qué habría que revocar, marcado como decisión de política')
+
+    // Y con un GRANT DIRECTO tampoco pasa, por otra razón: ahí no es «la
+    // extensión dejó su default», es alguien dándole acceso.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'CREATE ROLE drift_stat LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_stat; ' +
+      'GRANT SELECT ON extensions.pg_stat_statements TO drift_stat;'], { stdio: 'pipe' })
+    const statDirecto = medir('drift_stat')
+    comprobar(statDirecto.codigo !== 0 && /✗ SELECT DE TABLA:/.test(statDirecto.salida),
+      'con un GRANT DIRECTO sobre pg_stat_statements también bloquea, y nombra la fuente')
+    comprobar(/drift_stat/.test(statDirecto.salida),
+      'distinguiendo el grant directo de la vía PUBLIC en la procedencia')
+
+
     for (const n of NEGATIVOS.filter(x => x.cura)) {
-      const antes = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-        { [VAR_URL_LIVE]: urlDe(n.rol) })
+      const antes = medir(n.rol)
       const sql = remediosDe(antes.salida, n.regla)
       if (sql.length === 0) {
         comprobar(false, `${n.rol}: el diagnóstico de ${n.regla} no trae ningún SQL aplicable`)
         continue
       }
       for (const s of sql) db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
-      const despues = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-        { [VAR_URL_LIVE]: urlDe(n.rol) })
+      const despues = medir(n.rol)
       comprobar(!new RegExp(`✗ ${n.regla}:`).test(despues.salida),
         `${n.rol}: aplicar el remedio de ${n.regla} (${sql.length} sentencia(s)) elimina la vía`)
     }
-
-    // ── 2 quinquies · pg_stat_statements: tolerada, y dicha en voz alta ──────
-    //
-    // La extensión real está instalada en `extensions`, y concede SELECT a
-    // PUBLIC sobre sus dos vistas. La credencial necesita USAGE sobre ese
-    // esquema para que la huella coincida con la del dueño, así que las alcanza
-    // por un requisito de corrección. La decisión —documentada en
-    // `LECTURA_TOLERADA`— es no bloquear y avisar en cada corrida.
-    const conStat = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(/pg_stat_statements/.test(conStat.salida),
-      'pg_stat_statements es alcanzable con USAGE sobre `extensions` y el auditor lo detecta')
-    comprobar(conStat.codigo === 0 && !/✗ SELECT DE TABLA/.test(conStat.salida),
-      'y NO bloquea el refresco: está clasificada, no descubierta')
-    comprobar(/lectura TOLERADA — extensions\.pg_stat_statements \[vía PUBLIC\]/.test(conStat.salida),
-      'y se dice en voz alta, con su procedencia, en vez de callarse')
-    comprobar(/REVOKE SELECT ON extensions\.pg_stat_statements FROM PUBLIC;/.test(conStat.salida),
-      'y con el remedio por si se quiere cerrar (decisión de política)')
-
-    // Pero si el privilegio deja de venir SÓLO de PUBLIC, vuelve a bloquear:
-    // un GRANT directo a esta credencial ya no es «la extensión dejó su
-    // default», es alguien dándole acceso.
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      'CREATE ROLE drift_stat LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_stat; ' +
-      'GRANT SELECT ON extensions.pg_stat_statements TO drift_stat;'], { stdio: 'pipe' })
-    const statDirecto = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_stat') })
-    comprobar(statDirecto.codigo !== 0 && /✗ SELECT DE TABLA:/.test(statDirecto.salida),
-      'con un GRANT DIRECTO sobre pg_stat_statements, la tolerancia no aplica y bloquea')
-
 
     // La versión del servidor decide qué privilegios existen. Se lee UNA vez y
     // manda tanto en el fixture como en lo que se le exige al diagnóstico.
@@ -2498,8 +1926,7 @@ async function pruebaLive() {
     const privsNet = ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']
       .concat(versionServidor >= 170000 ? ['MAINTAIN'] : [])
 
-    const conNet = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    const conNet = medir('drift_lector')
     comprobar(conNet.codigo !== 0, 'con un esquema que concede USAGE a PUBLIC, la credencial correcta se RECHAZA')
     for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
       comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
@@ -2629,21 +2056,20 @@ async function pruebaLive() {
 
     // 2 · Y el guard del auditor lo confirma desde el otro lado: la credencial
     //     sigue siendo rechazada por los mismos tres motivos.
-    const trasRevoke = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
+    const trasRevoke = medir('drift_lector')
     comprobar(trasRevoke.codigo !== 0 && conNet.salida.includes(flagsNet)
       && trasRevoke.salida.includes(flagsNet),
       '  y el auditor lo ve: mismo rechazo, mismos privilegios, como si nada hubiera pasado')
 
     // 3 · La PRECONDICIÓN de la propuesta lo detiene ANTES de tocar nada.
-    const pre = psqlComo('drift_migrador', SQL_NET_PRECONDICION)
+    const pre = psqlComo('drift_migrador', SQL_FIXTURE_AUTORIDAD)
     comprobar(pre.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(pre.salida),
       '  la PRECONDICIÓN aborta: nombra al ejecutor y por qué no tiene autoridad')
     comprobar(/drift_net_duenio/.test(pre.salida) && /drift_migrador/.test(pre.salida),
       '  y nombra al dueño real y al que ejecuta, que es lo accionable')
 
     // 4 · Y la POSTCONDICIÓN convierte el éxito silencioso en un fallo.
-    const post = psqlComo('drift_migrador', SQL_NET_POSTCONDICION)
+    const post = psqlComo('drift_migrador', SQL_FIXTURE_SIN_PUBLICO)
     comprobar(post.codigo !== 0 && /POSTCONDICIÓN FALLIDA/.test(post.salida),
       '  la POSTCONDICIÓN falla y revierte: el éxito silencioso deja de ser silencioso')
     comprobar(/net\._http_response → SELECT/.test(post.salida),
@@ -2656,12 +2082,12 @@ async function pruebaLive() {
     //         de SUPERUSUARIO, para que lo único que falle sea la ausencia.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
       `ALTER SEQUENCE ${NET_SECUENCIA} RENAME TO drift_seq_escondida;`], { stdio: 'pipe' })
-    const sinUno = psqlComo('postgres', SQL_NET_PRECONDICION)
+    const sinUno = psqlComo('postgres', SQL_FIXTURE_AUTORIDAD)
     comprobar(sinUno.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(sinUno.salida),
       '  con un objeto ausente la precondición aborta, aun siendo superusuario')
     comprobar(sinUno.salida.includes(NET_SECUENCIA) && /falta\(n\)/.test(sinUno.salida),
       '  nombrando cuál falta de los tres, que es lo que hace falta para arreglarlo')
-    const loteSinUno = psqlLoteComo('postgres', SQL_NET_LOTE)
+    const loteSinUno = psqlLoteComo('postgres', SQL_FIXTURE_LOTE)
     comprobar(loteSinUno.codigo !== 0 && !/REVOKE/.test(loteSinUno.salida.split('PRECONDICIÓN FALLIDA')[1] ?? ''),
       '  y el LOTE se detiene ahí: ningún REVOKE llega a ejecutarse')
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
@@ -2689,7 +2115,7 @@ async function pruebaLive() {
       '  el migrador tiene ahora los privilegios WITH GRANT OPTION, tabla y secuencia')
 
     const aclConGopt = aclNet()
-    const preGopt = psqlComo('drift_migrador', SQL_NET_PRECONDICION)
+    const preGopt = psqlComo('drift_migrador', SQL_FIXTURE_AUTORIDAD)
     comprobar(preGopt.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(preGopt.salida),
       '  y AUN ASÍ la precondición lo rechaza: grant option no es autoridad')
     comprobar(/WITH GRANT OPTION no alcanza/.test(preGopt.salida),
@@ -2738,7 +2164,7 @@ async function pruebaLive() {
 
     const relAntesCol = aclNet()
     const attAntesCol = attNet()
-    const loteTercero = psqlLoteComo('drift_net_duenio', SQL_NET_LOTE)
+    const loteTercero = psqlLoteComo('drift_net_duenio', SQL_FIXTURE_LOTE)
     comprobar(loteTercero.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(loteTercero.salida),
       '  el lote, ejecutado por el DUEÑO A, aborta en la precondición')
     comprobar(/net\.http_request_queue\.url → SELECT \(otorgado por drift_b_net\)/
@@ -2763,7 +2189,7 @@ async function pruebaLive() {
     comprobar(/url = .*=r\/drift_net_duenio/.test(attNet()) && !/drift_b_net/.test(attNet()),
       '  ahora la vía por columna la concede el DUEÑO, y hay dos (SELECT y INSERT)')
 
-    const loteDuenio = psqlLoteComo('drift_net_duenio', SQL_NET_LOTE)
+    const loteDuenio = psqlLoteComo('drift_net_duenio', SQL_FIXTURE_LOTE)
     comprobar(loteDuenio.codigo === 0,
       '  el lote completo, con la autoridad del dueño, PASA de punta a punta')
     comprobar(attNet() === '',
@@ -2805,7 +2231,7 @@ async function pruebaLive() {
       '  asimetría montada: hereda al dueño de las TABLAS, no al de la SECUENCIA')
 
     const aclAsim = aclNet()
-    const loteAsim = psqlLoteComo('drift_asimetrico', SQL_NET_LOTE)
+    const loteAsim = psqlLoteComo('drift_asimetrico', SQL_FIXTURE_LOTE)
     comprobar(loteAsim.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(loteAsim.salida),
       '  el LOTE COMPLETO falla, y falla en la precondición —antes de cualquier REVOKE—')
     comprobar(new RegExp(`no tiene autoridad para revocar sobre ${NET_SECUENCIA.replace(/\./g, '\\.')}`)
@@ -2820,7 +2246,7 @@ async function pruebaLive() {
     //     secuencia abierta, lanza excepción, y la transacción entera se
     //     revierte: las tablas vuelven a como estaban. Sin esto, el lote a
     //     medio aplicar se registraría como un éxito.
-    const loteMutilado = SQL_NET_LOTE
+    const loteMutilado = SQL_FIXTURE_LOTE
       .replace(`REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC;`,
                '-- (a propósito: acá NO se revoca la secuencia)')
     comprobar(!loteMutilado.includes(`ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC`),
@@ -2855,7 +2281,7 @@ async function pruebaLive() {
     // 8 · CONTRAPRUEBA: los dos guards no son «siempre falla». Con el dueño
     //     verdadero, la precondición pasa —es el único camino soportado—.
     const preDuenio = db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      `SET ROLE drift_net_duenio; ${SQL_NET_PRECONDICION}`], { stdio: 'pipe' })
+      `SET ROLE drift_net_duenio; ${SQL_FIXTURE_AUTORIDAD}`], { stdio: 'pipe' })
     comprobar(typeof preDuenio === 'string',
       '  contraprueba: con la autoridad del DUEÑO la precondición pasa, no es un «siempre falla»')
 
@@ -2881,8 +2307,7 @@ async function pruebaLive() {
       for (const s of remediosDe(conNet.salida, regla)) {
         db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
       }
-      const parcial = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-        { [VAR_URL_LIVE]: urlDe('drift_lector') })
+      const parcial = medir('drift_lector')
       const ultima = i === reglasNet.length - 1
       comprobar(ultima ? parcial.codigo === 0 : parcial.codigo !== 0,
         ultima
@@ -2893,7 +2318,7 @@ async function pruebaLive() {
     // Y con TODO cerrado, la postcondición pasa. Es la otra mitad de la
     // contraprueba: sin esto, «falla siempre» y «detecta lo que hay» se ven
     // igual desde afuera.
-    const postFinal = psqlComo('postgres', SQL_NET_POSTCONDICION)
+    const postFinal = psqlComo('postgres', SQL_FIXTURE_SIN_PUBLICO)
     comprobar(postFinal.codigo === 0,
       '  y con las tres vías cerradas la POSTCONDICIÓN pasa: detecta lo que hay, no falla siempre')
 
@@ -2927,15 +2352,13 @@ async function pruebaLive() {
       db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
         'CREATE ROLE drift_maintain LOGIN; GRANT USAGE ON SCHEMA public, extensions TO drift_maintain; ' +
         'GRANT MAINTAIN ON public.clientes TO drift_maintain;'], { stdio: 'pipe' })
-      const conMaintain = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-        { [VAR_URL_LIVE]: urlDe('drift_maintain') })
+      const conMaintain = medir('drift_maintain')
       comprobar(conMaintain.codigo !== 0 && /public\.clientes \[MAINTAIN, vía drift_maintain\]/
         .test(conMaintain.salida), 'un GRANT MAINTAIN se detecta y se nombra')
       for (const s of remediosDe(conMaintain.salida, 'ESCRITURA')) {
         db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
       }
-      const sinMaintain = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-        { [VAR_URL_LIVE]: urlDe('drift_maintain') })
+      const sinMaintain = medir('drift_maintain')
       comprobar(sinMaintain.codigo === 0, 'y su remedio lo elimina')
     } else {
       // Se declara EXACTAMENTE qué se omitió y qué no. Lo omitido es UNA cosa:
@@ -2952,111 +2375,58 @@ async function pruebaLive() {
         `nombre en el motivo y en el REVOKE.`)
     }
 
-    // ── 2 ter · la cadena de conexión, antes de abrirla ────────────────────
-    //
-    // El guard vive en `validarUrlLive` y se prueba exhaustivamente en vitest;
-    // acá se comprueba que está CONECTADO al camino real. `options=` es el caso
-    // que más importa: deshace por URL el `default_transaction_read_only` que
-    // `PGOPTIONS` fija por entorno.
-    const conOptions = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
-      { [VAR_URL_LIVE]: `${urlDe('drift_lector')}&options=-c%20default_transaction_read_only%3Doff` })
-    comprobar(conOptions.codigo !== 0 && /«options»/.test(conOptions.salida),
-      'una URL con `options=` se rechaza antes de conectarse')
-    comprobar(!/credencial de solo lectura/.test(conOptions.salida),
-      'y se rechaza sin haber abierto la conexión')
     // El mensaje del caso de escritura nombra los privilegios EXACTOS, que es
     // lo que hace accionable el rechazo: un `REVOKE ALL` revocaría de más.
-    const escritor = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
-      { [VAR_URL_LIVE]: urlDe('drift_escritor') })
+    const escritor = medir('drift_escritor')
     comprobar(/public\.clientes \[INSERT, vía drift_escritor\]/.test(escritor.salida),
       'y el motivo nombra el privilegio exacto y su procedencia')
     comprobar(escritor.salida.includes('REVOKE INSERT ON ALL TABLES IN SCHEMA public FROM drift_escritor;'),
       'y el remedio revoca sólo ese privilegio, no un ALL a ciegas')
 
-    // ── 3 · sin saber qué proyecto es, tampoco ─────────────────────────────
-    const sinProyecto = correr(['--sembrar-produccion'], { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(sinProyecto.codigo !== 0 && /--proyecto/.test(sinProyecto.salida),
-      'sin poder deducir el proyecto y sin --proyecto, no se versiona nada')
-
-    // ── 3 bis · sin USAGE sobre un esquema del search_path, se niega ───────
+    // ── 3 · sin USAGE sobre un esquema del search_path, se niega ───────────
+    //
     // Es el fallo que más caro sale: no rompe nada, sólo serializa nombres
-    // cualificados, y el refresco quedaría versionado con drift permanente.
-    const corto = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
-      { [VAR_URL_LIVE]: urlDe('drift_corto') })
+    // CUALIFICADOS, y una huella tomada así traería drift permanente.
+    const corto = medir('drift_corto')
     comprobar(corto.codigo !== 0, 'un rol sin USAGE sobre un esquema del search_path se rechaza')
     comprobar(/extensions/.test(corto.salida) && /GRANT USAGE ON SCHEMA/.test(corto.salida),
       'y el mensaje nombra el esquema que falta y el GRANT que lo arregla')
 
-    // ── 4 · el camino feliz, en seco ───────────────────────────────────────
-    const seco = correr(['--sembrar-produccion', '--proyecto', 'prueba', '--en-seco'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(seco.codigo === 0, '--en-seco corre entero y sale 0')
-    comprobar(/sin superusuario, sin BYPASSRLS/.test(seco.salida), 'la credencial se mide, no se declara')
-    comprobar(readFileSync(RUTA_PRODUCCION, 'utf8') === respaldo, '--en-seco NO tocó el archivo versionado')
+    // ── 4 · el rol correcto pasa, y lee lo mismo que el dueño ──────────────
+    //
+    // LA PROPIEDAD CENTRAL, y la razón por la que los grants se leen del ACL y
+    // no de `information_schema`: lo que serializa un rol de solo lectura tiene
+    // que ser EXACTAMENTE lo que hay. Con la formulación anterior, los 563
+    // grupos /grants habrían salido vacíos y esto fallaría.
+    // A esta altura los remedios de los bloques anteriores ya cerraron todas
+    // las vías del fixture —incluida la de `pg_stat_statements`, que sin
+    // tolerancia aprobada bloqueaba—, así que el rol provisionado como
+    // prescribe el README pasa. Es la contraprueba del fail-closed: el guard
+    // rechaza lo que hay, no rechaza siempre.
+    const lector = medir('drift_lector')
+    comprobar(lector.codigo === 0,
+      `cerradas las vías, el rol correcto pasa (${lector.rechazos.map(r => r.regla).join(', ') || 'sin rechazos'})`)
+    comprobar(/sin superusuario, sin BYPASSRLS/.test(lector.salida),
+      'y se dice que se MIDIÓ, no que se declaró')
 
-    // ── 5 · y escribiendo de verdad ────────────────────────────────────────
-    const real = correr(['--sembrar-produccion', '--proyecto', 'prueba'],
-      { [VAR_URL_LIVE]: urlDe('drift_lector') })
-    comprobar(real.codigo === 0, 'el refresco corre y sale 0')
-
-    // El archivo no se escribe en su sitio: se escribe aparte, SE RELEE y sólo
-    // entonces se reemplaza con `rename(2)`. Lo que se valida es lo que quedó
-    // en disco —no el objeto que se serializó—, porque el archivo es lo único
-    // que el paso siguiente va a publicar.
-    comprobar(/relectura: \d+ grupos leídos del archivo nuevo/.test(real.salida),
-      'el archivo se relee del disco antes de reemplazar la instantánea')
-    const sobrantes = readdirSync(AQUI).filter(f => f.startsWith('huella-produccion.json.'))
-    comprobar(sobrantes.length === 0,
-      `no queda ningún archivo temporal a medio escribir (${sobrantes.join(', ') || 'ninguno'})`)
-
-    const escrita = huellaProduccionVersionada(RUTA_PRODUCCION).mapa
+    const comoLector = parsearHuella(execFileSync(join(binarios(), 'psql'),
+      ['-U', 'drift_lector', '-tAq', '-f', RUTA_FINGERPRINT],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: db.entorno }).trim())
     const delDueno = parsearHuella(huella(db.psql))
-
-    // LA PROPIEDAD CENTRAL: lo que lee la credencial de solo lectura es
-    // exactamente lo que hay. Con la formulación anterior de los grants, los
-    // 563 grupos /grants habrían salido vacíos y esto fallaría.
     const distintos = [...delDueno].filter(([k, v]) => {
-      const e = escrita.get(k); return !e || e.huella !== v.huella || e.n !== v.n
+      const e = comoLector.get(k); return !e || e.huella !== v.huella || e.n !== v.n
     })
-    comprobar(escrita.size === delDueno.size && distintos.length === 0,
+    comprobar(comoLector.size === delDueno.size && distintos.length === 0,
       `la huella del rol de solo lectura es idéntica a la del dueño (${delDueno.size} grupos)`)
-    if (distintos.length > 0) {
-      for (const [k] of distintos.slice(0, 5)) console.error(`    difiere: ${k}`)
-    }
+    if (distintos.length > 0) for (const [k] of distintos.slice(0, 5)) console.error(`    difiere: ${k}`)
 
-    const grants = [...escrita].filter(([k]) => k.endsWith('/grants'))
+    const grants = [...comoLector].filter(([k]) => k.endsWith('/grants'))
     comprobar(grants.length > 0 && grants.every(([, v]) => v.n > 0),
       `los ${grants.length} grupos /grants quedaron con contenido, ninguno vacío`)
 
-    // ── 6 · metadatos y ausencia de secretos ───────────────────────────────
-    const docNuevo = leerJson(RUTA_PRODUCCION)
-    comprobar(docNuevo.proyecto === 'prueba', 'el proyecto queda registrado')
-    comprobar(/^\d{4}-\d{2}-\d{2}$/.test(docNuevo.capturada), 'la fecha de captura queda registrada')
-    comprobar(typeof docNuevo.postgres === 'string' && docNuevo.postgres.length > 0,
-      `la versión de Postgres queda registrada (${docNuevo.postgres})`)
-    const docPrevio = JSON.parse(respaldo)
-    comprobar(!!docPrevio._README && docNuevo._README === docPrevio._README &&
-              docNuevo._CANONICO === docPrevio._CANONICO && docNuevo._ADVERTENCIA === docPrevio._ADVERTENCIA,
-      'la prosa del archivo se conserva: este comando refresca mediciones, no documentación')
-
-    const crudo = readFileSync(RUTA_PRODUCCION, 'utf8')
-    comprobar(!/postgres(ql)?:\/\//i.test(crudo), 'el archivo no contiene ninguna cadena de conexión')
-    comprobar(!crudo.includes(db.entorno.PGHOST), 'ni el host de la base')
-    comprobar(!/drift_lector/.test(crudo), 'ni el nombre del rol')
-
-    // ── 7 · el guard de la huella incompleta ───────────────────────────────
-    // Se comprueba sobre la función pura, con el resultado real: si todos los
-    // /grants vinieran vacíos, el refresco tiene que negarse.
-    const mutilada = new Map([...escrita].map(([k, v]) =>
-      [k, k.endsWith('/grants') ? { huella: v.huella, n: 0 } : v]))
-    const quejas = validarHuellaLive(mutilada, escrita)
-    comprobar(quejas.some(q => /VAC/i.test(q)),
-      'una huella con todos los /grants vacíos se rechaza antes de escribirse')
-
-    console.error('\n✓ Modo live: credencial medida, huella idéntica a la del dueño, ' +
-                  'guards activos y nada escrito cuando algo no cuadra.')
+    console.error('\n✓ Auditor de credenciales: privilegios medidos en las dos capas del ACL, ' +
+                  'remedios aplicables, y ninguna conexión fuera del clúster desechable.')
   } finally {
-    writeFileSync(RUTA_PRODUCCION, respaldo)
     rmSync(tmp, { recursive: true, force: true })
     db.destruir()
   }
@@ -3064,7 +2434,6 @@ async function pruebaLive() {
 
 async function principal() {
   const soloBaseline = bandera('--solo-baseline')
-  const sembrarProduccion = bandera('--sembrar-produccion')
   const sembrarBaseline = bandera('--sembrar-baseline')
   const pruebaNegativa = bandera('--prueba-negativa')
   const verificarHuella = bandera('--verificar-huella')
@@ -3075,18 +2444,7 @@ async function principal() {
   const refBase = valor('--base') ?? valor('--trinquete-contra') ?? 'origin/main'
 
   if (bandera('--prueba-tres-vias')) return pruebaTresVias()
-  if (bandera('--prueba-live')) return pruebaLive()
-
-  // El modo live no reconstruye nada: lee producción. Va antes de todo lo
-  // demás para no levantar un Postgres que no hace falta.
-  if (sembrarProduccion) {
-    process.exitCode = sembrarProduccionLive({
-      url: process.env[VAR_URL_LIVE] ?? '',
-      proyectoEsperado: valor('--proyecto'),
-      escribir: !bandera('--en-seco'),
-    })
-    return
-  }
+  if (bandera('--prueba-credencial')) return pruebaCredencial()
 
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
@@ -3337,7 +2695,7 @@ async function principal() {
       //      de drift falso de golpe.
       //
       //   B. ALCANZABILIDAD — un rol DEDICADO DE SOLO LECTURA saca la MISMA
-      //      huella. Es la credencial que el modo live va a usar, y por
+      //      huella. Es la credencial dedicada de solo lectura, y por
       //      information_schema no podía: esos catálogos son relativos al
       //      rol y le habrían devuelto cero grants, hasheando la cadena
       //      vacía sin que nada fallara. Ese es el falso negativo que esta
@@ -3443,7 +2801,7 @@ async function principal() {
         console.error(`✗ ALCANZABILIDAD: el rol de solo lectura saca otra huella en ${
           a.filter((l, i) => l !== b[i]).length} grupo(s) /grants.`)
         for (const l of distintas) console.error(`    dueño : ${l}`)
-        console.error('  La credencial del modo live no puede reproducir la huella: se estaría ' +
+        console.error('  Una credencial de solo lectura no reproduciría la huella: se estaría ' +
                       'refrescando huella-produccion.json con grants incompletos.')
         process.exit(1)
       }
