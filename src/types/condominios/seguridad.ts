@@ -300,6 +300,51 @@ export interface PresenciaPersonal {
   // Nullable porque la tabla también registra a quien no está en plantilla.
   personal_id?: string | null
   bloque_id?: string | null
+  // Marcaje de autoservicio (20260908000000): la evidencia de que la persona
+  // estuvo ahí y de que la hora la puso el servidor. Todo nullable porque el
+  // registro manual —el que teclea el administrador— no tiene nada de esto.
+  /** 'manual' (alguien lo tecleó) | 'autoservicio' (lo marcó el propio empleado). */
+  origen?: 'manual' | 'autoservicio' | null
+  /** Path en el bucket privado `presencia-evidencias`. Lo firma SecureImage. */
+  foto_entrada?: string | null
+  foto_salida?: string | null
+  gps_entrada?: CoordsMarcajePresencia | null
+  gps_salida?: CoordsMarcajePresencia | null
+  /** Instante exacto del marcaje. `hora_entrada` es su hora local recortada. */
+  entrada_marcada_en?: string | null
+  salida_marcada_en?: string | null
+}
+
+/** Ubicación guardada con un marcaje, ya normalizada por `presencia_marcar`. */
+export interface CoordsMarcajePresencia {
+  lat: number
+  lng: number
+  exactitud_m: number | null
+}
+
+/**
+ * Fila de `presencia_mi_ficha` (20260908000000): lo que el sistema ya sabe del
+ * empleado que va a marcar, para no volver a preguntárselo. `fecha_operativa` y
+ * `hora_servidor` vienen del SERVIDOR en la zona del tenant — el reloj del
+ * dispositivo no decide en qué día cae un turno.
+ */
+export interface MiFichaPresencia {
+  personal_id: string
+  nombre: string
+  cargo: string | null
+  foto_url: string | null
+  fecha_operativa: string
+  hora_servidor: string
+  bloque_id: string | null
+  turno: string | null
+  turno_inicio: string | null
+  turno_fin: string | null
+  /** Marcaje de hoy si ya existe; todo null cuando aún no ha marcado. */
+  registro_id: string | null
+  hora_entrada: string | null
+  hora_salida: string | null
+  estado: EstadoPresencia | null
+  origen: 'manual' | 'autoservicio' | null
 }
 
 

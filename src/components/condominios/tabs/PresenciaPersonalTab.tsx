@@ -1,9 +1,13 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useMemo, useState, type CSSProperties} from 'react'
+import { useEffect, useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { fetchMiFichaPresencia } from '../../../domain/condominios/presenciaAutoservicio'
 import { formatHoras, horasJornada } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
-import { PresenciaPersonal, EstadoPresencia, PersonalCondominio, BloqueTurno } from '../../../types'
+import MarcajeTurno from './presencia/MarcajeTurno'
+import { SecureImage } from '../../shared/SecureImage'
+import { BUCKET_PRESENCIA } from '../../../domain/shared/buckets'
+import { PresenciaPersonal, EstadoPresencia, PersonalCondominio, BloqueTurno, MiFichaPresencia } from '../../../types'
 
 interface Props {
   registros: PresenciaPersonal[]
@@ -26,11 +30,39 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
   { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
 ]
 
+/**
+ * Qué vino a hacer quien abre el tab. Es la primera pregunta y no la contesta el
+ * sistema: entrar a marcar el turno y venir a revisar la asistencia del equipo
+ * son dos cosas distintas, y hasta ahora el tab solo sabía hacer la segunda.
+ * `resolviendo` es el instante en que se averigua si esta cuenta tiene
+ * expediente aquí — sin eso no se puede ni ofrecer la primera opción.
+ */
+type ModoPresencia = 'resolviendo' | 'elegir' | 'marcar' | 'consulta'
+
 export default function PresenciaPersonalTab({ registros, personal, bloques, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [modo, setModo] = useState<ModoPresencia>('resolviendo')
+  const [miFicha, setMiFicha] = useState<MiFichaPresencia | null>(null)
+
+  // ¿Es esta cuenta un empleado de ESTE condominio? Lo contesta la base
+  // (presencia_mi_ficha, 20260908000000), porque la sesión no lo sabe: el
+  // vínculo cuenta→expediente vive en personal_condominio.user_id y el personal
+  // operativo no tiene permiso para leerlo.
+  //
+  // Si la consulta falla —una base sin la migración, la red— se cae a la vista
+  // de siempre. Nunca se deja el tab bloqueado por una función auxiliar.
+  useEffect(() => {
+    let vivo = true
+    void fetchMiFichaPresencia(proyectoId).then(({ ficha }) => {
+      if (!vivo) return
+      setMiFicha(ficha)
+      setModo(ficha ? 'elegir' : 'consulta')
+    })
+    return () => { vivo = false }
+  }, [proyectoId])
 
   const [form, setForm] = useState({
     personal_id: '',
@@ -109,6 +141,69 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
+  if (modo === 'resolviendo') {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--at-ink-3)', fontSize: 13 }}>
+        Preparando tu registro…
+      </div>
+    )
+  }
+
+  // La pregunta de entrada. Solo se ve cuando la cuenta TIENE expediente aquí:
+  // a quien no puede marcar no se le ofrece marcar.
+  if (modo === 'elegir' && miFicha) {
+    const yaCompleto = Boolean(miFicha.hora_entrada && miFicha.hora_salida)
+    return (
+      <div style={{ padding: 24, maxWidth: 560, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Hola, {miFicha.nombre}</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>¿Qué vas a hacer?</div>
+        </div>
+        <button
+          onClick={() => setModo('marcar')}
+          style={{
+            width: '100%', padding: '18px 16px', marginBottom: 10, border: 'none', borderRadius: 12,
+            background: 'var(--at-success)', color: 'var(--at-on-status)', cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700 }}>🟢 Ingresar a mi turno</div>
+          <div style={{ fontSize: 12, opacity: 0.9, marginTop: 2 }}>
+            {yaCompleto
+              ? 'Tu jornada de hoy ya está cerrada — podés revisarla'
+              : miFicha.hora_entrada
+                ? `Entraste a las ${miFicha.hora_entrada.slice(0, 5)} · marcar salida con foto y ubicación`
+                : 'Se abre la cámara y el sistema registra la hora'}
+          </div>
+        </button>
+        <button
+          onClick={() => setModo('consulta')}
+          style={{
+            width: '100%', padding: '18px 16px', border: '1px solid var(--at-line-strong)', borderRadius: 12,
+            background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700 }}>🔎 Solo estoy consultando</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
+            Ver la asistencia del día sin registrar nada
+          </div>
+        </button>
+      </div>
+    )
+  }
+
+  if (modo === 'marcar') {
+    return (
+      <div style={{ padding: 16 }}>
+        <MarcajeTurno
+          proyectoId={proyectoId}
+          fichaInicial={miFicha}
+          onRefresh={onRefresh}
+          onConsultar={() => setModo('consulta')}
+        />
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: 16 }}>
       {/* Header */}
@@ -118,12 +213,20 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           <input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)}
             style={{ ...inp, width: 'auto', padding: '6px 10px' }} />
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+        {miFicha && (
+          <button onClick={() => setModo('marcar')}
+            style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            🟢 Marcar mi turno
+          </button>
+        )}
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
             style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
           </button>
         )}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -236,6 +339,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                       {horasTotal && <span style={{ color: 'var(--at-accent)' }}> · {horasTotal}</span>}
                     </div>
                     {r.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.observaciones}</div>}
+                    <EvidenciaMarcaje registro={r} />
                   </div>
                 </div>
                 {canEdit && (
@@ -256,6 +360,41 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * La prueba del marcaje, junto al registro que sustenta. Una evidencia que
+ * nadie puede ver no es una evidencia: si la foto y la ubicación solo viven en
+ * la base, discutir un fichaje sigue siendo la palabra de uno contra la de otro.
+ *
+ * Solo aparece en los marcajes de autoservicio — el registro manual no tiene
+ * nada de esto y una fila vacía con iconos apagados diría lo contrario.
+ */
+function EvidenciaMarcaje({ registro }: { registro: PresenciaPersonal }) {
+  if (registro.origen !== 'autoservicio') return null
+  const gps = registro.gps_entrada ?? registro.gps_salida
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'var(--at-primary-soft)', color: 'var(--at-primary-2)' }}>
+        Marcado por la persona
+      </span>
+      {[registro.foto_entrada, registro.foto_salida].filter(Boolean).map(path => (
+        <SecureImage
+          key={path}
+          src={path}
+          bucket={BUCKET_PRESENCIA}
+          alt="Foto del marcaje"
+          style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--at-line)' }}
+        />
+      ))}
+      {gps && (
+        <span style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>
+          📍 {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+          {gps.exactitud_m ? ` (±${Math.round(gps.exactitud_m)} m)` : ''}
+        </span>
       )}
     </div>
   )
