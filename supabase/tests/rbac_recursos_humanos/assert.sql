@@ -13,14 +13,21 @@
 DO $$
 DECLARE n int;
 BEGIN
+  -- Sólo la PRIMERA tanda (20260907001200). El total de la sección lo vigila D1,
+  -- que es de la segunda: si A1 contara el total, cada tanda nueva lo rompería
+  -- y se acabaría relajando el assert en vez de leerlo.
   SELECT count(*) INTO n
   FROM public.permissions
-  WHERE category = 'recursos_humanos';
+  WHERE category = 'recursos_humanos'
+    AND (
+         split_part(key, '.', 3) IN ('personal', 'capacitacion_personal',
+                                     'tareas_cond', 'prog_limpieza', 'actividad_equipo')
+    );
 
   IF n <> 30 THEN
-    RAISE EXCEPTION 'A1: se esperaban 30 claves en recursos_humanos (5 tabs × base + 5 acciones), hay %', n;
+    RAISE EXCEPTION 'A1: se esperaban 30 claves de la primera tanda (5 tabs × base + 5 acciones), hay %', n;
   END IF;
-  RAISE NOTICE 'A1  OK  30 claves exactas en la categoría recursos_humanos';
+  RAISE NOTICE 'A1  OK  30 claves exactas de la primera tanda en recursos_humanos';
 END $$;
 
 DO $$
@@ -73,14 +80,17 @@ BEGIN
     RAISE EXCEPTION 'A4: inventario se movió a % — la reclasificación arrastró de más', cat;
   END IF;
 
-  -- `tareas_personal` (Seguridad) comparte prefijo con `tareas_cond` sólo hasta
-  -- "tareas", pero es el vecino que un patrón laxo se llevaría por delante.
-  SELECT category INTO cat FROM public.permissions WHERE key = 'condominios.tab.tareas_personal';
+  -- El vecino que comparte prefijo con `tareas_cond` es `tareas_personal`, pero
+  -- la segunda tanda lo muda legítimamente, así que ese control vive ahora en
+  -- entre_tandas.sql, que mira el estado intermedio — la única ventana donde el
+  -- arrastre de la PRIMERA sería visible. Aquí quedan los que se quedan en
+  -- Seguridad para siempre.
+  SELECT category INTO cat FROM public.permissions WHERE key = 'condominios.tab.bitacora_guardia';
   IF cat <> 'seguridad' THEN
-    RAISE EXCEPTION 'A4: tareas_personal se movió a % — la reclasificación arrastró de más', cat;
+    RAISE EXCEPTION 'A4: bitacora_guardia se movió a % — la reclasificación arrastró de más', cat;
   END IF;
 
-  RAISE NOTICE 'A4  OK  los vecinos (documentos, inventario, tareas_personal) no se movieron';
+  RAISE NOTICE 'A4  OK  los vecinos (documentos, inventario, bitacora_guardia) no se movieron';
 END $$;
 
 -- ── B · HERENCIA DE GRANTS ──────────────────────────────────────────────────
@@ -230,4 +240,85 @@ BEGIN
     RAISE EXCEPTION 'C2: % grant(s) apuntan a claves inexistentes', n;
   END IF;
   RAISE NOTICE 'C2  OK  ningún grant apunta al vacío';
+END $$;
+
+-- ── D · SEGUNDA TANDA: la jornada que venía de Seguridad (20260907001400) ───
+
+DO $$
+DECLARE n int;
+BEGIN
+  -- 10 tabs × (base + 5 acciones) = 60, más las 30 de la primera tanda = 90.
+  SELECT count(*) INTO n FROM public.permissions WHERE category = 'recursos_humanos';
+  IF n <> 90 THEN
+    RAISE EXCEPTION 'D1: se esperaban 90 claves en recursos_humanos (30 + 60 de la jornada), hay %', n;
+  END IF;
+  RAISE NOTICE 'D1  OK  90 claves: la sección absorbió la jornada completa';
+END $$;
+
+DO $$
+DECLARE falta text;
+BEGIN
+  FOREACH falta IN ARRAY ARRAY[
+    'condominios.tab.turnos',
+    'condominios.tab.plantillas_cargo',
+    'condominios.tab.ausencias',
+    'condominios.tab.horas_extra',
+    'condominios.tab.presencia',
+    'condominios.tab.panel_turno',
+    'condominios.tab.tareas_personal',
+    'condominios.tab.revision_tareas',
+    'condominios.tab.rutas_ronda',
+    'condominios.tab.desempeno_personal'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM public.permissions
+      WHERE key = falta AND category = 'recursos_humanos'
+    ) THEN
+      RAISE EXCEPTION 'D2: % no llegó a recursos_humanos (o dejó de existir)', falta;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'D2  OK  los diez tabs de la jornada están en la sección, con su nombre intacto';
+END $$;
+
+DO $$
+DECLARE cat text;
+BEGIN
+  -- Control negativo de la segunda tanda: lo que se queda en Seguridad. Con
+  -- `revision_tareas` ya mudado, el vigilante es `bitacora_guardia`, que
+  -- comparte el prefijo `bitacora` con `bitacora_acciones` (Administración) y
+  -- es de los que un patrón laxo se llevaría por delante.
+  SELECT category INTO cat FROM public.permissions WHERE key = 'condominios.tab.bitacora_guardia';
+  IF cat <> 'seguridad' THEN
+    RAISE EXCEPTION 'D3: bitacora_guardia se movió a % — la reclasificación arrastró de más', cat;
+  END IF;
+  RAISE NOTICE 'D3  OK  bitacora_guardia sigue en Seguridad';
+END $$;
+
+DO $$
+DECLARE n int;
+BEGIN
+  -- Lo que esta migración NO debe hacer: tocar autorización. El rol de
+  -- seguridad con jornada a cargo conserva sus seis grants, con sus effects.
+  SELECT count(*) INTO n FROM public.role_permissions
+  WHERE role_id = '00000000-0000-0000-0000-0000000000a6';
+  IF n <> 6 THEN
+    RAISE EXCEPTION 'D4: el rol de seguridad tenía 6 grants y ahora tiene % — la mudanza tocó autorización', n;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.role_permissions
+    WHERE role_id = '00000000-0000-0000-0000-0000000000a6'
+      AND permission_key = 'condominios.tab.turnos' AND effect = 'allow'
+  ) THEN
+    RAISE EXCEPTION 'D4: el rol de seguridad perdió turnos al mudarse de sección';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.role_permissions
+    WHERE role_id = '00000000-0000-0000-0000-0000000000a6'
+      AND permission_key = 'condominios.tab.revision_tareas' AND effect = 'deny'
+  ) THEN
+    RAISE EXCEPTION 'D4: el deny de revision_tareas se convirtió en allow';
+  END IF;
+  RAISE NOTICE 'D4  OK  el rol de seguridad conserva sus grants y sus deny';
 END $$;
