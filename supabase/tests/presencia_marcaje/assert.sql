@@ -12,7 +12,7 @@
 --   12-14  quién NO puede marcar: sin ficha, ficha inactiva, sin acceso
 --   15     la tardanza sale de la tolerancia de la plantilla de horario
 --   16-19  el bucket: privado, y sus policies (propia sí, ajena no, sin UPDATE)
---   20-21  la ACL de las RPC
+--   20-22  la ACL de las RPC, y el marcaje ejercido COMO `authenticated`
 -- ════════════════════════════════════════════════════════════════════════════
 
 DO $$
@@ -268,5 +268,46 @@ BEGIN
   IF NOT has_function_privilege('authenticated', 'public.presencia_marcar(uuid,text,text,jsonb,text)', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'public.presencia_mi_ficha(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION '21: authenticated no puede ejecutar las RPC del marcaje'; END IF;
-  RAISE NOTICE 'OK 21 authenticated sí: es quien marca';
+  -- Y solo eso, más el helper que se evalúa dentro de las policies de storage.
+  -- Los dos internos NO se le conceden: sus llamadores son cuerpos SECURITY
+  -- DEFINER que corren como el dueño (remedio de migrations-guard, regla b).
+  IF NOT has_function_privilege('authenticated', 'public.presencia_ficha_es_propia(text,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION '21: authenticated no puede evaluar presencia_ficha_es_propia; las policies de storage se romperían'; END IF;
+  IF has_function_privilege('authenticated', 'public.presencia_ficha_de_usuario(uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.presencia_zona_horaria(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION '21: los helpers internos siguen concedidos a authenticated'; END IF;
+  RAISE NOTICE 'OK 21 authenticated ejecuta las dos RPC y el helper de las policies, y nada más';
+END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 22 · El camino real, ejercido COMO `authenticated`
+-- Todo lo de arriba corre como superusuario, que ve y ejecuta todo: no probaría
+-- que un empleado de verdad puede marcar. Sobre todo después de revocarle a
+-- `authenticated` los dos helpers internos — si esa revocación rompiera la
+-- cadena, se vería exactamente aquí y en ningún otro lado.
+-- ════════════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE
+  LUZ uuid := 'e0000000-0000-0000-0000-000000000005';
+  P1  uuid := '11111111-0000-0000-0000-000000000001';
+  f   record;
+  r   record;
+BEGIN
+  PERFORM set_config('app.uid', LUZ::text, false);
+  SET LOCAL ROLE authenticated;
+
+  SELECT * INTO f FROM public.presencia_mi_ficha(P1);
+  IF f.nombre IS DISTINCT FROM 'Luz Jardinera' OR f.fecha_operativa IS NULL THEN
+    RAISE EXCEPTION '22: mi_ficha no contestó a una cuenta authenticated (%)', f; END IF;
+
+  SELECT * INTO r FROM public.presencia_marcar(P1, 'entrada', NULL, NULL, NULL);
+  IF r.registro_id IS NULL OR r.hora IS NULL THEN
+    RAISE EXCEPTION '22: un empleado authenticated no pudo marcar su entrada'; END IF;
+
+  SELECT * INTO r FROM public.presencia_marcar(P1, 'salida', NULL, NULL, NULL);
+  IF r.tipo <> 'salida' THEN RAISE EXCEPTION '22: no pudo cerrar su jornada'; END IF;
+
+  RESET ROLE;
+  PERFORM set_config('app.uid', NULL, false);
+  RAISE NOTICE 'OK 22 un empleado real (rol authenticated) consulta su ficha, entra y sale';
 END $$;

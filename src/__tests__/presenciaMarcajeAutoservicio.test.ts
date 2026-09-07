@@ -79,7 +79,27 @@ describe('quién puede marcar', () => {
     ]) {
       const escapado = fn.replace(/[().*+?^${}|[\]\\]/g, '\\$&')
       expect(codigo).toMatch(new RegExp(`REVOKE EXECUTE ON FUNCTION ${escapado} FROM PUBLIC, anon`))
+    }
+  })
+
+  it('a `authenticated` solo se le concede lo que de verdad invoca', () => {
+    // Las dos RPC que llama el navegador, y el helper que se evalúa DENTRO de
+    // las policies de storage (donde corre con el rol invocante).
+    for (const fn of [
+      'public.presencia_marcar(uuid, text, text, jsonb, text)',
+      'public.presencia_mi_ficha(uuid)',
+      'public.presencia_ficha_es_propia(text, text)',
+    ]) {
+      const escapado = fn.replace(/[().*+?^${}|[\]\\]/g, '\\$&')
       expect(codigo).toMatch(new RegExp(`GRANT\\s+EXECUTE ON FUNCTION ${escapado} TO authenticated`))
+    }
+    // Los dos helpers internos NO: sus llamadores son cuerpos SECURITY DEFINER
+    // que corren como el dueño. Es el remedio que prescribe el propio
+    // migrations-guard.allowlist.json para esta clase de función.
+    for (const fn of ['public.presencia_ficha_de_usuario(uuid)', 'public.presencia_zona_horaria(uuid)']) {
+      const escapado = fn.replace(/[().*+?^${}|[\]\\]/g, '\\$&')
+      expect(codigo).toMatch(new RegExp(`REVOKE EXECUTE ON FUNCTION ${escapado} FROM PUBLIC, anon, authenticated`))
+      expect(codigo).not.toMatch(new RegExp(`GRANT\\s+EXECUTE ON FUNCTION ${escapado} TO authenticated`))
     }
   })
 

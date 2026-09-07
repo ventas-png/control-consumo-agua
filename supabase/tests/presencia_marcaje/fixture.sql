@@ -205,20 +205,24 @@ INSERT INTO auth.users (id, email) VALUES
   ('e0000000-0000-0000-0000-000000000001', 'dina@empresa-a.com'),
   ('e0000000-0000-0000-0000-000000000002', 'marco@empresa-a.com'),
   ('e0000000-0000-0000-0000-000000000003', 'sin.ficha@empresa-a.com'),
-  ('e0000000-0000-0000-0000-000000000004', 'nocturno@empresa-a.com');
+  ('e0000000-0000-0000-0000-000000000004', 'nocturno@empresa-a.com'),
+  ('e0000000-0000-0000-0000-000000000005', 'luz@empresa-a.com');
 
 INSERT INTO public.app_users (id, full_name, role, activo, company_id, project_id) VALUES
   ('e0000000-0000-0000-0000-00000000000d', 'Ada Admin',      'admin',    true, 'aaaaaaaa-0000-0000-0000-00000000000a', NULL),
   ('e0000000-0000-0000-0000-000000000001', 'Dina Villatoro', 'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000002'),
   ('e0000000-0000-0000-0000-000000000002', 'Marco Sical',    'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
   ('e0000000-0000-0000-0000-000000000003', 'Sin Ficha',      'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
-  ('e0000000-0000-0000-0000-000000000004', 'Noe Nocturno',   'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001');
+  ('e0000000-0000-0000-0000-000000000004', 'Noe Nocturno',   'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-000000000005', 'Luz Jardinera',  'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001');
 
 INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, estado, user_id) VALUES
   ('9e000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Marco Antonio Sical', 'guardia',  'activo',   'e0000000-0000-0000-0000-000000000002'),
   ('9e000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Noe Nocturno',        'guardia',  'activo',   'e0000000-0000-0000-0000-000000000004'),
   ('9e000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Dina Villatoro',      'conserje', 'inactivo', 'e0000000-0000-0000-0000-000000000001'),
-  ('9e000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Ana sin cuenta',      'conserje', 'activo',   NULL);
+  ('9e000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Ana sin cuenta',      'conserje', 'activo',   NULL),
+  -- Luz existe solo para ejercer el camino real: marcar COMO `authenticated`.
+  ('9e000000-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Luz Jardinera',       'jardinero','activo',   'e0000000-0000-0000-0000-000000000005');
 
 -- Marco administra NADA: no tiene ni el permiso del tab. Es justo el caso que
 -- el diseño tiene que cubrir.

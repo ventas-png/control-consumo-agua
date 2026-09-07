@@ -19,7 +19,7 @@
 #     el día 5 y sale el 6; buscar "la fila de hoy" dejaría la de ayer abierta
 #     para siempre y la planilla sin esas ocho horas.
 #
-# QUÉ COMPRUEBA (21 invariantes)
+# QUÉ COMPRUEBA (22 invariantes)
 #   1-3    la vía existe sin el permiso del tab, y fecha/hora/expediente los
 #          pone la base
 #   4-6    la evidencia: la foto propia y subida queda ligada; la ajena y la
@@ -31,7 +31,12 @@
 #   15     la tardanza sale de la tolerancia de la plantilla de horario
 #   16-19  el bucket privado y sus policies: cada quien ve su foto, nadie la
 #          sustituye, quien fichó no la borra y nadie sube bajo otro expediente
-#   20-21  la ACL: anon no ejecuta nada, authenticated sí
+#   20-21  la ACL: anon no ejecuta nada; authenticated ejecuta las dos RPC y el
+#          helper de las policies, y NO los dos helpers internos (sus llamadores
+#          son cuerpos SECURITY DEFINER que corren como el dueño)
+#   22     el camino real ejercido COMO `authenticated`: todo lo anterior corre
+#          como superusuario, que ejecuta todo; esto es lo único que prueba que
+#          un empleado de verdad puede consultar su ficha, entrar y salir
 #
 # USO
 #   supabase/tests/presencia_marcaje/run.sh
@@ -92,7 +97,7 @@ psql -q -d presencia -c "
   GRANT SELECT ON storage.buckets, public.app_users, public.projects,
                   public.personal_condominio, public.presencia_personal TO authenticated;
 " >/dev/null
-echo "  OK    stubs + 5 cuentas + 2 condominios + 4 expedientes"
+echo "  OK    stubs + 6 cuentas + 2 condominios + 5 expedientes"
 
 echo "── 2/3 · la migración, aplicada DOS veces (idempotente) ────────────────"
 for _ in 1 2; do aplicar "$MIGRACION"; done

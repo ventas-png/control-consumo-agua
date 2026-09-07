@@ -151,8 +151,14 @@ $$;
 COMMENT ON FUNCTION public.presencia_zona_horaria(uuid) IS
   'Zona IANA del tenant para fechar el marcaje, con fallback a America/Guatemala si companies.timezone falta o es inválida. Un typo en configuración no puede impedir fichar.';
 
-REVOKE EXECUTE ON FUNCTION public.presencia_zona_horaria(uuid) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.presencia_zona_horaria(uuid) TO authenticated;
+-- SIN grant a `authenticated`, a propósito. Sus únicos llamadores son los
+-- cuerpos de presencia_mi_ficha y presencia_marcar, que son SECURITY DEFINER y
+-- corren como el dueño: no necesitan el privilegio del invocante. Y expuesta
+-- toma un company_id ajeno y contesta igual — trivial, pero es una lectura
+-- cross-tenant que nada necesita. Es el remedio que el propio
+-- scripts/migrations-guard.allowlist.json prescribe para esta clase de helper:
+-- «el remedio correcto no es un guard sino REVOKE EXECUTE … FROM authenticated».
+REVOKE EXECUTE ON FUNCTION public.presencia_zona_horaria(uuid) FROM PUBLIC, anon, authenticated;
 
 -- ── 3. Quién es esta cuenta AQUÍ ────────────────────────────────────────────
 -- SECURITY DEFINER porque tiene que leer `personal_condominio`, cuya RLS exige
@@ -179,8 +185,11 @@ $$;
 COMMENT ON FUNCTION public.presencia_ficha_de_usuario(uuid) IS
   'Expediente (personal_condominio.id) de la cuenta que llama en ese condominio, o NULL si no tiene o está inactiva. SECURITY DEFINER porque la RLS de personal_condominio exige el permiso del tab Personal, que el personal operativo no tiene sobre su propia ficha.';
 
-REVOKE EXECUTE ON FUNCTION public.presencia_ficha_de_usuario(uuid) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.presencia_ficha_de_usuario(uuid) TO authenticated;
+-- Tampoco se le concede a `authenticated`: la llaman presencia_mi_ficha,
+-- presencia_marcar y presencia_ficha_es_propia, las tres SECURITY DEFINER. La
+-- que SÍ se evalúa dentro de una policy —y por tanto con el rol invocante— es
+-- `presencia_ficha_es_propia`, que va justo abajo con su grant.
+REVOKE EXECUTE ON FUNCTION public.presencia_ficha_de_usuario(uuid) FROM PUBLIC, anon, authenticated;
 
 -- Variante en text para las policies de storage, donde los segmentos del path
 -- son text y un cast inválido en un WITH CHECK aborta la petición entera en vez
