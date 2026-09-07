@@ -39,6 +39,10 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   notify: vi.fn(),
+  // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
+  // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
+  // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
+  secureImage: vi.fn(),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
@@ -53,7 +57,9 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../../lib/nativeGeo', () => ({ obtenerUbicacion: mocks.obtenerUbicacion }))
 vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: vi.fn() }))
-vi.mock('../../../shared/SecureImage', () => ({ SecureImage: () => null }))
+vi.mock('../../../shared/SecureImage', () => ({
+  SecureImage: (props: { src?: string | null; bucket?: string }) => { mocks.secureImage(props); return null },
+}))
 
 const { default: PresenciaPersonalTab } = await import('../PresenciaPersonalTab')
 
@@ -215,5 +221,35 @@ describe('la lista del día', () => {
     await waitFor(() => expect(screen.getByText('Ana López')).toBeTruthy())
     expect(screen.getAllByText('Marcado por la persona').length).toBe(1)
     expect(screen.getByText(/14\.60271, -90\.51328/)).toBeTruthy()
+    // Y la foto se pide al bucket privado del fichaje, no al de media general.
+    expect(mocks.secureImage).toHaveBeenCalledTimes(1)
+    expect(mocks.secureImage).toHaveBeenCalledWith(
+      expect.objectContaining({ src: 'p1/per-1/f.jpg', bucket: 'presencia-evidencias' }),
+    )
+  })
+
+  it('sobrevive a la purga de su propia evidencia', async () => {
+    // Al año, la purga por retención (20260908000100) anula foto y GPS pero NO
+    // la fila: el marcaje es dato de planilla. La lista tiene que seguir
+    // mostrando la jornada —hora, estado, horas— sin la prueba que ya caducó, y
+    // sin romperse por un path nulo.
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    const purgado: PresenciaPersonal[] = [{
+      id: 'r1', company_id: 'c1', project_id: 'p1', nombre: 'Marco Sical', cargo: 'guardia',
+      fecha: new Date().toISOString().slice(0, 10), hora_entrada: '06:03', hora_salida: '14:05',
+      estado: 'presente', created_at: '2025-09-07', origen: 'autoservicio',
+      foto_entrada: null, foto_salida: null, gps_entrada: null, gps_salida: null,
+      entrada_marcada_en: '2025-09-07T12:03:00Z', salida_marcada_en: '2025-09-07T20:05:00Z',
+    }]
+    montar(purgado)
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    // El hecho sigue ahí, con sus horas calculadas.
+    expect(screen.getByText(/Entrada: 06:03/)).toBeTruthy()
+    expect(screen.getByText(/Salida: 14:05/)).toBeTruthy()
+    // Y sigue constando CÓMO se marcó, aunque la prueba ya no esté.
+    expect(screen.getByText('Marcado por la persona')).toBeTruthy()
+    // Sin foto ni coordenada: no se intenta firmar ninguna URL ni pintar nada.
+    expect(mocks.secureImage).not.toHaveBeenCalled()
+    expect(screen.queryByText(/📍/)).toBeNull()
   })
 })

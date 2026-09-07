@@ -1,8 +1,44 @@
-# Purga de fotos de lectura a los 90 días
+# Retención de fotos: lecturas a 90 días, fichajes a 1 año
 
-Elimina automáticamente la foto de toda lectura (`registros.foto`) con más de 90
-días para no inflar el software. **Los datos de la lectura (consumo, lectura,
-monto, estado) siempre se conservan — solo se descarta la imagen.**
+Elimina automáticamente las fotos que guardan los dos flujos que las producen.
+**En los dos casos la fila sobrevive**: se descarta la imagen, nunca el hecho.
+
+| Qué | Bucket | Plazo | Qué se anula |
+| --- | --- | --- | --- |
+| Foto de una lectura de agua | `registro-fotos` | **90 días** | `registros.foto` |
+| Foto y ubicación de un fichaje | `presencia-evidencias` | **365 días** | `presencia_personal.foto_entrada`, `.foto_salida`, `.gps_entrada`, `.gps_salida` |
+
+Los datos de la lectura (consumo, lectura, monto, estado) y los del marcaje
+(hora de entrada y salida, estado, horas trabajadas) **siempre se conservan**.
+
+## Por qué cada plazo es el que es
+
+**Lecturas — 90 días.** La foto prueba un número. Pasado un trimestre el número
+ya se cobró y la imagen solo pesa: es el bloat que motivó esta purga
+(`registros.foto` en base64 llegó a ~526 MB acumulados).
+
+**Fichajes — 365 días.** La foto y el GPS prueban que *una persona identificada*
+estuvo en un sitio a una hora. Sirven para resolver un marcaje discutido, y eso
+se discute dentro del ciclo laboral: la planilla del año, el aguinaldo, el bono
+14. Un año cubre esa ventana entera con margen. Pasada, ya no contesta ninguna
+pregunta abierta y lo único que queda es el rastro — una serie temporal de la
+cara y la posición de cada trabajador, que es el dato más sensible que guarda el
+producto.
+
+> Si el asesor laboral pide alinearlo con el plazo de prescripción de reclamos
+> (más largo que un año), el número vive en **un solo sitio**:
+> `run_purga_fotos_storage()` en `20260908000100_purga_fotos_presencia.sql`. Se
+> cambia ahí y el cron lo toma en la corrida siguiente.
+
+### El GPS caduca con la foto — es una decisión
+
+Al purgar un fichaje se anulan también `gps_entrada` y `gps_salida`. Es el mismo
+dato —dónde estuvo una persona identificada, a qué hora— y sin la foto ya no
+sirve para lo único que justificaba guardarlo. Dejarlo sobrevivir lo convertiría
+en el rastro de ubicación más longevo del sistema, conservado por omisión y no
+porque alguien decidiera conservarlo.
+
+## Por qué dos mecánicas
 
 ## Por qué dos mecánicas
 
@@ -17,12 +53,45 @@ La antigüedad se mide con `registros.fecha`. La UI ya tolera una foto ausente
 (`PhotoLightbox` / `RegistroFotoThumb` muestran un placeholder), así que purgar
 no rompe nada.
 
+## Los fichajes van por la misma cañería, no por una nueva
+
+`presencia-evidencias` (creado por `20260908000000_presencia_marcaje_autoservicio.sql`)
+se purga con la **misma** edge function y el **mismo** cron que las lecturas.
+`20260908000100_purga_fotos_presencia.sql` solo cambia el cuerpo de
+`run_purga_fotos_storage()` para que mande los dos plazos explícitos:
+
+```json
+{ "mode": "batch", "dias_registros": 90, "dias_presencia": 365 }
+```
+
+Los plazos viajan explícitos aunque la edge function tenga los mismos por
+defecto, para que la política de retención se lea **en la base**, donde vive el
+dato, y no solo en el código desplegado.
+
+**Por qué no una función hermana.** Habría necesitado su propio secreto de URL en
+el Vault, y los de abajo *todavía no están creados*: una segunda función era un
+segundo paso manual pendiente, y por tanto una segunda purga que no corre.
+Extendiendo la que ya existe, el día que se creen esos dos secretos empiezan a
+correr las dos.
+
+El barrido de cada bucket es independiente: que uno falle no aborta al otro, y la
+respuesta reporta ambos por separado (`objetivos: [{nombre, objetos_borrados,
+filas_actualizadas, errores}]`).
+
+**El orden importa y está probado.** Primero se borra el objeto del bucket y solo
+después se anula la columna. Al revés, un fallo del `remove` dejaría la fila sin
+path y el archivo vivo para siempre —invisible y no purgable—; al derecho, un
+fallo deja el path intacto y la corrida del mes siguiente lo reintenta.
+`supabase/functions/purgar-fotos-registros/__tests__/logic.test.ts` fuerza ese
+fallo y exige que la columna NO se haya tocado.
+
 ## Estado tras la migración `20260723000000_purga_fotos_registros.sql`
 
 - ✅ `purgar_datos_expirados(...)` extendida con el paso base64 (param `p_dias_fotos int DEFAULT 90`). Ya la corre el cron mensual `purgar_datos_expirados` (`0 3 1 * *`).
 - ✅ Función SQL `run_purga_fotos_storage()` — lee 2 secretos del vault y hace `net.http_post` a la edge function. **Safe no-op si faltan los secretos.**
 - ✅ Cron `purgar_fotos_storage_monthly` → `30 3 1 * *` (día 1, 03:30 UTC, desfasado 30 min del de retención).
 - ✅ Edge function `purgar-fotos-registros` (se despliega por `.github/workflows/deploy-functions.yml` al mergear a `main`).
+- ✅ `20260908000100` extiende esa misma función y ese mismo cron a `presencia-evidencias` (365 d, con el GPS). Sin cron nuevo y sin secretos nuevos.
 
 ## Lo único que falta — 1 paso manual (vault secrets)
 
