@@ -73,3 +73,63 @@ export function watchLocation(
 ): () => void {
   return isNative() ? watchNative(onSuccess, onError) : watchWeb(onSuccess, onError)
 }
+
+// ── Ubicación PUNTUAL ───────────────────────────────────────────────────────
+// `watchLocation` observa; un fichaje no observa: pregunta una vez, con un
+// límite de espera, y sigue adelante con o sin respuesta. Un marcaje que se
+// quedara colgado esperando al GPS sería peor que uno sin coordenadas — la
+// persona está parada en la puerta con el turno empezando.
+
+/** Coordenada de un marcaje, con la exactitud que reporta el dispositivo. */
+export interface CoordsMarcaje extends Coords {
+  /** Radio de error en metros, tal como lo da el dispositivo. null si no lo da. */
+  exactitud_m: number | null
+}
+
+const UNA_VEZ_OPTS = { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
+
+async function ubicacionNativa(): Promise<CoordsMarcaje> {
+  const { Geolocation } = await import('@capacitor/geolocation')
+  const perm = await Geolocation.requestPermissions()
+  if (perm.location === 'denied' && perm.coarseLocation === 'denied') {
+    throw new Error('Permiso de ubicación denegado')
+  }
+  const pos = await Geolocation.getCurrentPosition(UNA_VEZ_OPTS)
+  return {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    exactitud_m: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+  }
+}
+
+function ubicacionWeb(): Promise<CoordsMarcaje> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocalización no disponible en este dispositivo'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        exactitud_m: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+      }),
+      err => reject(new Error(err.message || 'No se pudo obtener la ubicación')),
+      UNA_VEZ_OPTS,
+    )
+  })
+}
+
+/**
+ * Pide la ubicación UNA vez. Nunca lanza: devuelve `{ coords }` o `{ error }`
+ * con un mensaje legible, porque quien la llama tiene que poder mostrar «sin
+ * ubicación» y dejar continuar en vez de romperse.
+ */
+export async function obtenerUbicacion(): Promise<{ coords: CoordsMarcaje | null; error: string | null }> {
+  try {
+    const coords = isNative() ? await ubicacionNativa() : await ubicacionWeb()
+    return { coords, error: null }
+  } catch (e) {
+    return { coords: null, error: e instanceof Error ? e.message : 'No se pudo obtener la ubicación' }
+  }
+}

@@ -1,13 +1,33 @@
 // Edge Function: purgar-fotos-registros
 // -----------------------------------------------------------------------------
-// Borra del bucket privado `registro-fotos` los objetos de fotos de lecturas con
-// más de N días (default 90) y luego pone `registros.foto = NULL` en esas filas.
-// Solo toca fotos en formato PATH de Storage; las heredadas en base64 (data-URI
-// inline en la columna) las limpia el paso SQL de `purgar_datos_expirados`.
+// Purga por RETENCIÓN las fotos que viven en buckets privados. Hoy son dos, con
+// plazos distintos porque son datos distintos:
 //
-// La antigüedad se mide con `registros.fecha`. No se filtra por estado de pago
-// (política: todas las lecturas >N días) — los datos de la lectura se conservan,
-// solo se descarta la imagen.
+//   `registro-fotos`        90 d   la foto de una lectura de agua. Prueba de un
+//                                  número; pasado un trimestre, el número ya se
+//                                  cobró y la foto solo pesa.
+//   `presencia-evidencias` 365 d   la foto y la ubicación de un fichaje. Prueba
+//                                  de que UNA PERSONA estuvo en un sitio a una
+//                                  hora. Se guarda un ciclo laboral completo
+//                                  —la planilla del año, el aguinaldo, el bono
+//                                  14— porque es la ventana en la que un
+//                                  marcaje se discute; pasada, es una serie
+//                                  temporal de la cara de cada trabajador sin
+//                                  ninguna pregunta que conteste.
+//
+// EN LOS DOS CASOS LA FILA SOBREVIVE. Se anula la columna de la foto (y, en el
+// fichaje, el GPS que la acompaña); la lectura y el marcaje —hora, estado,
+// horas trabajadas— son dato de negocio y de planilla, y no se tocan. Ver
+// docs/PURGA_FOTOS_SCHEDULE.md.
+//
+// De `registros` solo se tocan las fotos en formato PATH de Storage; las
+// heredadas en base64 (data-URI inline en la columna) las limpia el paso SQL de
+// `purgar_datos_expirados`. `presencia_personal` nunca tuvo base64.
+//
+// La antigüedad se mide con la fecha de negocio de cada fila (`registros.fecha`,
+// `presencia_personal.fecha`). No se filtra por estado de pago ni de asistencia:
+// la política es por tiempo, y una excepción por estado sería una retención que
+// nadie podría explicar.
 //
 // Invocada por pg_cron → pg_net (run_purga_fotos_storage, secretos en Vault) con
 // la service_role key, o manualmente por un super_admin con su JWT. En
@@ -16,15 +36,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { timingSafeEqualSecret } from '../_shared/auth.ts'
+import { diasDelBody, purgarObjetivo, type ClientePurga, type ObjetivoPurga } from './logic.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-const BUCKET = 'registro-fotos'
-const DIAS_RETENCION_DEFAULT = 90
-const BATCH_SIZE = 200
-// Tope duro por corrida (200 × 100 = 20 000 fotos); evita una corrida infinita.
-const MAX_ITERACIONES = 100
+const DIAS_REGISTROS_DEFAULT = 90
+const DIAS_PRESENCIA_DEFAULT = 365
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin')
@@ -49,53 +67,51 @@ Deno.serve(async (req: Request) => {
     }
     if (!autorizado) return json({ error: 'Forbidden' }, 403)
 
-    const body = await req.json().catch(() => ({})) as { dias?: number }
-    const dias = Number.isFinite(body.dias) && (body.dias as number) > 0
-      ? Math.floor(body.dias as number)
-      : DIAS_RETENCION_DEFAULT
-    const cutoff = new Date(Date.now() - dias * 86400000).toISOString()
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>
+    // `dias` a secas es la clave histórica de esta función, cuando purgaba una
+    // sola cosa: se conserva para no romper una invocación manual guardada.
+    const diasRegistros = diasDelBody(body, ['dias_registros', 'dias'], DIAS_REGISTROS_DEFAULT)
+    const diasPresencia = diasDelBody(body, ['dias_presencia'], DIAS_PRESENCIA_DEFAULT)
 
-    let objetosBorrados = 0
-    let filasActualizadas = 0
-    let iteraciones = 0
-    const errores: string[] = []
+    const objetivos: ObjetivoPurga[] = [
+      {
+        nombre: 'registros',
+        tabla: 'registros',
+        bucket: 'registro-fotos',
+        columnaFecha: 'fecha',
+        columnasFoto: ['foto'],
+        excluirLike: 'data:%',
+        diasRetencion: diasRegistros,
+      },
+      {
+        nombre: 'presencia',
+        tabla: 'presencia_personal',
+        bucket: 'presencia-evidencias',
+        columnaFecha: 'fecha',
+        columnasFoto: ['foto_entrada', 'foto_salida'],
+        // El GPS caduca con la foto: es el mismo dato —dónde estuvo una persona
+        // identificada— y sin la foto ya no resuelve el marcaje que justificaba
+        // guardarlo.
+        columnasAcompanantes: ['gps_entrada', 'gps_salida'],
+        diasRetencion: diasPresencia,
+      },
+    ]
 
-    for (let i = 0; i < MAX_ITERACIONES; i++) {
-      // Solo fotos en formato PATH de Storage (el base64 lo maneja el SQL).
-      // Al anular la columna, la siguiente vuelta ya no las trae → pagina sola.
-      const { data: rows, error } = await admin
-        .from('registros')
-        .select('id, foto')
-        .not('foto', 'is', null)
-        .not('foto', 'like', 'data:%')
-        .lt('fecha', cutoff)
-        .limit(BATCH_SIZE)
-      if (error) { errores.push(`select: ${error.message}`); break }
-      if (!rows || rows.length === 0) break
-
-      iteraciones++
-      const ids = rows.map((r) => r.id as string)
-      const paths = rows.map((r) => r.foto as string)
-
-      // 1) Borrar los objetos del bucket. Best-effort: un objeto ausente NO es
-      //    error en la Storage API (mismo criterio tolerante que delete-company).
-      const { error: rmErr } = await admin.storage.from(BUCKET).remove(paths)
-      if (rmErr) { errores.push(`remove: ${rmErr.message}`); break }
-      objetosBorrados += paths.length
-
-      // 2) Anular la columna SOLO tras borrar el objeto (si el remove fallara, no
-      //    perdemos el path y se reintenta el próximo mes).
-      const { error: updErr } = await admin.from('registros').update({ foto: null }).in('id', ids)
-      if (updErr) { errores.push(`update: ${updErr.message}`); break }
-      filasActualizadas += ids.length
+    // Cada objetivo se barre por separado y su fallo no aborta al otro: que la
+    // purga del fichaje tropiece no es motivo para dejar de purgar lecturas, ni
+    // al revés.
+    const resultados = []
+    for (const objetivo of objetivos) {
+      resultados.push(await purgarObjetivo(admin as unknown as ClientePurga, objetivo))
     }
+    const errores = resultados.flatMap(r => r.errores.map(e => `${r.nombre}/${e}`))
 
     return json({
       success: errores.length === 0,
-      dias,
-      objetos_borrados: objetosBorrados,
-      filas_actualizadas: filasActualizadas,
-      iteraciones,
+      objetivos: resultados,
+      // Totales agregados: lo que miraba quien ya leía esta respuesta.
+      objetos_borrados: resultados.reduce((n, r) => n + r.objetos_borrados, 0),
+      filas_actualizadas: resultados.reduce((n, r) => n + r.filas_actualizadas, 0),
       errores,
     })
   } catch (err) {

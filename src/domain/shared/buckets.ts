@@ -15,3 +15,13 @@ export const BUCKET_MEDIA = 'condominios-media'
  * 20260831000000 resuelven el permiso a partir de la pieza.
  */
 export const BUCKET_EVIDENCIAS = 'recepcion-evidencias'
+
+/**
+ * Fotos del marcaje de turno (entrada y salida). Bucket PRIVADO propio, por la
+ * misma razón que el de arriba y con más peso: en `condominios-media` cualquier
+ * residente del condominio podría descargar la serie de fotos de la cara y la
+ * ubicación de cada trabajador. Ruta `<project_id>/<personal_id>/<archivo>`; las
+ * policies de 20260908000000 dejan leer al dueño de la foto y a quien administra
+ * la asistencia, y no dejan sustituirla a nadie.
+ */
+export const BUCKET_PRESENCIA = 'presencia-evidencias'
