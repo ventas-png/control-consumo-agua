@@ -39,6 +39,8 @@ const COMPLETAS = {
   E2E_RESTRICTED_PASSWORD: 'y',
   E2E_EXPECTED_SUPABASE_REF: 'sandboxref',
   E2E_VERCEL_BYPASS_TOKEN: TOKEN_BYPASS,
+  E2E_SUPABASE_URL: 'https://sandboxref.supabase.co',
+  E2E_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_e2e_sandbox',
   SHA_ESPERADO: 'a'.repeat(40),
 }
 const ESPERADO = { sha: COMPLETAS.SHA_ESPERADO, ref: 'sandboxref' }
@@ -49,27 +51,47 @@ const META_OK = {
 }
 
 describe('inventario de variables', () => {
-  it('las obligatorias: credenciales + la DECLARACIÓN del ref + el bypass de Vercel (la URL ya no, se resuelve por SHA)', () => {
+  it('las obligatorias: credenciales + la DECLARACIÓN del ref + el bypass de Vercel + la API del sandbox (la URL del Preview ya no, se resuelve por SHA)', () => {
     expect([...VARIABLES_OBLIGATORIAS].sort()).toEqual([
       'E2E_EXPECTED_SUPABASE_REF',
       'E2E_LOGIN_EMAIL',
       'E2E_LOGIN_PASSWORD',
       'E2E_RESTRICTED_EMAIL',
       'E2E_RESTRICTED_PASSWORD',
+      'E2E_SUPABASE_PUBLISHABLE_KEY',
+      'E2E_SUPABASE_URL',
       'E2E_VERCEL_BYPASS_TOKEN',
     ])
   })
 
-  it('las condicionales son el token efímero y el flag del PAC', () => {
-    expect([...VARIABLES_CONDICIONALES].sort()).toEqual([
-      'E2E_FISCAL_SANDBOX_READY',
-      'E2E_INVITE_TOKEN',
-    ])
+  it('NO queda ninguna condicional: una omisión declarada seguía siendo una omisión', () => {
+    expect([...VARIABLES_CONDICIONALES]).toEqual([])
+  })
+
+  // Este guard es el que impide que alguien reponga el token estático por la
+  // puerta de atrás: si E2E_INVITE_TOKEN o E2E_FISCAL_SANDBOX_READY vuelven al
+  // preflight, a env.ts o al workflow, esta prueba lo dice.
+  it('el token de invitación y el flag del PAC no vuelven a aparecer en ningún lado', () => {
+    const fuentes = ['e2e/fixtures/env.ts', 'scripts/e2e-preflight.mjs', 'scripts/e2e-verificar.mjs']
+    for (const ruta of fuentes) {
+      const texto = readFileSync(resolve(ruta), 'utf8')
+      // Se nombran en la prosa que explica por qué se fueron; lo que no puede
+      // volver es su LECTURA como variable de entorno.
+      expect(texto, `${ruta} vuelve a leer E2E_INVITE_TOKEN`).not.toMatch(/env\(\s*'E2E_INVITE_TOKEN'|'E2E_INVITE_TOKEN'\s*[,\]]/)
+      expect(texto, `${ruta} vuelve a leer E2E_FISCAL_SANDBOX_READY`).not.toMatch(/env\(\s*'E2E_FISCAL_SANDBOX_READY'|'E2E_FISCAL_SANDBOX_READY'\s*[,\]]/)
+    }
   })
 
   it('los nombres de credenciales coinciden con los que lee e2e/fixtures/env.ts', () => {
     const env = readFileSync(resolve('e2e/fixtures/env.ts'), 'utf8')
-    for (const v of ['E2E_LOGIN_EMAIL', 'E2E_LOGIN_PASSWORD', 'E2E_RESTRICTED_EMAIL', 'E2E_RESTRICTED_PASSWORD', ...VARIABLES_CONDICIONALES]) {
+    for (const v of [
+      'E2E_LOGIN_EMAIL',
+      'E2E_LOGIN_PASSWORD',
+      'E2E_RESTRICTED_EMAIL',
+      'E2E_RESTRICTED_PASSWORD',
+      'E2E_SUPABASE_URL',
+      'E2E_SUPABASE_PUBLISHABLE_KEY',
+    ]) {
       expect(env, `env.ts no lee ${v}`).toContain(`'${v}'`)
     }
   })
@@ -732,8 +754,14 @@ describe('los caminos de dinero no pueden confundir la acción masiva con la de 
     })
 
     it(`${archivo} afirma que el botón de la fila DESAPARECE, no que exista un texto`, () => {
-      // toHaveCount(antes - 1) prueba la transición; getByText(/Emitida/) no.
-      expect(texto).toMatch(/toHaveCount\(antes - 1/)
+      // La transición se prueba contando el botón antes y después. Dos formas
+      // válidas, y la segunda es mejor: `toHaveCount(antes - 1)` sobre TODA la
+      // tabla —que era lo único posible mientras no se pudiera identificar una
+      // fila— o `toHaveCount(0)` sobre el botón DE LA FILA propia, localizada
+      // por `data-registro-id`. Lo que sigue prohibido es afirmar sobre un
+      // texto de estado: `getByText(/Emitida/)` pasa aunque la emisión fuera de
+      // otra fila.
+      expect(texto).toMatch(/toHaveCount\((?:antes - 1|0)/)
       expect(texto).not.toMatch(/getByText\(\/Emitida\/i\)/)
       expect(texto).not.toMatch(/getByText\(\/Pagada\/i\)/)
     })

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { login } from './fixtures/auth'
 import { hasBaseUrl, hasLoginCreds, reasons } from './fixtures/env'
-import { capturarLectura } from './fixtures/sembrar'
+import { capturarLectura, esperarCargoEnCobros } from './fixtures/sembrar'
 import { chooseFirstRealOption, exists, gotoSection } from './fixtures/ui'
 
 // CAMINO DE DINERO #1 (agua) — capturar LECTURA → emitir COBRO/Factura.
@@ -70,18 +70,24 @@ test.describe('AGUA · lectura → cobro', () => {
     // Se captura aquí y no se confía en que la prueba de arriba ya lo hizo:
     // las pruebas no pueden depender del orden en que Playwright las corra.
     await gotoSection(page, '/lecturas')
-    if (!(await capturarLectura(page))) {
+    const registroId = await capturarLectura(page)
+    if (registroId === null) {
       test.skip(true, 'sin unidad o contador para capturar: no se puede fabricar el cargo')
     }
 
+    // SE EMITE LA FILA PROPIA, NO «LA PRIMERA». El localizador anterior tomaba
+    // el primer botón de la tabla, que en el tenant compartido es la fila de
+    // otra corrida; y cuando la tabla no lo tenía todavía, la prueba se OMITÍA
+    // con «la lectura capturada no aparece como cargo emitible» — un skip
+    // inesperado, es decir rojo, que es exactamente lo que dejó la suite roja
+    // del 3 al 8 de septiembre. Ahora se espera a que la fila aparezca (por su
+    // id) y se emite ésa: si no aparece, es un fallo con nombre.
     await gotoSection(page, '/cobros')
-    const emitibles = page.locator('button[title^="Emitir factura"]')
-    if (!(await exists(emitibles.first()))) {
-      test.skip(true, 'la lectura capturada no aparece como cargo emitible en /cobros')
-    }
+    const fila = await esperarCargoEnCobros(page, registroId!)
 
-    const antes = await emitibles.count()
-    await emitibles.first().click()
-    await expect(emitibles).toHaveCount(antes - 1, { timeout: 20_000 })
+    const emitir = fila.locator('button[title^="Emitir factura"]')
+    await expect(emitir, 'el cargo recién creado debería ser emitible').toHaveCount(1)
+    await emitir.click()
+    await expect(emitir, 'tras emitir, la fila ya no ofrece emitir').toHaveCount(0, { timeout: 20_000 })
   })
 })

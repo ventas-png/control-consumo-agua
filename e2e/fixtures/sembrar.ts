@@ -19,7 +19,7 @@
 // Todo lo creado lleva un marcador con la marca de tiempo de la corrida, para
 // que se distinga de la siembra manual y se pueda limpiar sin ambigüedad.
 
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 import { chooseFirstRealOption } from './ui'
 
@@ -77,17 +77,33 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
 
 /**
  * Captura una lectura de medidor y deja un CARGO PENDIENTE (el registro nace
- * con factura_estado 'pendiente'), que es lo que consume «emite factura de un
- * cargo pendiente».
+ * con factura_estado 'pendiente'), que es lo que consumen «emite factura de un
+ * cargo pendiente» y el spec fiscal.
  *
- * @returns false si el tenant no tiene unidad o contador que permitan capturar
- *          — el caller decide si eso es un skip legítimo.
+ * DEVUELVE EL ID DEL REGISTRO CREADO, y no un booleano, porque quien la llama
+ * necesita apuntar a ESE cargo y no al primero que encuentre en la tabla.
+ *
+ * LA CARRERA QUE ESTO CIERRA. La versión anterior daba por buena la captura
+ * cuando el botón «Guardar Lectura» desaparecía. Desaparece porque
+ * `limpiarFormulario()` borra el contador seleccionado y desmonta el bloque —
+ * es un efecto de la UI, no la confirmación de que la fila entró. Entre el clic
+ * y el desmontaje sigue viva la petición: si el INSERT era rechazado (llave
+ * natural repetida, RLS, tarifa faltante) la pantalla podía haberse limpiado
+ * igual, y la prueba seguía adelante para caerse más tarde, en otro sitio y con
+ * un síntoma que no nombraba la causa. Ahora se espera la RESPUESTA del POST a
+ * /rest/v1/registros, se exige 2xx, y el id sale de la fila que la propia
+ * respuesta devuelve (crearRegistro hace insert().select()): que la fila vuelva
+ * ES la confirmación de que el registro existe.
+ *
+ * @returns el id del registro creado, o null si el tenant no tiene unidad o
+ *          contador que permitan capturar — el caller decide si eso es un skip
+ *          legítimo.
  */
-export async function capturarLectura(page: Page): Promise<boolean> {
+export async function capturarLectura(page: Page): Promise<string | null> {
   const unidad = page.getByLabel(/Seleccionar Unidad/i)
-  if ((await unidad.count()) === 0) return false
-  if ((await chooseFirstRealOption(unidad)) === null) return false
-  if ((await chooseFirstRealOption(page.getByLabel(/Seleccionar Contador/i))) === null) return false
+  if ((await unidad.count()) === 0) return null
+  if ((await chooseFirstRealOption(unidad)) === null) return null
+  if ((await chooseFirstRealOption(page.getByLabel(/Seleccionar Contador/i))) === null) return null
 
   // La lectura crece con el reloj: uq_registros_llave_natural es
   // (contador_id, lectura_actual, fecha), así que un valor fijo chocaría con
@@ -97,9 +113,46 @@ export async function capturarLectura(page: Page): Promise<boolean> {
   await page.getByPlaceholder('Ingrese lectura del medidor').fill(String(Math.floor(Date.now() / 60_000)))
 
   const guardar = page.getByRole('button', { name: /Guardar Lectura/i })
-  await guardar.click()
-  // Guardar desmonta el formulario (limpiarFormulario borra el contador). Es
-  // la señal de que la lectura entró; un rechazo lo dejaría en pantalla.
+  const [respuesta] = await Promise.all([
+    page.waitForResponse(
+      r => r.request().method() === 'POST' && /\/rest\/v1\/registros(\?|$)/.test(r.url()),
+      { timeout: 30_000 },
+    ),
+    guardar.click(),
+  ])
+
+  expect(
+    respuesta.status(),
+    'el INSERT de la lectura tiene que responder 2xx; si no, el cargo no existe',
+  ).toBeLessThan(300)
+
+  const filas = (await respuesta.json()) as Array<{ id?: string }>
+  const id = Array.isArray(filas) ? filas[0]?.id : undefined
+  expect(id, 'el INSERT devolvió 2xx pero sin la fila creada').toBeTruthy()
+
+  // Y recién ahora el desmontaje del formulario, que sigue siendo una señal
+  // útil —un rechazo de validación lo deja en pantalla— pero ya no es LA señal.
   await expect(guardar).toBeHidden({ timeout: 20_000 })
-  return true
+  return id as string
+}
+
+/**
+ * Confirma que el cargo recién capturado APARECE en /cobros y devuelve su fila,
+ * localizada por el id del registro y no por su posición.
+ *
+ * `data-registro-id` existe en la tabla de /cobros justamente para esto: sin él
+ * la única forma de tocar una fila es «la primera», que en un tenant compartido
+ * es la fila de otra corrida.
+ */
+export function filaDeCobro(page: Page, registroId: string): Locator {
+  return page.locator(`tr[data-registro-id="${registroId}"]`)
+}
+
+export async function esperarCargoEnCobros(page: Page, registroId: string): Promise<Locator> {
+  const fila = filaDeCobro(page, registroId)
+  await expect(
+    fila,
+    'el registro creado no aparece en /cobros: sin él no hay nada que emitir ni timbrar',
+  ).toHaveCount(1, { timeout: 30_000 })
+  return fila
 }

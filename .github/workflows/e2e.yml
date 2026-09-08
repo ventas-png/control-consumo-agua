@@ -19,7 +19,7 @@ name: E2E
 # El job es FAIL-CLOSED (mismo criterio que rls-harness): salía VERDE SIN
 # EJECUTAR cuando faltaba E2E_BASE_URL, y ese verde se contabilizó como
 # cobertura E2E durante semanas. Ahora:
-#   · faltan variables obligatorias (las SEIS E2E_*) → preflight ROJO;
+#   · faltan variables obligatorias (las OCHO E2E_*) → preflight ROJO;
 #   · PR de fork / Dependabot (sin secretos por diseño) → ROJO;
 #   · el destino se valida POSITIVAMENTE: el despliegue publica
 #     /e2e-meta.json y tiene que declarar environment=e2e-sandbox, el ref
@@ -27,8 +27,13 @@ name: E2E
 #     denylist de producción queda como segunda defensa;
 #   · la suite corre y DESPUÉS se verifica que ejecutó pruebas de verdad:
 #     cero descubiertas o todas skipped → ROJO aunque Playwright saliera 0.
-# La única omisión admitida es por spec CONDICIONAL (invite token efímero,
-# PAC sandbox) y queda DECLARADA en el resumen, nunca silenciosa.
+# NO HAY OMISIONES ADMITIDAS. Hubo dos specs condicionales —alta por invitación
+# y timbrado fiscal— que se omitían cuando faltaba la variable que declaraba su
+# precondición (un token de invitación efímero, el PAC sandbox listo). La
+# omisión quedaba DECLARADA en el resumen, que sonaba a rigor y en la práctica
+# significaba que esos dos caminos no se probaban casi nunca. Ahora cada uno
+# fabrica su propia precondición dentro de la prueba, y el resultado esperado de
+# la suite es 25 de 25: cualquier skip pone el job en rojo.
 #
 # SIN service_role: este job no la recibe ni la necesita — el despliegue de
 # pruebas usa la anon key de su sandbox, como cualquier cliente. El bypass de
@@ -62,8 +67,17 @@ jobs:
       E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
       E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
       E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
-      E2E_INVITE_TOKEN: ${{ secrets.E2E_INVITE_TOKEN }}
-      E2E_FISCAL_SANDBOX_READY: ${{ secrets.E2E_FISCAL_SANDBOX_READY }}
+      # API del Supabase de pruebas. La usan los specs que preparan y limpian su
+      # propio dato fuera del navegador: `invitation-accept` crea su invitación
+      # llamando a `invite-user` y borra después el usuario que creó.
+      #
+      # LA PUBLISHABLE, NO UNA SECRET KEY. Es la misma clave que el bundle del
+      # Preview ya publica: no concede nada que un visitante no tenga, y todo lo
+      # que la suite hace con ella viaja con el JWT del administrador y lo
+      # autoriza la RLS. Una `service_role` aquí convertiría las pruebas en un
+      # bypass de RLS y metería una llave de administrador en CI.
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
       E2E_RESTRICTED_EMAIL: ${{ secrets.E2E_RESTRICTED_EMAIL }}
       E2E_RESTRICTED_PASSWORD: ${{ secrets.E2E_RESTRICTED_PASSWORD }}
       E2E_EXPECTED_SUPABASE_REF: ${{ secrets.E2E_EXPECTED_SUPABASE_REF }}
@@ -127,7 +141,7 @@ jobs:
 
       # Playwright pone el job en rojo si una prueba FALLA; esto lo pone en rojo
       # si la suite NO CORRIÓ: cero descubiertas, todas skipped, un spec
-      # obligatorio enteramente omitido, o un condicional omitido con su
+      # obligatorio enteramente omitido, o cualquier prueba omitida con su
       # variable presente. Lee playwright-results.json (reporter json del
       # config). Ver scripts/e2e-verificar.mjs.
       #

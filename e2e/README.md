@@ -72,18 +72,24 @@ En CI el verde de este job significa «la suite corrió», no «no se opuso»:
   pruebas usa la anon key de su sandbox, como cualquier cliente.
 - **Verificador post-ejecución** (`scripts/e2e-verificar.mjs`): lee el reporte
   JSON y **falla** si se descubrieron cero pruebas, si todas quedaron skipped,
-  si un spec obligatorio no ejecutó ninguna, si un condicional se omitió con
-  su variable presente, o si quedó **cualquier skip inesperado** (un test
-  suelto de un spec obligatorio, o de un archivo fuera de las listas), aunque
-  el resto del archivo haya corrido.
+  si un spec obligatorio no ejecutó ninguna, o si quedó **cualquier skip**
+  (un test suelto de un spec obligatorio, o de un archivo fuera de las listas),
+  aunque el resto del archivo haya corrido.
 
-  **El criterio del verde**, explícito: **0 fallos**, **0 skips inesperados**
-  (el único skip admitido es el de un spec condicional sin su variable, y
-  queda **declarado** en el resumen) y **todos los specs obligatorios con al
-  menos una prueba ejecutada**. No es "0 skips literal": `invitation-accept`
-  y `fiscal-timbrar` pueden quedar en omisión declarada sin sus variables —
-  si algún día se quiere el 100 %, basta configurar `E2E_INVITE_TOKEN` fresco
-  y `E2E_FISCAL_SANDBOX_READY=1` y el verificador los exigirá.
+  **El criterio del verde**, explícito: **0 fallos**, **0 skips** y **todos los
+  specs con al menos una prueba ejecutada**. El resultado esperado es
+  **25 de 25**.
+
+  > **Ya no hay omisiones declaradas.** Hubo dos specs «condicionales»
+  > —`invitation-accept` y `fiscal-timbrar`— que se omitían cuando faltaba la
+  > variable que declaraba su precondición. La omisión salía anunciada en el
+  > resumen, lo que sonaba a rigor y significaba otra cosa: el alta por
+  > invitación y el timbrado fiscal casi nunca se probaban. `E2E_INVITE_TOKEN`
+  > era el caso extremo — un secreto estático con un token de **un solo uso**
+  > dentro, gastado desde la segunda corrida. Hoy cada spec fabrica su propia
+  > precondición: la invitación se crea llamando a `invite-user` en cada intento
+  > y el comprobante fiscal se emite dentro de la prueba. Las dos variables
+  > desaparecieron del repositorio.
 - El auto-skip de `fixtures/env.ts` sigue existiendo como **comodidad local**
   (correr sin variables no revienta tu terminal); en CI esos skips son
   precisamente lo que el verificador convierte en rojo.
@@ -102,8 +108,18 @@ En *Settings → Secrets and variables → Actions*:
 | `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | ✅ | Cuenta admin/operadora del tenant sembrado en ese sandbox. |
 | `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | ✅ | Usuario del MISMO tenant con rol restringido (viewer/operator, no admin ni owner). |
 | `E2E_VERCEL_BYPASS_TOKEN` | ✅ | **Protection Bypass for Automation** del proyecto de Vercel (Settings → Deployment Protection). Sin él, un Preview protegido respondería 401 al preflight y al navegador. Nunca se imprime. |
-| `E2E_INVITE_TOKEN` | condicional | Token de invitación **fresco y de un solo uso** (insert en `user_invitations` + edge `invite-user`). No puede vivir como secreto estático: se genera justo antes de la corrida que deba ejercitar ese flujo. Ausente → `invitation-accept` queda como **omitido declarado**. |
-| `E2E_FISCAL_SANDBOX_READY` | condicional | `1` cuando el despliegue de pruebas tiene PAC **sandbox** y configuración fiscal cargada. Ausente → `fiscal-timbrar` queda como **omitido declarado**. |
+| `E2E_SUPABASE_URL` | ✅ | URL de la API del proyecto Supabase sandbox (`https://<ref>.supabase.co`). La usan los specs que preparan y limpian su propio dato fuera del navegador. Su `<ref>` tiene que ser el de `E2E_EXPECTED_SUPABASE_REF`. |
+| `E2E_SUPABASE_PUBLISHABLE_KEY` | ✅ | La **publishable key** de ese proyecto — la misma que el bundle del Preview ya publica. **Nunca una secret key ni `service_role`**: todo lo que la suite hace con ella viaja con el JWT del administrador y lo autoriza la RLS, igual que la aplicación. Una secret key aquí convertiría las pruebas en un bypass de RLS. |
+
+`E2E_INVITE_TOKEN` y `E2E_FISCAL_SANDBOX_READY` **ya no existen**: podés borrarlas
+de *Actions secrets*. Ver el recuadro de arriba.
+
+> `E2E_LOGIN_EMAIL` tiene que ser **`admin` o `company_owner`** del tenant
+> sembrado, no sólo un operador: `invitation-accept` llama a `invite-user`, que
+> exige ese rol, y la limpieza usa `delete-user`, que exige lo mismo. Y el
+> **Origin del Preview** debe estar en `ALLOWED_ORIGINS` del proyecto Supabase,
+> porque los Edge Functions validan el origen y responden 403 si no coincide —
+> es el mismo requisito que ya tiene la aplicación para funcionar en Preview.
 
 #### Comprobá las credenciales ANTES de guardarlas
 
@@ -311,29 +327,32 @@ npx playwright install chromium
 
 export E2E_BASE_URL="https://<preview-ref>.vercel.app"   # o http://localhost:5173
 export E2E_LOGIN_EMAIL="qa@example.com"
-export E2E_LOGIN_PASSWORD="********"
-# opcionales por flujo:
-export E2E_INVITE_TOKEN="<token-fresco>"        # para invitation-accept
-export E2E_FISCAL_SANDBOX_READY=1               # para fiscal-timbrar
+export E2E_LOGIN_PASSWORD="********"            # admin o company_owner
+export E2E_SUPABASE_URL="https://<ref>.supabase.co"
+export E2E_SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
 
 npx playwright test --config e2e/playwright.config.ts
 ```
 
-> El login/agua/condominios usan `E2E_LOGIN_*`. La invitación consume un token
-> **efímero** (one-shot): generá uno fresco por corrida. El timbrado necesita PAC
-> sandbox configurado en el preview.
+> Ya no hay variables «por flujo»: la invitación y el timbrado fabrican su
+> propia precondición. Lo que sí necesitan es la API del sandbox
+> (`E2E_SUPABASE_*`) y que `E2E_LOGIN_EMAIL` sea admin o company_owner — es
+> quien firma la llamada a `invite-user` y quien limpia después.
 
 ## Variables de entorno
 
 | Var | Para | En CI |
 |---|---|---|
 | `E2E_BASE_URL` | base URL del preview/sandbox. En CI es **opcional**: el preflight resuelve la URL del despliegue del SHA por la API de Deployments; si se define, entra como un candidato más bajo la misma validación positiva. En local es la forma normal de apuntar la suite. | opcional |
-| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados | obligatoria |
+| `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` | login + flujos autenticados. **admin o company_owner**: firma `invite-user` y la limpieza | obligatoria |
 | `E2E_RESTRICTED_EMAIL` / `E2E_RESTRICTED_PASSWORD` | usuario viewer/operator del mismo tenant | obligatoria |
 | `E2E_EXPECTED_SUPABASE_REF` | declaración del proyecto Supabase sandbox esperado | obligatoria |
 | `E2E_VERCEL_BYPASS_TOKEN` | bypass oficial de la Deployment Protection de Vercel | obligatoria |
-| `E2E_INVITE_TOKEN` | token fresco de invitación | condicional (sólo invitation-accept) |
-| `E2E_FISCAL_SANDBOX_READY` | `=1` si el preview tiene PAC sandbox listo | condicional (sólo fiscal-timbrar) |
+| `E2E_SUPABASE_URL` | API del sandbox, para preparar y limpiar el dato propio de cada spec | obligatoria |
+| `E2E_SUPABASE_PUBLISHABLE_KEY` | publishable key de ese proyecto — **nunca** una secret key | obligatoria |
+
+`E2E_INVITE_TOKEN` y `E2E_FISCAL_SANDBOX_READY` fueron retiradas: no quedan
+variables condicionales ni specs que se omitan.
 
 ## CI
 
