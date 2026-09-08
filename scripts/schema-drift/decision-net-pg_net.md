@@ -77,9 +77,27 @@ está en su backlog.
 Ese último punto —que un `REVOKE` sin autoridad sale 0— es el que hacía
 peligrosa la propuesta anterior: una migración así habría quedado registrada
 como aplicada con la vía intacta. Está fijado como regresión en
-`--prueba-credencial`, junto con el resto de la semántica de ACL que el auditor
-da por cierta: las dos capas (`pg_class.relacl` y `pg_attribute.attacl`), los
-privilegios por columna, las secuencias, los otorgantes y el rollback.
+`--prueba-credencial`, **sobre un esquema sintético**, junto con el resto de la
+semántica de ACL que el auditor da por cierta: las dos capas
+(`pg_class.relacl` y `pg_attribute.attacl`), los privilegios por columna, las
+secuencias, los otorgantes y el rollback.
+
+### Qué se toca y qué no, con precisión
+
+`auditar.mjs` **no ejecuta** DDL, `GRANT`, `REVOKE`, `DROP` ni `ALTER` contra
+ningún nombre `net.*`; sólo los nombra como datos de `SIN_REMEDIO_SOPORTADO` y
+en las entradas de texto de las pruebas puras. Hay un tripwire que lo fija —que
+inspecciona **sólo ese archivo** y **sólo su texto**, así que no detecta SQL
+armado dinámicamente ni cubre el resto del andamiaje.
+
+**`bootstrap.sql` es la excepción deliberada.** Crea stubs locales de
+`net._http_response`, `net.http_post()` y `net.http_get()`, y debe seguir
+haciéndolo: **11 migraciones del repositorio los usan**, y sin ellos la
+reconstrucción no aplica. Son objetos vacíos dentro del clúster desechable —las
+funciones devuelven `1::bigint` y no salen a la red—, sin ninguna conexión con
+producción ni con la extensión gestionada. **No se quitan sin comprobar antes
+que las migraciones se pueden reconstruir**; hay una prueba que exige que sigan
+estando.
 
 ## Lo que sí quedó de este trabajo
 

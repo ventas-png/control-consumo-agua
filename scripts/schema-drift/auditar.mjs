@@ -1878,8 +1878,16 @@ COMMIT;
     // Reproduce la forma medida en producción —un esquema que concede USAGE a
     // PUBLIC y objetos que le conceden los OCHO privilegios de tabla, más una
     // secuencia con SELECT/USAGE/UPDATE— pero sobre `drift_acl`, que crea esta
-    // prueba. NO se ejecuta DDL, GRANT, REVOKE, DROP ni ALTER contra ningún
-    // nombre `net.*`: los objetos gestionados no se tocan ni en un fixture.
+    // prueba. Este archivo ya no ejecuta DDL, GRANT, REVOKE, DROP ni ALTER
+    // contra ningún nombre `net.*`.
+    //
+    // OJO CON EL ALCANCE DE ESA AFIRMACIÓN. Vale para `auditar.mjs`, no para
+    // todo el andamiaje: `bootstrap.sql` SÍ crea stubs locales de
+    // `net._http_response`, `net.http_post()` y `net.http_get()`, y tiene que
+    // seguir haciéndolo — 11 migraciones del repositorio los usan y sin ellos
+    // la reconstrucción no aplica. Son objetos vacíos dentro del clúster
+    // desechable, sin ninguna conexión con producción: `http_post`/`http_get`
+    // devuelven `1::bigint` y no salen a la red.
     //
     // Lo que el auditor hace con los objetos GESTIONADOS de verdad —bloquear
     // sin proponer SQL— se fija en la prueba PURA de `juzgarCredencial`, que

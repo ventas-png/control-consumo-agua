@@ -14,7 +14,7 @@
 // nada. Un guard roto de esa forma no rompe ninguna prueba: falla ABIERTO y
 // calla.
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
@@ -696,14 +696,25 @@ describe('juzgarCredencial · pg_net no lleva SQL, lleva un puntero', () => {
 })
 
 
-// ── Tripwire: ningún fixture toca los objetos gestionados ───────────────────
+// ── Tripwire de `auditar.mjs` (sólo de ese archivo) ─────────────────────────
 //
 // La separación no es una convención: es la conclusión del registro de
-// decisión. Los objetos de pg_net se NOMBRAN —para poder declararlos sin
-// remediación soportada y para las entradas de texto de las pruebas puras— pero
-// no se les ejecuta nada. Esta prueba lee el fuente del auditor y falla si
-// aparece cualquier sentencia contra un nombre `net.*`.
-describe('auditar.mjs · no ejecuta SQL contra objetos gestionados', () => {
+// decisión. En `auditar.mjs` los objetos de pg_net se NOMBRAN —para declararlos
+// sin remediación soportada y para las entradas de texto de las pruebas puras—
+// pero no se les ejecuta nada.
+//
+// QUÉ **NO** ES ESTA PRUEBA, para que nadie la lea de más:
+//
+//   · NO cubre todo el andamiaje. `bootstrap.sql` crea a propósito stubs
+//     locales de `net._http_response`, `net.http_post()` y `net.http_get()`,
+//     porque 11 migraciones del repositorio los usan y sin ellos la
+//     reconstrucción no aplica. Son objetos vacíos del clúster desechable, sin
+//     conexión con producción, y quitarlos rompería la reconstrucción.
+//   · NO es completa. Inspecciona el TEXTO del archivo, así que no detecta SQL
+//     armado dinámicamente —concatenado, interpolado o generado en tiempo de
+//     ejecución—. Es una red contra el error obvio de volver a pegar un lote,
+//     no una prueba de ausencia.
+describe('auditar.mjs · ese archivo no ejecuta SQL contra objetos gestionados', () => {
   const fuente = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), '..', 'auditar.mjs'), 'utf8')
 
@@ -711,7 +722,7 @@ describe('auditar.mjs · no ejecuta SQL contra objetos gestionados', () => {
                   'GRANT', 'REVOKE', 'ALTER TABLE', 'ALTER SEQUENCE', 'TRUNCATE']
 
   for (const verbo of VERBOS) {
-    it(`no hay ningún «${verbo} … net.…» en el fuente`, () => {
+    it(`no hay ningún «${verbo} … net.…» en el fuente de auditar.mjs`, () => {
       // Se mira la sentencia entera: el verbo y, en la misma sentencia, un
       // nombre cualificado con el esquema `net`.
       const re = new RegExp(`\\b${verbo}\\b[^;\\n]*\\bnet\\.[a-z_]`, 'i')
@@ -719,7 +730,7 @@ describe('auditar.mjs · no ejecuta SQL contra objetos gestionados', () => {
     })
   }
 
-  it('los nombres de pg_net sólo aparecen como DATOS o en prosa', () => {
+  it('en auditar.mjs los nombres de pg_net sólo aparecen como DATOS o en prosa', () => {
     const lineas = fuente.split('\n').filter(l => /\bnet\.[a-z_]/.test(l))
     expect(lineas.length).toBeGreaterThan(0)   // se siguen declarando
     for (const l of lineas) {
@@ -727,5 +738,37 @@ describe('auditar.mjs · no ejecuta SQL contra objetos gestionados', () => {
       const esProsa = /^\s*(\/\/|\*|\s*\*)/.test(l) || /decision-net-pg_net/.test(l)
       expect(esDato || esProsa).toBe(true)
     }
+  })
+})
+
+// ── Los stubs de `bootstrap.sql` tienen que seguir existiendo ───────────────
+//
+// La contraparte de la prueba anterior. `bootstrap.sql` es el andamiaje que
+// Supabase da de fábrica y que las migraciones dan por dado; sin los stubs de
+// pg_net, 11 migraciones del repositorio no aplican y la reconstrucción entera
+// se cae. No son un remedio ni un camino a producción: son objetos vacíos
+// dentro del clúster desechable —`http_post`/`http_get` devuelven `1::bigint` y
+// no salen a la red—. Esta prueba existe para que nadie los borre creyendo que
+// «limpia» referencias a pg_net.
+describe('bootstrap.sql · los stubs locales de pg_net se conservan', () => {
+  const AQUI = dirname(fileURLToPath(import.meta.url))
+  const bootstrap = readFileSync(join(AQUI, '..', 'bootstrap.sql'), 'utf8')
+
+  for (const stub of ['net._http_response', 'net.http_post', 'net.http_get']) {
+    it(`sigue creando ${stub}`, () => {
+      expect(bootstrap).toMatch(new RegExp(`CREATE (TABLE|OR REPLACE FUNCTION) ${stub.replace('.', '\\.')}`))
+    })
+  }
+
+  it('y las funciones son stubs inertes: no salen a la red', () => {
+    expect(bootstrap).toMatch(/net\.http_post\([\s\S]*?RETURNS bigint LANGUAGE sql AS \$\$ SELECT 1::bigint \$\$/)
+    expect(bootstrap).toMatch(/net\.http_get\([\s\S]*?RETURNS bigint LANGUAGE sql AS \$\$ SELECT 1::bigint \$\$/)
+  })
+
+  it('hay migraciones del repositorio que dependen de ellos', () => {
+    const dir = join(AQUI, '..', '..', '..', 'supabase', 'migrations')
+    const usan = readdirSync(dir).filter(f => f.endsWith('.sql'))
+      .filter(f => /net\.(http_post|http_get|_http_response)/.test(readFileSync(join(dir, f), 'utf8')))
+    expect(usan.length).toBeGreaterThan(0)
   })
 })

@@ -484,8 +484,21 @@ con las suyas, que es donde vive un `Authorization: Bearer`.
 Y **no hay remedio aplicable**: retirar esos grants no es una remediación
 soportada. Todo está en [`decision-net-pg_net.md`](decision-net-pg_net.md).
 
-`--prueba-credencial` reproduce esa forma en su clúster desechable y exige el
-rechazo, y fija además la semántica de PostgreSQL que lo explica: un `REVOKE`
+`--prueba-credencial` reproduce esa forma en su clúster desechable **sobre un
+esquema sintético** (`drift_acl`) y exige el rechazo. `auditar.mjs` no ejecuta
+DDL, `GRANT`, `REVOKE`, `DROP` ni `ALTER` contra ningún nombre `net.*`, y hay una
+prueba que lee ese archivo y falla si vuelve a aparecer — inspecciona sólo ese
+archivo y sólo su texto, así que no cubre SQL armado dinámicamente ni el resto
+del andamiaje.
+
+> **`bootstrap.sql` es la excepción, y tiene que serlo.** Crea stubs locales de
+> `net._http_response`, `net.http_post()` y `net.http_get()` porque **11
+> migraciones del repositorio los usan** y sin ellos la reconstrucción no
+> aplica. Son objetos vacíos dentro del clúster desechable —las funciones
+> devuelven `1::bigint` y no salen a la red—, sin ninguna conexión con
+> producción. No se quitan: hay una prueba que exige que sigan estando.
+
+La misma prueba fija la semántica de PostgreSQL que explica el bloqueo: un `REVOKE`
 retira lo que otorgó **quien lo ejecuta** —el grant de un tercero sobrevive y la
 sentencia **sale 0**—, `WITH GRANT OPTION` no alcanza para lo ajeno, los
 privilegios por columna viven en `pg_attribute.attacl` y no se ven desde
