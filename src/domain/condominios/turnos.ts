@@ -90,13 +90,29 @@ export const TURNO_A_TURNO_PERSONAL: Record<TurnoTipo, TurnoPersonal> = {
 
 // ── Aritmética de la jornada ────────────────────────────────────────────────
 
-/** Minutos desde medianoche de un `HH:MM` (o `HH:MM:SS`). NaN-safe → null. */
-function minutosDe(hora: string | null | undefined): number | null {
+/**
+ * Minutos desde medianoche de un `HH:MM` o `HH:MM:SS`. NaN-safe → null.
+ *
+ * LOS SEGUNDOS CUENTAN, y devuelve fracción de minuto por eso. Aceptaba el
+ * formato con segundos y los TIRABA, lo que estuvo bien mientras todas las
+ * horas venían de un `<input type="time">` (que graba `HH:MM`). Desde que el
+ * marcaje de autoservicio las pone el servidor con segundos (20260908000000),
+ * descartarlos convertía dos marcajes del mismo minuto en `fin == inicio` — y
+ * la regla de abajo lo leía como cruce de medianoche: 34 segundos de jornada
+ * mostrados como 24 HORAS. Pasó en producción el primer día.
+ *
+ * Además rompía el contrato con `turnos_horas_jornada()`, que usa
+ * `EXTRACT(EPOCH FROM time)` y por tanto SIEMPRE contó los segundos: la misma
+ * fila valía 24 h en pantalla y 0.01 h en la nómina.
+ */
+export function minutosDesdeMedianoche(hora: string | null | undefined): number | null {
   if (!hora) return null
-  const [h, m] = hora.split(':').map(Number)
+  const [h, m, s] = hora.split(':').map(Number)
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null
-  return h * 60 + m
+  return h * 60 + m + (Number.isFinite(s) ? s / 60 : 0)
 }
+
+const minutosDe = minutosDesdeMedianoche
 
 /**
  * Horas efectivas de una jornada, descontando el descanso.
