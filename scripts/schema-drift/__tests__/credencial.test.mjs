@@ -694,3 +694,38 @@ describe('juzgarCredencial · pg_net no lleva SQL, lleva un puntero', () => {
     expect(l.remedio).toContain('REVOKE SELECT ON net.otra_cosa FROM PUBLIC;')
   })
 })
+
+
+// ── Tripwire: ningún fixture toca los objetos gestionados ───────────────────
+//
+// La separación no es una convención: es la conclusión del registro de
+// decisión. Los objetos de pg_net se NOMBRAN —para poder declararlos sin
+// remediación soportada y para las entradas de texto de las pruebas puras— pero
+// no se les ejecuta nada. Esta prueba lee el fuente del auditor y falla si
+// aparece cualquier sentencia contra un nombre `net.*`.
+describe('auditar.mjs · no ejecuta SQL contra objetos gestionados', () => {
+  const fuente = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'auditar.mjs'), 'utf8')
+
+  const VERBOS = ['CREATE TABLE', 'CREATE SCHEMA', 'DROP TABLE', 'DROP SCHEMA',
+                  'GRANT', 'REVOKE', 'ALTER TABLE', 'ALTER SEQUENCE', 'TRUNCATE']
+
+  for (const verbo of VERBOS) {
+    it(`no hay ningún «${verbo} … net.…» en el fuente`, () => {
+      // Se mira la sentencia entera: el verbo y, en la misma sentencia, un
+      // nombre cualificado con el esquema `net`.
+      const re = new RegExp(`\\b${verbo}\\b[^;\\n]*\\bnet\\.[a-z_]`, 'i')
+      expect(fuente).not.toMatch(re)
+    })
+  }
+
+  it('los nombres de pg_net sólo aparecen como DATOS o en prosa', () => {
+    const lineas = fuente.split('\n').filter(l => /\bnet\.[a-z_]/.test(l))
+    expect(lineas.length).toBeGreaterThan(0)   // se siguen declarando
+    for (const l of lineas) {
+      const esDato = /^\s*'net\.[a-z_]+',?\s*$/.test(l)          // SIN_REMEDIO_SOPORTADO
+      const esProsa = /^\s*(\/\/|\*|\s*\*)/.test(l) || /decision-net-pg_net/.test(l)
+      expect(esDato || esProsa).toBe(true)
+    }
+  })
+})

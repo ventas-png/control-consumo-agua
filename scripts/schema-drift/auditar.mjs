@@ -1873,116 +1873,21 @@ COMMIT;
         `${n.rol}: aplicar el remedio de ${n.regla} (${sql.length} sentencia(s)) elimina la vía`)
     }
 
-    // La versión del servidor decide qué privilegios existen. Se lee UNA vez y
-    // manda tanto en el fixture como en lo que se le exige al diagnóstico.
-    const versionServidor = Number(db.psql(
-      ['-tAq', '-c', "SELECT current_setting('server_version_num')"], { stdio: 'pipe' }).trim())
-
-    // ── 2 sexies · el bloqueo REAL de producción: `net` con USAGE a PUBLIC ───
+    // ── 2 sexies · la forma que bloquea, sobre objetos SINTÉTICOS ───────────
     //
-    // Medido contra el catálogo real: el esquema `net` (pg_net, que instala
-    // Supabase) concede USAGE a PUBLIC, y `net._http_response` y
-    // `net.http_request_queue` conceden a PUBLIC SELECT, INSERT, UPDATE, DELETE
-    // y TRUNCATE. Con eso, una credencial provisionada EXACTAMENTE como
-    // prescribe el README —USAGE sobre `public` y `extensions`, y nada más— las
-    // alcanza igual: el privilegio no se lo dio nadie, lo tiene por ser PUBLIC.
+    // Reproduce la forma medida en producción —un esquema que concede USAGE a
+    // PUBLIC y objetos que le conceden los OCHO privilegios de tabla, más una
+    // secuencia con SELECT/USAGE/UPDATE— pero sobre `drift_acl`, que crea esta
+    // prueba. NO se ejecuta DDL, GRANT, REVOKE, DROP ni ALTER contra ningún
+    // nombre `net.*`: los objetos gestionados no se tocan ni en un fixture.
     //
-    // El guard TIENE que rechazarla, y esta prueba lo fija. No se agrega `net`
-    // a ninguna tolerancia: `_http_response` guarda los CUERPOS de las
-    // respuestas HTTP que hace la base —webhooks, llamadas a pasarelas de
-    // pago—, y `http_request_queue` las peticiones pendientes con sus cabeceras.
-    // Eso no son métricas: es el contenido de las integraciones, y con INSERT y
-    // UPDATE encima. Tolerarlo sería declarar aceptable justo lo que este
-    // auditor existe para no dejar pasar.
+    // Lo que el auditor hace con los objetos GESTIONADOS de verdad —bloquear
+    // sin proponer SQL— se fija en la prueba PURA de `juzgarCredencial`, que
+    // trabaja con entradas de texto y no toca ninguna base.
     //
-    // La reconstrucción NO reproduce esos grants —son de la instalación
-    // gestionada, no de las migraciones del repositorio—, así que la forma se
-    // construye acá tal cual, y se desarma al terminar para no contaminar el
-    // resto de la prueba.
-    //
-    // CON LOS NOMBRES REALES y la forma real: `http_request_queue` es la que
-    // tiene secuencia propia —su `id` es bigserial—, y `_http_response` NO
-    // tiene ninguna. El esquema `net` ya existe en la reconstrucción; lo que no
-    // existen son los grants, que son de la instalación gestionada.
-    //
-    // Y con los OCHO privilegios de tabla, no con cinco: producción concede
-    // también REFERENCES y TRIGGER —y MAINTAIN, que existe desde Postgres 17—.
-    // El GRANT se arma dentro del servidor, porque en 16 el texto `GRANT
-    // MAINTAIN` ni siquiera se puede analizar: sería un error de sintaxis antes
-    // de llegar a ejecutarse.
-    //
-    // Los GRANT van a una constante porque hay que REPONERLOS: la contraprueba
-    // del lote completo los retira de verdad, y el resto del bloque —los
-    // remedios regla por regla— necesita la forma de producción otra vez.
-    const grantsNet = `
-      DO $conceder$
-      DECLARE privs text := array_to_string(${SQL_PRIVS_TABLA}, ', ');
-      BEGIN
-        EXECUTE format('GRANT %s ON net._http_response, net.http_request_queue TO PUBLIC', privs);
-      END
-      $conceder$;
-      GRANT SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq TO PUBLIC;`
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      GRANT USAGE ON SCHEMA net TO PUBLIC;
-      CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
-      ${grantsNet}`], { stdio: 'pipe' })
-
-    // Los privilegios que el diagnóstico TIENE que enumerar, en el orden en que
-    // los nombra: todos menos SELECT, que va por su propia regla.
-    const privsNet = ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']
-      .concat(versionServidor >= 170000 ? ['MAINTAIN'] : [])
-
-    const conNet = medir('drift_lector')
-    comprobar(conNet.codigo !== 0, 'con un esquema que concede USAGE a PUBLIC, la credencial correcta se RECHAZA')
-    for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
-      comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
-    }
-    // El diagnóstico tiene que enumerar los OCHO, no los cinco de siempre: se
-    // exige la cadena COMPLETA, así un privilegio de más o de menos rompe.
-    const flagsNet = `net._http_response [${privsNet.join(', ')}, vía PUBLIC]`
-    comprobar(conNet.salida.includes(flagsNet),
-      `  nombrando la tabla, los privilegios exactos y que llegan vía PUBLIC: «${flagsNet}»`)
-    comprobar(/net\.http_request_queue_id_seq \[SELECT, USAGE, UPDATE, vía PUBLIC\]/
-      .test(conNet.salida),
-      '  y la secuencia REAL —la de http_request_queue— con sus tres privilegios')
-    comprobar(versionServidor >= 170000 ? /MAINTAIN/.test(conNet.salida) : !/MAINTAIN/.test(conNet.salida),
-      versionServidor >= 170000
-        ? '  y MAINTAIN, que en 17 también se concede'
-        : '  y en 16 NO nombra MAINTAIN, que en este servidor no existe')
-
-    // LA PARTE QUE IMPORTA: bloquea, pero NO propone SQL.
-    //
-    // Supabase Support confirmó que estos grants son gestionados, intencionales
-    // y necesarios, que todo rol LOGIN propio los hereda, y que retirarlos NO es
-    // una remediación soportada. Emitir un `REVOKE … FROM PUBLIC` contra ellos
-    // sería dar por accionable algo que el proveedor declaró que no lo es —y en
-    // un proyecto gestionado ese REVOKE ni siquiera fallaría: saldría 0 sin
-    // revocar nada—. El diagnóstico dice qué hay y remite a la decisión.
-    comprobar(!/REVOKE[^\n]*\bnet\.[^\n]*FROM PUBLIC;/.test(conNet.salida),
-      '  y NO propone ningún «REVOKE … net… FROM PUBLIC»: no hay remediación soportada')
-    comprobar(!/REVOKE[^\n]*\bnet\./.test(conNet.salida),
-      '  ni ningún otro REVOKE sobre los objetos gestionados de pg_net')
-    comprobar(/SIN REMEDIACIÓN SOPORTADA/.test(conNet.salida),
-      '  lo dice con todas las letras, en lugar de un remedio')
-    comprobar(/decision-net-pg_net\.md/.test(conNet.salida),
-      '  y remite al registro de decisión, que es donde está el porqué')
-
-    // La reconstrucción local SÍ tiene un `net._http_response_id_seq` —su `id`
-    // ahí es serial— pero SIN grants a PUBLIC, así que es inalcanzable y no
-    // puede aparecer. Producción no tiene esa secuencia en absoluto.
-    comprobar(!/_http_response_id_seq/.test(conNet.salida),
-      '  y no inventa una secuencia para _http_response, que en producción no tiene')
-    comprobar(!/FROM drift_lector;/.test(conNet.salida),
-      '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
-
-    // Se desarma la forma de producción: el resto de la prueba mide sobre el
-    // esquema sintético, no sobre los objetos gestionados.
-    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      'DROP TABLE net.http_request_queue; ' +
-      'REVOKE ALL PRIVILEGES ON TABLE net._http_response FROM PUBLIC; ' +
-      'REVOKE USAGE ON SCHEMA net FROM PUBLIC;'], { stdio: 'pipe' })
-    comprobar(medir('drift_lector').codigo === 0,
-      '  retirada la forma de producción del fixture, el rol correcto vuelve a pasar')
+    // El GRANT se arma dentro del servidor porque en Postgres 16 el texto
+    // `GRANT MAINTAIN` ni siquiera se puede analizar: sería un error de sintaxis
+    // antes de llegar a ejecutarse.
 
     // ── 2 sexies bis · semántica de ACL de PostgreSQL, sobre objetos propios ─
     //
@@ -2019,6 +1924,36 @@ COMMIT;
       $conceder$;
       GRANT SELECT, USAGE, UPDATE ON SEQUENCE ${ACL_SECUENCIA} TO PUBLIC;`
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', grantsAcl], { stdio: 'pipe' })
+
+    // La versión del servidor decide qué privilegios existen. Se lee UNA vez y
+    // manda tanto en el fixture como en lo que se le exige al diagnóstico.
+    const versionServidor = Number(db.psql(
+      ['-tAq', '-c', "SELECT current_setting('server_version_num')"], { stdio: 'pipe' }).trim())
+
+    // Los privilegios que el diagnóstico TIENE que enumerar, en el orden en que
+    // los nombra: todos menos SELECT, que va por su propia regla.
+    const privsForma = ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']
+      .concat(versionServidor >= 170000 ? ['MAINTAIN'] : [])
+
+    const conForma = medir('drift_lector')
+    comprobar(conForma.codigo !== 0,
+      'con un esquema que concede USAGE a PUBLIC, la credencial correcta se RECHAZA')
+    for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
+      comprobar(new RegExp(`✗ ${regla}:`).test(conForma.salida), `  y se rechaza por ${regla}`)
+    }
+    // Se exige la cadena COMPLETA: así un privilegio de más o de menos rompe.
+    const flagsForma = `${ACL_TABLAS[0]} [${privsForma.join(', ')}, vía PUBLIC]`
+    comprobar(conForma.salida.includes(flagsForma),
+      `  enumerando los privilegios exactos y que llegan vía PUBLIC: «${flagsForma}»`)
+    comprobar(conForma.salida.includes(`${ACL_SECUENCIA} [SELECT, USAGE, UPDATE, vía PUBLIC]`),
+      '  y la secuencia con sus tres privilegios')
+    comprobar(versionServidor >= 170000
+      ? /MAINTAIN/.test(conForma.salida) : !/MAINTAIN/.test(conForma.salida),
+      versionServidor >= 170000
+        ? '  y MAINTAIN, que en 17 también se concede'
+        : '  y en 16 NO nombra MAINTAIN, que en este servidor no existe')
+    comprobar(!/FROM drift_lector;/.test(conForma.salida),
+      '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
 
     const psqlComo = (rol, sql) => {
       const r = spawnSync(join(binarios(), 'psql'),
