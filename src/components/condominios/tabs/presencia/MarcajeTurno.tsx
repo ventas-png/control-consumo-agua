@@ -4,8 +4,17 @@ import { obtenerUbicacion, type CoordsMarcaje } from '../../../../lib/nativeGeo'
 import {
   fetchMiFichaPresencia, marcarPresencia, subirFotoMarcaje, type TipoMarcaje,
 } from '../../../../domain/condominios/presenciaAutoservicio'
-import { notify } from '../../../shared/Dialog'
+import { confirm, notify } from '../../../shared/Dialog'
+import { minutosDesdeMedianoche } from '../../../../domain/condominios/turnos'
 import type { MiFichaPresencia } from '../../../../types'
+
+/**
+ * Bajo este umbral, marcar la salida se pregunta antes. Cerrar la jornada sin
+ * querer fue el error MÁS COMÚN del primer día: dos de las cuatro primeras
+ * personas marcaron salida a los segundos de entrar, por volver a pulsar. Nadie
+ * trabaja un turno de cinco minutos, así que preguntarlo no estorba a nadie.
+ */
+const MINUTOS_SALIDA_SOSPECHOSA = 5
 
 interface Props {
   proyectoId: string
@@ -53,9 +62,12 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
   const [guardando, setGuardando] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const yaAbrio = useRef(false)
+  /** Reloj del dispositivo al bajar la ficha, para medir intervalos (no fechas). */
+  const cargadaEn = useRef(Date.now())
 
   const recargarFicha = useCallback(async () => {
     const { ficha: f, error } = await fetchMiFichaPresencia(proyectoId)
+    cargadaEn.current = Date.now()
     setFicha(f)
     setErrorFicha(error)
     setCargando(false)
@@ -113,8 +125,39 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
     : !ficha.hora_salida ? 'salida'
     : null
 
+  /**
+   * Minutos transcurridos desde la entrada, en el reloj del TENANT.
+   * `hora_servidor` es de cuando se bajó la ficha; se le suma lo corrido desde
+   * entonces. El reloj del dispositivo se usa solo para medir un intervalo,
+   * nunca para fechar el marcaje: esa hora la sigue poniendo Postgres.
+   */
+  function minutosDesdeEntrada(): number | null {
+    if (!ficha?.hora_entrada || !ficha.hora_servidor) return null
+    const ent = minutosDesdeMedianoche(ficha.hora_entrada)
+    const srv = minutosDesdeMedianoche(ficha.hora_servidor)
+    if (ent === null || srv === null) return null
+    return srv - ent + (Date.now() - cargadaEn.current) / 60000
+  }
+
   async function marcar(conFoto: boolean) {
     if (!ficha || !pendiente || guardando) return
+
+    if (pendiente === 'salida') {
+      const min = minutosDesdeEntrada()
+      if (min !== null && min >= 0 && min < MINUTOS_SALIDA_SOSPECHOSA) {
+        const r = await confirm({
+          title: '¿Marcar tu salida?',
+          text: `Entraste a las ${ficha.hora_entrada?.slice(0, 5)}, hace ${Math.max(1, Math.round(min))} min. `
+            + 'Si todavía estás en tu turno, cancelá: la salida solo se marca una vez.',
+          icon: 'warning',
+          variant: 'danger',
+          confirmText: 'Sí, marcar salida',
+          cancelText: 'Cancelar',
+        })
+        if (!r.isConfirmed) return
+      }
+    }
+
     setGuardando(true)
     try {
       let path: string | null = null
@@ -212,9 +255,14 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
         </div>
       ) : (
         <>
-          {/* Foto */}
+          {/* La foto es VISTA PREVIA, no un botón. Antes el único camino para
+              empezar era pulsar un recuadro punteado que se lee como adorno, y
+              el botón de abajo salía deshabilitado hasta entonces: quien no
+              daba con el recuadro veía la acción apagada y no sabía por qué.
+              Ahora la acción vive SIEMPRE en el botón principal, que en su
+              primera pulsación abre la cámara. */}
           <div style={{ marginBottom: 12 }}>
-            {foto ? (
+            {foto && (
               <div style={{ position: 'relative' }}>
                 <img src={foto.url} alt="Foto del marcaje"
                   style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--at-line)', display: 'block' }} />
@@ -222,12 +270,6 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
                   📷 Repetir foto
                 </button>
               </div>
-            ) : (
-              <button onClick={() => void tomarFoto()}
-                style={{ width: '100%', padding: '22px 12px', border: '2px dashed var(--at-line-strong)', borderRadius: 10, background: 'var(--at-surface-2)', cursor: 'pointer', fontSize: 13, color: 'var(--at-ink-2)' }}>
-                <div style={{ fontSize: 26, marginBottom: 4 }}>📷</div>
-                Tomar foto para marcar {pendiente}
-              </button>
             )}
             {errorFoto && <div style={{ ...dato, color: 'var(--at-danger)', marginTop: 6 }}>{errorFoto}</div>}
             <input
@@ -256,23 +298,29 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
             style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, marginBottom: 12 }}
           />
 
+          {/* UN botón, dos fases: sin foto abre la cámara; con foto confirma.
+              Nunca sale deshabilitado — un botón apagado no explica qué falta. */}
           <button
-            onClick={() => void marcar(true)}
-            disabled={guardando || !foto}
+            onClick={() => { if (!foto) void tomarFoto(); else void marcar(true) }}
+            disabled={guardando}
             style={{
               width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10,
-              background: pendiente === 'entrada' ? 'var(--at-success)' : 'var(--at-warning)',
+              background: pendiente === 'entrada' ? 'var(--at-success)' : 'var(--at-danger)',
               color: 'var(--at-on-status)', fontSize: 15, fontWeight: 700,
-              cursor: guardando || !foto ? 'not-allowed' : 'pointer',
-              opacity: guardando || !foto ? 0.55 : 1,
+              cursor: guardando ? 'not-allowed' : 'pointer',
+              opacity: guardando ? 0.55 : 1,
             }}
           >
             {guardando
               ? 'Registrando…'
-              : pendiente === 'entrada' ? '🟢 Marcar mi entrada' : '🔴 Marcar mi salida'}
+              : !foto
+                ? (pendiente === 'entrada' ? '📷 Marcar mi entrada' : '📷 Marcar mi salida')
+                : (pendiente === 'entrada' ? '🟢 Confirmar entrada' : '🔴 Confirmar salida')}
           </button>
           <div style={{ ...dato, textAlign: 'center', marginTop: 8 }}>
-            La hora la pone el sistema al registrar, no se escribe a mano.
+            {!foto
+              ? 'Se abre la cámara; la foto se confirma después.'
+              : 'La hora la pone el sistema al registrar, no se escribe a mano.'}
           </div>
 
           {/* Salida de emergencia: solo aparece cuando la cámara ya falló, para

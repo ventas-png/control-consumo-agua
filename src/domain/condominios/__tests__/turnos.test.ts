@@ -54,6 +54,30 @@ describe('horasJornada — la aritmética que hoy pierde el turno nocturno', () 
     expect(horasJornada('06:00:00', '14:00:00')).toBe(8)
   })
 
+  // El bug que se vio en producción el primer día del marcaje de autoservicio:
+  // dos marcajes del MISMO minuto se leían como `fin == inicio`, y la regla del
+  // cruce de medianoche los convertía en una jornada de 24 horas. El SQL, que
+  // usa EXTRACT(EPOCH FROM time), siempre contó los segundos: la misma fila
+  // valía 24 h en pantalla y 0.01 h en la nómina.
+  it('34 segundos de jornada son 34 segundos, no 24 horas', () => {
+    expect(horasJornada('06:02:07', '06:02:41')).toBe(0.01)
+  })
+
+  it('los segundos deciden el orden dentro del mismo minuto', () => {
+    expect(horasJornada('16:49:10', '16:49:55')).toBe(0.01)
+    expect(horasJornada('08:00:00', '08:30:30')).toBe(0.51)
+  })
+
+  // La regla del cruce de medianoche sigue viva: es lo que rescata el turno
+  // nocturno. Solo deja de dispararse por un empate que los segundos deshacen.
+  it('un empate exacto sigue siendo cruce de medianoche', () => {
+    expect(horasJornada('22:00:00', '22:00:00')).toBe(24)
+  })
+
+  it('el turno nocturno real no se toca', () => {
+    expect(horasJornada('22:00:00', '06:00:00')).toBe(8)
+  })
+
   it('devuelve null si falta una de las dos horas', () => {
     expect(horasJornada('08:00', null)).toBeNull()
     expect(horasJornada(null, '17:00')).toBeNull()

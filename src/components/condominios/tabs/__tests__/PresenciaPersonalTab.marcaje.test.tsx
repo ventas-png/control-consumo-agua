@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   createCondominioRow: vi.fn(async () => ({ error: null })),
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   notify: vi.fn(),
+  confirm: vi.fn(),
   // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
   // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
   // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
@@ -56,7 +57,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
   updateCondominioRow: mocks.updateCondominioRow,
 }))
 vi.mock('../../../../lib/nativeGeo', () => ({ obtenerUbicacion: mocks.obtenerUbicacion }))
-vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: vi.fn() }))
+vi.mock('../../../shared/Dialog', () => ({ notify: mocks.notify, confirm: mocks.confirm }))
 vi.mock('../../../shared/SecureImage', () => ({
   SecureImage: (props: { src?: string | null; bucket?: string }) => { mocks.secureImage(props); return null },
 }))
@@ -91,6 +92,7 @@ beforeEach(() => {
     error: null,
   })
   mocks.subirFotoMarcaje.mockResolvedValue({ path: 'p1/per-1/1757-foto.jpg', error: null })
+  mocks.confirm.mockResolvedValue({ isConfirmed: true })
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -136,13 +138,27 @@ describe('la pantalla de marcaje', () => {
     expect(screen.getByText(/Turno de hoy: 06:00–14:00/)).toBeTruthy()
     // La hora no se teclea: no hay ningún control para escribirla.
     expect(document.querySelectorAll('input[type="time"]').length).toBe(0)
-    expect(screen.getByText(/La hora la pone el sistema/)).toBeTruthy()
+    expect(screen.getByText(/Se abre la cámara/)).toBeTruthy()
   })
 
-  it('sin foto no deja marcar', async () => {
+  it('sin foto el botón NO está apagado: abre la cámara', async () => {
+    // Un botón deshabilitado no explica qué falta. Antes la única forma de
+    // empezar era pulsar un recuadro punteado que se leía como adorno.
     await entrarAMarcar()
-    const boton = screen.getByText(/Marcar mi entrada/).closest('button')!
-    expect(boton.hasAttribute('disabled')).toBe(true)
+    const boton = screen.getByText(/📷 Marcar mi entrada/).closest('button')!
+    expect(boton.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(boton)
+    // Abre la cámara, no registra nada todavía.
+    expect(mocks.marcarPresencia).not.toHaveBeenCalled()
+  })
+
+  it('con la foto tomada, el botón pasa a confirmar', async () => {
+    await entrarAMarcar()
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
+    expect(await screen.findByText(/🟢 Confirmar entrada/)).toBeTruthy()
+    expect(screen.queryByText(/📷 Marcar mi entrada/)).toBeNull()
   })
 
   it('sube la foto ANTES de marcar y no manda ninguna hora', async () => {
@@ -150,12 +166,7 @@ describe('la pantalla de marcaje', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
 
-    const boton = await waitFor(() => {
-      const b = screen.getByText(/Marcar mi entrada/).closest('button')!
-      expect(b.hasAttribute('disabled')).toBe(false)
-      return b
-    })
-    fireEvent.click(boton)
+    fireEvent.click(await screen.findByText(/Confirmar entrada/))
 
     await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
     expect(mocks.subirFotoMarcaje).toHaveBeenCalledWith('p1', 'per-1', expect.any(File))
@@ -180,6 +191,44 @@ describe('la pantalla de marcaje', () => {
     expect(await screen.findByText(/Marcar mi salida/)).toBeTruthy()
   })
 
+  describe('la salida no se cierra sin querer', () => {
+    // Dos de las cuatro primeras personas que ficharon en producción cerraron
+    // su jornada a los segundos de entrar, por volver a pulsar.
+    const reciénEntrada = {
+      ...FICHA, registro_id: 'r1', hora_entrada: '16:49:10', hora_servidor: '16:50:00',
+      estado: 'presente' as const, origen: 'autoservicio' as const,
+    }
+
+    async function irAMarcarSalida(ficha: MiFichaPresencia) {
+      mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha, error: null })
+      montar()
+      fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      fireEvent.change(input, { target: { files: [new File(['x'], 's.jpg', { type: 'image/jpeg' })] } })
+      fireEvent.click(await screen.findByText(/Confirmar salida/))
+    }
+
+    it('pregunta si la entrada fue hace menos de 5 minutos', async () => {
+      await irAMarcarSalida(reciénEntrada)
+      await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+      const arg = mocks.confirm.mock.calls[0][0]
+      expect(arg.text).toContain('16:49')   // le recuerda a qué hora entró
+    })
+
+    it('si cancela, no se registra nada', async () => {
+      mocks.confirm.mockResolvedValue({ isConfirmed: false })
+      await irAMarcarSalida(reciénEntrada)
+      await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+      expect(mocks.marcarPresencia).not.toHaveBeenCalled()
+    })
+
+    it('una jornada normal no pregunta nada', async () => {
+      await irAMarcarSalida({ ...reciénEntrada, hora_entrada: '06:00:00', hora_servidor: '14:00:00' })
+      await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
+      expect(mocks.confirm).not.toHaveBeenCalled()
+    })
+  })
+
   it('con la jornada cerrada no ofrece marcar nada', async () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({
       ficha: { ...FICHA, registro_id: 'r1', hora_entrada: '06:03:11', hora_salida: '14:05:00', estado: 'presente', origen: 'autoservicio' },
@@ -192,12 +241,16 @@ describe('la pantalla de marcaje', () => {
   })
 
   it('la ubicación que no llega no bloquea el marcaje', async () => {
-    mocks.obtenerUbicacion.mockResolvedValue({ coords: null, error: 'Permiso de ubicación denegado' })
+    mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.obtenerUbicacion.mockResolvedValue({ coords: null, error: 'Permiso de ubicación denegado' })
     await entrarAMarcar()
     expect(await screen.findByText(/Sin ubicación — Permiso de ubicación denegado/)).toBeTruthy()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
-    await waitFor(() => expect(screen.getByText(/Marcar mi entrada/).closest('button')!.hasAttribute('disabled')).toBe(false))
+    fireEvent.click(await screen.findByText(/Confirmar entrada/))
+    // Se registra igual, y la fila lo dirá: coords en null.
+    await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
+    expect(mocks.marcarPresencia.mock.calls[0][0].coords).toBeNull()
   })
 })
 
