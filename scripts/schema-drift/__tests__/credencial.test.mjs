@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import {
   juzgarCredencial, SECDEF_PERMITIDAS, avisarCredencial, clasificarLectura,
-  LECTURA_TOLERADA, SQL_PRIVS_TABLA, NET_OBJETOS, NET_TABLAS, NET_SECUENCIA,
+  LECTURA_TOLERADA, SQL_PRIVS_TABLA, SIN_REMEDIO_SOPORTADO, AVISO_SIN_REMEDIO,
 } from '../auditar.mjs'
 
 const sana = {
@@ -628,5 +628,69 @@ describe('SQL_PRIVS_TABLA · la lista versionada de privilegios', () => {
     expect(SQL_PRIVS_TABLA.match(/MAINTAIN/g)).toHaveLength(1)
     expect(SQL_PRIVS_TABLA.indexOf('MAINTAIN'))
       .toBeGreaterThan(SQL_PRIVS_TABLA.indexOf('170000'))
+  })
+})
+
+
+// ── Objetos gestionados por el proveedor: se bloquean, no se remedian ───────
+//
+// Supabase Support confirmó que los grants de pg_net a PUBLIC son gestionados,
+// intencionales y necesarios, que todo rol LOGIN propio los hereda, y que
+// retirarlos NO es una remediación soportada. Proponer un REVOKE contra ellos
+// sería dar por accionable algo que el proveedor declaró que no lo es — y en un
+// proyecto gestionado ese REVOKE ni siquiera fallaría: saldría 0 sin revocar.
+describe('juzgarCredencial · pg_net no lleva SQL, lleva un puntero', () => {
+  const NET = {
+    tabla: 'net._http_response',
+    otra: 'net.http_request_queue',
+    seq: 'net.http_request_queue_id_seq',
+  }
+  const conNet = {
+    ...sana,
+    escribibles: [T(NET.tabla, 'net', 'PUBLIC', 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'),
+                  T(NET.otra, 'net', 'PUBLIC', 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')].join('\x1e'),
+    leibles: [T(NET.tabla, 'net', 'PUBLIC'), T(NET.otra, 'net', 'PUBLIC')].join('\x1e'),
+    secuencias: T(NET.seq, 'net', 'PUBLIC', 'SELECT, USAGE, UPDATE'),
+  }
+  const texto = () => juzgarCredencial(conNet).map(r => `${r.regla}: ${r.detalle}\n${r.remedio}`).join('\n')
+
+  it('los tres objetos están declarados como sin remediación soportada', () => {
+    expect([...SIN_REMEDIO_SOPORTADO].sort()).toEqual([NET.tabla, NET.otra, NET.seq].sort())
+  })
+
+  it('BLOQUEA por las tres reglas: detectarlos sigue siendo el trabajo', () => {
+    expect(reglas(conNet)).toEqual(
+      expect.arrayContaining(['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']))
+  })
+
+  // LA REGRESIÓN QUE PIDE ESTE CAMBIO.
+  it('NO emite ningún «REVOKE … net… FROM PUBLIC»', () => {
+    expect(texto()).not.toMatch(/REVOKE[^\n]*\bnet\.[^\n]*FROM PUBLIC;/)
+  })
+
+  it('ni ningún otro REVOKE sobre esos objetos', () => {
+    expect(texto()).not.toMatch(/REVOKE[^\n]*\bnet\./)
+  })
+
+  it('ni un ALTER que cambie su propiedad', () => {
+    expect(texto()).not.toMatch(/ALTER (TABLE|SEQUENCE)[^\n]*\bnet\./)
+  })
+
+  it('dice que no hay remediación soportada y remite al registro de decisión', () => {
+    expect(texto()).toContain('SIN REMEDIACIÓN SOPORTADA')
+    expect(texto()).toContain('decision-net-pg_net.md')
+    expect(AVISO_SIN_REMEDIO).toContain('decision-net-pg_net.md')
+  })
+
+  it('el motivo sí los nombra, con sus privilegios y su procedencia', () => {
+    const r = juzgarCredencial(conNet).find(x => x.regla === 'ESCRITURA')
+    expect(r.detalle).toContain(`${NET.tabla} [INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, vía PUBLIC]`)
+  })
+
+  // Y no se contagia: un objeto cualquiera del mismo esquema sí lleva remedio.
+  it('un objeto NO gestionado sigue llevando su REVOKE', () => {
+    const l = juzgarCredencial({ ...sana, leibles: T('net.otra_cosa', 'net', 'PUBLIC') })
+      .find(x => x.regla === 'SELECT DE TABLA')
+    expect(l.remedio).toContain('REVOKE SELECT ON net.otra_cosa FROM PUBLIC;')
   })
 })

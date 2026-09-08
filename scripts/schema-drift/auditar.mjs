@@ -477,9 +477,6 @@ function valor(nombre) {
   return i === -1 ? null : process.argv[i + 1]
 }
 
-// ── Modo live: la parte que sí toca la red ─────────────────────────────────
-
-/**
 /**
  * Funciones SECURITY DEFINER que la credencial PUEDE ejecutar sin que el
  * refresco se niegue, con su justificación al lado.
@@ -575,18 +572,29 @@ export const SQL_PRIVS_TABLA =
            THEN ARRAY['MAINTAIN'] ELSE ARRAY[]::text[] END`
 
 /**
- * Los objetos de `pg_net` cuyos grants a `PUBLIC` bloquean una credencial
- * dedicada. Se conservan SÓLO como datos de las regresiones: nombran la forma
- * que el fixture reproduce.
+ * Objetos GESTIONADOS por el proveedor: se detectan y se bloquean, pero **no se
+ * propone SQL** para ellos.
  *
- * NO HAY REMEDIO APLICABLE, y por eso acá no hay ningún SQL de retirada.
- * Supabase Support confirmó que estos grants son gestionados, intencionales y
- * necesarios, que todo rol LOGIN propio los hereda, y que quitarlos no es una
- * remediación soportada. Ver `decision-net-pg_net.md`.
+ * Supabase Support confirmó que los grants de `pg_net` a `PUBLIC` son
+ * gestionados, intencionales y necesarios; que todo rol `LOGIN` propio los
+ * hereda; y que **retirarlos no es una remediación soportada**. Emitir un
+ * `REVOKE … FROM PUBLIC` contra ellos sería dar por accionable algo que el
+ * proveedor declaró que no lo es — y, en un proyecto gestionado, ese `REVOKE`
+ * ni siquiera fallaría: saldría 0 sin revocar nada.
+ *
+ * Así que el diagnóstico dice qué hay y remite a la decisión, sin SQL.
  */
-export const NET_TABLAS   = ['net._http_response', 'net.http_request_queue']
-export const NET_SECUENCIA = 'net.http_request_queue_id_seq'
-export const NET_OBJETOS  = [...NET_TABLAS, NET_SECUENCIA]
+export const SIN_REMEDIO_SOPORTADO = new Set([
+  'net._http_response',
+  'net.http_request_queue',
+  'net.http_request_queue_id_seq',
+])
+
+/** Lo que el diagnóstico dice en lugar de un remedio, para esos objetos. */
+export const AVISO_SIN_REMEDIO =
+  '-- SIN REMEDIACIÓN SOPORTADA: son grants gestionados por Supabase sobre pg_net, ' +
+  'intencionales y necesarios según Supabase Support, y todo rol LOGIN propio los ' +
+  'hereda. NO hay REVOKE aplicable. Ver scripts/schema-drift/decision-net-pg_net.md'
 
 /**
  * Lo que hay que medir del OTRO lado antes de leer nada.
@@ -915,6 +923,12 @@ export function juzgarCredencial(m, { permitidas = SECDEF_PERMITIDAS } = {}) {
   const remediosDeObjeto = (items, { privs, palabra = '', todos, alter }) => {
     const lineas = []
     const privsDe = (it) => (typeof privs === 'function' ? privs(it) : privs)
+    // Los objetos GESTIONADOS por el proveedor salen del reparto de remedios: se
+    // nombran en el motivo, pero no se les propone SQL. Ver
+    // `SIN_REMEDIO_SOPORTADO`.
+    const gestionados = items.filter(it => SIN_REMEDIO_SOPORTADO.has(it.nombre))
+    items = items.filter(it => !SIN_REMEDIO_SOPORTADO.has(it.nombre))
+    if (gestionados.length > 0) lineas.push(AVISO_SIN_REMEDIO)
     for (const it of items) {
       if (it.fuentes.includes('PUBLIC')) {
         // NO se propone `FROM <auditor>`: el privilegio es de PUBLIC, y
@@ -1482,6 +1496,15 @@ async function pruebaCredencial() {
 
     const listaSql = (xs) => xs.map(x => `'${x}'`).join(', ')
 
+    // Objetos SINTÉTICOS. Las regresiones de semántica de ACL corren sobre un
+    // esquema propio de la prueba, no sobre los objetos gestionados de ninguna
+    // extensión: lo que se fija es cómo se comporta PostgreSQL, y eso no
+    // necesita —ni debe— nombrar objetos reales de producción.
+    const ACL_ESQUEMA   = 'drift_acl'
+    const ACL_TABLAS    = ['drift_acl.recurso', 'drift_acl.bitacora']
+    const ACL_SECUENCIA = 'drift_acl.bitacora_id_seq'
+    const ACL_OBJETOS   = [...ACL_TABLAS, ACL_SECUENCIA]
+
     // ── Fixtures SQL de las regresiones de ACL ──────────────────────────────
     //
     // ESTO NO ES UN REMEDIO, Y NO HAY NINGUNO APLICABLE. Supabase Support
@@ -1506,8 +1529,8 @@ DECLARE
   yo        text    := current_user;
   soy_super boolean := coalesce((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false);
   privs     text[]  := ${SQL_PRIVS_TABLA};
-  esperados text[]  := ARRAY[${listaSql(NET_OBJETOS)}];
-  tablas    text[]  := ARRAY[${listaSql(NET_TABLAS)}];
+  esperados text[]  := ARRAY[${listaSql(ACL_OBJETOS)}];
+  tablas    text[]  := ARRAY[${listaSql(ACL_TABLAS)}];
   vistos    text[]  := ARRAY[]::text[];
   ausentes  text[];
   faltan    text[]  := ARRAY[]::text[];
@@ -1537,7 +1560,7 @@ BEGIN
       RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una tabla (relkind «r») y es «%».',
                       r.objeto, r.relkind;
     END IF;
-    IF r.objeto = '${NET_SECUENCIA}' AND r.relkind <> 'S' THEN
+    IF r.objeto = '${ACL_SECUENCIA}' AND r.relkind <> 'S' THEN
       RAISE EXCEPTION 'PRECONDICIÓN FALLIDA: % tendría que ser una secuencia (relkind «S») y es «%».',
                       r.objeto, r.relkind;
     END IF;
@@ -1650,8 +1673,8 @@ $precondicion$;`
 
     const SQL_FIXTURE_SIN_PUBLICO = `DO $postcondicion$
 DECLARE
-  esperados text[] := ARRAY[${listaSql(NET_OBJETOS)}];
-  tablas    text[] := ARRAY[${listaSql(NET_TABLAS)}];
+  esperados text[] := ARRAY[${listaSql(ACL_OBJETOS)}];
+  tablas    text[] := ARRAY[${listaSql(ACL_TABLAS)}];
   hallados  int;
   cuantos   int;
   restante  text;
@@ -1660,7 +1683,7 @@ BEGIN
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
    WHERE n.nspname || '.' || c.relname = ANY (esperados);
   IF hallados <> array_length(esperados, 1) THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: se esperaban % objetos de pg_net y hay %. '
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: se esperaban % objetos y hay %. '
                     'No se puede afirmar que la vía quedó cerrada sobre un objeto que no está.',
                     array_length(esperados, 1), hallados;
   END IF;
@@ -1698,7 +1721,7 @@ BEGIN
     FROM publico;
 
   IF cuantos > 0 THEN
-    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre pg_net: %. '
+    RAISE EXCEPTION 'POSTCONDICIÓN FALLIDA: PUBLIC conserva % privilegio(s) sobre los objetos medidos: %. '
                     'Se revierte la transacción ENTERA —incluidos los REVOKE que sí funcionaron—: '
                     'un REVOKE que no revoca sale 0 y no se distingue de uno que sí.',
                     cuantos, restante;
@@ -1706,36 +1729,19 @@ BEGIN
 END
 $postcondicion$;`
 
-    const SQL_FIXTURE_LOTE = `-- ═══════════════════════════════════════════════════════════════════════════
--- pg_net · retirar el acceso de PUBLIC a los tres objetos de la extensión.
---
--- ENVIAR Y EJECUTAR COMO UNA SOLA TRANSACCIÓN. No dividir en partes: la
--- postcondición del final sólo protege si puede revertir los REVOKE de arriba.
---
--- Requiere autoridad de propietario (supabase_admin). La precondición aborta
--- si quien ejecuta no la tiene — ver el mensaje que emite.
--- ═══════════════════════════════════════════════════════════════════════════
-BEGIN;
+    // El «lote» del fixture: precondición + REVOKE + postcondición en UNA
+    // transacción, para poder fijar que una excepción al final revierte los
+    // REVOKE de arriba. Es un montaje de prueba sobre objetos sintéticos, no un
+    // procedimiento para ejecutar en ninguna base real.
+    const SQL_FIXTURE_LOTE = `BEGIN;
 
 ${SQL_FIXTURE_AUTORIDAD}
 
--- ── REVOKE ────────────────────────────────────────────────────────────────
--- ALL PRIVILEGES y no una lista a mano: cubre los ocho privilegios de tabla
--- —SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER y MAINTAIN—
--- y también los que agregue el próximo mayor.
 REVOKE ALL PRIVILEGES ON TABLE
-  ${NET_TABLAS.join(',\n  ')}
+  ${ACL_TABLAS.join(',\n  ')}
 FROM PUBLIC;
 
--- La secuencia de la cola, que es la única que hay: _http_response no tiene
--- secuencia propia.
-REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC;
-
--- ── REGRANTS EXPLÍCITOS (aprobados de antemano) ───────────────────────────
--- Vacío: el análisis de impacto todavía no identificó ningún consumidor
--- legítimo que dependa del grant a PUBLIC. Si lo identifica, acá van líneas
--- GRANT concretas, con el rol real, ANTES de enviar el lote. Sin placeholders.
--- (fin de la sección)
+REVOKE ALL PRIVILEGES ON SEQUENCE ${ACL_SECUENCIA} FROM PUBLIC;
 
 ${SQL_FIXTURE_SIN_PUBLICO}
 
@@ -1912,10 +1918,10 @@ COMMIT;
       DO $conceder$
       DECLARE privs text := array_to_string(${SQL_PRIVS_TABLA}, ', ');
       BEGIN
-        EXECUTE format('GRANT %s ON ${NET_TABLAS.join(', ')} TO PUBLIC', privs);
+        EXECUTE format('GRANT %s ON net._http_response, net.http_request_queue TO PUBLIC', privs);
       END
       $conceder$;
-      GRANT SELECT, USAGE, UPDATE ON SEQUENCE ${NET_SECUENCIA} TO PUBLIC;`
+      GRANT SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq TO PUBLIC;`
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
       GRANT USAGE ON SCHEMA net TO PUBLIC;
       CREATE TABLE net.http_request_queue (id bigserial PRIMARY KEY, url text, headers jsonb);
@@ -1931,53 +1937,89 @@ COMMIT;
     for (const regla of ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']) {
       comprobar(new RegExp(`✗ ${regla}:`).test(conNet.salida), `  y se rechaza por ${regla}`)
     }
-    // El diagnóstico tiene que enumerar los OCHO, no los cinco de siempre. Se
-    // exige la cadena COMPLETA —así un privilegio de más o de menos rompe— y
-    // además, uno por uno, los tres que se agregaron.
+    // El diagnóstico tiene que enumerar los OCHO, no los cinco de siempre: se
+    // exige la cadena COMPLETA, así un privilegio de más o de menos rompe.
     const flagsNet = `net._http_response [${privsNet.join(', ')}, vía PUBLIC]`
     comprobar(conNet.salida.includes(flagsNet),
       `  nombrando la tabla, los privilegios exactos y que llegan vía PUBLIC: «${flagsNet}»`)
-    for (const priv of ['REFERENCES', 'TRIGGER']) {
-      comprobar(new RegExp(`REVOKE [^\n]*\\b${priv}\\b[^\n]*ON net\\._http_response FROM PUBLIC;`)
-        .test(conNet.salida), `  y el remedio retira ${priv}, que antes se escapaba`)
-    }
-    comprobar(versionServidor >= 170000
-      ? /REVOKE [^\n]*\bMAINTAIN\b[^\n]*ON net\._http_response FROM PUBLIC;/.test(conNet.salida)
-      : !/MAINTAIN/.test(conNet.salida),
+    comprobar(/net\.http_request_queue_id_seq \[SELECT, USAGE, UPDATE, vía PUBLIC\]/
+      .test(conNet.salida),
+      '  y la secuencia REAL —la de http_request_queue— con sus tres privilegios')
+    comprobar(versionServidor >= 170000 ? /MAINTAIN/.test(conNet.salida) : !/MAINTAIN/.test(conNet.salida),
       versionServidor >= 170000
         ? '  y MAINTAIN, que en 17 también se concede'
         : '  y en 16 NO nombra MAINTAIN, que en este servidor no existe')
-    comprobar(conNet.salida.includes(
-      'REVOKE SELECT, USAGE, UPDATE ON SEQUENCE net.http_request_queue_id_seq FROM PUBLIC;'),
-      '  y la secuencia REAL —la de http_request_queue— con sus tres privilegios')
+
+    // LA PARTE QUE IMPORTA: bloquea, pero NO propone SQL.
+    //
+    // Supabase Support confirmó que estos grants son gestionados, intencionales
+    // y necesarios, que todo rol LOGIN propio los hereda, y que retirarlos NO es
+    // una remediación soportada. Emitir un `REVOKE … FROM PUBLIC` contra ellos
+    // sería dar por accionable algo que el proveedor declaró que no lo es —y en
+    // un proyecto gestionado ese REVOKE ni siquiera fallaría: saldría 0 sin
+    // revocar nada—. El diagnóstico dice qué hay y remite a la decisión.
+    comprobar(!/REVOKE[^\n]*\bnet\.[^\n]*FROM PUBLIC;/.test(conNet.salida),
+      '  y NO propone ningún «REVOKE … net… FROM PUBLIC»: no hay remediación soportada')
+    comprobar(!/REVOKE[^\n]*\bnet\./.test(conNet.salida),
+      '  ni ningún otro REVOKE sobre los objetos gestionados de pg_net')
+    comprobar(/SIN REMEDIACIÓN SOPORTADA/.test(conNet.salida),
+      '  lo dice con todas las letras, en lugar de un remedio')
+    comprobar(/decision-net-pg_net\.md/.test(conNet.salida),
+      '  y remite al registro de decisión, que es donde está el porqué')
+
     // La reconstrucción local SÍ tiene un `net._http_response_id_seq` —su `id`
     // ahí es serial— pero SIN grants a PUBLIC, así que es inalcanzable y no
-    // puede aparecer. Producción no tiene esa secuencia en absoluto. La
-    // aserción vale en los dos casos, y es la que impediría mandar a alguien a
-    // ejecutar un REVOKE sobre un objeto que no existe.
+    // puede aparecer. Producción no tiene esa secuencia en absoluto.
     comprobar(!/_http_response_id_seq/.test(conNet.salida),
       '  y no inventa una secuencia para _http_response, que en producción no tiene')
     comprobar(!/FROM drift_lector;/.test(conNet.salida),
       '  y NUNCA propone revocarle al auditor algo que es de PUBLIC')
 
-    // ── 2 sexies bis · el REVOKE NO lo puede ejecutar el pipeline ───────────
+    // Se desarma la forma de producción: el resto de la prueba mide sobre el
+    // esquema sintético, no sobre los objetos gestionados.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      'DROP TABLE net.http_request_queue; ' +
+      'REVOKE ALL PRIVILEGES ON TABLE net._http_response FROM PUBLIC; ' +
+      'REVOKE USAGE ON SCHEMA net FROM PUBLIC;'], { stdio: 'pipe' })
+    comprobar(medir('drift_lector').codigo === 0,
+      '  retirada la forma de producción del fixture, el rol correcto vuelve a pasar')
+
+    // ── 2 sexies bis · semántica de ACL de PostgreSQL, sobre objetos propios ─
     //
-    // Medido contra el catálogo real: `net._http_response`,
-    // `net.http_request_queue` y `net.http_request_queue_id_seq` pertenecen a
-    // `supabase_admin`, y los grants a `PUBLIC` los hizo ese rol. El ejecutor
-    // habitual de las migraciones es `postgres`, que en Supabase NO es
-    // superusuario, NO es miembro de `supabase_admin` y NO tiene grant option
-    // sobre esos objetos.
+    // Todo lo que sigue corre sobre `drift_acl`, un esquema SINTÉTICO que crea
+    // esta prueba. No nombra objetos gestionados de ninguna extensión, y no es
+    // un procedimiento para ejecutar en ninguna base real: fija cómo se comporta
+    // PostgreSQL, que es lo que el auditor da por cierto.
     //
-    // Y acá está el modo de fallo que hace falta fijar con una prueba: en
-    // PostgreSQL, un REVOKE emitido por un rol sin autoridad NO FALLA. Emite un
-    // `WARNING: no privileges could be revoked` y la sentencia SALE 0. Una
-    // migración normal quedaría marcada como aplicada, el pipeline en verde y
-    // PUBLIC conservándolo todo. Es un falso negativo de seguridad perfecto:
-    // el registro dice que se cerró la vía, y la vía sigue abierta.
+    // Lo que se fija, y por qué importa:
     //
-    // Se reproduce esa forma exacta —dueño distinto del ejecutor— y se exige
-    // que el proceso NO pueda declarar éxito.
+    //   · un REVOKE emitido por un rol SIN autoridad NO FALLA: emite un WARNING
+    //     —«no privileges could be revoked»— y SALE 0. Un runner de migraciones
+    //     lo registraría como aplicado con la vía intacta;
+    //   · `WITH GRANT OPTION` no alcanza: un REVOKE retira lo que otorgó quien
+    //     lo ejecuta, o un rol del que sea miembro, no lo que otorgó un tercero;
+    //   · los privilegios por columna viven en `pg_attribute.attacl` y no se ven
+    //     desde `pg_class.relacl`;
+    //   · una excepción dentro de la transacción revierte los REVOKE anteriores.
+    //
+    // Es la evidencia de por qué el bloqueo del proveedor es real, sin dejar un
+    // procedimiento copiable contra objetos reales.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
+      CREATE SCHEMA ${ACL_ESQUEMA};
+      CREATE TABLE ${ACL_TABLAS[0]} (id bigint PRIMARY KEY, cuerpo text, cabeceras jsonb);
+      CREATE TABLE ${ACL_TABLAS[1]} (id bigserial PRIMARY KEY, url text, cabeceras jsonb);
+      GRANT USAGE ON SCHEMA ${ACL_ESQUEMA} TO PUBLIC;`], { stdio: 'pipe' })
+
+    const grantsAcl = `
+      DO $conceder$
+      DECLARE privs text := array_to_string(${SQL_PRIVS_TABLA}, ', ');
+      BEGIN
+        EXECUTE format('GRANT %s ON ${ACL_TABLAS.join(', ')} TO PUBLIC', privs);
+      END
+      $conceder$;
+      GRANT SELECT, USAGE, UPDATE ON SEQUENCE ${ACL_SECUENCIA} TO PUBLIC;`
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', grantsAcl], { stdio: 'pipe' })
+
     const psqlComo = (rol, sql) => {
       const r = spawnSync(join(binarios(), 'psql'),
         ['-U', rol, '-v', 'ON_ERROR_STOP=1', '-q', '-c', sql],
@@ -2001,78 +2043,77 @@ COMMIT;
         { encoding: 'utf8', env: db.entorno })
       return { codigo: r.status ?? 1, salida: `${r.stdout ?? ''}${r.stderr ?? ''}` }
     }
-    const aclNet = () => db.psql(['-tAq', '-c', `
+    const aclObj = () => db.psql(['-tAq', '-c', `
       SELECT c.relname || ' = ' || coalesce(c.relacl::text, '(por defecto)')
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'net'
-         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+       WHERE n.nspname = '${ACL_ESQUEMA}'
+         AND c.relname IN ('recurso', 'bitacora', 'bitacora_id_seq')
        ORDER BY c.relname`], { stdio: 'pipe' }).trim()
     // Lo que PUBLIC tiene, leído del ACL. A diferencia de `relacl::text`, esto
     // NO cambia cuando cambia el dueño: ahí sólo se reescribe el otorgante.
-    const publicoNet = () => db.psql(['-tAq', '-c', `
+    const publicoObj = () => db.psql(['-tAq', '-c', `
       SELECT c.relname || ' → ' || a.privilege_type
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         CROSS JOIN LATERAL aclexplode(c.relacl) AS a
-       WHERE n.nspname = 'net'
-         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
+       WHERE n.nspname = '${ACL_ESQUEMA}'
+         AND c.relname IN ('recurso', 'bitacora', 'bitacora_id_seq')
          AND a.grantee = 0
        ORDER BY 1`], { stdio: 'pipe' }).trim()
 
-    // `drift_net_duenio` hace de supabase_admin y `drift_migrador` de postgres:
+    // `drift_acl_duenio` hace de supabase_admin y `drift_migrador` de postgres:
     // con LOGIN, sin superusuario, sin membresía y sin grant option. Cambiar el
     // dueño reescribe el otorgante de los grants ya existentes, así que después
-    // de esto PUBLIC tiene lo que le dio `drift_net_duenio`, como en producción.
+    // de esto PUBLIC tiene lo que le dio `drift_acl_duenio`, como en producción.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      CREATE ROLE drift_net_duenio LOGIN NOSUPERUSER;   -- con LOGIN: ejecuta el lote como «A»
+      CREATE ROLE drift_acl_duenio LOGIN NOSUPERUSER;   -- con LOGIN: ejecuta el lote como «A»
       CREATE ROLE drift_migrador LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB;
-      GRANT USAGE ON SCHEMA net TO drift_migrador;
-      ALTER TABLE    net._http_response            OWNER TO drift_net_duenio;
-      ALTER TABLE    net.http_request_queue        OWNER TO drift_net_duenio;
-      ALTER SEQUENCE net.http_request_queue_id_seq OWNER TO drift_net_duenio;`],
+      GRANT USAGE ON SCHEMA ${ACL_ESQUEMA} TO drift_migrador;
+      ALTER TABLE    ${ACL_TABLAS[0]}            OWNER TO drift_acl_duenio;
+      ALTER TABLE    ${ACL_TABLAS[1]}        OWNER TO drift_acl_duenio;
+      ALTER SEQUENCE ${ACL_TABLAS[1]}_id_seq OWNER TO drift_acl_duenio;`],
       { stdio: 'pipe' })
 
     const propiedad = db.psql(['-tAq', '-c', `
       SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'net'
-         AND c.relname IN ('_http_response', 'http_request_queue', 'http_request_queue_id_seq')
-         AND pg_get_userbyid(c.relowner) = 'drift_net_duenio'`],
+       WHERE n.nspname = '${ACL_ESQUEMA}'
+         AND c.relname IN ('recurso', 'bitacora', 'bitacora_id_seq')
+         AND pg_get_userbyid(c.relowner) = 'drift_acl_duenio'`],
       { stdio: 'pipe' }).trim()
-    comprobar(propiedad === '3', '  la forma de producción: los 3 objetos de net son de OTRO rol (3 de 3)')
+    comprobar(propiedad === '3', '  la forma de producción: los 3 objetos son de OTRO rol (3 de 3)')
     comprobar(db.psql(['-tAq', '-c',
-      "SELECT pg_has_role('drift_migrador', 'drift_net_duenio', 'USAGE')"], { stdio: 'pipe' }).trim() === 'f',
+      "SELECT pg_has_role('drift_migrador', 'drift_acl_duenio', 'USAGE')"], { stdio: 'pipe' }).trim() === 'f',
       '  y el que ejecuta las migraciones NO es miembro de ese rol')
 
     // 1 · El REVOKE tal cual, como lo correría una migración normal.
-    const aclAntes = aclNet()
-    const publicoAntes = publicoNet()
+    const aclAntes = aclObj()
+    const publicoAntes = publicoObj()
     const revocado = psqlComo('drift_migrador',
-      'REVOKE ALL PRIVILEGES ON TABLE net._http_response, net.http_request_queue FROM PUBLIC;')
+      `REVOKE ALL PRIVILEGES ON TABLE ${ACL_TABLAS.join(', ')} FROM PUBLIC;`)
     comprobar(revocado.codigo === 0,
       '  el REVOKE de un NO dueño SALE 0 — no falla, que es justamente el problema')
     comprobar(/no privileges could be revoked/i.test(revocado.salida),
       '  y todo lo que deja es un WARNING, que un runner de migraciones ignora')
-    comprobar(aclNet() === aclAntes,
+    comprobar(aclObj() === aclAntes,
       '  la ACL queda INTACTA: PUBLIC conserva todo lo que tenía')
 
-    // 2 · Y el guard del auditor lo confirma desde el otro lado: la credencial
-    //     sigue siendo rechazada por los mismos tres motivos.
+    // 2 · Y el guard del auditor lo confirma desde el otro lado: la vía sigue
+    //     abierta y la credencial sigue siendo rechazada por ella.
     const trasRevoke = medir('drift_lector')
-    comprobar(trasRevoke.codigo !== 0 && conNet.salida.includes(flagsNet)
-      && trasRevoke.salida.includes(flagsNet),
-      '  y el auditor lo ve: mismo rechazo, mismos privilegios, como si nada hubiera pasado')
+    comprobar(trasRevoke.codigo !== 0 && trasRevoke.salida.includes(ACL_TABLAS[0]),
+      '  y el auditor lo ve: sigue rechazando por esos objetos, como si nada hubiera pasado')
 
     // 3 · La PRECONDICIÓN de la propuesta lo detiene ANTES de tocar nada.
     const pre = psqlComo('drift_migrador', SQL_FIXTURE_AUTORIDAD)
     comprobar(pre.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(pre.salida),
       '  la PRECONDICIÓN aborta: nombra al ejecutor y por qué no tiene autoridad')
-    comprobar(/drift_net_duenio/.test(pre.salida) && /drift_migrador/.test(pre.salida),
+    comprobar(/drift_acl_duenio/.test(pre.salida) && /drift_migrador/.test(pre.salida),
       '  y nombra al dueño real y al que ejecuta, que es lo accionable')
 
     // 4 · Y la POSTCONDICIÓN convierte el éxito silencioso en un fallo.
     const post = psqlComo('drift_migrador', SQL_FIXTURE_SIN_PUBLICO)
     comprobar(post.codigo !== 0 && /POSTCONDICIÓN FALLIDA/.test(post.salida),
       '  la POSTCONDICIÓN falla y revierte: el éxito silencioso deja de ser silencioso')
-    comprobar(/net\._http_response → SELECT/.test(post.salida),
+    comprobar(/drift_acl\.recurso → SELECT/.test(post.salida),
       '  enumerando qué sobrevivió, objeto por objeto y privilegio por privilegio')
 
     // 4 bis · UN OBJETO AUSENTE ABORTA, ANTES DE CUALQUIER REVOKE. Si el
@@ -2081,19 +2122,19 @@ COMMIT;
     //         lo daría por cerrado sin haberlo mirado. Se prueba con autoridad
     //         de SUPERUSUARIO, para que lo único que falle sea la ausencia.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      `ALTER SEQUENCE ${NET_SECUENCIA} RENAME TO drift_seq_escondida;`], { stdio: 'pipe' })
+      `ALTER SEQUENCE ${ACL_SECUENCIA} RENAME TO drift_seq_escondida;`], { stdio: 'pipe' })
     const sinUno = psqlComo('postgres', SQL_FIXTURE_AUTORIDAD)
     comprobar(sinUno.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(sinUno.salida),
       '  con un objeto ausente la precondición aborta, aun siendo superusuario')
-    comprobar(sinUno.salida.includes(NET_SECUENCIA) && /falta\(n\)/.test(sinUno.salida),
+    comprobar(sinUno.salida.includes(ACL_SECUENCIA) && /falta\(n\)/.test(sinUno.salida),
       '  nombrando cuál falta de los tres, que es lo que hace falta para arreglarlo')
     const loteSinUno = psqlLoteComo('postgres', SQL_FIXTURE_LOTE)
     comprobar(loteSinUno.codigo !== 0 && !/REVOKE/.test(loteSinUno.salida.split('PRECONDICIÓN FALLIDA')[1] ?? ''),
       '  y el LOTE se detiene ahí: ningún REVOKE llega a ejecutarse')
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      `ALTER SEQUENCE net.drift_seq_escondida RENAME TO ${NET_SECUENCIA.split('.')[1]};`],
+      `ALTER SEQUENCE ${ACL_ESQUEMA}.drift_seq_escondida RENAME TO ${ACL_SECUENCIA.split('.')[1]};`],
       { stdio: 'pipe' })
-    comprobar(aclNet() === aclAntes,
+    comprobar(aclObj() === aclAntes,
       '  y devolver el nombre deja la ACL como estaba')
 
     // 5 · GRANT OPTION NO ES AUTORIDAD. El migrador recibe del dueño los ocho
@@ -2102,36 +2143,36 @@ COMMIT;
     //     concedió quien lo ejecuta (o un rol del que sea miembro), no lo que
     //     concedió el dueño. Con mejor disfraz, el mismo falso negativo.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      SET ROLE drift_net_duenio;
-      GRANT ALL PRIVILEGES ON TABLE ${NET_TABLAS.join(', ')} TO drift_migrador WITH GRANT OPTION;
-      GRANT ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} TO drift_migrador WITH GRANT OPTION;
+      SET ROLE drift_acl_duenio;
+      GRANT ALL PRIVILEGES ON TABLE ${ACL_TABLAS.join(', ')} TO drift_migrador WITH GRANT OPTION;
+      GRANT ALL PRIVILEGES ON SEQUENCE ${ACL_SECUENCIA} TO drift_migrador WITH GRANT OPTION;
       RESET ROLE;`], { stdio: 'pipe' })
 
     const gopt = db.psql(['-tAq', '-c', `
-      SELECT has_table_privilege('drift_migrador', 'net._http_response', 'SELECT WITH GRANT OPTION')
-         AND has_sequence_privilege('drift_migrador', '${NET_SECUENCIA}', 'USAGE WITH GRANT OPTION')`],
+      SELECT has_table_privilege('drift_migrador', '${ACL_TABLAS[0]}', 'SELECT WITH GRANT OPTION')
+         AND has_sequence_privilege('drift_migrador', '${ACL_SECUENCIA}', 'USAGE WITH GRANT OPTION')`],
       { stdio: 'pipe' }).trim()
     comprobar(gopt === 't',
       '  el migrador tiene ahora los privilegios WITH GRANT OPTION, tabla y secuencia')
 
-    const aclConGopt = aclNet()
+    const aclConGopt = aclObj()
     const preGopt = psqlComo('drift_migrador', SQL_FIXTURE_AUTORIDAD)
     comprobar(preGopt.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(preGopt.salida),
       '  y AUN ASÍ la precondición lo rechaza: grant option no es autoridad')
     comprobar(/WITH GRANT OPTION no alcanza/.test(preGopt.salida),
       '  diciéndolo con todas las letras, para que nadie lo relaje después')
-    comprobar(/otorgado por=drift_net_duenio/.test(preGopt.salida),
+    comprobar(/otorgado por=drift_acl_duenio/.test(preGopt.salida),
       '  y nombrando al OTORGANTE real de los grants a PUBLIC, que es el quid')
 
     const revokeGopt = psqlComo('drift_migrador',
-      `REVOKE ALL PRIVILEGES ON TABLE ${NET_TABLAS.join(', ')} FROM PUBLIC;`)
-    comprobar(revokeGopt.codigo === 0 && aclNet() === aclConGopt,
+      `REVOKE ALL PRIVILEGES ON TABLE ${ACL_TABLAS.join(', ')} FROM PUBLIC;`)
+    comprobar(revokeGopt.codigo === 0 && aclObj() === aclConGopt,
       '  y el REVOKE con grant option sale 0 y deja la ACL byte por byte intacta')
 
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      SET ROLE drift_net_duenio;
-      REVOKE ALL PRIVILEGES ON TABLE ${NET_TABLAS.join(', ')} FROM drift_migrador;
-      REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM drift_migrador;
+      SET ROLE drift_acl_duenio;
+      REVOKE ALL PRIVILEGES ON TABLE ${ACL_TABLAS.join(', ')} FROM drift_migrador;
+      REVOKE ALL PRIVILEGES ON SEQUENCE ${ACL_SECUENCIA} FROM drift_migrador;
       RESET ROLE;`], { stdio: 'pipe' })
 
     // 5 bis · UN GRANT POR COLUMNA HECHO POR UN TERCERO. La capa que no se ve
@@ -2141,70 +2182,70 @@ COMMIT;
     //         retira lo que otorgó quien ejecuta, o un rol del que sea miembro.
     //         A ejecutaría el lote, saldría 0, y la columna seguiría abierta.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      CREATE ROLE drift_b_net LOGIN NOSUPERUSER;
-      GRANT USAGE ON SCHEMA net TO drift_b_net;
-      SET ROLE drift_net_duenio;
-      GRANT SELECT (url) ON net.http_request_queue TO drift_b_net WITH GRANT OPTION;
+      CREATE ROLE drift_acl_b LOGIN NOSUPERUSER;
+      GRANT USAGE ON SCHEMA ${ACL_ESQUEMA} TO drift_acl_b;
+      SET ROLE drift_acl_duenio;
+      GRANT SELECT (url) ON ${ACL_TABLAS[1]} TO drift_acl_b WITH GRANT OPTION;
       RESET ROLE;
-      SET ROLE drift_b_net;
-      GRANT SELECT (url) ON net.http_request_queue TO PUBLIC;
+      SET ROLE drift_acl_b;
+      GRANT SELECT (url) ON ${ACL_TABLAS[1]} TO PUBLIC;
       RESET ROLE;`], { stdio: 'pipe' })
 
-    const attNet = () => db.psql(['-tAq', '-c', `
+    const attObj = () => db.psql(['-tAq', '-c', `
       SELECT c.relname || '.' || at.attname || ' = ' || at.attacl::text
         FROM pg_attribute at
         JOIN pg_class c ON c.oid = at.attrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'net' AND at.attnum > 0 AND NOT at.attisdropped
+       WHERE n.nspname = '${ACL_ESQUEMA}' AND at.attnum > 0 AND NOT at.attisdropped
          AND at.attacl IS NOT NULL
        ORDER BY 1`], { stdio: 'pipe' }).trim()
 
-    comprobar(/drift_b_net/.test(attNet()),
+    comprobar(/drift_acl_b/.test(attObj()),
       '  montado: un GRANT SELECT(url) a PUBLIC otorgado por B, no por el dueño')
 
-    const relAntesCol = aclNet()
-    const attAntesCol = attNet()
-    const loteTercero = psqlLoteComo('drift_net_duenio', SQL_FIXTURE_LOTE)
+    const relAntesCol = aclObj()
+    const attAntesCol = attObj()
+    const loteTercero = psqlLoteComo('drift_acl_duenio', SQL_FIXTURE_LOTE)
     comprobar(loteTercero.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(loteTercero.salida),
       '  el lote, ejecutado por el DUEÑO A, aborta en la precondición')
-    comprobar(/net\.http_request_queue\.url → SELECT \(otorgado por drift_b_net\)/
+    comprobar(/drift_acl\.bitacora\.url → SELECT \(otorgado por drift_acl_b\)/
       .test(loteTercero.salida),
       '  identificando objeto, COLUMNA, privilegio y otorgante del grant ajeno')
     comprobar(/no puede actuar como el otorgante/.test(loteTercero.salida),
       '  y diciendo por qué: no puede actuar como ese otorgante')
-    comprobar(aclNet() === relAntesCol && attNet() === attAntesCol,
+    comprobar(aclObj() === relAntesCol && attObj() === attAntesCol,
       '  y relacl Y attacl quedan byte por byte iguales: ningún REVOKE se ejecutó')
 
     // 5 ter · CONTRAPRUEBA: la MISMA vía por columna, pero concedida por el
     //         dueño. Ahora el lote completo sí la cierra, y la postcondición
     //         —que mira las dos capas— pasa.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      SET ROLE drift_b_net;
-      REVOKE SELECT (url) ON net.http_request_queue FROM PUBLIC;
+      SET ROLE drift_acl_b;
+      REVOKE SELECT (url) ON ${ACL_TABLAS[1]} FROM PUBLIC;
       RESET ROLE;
-      SET ROLE drift_net_duenio;
-      REVOKE ALL PRIVILEGES ON TABLE net.http_request_queue FROM drift_b_net;
-      GRANT SELECT (url), INSERT (headers) ON net.http_request_queue TO PUBLIC;
+      SET ROLE drift_acl_duenio;
+      REVOKE ALL PRIVILEGES ON TABLE ${ACL_TABLAS[1]} FROM drift_acl_b;
+      GRANT SELECT (url), INSERT (cabeceras) ON ${ACL_TABLAS[1]} TO PUBLIC;
       RESET ROLE;`], { stdio: 'pipe' })
-    comprobar(/url = .*=r\/drift_net_duenio/.test(attNet()) && !/drift_b_net/.test(attNet()),
+    comprobar(/url = .*=r\/drift_acl_duenio/.test(attObj()) && !/drift_acl_b/.test(attObj()),
       '  ahora la vía por columna la concede el DUEÑO, y hay dos (SELECT y INSERT)')
 
-    const loteDuenio = psqlLoteComo('drift_net_duenio', SQL_FIXTURE_LOTE)
+    const loteDuenio = psqlLoteComo('drift_acl_duenio', SQL_FIXTURE_LOTE)
     comprobar(loteDuenio.codigo === 0,
       '  el lote completo, con la autoridad del dueño, PASA de punta a punta')
-    comprobar(attNet() === '',
-      '  y no queda NINGUNA ACL por columna: attacl vacío en todo el esquema net')
+    comprobar(attObj() === '',
+      '  y no queda NINGUNA ACL por columna: attacl vacío en todo el esquema sintético')
     comprobar(db.psql(['-tAq', '-c', `
       SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
        CROSS JOIN LATERAL aclexplode(c.relacl) a
-       WHERE n.nspname = 'net' AND a.grantee = 0`], { stdio: 'pipe' }).trim() === '0',
-      '  ni ninguna de nivel de objeto: PUBLIC no conserva nada en net')
+       WHERE n.nspname = '${ACL_ESQUEMA}' AND a.grantee = 0`], { stdio: 'pipe' }).trim() === '0',
+      '  ni ninguna de nivel de objeto: PUBLIC no conserva nada')
 
     // Y se repone la forma de producción para el resto del bloque.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      `REVOKE USAGE ON SCHEMA net FROM drift_b_net; DROP ROLE drift_b_net; ${grantsNet}`],
+      `REVOKE USAGE ON SCHEMA ${ACL_ESQUEMA} FROM drift_acl_b; DROP ROLE drift_acl_b; ${grantsAcl}`],
       { stdio: 'pipe' })
-    comprobar(aclNet() === relAntesCol && attNet() === '',
+    comprobar(aclObj() === relAntesCol && attObj() === '',
       '  repuesta la forma de producción (sin la vía por columna, que era del caso)')
 
     // 6 · PROPIETARIOS ASIMÉTRICOS: autoridad sobre las DOS TABLAS y no sobre
@@ -2214,30 +2255,30 @@ COMMIT;
     //     diciendo que se hizo. Se ejecuta EL LOTE COMPLETO y se exige que
     //     falle ANTES de tocar nada.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      CREATE ROLE drift_seq_duenio_net NOLOGIN;
+      CREATE ROLE drift_acl_seq_duenio NOLOGIN;
       CREATE ROLE drift_asimetrico LOGIN NOSUPERUSER;
-      GRANT drift_net_duenio TO drift_asimetrico;
-      GRANT USAGE ON SCHEMA net TO drift_asimetrico;
+      GRANT drift_acl_duenio TO drift_asimetrico;
+      GRANT USAGE ON SCHEMA ${ACL_ESQUEMA} TO drift_asimetrico;
       -- Una secuencia de bigserial está LIGADA a su tabla y no admite otro
       -- dueño mientras lo esté; se desliga para montar la asimetría y se
       -- vuelve a ligar al final.
-      ALTER SEQUENCE ${NET_SECUENCIA} OWNED BY NONE;
-      ALTER SEQUENCE ${NET_SECUENCIA} OWNER TO drift_seq_duenio_net;`], { stdio: 'pipe' })
+      ALTER SEQUENCE ${ACL_SECUENCIA} OWNED BY NONE;
+      ALTER SEQUENCE ${ACL_SECUENCIA} OWNER TO drift_acl_seq_duenio;`], { stdio: 'pipe' })
 
     comprobar(db.psql(['-tAq', '-c', `
-      SELECT pg_has_role('drift_asimetrico', 'drift_net_duenio', 'USAGE')
-         AND NOT pg_has_role('drift_asimetrico', 'drift_seq_duenio_net', 'USAGE')`],
+      SELECT pg_has_role('drift_asimetrico', 'drift_acl_duenio', 'USAGE')
+         AND NOT pg_has_role('drift_asimetrico', 'drift_acl_seq_duenio', 'USAGE')`],
       { stdio: 'pipe' }).trim() === 't',
       '  asimetría montada: hereda al dueño de las TABLAS, no al de la SECUENCIA')
 
-    const aclAsim = aclNet()
+    const aclAsim = aclObj()
     const loteAsim = psqlLoteComo('drift_asimetrico', SQL_FIXTURE_LOTE)
     comprobar(loteAsim.codigo !== 0 && /PRECONDICIÓN FALLIDA/.test(loteAsim.salida),
       '  el LOTE COMPLETO falla, y falla en la precondición —antes de cualquier REVOKE—')
-    comprobar(new RegExp(`no tiene autoridad para revocar sobre ${NET_SECUENCIA.replace(/\./g, '\\.')}`)
+    comprobar(new RegExp(`no tiene autoridad para revocar sobre ${ACL_SECUENCIA.replace(/\./g, '\\.')}`)
       .test(loteAsim.salida) && !/_http_response,/.test(loteAsim.salida.split('no tiene autoridad')[1] ?? ''),
       '  señalando EXACTAMENTE la secuencia, que es lo único sobre lo que no manda')
-    comprobar(aclNet() === aclAsim,
+    comprobar(aclObj() === aclAsim,
       '  y las TRES ACL quedan idénticas: no se aplicó ni la mitad que sí podía')
 
     // 7 · LA POSTCONDICIÓN REVIERTE LO YA HECHO. Se corre un lote MUTILADO
@@ -2247,19 +2288,19 @@ COMMIT;
     //     revierte: las tablas vuelven a como estaban. Sin esto, el lote a
     //     medio aplicar se registraría como un éxito.
     const loteMutilado = SQL_FIXTURE_LOTE
-      .replace(`REVOKE ALL PRIVILEGES ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC;`,
+      .replace(`REVOKE ALL PRIVILEGES ON SEQUENCE ${ACL_SECUENCIA} FROM PUBLIC;`,
                '-- (a propósito: acá NO se revoca la secuencia)')
-    comprobar(!loteMutilado.includes(`ON SEQUENCE ${NET_SECUENCIA} FROM PUBLIC`),
+    comprobar(!loteMutilado.includes(`ON SEQUENCE ${ACL_SECUENCIA} FROM PUBLIC`),
       '  el lote mutilado es el mismo lote, sin el REVOKE de la secuencia')
 
-    const aclAntesRollback = aclNet()
+    const aclAntesRollback = aclObj()
     const loteRoto = psqlLoteComo('postgres', loteMutilado)
     comprobar(loteRoto.codigo !== 0 && /POSTCONDICIÓN FALLIDA/.test(loteRoto.salida),
       '  con autoridad de sobra, el lote mutilado falla en la POSTCONDICIÓN')
-    comprobar(new RegExp(`${NET_SECUENCIA.replace(/\./g, '\\.')} → `).test(loteRoto.salida)
+    comprobar(new RegExp(`${ACL_SECUENCIA.replace(/\./g, '\\.')} → `).test(loteRoto.salida)
       || /http_request_queue_id_seq → /.test(loteRoto.salida),
       '  enumerando qué privilegio de PUBLIC sobrevivió y sobre qué objeto')
-    comprobar(aclNet() === aclAntesRollback,
+    comprobar(aclObj() === aclAntesRollback,
       '  y REVIERTE los REVOKE de las tablas, que sí habían funcionado: ACL idénticas')
 
     // Y el motivo de exigir ON_ERROR_STOP al ejecutar el lote: SIN él psql
@@ -2269,50 +2310,53 @@ COMMIT;
     const loteSinParar = psqlLoteComo('postgres', loteMutilado, { detener: false })
     comprobar(loteSinParar.codigo === 0 && /POSTCONDICIÓN FALLIDA/.test(loteSinParar.salida),
       '  sin ON_ERROR_STOP psql SALE 0 aunque el lote falló: por eso la propuesta lo exige')
-    comprobar(aclNet() === aclAntesRollback,
+    comprobar(aclObj() === aclAntesRollback,
       '  (y aun así revierte: el COMMIT de una transacción abortada es un ROLLBACK)')
 
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      ALTER SEQUENCE ${NET_SECUENCIA} OWNER TO drift_net_duenio;
-      ALTER SEQUENCE ${NET_SECUENCIA} OWNED BY net.http_request_queue.id;
-      REVOKE USAGE ON SCHEMA net FROM drift_asimetrico;
-      DROP ROLE drift_asimetrico; DROP ROLE drift_seq_duenio_net;`], { stdio: 'pipe' })
+      ALTER SEQUENCE ${ACL_SECUENCIA} OWNER TO drift_acl_duenio;
+      ALTER SEQUENCE ${ACL_SECUENCIA} OWNED BY ${ACL_TABLAS[1]}.id;
+      REVOKE USAGE ON SCHEMA ${ACL_ESQUEMA} FROM drift_asimetrico;
+      DROP ROLE drift_asimetrico; DROP ROLE drift_acl_seq_duenio;`], { stdio: 'pipe' })
 
     // 8 · CONTRAPRUEBA: los dos guards no son «siempre falla». Con el dueño
     //     verdadero, la precondición pasa —es el único camino soportado—.
     const preDuenio = db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      `SET ROLE drift_net_duenio; ${SQL_FIXTURE_AUTORIDAD}`], { stdio: 'pipe' })
+      `SET ROLE drift_acl_duenio; ${SQL_FIXTURE_AUTORIDAD}`], { stdio: 'pipe' })
     comprobar(typeof preDuenio === 'string',
       '  contraprueba: con la autoridad del DUEÑO la precondición pasa, no es un «siempre falla»')
 
     // Se devuelve la propiedad para que el resto del bloque —los remedios por
     // regla— corra como antes, y se retiran los dos roles de utilería.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', `
-      ALTER TABLE    net._http_response            OWNER TO postgres;
-      ALTER TABLE    net.http_request_queue        OWNER TO postgres;
-      ALTER SEQUENCE net.http_request_queue_id_seq OWNER TO postgres;
-      REVOKE USAGE ON SCHEMA net FROM drift_migrador;
-      DROP ROLE drift_migrador; DROP ROLE drift_net_duenio;`], { stdio: 'pipe' })
+      ALTER TABLE    ${ACL_TABLAS[0]}            OWNER TO postgres;
+      ALTER TABLE    ${ACL_TABLAS[1]}        OWNER TO postgres;
+      ALTER SEQUENCE ${ACL_TABLAS[1]}_id_seq OWNER TO postgres;
+      REVOKE USAGE ON SCHEMA ${ACL_ESQUEMA} FROM drift_migrador;
+      DROP ROLE drift_migrador; DROP ROLE drift_acl_duenio;`], { stdio: 'pipe' })
     // Cambiar el dueño reescribe el OTORGANTE dentro del aclitem, así que
     // `relacl::text` no puede ser la vara acá: lo que tiene que seguir idéntico
     // es lo que PUBLIC alcanza, que es lo único que este bloque mide.
-    comprobar(publicoNet() === publicoAntes && publicoAntes !== '',
+    comprobar(publicoObj() === publicoAntes && publicoAntes !== '',
       '  y devolver la propiedad no cambió lo que PUBLIC alcanza: se sigue midiendo lo mismo')
 
     // EL GUARD PASA SÓLO DESPUÉS DE CERRAR TODAS LAS VÍAS. Se aplican los
     // remedios regla por regla y se exige que siga rechazando hasta la última:
     // un guard que se conformara con cerrar una dejaría abiertas las otras.
-    const reglasNet = ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']
-    for (const [i, regla] of reglasNet.entries()) {
-      for (const s of remediosDe(conNet.salida, regla)) {
+    const conAcl = medir('drift_lector')
+    comprobar(conAcl.codigo !== 0 && conAcl.salida.includes(ACL_TABLAS[0]),
+      '  con la forma reconstruida sobre el esquema sintético, el guard rechaza')
+    const reglasAcl = ['ESCRITURA', 'SELECT DE TABLA', 'SECUENCIA']
+    for (const [i, regla] of reglasAcl.entries()) {
+      for (const s of remediosDe(conAcl.salida, regla)) {
         db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c', s], { stdio: 'pipe' })
       }
       const parcial = medir('drift_lector')
-      const ultima = i === reglasNet.length - 1
+      const ultima = i === reglasAcl.length - 1
       comprobar(ultima ? parcial.codigo === 0 : parcial.codigo !== 0,
         ultima
           ? '  y sólo con las TRES cerradas el guard pasa, sin tocar el USAGE del esquema'
-          : `  cerrada ${regla}, sigue rechazando: falta ${reglasNet.slice(i + 1).join(' y ')}`)
+          : `  cerrada ${regla}, sigue rechazando: falta ${reglasAcl.slice(i + 1).join(' y ')}`)
     }
 
     // Y con TODO cerrado, la postcondición pasa. Es la otra mitad de la
@@ -2325,9 +2369,7 @@ COMMIT;
     // Teardown: se deshace lo que se agregó, sin tocar lo que trae la
     // reconstrucción.
     db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
-      'DROP TABLE net.http_request_queue; ' +
-      'REVOKE ALL PRIVILEGES ON TABLE net._http_response FROM PUBLIC; ' +
-      'REVOKE USAGE ON SCHEMA net FROM PUBLIC;'], { stdio: 'pipe' })
+      `DROP SCHEMA ${ACL_ESQUEMA} CASCADE;`], { stdio: 'pipe' })
 
 
     // ── 2 septies · MAINTAIN, que sólo existe desde Postgres 17 ─────────────
