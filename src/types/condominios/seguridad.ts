@@ -324,6 +324,55 @@ export interface PresenciaPersonal {
   motivo_correccion?: string | null
   /** Con valor, la fila no cuenta para las horas. Nunca se borra. */
   anulado_en?: string | null
+  /** Pausas de la jornada (20260908000300). Se traen aparte, con su propia
+   *  consulta: la lista del día las necesita, el marcaje no. */
+  pausas?: PausaPresencia[]
+}
+
+/** Un tipo de pausa vigente para la empresa, de `presencia_tipos_pausa_efectivos()`. */
+export interface TipoPausa {
+  codigo: string
+  etiqueta: string
+  /** true = sus minutos restan de las horas laborales, y por tanto de la paga. */
+  descuenta: boolean
+  /** Tope ORIENTATIVO: no impide nada, marca en pantalla la pausa que lo excede. */
+  minutos_max: number | null
+  orden: number
+  /** false = es un default de la casa, la empresa todavía no configuró los suyos. */
+  configurado: boolean
+}
+
+/**
+ * Una pausa dentro de una jornada (refacción, almuerzo, cena, descanso).
+ *
+ * Los instantes son `timestamptz` y no un par de `time` a propósito: una pausa
+ * de turno nocturno cruza la medianoche con naturalidad, y medir eso con `time`
+ * es exactamente lo que produjo el bug de las 24 horas (#839).
+ */
+export interface PausaPresencia {
+  id: string
+  registro_id: string
+  personal_id: string | null
+  tipo: string
+  /** Nombre visible, desnormalizado del catálogo al crear la pausa. */
+  etiqueta: string
+  /** Regla de planilla CONGELADA al iniciar: cambiar el catálogo no reescribe
+   *  lo que ya se pagó. */
+  descuenta: boolean
+  /** NULL solo en las pausas manuales: se sabe cuánto duró, no a qué hora fue. */
+  inicio_en: string | null
+  fin_en: string | null
+  /** Duración. La sella la base desde los instantes; es lo que consume la planilla. */
+  minutos: number | null
+  origen: 'autoservicio' | 'manual'
+  /** true = la persona marcó su salida con esta pausa abierta y la cerró el
+   *  marcaje de salida, no ella. Señal de que el dato merece una mirada. */
+  cerrada_al_salir: boolean
+  registrada_por_nombre?: string | null
+  corregido_por_nombre?: string | null
+  corregido_en?: string | null
+  motivo_correccion?: string | null
+  anulado_en?: string | null
 }
 
 /** Ubicación guardada con un marcaje, ya normalizada por `presencia_marcar`. */
@@ -362,6 +411,16 @@ export interface MiFichaPresencia {
   corregido_por_nombre: string | null
   motivo_correccion: string | null
   anulado_en: string | null
+  /** Fecha de la fila que se está mostrando. Puede NO ser la de hoy: en un
+   *  turno nocturno la jornada abierta es la de ayer (20260908000300). */
+  registro_fecha: string | null
+  // Pausa abierta y minutos pausados de esa jornada.
+  pausa_abierta_id: string | null
+  pausa_abierta_tipo: string | null
+  pausa_abierta_etiqueta: string | null
+  pausa_abierta_desde: string | null
+  minutos_pausa: number | null
+  minutos_pausa_descontables: number | null
 }
 
 

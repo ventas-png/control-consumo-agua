@@ -5,8 +5,9 @@ import {
   fetchMiFichaPresencia, marcarPresencia, subirFotoMarcaje, type TipoMarcaje,
 } from '../../../../domain/condominios/presenciaAutoservicio'
 import { confirm, notify } from '../../../shared/Dialog'
-import { minutosDesdeMedianoche } from '../../../../domain/condominios/turnos'
-import type { MiFichaPresencia } from '../../../../types'
+import { fetchTiposPausa, marcarPausa, type AccionPausa } from '../../../../domain/condominios/pausasPresencia'
+import { formatHoras, minutosDesdeMedianoche } from '../../../../domain/condominios/turnos'
+import type { MiFichaPresencia, TipoPausa } from '../../../../types'
 
 /**
  * Bajo este umbral, marcar la salida se pregunta antes. Cerrar la jornada sin
@@ -15,6 +16,16 @@ import type { MiFichaPresencia } from '../../../../types'
  * trabaja un turno de cinco minutos, así que preguntarlo no estorba a nadie.
  */
 const MINUTOS_SALIDA_SOSPECHOSA = 5
+
+/**
+ * Icono por tipo de pausa. Es SOLO decoración de los códigos que trae el
+ * catálogo de la casa: un tipo que la empresa invente sale con el genérico, sin
+ * romper nada. Poner el emoji en la base habría sido meter presentación en el
+ * dato para ganar cuatro caracteres.
+ */
+const ICONO_PAUSA: Record<string, string> = {
+  refaccion: '☕', almuerzo: '🍽️', cena: '🌙', descanso: '⏸️',
+}
 
 interface Props {
   proyectoId: string
@@ -60,6 +71,8 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
   const [gpsCargando, setGpsCargando] = useState(true)
   const [observaciones, setObservaciones] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [tipos, setTipos] = useState<TipoPausa[]>([])
+  const [pausando, setPausando] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const yaAbrio = useRef(false)
   /** Reloj del dispositivo al bajar la ficha, para medir intervalos (no fechas). */
@@ -88,6 +101,14 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
     return () => { vivo = false }
   }, [])
 
+  // El catálogo de pausas de la empresa. Si falla, la sección de pausas
+  // simplemente no aparece: no puede impedir que alguien marque su entrada.
+  useEffect(() => {
+    let vivo = true
+    void fetchTiposPausa().then(({ tipos: t }) => { if (vivo) setTipos(t) })
+    return () => { vivo = false }
+  }, [])
+
   const tomarFoto = useCallback(async (auto = false) => {
     setErrorFoto(null)
     if (!auto) setIntentos(n => n + 1)
@@ -100,14 +121,6 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
     if (file) usarArchivo(file)
     else setErrorFoto('No se tomó la foto. Revisá el permiso de cámara e intentá de nuevo.')
   }, [])
-
-  // Apertura automática, una sola vez y solo cuando hay algo que marcar.
-  useEffect(() => {
-    if (cargando || yaAbrio.current || !ficha) return
-    if (ficha.hora_entrada && ficha.hora_salida) return  // jornada cerrada
-    yaAbrio.current = true
-    void tomarFoto(true)
-  }, [cargando, ficha, tomarFoto])
 
   function usarArchivo(file: File) {
     setErrorFoto(null)
@@ -130,6 +143,21 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
     : !ficha.hora_salida ? 'salida'
     : null
 
+  // Apertura automática, una sola vez y SOLO para la entrada.
+  //
+  // Antes se abría también con la jornada abierta, dando por hecho que quien
+  // entra a esta pantalla viene a cerrarla. Desde que hay pausas eso es falso la
+  // mayoría de las veces: se entra tres o cuatro veces al día a marcar refacción
+  // y almuerzo, y una cámara que salta encima de los botones de pausa estorba en
+  // todas esas. La salida sigue abriéndola con UN toque —el botón grande de
+  // abajo—, que es lo que se pidió: que no haya que dar con un icono.
+  useEffect(() => {
+    if (cargando || yaAbrio.current || !ficha) return
+    if (pendiente !== 'entrada') return
+    yaAbrio.current = true
+    void tomarFoto(true)
+  }, [cargando, ficha, pendiente, tomarFoto])
+
   /**
    * Minutos transcurridos desde la entrada, en el reloj del TENANT.
    * `hora_servidor` es de cuando se bajó la ficha; se le suma lo corrido desde
@@ -141,7 +169,54 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
     const ent = minutosDesdeMedianoche(ficha.hora_entrada)
     const srv = minutosDesdeMedianoche(ficha.hora_servidor)
     if (ent === null || srv === null) return null
-    return srv - ent + (Date.now() - cargadaEn.current) / 60000
+    // Un `srv < ent` solo puede significar que la jornada cruzó la medianoche:
+    // el guardia entró a las 22:00 y son las 00:30. Sin esto la cuenta sale
+    // negativa —‑1290 min— y la pantalla mostraría un disparate. Es la misma
+    // lectura que aplica `turnos_horas_jornada` a un `fin <= inicio`.
+    const corridos = srv - ent + (srv < ent ? 1440 : 0)
+    return corridos + (Date.now() - cargadaEn.current) / 60000
+  }
+
+  /** Lo que lleva EN EL PUESTO, en horas. Es estadía, no jornada: lo pausado
+   *  se muestra al lado, sin restarlo aquí. */
+  const horasEnPuesto = (() => {
+    const min = minutosDesdeEntrada()
+    return min === null ? null : Math.max(0, min) / 60
+  })()
+
+  /**
+   * Minutos que lleva abierta la pausa, con el mismo criterio que
+   * `minutosDesdeEntrada`: el reloj del dispositivo mide el INTERVALO desde que
+   * se bajó la ficha, nunca fecha nada. `pausa_abierta_desde` es un instante de
+   * servidor y así se queda.
+   */
+  function minutosEnPausa(): number | null {
+    if (!ficha?.pausa_abierta_desde) return null
+    const desde = Date.parse(ficha.pausa_abierta_desde)
+    if (!Number.isFinite(desde)) return null
+    // El delta se calcula contra el reloj del dispositivo EN EL MOMENTO de bajar
+    // la ficha, para que un desfase del teléfono no infle ni encoja la cuenta.
+    return (Date.now() - desde) / 60000
+  }
+
+  async function pausar(accion: AccionPausa, tipo?: string) {
+    if (!ficha || pausando) return
+    setPausando(true)
+    try {
+      const { data, error } = await marcarPausa({ projectId: proyectoId, accion, tipo, coords })
+      if (error) { notify({ variant: 'error', title: 'No se registró la pausa', text: error }); return }
+      notify({
+        variant: 'success',
+        title: accion === 'iniciar' ? `${data?.etiqueta ?? 'Pausa'} iniciada` : `Regresaste de ${data?.etiqueta ?? 'la pausa'}`,
+        text: accion === 'terminar' && data?.minutos != null
+          ? `${Math.round(data.minutos)} min${data.descuenta ? ' · se descuentan de tu jornada' : ' · cuentan como jornada'}`
+          : undefined,
+      })
+      await recargarFicha()
+      onRefresh()
+    } finally {
+      setPausando(false)
+    }
   }
 
   async function marcar(conFoto: boolean) {
@@ -240,6 +315,14 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
               ? `Turno de hoy: ${ficha.turno_inicio.slice(0, 5)}–${ficha.turno_fin.slice(0, 5)}`
               : 'Sin turno asignado hoy'}
           </div>
+          {/* La jornada abierta puede ser la de AYER: el turno de noche entra el
+              5 y sale el 6. Decirlo evita que alguien crea que está cerrando
+              una jornada que no es la suya. */}
+          {ficha.registro_fecha && ficha.registro_fecha !== ficha.fecha_operativa && (
+            <div style={{ ...dato, color: 'var(--at-warning)' }}>
+              Jornada abierta del {ficha.registro_fecha}
+            </div>
+          )}
         </div>
         <button onClick={onConsultar} style={{ ...btnSecundario, padding: '5px 10px', fontSize: 11 }}>
           Solo consultar
@@ -268,6 +351,78 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
             {ficha.motivo_correccion ? `: ${ficha.motivo_correccion}` : '.'}
           </div>
           {anulada && <div style={{ marginTop: 4 }}>Podés volver a marcar tu entrada.</div>}
+        </div>
+      )}
+
+      {/* ── Las pausas de la jornada ───────────────────────────────────────
+          Solo con la jornada ABIERTA: antes de entrar no hay de qué pausar, y
+          después de salir la jornada está cerrada. Va ARRIBA de la foto porque
+          quien viene a marcar su almuerzo entra tres veces al día y no tiene por
+          qué pasar cada vez por delante de la cámara. */}
+      {pendiente === 'salida' && !anulada && (
+        <div style={{
+          border: '1px solid var(--at-line)', borderRadius: 10, padding: 12, marginBottom: 14,
+          background: 'var(--at-surface-2)',
+        }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <Numero titulo="En el puesto" valor={formatHoras(horasEnPuesto)} />
+            <Numero titulo="Descanso" valor={formatHoras((ficha.minutos_pausa ?? 0) / 60)} />
+          </div>
+
+          {ficha.pausa_abierta_id ? (
+            <>
+              <div style={{
+                background: 'var(--at-warning-tint)', color: 'var(--at-warning)',
+                borderRadius: 8, padding: '8px 10px', fontSize: 12.5, fontWeight: 600, marginBottom: 8,
+              }}>
+                {ICONO_PAUSA[ficha.pausa_abierta_tipo ?? ''] ?? '⏸️'} En {ficha.pausa_abierta_etiqueta ?? 'pausa'}
+                {minutosEnPausa() !== null && ` · ${Math.max(0, Math.round(minutosEnPausa()!))} min`}
+              </div>
+              <button
+                onClick={() => void pausar('terminar')}
+                disabled={pausando}
+                style={{
+                  width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10,
+                  background: 'var(--at-primary)', color: 'var(--at-on-status)',
+                  fontSize: 15, fontWeight: 700, cursor: pausando ? 'not-allowed' : 'pointer',
+                  opacity: pausando ? 0.55 : 1,
+                }}
+              >
+                {pausando ? 'Registrando…' : `▶️ Regresé de ${ficha.pausa_abierta_etiqueta ?? 'la pausa'}`}
+              </button>
+              {/* Que lo sepa ANTES de irse, no cuando lea el recibo: la salida
+                  cierra la pausa sola, y esa es la única forma de que no quede
+                  abierta para siempre. */}
+              <div style={{ ...dato, textAlign: 'center', marginTop: 8 }}>
+                Si marcás tu salida sin volver, la pausa se cierra en ese momento.
+              </div>
+            </>
+          ) : tipos.length > 0 ? (
+            <>
+              <div style={{ ...dato, marginBottom: 6 }}>¿Salís a una pausa?</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
+                {tipos.map(t => (
+                  <button
+                    key={t.codigo}
+                    onClick={() => void pausar('iniciar', t.codigo)}
+                    disabled={pausando}
+                    style={{
+                      padding: '11px 8px', borderRadius: 9, cursor: pausando ? 'not-allowed' : 'pointer',
+                      border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)',
+                      color: 'var(--at-ink-2)', fontSize: 13, fontWeight: 600, opacity: pausando ? 0.55 : 1,
+                    }}
+                  >
+                    <div>{ICONO_PAUSA[t.codigo] ?? '⏸️'} {t.etiqueta}</div>
+                    {/* Se dice si descuenta ANTES de pulsar. Enterarse después
+                        de que el almuerzo no se paga es enterarse tarde. */}
+                    <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--at-ink-3)', marginTop: 2 }}>
+                      {t.descuenta ? 'se descuenta' : 'cuenta como jornada'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -368,6 +523,16 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
 const btnSecundario: CSSProperties = {
   padding: '8px 14px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
   border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+}
+
+/** Una cifra del desglose de la jornada, en la pantalla del propio empleado. */
+function Numero({ titulo, valor }: { titulo: string; valor: string }) {
+  return (
+    <div style={{ flex: 1, textAlign: 'center', padding: '6px 6px', borderRadius: 8, background: 'var(--at-chip)' }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--at-ink-2)' }}>{valor}</div>
+      <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>{titulo}</div>
+    </div>
+  )
 }
 
 function Marca({ titulo, hora }: { titulo: string; hora: string | null }) {

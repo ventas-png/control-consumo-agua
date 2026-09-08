@@ -1,14 +1,21 @@
 import { hoyLocalISO } from '../../../lib/format'
-import { useEffect, useMemo, useState, type CSSProperties} from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import { anularPresencia, corregirPresencia, fetchMiFichaPresencia } from '../../../domain/condominios/presenciaAutoservicio'
+import {
+  agregarPausa, ajustarPausa, anularPausa, desglose, fetchPausasDeRegistros, fetchTiposPausa,
+  guardarTipoPausa,
+} from '../../../domain/condominios/pausasPresencia'
 import { openPromptDialog } from '../../shared/PromptDialog'
-import { formatHoras, horasJornada } from '../../../domain/condominios/turnos'
+import { formatHoras } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
 import MarcajeTurno from './presencia/MarcajeTurno'
 import { SecureImage } from '../../shared/SecureImage'
 import { BUCKET_PRESENCIA } from '../../../domain/shared/buckets'
-import { PresenciaPersonal, EstadoPresencia, PersonalCondominio, BloqueTurno, MiFichaPresencia } from '../../../types'
+import {
+  PresenciaPersonal, EstadoPresencia, PersonalCondominio, BloqueTurno, MiFichaPresencia,
+  PausaPresencia, TipoPausa,
+} from '../../../types'
 
 interface Props {
   registros: PresenciaPersonal[]
@@ -79,7 +86,44 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     observaciones: '',
   })
 
-  const registrosDia = registros.filter(r => r.fecha === fechaFiltro)
+  const registrosDia = useMemo(() => registros.filter(r => r.fecha === fechaFiltro), [registros, fechaFiltro])
+
+  // Las pausas viven en su propia tabla y se piden aparte, por los ids que ya
+  // están en pantalla. No por fecha: la cena de un turno nocturno cae DESPUÉS
+  // de la medianoche y filtrar por fecha la dejaría fuera justo a ella.
+  const [pausas, setPausas] = useState<PausaPresencia[]>([])
+  const [tiposPausa, setTiposPausa] = useState<TipoPausa[]>([])
+  const [configPausas, setConfigPausas] = useState(false)
+  const idsDia = useMemo(() => registrosDia.map(r => r.id).join(','), [registrosDia])
+
+  useEffect(() => {
+    let vivo = true
+    const ids = idsDia ? idsDia.split(',') : []
+    void fetchPausasDeRegistros(ids).then(({ pausas: p }) => { if (vivo) setPausas(p) })
+    return () => { vivo = false }
+  }, [idsDia])
+
+  const recargarTipos = useCallback(() => {
+    void fetchTiposPausa().then(({ tipos }) => setTiposPausa(tipos))
+  }, [])
+  useEffect(() => { recargarTipos() }, [recargarTipos])
+
+  /** Las pausas de un marcaje, en el orden en que ocurrieron. */
+  const pausasDe = useMemo(() => {
+    const mapa = new Map<string, PausaPresencia[]>()
+    for (const p of pausas) {
+      const lista = mapa.get(p.registro_id)
+      if (lista) lista.push(p)
+      else mapa.set(p.registro_id, [p])
+    }
+    return mapa
+  }, [pausas])
+
+  /** Vuelve a bajar marcajes Y pausas: una pausa cambia las horas de la fila. */
+  function refrescarTodo() {
+    void fetchPausasDeRegistros(idsDia ? idsDia.split(',') : []).then(({ pausas: p }) => setPausas(p))
+    onRefresh()
+  }
 
   // Solo se ficha a quien sigue en plantilla. Si el condominio todavía no tiene
   // personal registrado, el campo degrada a texto libre para no bloquear el
@@ -195,6 +239,109 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     onRefresh()
   }
 
+  // ── Pausas ────────────────────────────────────────────────────────────────
+  // Las tres acciones piden motivo por la misma razón que corregir un marcaje:
+  // cada una mueve horas que se pagan, y el motivo es lo único que separa una
+  // corrección legítima de una manipulación. La base lo exige igual; el diálogo
+  // solo evita el viaje.
+
+  /** La pausa que la persona no marcó. Sin ella, el almuerzo olvidado se paga. */
+  async function agregar(r: PresenciaPersonal) {
+    if (tiposPausa.length === 0) {
+      notify({ variant: 'warning', title: 'Sin tipos de pausa', text: 'No hay tipos configurados.' })
+      return
+    }
+    const datos = await openPromptDialog({
+      title: `Agregar una pausa a ${r.nombre}`,
+      description: 'Para la pausa que no se marcó. Se declara cuánto duró, no a qué hora fue: '
+        + 'eso último no lo sabe nadie, y ponerle una hora inventada sería peor que no ponerla.',
+      fields: [
+        {
+          name: 'tipo', label: 'Tipo de pausa', control: 'select', initialValue: tiposPausa[0].codigo,
+          options: tiposPausa.map(t => ({
+            value: t.codigo,
+            label: `${t.etiqueta} — ${t.descuenta ? 'descuenta' : 'no descuenta'}`,
+          })),
+        },
+        { name: 'minutos', label: 'Duración en minutos', type: 'number', initialValue: '60' },
+        { name: 'motivo', label: 'Motivo', control: 'textarea', rows: 2 },
+      ],
+      submitText: 'Agregar la pausa',
+      validate: d => {
+        const m = Number(d.minutos)
+        if (!Number.isFinite(m) || m <= 0 || m > 1440) return 'Los minutos tienen que estar entre 1 y 1440'
+        return d.motivo.trim().length < 5 ? 'Escribí el motivo (al menos 5 caracteres)' : null
+      },
+    })
+    if (!datos) return
+    const { error } = await agregarPausa({
+      registroId: r.id, tipo: datos.tipo, minutos: Number(datos.minutos), motivo: datos.motivo,
+    })
+    if (error) { notify({ variant: 'error', title: 'No se agregó la pausa', text: error }); return }
+    notify({ variant: 'success', title: 'Pausa agregada' })
+    refrescarTodo()
+  }
+
+  /** Ajusta la DURACIÓN, nunca los instantes: la hora la puso el servidor. */
+  async function ajustar(p: PausaPresencia) {
+    const datos = await openPromptDialog({
+      title: `Ajustar ${p.etiqueta}`,
+      description: 'Se corrige cuánto duró, no a qué hora fue: el momento lo puso el servidor y '
+        + 'lo sigue poniendo. Queda constancia de quién ajustó y por qué.',
+      fields: [
+        { name: 'minutos', label: 'Duración en minutos', type: 'number', initialValue: String(Math.round(p.minutos ?? 0)) },
+        { name: 'motivo', label: 'Motivo del ajuste', control: 'textarea', rows: 2 },
+      ],
+      submitText: 'Guardar el ajuste',
+      validate: d => {
+        const m = Number(d.minutos)
+        if (!Number.isFinite(m) || m < 0 || m > 1440) return 'Los minutos tienen que estar entre 0 y 1440'
+        return d.motivo.trim().length < 5 ? 'Escribí el motivo del ajuste (al menos 5 caracteres)' : null
+      },
+    })
+    if (!datos) return
+    const { error } = await ajustarPausa(p.id, Number(datos.minutos), datos.motivo)
+    if (error) { notify({ variant: 'error', title: 'No se ajustó', text: error }); return }
+    notify({ variant: 'success', title: 'Pausa ajustada' })
+    refrescarTodo()
+  }
+
+  /** Anular una pausa DEVUELVE horas pagadas; por eso exige `.delete`. */
+  async function quitarPausa(p: PausaPresencia) {
+    const datos = await openPromptDialog({
+      title: `Anular ${p.etiqueta}`,
+      description: 'La pausa no se borra: queda visible y marcada, pero deja de contar. '
+        + 'Sus minutos vuelven a las horas laborales si descontaban.',
+      fields: [{ name: 'motivo', label: 'Motivo de la anulación', control: 'textarea', rows: 2 }],
+      submitText: 'Anular la pausa',
+      validate: d => d.motivo.trim().length < 5
+        ? 'Escribí el motivo de la anulación (al menos 5 caracteres)' : null,
+    })
+    if (!datos) return
+    const { error } = await anularPausa(p.id, datos.motivo)
+    if (error) { notify({ variant: 'error', title: 'No se anuló', text: error }); return }
+    notify({ variant: 'success', title: 'Pausa anulada' })
+    refrescarTodo()
+  }
+
+  /**
+   * Cambia si un tipo de pausa descuenta o no. Vale HACIA ADELANTE: las pausas
+   * ya registradas llevan su regla congelada, así que esto no reescribe ninguna
+   * planilla cerrada — y esa es la razón de que se pueda tocar sin miedo.
+   */
+  async function alternarDescuento(t: TipoPausa) {
+    const { error } = await guardarTipoPausa({
+      codigo: t.codigo, etiqueta: t.etiqueta, descuenta: !t.descuenta, minutosMax: t.minutos_max,
+    })
+    if (error) { notify({ variant: 'error', title: 'No se guardó', text: error }); return }
+    notify({
+      variant: 'success',
+      title: `${t.etiqueta}: ${!t.descuenta ? 'ahora descuenta' : 'ya no descuenta'}`,
+      text: 'Aplica a las pausas nuevas. Las ya registradas conservan su regla.',
+    })
+    recargarTipos()
+  }
+
   async function registrarSalida(id: string) {
     const hora = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
     const { error } = await updateCondominioRow('presencia_personal', id, { hora_salida: hora })
@@ -284,6 +431,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             🟢 Marcar mi turno
           </button>
         )}
+        {canEdit && tiposPausa.length > 0 && (
+          <button onClick={() => setConfigPausas(v => !v)}
+            title="Qué pausas descuentan de las horas que se pagan"
+            style={{ padding: '8px 16px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            {configPausas ? '✕ Cerrar' : '⏸️ Pausas'}
+          </button>
+        )}
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
             style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
@@ -306,6 +460,51 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Total</div>
         </div>
       </div>
+
+      {/* Configuración de pausas — quién descuenta y quién no.
+          Vive aquí y no en una pantalla de ajustes remota porque es aquí donde
+          se ve la consecuencia: la fila de al lado cambia de número. */}
+      {configPausas && (
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Pausas de la jornada</div>
+          <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+            Una pausa que <strong>descuenta</strong> resta de las horas laborales, y por tanto de lo que se paga.
+            Una que no descuenta se mide igual, pero la persona sigue en jornada —el caso del guardia que
+            come sin poder dejar el puesto—.
+            {' '}El cambio vale <strong>hacia adelante</strong>: las pausas ya registradas conservan la regla
+            que tenían, así que esto nunca reescribe una planilla cerrada.
+            {tiposPausa.some(t => !t.configurado) && (
+              <> {' '}Ahora mismo rigen los valores por defecto; al cambiar cualquiera quedan guardados como
+              los de la empresa.</>
+            )}
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {tiposPausa.map(t => (
+              <div key={t.codigo} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+                background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '8px 12px',
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.etiqueta}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
+                    {t.descuenta ? 'Se descuenta de las horas laborales' : 'Cuenta como jornada trabajada'}
+                    {t.minutos_max ? ` · sugerido hasta ${t.minutos_max} min` : ''}
+                  </div>
+                </div>
+                <button onClick={() => void alternarDescuento(t)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    border: '1px solid var(--at-line-strong)',
+                    background: t.descuenta ? 'var(--at-warning-tint)' : 'var(--at-surface-2)',
+                    color: t.descuenta ? 'var(--at-warning)' : 'var(--at-ink-2)',
+                  }}>
+                  {t.descuenta ? 'Descuenta' : 'No descuenta'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Formulario */}
       {mostrarForm && (
@@ -384,12 +583,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
         <div style={{ display: 'grid', gap: 8 }}>
           {registrosDia.map(r => {
             const est = ESTADOS_PRESENCIA.find(s => s.value === r.estado)
-            // Antes esto restaba a pelo y devolvía null si el resultado era
-            // negativo: un turno de 22:00 a 06:00 daba -960 minutos y las horas
-            // desaparecían de pantalla. `horasJornada` trata fin <= inicio como
-            // cruce de medianoche, que es la única lectura posible.
-            const horas = horasJornada(r.hora_entrada, r.hora_salida)
-            const horasTotal = horas ? formatHoras(horas) : null
+            const susPausas = pausasDe.get(r.id) ?? []
+            // El desglose vive en el dominio y es gemelo de lo que hace
+            // `calcular_horas_personal` en SQL, incluido tratar `fin <= inicio`
+            // como cruce de medianoche: que cada lado tuviera su aritmética es
+            // lo que produjo el bug de las 24 horas (#839).
+            const { estadia, descanso, laborales } = desglose(r.hora_entrada, r.hora_salida, susPausas)
+            const hayDescuento = estadia !== null && laborales !== null && laborales < estadia
             return (
               <div key={r.id} style={{
                 background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8,
@@ -406,11 +606,33 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                       {r.cargo && <span>{r.cargo} · </span>}
                       {r.hora_entrada && <span>Entrada: {r.hora_entrada}</span>}
                       {r.hora_salida && <span> · Salida: {r.hora_salida}</span>}
-                      {horasTotal && <span style={{ color: 'var(--at-accent)' }}> · {horasTotal}</span>}
+                      {/* Estadía y laborales se muestran SEPARADAS solo cuando
+                          difieren. Con cero pausas que descuenten son el mismo
+                          número, y enseñarlo dos veces solo enseña ruido. */}
+                      {estadia !== null && (
+                        hayDescuento ? (
+                          <>
+                            <span style={{ color: 'var(--at-ink-3)' }}> · Estadía: {formatHoras(estadia)}</span>
+                            <span style={{ color: 'var(--at-accent)', fontWeight: 600 }}> · Laborales: {formatHoras(laborales)}</span>
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--at-accent)' }}> · {formatHoras(estadia)}</span>
+                        )
+                      )}
+                      {descanso > 0 && (
+                        <span style={{ color: 'var(--at-ink-3)' }}> · Descanso: {formatHoras(descanso)}</span>
+                      )}
                     </div>
                     {r.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.observaciones}</div>}
                     <EvidenciaMarcaje registro={r} />
                     <HuellaCorreccion registro={r} />
+                    <Pausas
+                      pausas={susPausas}
+                      canEdit={canEdit && !r.anulado_en}
+                      canDelete={canDelete && !r.anulado_en}
+                      onAjustar={ajustar}
+                      onAnular={quitarPausa}
+                    />
                   </div>
                 </div>
                 {/* Sobre una fila anulada no se actúa: ya no cuenta, y dejar los
@@ -435,6 +657,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                         ✏️ Corregir
                       </button>
                     )}
+                    {canEdit && r.hora_entrada && (
+                      <button onClick={() => void agregar(r)}
+                        title="Para la pausa que la persona no marcó"
+                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        ⏸️ Pausa
+                      </button>
+                    )}
                     {canDelete && (
                       <button onClick={() => void anular(r)}
                         style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-danger)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
@@ -448,6 +677,58 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Las pausas de una jornada, junto al marcaje que las contiene.
+ *
+ * SE VEN LAS ANULADAS, apagadas. Una pausa anulada devolvió horas pagadas, así
+ * que esconderla sería esconder por qué la fila cambió de número — el mismo
+ * criterio con el que un marcaje anulado se queda en la lista.
+ *
+ * `cerrada_al_salir` lleva su propia marca porque no es un dato cualquiera: la
+ * cerró el sistema, no la persona, y casi siempre significa que la pausa dura
+ * más de lo que duró de verdad.
+ */
+function Pausas({ pausas, canEdit, canDelete, onAjustar, onAnular }: {
+  pausas: PausaPresencia[]
+  canEdit: boolean
+  canDelete: boolean
+  onAjustar: (p: PausaPresencia) => void
+  onAnular: (p: PausaPresencia) => void
+}) {
+  if (pausas.length === 0) return null
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+      {pausas.map(p => {
+        const anulada = Boolean(p.anulado_en)
+        const abierta = p.minutos === null && !anulada
+        return (
+          <span key={p.id} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5,
+            padding: '2px 7px', borderRadius: 8, opacity: anulada ? 0.55 : 1,
+            background: anulada ? 'var(--at-chip)' : p.descuenta ? 'var(--at-warning-tint)' : 'var(--at-chip)',
+            color: anulada ? 'var(--at-ink-3)' : p.descuenta ? 'var(--at-warning)' : 'var(--at-ink-2)',
+            textDecoration: anulada ? 'line-through' : undefined,
+          }}>
+            <strong style={{ fontWeight: 700 }}>{p.etiqueta}</strong>
+            {abierta ? 'en curso' : `${Math.round(p.minutos ?? 0)} min`}
+            {!anulada && !p.descuenta && <span title="Cuenta como jornada trabajada">· no descuenta</span>}
+            {p.origen === 'manual' && <span title="La agregó quien administra: se sabe cuánto duró, no a qué hora fue">· agregada</span>}
+            {p.cerrada_al_salir && <span title="Quedó abierta y la cerró el marcaje de salida" style={{ color: 'var(--at-danger)' }}>· sin cerrar</span>}
+            {canEdit && !anulada && !abierta && (
+              <button onClick={() => onAjustar(p)} aria-label={`Ajustar ${p.etiqueta}`}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 10.5, color: 'inherit' }}>✏️</button>
+            )}
+            {canDelete && !anulada && (
+              <button onClick={() => onAnular(p)} aria-label={`Anular ${p.etiqueta}`}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 10.5, color: 'inherit' }}>✕</button>
+            )}
+          </span>
+        )
+      })}
     </div>
   )
 }
