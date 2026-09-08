@@ -103,3 +103,45 @@ export async function marcarPresencia(params: {
   const filas = (data as ResultadoMarcaje[] | null) ?? []
   return { data: filas[0] ?? null, error: null }
 }
+
+/**
+ * Corrige las horas y el estado de un marcaje. El motivo es OBLIGATORIO y lo
+ * exige la base, no esta capa: es lo único que separa una corrección legítima de
+ * una manipulación, y un `if` en el navegador no lo garantiza.
+ *
+ * Se manda el estado COMPLETO deseado, no un delta: `horaSalida: null` reabre
+ * una jornada que se cerró por error. La foto y el GPS no viajan porque no se
+ * tocan — son del marcaje original y lo siguen siendo.
+ */
+export async function corregirPresencia(params: {
+  registroId: string
+  horaEntrada: string
+  horaSalida: string | null
+  estado: string
+  motivo: string
+}): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('presencia_corregir', {
+    p_registro_id: params.registroId,
+    p_hora_entrada: params.horaEntrada,
+    p_hora_salida: params.horaSalida,
+    p_estado: params.estado,
+    p_motivo: params.motivo,
+  })
+  return { error: error ? error.message : null }
+}
+
+/**
+ * Anula un registro: queda visible y marcado, pero fuera del cómputo de horas.
+ * NO borra — una fila de asistencia es evidencia de planilla. Exige el permiso
+ * `.delete`, distinto del de corregir.
+ */
+export async function anularPresencia(
+  registroId: string,
+  motivo: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('presencia_anular', {
+    p_registro_id: registroId,
+    p_motivo: motivo,
+  })
+  return { error: error ? error.message : null }
+}

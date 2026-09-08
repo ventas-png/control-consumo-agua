@@ -73,7 +73,12 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
     asueto: acc.asueto + Number(f.horas_asueto || 0),
     planificadas: acc.planificadas + Number(f.horas_planificadas || 0),
     trabajadas: acc.trabajadas + Number(f.horas_trabajadas || 0),
-  }), { ordinarias: 0, extra: 0, nocturnas: 0, asueto: 0, planificadas: 0, trabajadas: 0 }), [filas])
+    estadia: acc.estadia + Number(f.horas_estadia || 0),
+    descanso: acc.descanso + Number(f.horas_descanso || 0),
+  }), { ordinarias: 0, extra: 0, nocturnas: 0, asueto: 0, planificadas: 0, trabajadas: 0, estadia: 0, descanso: 0 }), [filas])
+
+  /** ¿Alguien pausó algo en el período? Decide si la tabla separa las columnas. */
+  const hayPausas = useMemo(() => filas.some(f => Number(f.horas_descanso || 0) > 0), [filas])
 
   const periodo = `${MESES[cursor.month]} ${cursor.year}`
 
@@ -104,6 +109,8 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
               { header: 'Días de ausencia', accessor: 'dias_ausencia', align: 'right' },
               { header: 'Tardanzas', accessor: 'tardanzas', align: 'right' },
               { header: 'Horas programadas', accessor: 'horas_planificadas', align: 'right' },
+              { header: 'Horas de estadía', accessor: 'horas_estadia', align: 'right' },
+              { header: 'Horas de descanso', accessor: 'horas_descanso', align: 'right' },
               { header: 'Horas trabajadas', accessor: 'horas_trabajadas', align: 'right' },
               { header: 'Horas ordinarias', accessor: 'horas_ordinarias', align: 'right' },
               { header: 'Horas extra', accessor: 'horas_extra', align: 'right' },
@@ -125,6 +132,11 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
           { label: 'Horas nocturnas', val: formatHoras(totales.nocturnas), color: 'var(--at-info)' },
           { label: 'Horas en asueto', val: formatHoras(totales.asueto), color: totales.asueto > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' },
           { label: 'Programado vs real', val: `${formatHoras(totales.planificadas)} / ${formatHoras(totales.trabajadas)}`, color: 'var(--at-ink-2)' },
+          // Estadía y trabajadas se separaron en 20260908000300: la primera es
+          // lo que la persona estuvo, la segunda lo que se paga. El descanso es
+          // la diferencia, y se enseña para poder comprobar que se está dando —
+          // no solo para restarlo.
+          { label: 'Estadía / descanso', val: `${formatHoras(totales.estadia)} / ${formatHoras(totales.descanso)}`, color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', border: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: k.color }}>{k.val}</div>
@@ -160,6 +172,11 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
                 <th style={th}>Ausencia</th>
                 <th style={th}>Tardanzas</th>
                 <th style={th}>Programadas</th>
+                {/* Estadía y Descanso solo aparecen si alguien pausó algo. Con
+                    cero pausas, Estadía y Trabajadas son la misma columna
+                    repetida — dos columnas iguales enseñan ruido, no dato. */}
+                {hayPausas && <th style={th}>Estadía</th>}
+                {hayPausas && <th style={th}>Descanso</th>}
                 <th style={th}>Trabajadas</th>
                 <th style={th}>Ordinarias</th>
                 <th style={th}>Extra</th>
@@ -179,6 +196,8 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
                   <td style={{ ...td, color: f.dias_ausencia > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{f.dias_ausencia}</td>
                   <td style={{ ...td, color: f.tardanzas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{f.tardanzas}</td>
                   <td style={td}>{formatHoras(f.horas_planificadas)}</td>
+                  {hayPausas && <td style={{ ...td, color: 'var(--at-ink-3)' }}>{formatHoras(f.horas_estadia)}</td>}
+                  {hayPausas && <td style={{ ...td, color: 'var(--at-ink-3)' }}>{formatHoras(f.horas_descanso)}</td>}
                   <td style={td}>{formatHoras(f.horas_trabajadas)}</td>
                   <td style={{ ...td, fontWeight: 600, color: 'var(--at-ink)' }}>{formatHoras(f.horas_ordinarias)}</td>
                   <td style={{ ...td, fontWeight: 700, color: Number(f.horas_extra) > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>

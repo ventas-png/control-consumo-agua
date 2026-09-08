@@ -21,7 +21,7 @@ function fila(over: Partial<HorasPersonal> = {}): HorasPersonal {
     personal_id: 'emp1', nombre: 'Pedro Guardia', cargo: 'guardia',
     dias_planificados: 22, dias_trabajados: 21, dias_ausencia: 1,
     dias_asueto_trabajado: 0, tardanzas: 2,
-    horas_planificadas: 176, horas_trabajadas: 182,
+    horas_planificadas: 176, horas_estadia: 182, horas_descanso: 0, horas_trabajadas: 182,
     horas_ordinarias: 168, horas_extra: 14,
     horas_nocturnas: 96, horas_asueto: 0, horas_asueto_ponderadas: 0,
     ...over,

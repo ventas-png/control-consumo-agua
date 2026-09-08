@@ -11,7 +11,9 @@
 // vuelve a ser lo que el dispositivo diga que es.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import type { BloqueTurno, MiFichaPresencia, PersonalCondominio, PresenciaPersonal } from '../../../../types'
+import type {
+  BloqueTurno, MiFichaPresencia, PausaPresencia, PersonalCondominio, PresenciaPersonal, TipoPausa,
+} from '../../../../types'
 
 const FICHA: MiFichaPresencia = {
   personal_id: 'per-1',
@@ -29,6 +31,17 @@ const FICHA: MiFichaPresencia = {
   hora_salida: null,
   estado: null,
   origen: null,
+  corregido_en: null,
+  corregido_por_nombre: null,
+  motivo_correccion: null,
+  anulado_en: null,
+  registro_fecha: null,
+  pausa_abierta_id: null,
+  pausa_abierta_tipo: null,
+  pausa_abierta_etiqueta: null,
+  pausa_abierta_desde: null,
+  minutos_pausa: 0,
+  minutos_pausa_descontables: 0,
 }
 
 const mocks = vi.hoisted(() => ({
@@ -40,6 +53,16 @@ const mocks = vi.hoisted(() => ({
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   notify: vi.fn(),
   confirm: vi.fn(),
+  corregirPresencia: vi.fn(),
+  anularPresencia: vi.fn(),
+  openPromptDialog: vi.fn(),
+  fetchTiposPausa: vi.fn(),
+  fetchPausasDeRegistros: vi.fn(),
+  marcarPausa: vi.fn(),
+  agregarPausa: vi.fn(),
+  ajustarPausa: vi.fn(),
+  anularPausa: vi.fn(),
+  guardarTipoPausa: vi.fn(),
   // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
   // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
   // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
@@ -51,6 +74,22 @@ vi.mock('../../../../domain/condominios/presenciaAutoservicio', () => ({
   fetchMiFichaPresencia: mocks.fetchMiFichaPresencia,
   marcarPresencia: mocks.marcarPresencia,
   subirFotoMarcaje: mocks.subirFotoMarcaje,
+  corregirPresencia: mocks.corregirPresencia,
+  anularPresencia: mocks.anularPresencia,
+}))
+vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
+// El desglose (`desglose`, `pausasVigentes`, `minutosPausa`) NO se mockea: es
+// aritmética pura y gemela de la del SQL, y sustituirla por un stub dejaría de
+// comprobar justo el número que importa. Solo se interceptan las que van a red.
+vi.mock('../../../../domain/condominios/pausasPresencia', async (original) => ({
+  ...(await original<typeof import('../../../../domain/condominios/pausasPresencia')>()),
+  fetchTiposPausa: mocks.fetchTiposPausa,
+  fetchPausasDeRegistros: mocks.fetchPausasDeRegistros,
+  marcarPausa: mocks.marcarPausa,
+  agregarPausa: mocks.agregarPausa,
+  ajustarPausa: mocks.ajustarPausa,
+  anularPausa: mocks.anularPausa,
+  guardarTipoPausa: mocks.guardarTipoPausa,
 }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
@@ -69,7 +108,12 @@ const PERSONAL: PersonalCondominio[] = [{
   cargo: 'guardia', turno: 'diurno', estado: 'activo', created_at: '2026-01-01',
 } as PersonalCondominio]
 
-function montar(registros: PresenciaPersonal[] = [], bloques: BloqueTurno[] = []) {
+function montar(
+  registros: PresenciaPersonal[] = [],
+  bloques: BloqueTurno[] = [],
+  permisos: { canCreate?: boolean; canEdit?: boolean; canDelete?: boolean } = {},
+) {
+  const { canCreate = true, canEdit = true, canDelete = true } = permisos
   return render(
     <PresenciaPersonalTab
       registros={registros}
@@ -77,11 +121,37 @@ function montar(registros: PresenciaPersonal[] = [], bloques: BloqueTurno[] = []
       bloques={bloques}
       proyectoId="p1"
       companyId="c1"
-      canCreate
-      canEdit
+      canCreate={canCreate}
+      canEdit={canEdit}
+      canDelete={canDelete}
       onRefresh={() => {}}
     />,
   )
+}
+
+const HOY = new Date().toISOString().slice(0, 10)
+
+const TIPOS_PAUSA: TipoPausa[] = [
+  { codigo: 'refaccion', etiqueta: 'Refacción', descuenta: false, minutos_max: 30, orden: 1, configurado: false },
+  { codigo: 'almuerzo', etiqueta: 'Almuerzo', descuenta: true, minutos_max: 60, orden: 2, configurado: false },
+]
+
+/** Una pausa cerrada, con la duración ya sellada por la base. */
+function pausa(extra: Partial<PausaPresencia> = {}): PausaPresencia {
+  return {
+    id: 'pa-1', registro_id: 'r1', personal_id: 'per-1', tipo: 'almuerzo', etiqueta: 'Almuerzo',
+    descuenta: true, inicio_en: '2026-09-08T18:00:00Z', fin_en: '2026-09-08T19:00:00Z',
+    minutos: 60, origen: 'autoservicio', cerrada_al_salir: false, ...extra,
+  }
+}
+
+/** Fila base de la lista del día, para las pruebas de corrección. */
+function filaDelDia(extra: Partial<PresenciaPersonal> = {}): PresenciaPersonal {
+  return {
+    id: 'r1', company_id: 'c1', project_id: 'p1', nombre: 'Marco Sical', cargo: 'guardia',
+    fecha: HOY, hora_entrada: '06:02:07', hora_salida: '06:02:41', estado: 'presente',
+    created_at: '2026-09-08', origen: 'autoservicio', ...extra,
+  } as PresenciaPersonal
 }
 
 beforeEach(() => {
@@ -93,6 +163,19 @@ beforeEach(() => {
   })
   mocks.subirFotoMarcaje.mockResolvedValue({ path: 'p1/per-1/1757-foto.jpg', error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.corregirPresencia.mockResolvedValue({ error: null })
+  mocks.anularPresencia.mockResolvedValue({ error: null })
+  mocks.openPromptDialog.mockResolvedValue(null)
+  mocks.fetchTiposPausa.mockResolvedValue({ tipos: TIPOS_PAUSA, error: null })
+  mocks.fetchPausasDeRegistros.mockResolvedValue({ pausas: [], error: null })
+  mocks.marcarPausa.mockResolvedValue({
+    data: { pausa_id: 'pa-1', accion: 'iniciar', tipo: 'almuerzo', etiqueta: 'Almuerzo', descuenta: true, minutos: null },
+    error: null,
+  })
+  mocks.agregarPausa.mockResolvedValue({ error: null })
+  mocks.ajustarPausa.mockResolvedValue({ error: null })
+  mocks.anularPausa.mockResolvedValue({ error: null })
+  mocks.guardarTipoPausa.mockResolvedValue({ error: null })
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -242,6 +325,9 @@ describe('la pantalla de marcaje', () => {
 
   it('la ubicación que no llega no bloquea el marcaje', async () => {
     mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.corregirPresencia.mockResolvedValue({ error: null })
+  mocks.anularPresencia.mockResolvedValue({ error: null })
+  mocks.openPromptDialog.mockResolvedValue(null)
   mocks.obtenerUbicacion.mockResolvedValue({ coords: null, error: 'Permiso de ubicación denegado' })
     await entrarAMarcar()
     expect(await screen.findByText(/Sin ubicación — Permiso de ubicación denegado/)).toBeTruthy()
@@ -251,6 +337,46 @@ describe('la pantalla de marcaje', () => {
     // Se registra igual, y la fila lo dirá: coords en null.
     await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
     expect(mocks.marcarPresencia.mock.calls[0][0].coords).toBeNull()
+  })
+})
+
+describe('lo que se le dice a la persona sobre su propia jornada', () => {
+  // Enterarse por el recibo de pago de que a uno le cambiaron la jornada es la
+  // peor forma de enterarse.
+  it('avisa cuando le corrigieron el marcaje, con quién y por qué', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({
+      ficha: {
+        ...FICHA, registro_id: 'r1', hora_entrada: '06:02:00', hora_salida: '14:05:00',
+        estado: 'presente' as const, origen: 'autoservicio' as const,
+        corregido_en: '2026-09-08T12:00:00Z', corregido_por_nombre: 'Ada Admin',
+        motivo_correccion: 'salida marcada por error',
+      },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    expect(await screen.findByText(/Tu jornada de hoy fue corregida/)).toBeTruthy()
+    expect(screen.getByText(/Ada Admin: salida marcada por error/)).toBeTruthy()
+  })
+
+  it('si se la anularon, el día vuelve a empezar', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({
+      ficha: {
+        ...FICHA, registro_id: 'r1', hora_entrada: '06:02:00', hora_salida: '14:05:00',
+        estado: 'presente' as const, origen: 'autoservicio' as const,
+        corregido_en: '2026-09-08T12:00:00Z', corregido_por_nombre: 'Ada Admin',
+        motivo_correccion: 'marcó en el condominio equivocado',
+        anulado_en: '2026-09-08T12:00:00Z',
+      },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    expect(await screen.findByText(/Tu marcaje de hoy fue anulado/)).toBeTruthy()
+    // Lo que le toca es volver a marcar ENTRADA, no cerrar una salida que ya no
+    // existe. Y las horas anuladas no se le muestran como si contaran.
+    expect(screen.getByText(/Marcar mi entrada/)).toBeTruthy()
+    expect(screen.queryByText('06:02')).toBeNull()
   })
 })
 
@@ -304,5 +430,285 @@ describe('la lista del día', () => {
     // Sin foto ni coordenada: no se intenta firmar ninguna URL ni pintar nada.
     expect(mocks.secureImage).not.toHaveBeenCalled()
     expect(screen.queryByText(/📍/)).toBeNull()
+  })
+})
+
+describe('corregir y anular desde la lista', () => {
+  beforeEach(() => { mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null }) })
+
+  it('sin permiso de editar no se ofrece corregir', async () => {
+    montar([filaDelDia()], [], { canEdit: false, canDelete: false })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.queryByText(/Corregir/)).toBeNull()
+    expect(screen.queryByText(/Anular/)).toBeNull()
+  })
+
+  it('anular es un permiso APARTE de corregir', async () => {
+    // Quien puede corregir no debería poder invalidar una jornada entera.
+    montar([filaDelDia()], [], { canEdit: true, canDelete: false })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.getByText(/Corregir/)).toBeTruthy()
+    expect(screen.queryByText(/Anular/)).toBeNull()
+  })
+
+  it('la corrección pide motivo y viaja con él', async () => {
+    mocks.openPromptDialog.mockResolvedValue({
+      hora_entrada: '06:02', hora_salida: '14:05', estado: 'presente',
+      motivo: 'salida marcada por error el primer día',
+    })
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+
+    await waitFor(() => expect(mocks.corregirPresencia).toHaveBeenCalled())
+    expect(mocks.corregirPresencia.mock.calls[0][0]).toEqual({
+      registroId: 'r1',
+      horaEntrada: '06:02',
+      horaSalida: '14:05',
+      estado: 'presente',
+      motivo: 'salida marcada por error el primer día',
+    })
+    // El formulario exige el motivo antes de llegar a la base.
+    const opciones = mocks.openPromptDialog.mock.calls[0][0]
+    expect(opciones.validate({ hora_entrada: '06:02', motivo: 'x' })).toMatch(/motivo/i)
+    expect(opciones.validate({ hora_entrada: '', motivo: 'un motivo válido' })).toMatch(/entrada/i)
+    expect(opciones.validate({ hora_entrada: '06:02', motivo: 'un motivo válido' })).toBeNull()
+  })
+
+  it('vaciar la salida en la corrección reabre la jornada', async () => {
+    mocks.openPromptDialog.mockResolvedValue({
+      hora_entrada: '06:02', hora_salida: '', estado: 'presente', motivo: 'aún no salía',
+    })
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+    await waitFor(() => expect(mocks.corregirPresencia).toHaveBeenCalled())
+    expect(mocks.corregirPresencia.mock.calls[0][0].horaSalida).toBeNull()
+  })
+
+  it('si se cancela el formulario no se toca nada', async () => {
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+    await waitFor(() => expect(mocks.openPromptDialog).toHaveBeenCalled())
+    expect(mocks.corregirPresencia).not.toHaveBeenCalled()
+  })
+
+  it('una fila anulada se ve, se explica, y ya no se opera', async () => {
+    montar([filaDelDia({
+      anulado_en: '2026-09-08T12:00:00Z', corregido_en: '2026-09-08T12:00:00Z',
+      corregido_por_nombre: 'Ada Admin', motivo_correccion: 'marcaje de prueba',
+    })])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.getByText('ANULADA')).toBeTruthy()
+    expect(screen.getByText(/Anulada por Ada Admin.*marcaje de prueba/)).toBeTruthy()
+    // Ni corregir ni anular ni cambiar el estado: ya no cuenta.
+    expect(screen.queryByText(/Corregir/)).toBeNull()
+    expect(screen.queryByText(/^Anular$/)).toBeNull()
+  })
+
+  it('lo anulado no infla los contadores del día', async () => {
+    montar([
+      filaDelDia({ id: 'r1' }),
+      filaDelDia({ id: 'r2', nombre: 'Ana López', anulado_en: '2026-09-08T12:00:00Z' }),
+    ])
+    await waitFor(() => expect(screen.getByText('Ana López')).toBeTruthy())
+    // Dos filas en pantalla, un solo presente vigente.
+    const presentes = screen.getByText('Presente', { selector: 'div' }).previousSibling
+    expect(presentes?.textContent).toBe('1')
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Las pausas de la jornada (20260908000300)
+// ════════════════════════════════════════════════════════════════════════════
+// Lo que se cubre aquí es, otra vez, lo que el sandbox SQL no puede ver: que la
+// pantalla no pida NUNCA una hora ni una duración para pausar, que se diga si
+// la pausa descuenta ANTES de pulsarla, y que las tres cifras de la lista se
+// muevan cuando se mueve una pausa.
+
+const FICHA_EN_TURNO: MiFichaPresencia = {
+  ...FICHA, registro_id: 'r1', hora_entrada: '06:03:11', estado: 'presente', origen: 'autoservicio',
+  registro_fecha: '2026-09-07', hora_servidor: '12:03:11',
+}
+
+describe('el empleado marca su pausa', () => {
+  async function entrarConTurnoAbierto(ficha: MiFichaPresencia = FICHA_EN_TURNO) {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha, error: null })
+    montar()
+    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    return screen.findByText('Marco Sical')
+  }
+
+  it('ofrece un botón por tipo, y dice cuál descuenta ANTES de pulsarlo', async () => {
+    await entrarConTurnoAbierto()
+    expect(await screen.findByText(/☕ Refacción/)).toBeTruthy()
+    expect(screen.getByText(/🍽️ Almuerzo/)).toBeTruthy()
+    // Enterarse de que el almuerzo no se paga DESPUÉS de tomarlo es enterarse
+    // tarde: la consecuencia va en el propio botón.
+    expect(screen.getByText('se descuenta')).toBeTruthy()
+    expect(screen.getByText('cuenta como jornada')).toBeTruthy()
+  })
+
+  it('pausar NO manda ninguna hora ni duración: solo el tipo', async () => {
+    // Es la misma garantía que protege el marcaje. Si el cliente pudiera mandar
+    // los instantes, la persona estaría tecleando minutos que se restan de su
+    // propio pago.
+    await entrarConTurnoAbierto()
+    fireEvent.click(await screen.findByText(/🍽️ Almuerzo/))
+    await waitFor(() => expect(mocks.marcarPausa).toHaveBeenCalled())
+    const args = mocks.marcarPausa.mock.calls[0][0]
+    expect(args).toEqual({ projectId: 'p1', accion: 'iniciar', tipo: 'almuerzo', coords: expect.anything() })
+    expect(Object.keys(args).some(k => /hora|fecha|minut|inicio|fin/i.test(k))).toBe(false)
+  })
+
+  it('con una pausa abierta, la única acción de pausa es volver', async () => {
+    await entrarConTurnoAbierto({
+      ...FICHA_EN_TURNO,
+      pausa_abierta_id: 'pa-1', pausa_abierta_tipo: 'almuerzo', pausa_abierta_etiqueta: 'Almuerzo',
+      pausa_abierta_desde: new Date(Date.now() - 25 * 60_000).toISOString(),
+    })
+    expect(await screen.findByText(/Regresé de Almuerzo/)).toBeTruthy()
+    // Ni se puede abrir una segunda pausa encima de la abierta…
+    expect(screen.queryByText(/🍽️ Almuerzo$/)).toBeNull()
+    // …y se avisa de lo que pasa si se va sin volver, ANTES de que se vaya.
+    expect(screen.getByText(/la pausa se cierra en ese momento/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText(/Regresé de Almuerzo/))
+    await waitFor(() => expect(mocks.marcarPausa).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'terminar' }),
+    ))
+  })
+
+  it('antes de marcar entrada no hay nada que pausar', async () => {
+    await entrarConTurnoAbierto(FICHA)
+    expect(screen.queryByText(/🍽️ Almuerzo/)).toBeNull()
+  })
+
+  it('la cámara ya NO se abre sola con la jornada abierta', async () => {
+    // Se entra a esta pantalla tres o cuatro veces al día a marcar pausas. Una
+    // cámara que salta encima de los botones estorba en todas menos una.
+    await entrarConTurnoAbierto()
+    await screen.findByText(/☕ Refacción/)
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    // Y la salida se sigue pudiendo marcar con UN toque.
+    expect(screen.getByText(/📷 Marcar mi salida/)).toBeTruthy()
+  })
+
+  it('avisa cuando la jornada abierta es la de AYER (turno nocturno)', async () => {
+    await entrarConTurnoAbierto({ ...FICHA_EN_TURNO, registro_fecha: '2026-09-06' })
+    expect(await screen.findByText(/Jornada abierta del 2026-09-06/)).toBeTruthy()
+  })
+})
+
+describe('las pausas en la lista del día', () => {
+  it('separa estadía de horas laborales solo cuando la pausa descuenta', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({ pausas: [pausa()], error: null })
+    montar([filaDelDia({ hora_entrada: '06:00:00', hora_salida: '14:00:00' })])
+    // 8 h en el puesto, 1 h de almuerzo que descuenta → 7 h laborales.
+    expect(await screen.findByText(/Estadía: 8h/)).toBeTruthy()
+    expect(screen.getByText(/Laborales: 7h/)).toBeTruthy()
+    expect(screen.getByText(/Descanso: 1h/)).toBeTruthy()
+  })
+
+  it('con una pausa que NO descuenta enseña UN solo número, no dos iguales', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({
+      pausas: [pausa({ tipo: 'refaccion', etiqueta: 'Refacción', descuenta: false, minutos: 30 })],
+      error: null,
+    })
+    montar([filaDelDia({ hora_entrada: '06:00:00', hora_salida: '14:00:00' })])
+    await screen.findByText(/Descanso: 0h 30m/)
+    expect(screen.queryByText(/Estadía:/)).toBeNull()
+    expect(screen.getByText(/· 8h/)).toBeTruthy()
+  })
+
+  it('la pausa anulada se ve, pero ya no resta', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({
+      pausas: [pausa({ anulado_en: '2026-09-08T20:00:00Z' })], error: null,
+    })
+    montar([filaDelDia({ hora_entrada: '06:00:00', hora_salida: '14:00:00' })])
+    // Sigue en pantalla —es evidencia de por qué la fila cambió de número—…
+    expect(await screen.findByText('Almuerzo')).toBeTruthy()
+    // …pero las 8 h vuelven a ser las 8 h.
+    expect(screen.queryByText(/Laborales:/)).toBeNull()
+  })
+
+  it('marca la pausa que cerró el sistema, no la persona', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({
+      pausas: [pausa({ cerrada_al_salir: true })], error: null,
+    })
+    montar([filaDelDia()])
+    expect(await screen.findByText(/sin cerrar/)).toBeTruthy()
+  })
+
+  it('agregar la pausa que nadie marcó exige motivo y pasa por la RPC', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.openPromptDialog.mockResolvedValue({ tipo: 'almuerzo', minutos: '45', motivo: 'Olvidó marcarlo' })
+    montar([filaDelDia()])
+    fireEvent.click(await screen.findByTitle('Para la pausa que la persona no marcó'))
+    await waitFor(() => expect(mocks.agregarPausa).toHaveBeenCalledWith({
+      registroId: 'r1', tipo: 'almuerzo', minutos: 45, motivo: 'Olvidó marcarlo',
+    }))
+    // El diálogo rechaza un motivo corto antes de llegar a la base.
+    const { validate } = mocks.openPromptDialog.mock.calls[0][0]
+    expect(validate({ tipo: 'almuerzo', minutos: '45', motivo: 'ok' })).toMatch(/motivo/i)
+    expect(validate({ tipo: 'almuerzo', minutos: '0', motivo: 'Olvidó marcarlo' })).toMatch(/1 y 1440/)
+  })
+
+  it('ajustar una pausa manda MINUTOS, nunca instantes', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({ pausas: [pausa()], error: null })
+    mocks.openPromptDialog.mockResolvedValue({ minutos: '30', motivo: 'Volvió antes' })
+    montar([filaDelDia()])
+    fireEvent.click(await screen.findByLabelText('Ajustar Almuerzo'))
+    await waitFor(() => expect(mocks.ajustarPausa).toHaveBeenCalledWith('pa-1', 30, 'Volvió antes'))
+    // La hora la puso el servidor y la sigue poniendo: no hay campo para ella.
+    const campos = mocks.openPromptDialog.mock.calls[0][0].fields.map((f: { name: string }) => f.name)
+    expect(campos).toEqual(['minutos', 'motivo'])
+  })
+
+  it('anular una pausa exige `.delete`, no `.edit`', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({ pausas: [pausa()], error: null })
+    montar([filaDelDia()], [], { canEdit: true, canDelete: false })
+    await screen.findByText('Almuerzo')
+    expect(screen.queryByLabelText('Anular Almuerzo')).toBeNull()
+    // Ajustar sí, que es el permiso que sí tiene.
+    expect(screen.getByLabelText('Ajustar Almuerzo')).toBeTruthy()
+  })
+
+  it('sin `.edit` no se ajusta ni se agrega ninguna pausa', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchPausasDeRegistros.mockResolvedValue({ pausas: [pausa()], error: null })
+    montar([filaDelDia()], [], { canEdit: false, canDelete: false })
+    await screen.findByText('Almuerzo')
+    expect(screen.queryByLabelText('Ajustar Almuerzo')).toBeNull()
+    expect(screen.queryByTitle('Para la pausa que la persona no marcó')).toBeNull()
+  })
+})
+
+describe('la configuración de qué descuenta', () => {
+  it('dice que el cambio vale hacia adelante, y guarda la regla invertida', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    montar([filaDelDia()])
+    fireEvent.click(await screen.findByTitle('Qué pausas descuentan de las horas que se pagan'))
+    // Lo que hace seguro tocar esto: no reescribe ninguna planilla cerrada.
+    expect(screen.getByText(/hacia adelante/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText('No descuenta'))
+    await waitFor(() => expect(mocks.guardarTipoPausa).toHaveBeenCalledWith({
+      codigo: 'refaccion', etiqueta: 'Refacción', descuenta: true, minutosMax: 30,
+    }))
+  })
+
+  it('sin `.edit` la configuración no se ofrece', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    montar([filaDelDia()], [], { canEdit: false })
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByTitle('Qué pausas descuentan de las horas que se pagan')).toBeNull()
   })
 })
