@@ -17,7 +17,11 @@ base haga peticiones HTTP salientes— concede `USAGE` a `PUBLIC`, y:
 | `net.http_request_queue_id_seq` | `SELECT`, `USAGE` y `UPDATE`. Es la única secuencia: `_http_response` no tiene una propia. |
 
 Los tres objetos y sus grants pertenecen a `supabase_admin`. Ninguna migración
-de este repositorio los declara, y la reconstrucción local no los reproduce.
+declara la definición administrada ni los grants de estos objetos. La
+reconstrucción local no reproduce la ACL gestionada: `bootstrap.sql` crea
+únicamente un stub inerte de `net._http_response`, además de `net.http_post()`
+y `net.http_get()` para que las migraciones compilen; no recrea
+`net.http_request_queue`, su secuencia ni los grants administrados a `PUBLIC`.
 
 ## Lo que respondió Supabase Support
 
