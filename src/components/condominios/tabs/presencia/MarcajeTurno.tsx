@@ -119,8 +119,13 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
   // la foto cinco veces no deja cinco imágenes en memoria.
   useEffect(() => () => { if (foto) URL.revokeObjectURL(foto.url) }, [foto])
 
+  // Una jornada ANULADA no cuenta, así que para quien la vive el día vuelve a
+  // empezar: lo que le toca es marcar entrada, no cerrar una salida que ya no
+  // existe. (`presencia_mi_ficha` solo devuelve la anulada cuando no hay otra.)
+  const anulada = Boolean(ficha?.anulado_en)
   const pendiente: TipoMarcaje | null =
     !ficha ? null
+    : anulada ? 'entrada'
     : !ficha.hora_entrada ? 'entrada'
     : !ficha.hora_salida ? 'salida'
     : null
@@ -241,11 +246,30 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
         </button>
       </div>
 
-      {/* Estado del día */}
+      {/* Estado del día. Si la jornada está anulada, sus horas ya no son las
+          suyas: mostrarlas como si contaran sería mentir. */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <Marca titulo="Entrada" hora={ficha.hora_entrada} />
-        <Marca titulo="Salida" hora={ficha.hora_salida} />
+        <Marca titulo="Entrada" hora={anulada ? null : ficha.hora_entrada} />
+        <Marca titulo="Salida" hora={anulada ? null : ficha.hora_salida} />
       </div>
+
+      {/* Que se lo digan A ELLA, no el recibo de pago a fin de mes. */}
+      {ficha.corregido_en && (
+        <div style={{
+          border: `1px solid ${anulada ? 'var(--at-danger)' : 'var(--at-warning)'}`,
+          background: anulada ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)',
+          borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 12.5, lineHeight: 1.45,
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 2 }}>
+            {anulada ? 'Tu marcaje de hoy fue anulado' : 'Tu jornada de hoy fue corregida'}
+          </div>
+          <div>
+            Por {ficha.corregido_por_nombre ?? 'un administrador'}
+            {ficha.motivo_correccion ? `: ${ficha.motivo_correccion}` : '.'}
+          </div>
+          {anulada && <div style={{ marginTop: 4 }}>Podés volver a marcar tu entrada.</div>}
+        </div>
+      )}
 
       {pendiente === null ? (
         <div style={{ textAlign: 'center', padding: '14px 0' }}>

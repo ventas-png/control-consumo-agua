@@ -675,7 +675,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'equipos', label: 'Equipos', icon: '⚙️', render: (ctx) =>
     <EquiposComunesTab equipos={ctx.equiposComunes} proyectoId={ctx.proyectoId} companyId={ctx.cid} moneda={ctx.moneda} canCreate={ctx.canCreate('equipos')} canEdit={ctx.canEdit('equipos')} onRefresh={ctx.onRefresh} /> },
   { id: 'presencia', label: 'Presencia', icon: '📋', render: (ctx) =>
-    <PresenciaPersonalTab registros={ctx.presenciaPersonal} personal={ctx.personal} bloques={ctx.bloquesTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('presencia')} canEdit={ctx.canEdit('presencia')} onRefresh={ctx.onRefresh} /> },
+    <PresenciaPersonalTab registros={ctx.presenciaPersonal} personal={ctx.personal} bloques={ctx.bloquesTurno} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('presencia')} canEdit={ctx.canEdit('presencia')} canDelete={ctx.canDelete('presencia')} onRefresh={ctx.onRefresh} /> },
   { id: 'turnos', label: 'Asignación turnos', icon: '🗓️', render: (ctx) =>
     <TurnosTab plantillas={ctx.plantillasHorario} asignaciones={ctx.asignacionesTurno} bloques={ctx.bloquesTurno} ausencias={ctx.ausenciasPersonal} diasNoLaborables={ctx.diasNoLaborables} personal={ctx.personal} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('turnos')} canEdit={ctx.canEdit('turnos')} onRefresh={ctx.onRefresh} /> },
   { id: 'ausencias', label: 'Ausencias', icon: '🌴', render: (ctx) =>

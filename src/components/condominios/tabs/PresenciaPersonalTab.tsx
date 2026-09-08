@@ -1,7 +1,8 @@
 import { hoyLocalISO } from '../../../lib/format'
 import { useEffect, useMemo, useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
-import { fetchMiFichaPresencia } from '../../../domain/condominios/presenciaAutoservicio'
+import { anularPresencia, corregirPresencia, fetchMiFichaPresencia } from '../../../domain/condominios/presenciaAutoservicio'
+import { openPromptDialog } from '../../shared/PromptDialog'
 import { formatHoras, horasJornada } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
 import MarcajeTurno from './presencia/MarcajeTurno'
@@ -19,6 +20,9 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
+  /** Anular exige `.delete`, no `.edit`: es el acto con forma de borrado —saca
+   *  el día de la planilla— aunque no destruya nada. */
+  canDelete: boolean
   onRefresh: () => void
 }
 
@@ -39,7 +43,7 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
  */
 type ModoPresencia = 'resolviendo' | 'elegir' | 'marcar' | 'consulta'
 
-export default function PresenciaPersonalTab({ registros, personal, bloques, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export default function PresenciaPersonalTab({ registros, personal, bloques, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -91,8 +95,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
       : b.turno
   }, [bloques, form.personal_id, form.fecha])
 
+  // Los KPIs cuentan lo VIGENTE. Una jornada anulada sigue en la lista —es
+  // evidencia y su rastro importa— pero no debe inflar el «Presente» del día,
+  // igual que no suma horas a la planilla.
+  const vigentesDia = registrosDia.filter(r => !r.anulado_en)
+
   const contadores = ESTADOS_PRESENCIA.reduce((acc, s) => {
-    acc[s.value] = registrosDia.filter(r => r.estado === s.value).length
+    acc[s.value] = vigentesDia.filter(r => r.estado === s.value).length
     return acc
   }, {} as Record<EstadoPresencia, number>)
 
@@ -128,6 +137,61 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
   async function actualizarEstado(id: string, estado: EstadoPresencia) {
     const { error } = await updateCondominioRow('presencia_personal', id, { estado })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    onRefresh()
+  }
+
+  /**
+   * Corregir es un acto DISTINTO de marcar, y por eso pide motivo. La foto y el
+   * GPS no viajan: son del marcaje original y no se tocan — la base tampoco los
+   * dejaría cambiar.
+   */
+  async function corregir(r: PresenciaPersonal) {
+    const datos = await openPromptDialog({
+      title: `Corregir el marcaje de ${r.nombre}`,
+      description: 'La foto y la ubicación siguen siendo las del marcaje original: '
+        + 'corregir la hora no reescribe lo que la cámara vio. Queda constancia de quién corrigió y por qué.',
+      fields: [
+        { name: 'hora_entrada', label: 'Hora de entrada', type: 'time', initialValue: (r.hora_entrada ?? '').slice(0, 5) },
+        { name: 'hora_salida', label: 'Hora de salida (vacío = jornada abierta)', type: 'time', initialValue: (r.hora_salida ?? '').slice(0, 5) },
+        {
+          name: 'estado', label: 'Estado', control: 'select', initialValue: r.estado,
+          options: ESTADOS_PRESENCIA.map(s => ({ value: s.value, label: s.label })),
+        },
+        { name: 'motivo', label: 'Motivo de la corrección', control: 'textarea', rows: 2 },
+      ],
+      submitText: 'Guardar corrección',
+      validate: d => !d.hora_entrada
+        ? 'La hora de entrada es obligatoria. Si el registro no debe contar, anulalo.'
+        : d.motivo.trim().length < 5 ? 'Escribí el motivo de la corrección (al menos 5 caracteres)' : null,
+    })
+    if (!datos) return
+    const { error } = await corregirPresencia({
+      registroId: r.id,
+      horaEntrada: datos.hora_entrada,
+      horaSalida: datos.hora_salida || null,
+      estado: datos.estado,
+      motivo: datos.motivo,
+    })
+    if (error) { notify({ variant: 'error', title: 'No se corrigió', text: error }); return }
+    notify({ variant: 'success', title: 'Marcaje corregido' })
+    onRefresh()
+  }
+
+  /** Anular NO borra: la fila queda visible y fuera del cómputo de horas. */
+  async function anular(r: PresenciaPersonal) {
+    const datos = await openPromptDialog({
+      title: `Anular el marcaje de ${r.nombre}`,
+      description: 'La fila no se borra —es evidencia de planilla—: queda visible y marcada, '
+        + 'pero deja de contar para las horas. No se puede deshacer desde aquí.',
+      fields: [{ name: 'motivo', label: 'Motivo de la anulación', control: 'textarea', rows: 2 }],
+      submitText: 'Anular el marcaje',
+      validate: d => d.motivo.trim().length < 5
+        ? 'Escribí el motivo de la anulación (al menos 5 caracteres)' : null,
+    })
+    if (!datos) return
+    const { error } = await anularPresencia(r.id, datos.motivo)
+    if (error) { notify({ variant: 'error', title: 'No se anuló', text: error }); return }
+    notify({ variant: 'success', title: 'Marcaje anulado', text: 'Deja de contar para las horas.' })
     onRefresh()
   }
 
@@ -238,7 +302,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           </div>
         ))}
         <div style={{ background: 'var(--at-chip)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{registrosDia.length}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{vigentesDia.length}</div>
           <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Total</div>
         </div>
       </div>
@@ -327,7 +391,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             const horas = horasJornada(r.hora_entrada, r.hora_salida)
             const horasTotal = horas ? formatHoras(horas) : null
             return (
-              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={r.id} style={{
+                background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8,
+                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                // Anulada: se ve, pero se ve APAGADA. No se esconde — es
+                // evidencia, y esconderla sería la mitad de borrarla.
+                opacity: r.anulado_en ? 0.6 : 1,
+              }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <span style={{ padding: '3px 10px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 12, fontWeight: 600 }}>{est?.label}</span>
                   <div>
@@ -340,20 +410,37 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                     </div>
                     {r.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.observaciones}</div>}
                     <EvidenciaMarcaje registro={r} />
+                    <HuellaCorreccion registro={r} />
                   </div>
                 </div>
-                {canEdit && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {!r.hora_salida && r.estado === 'presente' && (
+                {/* Sobre una fila anulada no se actúa: ya no cuenta, y dejar los
+                    controles vivos invitaría a «arreglarla» editándola. */}
+                {!r.anulado_en && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {canEdit && !r.hora_salida && r.estado === 'presente' && (
                       <button onClick={() => registrarSalida(r.id)}
                         style={{ padding: '5px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                         Registrar salida
                       </button>
                     )}
-                    <select value={r.estado} onChange={e => actualizarEstado(r.id, e.target.value as EstadoPresencia)}
-                      style={{ padding: '4px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
-                      {ESTADOS_PRESENCIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
+                    {canEdit && (
+                      <select value={r.estado} onChange={e => actualizarEstado(r.id, e.target.value as EstadoPresencia)}
+                        style={{ padding: '4px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
+                        {ESTADOS_PRESENCIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => void corregir(r)}
+                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        ✏️ Corregir
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => void anular(r)}
+                        style={{ padding: '5px 10px', background: 'var(--at-surface-2)', color: 'var(--at-danger)', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        Anular
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -396,6 +483,37 @@ function EvidenciaMarcaje({ registro }: { registro: PresenciaPersonal }) {
           {gps.exactitud_m ? ` (±${Math.round(gps.exactitud_m)} m)` : ''}
         </span>
       )}
+    </div>
+  )
+}
+
+/**
+ * La huella de la corrección, en la fila y no en otra pestaña.
+ *
+ * `bitacora_acciones` ya guarda el antes/después de cada columna con su autor
+ * desde 20260731000100, así que el forense existía. Lo que faltaba es que se vea
+ * DONDE SE LEE EL DATO: una corrección que solo consta en la bitácora es, en la
+ * práctica, invisible — nadie audita la bitácora para leer una lista de
+ * asistencia.
+ */
+function HuellaCorreccion({ registro }: { registro: PresenciaPersonal }) {
+  if (!registro.corregido_en) return null
+  const quien = registro.corregido_por_nombre ?? 'un administrador'
+  const cuando = registro.corregido_en.slice(0, 10)
+  const anulada = Boolean(registro.anulado_en)
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginTop: 6, flexWrap: 'wrap' }}>
+      <span style={{
+        fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 8,
+        background: anulada ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)',
+        color: anulada ? 'var(--at-danger)' : 'var(--at-warning)',
+      }}>
+        {anulada ? 'ANULADA' : 'Corregida'}
+      </span>
+      <span style={{ fontSize: 10.5, color: 'var(--at-ink-3)' }}>
+        {anulada ? 'Anulada' : 'Corregida'} por {quien} el {cuando}
+        {registro.motivo_correccion ? ` — ${registro.motivo_correccion}` : ''}
+      </span>
     </div>
   )
 }

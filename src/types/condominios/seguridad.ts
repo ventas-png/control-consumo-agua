@@ -313,6 +313,17 @@ export interface PresenciaPersonal {
   /** Instante exacto del marcaje. `hora_entrada` es su hora local recortada. */
   entrada_marcada_en?: string | null
   salida_marcada_en?: string | null
+  // Corrección y anulación (20260908000200). Corregir es un acto DISTINTO de
+  // marcar y por eso deja su propia huella; anular deja la fila visible pero
+  // fuera del cómputo de horas, porque borrarla destruiría evidencia de planilla.
+  corregido_por?: string | null
+  /** Nombre legible, desnormalizado: la fila sigue diciendo quién la tocó
+   *  aunque esa cuenta se borre, y no hace falta consultar `app_users`. */
+  corregido_por_nombre?: string | null
+  corregido_en?: string | null
+  motivo_correccion?: string | null
+  /** Con valor, la fila no cuenta para las horas. Nunca se borra. */
+  anulado_en?: string | null
 }
 
 /** Ubicación guardada con un marcaje, ya normalizada por `presencia_marcar`. */
@@ -345,6 +356,12 @@ export interface MiFichaPresencia {
   hora_salida: string | null
   estado: EstadoPresencia | null
   origen: 'manual' | 'autoservicio' | null
+  /** Si a la persona le corrigieron o anularon la jornada, se lo decimos a ella
+   *  también: enterarse por el recibo de pago es la peor forma de enterarse. */
+  corregido_en: string | null
+  corregido_por_nombre: string | null
+  motivo_correccion: string | null
+  anulado_en: string | null
 }
 
 

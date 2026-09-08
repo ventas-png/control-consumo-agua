@@ -29,6 +29,10 @@ const FICHA: MiFichaPresencia = {
   hora_salida: null,
   estado: null,
   origen: null,
+  corregido_en: null,
+  corregido_por_nombre: null,
+  motivo_correccion: null,
+  anulado_en: null,
 }
 
 const mocks = vi.hoisted(() => ({
@@ -40,6 +44,9 @@ const mocks = vi.hoisted(() => ({
   updateCondominioRow: vi.fn(async () => ({ error: null })),
   notify: vi.fn(),
   confirm: vi.fn(),
+  corregirPresencia: vi.fn(),
+  anularPresencia: vi.fn(),
+  openPromptDialog: vi.fn(),
   // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
   // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
   // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
@@ -51,7 +58,10 @@ vi.mock('../../../../domain/condominios/presenciaAutoservicio', () => ({
   fetchMiFichaPresencia: mocks.fetchMiFichaPresencia,
   marcarPresencia: mocks.marcarPresencia,
   subirFotoMarcaje: mocks.subirFotoMarcaje,
+  corregirPresencia: mocks.corregirPresencia,
+  anularPresencia: mocks.anularPresencia,
 }))
+vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
   updateCondominioRow: mocks.updateCondominioRow,
@@ -69,7 +79,12 @@ const PERSONAL: PersonalCondominio[] = [{
   cargo: 'guardia', turno: 'diurno', estado: 'activo', created_at: '2026-01-01',
 } as PersonalCondominio]
 
-function montar(registros: PresenciaPersonal[] = [], bloques: BloqueTurno[] = []) {
+function montar(
+  registros: PresenciaPersonal[] = [],
+  bloques: BloqueTurno[] = [],
+  permisos: { canCreate?: boolean; canEdit?: boolean; canDelete?: boolean } = {},
+) {
+  const { canCreate = true, canEdit = true, canDelete = true } = permisos
   return render(
     <PresenciaPersonalTab
       registros={registros}
@@ -77,11 +92,23 @@ function montar(registros: PresenciaPersonal[] = [], bloques: BloqueTurno[] = []
       bloques={bloques}
       proyectoId="p1"
       companyId="c1"
-      canCreate
-      canEdit
+      canCreate={canCreate}
+      canEdit={canEdit}
+      canDelete={canDelete}
       onRefresh={() => {}}
     />,
   )
+}
+
+const HOY = new Date().toISOString().slice(0, 10)
+
+/** Fila base de la lista del día, para las pruebas de corrección. */
+function filaDelDia(extra: Partial<PresenciaPersonal> = {}): PresenciaPersonal {
+  return {
+    id: 'r1', company_id: 'c1', project_id: 'p1', nombre: 'Marco Sical', cargo: 'guardia',
+    fecha: HOY, hora_entrada: '06:02:07', hora_salida: '06:02:41', estado: 'presente',
+    created_at: '2026-09-08', origen: 'autoservicio', ...extra,
+  } as PresenciaPersonal
 }
 
 beforeEach(() => {
@@ -93,6 +120,9 @@ beforeEach(() => {
   })
   mocks.subirFotoMarcaje.mockResolvedValue({ path: 'p1/per-1/1757-foto.jpg', error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.corregirPresencia.mockResolvedValue({ error: null })
+  mocks.anularPresencia.mockResolvedValue({ error: null })
+  mocks.openPromptDialog.mockResolvedValue(null)
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -242,6 +272,9 @@ describe('la pantalla de marcaje', () => {
 
   it('la ubicación que no llega no bloquea el marcaje', async () => {
     mocks.confirm.mockResolvedValue({ isConfirmed: true })
+  mocks.corregirPresencia.mockResolvedValue({ error: null })
+  mocks.anularPresencia.mockResolvedValue({ error: null })
+  mocks.openPromptDialog.mockResolvedValue(null)
   mocks.obtenerUbicacion.mockResolvedValue({ coords: null, error: 'Permiso de ubicación denegado' })
     await entrarAMarcar()
     expect(await screen.findByText(/Sin ubicación — Permiso de ubicación denegado/)).toBeTruthy()
@@ -251,6 +284,46 @@ describe('la pantalla de marcaje', () => {
     // Se registra igual, y la fila lo dirá: coords en null.
     await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
     expect(mocks.marcarPresencia.mock.calls[0][0].coords).toBeNull()
+  })
+})
+
+describe('lo que se le dice a la persona sobre su propia jornada', () => {
+  // Enterarse por el recibo de pago de que a uno le cambiaron la jornada es la
+  // peor forma de enterarse.
+  it('avisa cuando le corrigieron el marcaje, con quién y por qué', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({
+      ficha: {
+        ...FICHA, registro_id: 'r1', hora_entrada: '06:02:00', hora_salida: '14:05:00',
+        estado: 'presente' as const, origen: 'autoservicio' as const,
+        corregido_en: '2026-09-08T12:00:00Z', corregido_por_nombre: 'Ada Admin',
+        motivo_correccion: 'salida marcada por error',
+      },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    expect(await screen.findByText(/Tu jornada de hoy fue corregida/)).toBeTruthy()
+    expect(screen.getByText(/Ada Admin: salida marcada por error/)).toBeTruthy()
+  })
+
+  it('si se la anularon, el día vuelve a empezar', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({
+      ficha: {
+        ...FICHA, registro_id: 'r1', hora_entrada: '06:02:00', hora_salida: '14:05:00',
+        estado: 'presente' as const, origen: 'autoservicio' as const,
+        corregido_en: '2026-09-08T12:00:00Z', corregido_por_nombre: 'Ada Admin',
+        motivo_correccion: 'marcó en el condominio equivocado',
+        anulado_en: '2026-09-08T12:00:00Z',
+      },
+      error: null,
+    })
+    montar()
+    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    expect(await screen.findByText(/Tu marcaje de hoy fue anulado/)).toBeTruthy()
+    // Lo que le toca es volver a marcar ENTRADA, no cerrar una salida que ya no
+    // existe. Y las horas anuladas no se le muestran como si contaran.
+    expect(screen.getByText(/Marcar mi entrada/)).toBeTruthy()
+    expect(screen.queryByText('06:02')).toBeNull()
   })
 })
 
@@ -304,5 +377,91 @@ describe('la lista del día', () => {
     // Sin foto ni coordenada: no se intenta firmar ninguna URL ni pintar nada.
     expect(mocks.secureImage).not.toHaveBeenCalled()
     expect(screen.queryByText(/📍/)).toBeNull()
+  })
+})
+
+describe('corregir y anular desde la lista', () => {
+  beforeEach(() => { mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null }) })
+
+  it('sin permiso de editar no se ofrece corregir', async () => {
+    montar([filaDelDia()], [], { canEdit: false, canDelete: false })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.queryByText(/Corregir/)).toBeNull()
+    expect(screen.queryByText(/Anular/)).toBeNull()
+  })
+
+  it('anular es un permiso APARTE de corregir', async () => {
+    // Quien puede corregir no debería poder invalidar una jornada entera.
+    montar([filaDelDia()], [], { canEdit: true, canDelete: false })
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.getByText(/Corregir/)).toBeTruthy()
+    expect(screen.queryByText(/Anular/)).toBeNull()
+  })
+
+  it('la corrección pide motivo y viaja con él', async () => {
+    mocks.openPromptDialog.mockResolvedValue({
+      hora_entrada: '06:02', hora_salida: '14:05', estado: 'presente',
+      motivo: 'salida marcada por error el primer día',
+    })
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+
+    await waitFor(() => expect(mocks.corregirPresencia).toHaveBeenCalled())
+    expect(mocks.corregirPresencia.mock.calls[0][0]).toEqual({
+      registroId: 'r1',
+      horaEntrada: '06:02',
+      horaSalida: '14:05',
+      estado: 'presente',
+      motivo: 'salida marcada por error el primer día',
+    })
+    // El formulario exige el motivo antes de llegar a la base.
+    const opciones = mocks.openPromptDialog.mock.calls[0][0]
+    expect(opciones.validate({ hora_entrada: '06:02', motivo: 'x' })).toMatch(/motivo/i)
+    expect(opciones.validate({ hora_entrada: '', motivo: 'un motivo válido' })).toMatch(/entrada/i)
+    expect(opciones.validate({ hora_entrada: '06:02', motivo: 'un motivo válido' })).toBeNull()
+  })
+
+  it('vaciar la salida en la corrección reabre la jornada', async () => {
+    mocks.openPromptDialog.mockResolvedValue({
+      hora_entrada: '06:02', hora_salida: '', estado: 'presente', motivo: 'aún no salía',
+    })
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+    await waitFor(() => expect(mocks.corregirPresencia).toHaveBeenCalled())
+    expect(mocks.corregirPresencia.mock.calls[0][0].horaSalida).toBeNull()
+  })
+
+  it('si se cancela el formulario no se toca nada', async () => {
+    montar([filaDelDia()])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    fireEvent.click(screen.getByText(/Corregir/))
+    await waitFor(() => expect(mocks.openPromptDialog).toHaveBeenCalled())
+    expect(mocks.corregirPresencia).not.toHaveBeenCalled()
+  })
+
+  it('una fila anulada se ve, se explica, y ya no se opera', async () => {
+    montar([filaDelDia({
+      anulado_en: '2026-09-08T12:00:00Z', corregido_en: '2026-09-08T12:00:00Z',
+      corregido_por_nombre: 'Ada Admin', motivo_correccion: 'marcaje de prueba',
+    })])
+    await waitFor(() => expect(screen.getByText('Marco Sical')).toBeTruthy())
+    expect(screen.getByText('ANULADA')).toBeTruthy()
+    expect(screen.getByText(/Anulada por Ada Admin.*marcaje de prueba/)).toBeTruthy()
+    // Ni corregir ni anular ni cambiar el estado: ya no cuenta.
+    expect(screen.queryByText(/Corregir/)).toBeNull()
+    expect(screen.queryByText(/^Anular$/)).toBeNull()
+  })
+
+  it('lo anulado no infla los contadores del día', async () => {
+    montar([
+      filaDelDia({ id: 'r1' }),
+      filaDelDia({ id: 'r2', nombre: 'Ana López', anulado_en: '2026-09-08T12:00:00Z' }),
+    ])
+    await waitFor(() => expect(screen.getByText('Ana López')).toBeTruthy())
+    // Dos filas en pantalla, un solo presente vigente.
+    const presentes = screen.getByText('Presente', { selector: 'div' }).previousSibling
+    expect(presentes?.textContent).toBe('1')
   })
 })
