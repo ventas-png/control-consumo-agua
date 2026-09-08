@@ -588,12 +588,6 @@
       "produccion": "1fb92b96e7ad2a3ff07212f093f1b8d90de26eff567e69a2b4a9fc5075fdc869:4",
       "repo": "17ce3010c379bfc2454d4e2bc1e9187ccb84c4582be7ac962f6071884f9de674:3"
     },
-    "tabla:payment_requests/policies": {
-      "motivo": "SEGURIDAD · ALTA. Producción tiene `payment_requests_select · SELECT · TO public · USING (true)`: lectura sin filtro de toda la tabla, y `anon` conserva el GRANT de SELECT, así que la RLS es el único control y no controla nada. El repositorio NO declara esa policy y su propio harness (src/test/rls/rlsHarness.test.ts) afirma lo contrario: payment_requests está en NO_SELECT_TABLES y en ANON_DENY_TABLES. El repositorio es el lado correcto; producción hay que corregirla. Sigue en #826.",
-      "desde": "2026-09-01",
-      "produccion": "355fee1e0ac64b10e9caa82fdf82990246d2f0ff22803258659eb0560b0a69af:3",
-      "repo": "bc099c8f77eda47d7861e4b448ba17d9a0c865eb964178061df5d224985ac8c3:2"
-    },
     "tabla:plantillas_tarea_cargo/columnas": {
       "motivo": "Producción y el repositorio no describen las mismas columnas (nombre, tipo, NOT NULL o default). Origen: las 86 migraciones huérfanas de marzo–junio 2026 que se aplicaron a mano y nunca se escribieron como archivo — el `CREATE TABLE IF NOT EXISTS` del repo no tocó la tabla ya existente. Inventario completo en #826.",
       "desde": "2026-09-01",
