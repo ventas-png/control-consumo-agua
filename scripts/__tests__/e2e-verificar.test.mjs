@@ -89,14 +89,21 @@ describe('reglas de no-ejecución', () => {
   })
 })
 
-describe('condicionales: omisión declarada, jamás silenciosa', () => {
-  it('sin la variable → no es fallo, pero queda DECLARADO con el porqué', () => {
+describe('ya no hay condicionales: invitación y fiscal son obligatorios', () => {
+  it('los dos que se omitían ahora son OBLIGATORIOS y no hay ninguno condicional', () => {
+    expect(SPECS_OBLIGATORIOS).toContain('invitation-accept.e2e.ts')
+    expect(SPECS_OBLIGATORIOS).toContain('fiscal-timbrar.e2e.ts')
+    expect(SPECS_CONDICIONALES).toEqual([])
+  })
+
+  it('omitirlos ya NO se declara: es rojo, con el nombre del spec', () => {
+    // Antes esto devolvía dos "omisiones declaradas" y el job seguía verde. Un
+    // spec que no corre no es cobertura, se anuncie o no.
     const rep = reporteCompleto({ 'invitation-accept.e2e.ts': 'skipped', 'fiscal-timbrar.e2e.ts': 'skipped' })
     const { fallos, declarados } = verificar(resumir(rep), {})
-    expect(fallos).toEqual([])
-    expect(declarados).toHaveLength(2)
-    expect(declarados.join('\n')).toMatch(/token fresco de un solo uso/)
-    expect(declarados.join('\n')).toMatch(/PAC sandbox/)
+    expect(declarados).toEqual([])
+    expect(fallos.some((f) => f.includes('invitation-accept.e2e.ts'))).toBe(true)
+    expect(fallos.some((f) => f.includes('fiscal-timbrar.e2e.ts'))).toBe(true)
   })
 
   for (const { archivo, variable } of SPECS_CONDICIONALES) {
@@ -138,12 +145,14 @@ describe('0 skips INESPERADOS: el único skip admitido es el condicional declara
     expect(declarados).toEqual([])
   })
 
-  it('skip parcial de un condicional SIN su variable → declarado, no fallo', () => {
+  it('un skip suelto en invitación —que antes se declaraba— ahora es rojo', () => {
     const rep = reporteCompleto()
     rep.suites.push(spec('invitation-accept.e2e.ts', [t('skipped', 'sin token')]))
     const { fallos, declarados } = verificar(resumir(rep), {})
-    expect(fallos).toEqual([])
-    expect(declarados.some((d) => d.includes('invitation-accept.e2e.ts'))).toBe(true)
+    expect(declarados).toEqual([])
+    expect(fallos).toHaveLength(1)
+    expect(fallos[0]).toMatch(/INESPERADO/)
+    expect(fallos[0]).toContain('invitation-accept.e2e.ts')
   })
 
   it('skip parcial de un condicional CON su variable presente → rojo inesperado', () => {

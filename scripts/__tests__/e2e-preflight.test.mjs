@@ -39,6 +39,8 @@ const COMPLETAS = {
   E2E_RESTRICTED_PASSWORD: 'y',
   E2E_EXPECTED_SUPABASE_REF: 'sandboxref',
   E2E_VERCEL_BYPASS_TOKEN: TOKEN_BYPASS,
+  E2E_SUPABASE_URL: 'https://sandboxref.supabase.co',
+  E2E_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_e2e_sandbox',
   SHA_ESPERADO: 'a'.repeat(40),
 }
 const ESPERADO = { sha: COMPLETAS.SHA_ESPERADO, ref: 'sandboxref' }
@@ -49,27 +51,47 @@ const META_OK = {
 }
 
 describe('inventario de variables', () => {
-  it('las obligatorias: credenciales + la DECLARACIÓN del ref + el bypass de Vercel (la URL ya no, se resuelve por SHA)', () => {
+  it('las obligatorias: credenciales + la DECLARACIÓN del ref + el bypass de Vercel + la API del sandbox (la URL del Preview ya no, se resuelve por SHA)', () => {
     expect([...VARIABLES_OBLIGATORIAS].sort()).toEqual([
       'E2E_EXPECTED_SUPABASE_REF',
       'E2E_LOGIN_EMAIL',
       'E2E_LOGIN_PASSWORD',
       'E2E_RESTRICTED_EMAIL',
       'E2E_RESTRICTED_PASSWORD',
+      'E2E_SUPABASE_PUBLISHABLE_KEY',
+      'E2E_SUPABASE_URL',
       'E2E_VERCEL_BYPASS_TOKEN',
     ])
   })
 
-  it('las condicionales son el token efímero y el flag del PAC', () => {
-    expect([...VARIABLES_CONDICIONALES].sort()).toEqual([
-      'E2E_FISCAL_SANDBOX_READY',
-      'E2E_INVITE_TOKEN',
-    ])
+  it('NO queda ninguna condicional: una omisión declarada seguía siendo una omisión', () => {
+    expect([...VARIABLES_CONDICIONALES]).toEqual([])
+  })
+
+  // Este guard es el que impide que alguien reponga el token estático por la
+  // puerta de atrás: si E2E_INVITE_TOKEN o E2E_FISCAL_SANDBOX_READY vuelven al
+  // preflight, a env.ts o al workflow, esta prueba lo dice.
+  it('el token de invitación y el flag del PAC no vuelven a aparecer en ningún lado', () => {
+    const fuentes = ['e2e/fixtures/env.ts', 'scripts/e2e-preflight.mjs', 'scripts/e2e-verificar.mjs']
+    for (const ruta of fuentes) {
+      const texto = readFileSync(resolve(ruta), 'utf8')
+      // Se nombran en la prosa que explica por qué se fueron; lo que no puede
+      // volver es su LECTURA como variable de entorno.
+      expect(texto, `${ruta} vuelve a leer E2E_INVITE_TOKEN`).not.toMatch(/env\(\s*'E2E_INVITE_TOKEN'|'E2E_INVITE_TOKEN'\s*[,\]]/)
+      expect(texto, `${ruta} vuelve a leer E2E_FISCAL_SANDBOX_READY`).not.toMatch(/env\(\s*'E2E_FISCAL_SANDBOX_READY'|'E2E_FISCAL_SANDBOX_READY'\s*[,\]]/)
+    }
   })
 
   it('los nombres de credenciales coinciden con los que lee e2e/fixtures/env.ts', () => {
     const env = readFileSync(resolve('e2e/fixtures/env.ts'), 'utf8')
-    for (const v of ['E2E_LOGIN_EMAIL', 'E2E_LOGIN_PASSWORD', 'E2E_RESTRICTED_EMAIL', 'E2E_RESTRICTED_PASSWORD', ...VARIABLES_CONDICIONALES]) {
+    for (const v of [
+      'E2E_LOGIN_EMAIL',
+      'E2E_LOGIN_PASSWORD',
+      'E2E_RESTRICTED_EMAIL',
+      'E2E_RESTRICTED_PASSWORD',
+      'E2E_SUPABASE_URL',
+      'E2E_SUPABASE_PUBLISHABLE_KEY',
+    ]) {
       expect(env, `env.ts no lee ${v}`).toContain(`'${v}'`)
     }
   })
@@ -648,9 +670,17 @@ describe('el helper de login no puede volver a chocar con el botón del nav', ()
 // Esto ata las dos puntas: cada label que un spec direccione por getByLabel
 // tiene que estar asociado a un control en la app.
 describe('los labels que los specs direccionan están asociados a su control', () => {
-  const specs = readdirSync(resolve('e2e'))
-    .filter((f) => f.endsWith('.e2e.ts'))
-    .map((f) => readFileSync(resolve('e2e', f), 'utf8'))
+  // Se miran también los FIXTURES: la selección de unidad y contador se mudó a
+  // `capturarLectura`, así que si sólo se leyeran los *.e2e.ts esta prueba
+  // dejaría de vigilar justo las etiquetas por las que empezó.
+  const specs = [
+    ...readdirSync(resolve('e2e'))
+      .filter((f) => f.endsWith('.e2e.ts'))
+      .map((f) => readFileSync(resolve('e2e', f), 'utf8')),
+    ...readdirSync(resolve('e2e/fixtures'))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => readFileSync(resolve('e2e/fixtures', f), 'utf8')),
+  ]
 
   /** Los textos que los specs buscan con getByLabel(/…/i). */
   const etiquetasBuscadas = [
@@ -694,6 +724,23 @@ describe('los labels que los specs direccionan están asociados a su control', (
     })
   }
 
+  // La captura de lecturas ya no inventa el valor con el reloj: lo lee de
+  // «Última Lectura», el bloque que LecturasSection pinta con `ultimaLectura`,
+  // y escribe ese número más uno. Eso lo hace inmune a que dos capturas caigan
+  // en el mismo minuto —que es lo que rompía con 409 al volverse obligatorio el
+  // spec fiscal— pero lo ata a una etiqueta de texto. Si alguien la renombra,
+  // que se entere aquí y no en una corrida a medias.
+  it('la etiqueta «Última Lectura» sigue existiendo: el fixture de captura la lee', () => {
+    const componente = readFileSync(resolve('src/components/lecturas/LecturasSection.tsx'), 'utf8')
+    const fixture = readFileSync(resolve('e2e/fixtures/sembrar.ts'), 'utf8')
+    expect(componente, 'LecturasSection ya no muestra «Última Lectura»').toContain('Última Lectura')
+    expect(fixture, 'sembrar.ts dejó de leer «Última Lectura»').toContain('Última Lectura')
+    // Y que no haya vuelto el valor sacado del reloj, que es lo que colisionaba.
+    expect(fixture, 'sembrar.ts volvió a derivar la lectura del reloj').not.toMatch(
+      /fill\(String\(Math\.floor\(Date\.now\(\)/,
+    )
+  })
+
   it('ningún htmlFor de LecturasSection apunta a un id inexistente', () => {
     const fuente = readFileSync(resolve('src/components/lecturas/LecturasSection.tsx'), 'utf8')
     const ids = [...fuente.matchAll(/htmlFor="([^"]+)"/g)].map((m) => m[1])
@@ -732,8 +779,14 @@ describe('los caminos de dinero no pueden confundir la acción masiva con la de 
     })
 
     it(`${archivo} afirma que el botón de la fila DESAPARECE, no que exista un texto`, () => {
-      // toHaveCount(antes - 1) prueba la transición; getByText(/Emitida/) no.
-      expect(texto).toMatch(/toHaveCount\(antes - 1/)
+      // La transición se prueba contando el botón antes y después. Dos formas
+      // válidas, y la segunda es mejor: `toHaveCount(antes - 1)` sobre TODA la
+      // tabla —que era lo único posible mientras no se pudiera identificar una
+      // fila— o `toHaveCount(0)` sobre el botón DE LA FILA propia, localizada
+      // por `data-registro-id`. Lo que sigue prohibido es afirmar sobre un
+      // texto de estado: `getByText(/Emitida/)` pasa aunque la emisión fuera de
+      // otra fila.
+      expect(texto).toMatch(/toHaveCount\((?:antes - 1|0)/)
       expect(texto).not.toMatch(/getByText\(\/Emitida\/i\)/)
       expect(texto).not.toMatch(/getByText\(\/Pagada\/i\)/)
     })
@@ -943,14 +996,18 @@ describe('los textos que los specs afirman tienen que existir en la app', () => 
 // El par sólo prueba algo mientras siga siendo un par: éxito = desaparece,
 // rechazo = permanece. Invertir cualquiera de los dos lo rompe en silencio.
 describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del otro', () => {
-  const cobro = readFileSync(resolve('e2e/agua-lectura-cobro.e2e.ts'), 'utf8')
+  const sembrar = readFileSync(resolve('e2e/fixtures/sembrar.ts'), 'utf8')
   const validaciones = readFileSync(resolve('e2e/agua-lectura-validaciones.e2e.ts'), 'utf8')
   const sinComentarios = (s) =>
-    s.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
+    s.split('\n').filter((l) => !l.trimStart().startsWith('//') && !l.trimStart().startsWith('*')).join('\n')
 
+  // La aserción de éxito vive en `capturarLectura`, que es por donde pasan AHORA
+  // las tres capturas de la suite (antes `agua-lectura-cobro` tenía la suya
+  // aparte). El par sigue siendo par: el lado del éxito está en el fixture, el
+  // del rechazo en el spec de validaciones.
   it('captura exitosa: el botón de guardar DESAPARECE', () => {
-    expect(sinComentarios(cobro)).toMatch(/expect\(guardar\)\.toBeHidden\(/)
-    expect(sinComentarios(cobro)).not.toMatch(/expect\(guardar\)\.toBeVisible\(/)
+    expect(sinComentarios(sembrar)).toMatch(/expect\(guardar\)\.toBeHidden\(/)
+    expect(sinComentarios(sembrar)).not.toMatch(/expect\(guardar\)\.toBeVisible\(/)
   })
 
   it('rechazo por consumo negativo: el botón de guardar PERMANECE', () => {
@@ -958,12 +1015,46 @@ describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del
     expect(sinComentarios(validaciones)).not.toMatch(/expect\(guardar\)\.toBeHidden\(/)
   })
 
-  it('la lectura que se captura NO es una constante (clave natural anti-duplicado)', () => {
-    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha): con
-    // un valor fijo, la segunda corrida del mismo día choca con el índice y el
-    // guardado se rechaza — la prueba se caería sin que nada esté roto.
-    expect(sinComentarios(cobro)).toMatch(/fill\(lectura\)/)
-    expect(sinComentarios(cobro)).toMatch(/Date\.now\(\)/)
+  it('la captura no da por buena la escritura: exige un 2xx del INSERT', () => {
+    // Que el formulario se cierre es un efecto de la UI (limpiarFormulario
+    // desmonta el bloque), no la confirmación de que la fila entró. Un rechazo
+    // del INSERT podía dejar la pantalla igual y la prueba seguía adelante para
+    // caerse más tarde y en otro sitio.
+    expect(sinComentarios(sembrar)).toMatch(/waitForResponse\(/)
+    expect(sinComentarios(sembrar)).toMatch(/toBeLessThan\(300\)/)
+  })
+
+  it('el valor capturado se MIDE contra la base, no se adivina', () => {
+    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha). Con un
+    // valor fijo, la segunda corrida del mismo día choca; con uno derivado del
+    // reloj, chocan dos capturas del mismo minuto y cualquier reintento; y con
+    // «la última mostrada más uno» choca la segunda captura de la corrida,
+    // porque la pantalla no muestra el máximo del contador sino el registro de
+    // UUID más chico del día (el historial se ordena sólo por fecha). Lo único
+    // que acierta al primer intento es el máximo REAL, consultado por API.
+    expect(sinComentarios(sembrar)).toMatch(/maxLecturaDeContador/)
+    expect(sinComentarios(sembrar), 'la lectura no puede volver a derivarse del reloj')
+      .not.toMatch(/fill\(String\(Math\.floor\(Date\.now\(\)/)
+  })
+
+  it('la caminata secuencial queda como red ante carreras, y sólo ante el 409', () => {
+    // El máximo medido puede quedar obsoleto si otra corrida escribe entre la
+    // consulta y el guardado. Esa distancia es el número de escritores
+    // simultáneos, así que se suma de a uno. Cualquier otro código corta: un 403
+    // de RLS o un 400 de validación no se arreglan cambiando el número.
+    expect(sinComentarios(sembrar)).toMatch(/escribirEnElPrimerValorLibre/)
+    expect(sinComentarios(sembrar)).toMatch(/status\(\) !== 409/)
+    expect(sinComentarios(sembrar), 'los saltos exponenciales no cubrían los huecos intermedios')
+      .not.toMatch(/SALTOS_DE_LECTURA/)
+  })
+
+  it('la búsqueda de valor libre tiene prueba de comportamiento propia', () => {
+    // Verificar esto corriendo el E2E completo cuesta diez minutos y depende de
+    // qué valores estén ocupados ese día. La prueba unitaria FABRICA las
+    // colisiones, así que el caso de varios 409 seguidos se ejercita siempre.
+    const prueba = readFileSync(resolve('e2e/fixtures/__tests__/valor-libre.test.ts'), 'utf8')
+    expect(prueba).toContain('escribirEnElPrimerValorLibre')
+    expect(prueba, 'tiene que reproducir MÁS DE UN 409 seguido').toMatch(/\[10, 11, 12, 13, 14\]/)
   })
 })
 

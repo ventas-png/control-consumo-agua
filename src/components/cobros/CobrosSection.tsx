@@ -716,7 +716,13 @@ export function CobrosSection({ registros, clientes, moneda = 'Q', proyectos = [
                       facturaEmitida && puedeDispararTimbrado(docFiscal?.estado)
                     const timbrando = timbrandoId === r.id
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
+                      // `data-registro-id` es el ancla de los E2E: sin él la única
+                      // forma de tocar una fila es «la primera de la tabla», y en el
+                      // tenant compartido de pruebas ésa suele ser la de otra corrida.
+                      // Es un atributo inerte —no lo lee ningún estilo ni ninguna
+                      // lógica— y el id del registro no es un secreto: ya viaja en
+                      // cada petición que la propia tabla dispara.
+                      <tr key={r.id} data-registro-id={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: bulk.isSelected(r.id) ? 'var(--at-primary-tint)' : undefined }}
                         onMouseEnter={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
                         onMouseLeave={e => { if (!bulk.isSelected(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
                         {canEdit && (

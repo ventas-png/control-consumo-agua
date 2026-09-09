@@ -12,18 +12,17 @@
 //   · cero pruebas ejecutadas (todas skipped)               → rojo
 //   · un spec OBLIGATORIO sin ninguna prueba ejecutada      → rojo, nombrándolo
 //     y citando las razones de skip que dejó (accionables: "sembrar X")
-//   · un spec CONDICIONAL skipped CON su variable presente  → rojo
-//   · un spec CONDICIONAL skipped SIN su variable           → omitido DECLARADO
-//     (visible en el resumen, nunca silencioso)
-//   · CUALQUIER otro skip                                   → rojo: es un skip
-//     INESPERADO (un test individual de un spec obligatorio, o de un archivo
-//     fuera de las listas), aunque el resto del archivo haya corrido
+//   · CUALQUIER skip                                        → rojo. Ya no hay
+//     specs condicionales: la mecánica de "omisión declarada" sigue existiendo
+//     (SPECS_CONDICIONALES, hoy vacía) pero no la usa nadie, así que cualquier
+//     skip es INESPERADO — un test individual de un spec obligatorio, o un
+//     archivo fuera de las listas—, aunque el resto del archivo haya corrido
 //
 // EL CRITERIO DEL VERDE, en tres condiciones (las mismas que documentan el PR
 // y e2e/README.md):
 //   1. 0 fallos — eso lo reporta Playwright;
-//   2. 0 skips INESPERADOS — el ÚNICO skip admitido es el de un spec
-//      condicional cuya variable está ausente, y queda DECLARADO;
+//   2. 0 skips, punto. Mientras hubo condicionales el criterio admitía uno
+//      "declarado"; hoy el resultado esperado es 25 de 25;
 //   3. todos los specs obligatorios con al menos una prueba ejecutada.
 //
 // El mismo criterio que el paso "Verificar que el harness ejecutó los
@@ -37,11 +36,15 @@
 import { appendFileSync, readFileSync } from 'node:fs'
 
 /**
- * Los SIETE specs cuyo gating depende sólo de las variables obligatorias: si
- * el preflight pasó, cada uno tiene que ejecutar al menos una prueba. Un spec
- * de esta lista completamente skipped significa que el despliegue de pruebas
- * no está sembrado como debe (el skip runtime dice qué falta) — y eso es un
- * fallo del entorno que hay que ver, no tragarse.
+ * LOS NUEVE specs — todos — cuyo gating depende sólo de las variables
+ * obligatorias: si el preflight pasó, cada uno tiene que ejecutar al menos una
+ * prueba. Un spec de esta lista completamente skipped significa que el
+ * despliegue de pruebas no está sembrado como debe (el skip runtime dice qué
+ * falta) — y eso es un fallo del entorno que hay que ver, no tragarse.
+ *
+ * `invitation-accept` y `fiscal-timbrar` entraron aquí al dejar de ser
+ * condicionales: fabrican su propia precondición dentro de la prueba en vez de
+ * esperar a que alguien la prepare. Ver SPECS_CONDICIONALES, abajo.
  */
 export const SPECS_OBLIGATORIOS = [
   'auth-login.e2e.ts',
@@ -51,13 +54,22 @@ export const SPECS_OBLIGATORIOS = [
   'agua-lectura-validaciones.e2e.ts',
   'condominios-cuota.e2e.ts',
   'contabilidad-ledger.e2e.ts',
+  'invitation-accept.e2e.ts',
+  'fiscal-timbrar.e2e.ts',
 ]
 
-/** Los DOS specs condicionales y la variable que los habilita. */
-export const SPECS_CONDICIONALES = [
-  { archivo: 'invitation-accept.e2e.ts', variable: 'E2E_INVITE_TOKEN' },
-  { archivo: 'fiscal-timbrar.e2e.ts', variable: 'E2E_FISCAL_SANDBOX_READY' },
-]
+/**
+ * NO QUEDA NINGUNO. La lista sobrevive vacía porque el mecanismo —«omisión
+ * declarada»— sigue siendo parte del contrato de este verificador, y porque
+ * volver a añadir una entrada aquí tiene que ser una decisión deliberada y
+ * revisable, no el efecto colateral de que alguien no supiera preparar un dato.
+ *
+ * Una omisión declarada seguía siendo una omisión: el spec no corría, y el
+ * resumen del job lo decía en un `notice` que nadie leía como lo que era —una
+ * parte del producto sin probar—. Hoy el resultado esperado de la suite es
+ * 25 de 25, sin ninguna.
+ */
+export const SPECS_CONDICIONALES = []
 
 /**
  * Reduce el reporte JSON de Playwright a conteos por archivo.
@@ -167,12 +179,11 @@ export function verificar(porArchivo, env = {}) {
       )
     }
     if (!habilitado && c.skipped > 0) {
-      declarados.push(
-        `${archivo}: omitido DECLARADO — falta ${variable} ` +
-          (variable === 'E2E_INVITE_TOKEN'
-            ? '(token fresco de un solo uso; generarlo justo antes de la corrida)'
-            : '(el despliegue de pruebas no declara PAC sandbox listo)'),
-      )
+      // Hoy inalcanzable: SPECS_CONDICIONALES está vacía. La rama se conserva
+      // porque el mecanismo sigue siendo parte del contrato; si algún día vuelve
+      // a haber un condicional, su omisión tiene que salir DECLARADA y no
+      // silenciosa. El porqué lo aporta quien añada la entrada.
+      declarados.push(`${archivo}: omitido DECLARADO — falta ${variable}`)
     }
   }
 
