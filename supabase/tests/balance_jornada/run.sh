@@ -48,6 +48,8 @@ MIGRACION_5="$RAIZ/supabase/migrations/20260909000100_balance_de_jornada.sql"
 # Los binarios no siempre están en PATH (en Debian/Ubuntu viven versionados).
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
+for d in ${PGBIN:-} /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
+export PATH
 command -v initdb >/dev/null || { echo "❌ falta initdb (instalá PostgreSQL)"; exit 1; }
 
 # El socket unix tiene un tope de 107 bytes: se usa una ruta corta a propósito.
