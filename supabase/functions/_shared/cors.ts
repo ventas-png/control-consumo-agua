@@ -84,7 +84,35 @@ const HOST_PREVIEW_VERCEL =
   /^control-consumo-agua?-[a-z0-9-]+-prestadora-de-servicios-projects\.vercel\.app$/
 
 /**
- * ¿Es `origin` un preview de Vercel de este proyecto?
+ * ¿ESTÁ HABILITADA la puerta de los previews? Por defecto NO.
+ *
+ * Un preview de Vercel es un despliegue de código sin revisar: cualquiera con
+ * permiso de push abre una rama y estrena un origen que casa con el patrón. Eso
+ * es aceptable contra el Supabase SANDBOX, donde los datos son de juguete, y no
+ * lo es contra el de PRODUCCIÓN, donde ese origen podría leer respuestas
+ * autenticadas de clientes reales. La forma del host no distingue los dos
+ * casos —es la misma— así que la distinción tiene que venir del entorno.
+ *
+ * `ALLOW_VERCEL_PREVIEW_ORIGINS=true` se define ÚNICAMENTE en el proyecto
+ * sandbox. Sin la variable, o con cualquier otro valor, los previews quedan
+ * fuera: la omisión no concede nada, que es lo que tiene que pasar cuando
+ * alguien despliega estas funciones a un proyecto nuevo sin leer esto.
+ *
+ * Se tolera el espacio sobrante y las mayúsculas porque un secreto se pega a
+ * mano; no se toleran `1`, `yes` ni `on`: un flag que acepta sinónimos acaba
+ * habilitado por accidente.
+ */
+function vercelPreviewsHabilitados(): boolean {
+  return (Deno.env.get('ALLOW_VERCEL_PREVIEW_ORIGINS') ?? '').trim().toLowerCase() === 'true'
+}
+
+/**
+ * ¿Es `origin` un preview de Vercel de este proyecto, Y están habilitados?
+ *
+ * El flag se comprueba AQUÍ, y no sólo en `isOriginAllowed`, para que no exista
+ * un camino que devuelva «sí» sin pasar por él: quien llame a esta función
+ * desde una edge function nueva hereda la protección sin tener que saber que
+ * existe.
  *
  * Exige HTTPS: el mismo hostname sobre `http` es un origen DISTINTO y no se
  * acepta — permitirlo invitaría a un man-in-the-middle a hablar con las edge
@@ -96,6 +124,8 @@ const HOST_PREVIEW_VERCEL =
  * un navegador cumpliendo la especificación, sino de alguien probando suerte.
  */
 export function isVercelPreviewOrigin(origin: string): boolean {
+  if (!vercelPreviewsHabilitados()) return false
+
   let url: URL
   try {
     url = new URL(origin)

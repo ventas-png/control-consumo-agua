@@ -21,16 +21,54 @@
 
 import { expect, type Locator, type Page, type Response } from '@playwright/test'
 
+import { iniciarSesionApi, maxLecturaDeContador } from './api'
+import { hasSupabaseApi } from './env'
 import { chooseFirstRealOption } from './ui'
 
 /**
- * Distancias, a partir de la última lectura mostrada, que `capturarLectura`
- * prueba hasta encontrar un valor libre. Doblan para cubrir 64 valores ya
- * ocupados en 7 intentos; un paso de uno en uno se quedaría corto en un día
- * con varias corridas. El salto sólo infla el consumo del sandbox (validarLectura
- * avisa de un salto anómalo pero NO lo bloquea: devuelve `valid: true`).
+ * Cuántos valores consecutivos prueba `escribirEnElPrimerValorLibre` antes de
+ * rendirse. Es una RED, no el mecanismo: el valor de partida sale del máximo
+ * real del contador (`maxLecturaDeContador`), así que el primer intento ya
+ * debería entrar. Lo único que puede ocuparlo entre la consulta y la escritura
+ * es otra corrida escribiendo en el mismo contador, y ahí la distancia es el
+ * número de escritores simultáneos: unos pocos, no decenas.
+ *
+ * La versión anterior hacía lo contrario —saltos 1, 2, 4… 64 desde lo que
+ * mostraba la pantalla— y era una apuesta mal contada: siete intentos NO cubren
+ * 64 valores ocupados, sólo siete posiciones concretas. Con 8 y 16 tomados, el
+ * salto de 8 choca y el de 16 también, y el hueco de 9 nunca se prueba.
  */
-const SALTOS_DE_LECTURA = [1, 2, 4, 8, 16, 32, 64] as const
+const INTENTOS_DE_ESCRITURA = 12
+
+/**
+ * Escribe empezando en `desde` y, ante un 409 —que significa exactamente «ese
+ * valor ya está tomado para este contador y esta fecha»—, prueba el siguiente
+ * entero. Cualquier otro código corta en el acto: un 403 de RLS o un 400 de
+ * validación no se arreglan cambiando el número, y reintentarlos escondería la
+ * causa.
+ *
+ * Devuelve la ÚLTIMA respuesta aunque sea 409: quien llama la afirma y así el
+ * fallo dice «no se encontró hueco» con el status a la vista, en vez de lanzar
+ * un error propio que oculte lo que respondió el servidor.
+ *
+ * Es genérica en la respuesta (sólo pide `status()`) para poder ejercitarla sin
+ * navegador: ver `e2e/fixtures/__tests__/valor-libre.test.ts`.
+ */
+export async function escribirEnElPrimerValorLibre<T extends { status(): number }>(
+  desde: number,
+  escribir: (valor: number) => Promise<T>,
+  intentos: number = INTENTOS_DE_ESCRITURA,
+): Promise<{ valor: number; respuesta: T; intentos: number }> {
+  let respuesta: T | null = null
+  let valor = desde
+  for (let n = 0; n < intentos; n++) {
+    valor = desde + n
+    respuesta = await escribir(valor)
+    if (respuesta.status() !== 409) return { valor, respuesta, intentos: n + 1 }
+  }
+  if (!respuesta) throw new Error('escribirEnElPrimerValorLibre se llamó con intentos <= 0')
+  return { valor, respuesta, intentos }
+}
 
 /** Marca única por corrida: aparece en las notas de lo que creamos. */
 export function marcaDeCorrida(prefijo: string): string {
@@ -98,8 +136,10 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
  * vienen los registros —`useRegistrosQuery` pide `fecha desc, id asc`—, o sea
  * el UUID más chico del día, que no es la lectura más alta ni la más reciente.
  * Con dos capturas el mismo día, la segunda puede ver el valor de la primera…
- * o el de cualquier otra. Por eso quien la usa camina hacia arriba hasta
- * encontrar un valor libre en vez de dar por buena `anterior + 1`.
+ * o el de cualquier otra. Por eso el valor a escribir NO sale de aquí sino de
+ * `maxLecturaDeContador`, que lo mide contra la base; esto se conserva sólo
+ * como piso (y como la única fuente cuando no hay API configurada, corriendo en
+ * local) y porque su ausencia delata que no hay contador seleccionado.
  *
  * Un contador sin historial muestra 0 —`getUltimaLectura` devuelve
  * `{ lectura: 0, esPrimera: true }`—, así que la primera captura escribe 1.
@@ -124,6 +164,24 @@ async function ultimaLecturaMostrada(page: Page): Promise<number> {
     `«Última Lectura» no trae un número legible (leído: ${JSON.stringify(texto.slice(0, 80))})`,
   ).toBe(true)
   return valor
+}
+
+/**
+ * El máximo real del contador, medido contra la base con el JWT del mismo
+ * usuario que está usando la UI. Devuelve null cuando no hay API configurada
+ * —correr en local sin E2E_SUPABASE_* es legítimo; en CI esas variables son
+ * obligatorias y el preflight lo exige— y entonces la captura cae a lo que
+ * muestra la pantalla, que es una cota inferior válida.
+ *
+ * Se inicia sesión por API en vez de rescatar el token del localStorage: el
+ * formato de almacenamiento de supabase-js es un detalle interno suyo (cambia
+ * de versión, puede venir troceado), y `iniciarSesionApi` ya es el camino que
+ * usan los demás specs.
+ */
+async function maxLecturaConocida(page: Page, contadorId: string): Promise<number | null> {
+  if (!hasSupabaseApi) return null
+  const jwt = await iniciarSesionApi(page.request)
+  return await maxLecturaDeContador(page.request, jwt, contadorId)
 }
 
 /**
@@ -154,44 +212,43 @@ export async function capturarLectura(page: Page): Promise<string | null> {
   const unidad = page.getByLabel(/Seleccionar Unidad/i)
   if ((await unidad.count()) === 0) return null
   if ((await chooseFirstRealOption(unidad)) === null) return null
-  if ((await chooseFirstRealOption(page.getByLabel(/Seleccionar Contador/i))) === null) return null
+  const contadorId = await chooseFirstRealOption(page.getByLabel(/Seleccionar Contador/i))
+  if (contadorId === null) return null
 
-  // LA LECTURA SALE DEL ESTADO, NO DEL RELOJ — Y EL 409 SE MIDE, NO SE ADIVINA.
+  // EL VALOR SALE DEL MÁXIMO REAL, MEDIDO POR API. NO DEL RELOJ NI DE LA UI.
   //
   // uq_registros_llave_natural es (contador_id, lectura_actual, fecha), y
   // validarLectura exige además que el valor SUPERE al anterior para no leerlo
-  // como retroceso del medidor.
+  // como retroceso del medidor. «Máximo del contador + 1» cumple las dos por
+  // definición, y es la ÚNICA forma de acertar al primer intento.
   //
-  // Antes se usaban los minutos desde epoch, y funcionó mientras hubo UNA sola
-  // captura por corrida. Al volver obligatorio el spec fiscal pasaron a ser
-  // tres, y dos capturas del mismo minuto —o cualquier REINTENTO, que ocurre
-  // segundos después— repiten el valor: 409. Subir la resolución del reloj
-  // habría sido apostar a que dos escrituras no caigan en la misma unidad de
-  // tiempo, y de paso inflaba el medidor del sandbox en millones de m³.
+  // Las dos versiones anteriores fallaron por adivinar en vez de medir:
   //
-  // «Última lectura más uno» tampoco basta, y la corrida que lo probó está
-  // documentada arriba en `ultimaLecturaMostrada`: la pantalla no muestra el
-  // MÁXIMO del contador, muestra el registro de UUID más chico entre los del
-  // día, porque el historial se ordena sólo por `fecha` y todas las lecturas
-  // del mismo día llevan la misma (el mediodía). Con eso, la primera captura
-  // de la corrida guardó y la SEGUNDA volvió a leer el mismo número y volvió a
-  // pedir el mismo valor: 409 en los tres intentos.
+  //   · los minutos desde epoch: dos capturas del mismo minuto —o cualquier
+  //     REINTENTO, que ocurre segundos después— repiten el valor. 409.
+  //   · «última lectura mostrada + 1»: la pantalla NO muestra el máximo (ver
+  //     `ultimaLecturaMostrada`), así que la segunda captura de la corrida
+  //     volvía a leer el mismo número y a pedir el mismo valor. 409 otra vez.
   //
-  // Así que el valor se BUSCA. Se empieza en `anterior + 1` y, ante un 409
-  // —que es exactamente «ese valor ya existe para este contador y esta
-  // fecha»—, se salta al siguiente hueco doblando la distancia: 1, 2, 4, 8…
-  // Doblar y no sumar de a uno importa porque el tenant es compartido y el día
-  // acumula capturas de corridas anteriores: siete intentos cubren 64 valores
-  // ocupados en vez de 7. Cualquier otro código corta el bucle en el acto: un
-  // 403 de RLS o un 400 de validación no se arreglan cambiando el número, y
-  // reintentarlos sólo escondería la causa.
-  const anterior = await ultimaLecturaMostrada(page)
+  // La consulta pide `order=lectura_actual.desc&limit=1` con el filtro del
+  // índice parcial: la ordena la base, no el cliente, y trae UNA fila.
+  //
+  // Lo que queda para la caminata secuencial es sólo la CARRERA: que otra
+  // corrida escriba en el mismo contador entre la consulta y el guardado. Ahí
+  // la distancia es el número de escritores simultáneos, así que sumar de a uno
+  // es exactamente lo que corresponde.
+  const mostrada = await ultimaLecturaMostrada(page)
+  const maximo = await maxLecturaConocida(page, contadorId)
+  const desde = Math.max(mostrada, maximo ?? mostrada) + 1
+
   const campo = page.getByPlaceholder('Ingrese lectura del medidor')
   const guardar = page.getByRole('button', { name: /Guardar Lectura/i })
 
-  let respuesta: Response | null = null
-  for (const salto of SALTOS_DE_LECTURA) {
-    await campo.fill(String(anterior + salto))
+  // El rechazo por llave repetida deja el formulario EN pantalla —handleGuardar
+  // hace `return` antes de `limpiarFormulario()`—, así que el intento siguiente
+  // puede reescribir el campo sin recargar nada.
+  const { respuesta, intentos } = await escribirEnElPrimerValorLibre<Response>(desde, async valor => {
+    await campo.fill(String(valor))
     const [r] = await Promise.all([
       page.waitForResponse(
         req => req.request().method() === 'POST' && /\/rest\/v1\/registros(\?|$)/.test(req.url()),
@@ -199,19 +256,13 @@ export async function capturarLectura(page: Page): Promise<string | null> {
       ),
       guardar.click(),
     ])
-    respuesta = r
-    // 409 = choque con la llave natural: el mismo valor ya está tomado para
-    // este contador y esta fecha. Es el único caso que se reintenta, y el
-    // rechazo deja el formulario en pantalla (handleGuardar hace `return`
-    // antes de limpiarlo), así que el siguiente intento puede reescribir.
-    if (r.status() !== 409) break
-  }
-
-  if (!respuesta) throw new Error('SALTOS_DE_LECTURA quedó vacío: no se intentó ninguna captura')
+    return r
+  })
 
   expect(
     respuesta.status(),
-    'el INSERT de la lectura tiene que responder 2xx; si no, el cargo no existe',
+    `el INSERT de la lectura tiene que responder 2xx; si no, el cargo no existe ` +
+    `(se probaron ${intentos} valores consecutivos desde ${desde})`,
   ).toBeLessThan(300)
 
   const filas = (await respuesta.json()) as Array<{ id?: string }>

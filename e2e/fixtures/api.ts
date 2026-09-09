@@ -174,6 +174,46 @@ export async function eliminarUsuario(
   return res.ok()
 }
 
+/**
+ * Máximo `lectura_actual` registrado para un contador. Es el dato que la
+ * captura necesita para elegir un valor libre a la PRIMERA, y que la pantalla
+ * NO da: «Última Lectura» sale de un historial ordenado sólo por `fecha`, así
+ * que entre las lecturas del mismo día muestra una cualquiera (ver
+ * `ultimaLecturaMostrada` en sembrar.ts).
+ *
+ * SE PIDE EL MÁXIMO DEL CONTADOR, NO EL DEL DÍA. La llave natural es
+ * (contador_id, lectura_actual, fecha), así que para no chocar bastaría con el
+ * máximo de esa fecha; pero `validarLectura` exige ADEMÁS que el valor supere
+ * al anterior para no leerlo como retroceso del medidor. El máximo del contador
+ * es ≥ el del día y cumple las dos condiciones de una sola vez, con una sola
+ * consulta. Ordena la base (`order=lectura_actual.desc&limit=1`), no el cliente.
+ *
+ * El filtro `deleted_at=is.null` no es cosmético: espeja el predicado del
+ * índice, que es PARCIAL (`WHERE deleted_at IS NULL AND contador_id IS NOT
+ * NULL`). Una lectura borrada no ocupa la llave, así que contarla inflaría el
+ * valor sin motivo.
+ *
+ * Devuelve null si el contador no tiene lecturas o si la consulta no responde
+ * 2xx: el caller cae entonces a lo que muestra la pantalla, que sigue siendo
+ * una cota inferior válida.
+ */
+export async function maxLecturaDeContador(
+  request: APIRequestContext,
+  jwt: string,
+  contadorId: string,
+): Promise<number | null> {
+  const res = await request.get(
+    `${SUPABASE.url}/rest/v1/registros` +
+    `?select=lectura_actual&contador_id=eq.${encodeURIComponent(contadorId)}` +
+    '&deleted_at=is.null&order=lectura_actual.desc&limit=1',
+    { headers: autorizado(jwt) },
+  )
+  if (!res.ok()) return null
+  const filas = (await res.json()) as Array<{ lectura_actual: number | string | null }>
+  const valor = Number(filas[0]?.lectura_actual)
+  return Number.isFinite(valor) ? valor : null
+}
+
 /** Borra la fila de user_invitations. La policy `user_invitations_delete`
  *  autoriza a admin/owner sobre las de su company. No lanza. */
 export async function eliminarInvitacion(

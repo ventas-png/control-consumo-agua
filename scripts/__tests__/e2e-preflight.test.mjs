@@ -1024,18 +1024,37 @@ describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del
     expect(sinComentarios(sembrar)).toMatch(/toBeLessThan\(300\)/)
   })
 
-  it('el valor capturado se BUSCA ante un 409, no se adivina con el reloj', () => {
+  it('el valor capturado se MIDE contra la base, no se adivina', () => {
     // uq_registros_llave_natural es (contador_id, lectura_actual, fecha). Con un
     // valor fijo, la segunda corrida del mismo día choca; con uno derivado del
     // reloj, chocan dos capturas del mismo minuto y cualquier reintento; y con
     // «la última mostrada más uno» choca la segunda captura de la corrida,
     // porque la pantalla no muestra el máximo del contador sino el registro de
     // UUID más chico del día (el historial se ordena sólo por fecha). Lo único
-    // que cierra el caso es reintentar ante el 409 con otro valor.
-    expect(sinComentarios(sembrar)).toMatch(/SALTOS_DE_LECTURA/)
-    expect(sinComentarios(sembrar)).toMatch(/status\(\) !== 409/)
+    // que acierta al primer intento es el máximo REAL, consultado por API.
+    expect(sinComentarios(sembrar)).toMatch(/maxLecturaDeContador/)
     expect(sinComentarios(sembrar), 'la lectura no puede volver a derivarse del reloj')
       .not.toMatch(/fill\(String\(Math\.floor\(Date\.now\(\)/)
+  })
+
+  it('la caminata secuencial queda como red ante carreras, y sólo ante el 409', () => {
+    // El máximo medido puede quedar obsoleto si otra corrida escribe entre la
+    // consulta y el guardado. Esa distancia es el número de escritores
+    // simultáneos, así que se suma de a uno. Cualquier otro código corta: un 403
+    // de RLS o un 400 de validación no se arreglan cambiando el número.
+    expect(sinComentarios(sembrar)).toMatch(/escribirEnElPrimerValorLibre/)
+    expect(sinComentarios(sembrar)).toMatch(/status\(\) !== 409/)
+    expect(sinComentarios(sembrar), 'los saltos exponenciales no cubrían los huecos intermedios')
+      .not.toMatch(/SALTOS_DE_LECTURA/)
+  })
+
+  it('la búsqueda de valor libre tiene prueba de comportamiento propia', () => {
+    // Verificar esto corriendo el E2E completo cuesta diez minutos y depende de
+    // qué valores estén ocupados ese día. La prueba unitaria FABRICA las
+    // colisiones, así que el caso de varios 409 seguidos se ejercita siempre.
+    const prueba = readFileSync(resolve('e2e/fixtures/__tests__/valor-libre.test.ts'), 'utf8')
+    expect(prueba).toContain('escribirEnElPrimerValorLibre')
+    expect(prueba, 'tiene que reproducir MÁS DE UN 409 seguido').toMatch(/\[10, 11, 12, 13, 14\]/)
   })
 })
 

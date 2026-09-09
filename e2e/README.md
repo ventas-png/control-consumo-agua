@@ -117,9 +117,14 @@ de *Actions secrets*. Ver el recuadro de arriba.
 > `E2E_LOGIN_EMAIL` tiene que ser **`admin` o `company_owner`** del tenant
 > sembrado, no sólo un operador: `invitation-accept` llama a `invite-user`, que
 > exige ese rol, y la limpieza usa `delete-user`, que exige lo mismo. Y el
-> **Origin del Preview** debe estar en `ALLOWED_ORIGINS` del proyecto Supabase,
-> porque los Edge Functions validan el origen y responden 403 si no coincide —
-> es el mismo requisito que ya tiene la aplicación para funcionar en Preview.
+> **Origin del Preview** debe estar permitido por los Edge Functions, que
+> validan el origen y responden 403 si no coincide — es el mismo requisito que
+> ya tiene la aplicación para funcionar en Preview. Dos formas de cumplirlo:
+> ponerlo en `ALLOWED_ORIGINS` del proyecto Supabase (host por host, y el host
+> cambia en cada despliegue), o definir `ALLOW_VERCEL_PREVIEW_ORIGINS=true`
+> **en el sandbox y sólo ahí**, que abre por forma los previews de este
+> proyecto y este equipo (ver `supabase/functions/_shared/cors.ts`). En
+> producción esa variable no se define: un preview es código sin revisar.
 
 #### Comprobá las credenciales ANTES de guardarlas
 

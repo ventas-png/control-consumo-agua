@@ -78,7 +78,13 @@ describe('_shared/cors — headers y validación', () => {
 // Vercel estrena host en cada despliegue de preview, así que ninguna lista fija
 // los cubre y la puerta tiene que abrirse por FORMA. Estas pruebas fijan dónde
 // está el filo: qué entra, y sobre todo qué no.
-describe('_shared/cors — previews de Vercel de este proyecto', () => {
+describe('_shared/cors — previews de Vercel de este proyecto (con el flag ENCENDIDO)', () => {
+  // La puerta de los previews está cerrada por defecto y sólo la abre
+  // ALLOW_VERCEL_PREVIEW_ORIGINS=true, definido únicamente en el Supabase
+  // sandbox (ver el describe siguiente). Todo este bloque describe cómo se
+  // comporta ESTANDO abierta.
+  beforeEach(() => stubDeno({ ALLOW_VERCEL_PREVIEW_ORIGINS: 'true' }))
+
   // Dos previews DISTINTOS y REALES, copiados de despliegues de este proyecto.
   // Con uno solo, un `includes()` de la cadena exacta pasaría la prueba y
   // seguiría estando roto.
@@ -113,7 +119,7 @@ describe('_shared/cors — previews de Vercel de este proyecto', () => {
   })
 
   it('siguen aceptándose aunque ALLOWED_ORIGINS traiga otra cosa', async () => {
-    stubDeno({ ALLOWED_ORIGINS: 'https://staging.example' })
+    stubDeno({ ALLOWED_ORIGINS: 'https://staging.example', ALLOW_VERCEL_PREVIEW_ORIGINS: 'true' })
     const { isOriginAllowed } = await import('../cors.ts')
     expect(isOriginAllowed(PREVIEW_RAMA)).toBe(true)
     expect(isOriginAllowed('https://staging.example')).toBe(true)
@@ -205,5 +211,78 @@ describe('_shared/cors — previews de Vercel de este proyecto', () => {
     expect(isOriginAllowed('https://control-consumo-agua-prestadora-de-servicios-projects.vercel.app')).toBe(false)
     // Otro TLD.
     expect(isOriginAllowed('https://control-consumo-agua-git-x-prestadora-de-servicios-projects.vercel.dev')).toBe(false)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// La puerta de los previews está CERRADA por defecto
+// ════════════════════════════════════════════════════════════════════════════
+// Un preview de Vercel es código sin revisar: cualquiera con permiso de push
+// abre una rama y estrena un origen que casa con el patrón. Contra el Supabase
+// sandbox eso es aceptable —los datos son de juguete—; contra el de producción
+// sería un origen permitido que puede leer respuestas autenticadas de clientes
+// reales. La forma del host es idéntica en ambos casos, así que la distinción
+// tiene que venir del entorno: ALLOW_VERCEL_PREVIEW_ORIGINS=true, definido
+// SÓLO en el sandbox.
+//
+// Estas pruebas fijan las dos mitades: sin el flag no entra ni el preview más
+// legítimo, y con el flag no entra nada más que los previews de este proyecto.
+describe('_shared/cors — ALLOW_VERCEL_PREVIEW_ORIGINS', () => {
+  const PREVIEW =
+    'https://control-consumo-agu-git-c1a22a-prestadora-de-servicios-projects.vercel.app'
+
+  it('POR DEFECTO (sin la variable) rechaza el preview', async () => {
+    // `beforeEach` global deja el entorno sin ALLOWED_ORIGINS ni flag: es el
+    // entorno de un proyecto Supabase recién desplegado, y también el de
+    // producción.
+    const { isOriginAllowed, isVercelPreviewOrigin, getCorsHeaders } = await import('../cors.ts')
+    expect(isOriginAllowed(PREVIEW)).toBe(false)
+    expect(isVercelPreviewOrigin(PREVIEW)).toBe(false)
+    // Y el header cae al primer origen permitido, no al preview.
+    expect(getCorsHeaders(PREVIEW)['Access-Control-Allow-Origin']).toBe('https://administratodo.com')
+  })
+
+  it('con el flag en «true» acepta el preview y devuelve su origen exacto', async () => {
+    stubDeno({ ALLOW_VERCEL_PREVIEW_ORIGINS: 'true' })
+    const { isOriginAllowed, getCorsHeaders, validateOrigin } = await import('../cors.ts')
+    expect(isOriginAllowed(PREVIEW)).toBe(true)
+    expect(getCorsHeaders(PREVIEW)['Access-Control-Allow-Origin']).toBe(PREVIEW)
+    expect(validateOrigin(PREVIEW, getCorsHeaders(PREVIEW))).toBeNull()
+  })
+
+  it('tolera espacios y mayúsculas en el valor del secreto', async () => {
+    // Un secreto se pega a mano; un espacio al final no debería costar una
+    // tarde de 403 indistinguibles de un bug.
+    stubDeno({ ALLOW_VERCEL_PREVIEW_ORIGINS: '  TRUE  ' })
+    const { isOriginAllowed } = await import('../cors.ts')
+    expect(isOriginAllowed(PREVIEW)).toBe(true)
+  })
+
+  it('NO acepta sinónimos de «true»: un flag laxo se enciende por accidente', async () => {
+    for (const valor of ['1', 'yes', 'on', 'sí', 'false', '']) {
+      stubDeno({ ALLOW_VERCEL_PREVIEW_ORIGINS: valor })
+      const { isOriginAllowed } = await import('../cors.ts')
+      expect(isOriginAllowed(PREVIEW), `«${valor}» no puede habilitar los previews`).toBe(false)
+    }
+  })
+
+  it('el flag NO abre nada más: sigue exigiendo el proyecto, el equipo y https', async () => {
+    stubDeno({ ALLOW_VERCEL_PREVIEW_ORIGINS: 'true' })
+    const { isOriginAllowed } = await import('../cors.ts')
+    expect(isOriginAllowed('https://proyecto-ajeno-git-main-otra-org-projects.vercel.app')).toBe(false)
+    expect(isOriginAllowed(`${PREVIEW}.evil.com`)).toBe(false)
+    expect(isOriginAllowed(PREVIEW.replace('https://', 'http://'))).toBe(false)
+  })
+
+  it('el flag NO afecta a los dominios de producción ni a ALLOWED_ORIGINS', async () => {
+    // Encendido o apagado, la lista exacta se comporta igual. Si esto se rompe,
+    // el flag habría dejado de ser una puerta extra para convertirse en un
+    // interruptor general.
+    for (const env of [{}, { ALLOW_VERCEL_PREVIEW_ORIGINS: 'true' }]) {
+      stubDeno(env)
+      const { isOriginAllowed } = await import('../cors.ts')
+      expect(isOriginAllowed('https://administratodo.com')).toBe(true)
+      expect(isOriginAllowed('https://evil.example')).toBe(false)
+    }
   })
 })
