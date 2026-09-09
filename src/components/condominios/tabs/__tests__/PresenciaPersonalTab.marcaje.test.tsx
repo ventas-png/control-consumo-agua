@@ -188,7 +188,7 @@ afterEach(cleanup)
 describe('la pregunta de entrada', () => {
   it('a quien tiene expediente le pregunta qué viene a hacer', async () => {
     montar()
-    expect(await screen.findByText(/Ingresar a mi turno/)).toBeTruthy()
+    expect(await screen.findByText(/🟢 Marcar mi entrada/)).toBeTruthy()
     expect(screen.getByText(/Solo estoy consultando/)).toBeTruthy()
     // Y no aterriza en la lista del equipo antes de preguntar.
     expect(screen.queryByText('Registrar asistencia')).toBeNull()
@@ -198,7 +198,7 @@ describe('la pregunta de entrada', () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
     montar()
     await waitFor(() => expect(screen.getByText(/Sin registros para/)).toBeTruthy())
-    expect(screen.queryByText(/Ingresar a mi turno/)).toBeNull()
+    expect(screen.queryByText(/🟢 Marcar mi entrada/)).toBeNull()
   })
 
   it('si la consulta falla, el tab sigue sirviendo para lo de siempre', async () => {
@@ -211,7 +211,7 @@ describe('la pregunta de entrada', () => {
 describe('la pantalla de marcaje', () => {
   async function entrarAMarcar() {
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    fireEvent.click(await screen.findByText(/🟢 Marcar mi entrada/))
     return screen.findByText('Marco Sical')
   }
 
@@ -240,7 +240,7 @@ describe('la pantalla de marcaje', () => {
     await entrarAMarcar()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
-    expect(await screen.findByText(/🟢 Confirmar entrada/)).toBeTruthy()
+    expect(await screen.findByText(/🟢 Confirmar mi entrada/)).toBeTruthy()
     expect(screen.queryByText(/📷 Marcar mi entrada/)).toBeNull()
   })
 
@@ -249,7 +249,7 @@ describe('la pantalla de marcaje', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
 
-    fireEvent.click(await screen.findByText(/Confirmar entrada/))
+    fireEvent.click(await screen.findByText(/Confirmar mi entrada/))
 
     await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
     expect(mocks.subirFotoMarcaje).toHaveBeenCalledWith('p1', 'per-1', expect.any(File))
@@ -270,8 +270,8 @@ describe('la pantalla de marcaje', () => {
       error: null,
     })
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
-    expect(await screen.findByText(/Marcar mi salida/)).toBeTruthy()
+    // Sin clic intermedio: con el turno abierto el tab va derecho a las acciones.
+    expect(await screen.findByText(/Registrar mi salida/)).toBeTruthy()
   })
 
   describe('la salida no se cierra sin querer', () => {
@@ -285,10 +285,10 @@ describe('la pantalla de marcaje', () => {
     async function irAMarcarSalida(ficha: MiFichaPresencia) {
       mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha, error: null })
       montar()
-      fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+      await screen.findByText(/Registrar mi salida/)
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
       fireEvent.change(input, { target: { files: [new File(['x'], 's.jpg', { type: 'image/jpeg' })] } })
-      fireEvent.click(await screen.findByText(/Confirmar salida/))
+      fireEvent.click(await screen.findByText(/Confirmar mi salida/))
     }
 
     it('pregunta si la entrada fue hace menos de 5 minutos', async () => {
@@ -318,7 +318,9 @@ describe('la pantalla de marcaje', () => {
       error: null,
     })
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    // Con la jornada cerrada el botón invita a REVISARLA, no a volver a fichar:
+    // «Ingresar a mi turno» sobre un turno ya cerrado invitaba justo a eso.
+    fireEvent.click(await screen.findByText(/📋 Ver mi jornada de hoy/))
     expect(await screen.findByText(/ya está completa/)).toBeTruthy()
     expect(screen.queryByText(/Marcar mi entrada/)).toBeNull()
   })
@@ -333,7 +335,7 @@ describe('la pantalla de marcaje', () => {
     expect(await screen.findByText(/Sin ubicación — Permiso de ubicación denegado/)).toBeTruthy()
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File(['x'], 'selfie.jpg', { type: 'image/jpeg' })] } })
-    fireEvent.click(await screen.findByText(/Confirmar entrada/))
+    fireEvent.click(await screen.findByText(/Confirmar mi entrada/))
     // Se registra igual, y la fila lo dirá: coords en null.
     await waitFor(() => expect(mocks.marcarPresencia).toHaveBeenCalled())
     expect(mocks.marcarPresencia.mock.calls[0][0].coords).toBeNull()
@@ -354,7 +356,7 @@ describe('lo que se le dice a la persona sobre su propia jornada', () => {
       error: null,
     })
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    fireEvent.click(await screen.findByText(/📋 Ver mi jornada de hoy/))
     expect(await screen.findByText(/Tu jornada de hoy fue corregida/)).toBeTruthy()
     expect(screen.getByText(/Ada Admin: salida marcada por error/)).toBeTruthy()
   })
@@ -371,7 +373,8 @@ describe('lo que se le dice a la persona sobre su propia jornada', () => {
       error: null,
     })
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
+    // Anulada NO es «completa»: el selector ofrece marcar entrada, no revisar.
+    fireEvent.click(await screen.findByText(/🟢 Marcar mi entrada/))
     expect(await screen.findByText(/Tu marcaje de hoy fue anulado/)).toBeTruthy()
     // Lo que le toca es volver a marcar ENTRADA, no cerrar una salida que ya no
     // existe. Y las horas anuladas no se le muestran como si contaran.
@@ -533,15 +536,47 @@ const FICHA_EN_TURNO: MiFichaPresencia = {
 }
 
 describe('el empleado marca su pausa', () => {
+  // Con la jornada abierta el tab NO pregunta nada: entra derecho a la pantalla
+  // de las dos acciones. Que estas pruebas no tengan que pulsar nada para llegar
+  // ES el arreglo — antes había una pregunta en medio que tapaba los botones.
   async function entrarConTurnoAbierto(ficha: MiFichaPresencia = FICHA_EN_TURNO) {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha, error: null })
     montar()
-    fireEvent.click(await screen.findByText(/Ingresar a mi turno/))
     return screen.findByText('Marco Sical')
   }
 
-  it('ofrece un botón por tipo, y dice cuál descuenta ANTES de pulsarlo', async () => {
+  /** Despliega los tipos: la clasificación vive DETRÁS del botón de descanso. */
+  async function abrirDescanso() {
+    fireEvent.click(await screen.findByText(/⏸️ Registrar mi descanso/))
+  }
+
+  it('con el turno abierto, las dos acciones se ven sin pulsar nada', async () => {
+    // El fallo que esto fija: una persona ya ingresada no encontraba dónde
+    // marcar su descanso ni su salida, porque la pregunta «¿qué vas a hacer?»
+    // se interponía con un botón que decía «Ingresar a mi turno».
     await entrarConTurnoAbierto()
+    expect(await screen.findByText(/⏸️ Registrar mi descanso/)).toBeTruthy()
+    expect(screen.getByText(/📷 Registrar mi salida/)).toBeTruthy()
+    // Y la pregunta que las tapaba ya no aparece.
+    expect(screen.queryByText('¿Qué vas a hacer?')).toBeNull()
+  })
+
+  it('la observación ya no se interpone entre los dos botones', async () => {
+    // Casi nadie la escribe, y un campo de texto en medio separaba los botones
+    // lo suficiente como para que el segundo dejara de verse.
+    await entrarConTurnoAbierto()
+    await screen.findByText(/⏸️ Registrar mi descanso/)
+    expect(screen.queryByPlaceholderText('Observación (opcional)')).toBeNull()
+    fireEvent.click(screen.getByText('Agregar una observación'))
+    expect(screen.getByPlaceholderText('Observación (opcional)')).toBeTruthy()
+  })
+
+  it('el descanso es UN botón y la clasificación viene después', async () => {
+    await entrarConTurnoAbierto()
+    // Los tipos no compiten con la salida hasta que se pide el descanso.
+    expect(screen.queryByText(/☕ Refacción/)).toBeNull()
+
+    await abrirDescanso()
     expect(await screen.findByText(/☕ Refacción/)).toBeTruthy()
     expect(screen.getByText(/🍽️ Almuerzo/)).toBeTruthy()
     // Enterarse de que el almuerzo no se paga DESPUÉS de tomarlo es enterarse
@@ -555,6 +590,7 @@ describe('el empleado marca su pausa', () => {
     // los instantes, la persona estaría tecleando minutos que se restan de su
     // propio pago.
     await entrarConTurnoAbierto()
+    await abrirDescanso()
     fireEvent.click(await screen.findByText(/🍽️ Almuerzo/))
     await waitFor(() => expect(mocks.marcarPausa).toHaveBeenCalled())
     const args = mocks.marcarPausa.mock.calls[0][0]
@@ -570,7 +606,7 @@ describe('el empleado marca su pausa', () => {
     })
     expect(await screen.findByText(/Regresé de Almuerzo/)).toBeTruthy()
     // Ni se puede abrir una segunda pausa encima de la abierta…
-    expect(screen.queryByText(/🍽️ Almuerzo$/)).toBeNull()
+    expect(screen.queryByText(/Registrar mi descanso/)).toBeNull()
     // …y se avisa de lo que pasa si se va sin volver, ANTES de que se vaya.
     expect(screen.getByText(/la pausa se cierra en ese momento/)).toBeTruthy()
 
@@ -581,18 +617,21 @@ describe('el empleado marca su pausa', () => {
   })
 
   it('antes de marcar entrada no hay nada que pausar', async () => {
-    await entrarConTurnoAbierto(FICHA)
-    expect(screen.queryByText(/🍽️ Almuerzo/)).toBeNull()
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: FICHA, error: null })
+    montar()
+    fireEvent.click(await screen.findByText(/🟢 Marcar mi entrada/))
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByText(/Registrar mi descanso/)).toBeNull()
   })
 
   it('la cámara ya NO se abre sola con la jornada abierta', async () => {
     // Se entra a esta pantalla tres o cuatro veces al día a marcar pausas. Una
     // cámara que salta encima de los botones estorba en todas menos una.
     await entrarConTurnoAbierto()
-    await screen.findByText(/☕ Refacción/)
+    await screen.findByText(/⏸️ Registrar mi descanso/)
     expect(URL.createObjectURL).not.toHaveBeenCalled()
     // Y la salida se sigue pudiendo marcar con UN toque.
-    expect(screen.getByText(/📷 Marcar mi salida/)).toBeTruthy()
+    expect(screen.getByText(/📷 Registrar mi salida/)).toBeTruthy()
   })
 
   it('avisa cuando la jornada abierta es la de AYER (turno nocturno)', async () => {
