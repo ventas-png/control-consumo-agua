@@ -18,7 +18,18 @@ const mocks = vi.hoisted(() => ({
   })),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
+  createCondominioRowReturning: vi.fn<
+    () => Promise<{ data: { id: string } | null; error: { message: string } | null }>
+  >(async () => ({ data: { id: 'ph-nueva' }, error: null })),
+  fetchCuposDePlantillas: vi.fn(async () => ({ cupos: [], error: null })),
+  guardarCupos: vi.fn(async () => ({ error: null })),
+  fetchTiposPausa: vi.fn(async () => ({ tipos: TIPOS_PAUSA, error: null })),
 }))
+
+const TIPOS_PAUSA = [
+  { codigo: 'refaccion', etiqueta: 'Refacción', descuenta: false, minutos_max: 30, orden: 1, configurado: true },
+  { codigo: 'almuerzo', etiqueta: 'Almuerzo', descuenta: true, minutos_max: 60, orden: 2, configurado: true },
+]
 
 vi.mock('../../../../lib/supabase', () => ({
   supabase: { from: () => ({}) },
@@ -26,9 +37,20 @@ vi.mock('../../../../lib/supabase', () => ({
 }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
+  createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
   deleteCondominioRow: mocks.deleteCondominioRow,
   generarBloquesTurno: mocks.generarBloquesTurno,
+}))
+// `tramosDemora` y `minutosCupoQueDescuentan` NO se mockean: son aritmética pura
+// y lo que se comprueba abajo es justo lo que producen en pantalla.
+vi.mock('../../../../domain/condominios/politicaJornada', async (original) => ({
+  ...(await original<typeof import('../../../../domain/condominios/politicaJornada')>()),
+  fetchCuposDePlantillas: mocks.fetchCuposDePlantillas,
+  guardarCupos: mocks.guardarCupos,
+}))
+vi.mock('../../../../domain/condominios/pausasPresencia', () => ({
+  fetchTiposPausa: mocks.fetchTiposPausa,
 }))
 // La ruta se resuelve desde ESTE archivo, no desde el componente: sin el mock,
 // `confirm()` monta un diálogo real que necesita <DialogProvider> y su promesa
@@ -44,6 +66,7 @@ const plantilla: PlantillaHorario = {
   id: 'ph1', company_id: 'c1', project_id: 'p1', nombre: 'Nocturno', codigo: 'N',
   turno: 'noche', hora_inicio: '22:00', hora_fin: '06:00', cruza_medianoche: true,
   minutos_descanso: 0, horas_jornada: 8, tolerancia_entrada_min: 10,
+  tolerancia_salida_min: 0, demora_compensable_hasta_min: 0, extra_requiere_autorizacion: true,
   color: 'var(--at-primary)', activo: true, created_at: '2026-08-01T00:00:00.000Z',
 }
 
@@ -124,8 +147,8 @@ describe('TurnosTab — asignación de turnos', () => {
     fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '14:00' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [tabla, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(tabla).toBe('plantillas_horario')
     expect(payload.nombre).toBe('Diurno')
     // `horas_jornada` NO viaja en el payload: la sella el trigger.
@@ -141,8 +164,8 @@ describe('TurnosTab — asignación de turnos', () => {
     fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '06:00' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
-    const [, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(payload.cruza_medianoche).toBe(true)
   })
 
@@ -224,5 +247,97 @@ describe('TurnosTab — asignación de turnos', () => {
     renderTab({ asignaciones: [] })
     fireEvent.click(screen.getByText(/^Reglas/))
     expect(screen.getByText('Sin reglas de asignación')).toBeTruthy()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// La vara de la jornada (20260909000000)
+// ════════════════════════════════════════════════════════════════════════════
+// Lo que se cubre es lo que el sandbox SQL no ve: que quien configura la jornada
+// LEA la política que está declarando. Un tramo mal descrito no rompe ninguna
+// invariante de base de datos y sí hace que alguien fije una regla distinta de
+// la que cree haber fijado.
+
+describe('la vara de la jornada', () => {
+  async function abrirJornadaNueva() {
+    renderTab()
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    fireEvent.click(screen.getByText('+ Nueva jornada'))
+    return screen.findByText('Lo que esta jornada espera')
+  }
+
+  it('escribe la política de demora en palabras, no en dos números sueltos', async () => {
+    await abrirJornadaNueva()
+    // Con el default (tolerancia 10, sin tramo compensable) son dos frases.
+    expect(screen.getByText('Hasta 10 min tarde: no pasa nada')).toBeTruthy()
+    expect(screen.getByText('Más de 10 min: se debita')).toBeTruthy()
+
+    // Al declarar el tramo compensable aparece la tercera, y la de débito se
+    // corre: es la política C entera, dicha como va a regir.
+    fireEvent.change(screen.getByLabelText('Demora compensable hasta (min)'), { target: { value: '30' } })
+    expect(screen.getByText('De 10 a 30 min: se compensa')).toBeTruthy()
+    expect(screen.getByText('Más de 30 min: se debita')).toBeTruthy()
+  })
+
+  it('avisa cuando los cupos y el descanso de la jornada no cuadran', async () => {
+    // No lo arregla solo: cambiar `minutos_descanso` por detrás movería las
+    // horas planificadas de todos los días futuros sin que nadie lo pidiera.
+    await abrirJornadaNueva()
+    fireEvent.change(screen.getByLabelText('Cupo de Almuerzo'), { target: { value: '45' } })
+    expect(await screen.findByText(/Los cupos que descuentan suman/)).toBeTruthy()
+
+    // Y el aviso desaparece cuando coinciden.
+    fireEvent.change(screen.getByLabelText('Descanso (min)'), { target: { value: '45' } })
+    await waitFor(() => expect(screen.queryByText(/Los cupos que descuentan suman/)).toBeNull())
+  })
+
+  it('el cupo de refacción no suma al descanso, porque no descuenta', async () => {
+    await abrirJornadaNueva()
+    fireEvent.change(screen.getByLabelText('Cupo de Refacción'), { target: { value: '15' } })
+    // Descanso declarado 0 y cupos que descuentan 0: cuadran, no hay aviso.
+    expect(screen.queryByText(/Los cupos que descuentan suman/)).toBeNull()
+  })
+
+  it('guarda la vara junto a la jornada, y los cupos después', async () => {
+    await abrirJornadaNueva()
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Diurno' } })
+    fireEvent.change(screen.getByLabelText('Tolerancia de salida (min)'), { target: { value: '5' } })
+    fireEvent.change(screen.getByLabelText('Demora compensable hasta (min)'), { target: { value: '30' } })
+    fireEvent.change(screen.getByLabelText('Cupo de Almuerzo'), { target: { value: '45' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
+    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(payload.tolerancia_salida_min).toBe(5)
+    expect(payload.demora_compensable_hasta_min).toBe(30)
+    expect(payload.extra_requiere_autorizacion).toBe(true)
+    // El cupo NO viaja en la jornada: es una tabla hija, y va después de que la
+    // jornada exista para que no quede colgando de nada.
+    expect(payload.cupos).toBeUndefined()
+
+    await waitFor(() => expect(mocks.guardarCupos).toHaveBeenCalledWith(
+      expect.objectContaining({ plantillaId: 'ph-nueva', minutos: expect.objectContaining({ almuerzo: 45 }) }),
+    ))
+  })
+
+  it('si la jornada no se guarda, no se intentan los cupos', async () => {
+    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
+    await abrirJornadaNueva()
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Diurno' } })
+    fireEvent.change(screen.getByLabelText('Cupo de Almuerzo'), { target: { value: '45' } })
+    fireEvent.click(screen.getByText('Guardar'))
+
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'error' }),
+    ))
+    expect(mocks.guardarCupos).not.toHaveBeenCalled()
+  })
+
+  it('dice que la vara se congela y que todavía no tiene efectos', async () => {
+    // Las dos mitades que hacen seguro tocar esto: no reescribe el pasado, y
+    // por ahora no mueve ningún número.
+    await abrirJornadaNueva()
+    expect(screen.getByText(/congela/)).toBeTruthy()
+    expect(screen.getByText(/todavía no/i)).toBeTruthy()
   })
 })
