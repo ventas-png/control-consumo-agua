@@ -395,6 +395,12 @@ export interface HorasPersonal {
   dias_asueto_trabajado: number
   tardanzas: number
   horas_planificadas: number
+  /** Lo que la persona ESTUVO: entrada → salida, sin descontar nada. */
+  horas_estadia: number
+  /** Lo que pausó, descuente o no. Se mide para poder mirarlo, no solo para
+   *  restarlo: es con lo que se comprueba que el descanso se está dando. */
+  horas_descanso: number
+  /** Lo que se paga: estadía menos las pausas que descuentan (20260908000300). */
   horas_trabajadas: number
   horas_ordinarias: number
   horas_extra: number

@@ -76,24 +76,36 @@ export const VARIABLES_OBLIGATORIAS = [
   'E2E_RESTRICTED_PASSWORD',
   'E2E_EXPECTED_SUPABASE_REF',
   'E2E_VERCEL_BYPASS_TOKEN',
+  // La API del Supabase de pruebas. La usan los specs que preparan y limpian su
+  // propio dato por fuera del navegador (crear la invitación, retirar lo
+  // creado). Es la PUBLISHABLE key, la misma que el bundle del Preview ya
+  // lleva: no concede nada que un visitante no tenga, y todo lo que se hace con
+  // ella pasa por el JWT del admin y por la RLS. Aquí no entra una secret key.
+  'E2E_SUPABASE_URL',
+  'E2E_SUPABASE_PUBLISHABLE_KEY',
 ]
 
 /**
- * Las DOS condicionales, con su razón estructural — no son "opcionales porque
- * nadie las puso":
+ * YA NO HAY VARIABLES CONDICIONALES, y la lista se queda —vacía— porque el
+ * contrato con e2e-verificar.mjs sigue existiendo y porque su ausencia tiene
+ * que ser una decisión visible, no un olvido.
  *
- *   · E2E_INVITE_TOKEN: un token de invitación es FRESCO y de un solo uso; el
- *     spec lo consume al aceptarla. No puede vivir como secreto estático del
- *     repo — estaría vencido en la segunda corrida.
- *   · E2E_FISCAL_SANDBOX_READY: declara que el despliegue de pruebas tiene PAC
- *     sandbox y configuración fiscal cargada. Depende de credenciales de un
- *     tercero, no de este repo.
+ * Había dos, y las dos declaraban una precondición que alguien debía preparar a
+ * mano antes de la corrida:
  *
- * Si están ausentes, scripts/e2e-verificar.mjs exige que su spec haya quedado
- * como "omitido declarado"; si están PRESENTES y su spec no corrió, el job
- * falla.
+ *   · E2E_INVITE_TOKEN llevaba dentro un token de UN SOLO USO. Servía para una
+ *     corrida; en la siguiente estaba gastado. En la práctica el spec de alta
+ *     por invitación vivía omitido, y el único camino de alta por invitación
+ *     del producto no se probaba nunca.
+ *   · E2E_FISCAL_SANDBOX_READY declaraba que el despliegue tenía PAC sandbox
+ *     listo. Mientras nadie la pusiera, el camino fiscal tampoco se probaba.
+ *
+ * Los dos specs fabrican ahora su propia precondición: la invitación se crea
+ * llamando a `invite-user` en cada intento, y el comprobante fiscal se emite
+ * dentro de la prueba. Una omisión declarada sigue siendo una omisión: el
+ * resultado esperado de la suite es 25 de 25, sin ninguna.
  */
-export const VARIABLES_CONDICIONALES = ['E2E_INVITE_TOKEN', 'E2E_FISCAL_SANDBOX_READY']
+export const VARIABLES_CONDICIONALES = []
 
 /**
  * SEGUNDA defensa: hosts de PRODUCCIÓN a los que ni siquiera se les hace el
