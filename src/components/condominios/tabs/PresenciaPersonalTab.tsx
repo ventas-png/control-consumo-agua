@@ -6,6 +6,9 @@ import {
   agregarPausa, ajustarPausa, anularPausa, desglose, fetchPausasDeRegistros, fetchTiposPausa,
   guardarTipoPausa,
 } from '../../../domain/condominios/pausasPresencia'
+import {
+  fetchBalanceDias, hallazgosEnPalabras, type BalanceDia,
+} from '../../../domain/condominios/balanceJornada'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { formatHoras } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
@@ -115,6 +118,33 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     void fetchTiposPausa().then(({ tipos }) => setTiposPausa(tipos))
   }, [])
   useEffect(() => { recargarTipos() }, [recargarTipos])
+
+  // El balance del día: lo esperado contra lo ocurrido. Lo resuelve la base con
+  // la vara CONGELADA en cada bloque, no con la vigente hoy, y no toca ningún
+  // número de la planilla — solo dice en qué se diferencian. Si la cuenta no
+  // tiene el permiso del tab, la función lo rechaza y aquí simplemente no se
+  // muestra nada: el marcaje sigue funcionando igual.
+  const [balance, setBalance] = useState<BalanceDia[]>([])
+  useEffect(() => {
+    let vivo = true
+    setBalance([])
+    void fetchBalanceDias({ projectId: proyectoId, desde: fechaFiltro, hasta: fechaFiltro })
+      .then(({ dias }) => { if (vivo) setBalance(dias) })
+    return () => { vivo = false }
+  }, [proyectoId, fechaFiltro, registros])
+
+  /** El balance de cada marcaje, por el id del registro que lo produjo. */
+  const balanceDe = useMemo(() => {
+    const mapa = new Map<string, BalanceDia>()
+    for (const d of balance) if (d.registro_id) mapa.set(d.registro_id, d)
+    return mapa
+  }, [balance])
+
+  /** Turnos planificados que nadie cubrió: no tienen fila donde aparecer. */
+  const sinCubrir = useMemo(
+    () => balance.filter(d => d.hallazgos.includes('sin_marcaje')),
+    [balance],
+  )
 
   /** Las pausas de un marcaje, en el orden en que ocurrieron. */
   const pausasDe = useMemo(() => {
@@ -596,6 +626,26 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
         </div>
       )}
 
+      {/* Los turnos planificados que nadie marcó no tienen fila en la lista: sin
+          marcaje no hay registro. Se enseñan aparte para que la ausencia se vea,
+          que es justo lo que antes se perdía. */}
+      {sinCubrir.length > 0 && (
+        <div style={{
+          background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)',
+          borderRadius: 8, padding: '10px 14px', marginBottom: 8, fontSize: 12,
+        }}>
+          <strong style={{ color: 'var(--at-warning)' }}>Turnos planificados sin marcaje</strong>
+          <div style={{ marginTop: 4, color: 'var(--at-ink-2)' }}>
+            {sinCubrir.map(d => (
+              <div key={`${d.personal_id}-${d.fecha}`}>
+                {d.nombre}
+                {d.turno_inicio && d.turno_fin && ` · ${d.turno_inicio.slice(0, 5)}–${d.turno_fin.slice(0, 5)}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Lista del día */}
       {registrosDia.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
@@ -655,6 +705,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                       onAjustar={ajustar}
                       onAnular={quitarPausa}
                     />
+                    {!r.anulado_en && <ContraLaJornada dia={balanceDe.get(r.id) ?? null} />}
                   </div>
                 </div>
                 {/* Sobre una fila anulada no se actúa: ya no cuenta, y dejar los
@@ -698,6 +749,37 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * En qué se diferencia este día de lo que su jornada esperaba (fase 2).
+ *
+ * SOLO LEE. Ninguno de estos números entra a la planilla: `horas_laborales`
+ * sigue siendo lo que era antes de que existiera la vara. Debitar la demora,
+ * exigir la compensación y reconocer la extra es la fase 4, y no se hace hasta
+ * poder mirar un mes real de estas comparaciones.
+ *
+ * EL DÍA QUE CUMPLE NO DICE NADA. Un «✅ cumple» en cada fila sería ruido en el
+ * 90 % de los días y haría invisible al 10 % que importa. Y el día que todavía
+ * no se puede juzgar —jornada abierta, sin vara declarada— lo dice con esas
+ * palabras en vez de acusar de un incumplimiento que nadie ha cometido.
+ */
+function ContraLaJornada({ dia }: { dia: BalanceDia | null }) {
+  if (!dia || dia.hallazgos.length === 0) return null
+  const frases = hallazgosEnPalabras(dia)
+  // Lo que no se puede juzgar se enseña en gris; lo que sí, en ámbar.
+  const enEspera = !dia.tiene_vara || dia.hallazgos.includes('jornada_abierta')
+  return (
+    <div style={{
+      fontSize: 11, marginTop: 4,
+      color: enEspera ? 'var(--at-ink-3)' : 'var(--at-warning)',
+    }}>
+      {enEspera ? '⏳' : '⚠️'} Contra la jornada: {frases.join(' · ')}
+      {dia.horas_planificadas !== null && (
+        <span style={{ color: 'var(--at-ink-3)' }}> · Planificado: {formatHoras(dia.horas_planificadas)}</span>
       )}
     </div>
   )

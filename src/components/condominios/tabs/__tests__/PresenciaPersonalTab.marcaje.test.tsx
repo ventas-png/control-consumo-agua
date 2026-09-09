@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   ajustarPausa: vi.fn(),
   anularPausa: vi.fn(),
   guardarTipoPausa: vi.fn(),
+  fetchBalanceDias: vi.fn(),
   // Espía en vez de un stub mudo: la foto vive en un bucket privado y se firma
   // al render, así que en jsdom nunca hay un <img>. Sin contar las llamadas, un
   // «no se renderizó la foto» pasaría igual si SÍ se hubiera intentado.
@@ -90,6 +91,13 @@ vi.mock('../../../../domain/condominios/pausasPresencia', async (original) => ({
   ajustarPausa: mocks.ajustarPausa,
   anularPausa: mocks.anularPausa,
   guardarTipoPausa: mocks.guardarTipoPausa,
+}))
+// El balance (fase 2) solo LEE, pero lee por red. Se intercepta la consulta y
+// no la lectura de los hallazgos: esa es aritmética de presentación y vale la
+// pena que estas pruebas la ejerzan de verdad.
+vi.mock('../../../../domain/condominios/balanceJornada', async (original) => ({
+  ...(await original<typeof import('../../../../domain/condominios/balanceJornada')>()),
+  fetchBalanceDias: mocks.fetchBalanceDias,
 }))
 vi.mock('../../../../domain/condominios/tabMutations', () => ({
   createCondominioRow: mocks.createCondominioRow,
@@ -176,6 +184,7 @@ beforeEach(() => {
   mocks.ajustarPausa.mockResolvedValue({ error: null })
   mocks.anularPausa.mockResolvedValue({ error: null })
   mocks.guardarTipoPausa.mockResolvedValue({ error: null })
+  mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: null })
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -772,5 +781,93 @@ describe('la configuración de qué descuenta', () => {
     montar([filaDelDia()], [], { canEdit: false })
     await screen.findByText('Marco Sical')
     expect(screen.queryByTitle('Qué pausas descuentan de las horas que se pagan')).toBeNull()
+  })
+})
+
+// ── El balance del día (fase 2) ─────────────────────────────────────────────
+//
+// Lo que estas pruebas protegen no es la aritmética —esa vive en SQL y tiene su
+// sandbox— sino el criterio de qué se le dice a quien mira la lista: que el día
+// que cumple no diga nada, que el que todavía no se puede juzgar no se acuse, y
+// sobre todo que el turno planificado que NADIE marcó aparezca, porque sin
+// marcaje no hay fila donde apareciera solo.
+describe('el balance contra la jornada', () => {
+  function balance(over: Record<string, unknown> = {}) {
+    return {
+      personal_id: 'per-1', nombre: 'Marco Sical', cargo: 'guardia', fecha: HOY,
+      bloque_id: 'blq-1', turno_inicio: '06:00:00', turno_fin: '14:00:00',
+      horas_planificadas: 7.25, tiene_vara: true,
+      registro_id: 'r1', hora_entrada: '06:00:00', hora_salida: '14:00:00',
+      horas_estadia: 8, horas_descanso: 0.75, horas_laborales: 7.25,
+      minutos_tarde: 0, tramo_demora: null, minutos_salida_temprana: 0,
+      minutos_exceso_descanso: 0, horas_sobre_jornada: 0,
+      extra_requiere_autorizacion: true, cumple: true, hallazgos: [] as string[],
+      ...over,
+    }
+  }
+
+  it('el día que cumple no agrega ni una palabra a su fila', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [balance()], error: null })
+    montar([filaDelDia()])
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('la demora se enseña con su tramo, junto al marcaje que la produjo', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
+      error: null,
+    })
+    montar([filaDelDia()])
+    expect(await screen.findByText(/entró 25 min tarde \(se compensa\)/)).toBeTruthy()
+  })
+
+  it('la jornada abierta se marca en espera, no como incumplimiento', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ hora_salida: null, cumple: false, hallazgos: ['jornada_abierta'] })],
+      error: null,
+    })
+    montar([filaDelDia({ hora_salida: null })])
+    const linea = await screen.findByText(/Contra la jornada/)
+    expect(linea.textContent).toContain('la jornada quedó abierta')
+    expect(linea.textContent).toContain('⏳')
+  })
+
+  it('el turno que nadie cubrió se enseña aunque no tenga fila', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({
+        registro_id: null, hora_entrada: null, hora_salida: null,
+        horas_estadia: null, horas_laborales: null,
+        cumple: false, hallazgos: ['sin_marcaje'],
+      })],
+      error: null,
+    })
+    montar([])
+    expect(await screen.findByText('Turnos planificados sin marcaje')).toBeTruthy()
+    expect(screen.getByText(/06:00–14:00/)).toBeTruthy()
+  })
+
+  it('sobre una fila anulada no se juzga nada: ese día, para la vara, no existe', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
+      error: null,
+    })
+    montar([filaDelDia({ anulado_en: '2026-09-08T20:00:00Z' })])
+    await screen.findByText('Marco Sical')
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('si la cuenta no tiene el permiso, el balance calla y el marcaje sigue', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: 'no autorizado' })
+    montar([filaDelDia()])
+    expect(await screen.findByText('Marco Sical')).toBeTruthy()
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+    expect(screen.queryByText('Turnos planificados sin marcaje')).toBeNull()
   })
 })

@@ -1,0 +1,171 @@
+// domain/condominios/balanceJornada.ts — Lo esperado y lo ocurrido, uno al lado
+// del otro (fase 2).
+//
+// QUÉ HACE. Lee. Nada más. Pone la vara que la fase 1 congeló en el bloque
+// (`bloques_turno.politica`) junto al marcaje que efectivamente ocurrió, y dice
+// en qué se diferencian: cuántos minutos tarde, en qué tramo cae esa demora,
+// cuánto se salió antes, cuánto descanso se excedió por tipo, y cuánto quedó
+// por encima de la jornada.
+//
+// LO QUE SIGUE SIN HACER. Cambiar un número de la planilla. `calcular_horas_
+// personal` devuelve exactamente lo mismo con esto puesto que sin esto — hay una
+// invariante de sandbox que lo comprueba comparando la fila entera antes y
+// después. Debitar la demora, exigir la compensación y reconocer la extra es la
+// fase 4, y no se hace hasta poder mirar un mes real de estas comparaciones.
+//
+// POR QUÉ EL CÓMPUTO ESTÁ EN SQL Y NO AQUÍ. Porque la medianoche. La misma
+// jornada de 22:00 a 06:00 que produjo #839 vuelve a aparecer en cada resta:
+// entrar 00:30 a un turno de las 22:00 son 150 minutos tarde, no −1290. Esa
+// regla ya vive en `turnos_horas_jornada` y ahora en `turnos_minutos_desvio`;
+// duplicarla en TypeScript sería garantizar que un día divergan.
+import { supabase } from '../../lib/supabase'
+import { reportDegradedQuery } from '../queryFetch'
+
+/** Los tres tramos en que puede caer una demora. `null` = no hubo demora. */
+export type TramoDemora = 'sin_consecuencia' | 'compensable' | 'debitada'
+
+/** Cada cosa que el día no cumplió. Vacío = el día cumple. */
+export type HallazgoBalance =
+  | 'sin_vara'
+  | 'sin_planificar'
+  | 'sin_marcaje'
+  | 'jornada_abierta'
+  | 'demora'
+  | 'salida_temprana'
+  | 'exceso_descanso'
+  | 'extra_sin_autorizar'
+
+/** Un día de una persona: lo esperado, lo ocurrido y la diferencia. */
+export interface BalanceDia {
+  personal_id: string
+  nombre: string
+  cargo: string | null
+  fecha: string
+  // Lo esperado
+  bloque_id: string | null
+  turno_inicio: string | null
+  turno_fin: string | null
+  horas_planificadas: number | null
+  tiene_vara: boolean
+  // Lo ocurrido
+  registro_id: string | null
+  hora_entrada: string | null
+  hora_salida: string | null
+  horas_estadia: number | null
+  horas_descanso: number | null
+  horas_laborales: number | null
+  // La comparación
+  minutos_tarde: number | null
+  tramo_demora: TramoDemora | null
+  minutos_salida_temprana: number | null
+  minutos_exceso_descanso: number | null
+  horas_sobre_jornada: number | null
+  extra_requiere_autorizacion: boolean | null
+  cumple: boolean
+  hallazgos: HallazgoBalance[]
+}
+
+/**
+ * El balance de un rango de días. Lo resuelve la base con la vara congelada en
+ * cada bloque, no con la vigente hoy: una jornada que en marzo daba 45 min de
+ * almuerzo se sigue juzgando con esos 45 aunque en septiembre den 60.
+ */
+export async function fetchBalanceDias(params: {
+  projectId: string
+  desde: string
+  hasta: string
+}): Promise<{ dias: BalanceDia[]; error: string | null }> {
+  const { data, error } = await supabase.rpc('presencia_balance_dia', {
+    p_project_id: params.projectId,
+    p_desde: params.desde,
+    p_hasta: params.hasta,
+  })
+  reportDegradedQuery('condominios.fetchBalanceDias', error)
+  if (error) return { dias: [], error: error.message }
+  return { dias: (data as BalanceDia[] | null) ?? [], error: null }
+}
+
+/** Cómo se lee cada hallazgo, en la frase que va en pantalla. */
+const FRASES: Record<HallazgoBalance, string> = {
+  sin_vara: 'la jornada no declara qué espera',
+  sin_planificar: 'no había turno planificado',
+  sin_marcaje: 'el turno no se cubrió',
+  jornada_abierta: 'la jornada quedó abierta',
+  demora: 'entró tarde',
+  salida_temprana: 'salió antes',
+  exceso_descanso: 'excedió el descanso',
+  extra_sin_autorizar: 'trabajó de más sin autorización',
+}
+
+/**
+ * Los hallazgos del día en palabras, con el número que los sustenta.
+ *
+ * Cada frase lleva su magnitud a propósito: «entró tarde» invita a discutir,
+ * «entró 12 min tarde (se compensa)» dice exactamente qué pasó y qué sigue.
+ */
+export function hallazgosEnPalabras(dia: BalanceDia): string[] {
+  return dia.hallazgos.map((h) => {
+    switch (h) {
+      case 'demora': {
+        const tramo =
+          dia.tramo_demora === 'compensable'
+            ? ' (se compensa)'
+            : dia.tramo_demora === 'debitada'
+              ? ' (se debita)'
+              : ''
+        return `entró ${redondear(dia.minutos_tarde)} min tarde${tramo}`
+      }
+      case 'salida_temprana':
+        return `salió ${redondear(dia.minutos_salida_temprana)} min antes`
+      case 'exceso_descanso':
+        return `excedió el descanso en ${redondear(dia.minutos_exceso_descanso)} min`
+      case 'extra_sin_autorizar':
+        return `${redondear(dia.horas_sobre_jornada)} h sobre la jornada, sin autorizar`
+      default:
+        return FRASES[h]
+    }
+  })
+}
+
+/** Los minutos como los diría una persona: sin decimales que nadie mira. */
+function redondear(n: number | null): string {
+  if (n === null || Number.isNaN(n)) return '?'
+  return String(Math.round(n * 100) / 100)
+}
+
+/** El resumen de un rango: cuántos días se juzgaron y cuántos cumplieron. */
+export interface ResumenBalance {
+  dias: number
+  /** Días con vara y con jornada cerrada: los únicos que se pueden juzgar. */
+  juzgables: number
+  cumplen: number
+  minutosTarde: number
+  minutosSalidaTemprana: number
+  minutosExcesoDescanso: number
+  horasSobreJornada: number
+}
+
+/**
+ * Suma un rango. Los días que no se pueden juzgar (sin vara, sin marcaje, con la
+ * jornada abierta) se cuentan aparte en vez de contarse como incumplidos: un
+ * turno de esta noche que todavía no cerró no es una falta.
+ */
+export function resumirBalance(dias: BalanceDia[]): ResumenBalance {
+  const juzgable = (d: BalanceDia) =>
+    d.tiene_vara &&
+    !d.hallazgos.includes('sin_marcaje') &&
+    !d.hallazgos.includes('jornada_abierta')
+  return {
+    dias: dias.length,
+    juzgables: dias.filter(juzgable).length,
+    cumplen: dias.filter((d) => juzgable(d) && d.cumple).length,
+    minutosTarde: suma(dias.map((d) => d.minutos_tarde)),
+    minutosSalidaTemprana: suma(dias.map((d) => d.minutos_salida_temprana)),
+    minutosExcesoDescanso: suma(dias.map((d) => d.minutos_exceso_descanso)),
+    horasSobreJornada: suma(dias.map((d) => d.horas_sobre_jornada)),
+  }
+}
+
+function suma(ns: (number | null)[]): number {
+  return ns.reduce<number>((acc, n) => acc + (n ?? 0), 0)
+}
