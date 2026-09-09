@@ -409,6 +409,32 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
+      # 20260909000000 DECLARA la vara de cada jornada y la congela en el bloque.
+      # Su afirmación central —«esto no mueve ni un número del cómputo»— no se
+      # comprueba leyendo el SQL: la invariante 1 compara la fila entera de
+      # `calcular_horas_personal` antes y después de declararla completa. Las
+      # otras dos que importan: que cambiar la jornada mañana NO reescriba
+      # contra qué se midió un día ya planificado, y que un tope compensable por
+      # debajo de la tolerancia se rechace — vaciaría el tramo del medio y
+      # degradaría la política a «todo se debita» sin que nadie lo decidiera.
+      - name: La vara de la jornada — se declara, se congela y no mueve el cómputo
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55494
+        run: supabase/tests/politica_jornada/run.sh
+
+      # 20260909000100 COMPARA, y sigue sin tocar la planilla: su invariante 1 es
+      # que consultar el balance no mueva el cómputo. Lo que hay que ver correr
+      # es la aritmética que en TypeScript divergiría: entrar 00:30 a un turno de
+      # las 22:00 son 150 min tarde y no −1290, el exceso de descanso se mide
+      # TIPO A TIPO (90 de almuerzo contra un cupo de 45 son 45, aunque sobre
+      # refacción sin usar) y un tipo sin cupo declarado no produce exceso —
+      # tratar «no declarado» como cero inventaría faltas por toda la planilla.
+      - name: Balance del día — lo esperado contra lo ocurrido, sin mover la planilla
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55495
+        run: supabase/tests/balance_jornada/run.sh
 
   rls-harness:
     name: RLS harness (server-side)
@@ -522,30 +548,3 @@ jobs:
           path: rls-report.json
           retention-days: 14
           if-no-files-found: warn
-
-      # 20260909000000 DECLARA la vara de cada jornada y la congela en el bloque.
-      # Su afirmación central —«esto no mueve ni un número del cómputo»— no se
-      # comprueba leyendo el SQL: la invariante 1 compara la fila entera de
-      # `calcular_horas_personal` antes y después de declararla completa. Las
-      # otras dos que importan: que cambiar la jornada mañana NO reescriba
-      # contra qué se midió un día ya planificado, y que un tope compensable por
-      # debajo de la tolerancia se rechace — vaciaría el tramo del medio y
-      # degradaría la política a «todo se debita» sin que nadie lo decidiera.
-      - name: La vara de la jornada — se declara, se congela y no mueve el cómputo
-        env:
-          PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55494
-        run: supabase/tests/politica_jornada/run.sh
-
-      # 20260909000100 COMPARA, y sigue sin tocar la planilla: su invariante 1 es
-      # que consultar el balance no mueva el cómputo. Lo que hay que ver correr
-      # es la aritmética que en TypeScript divergiría: entrar 00:30 a un turno de
-      # las 22:00 son 150 min tarde y no −1290, el exceso de descanso se mide
-      # TIPO A TIPO (90 de almuerzo contra un cupo de 45 son 45, aunque sobre
-      # refacción sin usar) y un tipo sin cupo declarado no produce exceso —
-      # tratar «no declarado» como cero inventaría faltas por toda la planilla.
-      - name: Balance del día — lo esperado contra lo ocurrido, sin mover la planilla
-        env:
-          PGBIN: ${{ steps.pg.outputs.bin }}
-          PGPORT_TEST: 55495
-        run: supabase/tests/balance_jornada/run.sh
