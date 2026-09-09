@@ -70,7 +70,15 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     void fetchMiFichaPresencia(proyectoId).then(({ ficha }) => {
       if (!vivo) return
       setMiFicha(ficha)
-      setModo(ficha ? 'elegir' : 'consulta')
+      // CON LA JORNADA ABIERTA NO SE PREGUNTA NADA. La pregunta «¿qué vas a
+      // hacer?» solo tiene sentido ANTES de fichar. A quien ya entró le sobra:
+      // en producción se vio a una persona ya ingresada mirando un botón que
+      // decía «Ingresar a mi turno» y sin encontrar dónde marcar su descanso ni
+      // su salida — la pregunta le estaba tapando las dos acciones que sí
+      // necesitaba. Se va derecho a la pantalla que las tiene, y desde ahí
+      // sigue existiendo «Solo consultar» para el que venía a mirar.
+      const enTurno = Boolean(ficha?.hora_entrada && !ficha.hora_salida && !ficha.anulado_en)
+      setModo(!ficha ? 'consulta' : enTurno ? 'marcar' : 'elegir')
     })
     return () => { vivo = false }
   }, [proyectoId])
@@ -362,28 +370,42 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
 
   // La pregunta de entrada. Solo se ve cuando la cuenta TIENE expediente aquí:
   // a quien no puede marcar no se le ofrece marcar.
+  // Esta pantalla ya SOLO se ve en dos situaciones: antes de marcar la entrada,
+  // y con la jornada del día ya cerrada. Con el turno abierto se salta (ver el
+  // efecto de arriba), porque entonces la pregunta estorba en vez de ayudar.
   if (modo === 'elegir' && miFicha) {
-    const yaCompleto = Boolean(miFicha.hora_entrada && miFicha.hora_salida)
+    // Una jornada ANULADA no está «completa»: para quien la vive el día vuelve
+    // a empezar, y lo que le toca es marcar entrada. Decirle que ya cerró sería
+    // repetirle el error que la anulación vino a deshacer.
+    const yaCompleto = Boolean(miFicha.hora_entrada && miFicha.hora_salida && !miFicha.anulado_en)
     return (
       <div style={{ padding: 24, maxWidth: 560, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 18 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>Hola, {miFicha.nombre}</div>
-          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>¿Qué vas a hacer?</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
+            {yaCompleto ? 'Tu jornada de hoy ya está cerrada' : '¿Qué vas a hacer?'}
+          </div>
         </div>
         <button
           onClick={() => setModo('marcar')}
           style={{
             width: '100%', padding: '18px 16px', marginBottom: 10, border: 'none', borderRadius: 12,
-            background: 'var(--at-success)', color: 'var(--at-on-status)', cursor: 'pointer', textAlign: 'left',
+            background: yaCompleto ? 'var(--at-surface-2)' : 'var(--at-success)',
+            color: yaCompleto ? 'var(--at-ink-2)' : 'var(--at-on-status)',
+            cursor: 'pointer', textAlign: 'left',
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700 }}>🟢 Ingresar a mi turno</div>
+          {/* El botón dice el ACTO que va a ocurrir, no el nombre de la sección.
+              «Ingresar a mi turno» con la jornada cerrada invitaba a fichar dos
+              veces; con ella abierta, a alguien que ya entró le decía justo lo
+              que no necesitaba oír. */}
+          <div style={{ fontSize: 15, fontWeight: 700 }}>
+            {yaCompleto ? '📋 Ver mi jornada de hoy' : '🟢 Marcar mi entrada'}
+          </div>
           <div style={{ fontSize: 12, opacity: 0.9, marginTop: 2 }}>
             {yaCompleto
-              ? 'Tu jornada de hoy ya está cerrada — podés revisarla'
-              : miFicha.hora_entrada
-                ? `Entraste a las ${miFicha.hora_entrada.slice(0, 5)} · marcar salida con foto y ubicación`
-                : 'Se abre la cámara y el sistema registra la hora'}
+              ? `Entrada ${miFicha.hora_entrada?.slice(0, 5)} · Salida ${miFicha.hora_salida?.slice(0, 5)}`
+              : 'Se abre la cámara y el sistema registra la hora'}
           </div>
         </button>
         <button

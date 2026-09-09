@@ -73,6 +73,7 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
   const [guardando, setGuardando] = useState(false)
   const [tipos, setTipos] = useState<TipoPausa[]>([])
   const [pausando, setPausando] = useState(false)
+  const [eligiendoPausa, setEligiendoPausa] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const yaAbrio = useRef(false)
   /** Reloj del dispositivo al bajar la ficha, para medir intervalos (no fechas). */
@@ -212,6 +213,7 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
           ? `${Math.round(data.minutos)} min${data.descuenta ? ' · se descuentan de tu jornada' : ' · cuentan como jornada'}`
           : undefined,
       })
+      setEligiendoPausa(false)
       await recargarFicha()
       onRefresh()
     } finally {
@@ -354,157 +356,123 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
         </div>
       )}
 
-      {/* ── Las pausas de la jornada ───────────────────────────────────────
-          Solo con la jornada ABIERTA: antes de entrar no hay de qué pausar, y
-          después de salir la jornada está cerrada. Va ARRIBA de la foto porque
-          quien viene a marcar su almuerzo entra tres veces al día y no tiene por
-          qué pasar cada vez por delante de la cámara. */}
+      {/* ══ CON LA JORNADA ABIERTA: DOS ACCIONES, Y NADA MÁS ═══════════════
+          En producción una persona ya ingresada no encontraba dónde marcar su
+          descanso ni su salida. La causa no era que faltaran botones: era que
+          había demasiadas cosas antes de ellos —vista previa de foto, línea de
+          ubicación, campo de observación— y las dos acciones quedaban lejos y
+          mezcladas con lo accesorio.
+
+          Ahora, con el turno abierto, lo PRIMERO y lo ÚNICO grande son los dos
+          botones que la persona puede necesitar. El descanso va arriba porque
+          es el que se usa varias veces al día; la salida abajo porque se usa una
+          y equivocarse cuesta —fue el error del primer día—. Lo accesorio queda
+          debajo, en letra pequeña. */}
       {pendiente === 'salida' && !anulada && (
-        <div style={{
-          border: '1px solid var(--at-line)', borderRadius: 10, padding: 12, marginBottom: 14,
-          background: 'var(--at-surface-2)',
-        }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <Numero titulo="En el puesto" valor={formatHoras(horasEnPuesto)} />
             <Numero titulo="Descanso" valor={formatHoras((ficha.minutos_pausa ?? 0) / 60)} />
           </div>
 
+          {/* ── 1. El descanso ─────────────────────────────────────────────
+              UN botón, y la clasificación DESPUÉS. Cuatro botones de entrada
+              obligan a decidir el tipo antes de entender que ahí se marca el
+              descanso; uno solo dice primero QUÉ se va a hacer y luego pregunta
+              CUÁL, que es el orden en que la persona lo piensa. */}
           {ficha.pausa_abierta_id ? (
             <>
-              <div style={{
-                background: 'var(--at-warning-tint)', color: 'var(--at-warning)',
-                borderRadius: 8, padding: '8px 10px', fontSize: 12.5, fontWeight: 600, marginBottom: 8,
-              }}>
-                {ICONO_PAUSA[ficha.pausa_abierta_tipo ?? ''] ?? '⏸️'} En {ficha.pausa_abierta_etiqueta ?? 'pausa'}
-                {minutosEnPausa() !== null && ` · ${Math.max(0, Math.round(minutosEnPausa()!))} min`}
-              </div>
               <button
                 onClick={() => void pausar('terminar')}
                 disabled={pausando}
                 style={{
-                  width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10,
+                  width: '100%', padding: '16px', marginBottom: 10, border: 'none', borderRadius: 12,
                   background: 'var(--at-primary)', color: 'var(--at-on-status)',
-                  fontSize: 15, fontWeight: 700, cursor: pausando ? 'not-allowed' : 'pointer',
-                  opacity: pausando ? 0.55 : 1,
+                  fontSize: 16, fontWeight: 700, cursor: pausando ? 'not-allowed' : 'pointer',
+                  opacity: pausando ? 0.55 : 1, textAlign: 'left',
                 }}
               >
-                {pausando ? 'Registrando…' : `▶️ Regresé de ${ficha.pausa_abierta_etiqueta ?? 'la pausa'}`}
+                <div>{pausando ? 'Registrando…' : `▶️ Regresé de ${ficha.pausa_abierta_etiqueta ?? 'mi descanso'}`}</div>
+                <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500, marginTop: 2 }}>
+                  {ICONO_PAUSA[ficha.pausa_abierta_tipo ?? ''] ?? '⏸️'} En {ficha.pausa_abierta_etiqueta ?? 'pausa'}
+                  {minutosEnPausa() !== null && ` desde hace ${Math.max(0, Math.round(minutosEnPausa()!))} min`}
+                </div>
               </button>
-              {/* Que lo sepa ANTES de irse, no cuando lea el recibo: la salida
-                  cierra la pausa sola, y esa es la única forma de que no quede
-                  abierta para siempre. */}
-              <div style={{ ...dato, textAlign: 'center', marginTop: 8 }}>
+              {/* Que lo sepa ANTES de irse, no cuando lea el recibo. */}
+              <div style={{ ...dato, textAlign: 'center', marginBottom: 12 }}>
                 Si marcás tu salida sin volver, la pausa se cierra en ese momento.
               </div>
             </>
-          ) : tipos.length > 0 ? (
-            <>
-              <div style={{ ...dato, marginBottom: 6 }}>¿Salís a una pausa?</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
-                {tipos.map(t => (
-                  <button
-                    key={t.codigo}
-                    onClick={() => void pausar('iniciar', t.codigo)}
-                    disabled={pausando}
-                    style={{
-                      padding: '11px 8px', borderRadius: 9, cursor: pausando ? 'not-allowed' : 'pointer',
-                      border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)',
-                      color: 'var(--at-ink-2)', fontSize: 13, fontWeight: 600, opacity: pausando ? 0.55 : 1,
-                    }}
-                  >
-                    <div>{ICONO_PAUSA[t.codigo] ?? '⏸️'} {t.etiqueta}</div>
-                    {/* Se dice si descuenta ANTES de pulsar. Enterarse después
-                        de que el almuerzo no se paga es enterarse tarde. */}
-                    <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                      {t.descuenta ? 'se descuenta' : 'cuenta como jornada'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : null}
-        </div>
-      )}
+          ) : tipos.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <button
+                onClick={() => setEligiendoPausa(v => !v)}
+                disabled={pausando}
+                style={{
+                  width: '100%', padding: '16px', border: 'none', borderRadius: 12,
+                  background: 'var(--at-warning)', color: 'var(--at-on-status)',
+                  fontSize: 16, fontWeight: 700, cursor: pausando ? 'not-allowed' : 'pointer',
+                  opacity: pausando ? 0.55 : 1, textAlign: 'left',
+                }}
+              >
+                <div>{eligiendoPausa ? '✕ Cancelar' : '⏸️ Registrar mi descanso'}</div>
+                <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500, marginTop: 2 }}>
+                  {eligiendoPausa ? 'Elegí abajo qué descanso vas a tomar' : 'Refacción, almuerzo, cena o descanso'}
+                </div>
+              </button>
 
-      {pendiente === null ? (
-        <div style={{ textAlign: 'center', padding: '14px 0' }}>
-          <div style={{ fontSize: 26 }}>✅</div>
-          <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>Tu jornada de hoy ya está completa</div>
-          <div style={dato}>Entrada {ficha.hora_entrada?.slice(0, 5)} · Salida {ficha.hora_salida?.slice(0, 5)}</div>
-        </div>
-      ) : (
-        <>
-          {/* La foto es VISTA PREVIA, no un botón. Antes el único camino para
-              empezar era pulsar un recuadro punteado que se lee como adorno, y
-              el botón de abajo salía deshabilitado hasta entonces: quien no
-              daba con el recuadro veía la acción apagada y no sabía por qué.
-              Ahora la acción vive SIEMPRE en el botón principal, que en su
-              primera pulsación abre la cámara. */}
-          <div style={{ marginBottom: 12 }}>
-            {foto && (
-              <div style={{ position: 'relative' }}>
-                <img src={foto.url} alt="Foto del marcaje"
-                  style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--at-line)', display: 'block' }} />
-                <button onClick={() => void tomarFoto()} style={{ ...btnSecundario, marginTop: 8, width: '100%' }}>
-                  📷 Repetir foto
-                </button>
-              </div>
-            )}
-            {errorFoto && <div style={{ ...dato, color: 'var(--at-danger)', marginTop: 6 }}>{errorFoto}</div>}
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              capture="user"
-              style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) usarArchivo(f); e.target.value = '' }}
-            />
-          </div>
+              {eligiendoPausa && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6, marginTop: 8 }}>
+                  {tipos.map(t => (
+                    <button
+                      key={t.codigo}
+                      onClick={() => void pausar('iniciar', t.codigo)}
+                      disabled={pausando}
+                      style={{
+                        padding: '13px 8px', borderRadius: 10, cursor: pausando ? 'not-allowed' : 'pointer',
+                        border: '1.5px solid var(--at-warning)', background: 'var(--at-surface)',
+                        color: 'var(--at-ink)', fontSize: 14, fontWeight: 700, opacity: pausando ? 0.55 : 1,
+                      }}
+                    >
+                      {/* SIN la regla de planilla al lado. La tuvo, y estaba
+                          mal: la persona no elige entre refacción y almuerzo
+                          según lo que le paguen, elige según lo que va a hacer.
+                          Puestas una al lado de otra en el momento de elegir,
+                          «se descuenta» y «cuenta como jornada» enseñan el
+                          arbitraje —marcar todo como lo que no descuenta— y
+                          convierten una clasificación de la realidad en un menú
+                          de precios. Lo que sí se le dice, al TERMINAR la pausa
+                          y con la clasificación ya hecha, es cuánto duró y si se
+                          descuenta; ahí ya no hay nada que manipular. */}
+                      {ICONO_PAUSA[t.codigo] ?? '⏸️'} {t.etiqueta}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Ubicación: informativa, nunca bloqueante */}
-          <div style={{ ...dato, marginBottom: 12 }}>
-            {gpsCargando
-              ? '📍 Obteniendo ubicación…'
-              : coords
-                ? `📍 Ubicación capturada${coords.exactitud_m ? ` (±${Math.round(coords.exactitud_m)} m)` : ''}`
-                : `📍 Sin ubicación${errorGps ? ` — ${errorGps}` : ''}`}
-          </div>
-
-          <input
-            value={observaciones}
-            onChange={e => setObservaciones(e.target.value)}
-            placeholder="Observación (opcional)"
-            style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, marginBottom: 12 }}
-          />
-
-          {/* UN botón, dos fases: sin foto abre la cámara; con foto confirma.
-              Nunca sale deshabilitado — un botón apagado no explica qué falta. */}
+          {/* ── 2. La salida ───────────────────────────────────────────────
+              Mismas dos fases de siempre: la primera pulsación abre la cámara,
+              la segunda registra. Nunca deshabilitado. */}
+          {foto && <VistaPrevia foto={foto} onRepetir={() => void tomarFoto()} />}
+          {errorFoto && <div style={{ ...dato, color: 'var(--at-danger)', marginBottom: 6 }}>{errorFoto}</div>}
           <button
             onClick={() => { if (!foto) void tomarFoto(); else void marcar(true) }}
             disabled={guardando}
             style={{
-              width: '100%', padding: '13px 16px', border: 'none', borderRadius: 10,
-              background: pendiente === 'entrada' ? 'var(--at-success)' : 'var(--at-danger)',
-              color: 'var(--at-on-status)', fontSize: 15, fontWeight: 700,
-              cursor: guardando ? 'not-allowed' : 'pointer',
-              opacity: guardando ? 0.55 : 1,
+              width: '100%', padding: '16px', border: 'none', borderRadius: 12,
+              background: 'var(--at-danger)', color: 'var(--at-on-status)',
+              fontSize: 16, fontWeight: 700, cursor: guardando ? 'not-allowed' : 'pointer',
+              opacity: guardando ? 0.55 : 1, textAlign: 'left',
             }}
           >
-            {guardando
-              ? 'Registrando…'
-              : !foto
-                ? (pendiente === 'entrada' ? '📷 Marcar mi entrada' : '📷 Marcar mi salida')
-                : (pendiente === 'entrada' ? '🟢 Confirmar entrada' : '🔴 Confirmar salida')}
+            <div>{guardando ? 'Registrando…' : foto ? '🔴 Confirmar mi salida' : '📷 Registrar mi salida'}</div>
+            <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500, marginTop: 2 }}>
+              {foto ? 'La hora la pone el sistema, no se escribe a mano' : 'Se abre la cámara y termina tu jornada'}
+            </div>
           </button>
-          <div style={{ ...dato, textAlign: 'center', marginTop: 8 }}>
-            {!foto
-              ? 'Se abre la cámara; la foto se confirma después.'
-              : 'La hora la pone el sistema al registrar, no se escribe a mano.'}
-          </div>
 
-          {/* Salida de emergencia: solo aparece cuando la cámara ya falló, para
-              que no sea el camino cómodo. El marcaje queda sin evidencia y la
-              observación lo deja dicho en la fila. */}
           {intentos > 0 && !foto && (
             <button
               onClick={() => { setObservaciones(o => o || 'Marcaje sin foto: cámara no disponible'); void marcar(false) }}
@@ -514,6 +482,66 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
               Marcar sin foto (cámara no disponible)
             </button>
           )}
+
+          {/* ── Lo accesorio, debajo y en pequeño ─────────────────────────── */}
+          <Accesorios
+            gpsCargando={gpsCargando} coords={coords} errorGps={errorGps}
+            observaciones={observaciones} setObservaciones={setObservaciones} dato={dato}
+          />
+          <input
+            ref={inputRef} type="file" accept="image/*" capture="user" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) usarArchivo(f); e.target.value = '' }}
+          />
+        </>
+      )}
+
+      {/* ══ ANTES DE ENTRAR, Y CON LA JORNADA YA CERRADA ═══════════════════ */}
+      {pendiente === null && (
+        <div style={{ textAlign: 'center', padding: '14px 0' }}>
+          <div style={{ fontSize: 26 }}>✅</div>
+          <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>Tu jornada de hoy ya está completa</div>
+          <div style={dato}>Entrada {ficha.hora_entrada?.slice(0, 5)} · Salida {ficha.hora_salida?.slice(0, 5)}</div>
+        </div>
+      )}
+
+      {pendiente === 'entrada' && (
+        <>
+          {foto && <VistaPrevia foto={foto} onRepetir={() => void tomarFoto()} />}
+          {errorFoto && <div style={{ ...dato, color: 'var(--at-danger)', marginBottom: 6 }}>{errorFoto}</div>}
+          <input
+            ref={inputRef} type="file" accept="image/*" capture="user" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) usarArchivo(f); e.target.value = '' }}
+          />
+          <button
+            onClick={() => { if (!foto) void tomarFoto(); else void marcar(true) }}
+            disabled={guardando}
+            style={{
+              width: '100%', padding: '16px', border: 'none', borderRadius: 12,
+              background: 'var(--at-success)', color: 'var(--at-on-status)',
+              fontSize: 16, fontWeight: 700, cursor: guardando ? 'not-allowed' : 'pointer',
+              opacity: guardando ? 0.55 : 1, textAlign: 'left',
+            }}
+          >
+            <div>{guardando ? 'Registrando…' : foto ? '🟢 Confirmar mi entrada' : '📷 Marcar mi entrada'}</div>
+            <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500, marginTop: 2 }}>
+              {foto ? 'La hora la pone el sistema, no se escribe a mano' : 'Se abre la cámara; la foto se confirma después'}
+            </div>
+          </button>
+
+          {intentos > 0 && !foto && (
+            <button
+              onClick={() => { setObservaciones(o => o || 'Marcaje sin foto: cámara no disponible'); void marcar(false) }}
+              disabled={guardando}
+              style={{ ...btnSecundario, width: '100%', marginTop: 8 }}
+            >
+              Marcar sin foto (cámara no disponible)
+            </button>
+          )}
+
+          <Accesorios
+            gpsCargando={gpsCargando} coords={coords} errorGps={errorGps}
+            observaciones={observaciones} setObservaciones={setObservaciones} dato={dato}
+          />
         </>
       )}
     </div>
@@ -523,6 +551,61 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
 const btnSecundario: CSSProperties = {
   padding: '8px 14px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
   border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+}
+
+/** La foto tomada, con la opción de repetirla. Es vista previa, no un botón. */
+function VistaPrevia({ foto, onRepetir }: { foto: { url: string }; onRepetir: () => void }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <img src={foto.url} alt="Foto del marcaje"
+        style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--at-line)', display: 'block' }} />
+      <button onClick={onRepetir} style={{ ...btnSecundario, marginTop: 6, width: '100%' }}>
+        📷 Repetir foto
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Ubicación y observación: lo que NO es una acción va debajo y en pequeño.
+ *
+ * La observación se pliega detrás de un enlace porque casi nadie la escribe, y
+ * un campo de texto entre los dos botones grandes los separaba lo suficiente
+ * como para que la persona dejara de ver el segundo.
+ */
+function Accesorios({ gpsCargando, coords, errorGps, observaciones, setObservaciones, dato }: {
+  gpsCargando: boolean
+  coords: CoordsMarcaje | null
+  errorGps: string | null
+  observaciones: string
+  setObservaciones: (v: string) => void
+  dato: CSSProperties
+}) {
+  const [abierta, setAbierta] = useState(false)
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ ...dato, textAlign: 'center' }}>
+        {gpsCargando
+          ? '📍 Obteniendo ubicación…'
+          : coords
+            ? `📍 Ubicación capturada${coords.exactitud_m ? ` (±${Math.round(coords.exactitud_m)} m)` : ''}`
+            : `📍 Sin ubicación${errorGps ? ` — ${errorGps}` : ''}`}
+      </div>
+      {abierta || observaciones ? (
+        <input
+          value={observaciones}
+          onChange={e => setObservaciones(e.target.value)}
+          placeholder="Observación (opcional)"
+          style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, marginTop: 8 }}
+        />
+      ) : (
+        <button onClick={() => setAbierta(true)}
+          style={{ ...dato, display: 'block', margin: '6px auto 0', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+          Agregar una observación
+        </button>
+      )}
+    </div>
+  )
 }
 
 /** Una cifra del desglose de la jornada, en la pantalla del propio empleado. */
