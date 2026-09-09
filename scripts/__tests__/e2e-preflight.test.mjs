@@ -716,6 +716,23 @@ describe('los labels que los specs direccionan están asociados a su control', (
     })
   }
 
+  // La captura de lecturas ya no inventa el valor con el reloj: lo lee de
+  // «Última Lectura», el bloque que LecturasSection pinta con `ultimaLectura`,
+  // y escribe ese número más uno. Eso lo hace inmune a que dos capturas caigan
+  // en el mismo minuto —que es lo que rompía con 409 al volverse obligatorio el
+  // spec fiscal— pero lo ata a una etiqueta de texto. Si alguien la renombra,
+  // que se entere aquí y no en una corrida a medias.
+  it('la etiqueta «Última Lectura» sigue existiendo: el fixture de captura la lee', () => {
+    const componente = readFileSync(resolve('src/components/lecturas/LecturasSection.tsx'), 'utf8')
+    const fixture = readFileSync(resolve('e2e/fixtures/sembrar.ts'), 'utf8')
+    expect(componente, 'LecturasSection ya no muestra «Última Lectura»').toContain('Última Lectura')
+    expect(fixture, 'sembrar.ts dejó de leer «Última Lectura»').toContain('Última Lectura')
+    // Y que no haya vuelto el valor sacado del reloj, que es lo que colisionaba.
+    expect(fixture, 'sembrar.ts volvió a derivar la lectura del reloj').not.toMatch(
+      /fill\(String\(Math\.floor\(Date\.now\(\)/,
+    )
+  })
+
   it('ningún htmlFor de LecturasSection apunta a un id inexistente', () => {
     const fuente = readFileSync(resolve('src/components/lecturas/LecturasSection.tsx'), 'utf8')
     const ids = [...fuente.matchAll(/htmlFor="([^"]+)"/g)].map((m) => m[1])

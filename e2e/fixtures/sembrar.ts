@@ -76,6 +76,38 @@ export async function crearCuotaPendiente(page: Page, monto = '250'): Promise<vo
 }
 
 /**
+ * Lee «Última Lectura» del bloque de info del contador, que LecturasSection
+ * pinta en cuanto hay contador seleccionado (`ultimaLectura`, calculado del
+ * historial). Es el mismo número que la app usará como `lectura_anterior` al
+ * guardar, así que basarse en él es basarse en el estado real y no en una
+ * suposición sobre el reloj.
+ *
+ * Un contador sin historial muestra 0 —`getUltimaLectura` devuelve
+ * `{ lectura: 0, esPrimera: true }`—, así que la primera captura escribe 1.
+ */
+async function ultimaLecturaMostrada(page: Page): Promise<number> {
+  // El bloque es <div><small>Última Lectura</small><div>{valor}</div>…</div>:
+  // se ancla en la etiqueta y se sube al contenedor, que es lo único estable
+  // (no hay data-testid en este componente).
+  const bloque = page.locator('div').filter({
+    has: page.getByText('Última Lectura', { exact: true }),
+  }).last()
+
+  await expect(
+    bloque,
+    'no aparece el bloque «Última Lectura»: sin contador seleccionado no hay captura posible',
+  ).toBeVisible({ timeout: 20_000 })
+
+  const texto = (await bloque.innerText()).replace('Última Lectura', ' ')
+  const valor = Number((texto.match(/-?\d+(?:[.,]\d+)?/) ?? ['NaN'])[0].replace(',', '.'))
+  expect(
+    Number.isFinite(valor),
+    `«Última Lectura» no trae un número legible (leído: ${JSON.stringify(texto.slice(0, 80))})`,
+  ).toBe(true)
+  return valor
+}
+
+/**
  * Captura una lectura de medidor y deja un CARGO PENDIENTE (el registro nace
  * con factura_estado 'pendiente'), que es lo que consumen «emite factura de un
  * cargo pendiente» y el spec fiscal.
@@ -105,12 +137,27 @@ export async function capturarLectura(page: Page): Promise<string | null> {
   if ((await chooseFirstRealOption(unidad)) === null) return null
   if ((await chooseFirstRealOption(page.getByLabel(/Seleccionar Contador/i))) === null) return null
 
-  // La lectura crece con el reloj: uq_registros_llave_natural es
-  // (contador_id, lectura_actual, fecha), así que un valor fijo chocaría con
-  // el índice en la segunda corrida del mismo día. Los minutos desde epoch
-  // crecen siempre y además superan a la lectura anterior, que es lo que
-  // validarLectura exige para no leerlo como retroceso del medidor.
-  await page.getByPlaceholder('Ingrese lectura del medidor').fill(String(Math.floor(Date.now() / 60_000)))
+  // LA LECTURA SALE DEL ESTADO, NO DEL RELOJ.
+  //
+  // uq_registros_llave_natural es (contador_id, lectura_actual, fecha), y
+  // validarLectura exige además que el valor SUPERE al anterior para no leerlo
+  // como retroceso del medidor. Las dos cosas las cumple, por definición, «la
+  // última lectura más uno».
+  //
+  // Antes se usaban los minutos desde epoch, y funcionó mientras hubo UNA sola
+  // captura por corrida. Al volver obligatorio el spec fiscal pasaron a ser
+  // tres, y dos capturas del mismo minuto —o cualquier REINTENTO, que ocurre
+  // segundos después— repiten el valor y el INSERT choca con el índice: 409.
+  // Se vio en la primera corrida real de la suite completa, con los tres
+  // intentos de `emite factura de un cargo pendiente` cayendo con 409.
+  //
+  // El reloj no era la respuesta: la resolución que hiciera falta (segundos,
+  // milisegundos) seguiría siendo una apuesta a que dos escrituras no caigan
+  // en la misma unidad de tiempo, y de paso inflaba el medidor del sandbox en
+  // millones de m³ por corrida. Leer lo que la pantalla ya muestra fija el
+  // valor contra el dato real y deja el consumo en 1 m³.
+  const anterior = await ultimaLecturaMostrada(page)
+  await page.getByPlaceholder('Ingrese lectura del medidor').fill(String(anterior + 1))
 
   const guardar = page.getByRole('button', { name: /Guardar Lectura/i })
   const [respuesta] = await Promise.all([
