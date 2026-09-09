@@ -434,12 +434,17 @@ export default function MarcajeTurno({ proyectoId, fichaInicial = null, onRefres
                         color: 'var(--at-ink)', fontSize: 14, fontWeight: 700, opacity: pausando ? 0.55 : 1,
                       }}
                     >
-                      <div>{ICONO_PAUSA[t.codigo] ?? '⏸️'} {t.etiqueta}</div>
-                      {/* Se dice si descuenta ANTES de pulsar. Enterarse después
-                          de que el almuerzo no se paga es enterarse tarde. */}
-                      <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                        {t.descuenta ? 'se descuenta' : 'cuenta como jornada'}
-                      </div>
+                      {/* SIN la regla de planilla al lado. La tuvo, y estaba
+                          mal: la persona no elige entre refacción y almuerzo
+                          según lo que le paguen, elige según lo que va a hacer.
+                          Puestas una al lado de otra en el momento de elegir,
+                          «se descuenta» y «cuenta como jornada» enseñan el
+                          arbitraje —marcar todo como lo que no descuenta— y
+                          convierten una clasificación de la realidad en un menú
+                          de precios. Lo que sí se le dice, al TERMINAR la pausa
+                          y con la clasificación ya hecha, es cuánto duró y si se
+                          descuenta; ahí ya no hay nada que manipular. */}
+                      {ICONO_PAUSA[t.codigo] ?? '⏸️'} {t.etiqueta}
                     </button>
                   ))}
                 </div>

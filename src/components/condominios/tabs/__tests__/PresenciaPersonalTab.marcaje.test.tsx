@@ -579,10 +579,33 @@ describe('el empleado marca su pausa', () => {
     await abrirDescanso()
     expect(await screen.findByText(/☕ Refacción/)).toBeTruthy()
     expect(screen.getByText(/🍽️ Almuerzo/)).toBeTruthy()
-    // Enterarse de que el almuerzo no se paga DESPUÉS de tomarlo es enterarse
-    // tarde: la consecuencia va en el propio botón.
-    expect(screen.getByText('se descuenta')).toBeTruthy()
-    expect(screen.getByText('cuenta como jornada')).toBeTruthy()
+  })
+
+  it('el botón del tipo NO enseña si descuenta', async () => {
+    // No es información que ayude a decidir —se elige por lo que se va a hacer,
+    // no por lo que se paga— y una al lado de otra enseñan el arbitraje: marcar
+    // todo como el tipo que no descuenta. Lo que sí se dice es al TERMINAR, con
+    // la clasificación ya hecha (ver la prueba de abajo).
+    await entrarConTurnoAbierto()
+    await abrirDescanso()
+    expect(screen.queryByText('se descuenta')).toBeNull()
+    expect(screen.queryByText('cuenta como jornada')).toBeNull()
+  })
+
+  it('al TERMINAR sí se le dice cuánto duró y si se descuenta', async () => {
+    mocks.marcarPausa.mockResolvedValue({
+      data: { pausa_id: 'pa-1', accion: 'terminar', tipo: 'almuerzo', etiqueta: 'Almuerzo', descuenta: true, minutos: 45 },
+      error: null,
+    })
+    await entrarConTurnoAbierto({
+      ...FICHA_EN_TURNO,
+      pausa_abierta_id: 'pa-1', pausa_abierta_tipo: 'almuerzo', pausa_abierta_etiqueta: 'Almuerzo',
+      pausa_abierta_desde: new Date(Date.now() - 45 * 60_000).toISOString(),
+    })
+    fireEvent.click(await screen.findByText(/Regresé de Almuerzo/))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('se descuentan de tu jornada') }),
+    ))
   })
 
   it('pausar NO manda ninguna hora ni duración: solo el tipo', async () => {
