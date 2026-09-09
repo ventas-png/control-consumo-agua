@@ -122,8 +122,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `--with-deps` corre `apt-get update`, y la imagen del runner trae en sus
+      # listas el repositorio de Google Chrome. El 9 de septiembre ese índice
+      # quedó inconsistente —el `Packages.gz` servido no casa con los hashes del
+      # `Release` publicado— y `apt` termina con código 100: la instalación del
+      # navegador falla y el job muere ANTES de correr una sola prueba. Se
+      # reprodujo idéntico en dos intentos seguidos, así que no es ruido de red:
+      # reintentar no lo arregla.
+      #
+      # Playwright no necesita ese repositorio: el binario de Chromium lo baja de
+      # su propio CDN y las librerías del sistema salen de los archivos de
+      # Ubuntu. Se quita la lista ajena antes de instalar —`rm -f` calla si no
+      # está, así que tampoco ata el workflow a que el fichero exista.
       - name: Install Chromium (binario del navegador)
-        run: npx playwright install --with-deps chromium
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          npx playwright install --with-deps chromium
 
       - name: Type-check e2e
         run: npx tsc -p e2e/tsconfig.json
