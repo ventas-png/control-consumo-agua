@@ -79,13 +79,20 @@ describe('_shared/cors — headers y validación', () => {
 // los cubre y la puerta tiene que abrirse por FORMA. Estas pruebas fijan dónde
 // está el filo: qué entra, y sobre todo qué no.
 describe('_shared/cors — previews de Vercel de este proyecto', () => {
-  // Dos previews DISTINTOS: uno con el sufijo de rama que pone Vercel y otro
-  // con un hash. Con uno solo, un `includes()` de la cadena exacta pasaría la
-  // prueba y seguiría estando roto.
+  // Dos previews DISTINTOS y REALES, copiados de despliegues de este proyecto.
+  // Con uno solo, un `includes()` de la cadena exacta pasaría la prueba y
+  // seguiría estando roto.
+  //
+  // Y son distintos en algo más que el sufijo: el alias de RAMA viene truncado
+  // —`control-consumo-agu`, sin la `a` final— porque Vercel recorta el nombre
+  // del proyecto para que el host quepa en los 63 caracteres de una etiqueta
+  // DNS, mientras que la URL canónica del despliegue lo conserva entero. Las
+  // dos sirven la misma app. Si alguien «arregla» el patrón quitando el `?` de
+  // `agua?`, esta prueba se cae y le dice por qué.
   const PREVIEW_RAMA =
-    'https://control-consumo-agua-git-c1a22a-prestadora-de-servicios-projects.vercel.app'
+    'https://control-consumo-agu-git-c1a22a-prestadora-de-servicios-projects.vercel.app'
   const PREVIEW_HASH =
-    'https://control-consumo-agua-46lcs36pjkasmnqmagmgfsdfyyus-prestadora-de-servicios-projects.vercel.app'
+    'https://control-consumo-agua-4lt4l03ik-prestadora-de-servicios-projects.vercel.app'
 
   it('acepta previews de este proyecto (rama y hash)', async () => {
     const { isOriginAllowed } = await import('../cors.ts')
@@ -188,6 +195,12 @@ describe('_shared/cors — previews de Vercel de este proyecto', () => {
     const { isOriginAllowed } = await import('../cors.ts')
     // Sin el prefijo del proyecto.
     expect(isOriginAllowed('https://prestadora-de-servicios-projects.vercel.app')).toBe(false)
+    // El truncado admitido es EXACTAMENTE una letra menos. Ni dos, ni un
+    // prefijo cualquiera: `agua?` no es una puerta a «lo que empiece por
+    // control-consumo».
+    expect(isOriginAllowed('https://control-consumo-ag-git-x-prestadora-de-servicios-projects.vercel.app')).toBe(false)
+    expect(isOriginAllowed('https://control-consumo-git-x-prestadora-de-servicios-projects.vercel.app')).toBe(false)
+    expect(isOriginAllowed('https://control-consumo-aguas-git-x-prestadora-de-servicios-projects.vercel.app')).toBe(false)
     // Sin nada entre el proyecto y el equipo: el patrón exige al menos un tramo.
     expect(isOriginAllowed('https://control-consumo-agua-prestadora-de-servicios-projects.vercel.app')).toBe(false)
     // Otro TLD.

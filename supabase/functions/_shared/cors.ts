@@ -50,6 +50,18 @@ function getAllowedOrigins(): string[] {
 // Para este proyecto y este equipo, eso es
 //   control-consumo-agua-<lo que Vercel ponga>-prestadora-de-servicios-projects.vercel.app
 //
+// CON UNA TRAMPA: Vercel TRUNCA el nombre del proyecto cuando el host completo
+// no cabe en los 63 caracteres de una etiqueta DNS, y el alias de rama —el
+// enlace «Preview» que publica su bot en cada PR, el que abre un humano— pierde
+// la última letra:
+//   control-consumo-agu-git-c1a22a-prestadora-de-servicios-projects.vercel.app
+// mientras que la URL canónica del despliegue conserva el nombre entero:
+//   control-consumo-agua-4lt4l03ik-prestadora-de-servicios-projects.vercel.app
+// Las dos son reales y las dos sirven la misma aplicación, así que el patrón
+// acepta el nombre con la `a` final y sin ella (`agua?`). Lo que NO se relaja
+// es el resto: el sufijo del equipo sigue siendo obligatorio y anclado, que es
+// lo que impide que el preview de otra organización entre por aquí.
+//
 // POR QUÉ UNA REGEX ANCLADA Y NO UN COMODÍN. Las tres formas fáciles de
 // escribir esto son las tres formas de abrirlo de par en par:
 //
@@ -69,7 +81,7 @@ function getAllowedOrigins(): string[] {
 // `https://control-consumo-agua-x-prestadora-de-servicios-projects.vercel.app@evil.com`
 // el hostname real es `evil.com`, y la regex lo rechaza sin ambigüedad.
 const HOST_PREVIEW_VERCEL =
-  /^control-consumo-agua-[a-z0-9-]+-prestadora-de-servicios-projects\.vercel\.app$/
+  /^control-consumo-agua?-[a-z0-9-]+-prestadora-de-servicios-projects\.vercel\.app$/
 
 /**
  * ¿Es `origin` un preview de Vercel de este proyecto?
