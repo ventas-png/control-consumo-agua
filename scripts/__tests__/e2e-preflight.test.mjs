@@ -670,9 +670,17 @@ describe('el helper de login no puede volver a chocar con el botón del nav', ()
 // Esto ata las dos puntas: cada label que un spec direccione por getByLabel
 // tiene que estar asociado a un control en la app.
 describe('los labels que los specs direccionan están asociados a su control', () => {
-  const specs = readdirSync(resolve('e2e'))
-    .filter((f) => f.endsWith('.e2e.ts'))
-    .map((f) => readFileSync(resolve('e2e', f), 'utf8'))
+  // Se miran también los FIXTURES: la selección de unidad y contador se mudó a
+  // `capturarLectura`, así que si sólo se leyeran los *.e2e.ts esta prueba
+  // dejaría de vigilar justo las etiquetas por las que empezó.
+  const specs = [
+    ...readdirSync(resolve('e2e'))
+      .filter((f) => f.endsWith('.e2e.ts'))
+      .map((f) => readFileSync(resolve('e2e', f), 'utf8')),
+    ...readdirSync(resolve('e2e/fixtures'))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => readFileSync(resolve('e2e/fixtures', f), 'utf8')),
+  ]
 
   /** Los textos que los specs buscan con getByLabel(/…/i). */
   const etiquetasBuscadas = [
@@ -988,14 +996,18 @@ describe('los textos que los specs afirman tienen que existir en la app', () => 
 // El par sólo prueba algo mientras siga siendo un par: éxito = desaparece,
 // rechazo = permanece. Invertir cualquiera de los dos lo rompe en silencio.
 describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del otro', () => {
-  const cobro = readFileSync(resolve('e2e/agua-lectura-cobro.e2e.ts'), 'utf8')
+  const sembrar = readFileSync(resolve('e2e/fixtures/sembrar.ts'), 'utf8')
   const validaciones = readFileSync(resolve('e2e/agua-lectura-validaciones.e2e.ts'), 'utf8')
   const sinComentarios = (s) =>
-    s.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
+    s.split('\n').filter((l) => !l.trimStart().startsWith('//') && !l.trimStart().startsWith('*')).join('\n')
 
+  // La aserción de éxito vive en `capturarLectura`, que es por donde pasan AHORA
+  // las tres capturas de la suite (antes `agua-lectura-cobro` tenía la suya
+  // aparte). El par sigue siendo par: el lado del éxito está en el fixture, el
+  // del rechazo en el spec de validaciones.
   it('captura exitosa: el botón de guardar DESAPARECE', () => {
-    expect(sinComentarios(cobro)).toMatch(/expect\(guardar\)\.toBeHidden\(/)
-    expect(sinComentarios(cobro)).not.toMatch(/expect\(guardar\)\.toBeVisible\(/)
+    expect(sinComentarios(sembrar)).toMatch(/expect\(guardar\)\.toBeHidden\(/)
+    expect(sinComentarios(sembrar)).not.toMatch(/expect\(guardar\)\.toBeVisible\(/)
   })
 
   it('rechazo por consumo negativo: el botón de guardar PERMANECE', () => {
@@ -1003,12 +1015,27 @@ describe('éxito y rechazo del guardado de lecturas se afirman al revés uno del
     expect(sinComentarios(validaciones)).not.toMatch(/expect\(guardar\)\.toBeHidden\(/)
   })
 
-  it('la lectura que se captura NO es una constante (clave natural anti-duplicado)', () => {
-    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha): con
-    // un valor fijo, la segunda corrida del mismo día choca con el índice y el
-    // guardado se rechaza — la prueba se caería sin que nada esté roto.
-    expect(sinComentarios(cobro)).toMatch(/fill\(lectura\)/)
-    expect(sinComentarios(cobro)).toMatch(/Date\.now\(\)/)
+  it('la captura no da por buena la escritura: exige un 2xx del INSERT', () => {
+    // Que el formulario se cierre es un efecto de la UI (limpiarFormulario
+    // desmonta el bloque), no la confirmación de que la fila entró. Un rechazo
+    // del INSERT podía dejar la pantalla igual y la prueba seguía adelante para
+    // caerse más tarde y en otro sitio.
+    expect(sinComentarios(sembrar)).toMatch(/waitForResponse\(/)
+    expect(sinComentarios(sembrar)).toMatch(/toBeLessThan\(300\)/)
+  })
+
+  it('el valor capturado se BUSCA ante un 409, no se adivina con el reloj', () => {
+    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha). Con un
+    // valor fijo, la segunda corrida del mismo día choca; con uno derivado del
+    // reloj, chocan dos capturas del mismo minuto y cualquier reintento; y con
+    // «la última mostrada más uno» choca la segunda captura de la corrida,
+    // porque la pantalla no muestra el máximo del contador sino el registro de
+    // UUID más chico del día (el historial se ordena sólo por fecha). Lo único
+    // que cierra el caso es reintentar ante el 409 con otro valor.
+    expect(sinComentarios(sembrar)).toMatch(/SALTOS_DE_LECTURA/)
+    expect(sinComentarios(sembrar)).toMatch(/status\(\) !== 409/)
+    expect(sinComentarios(sembrar), 'la lectura no puede volver a derivarse del reloj')
+      .not.toMatch(/fill\(String\(Math\.floor\(Date\.now\(\)/)
   })
 })
 

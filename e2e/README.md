@@ -155,11 +155,16 @@ auto-skipean en runtime — y como `agua-lectura-cobro` y `condominios-cuota` so
 **obligatorios**, quedarse en cero ejecutadas los pone rojos en el verificador:
 
 ```
+sin unidad o contador sembrados: no hay captura posible
+sin unidad o contador para capturar: no se puede fabricar el cargo
+este rol no puede crear cuotas: no hay «+ Nueva cuota»
 la unidad no tiene contador sembrado
-sin cargos pendientes para emitir — sembrar registro pendiente
-sin cuotas pendientes — generar/sembrar una cuota
-sin cuotas cobrables — sembrar una cuota emitida
 ```
+
+(Los cargos y las cuotas ya no hacen falta sembrados: cada spec de dinero los
+fabrica por la UI. Lo que sigue siendo alta de administración —y por tanto
+motivo de skip, es decir de rojo— es el FIXTURE DEL TENANT: una unidad y un
+contador con tarifa vigente.)
 
 ```bash
 SEED_SERVICE_ROLE_KEY="<service_role del sandbox>" \

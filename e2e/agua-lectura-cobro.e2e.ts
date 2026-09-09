@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { login } from './fixtures/auth'
 import { hasBaseUrl, hasLoginCreds, reasons } from './fixtures/env'
 import { capturarLectura, esperarCargoEnCobros } from './fixtures/sembrar'
-import { chooseFirstRealOption, exists, gotoSection } from './fixtures/ui'
+import { gotoSection } from './fixtures/ui'
 
 // CAMINO DE DINERO #1 (agua) — capturar LECTURA → emitir COBRO/Factura.
 // Requiere datos sembrados (unidad + contador + tarifa vigente; cargo pendiente).
@@ -21,40 +21,24 @@ test.describe('AGUA · lectura → cobro', () => {
     await login(page)
     await gotoSection(page, '/lecturas')
 
-    const unidad = page.getByLabel(/Seleccionar Unidad/i)
-    if (!(await exists(unidad))) test.skip(true, 'UI de lecturas no disponible para este rol')
-    const u = await chooseFirstRealOption(unidad)
-    test.skip(u === null, 'sin unidades sembradas')
-
-    const contador = page.getByLabel(/Seleccionar Contador/i)
-    const c = await chooseFirstRealOption(contador)
-    test.skip(c === null, 'la unidad no tiene contador sembrado')
-
-    // LA LECTURA CRECE CON EL RELOJ, y no es una constante. La clave natural
-    // uq_registros_llave_natural es (contador_id, lectura_actual, fecha): con
-    // un '999999' fijo, la segunda corrida DEL MISMO DÍA choca con el índice,
-    // el guardado se rechaza y la prueba se cae sin que nada esté roto. Los
-    // minutos desde epoch crecen siempre, así que cada corrida trae un valor
-    // nuevo y además mayor que el que dejó la anterior — que es lo que
-    // validarLectura exige para no tratarlo como retroceso del medidor.
-    const lectura = String(Math.floor(Date.now() / 60_000))
-    await page.getByPlaceholder('Ingrese lectura del medidor').fill(lectura)
-    const guardar = page.getByRole('button', { name: /Guardar Lectura/i })
-    await guardar.click()
-
-    // ÉXITO = EL FORMULARIO SE CIERRA. La aserción anterior era la contraria
-    // («el form sigue operable») y estaba INVERTIDA: LecturasSection sólo llama
-    // a limpiarFormulario() en los caminos de guardado, y eso borra el contador
-    // seleccionado, con lo que el bloque {contadorSeleccionado && …} —input y
-    // botón incluidos— se desmonta. Un rechazo de validación, en cambio, hace
-    // `return notify(...)` ANTES y deja el formulario en pantalla. Es decir: la
-    // prueba pasaba cuando la lectura NO se guardaba y fallaba cuando sí.
+    // UNA SOLA FORMA DE ESCRIBIR UNA LECTURA, la del fixture. Esta prueba
+    // tenía la suya —seleccionaba unidad y contador a mano y escribía los
+    // minutos desde epoch— mientras las otras dos capturas de la suite pasaban
+    // por `capturarLectura`. Dos mecanismos para la misma escritura son dos
+    // maneras distintas de chocar con uq_registros_llave_natural, y arreglar
+    // una no arregla la otra. El fixture además AFIRMA el 2xx del INSERT y
+    // busca un valor libre ante un 409; el `fill` suelto daba por buena la
+    // captura con que el botón desapareciera, que es un efecto de la UI y no
+    // la confirmación de que la fila entró.
     //
-    // Se vio en el run 32888464432: el primer intento guardó de verdad (botón
-    // desmontado → rojo) y el reintento pasó porque para entonces la app ya
-    // rechazaba la lectura. Quedó marcada como "flaky", que es como se ve un
-    // verde falso cuando el mundo deja de cooperar.
-    await expect(guardar).toBeHidden({ timeout: 20_000 })
+    // La aserción de éxito —el formulario se cierra— sigue existiendo, ahora
+    // dentro de `capturarLectura`; el par con `agua-lectura-validaciones` (ahí
+    // el rechazo deja el botón EN pantalla) queda intacto.
+    const registroId = await capturarLectura(page)
+    if (registroId === null) {
+      test.skip(true, 'sin unidad o contador sembrados: no hay captura posible')
+    }
+    expect(registroId, 'la captura tiene que devolver el id del registro creado').toBeTruthy()
   })
 
   test('emite factura de un cargo pendiente', async ({ page }) => {
