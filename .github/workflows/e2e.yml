@@ -134,9 +134,23 @@ jobs:
       # su propio CDN y las librerías del sistema salen de los archivos de
       # Ubuntu. Se quita la lista ajena antes de instalar —`rm -f` calla si no
       # está, así que tampoco ata el workflow a que el fichero exista.
+      # Se busca POR CONTENIDO y no por nombre de fichero: el primer intento
+      # borraba `google-chrome.list` y el repositorio seguía ahí, porque la
+      # imagen del runner ya no usa ese nombre (las listas modernas van en
+      # formato deb822, con extensión `.sources`). Se borra cualquier fichero de
+      # `sources.list.d` que mencione el host, y se filtra también el
+      # `sources.list` principal por si la entrada viviera ahí.
+      #
+      # El `ls` de antes y después no es adorno: si esto vuelve a fallar, el log
+      # dice qué listas había y cuáles se quitaron, en vez de dejar adivinando.
       - name: Install Chromium (binario del navegador)
         run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          set -uo pipefail
+          echo "::group::Listas de apt antes"; ls -1 /etc/apt/sources.list.d || true; echo "::endgroup::"
+          sudo find /etc/apt/sources.list.d -type f \
+            -exec grep -q 'dl\.google\.com' {} \; -print -delete || true
+          sudo sed -i '/dl\.google\.com/d' /etc/apt/sources.list || true
+          echo "::group::Listas de apt después"; ls -1 /etc/apt/sources.list.d || true; echo "::endgroup::"
           npx playwright install --with-deps chromium
 
       - name: Type-check e2e
