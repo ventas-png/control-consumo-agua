@@ -165,6 +165,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/schema-drift/auditar.mjs --prueba-acl
 
+      # LOS DOS CAMINOS de fingerprint.sql, contra un Postgres real. El archivo
+      # es SQL PORTABLE —sin meta-instrucciones de psql— porque el Editor SQL de
+      # Supabase, que es el único camino soportado para refrescar la huella de
+      # producción a mano, respondía ERROR 42601 al `\set ON_ERROR_STOP on` que
+      # llevaba dentro. La bandera pasó a los llamadores, y esta prueba mide que
+      # el corte no abrió el guard: inyecta un objeto con un separador en el
+      # nombre y exige que NINGUNO de los dos caminos emita huella.
+      - name: fingerprint.sql es portable y fail-closed por los dos caminos
+        if: ${{ !cancelled() }}
+        run: node scripts/schema-drift/auditar.mjs --prueba-portabilidad
+
       # El auditor de credenciales contra un Postgres DESECHABLE que levanta la
       # propia prueba: un rol por cada privilegio que se rechaza, las dos capas
       # del ACL (`pg_class.relacl` y `pg_attribute.attacl`), privilegios por
