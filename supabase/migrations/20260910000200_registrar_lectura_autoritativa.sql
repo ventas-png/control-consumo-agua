@@ -53,7 +53,7 @@
 -- LAS TRES REGLAS DE NEGOCIO, DECIDIDAS Y ESCRITAS (no inferidas del código):
 --
 --   · VARIAS LECTURAS EL MISMO DÍA → se permiten y se ENCADENAN. El orden
---     vigente es total: (fecha, created_at, id). La segunda lectura del día
+--     vigente es total: (secuencia, fecha, created_at, id). La segunda del día
 --     toma como anterior a la primera. El índice único natural
 --     (contador, lectura, fecha) sigue rechazando el reenvío idéntico.
 --   · LECTURA RETROACTIVA → se RECHAZA (22023). La fecha no puede ser anterior
@@ -152,7 +152,7 @@ COMMENT ON INDEX public.uq_registros_idempotencia IS
   'Idempotencia por operación del outbox offline. NO parcial por deleted_at: un reintento de una lectura ya borrada no la resucita.';
 
 -- El índice que hace barato «la lectura vigente de este contador» con el orden
--- total (fecha, created_at, id) que usa agua_lectura_contexto.
+-- total (secuencia, fecha, created_at, id) que usa agua_lectura_contexto.
 CREATE INDEX IF NOT EXISTS idx_registros_contador_orden_total
   ON public.registros (contador_id, secuencia DESC, fecha DESC, created_at DESC, id DESC)
   WHERE deleted_at IS NULL AND contador_id IS NOT NULL;
@@ -294,7 +294,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.agua_lectura_contexto(uuid) IS
-  'Estado autoritativo de un contador para calcular una lectura: proyecto/empresa/cliente, zona horaria del tenant, tarifa VIGENTE tomada de la base, y lectura vigente resuelta con orden TOTAL (fecha, created_at, id) ignorando soft-deleted. SECURITY DEFINER con guard propio (empresa + can_access_project) porque un operador con agua.lecturas.create puede no tener agua.lecturas.view y leería cero filas — concluyendo "primera lectura" y facturando de menos.';
+  'Estado autoritativo de un contador para calcular una lectura: proyecto/empresa/cliente, zona horaria del tenant, tarifa VIGENTE tomada de la base, y lectura vigente resuelta con orden TOTAL (secuencia, fecha, created_at, id) ignorando soft-deleted. SECURITY DEFINER con guard propio (empresa + can_access_project) porque un operador con agua.lecturas.create puede no tener agua.lecturas.view y leería cero filas — concluyendo "primera lectura" y facturando de menos.';
 
 REVOKE EXECUTE ON FUNCTION public.agua_lectura_contexto(uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.agua_lectura_contexto(uuid) TO authenticated;
