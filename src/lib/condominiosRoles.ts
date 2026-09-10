@@ -94,7 +94,7 @@ const TODAS_OPERACIONES = [
   'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
   'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
   'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
-  'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas', 'prestamos',
+  'permisos_obra', 'garantias', 'areas_config', 'checklist_areas', 'prog_limpieza', 'control_plagas', 'prestamos',
 ]
 
 const TODAS_INSTALACIONES = [
@@ -197,6 +197,10 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     'accesos_res', 'control_accesos_qr', 'solicitudes',
     // Instalaciones: seguridad física
     'parqueos', 'estac_visita', 'llaves', 'camaras', 'amenidades', 'bodegas',
+    // Operaciones: el catálogo de áreas que arman los puntos de control de las
+    // rondas. Antes lo administraba embebido en Rutas Ronda; el CRUD se mudó a
+    // su propio tab y el rol conserva el acceso que ya ejercía.
+    'areas_config',
     // Administración
     'bitacora_acciones', 'libro_novedades',
   ]),

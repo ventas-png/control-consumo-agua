@@ -44,7 +44,7 @@ export const SECTIONS: SectionDef[] = [
     'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
     'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros',
     'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
-    'permisos_obra', 'garantias', 'checklist_areas', 'control_plagas',
+    'permisos_obra', 'garantias', 'areas_config', 'checklist_areas', 'control_plagas',
     'prestamos',
   ]},
   { id: 'instalaciones', label: 'Instalaciones', tabs: [

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   openPromptDialog: vi.fn(async () => null as Record<string, string> | null),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
+  irATab: vi.fn(),
 }))
 
 vi.mock('../../../../lib/supabase', () => ({
@@ -85,6 +86,8 @@ function renderTab(props: Partial<Parameters<typeof ProgramacionLimpiezaTab>[0]>
       canCreate
       canEdit
       canDelete
+      puedeConfigurarAreas
+      onIrATab={mocks.irATab}
       onRefresh={() => {}}
       {...props}
     />,
@@ -142,17 +145,30 @@ describe('ProgramacionLimpiezaTab — catálogo de actividades compartido', () =
     expect(screen.queryByText(/se guardan al instante/)).toBeNull()
   })
 
-  it('la vista Catálogo de áreas monta el CRUD compartido', () => {
+  // El alta de áreas se mudó a su propio tab: Limpieza las MUESTRA para saber
+  // qué se puede programar, pero no las crea ni las edita. Es la mitad del
+  // arreglo del punto único de creación (la otra mitad vive en RutasRondaTab).
+  it('la vista Áreas del catálogo es de solo lectura', () => {
     renderTab()
-    fireEvent.click(screen.getByText(/Catálogo de áreas/))
-    expect(screen.getByText('+ Nueva área')).toBeTruthy()
+    fireEvent.click(screen.getByText(/Áreas del catálogo/))
     expect(screen.getByText('Piscina')).toBeTruthy()
+    expect(screen.queryByText('+ Nueva área')).toBeNull()
+    expect(screen.queryByText('✏️ Editar')).toBeNull()
+    expect(screen.queryByLabelText('Eliminar Piscina')).toBeNull()
+    expect(screen.queryByText('Desactivar')).toBeNull()
   })
 
-  it('sin canDelete, Limpieza no ofrece eliminar áreas del catálogo', () => {
-    renderTab({ canDelete: false })
-    fireEvent.click(screen.getByText(/Catálogo de áreas/))
-    expect(screen.getByText('✏️ Editar')).toBeTruthy()
-    expect(screen.queryByLabelText('Eliminar Piscina')).toBeNull()
+  it('ofrece el atajo al tab Áreas a quien puede verlo', () => {
+    renderTab()
+    fireEvent.click(screen.getByText(/Áreas del catálogo/))
+    fireEvent.click(screen.getByText(/Configurar áreas/))
+    expect(mocks.irATab).toHaveBeenCalledWith('areas_config')
+  })
+
+  it('sin visibilidad del tab Áreas, explica dónde se administran en vez de ofrecer el atajo', () => {
+    renderTab({ puedeConfigurarAreas: false })
+    fireEvent.click(screen.getByText(/Áreas del catálogo/))
+    expect(screen.queryByText(/Configurar áreas/)).toBeNull()
+    expect(screen.getByText(/Sin acceso al tab Áreas/)).toBeTruthy()
   })
 })

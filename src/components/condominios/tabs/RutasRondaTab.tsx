@@ -6,7 +6,7 @@ import {
   updateCondominioRow,
   deleteCondominioRow,
 } from '../../../domain/condominios/tabMutations'
-import { AreasCatalog } from '../AreasCatalog'
+import { AreasResumen } from '../AreasResumen'
 import type { AreaCondominio, RutaRonda, PuntoControlRuta } from '../../../types'
 
 interface Props {
@@ -17,7 +17,9 @@ interface Props {
   companyId: string
   canCreate: boolean
   canEdit: boolean
-  canDelete: boolean
+  /** Visibilidad del tab "Áreas": decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -25,8 +27,10 @@ function blank_ruta(): { nombre: string; descripcion: string; tiempo_estimado_mi
   return { nombre: '', descripcion: '', tiempo_estimado_min: '' }
 }
 
-export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
-  const [vista, setVista] = useState<'areas' | 'rutas'>('areas')
+export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, companyId, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
+  // Arranca en Rutas: desde que el catálogo se administra en su propio tab, la
+  // vista de áreas aquí es referencia (qué puedo encadenar), no el trabajo.
+  const [vista, setVista] = useState<'areas' | 'rutas'>('rutas')
   const [saving, setSaving] = useState(false)
 
   // ── Rutas state ─────────────────────────────────────────────
@@ -149,16 +153,12 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         ))}
       </div>
 
-      {/* ─── ÁREAS (catálogo compartido con Limpieza) ───────────────────── */}
+      {/* ─── ÁREAS (catálogo compartido, de solo lectura desde aquí) ─────── */}
       {vista === 'areas' && (
-        <AreasCatalog
+        <AreasResumen
           areas={areas}
-          proyectoId={proyectoId}
-          companyId={companyId}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          onRefresh={onRefresh}
+          uso="los puntos de control de cada ruta"
+          onConfigurar={puedeConfigurarAreas ? () => onIrATab('areas_config') : undefined}
         />
       )}
 

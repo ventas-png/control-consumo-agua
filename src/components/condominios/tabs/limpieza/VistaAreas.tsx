@@ -110,7 +110,7 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
     // legado se permite guardar sin vincular (queda "pendiente"), para no
     // forzar un vínculo apurado por corregir otra cosa.
     if (!editId && !areaSel) {
-      return notify({ variant: 'warning', title: 'Campo requerido', text: 'Selecciona el área del catálogo. Si no existe, créala en "Catálogo de áreas".' })
+      return notify({ variant: 'warning', title: 'Campo requerido', text: 'Selecciona el área del catálogo. Si no existe, créala en el tab "Áreas".' })
     }
     setSaving(true)
     const payload = {
@@ -310,7 +310,7 @@ export function VistaAreas({ programaciones, personal, areas, proyectoId, compan
               </select>
               {editando && !editando.area_id && (
                 <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>
-                  ⚠ Registro anterior con texto libre: “{editando.area}”. Elegí el área del catálogo para vincularlo (si no existe, créala en “Catálogo de áreas”).
+                  ⚠ Registro anterior con texto libre: “{editando.area}”. Elegí el área del catálogo para vincularlo (si no existe, créala en el tab “Áreas”).
                 </div>
               )}
             </div>
