@@ -31,6 +31,7 @@ const CONSUMIDORES = [
   { icon: '🧹', label: 'Limpieza',       detalle: 'programaciones y ruta del día' },
   { icon: '📋', label: 'Plantillas',     detalle: 'actividades por cargo' },
   { icon: '✅', label: 'Tareas',         detalle: 'tareas del condominio' },
+  { icon: '🗒️', label: 'Checklist',      detalle: 'inspecciones por área' },
 ]
 
 export function AreasCondominioTab({ areas, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {

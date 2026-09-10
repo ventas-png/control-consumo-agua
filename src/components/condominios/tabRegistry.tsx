@@ -665,7 +665,7 @@ export const TAB_REGISTRY: TabDef[] = [
   { id: 'incidentes', label: 'Incidentes', icon: '🚨', render: (ctx) =>
     <IncidentesTab incidentes={ctx.incidentes} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('incidentes')} canEdit={ctx.canEdit('incidentes')} onRefresh={ctx.onRefresh} /> },
   { id: 'checklist_areas', label: 'Checklist', icon: '🗒️', render: (ctx) =>
-    <ChecklistAreasTab checklists={ctx.checklistAreas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} onRefresh={ctx.onRefresh} /> },
+    <ChecklistAreasTab checklists={ctx.checklistAreas} areas={ctx.areas} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('checklist_areas')} canEdit={ctx.canEdit('checklist_areas')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'prog_limpieza', label: 'Limpieza', icon: '🧹', render: (ctx) =>
     <ProgramacionLimpiezaTab programaciones={ctx.progLimpieza} ejecuciones={ctx.ejecLimpieza} personal={ctx.personal} areas={ctx.areas} plantillas={ctx.plantillasCargo} suministros={ctx.suministros} inventario={ctx.inventario} proyectoId={ctx.proyectoId} companyId={ctx.cid} canCreate={ctx.canCreate('prog_limpieza')} canEdit={ctx.canEdit('prog_limpieza')} canDelete={ctx.canDelete('prog_limpieza')} puedeConfigurarAreas={ctx.canView('areas_config')} onIrATab={ctx.irATab} onRefresh={ctx.onRefresh} /> },
   { id: 'consumo_energia', label: 'Consumo Energía', icon: '⚡', render: (ctx) =>

@@ -20,8 +20,12 @@
 //      seguridad las administraba embebidas en Rutas Ronda.
 //   4. Que la migración siembre la clave RBAC del tab y la sume a las policies
 //      de escritura — sin eso el tab se ve y la BD rechaza cada guardado.
-//   5. Que `tareas_condominio.area_id` exista con ON DELETE RESTRICT: el área
-//      en uso se desactiva, no se borra dejando tareas colgando.
+//   5. Que `tareas_condominio.area_id` y `checklist_areas.area_id` existan con
+//      ON DELETE RESTRICT: el área en uso se desactiva, no se borra dejando
+//      tareas ni inspecciones colgando.
+//   6. Que NINGÚN consumidor vuelva a capturar el área como texto libre. Es la
+//      regresión barata: basta un `<input>` nuevo en un tab para que "Piscina"
+//      y "piscina" vuelvan a ser dos áreas.
 // ════════════════════════════════════════════════════════════════════════════
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -34,6 +38,9 @@ const TAB = 'areas_config'
 const MIGRACION = resolve('supabase/migrations/20260910000000_areas_un_solo_lugar_y_tareas_por_catalogo.sql')
 /** Sin comentarios: que la clave aparezca en la explicación no es que se siembre. */
 const sql = readFileSync(MIGRACION, 'utf8').replace(/--[^\n]*/g, '')
+
+const MIGRACION_CHECKLIST = resolve('supabase/migrations/20260910000100_checklist_areas_por_catalogo.sql')
+const sqlChecklist = readFileSync(MIGRACION_CHECKLIST, 'utf8').replace(/--[^\n]*/g, '')
 
 const DIR_TABS = resolve('src/components/condominios/tabs')
 
@@ -120,5 +127,30 @@ describe('migración del tab Áreas y del área de las tareas', () => {
     // Tres pasos: vincular único → crear faltante → vincular las creadas.
     expect(sql.match(/UPDATE public\.tareas_condominio t\s+SET area_id = a\.id/g)).toHaveLength(2)
     expect(sql.match(/SELECT 1 FROM public\.areas_condominio otra/g)).toHaveLength(2)
+  })
+
+  it('vincula checklist_areas al catálogo con ON DELETE RESTRICT y su backfill', () => {
+    expect(sqlChecklist).toMatch(/ALTER TABLE public\.checklist_areas\s+ADD COLUMN IF NOT EXISTS area_id uuid\s+REFERENCES public\.areas_condominio\(id\) ON DELETE RESTRICT/)
+    expect(sqlChecklist.match(/UPDATE public\.checklist_areas c\s+SET area_id = a\.id/g)).toHaveLength(2)
+    expect(sqlChecklist.match(/SELECT 1 FROM public\.areas_condominio otra/g)).toHaveLength(2)
+  })
+})
+
+describe('ningún tab captura el área como texto libre', () => {
+  // Los tres consumidores que alguna vez la transcribieron. El día que alguno
+  // vuelva a un <input>, esto se cae — que es el punto: el arreglo no es un
+  // formulario, es que el área tenga una sola fuente.
+  // (En Limpieza el formulario vive en la vista, no en el tab contenedor.)
+  const CONSUMIDORES = ['limpieza/VistaAreas.tsx', 'TareasCondominioTab.tsx', 'ChecklistAreasTab.tsx']
+
+  it.each(CONSUMIDORES)('%s captura el área con un <select> del catálogo', archivo => {
+    const [ruta] = archivosUI(DIR_TABS).filter(f => f.endsWith(archivo))
+    const src = readFileSync(ruta, 'utf8')
+    // El estado del formulario apunta al id del catálogo, no a un nombre suelto.
+    expect(src).toMatch(/area_?[Ii]d/)
+    // Y ninguno conserva los placeholders de captura libre que tenían antes.
+    for (const placeholder of ['Piscina, lobby', 'Ej. Lobby, Piscina, Gimnasio', 'Ej. Piscina, Lobby, Gimnasio']) {
+      expect(src).not.toContain(placeholder)
+    }
   })
 })

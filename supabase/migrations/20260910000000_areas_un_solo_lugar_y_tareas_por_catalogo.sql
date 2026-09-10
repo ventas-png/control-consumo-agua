@@ -38,8 +38,8 @@
 -- LO QUE **NO** HACE: no toca la policy de DELETE de `areas_condominio` (borrar
 -- un área sigue siendo de company_owner/admin y ahora, además, RESTRICT lo
 -- bloquea si tiene tareas), ni el DEFAULT ni el NOT NULL de nada, ni migra
--- `checklist_areas.area`, que sigue siendo texto libre de su propio flujo de
--- inspección (queda pendiente, con el mismo patrón que este archivo).
+-- `checklist_areas.area` — eso lo hace 20260910000100 con este mismo patrón,
+-- inmediatamente después.
 --
 -- IDEMPOTENTE: ON CONFLICT DO NOTHING en cada INSERT de catálogo, ADD COLUMN /
 -- CREATE INDEX IF NOT EXISTS, DROP POLICY IF EXISTS antes de cada CREATE, y el
