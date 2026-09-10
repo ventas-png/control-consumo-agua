@@ -7,9 +7,15 @@
 // abierta, vara sin declarar) no se cuente como incumplido. Un resumen que
 // contara «12 de 20 cumplen» incluyendo los turnos de esta noche que aún no
 // cierran acusaría de una falta que nadie cometió.
-import { describe, it, expect, vi } from 'vitest'
-vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) }, db: { from: () => ({}) } }))
-import { hallazgosEnPalabras, resumirBalance, type BalanceDia } from '../balanceJornada'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+const mocks = vi.hoisted(() => ({
+  rpc: vi.fn<() => Promise<{ data: unknown; error: { code?: string; message: string } | null }>>(),
+}))
+vi.mock('../../../lib/supabase', () => ({
+  supabase: { from: () => ({}), rpc: mocks.rpc }, db: { from: () => ({}) },
+}))
+vi.mock('../../queryFetch', () => ({ reportDegradedQuery: () => false }))
+import { fetchBalanceDias, hallazgosEnPalabras, resumirBalance, type BalanceDia } from '../balanceJornada'
 
 function dia(over: Partial<BalanceDia> = {}): BalanceDia {
   return {
@@ -178,5 +184,50 @@ describe('los días que no se pueden juzgar quedan fuera del recuento', () => {
       .toContain('las horas se suman')
     expect(hallazgosEnPalabras(dia({ cumple: false, hallazgos: ['marcaje_ambiguo'] }))[0])
       .toContain('no se puede ubicar')
+  })
+})
+
+// ── Por qué falta el balance ────────────────────────────────────────────────
+//
+// No verlo porque no te corresponde y no verlo porque la consulta se cayó se
+// parecen en la pantalla —en los dos casos no hay balance— y no se parecen en
+// nada para quien mira. Sin esta distinción, la pantalla sólo puede elegir
+// entre callar siempre (y pintar un fallo como «todo en orden») o avisar
+// siempre (y avisar de que el candado cerró bien).
+describe('la lectura del balance distingue el candado del tropiezo', () => {
+  beforeEach(() => { mocks.rpc.mockReset() })
+
+  const pedir = () => fetchBalanceDias({ projectId: 'p1', desde: '2026-09-01', hasta: '2026-09-01' })
+
+  it('42501 es falta de permiso, venga del tab o del alcance de proyecto', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'no autorizado' } })
+    const r = await pedir()
+    expect(r.fallo).toBe('sin_permiso')
+    expect(r.dias).toEqual([])
+  })
+
+  it('sin código, el texto sirve de red: un 403 del gateway sigue siendo el candado', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'permission denied for function' } })
+    expect((await pedir()).fallo).toBe('sin_permiso')
+  })
+
+  it('la red caída es operacional, y por eso SÍ hay algo que avisar', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'TypeError: fetch failed' } })
+    expect((await pedir()).fallo).toBe('operacional')
+  })
+
+  it('un proyecto inexistente no es falta de permiso: es un error que hay que ver', async () => {
+    // 42704 lo levanta la propia función cuando el uuid no existe. Tratarlo
+    // como candado lo escondería, y es justo el que conviene mirar.
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '42704', message: 'proyecto inexistente' } })
+    expect((await pedir()).fallo).toBe('operacional')
+  })
+
+  it('el camino bueno no reporta fallo, y una respuesta vacía no es un error', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null })
+    const r = await pedir()
+    expect(r.fallo).toBeNull()
+    expect(r.error).toBeNull()
+    expect(r.dias).toEqual([])
   })
 })

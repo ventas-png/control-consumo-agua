@@ -184,7 +184,7 @@ beforeEach(() => {
   mocks.ajustarPausa.mockResolvedValue({ error: null })
   mocks.anularPausa.mockResolvedValue({ error: null })
   mocks.guardarTipoPausa.mockResolvedValue({ error: null })
-  mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: null })
+  mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: null, fallo: null })
   mocks.obtenerUbicacion.mockResolvedValue({
     coords: { lat: 14.60271, lng: -90.51328, exactitud_m: 12 }, error: null,
   })
@@ -808,7 +808,7 @@ describe('el balance contra la jornada', () => {
 
   it('el día que cumple no agrega ni una palabra a su fila', async () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
-    mocks.fetchBalanceDias.mockResolvedValue({ dias: [balance()], error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [balance()], error: null, fallo: null })
     montar([filaDelDia()])
     await screen.findByText('Marco Sical')
     expect(screen.queryByText(/Contra la jornada/)).toBeNull()
@@ -818,7 +818,7 @@ describe('el balance contra la jornada', () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
     mocks.fetchBalanceDias.mockResolvedValue({
       dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
-      error: null,
+      error: null, fallo: null,
     })
     montar([filaDelDia()])
     expect(await screen.findByText(/entró 25 min tarde \(se compensa\)/)).toBeTruthy()
@@ -828,7 +828,7 @@ describe('el balance contra la jornada', () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
     mocks.fetchBalanceDias.mockResolvedValue({
       dias: [balance({ hora_salida: null, cumple: false, hallazgos: ['jornada_abierta'] })],
-      error: null,
+      error: null, fallo: null,
     })
     montar([filaDelDia({ hora_salida: null })])
     const linea = await screen.findByText(/Contra la jornada/)
@@ -844,7 +844,7 @@ describe('el balance contra la jornada', () => {
         horas_estadia: null, horas_laborales: null,
         cumple: false, hallazgos: ['sin_marcaje'],
       })],
-      error: null,
+      error: null, fallo: null,
     })
     montar([])
     expect(await screen.findByText('Turnos planificados sin marcaje')).toBeTruthy()
@@ -855,7 +855,7 @@ describe('el balance contra la jornada', () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
     mocks.fetchBalanceDias.mockResolvedValue({
       dias: [balance({ cumple: false, hallazgos: ['demora'], minutos_tarde: 25, tramo_demora: 'compensable' })],
-      error: null,
+      error: null, fallo: null,
     })
     montar([filaDelDia({ anulado_en: '2026-09-08T20:00:00Z' })])
     await screen.findByText('Marco Sical')
@@ -864,11 +864,54 @@ describe('el balance contra la jornada', () => {
 
   it('si la cuenta no tiene el permiso, el balance calla y el marcaje sigue', async () => {
     mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
-    mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: 'no autorizado' })
+    mocks.fetchBalanceDias.mockResolvedValue({ dias: [], error: 'no autorizado', fallo: 'sin_permiso' })
     montar([filaDelDia()])
     expect(await screen.findByText('Marco Sical')).toBeTruthy()
     expect(screen.queryByText(/Contra la jornada/)).toBeNull()
     expect(screen.queryByText('Turnos planificados sin marcaje')).toBeNull()
+    // Y NINGUNA advertencia: el candado cerró bien, no hay nada que avisar.
+    expect(screen.queryByText(/No se pudo calcular el balance/)).toBeNull()
+  })
+})
+
+// ── Un error de lectura no puede leerse como «sin hallazgos» ────────────────
+//
+// Sin balance, ninguna fila lleva su línea «Contra la jornada» — que es
+// exactamente el aspecto de un día en orden. La ausencia de balance no es
+// neutra: se parece al verde. Estas tres pruebas separan las tres razones por
+// las que puede faltar, porque para quien mira no significan lo mismo.
+describe('la falta de balance dice POR QUÉ falta', () => {
+  it('mientras se calcula lo dice, en vez de fingir que no hay nada que decir', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    // La promesa nunca resuelve: es exactamente «todavía calculando».
+    mocks.fetchBalanceDias.mockReturnValue(new Promise(() => {}))
+    montar([filaDelDia()])
+    expect(await screen.findByText(/Calculando el balance contra la jornada/)).toBeTruthy()
+    expect(screen.queryByText(/No se pudo calcular el balance/)).toBeNull()
+  })
+
+  it('un error operacional avisa, y no rompe nada de lo que ya funciona', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockResolvedValue({
+      dias: [], error: 'fetch failed', fallo: 'operacional',
+    })
+    montar([filaDelDia()])
+    const aviso = await screen.findByText(/No se pudo calcular el balance del día/)
+    expect(aviso).toBeTruthy()
+    // NO DESTRUCTIVO: la lista sigue ahí y se sigue pudiendo trabajar con ella.
+    expect(screen.getByText('Marco Sical')).toBeTruthy()
+    expect(aviso.closest('[role="status"]')?.textContent)
+      .toContain('se siguen pudiendo registrar y corregir')
+    // Y sobre todo: no se pinta un día sin hallazgos que nadie calculó.
+    expect(screen.queryByText(/Contra la jornada/)).toBeNull()
+  })
+
+  it('un rechazo de la promesa también avisa, en vez de calcular para siempre', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    mocks.fetchBalanceDias.mockRejectedValue(new Error('la red se cayó'))
+    montar([filaDelDia()])
+    expect(await screen.findByText(/No se pudo calcular el balance del día/)).toBeTruthy()
+    expect(screen.queryByText(/Calculando el balance/)).toBeNull()
   })
 })
 
@@ -891,7 +934,7 @@ describe('el balance de un día con varios marcajes', () => {
         extra_requiere_autorizacion: true, cumple: false,
         hallazgos: ['marcajes_multiples'],
       }],
-      error: null,
+      error: null, fallo: null,
     })
     montar([
       filaDelDia({ id: 'r1', hora_entrada: '06:00:00', hora_salida: '10:00:00' }),

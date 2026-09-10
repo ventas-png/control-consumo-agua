@@ -124,12 +124,36 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
   // número de la planilla — solo dice en qué se diferencian. Si la cuenta no
   // tiene el permiso del tab, la función lo rechaza y aquí simplemente no se
   // muestra nada: el marcaje sigue funcionando igual.
+  // ESTADO EXPLÍCITO, PORQUE LA AUSENCIA DE BALANCE NO ES NEUTRA. Sin balance,
+  // ninguna fila lleva su línea «Contra la jornada» — que es exactamente el
+  // aspecto de un día sin hallazgos. Un fallo de lectura pintado como «todo en
+  // orden» es peor que no calcular nada, porque nadie va a volver a mirar.
+  //
+  // Los cuatro estados dicen cosas distintas:
+  //   · `cargando`  la comparación todavía no está; se dice, no se finge.
+  //   · `listo`     lo de siempre.
+  //   · `error`     la red o la base fallaron: advertencia NO destructiva —el
+  //                 marcaje de abajo es correcto y sigue funcionando—.
+  //   · `sin_permiso` el diseño funcionando: la sección no aparece y no hay
+  //                 nada que avisar. Avisar acá sería avisar de que el candado
+  //                 cerró bien.
   const [balance, setBalance] = useState<BalanceDia[]>([])
+  const [balanceEstado, setBalanceEstado] =
+    useState<'cargando' | 'listo' | 'error' | 'sin_permiso'>('cargando')
   useEffect(() => {
     let vivo = true
     setBalance([])
+    setBalanceEstado('cargando')
     void fetchBalanceDias({ projectId: proyectoId, desde: fechaFiltro, hasta: fechaFiltro })
-      .then(({ dias }) => { if (vivo) setBalance(dias) })
+      .then(({ dias, fallo }) => {
+        if (!vivo) return
+        if (fallo) { setBalanceEstado(fallo === 'sin_permiso' ? 'sin_permiso' : 'error'); return }
+        setBalance(dias)
+        setBalanceEstado('listo')
+      })
+      // Un rechazo deja el estado en 'cargando' para siempre si no se atiende:
+      // la pantalla diría «calculando» y no terminaría nunca.
+      .catch(() => { if (vivo) setBalanceEstado('error') })
     return () => { vivo = false }
   }, [proyectoId, fechaFiltro, registros])
 
@@ -640,6 +664,26 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
       {/* Los turnos planificados que nadie marcó no tienen fila en la lista: sin
           marcaje no hay registro. Se enseñan aparte para que la ausencia se vea,
           que es justo lo que antes se perdía. */}
+      {balanceEstado === 'error' && (
+        <div
+          role="status"
+          style={{
+            background: 'var(--at-chip)', border: '1px solid var(--at-ink-3)',
+            borderRadius: 8, padding: '10px 14px', marginBottom: 8, fontSize: 12,
+            color: 'var(--at-ink-2)',
+          }}
+        >
+          <strong>No se pudo calcular el balance del día.</strong>{' '}
+          Las horas y los marcajes de abajo son correctos y se siguen pudiendo
+          registrar y corregir; lo que falta es la comparación contra lo que
+          esperaba la jornada. Volvé a abrir el día en un momento.
+        </div>
+      )}
+      {balanceEstado === 'cargando' && (
+        <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginBottom: 8 }}>
+          Calculando el balance contra la jornada…
+        </div>
+      )}
       {sinCubrir.length > 0 && (
         <div style={{
           background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)',

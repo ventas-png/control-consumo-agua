@@ -76,6 +76,38 @@ export interface BalanceDia {
 }
 
 /**
+ * POR QUÉ SE DISTINGUEN DOS FALLOS.
+ *
+ * No ver el balance porque no te corresponde y no verlo porque la consulta se
+ * cayó se parecen en la pantalla —en los dos casos no hay balance— y no se
+ * parecen en nada para quien mira:
+ *
+ *   · `sin_permiso` es el diseño funcionando. La cuenta no tiene el permiso del
+ *     tab, o el condominio no es suyo. La función responde 42501 y la sección
+ *     simplemente no aparece: el marcaje sigue igual y no hay nada que avisar.
+ *     Poner una advertencia acá sería avisar de que el candado cerró.
+ *
+ *   · `operacional` es la red, la base o un bug. Ahí SÍ hay algo que decir, y lo
+ *     que no se puede hacer es callarlo: sin balance, cada fila queda sin su
+ *     línea «Contra la jornada», que es exactamente el aspecto de un día sin
+ *     hallazgos. Un fallo pintado como «todo en orden» es peor que no calcular
+ *     nada, porque nadie va a volver a mirar.
+ *
+ * 42501 lo levanta la función tanto por el permiso del tab como por el alcance
+ * de proyecto, y las dos cosas significan lo mismo para quien pregunta: este
+ * balance no es tuyo.
+ */
+export type FalloBalance = 'sin_permiso' | 'operacional'
+
+function clasificarFallo(error: { code?: string; message?: string }): FalloBalance {
+  if (error.code === '42501') return 'sin_permiso'
+  // El código es lo fiable; el texto es la red de seguridad para los caminos
+  // donde PostgREST no lo propaga (un 403 del gateway, por ejemplo).
+  if (/permission denied|no autorizado/i.test(error.message ?? '')) return 'sin_permiso'
+  return 'operacional'
+}
+
+/**
  * El balance de un rango de días. Lo resuelve la base con la vara congelada en
  * cada bloque, no con la vigente hoy: una jornada que en marzo daba 45 min de
  * almuerzo se sigue juzgando con esos 45 aunque en septiembre den 60.
@@ -84,15 +116,15 @@ export async function fetchBalanceDias(params: {
   projectId: string
   desde: string
   hasta: string
-}): Promise<{ dias: BalanceDia[]; error: string | null }> {
+}): Promise<{ dias: BalanceDia[]; error: string | null; fallo: FalloBalance | null }> {
   const { data, error } = await supabase.rpc('presencia_balance_dia', {
     p_project_id: params.projectId,
     p_desde: params.desde,
     p_hasta: params.hasta,
   })
   reportDegradedQuery('condominios.fetchBalanceDias', error)
-  if (error) return { dias: [], error: error.message }
-  return { dias: (data as BalanceDia[] | null) ?? [], error: null }
+  if (error) return { dias: [], error: error.message, fallo: clasificarFallo(error) }
+  return { dias: (data as BalanceDia[] | null) ?? [], error: null, fallo: null }
 }
 
 /** Cómo se lee cada hallazgo, en la frase que va en pantalla. */
