@@ -43,11 +43,37 @@
 -- esa función en tiempo de ejecución. La guarda mira las dos cosas y ABORTA con
 -- un mensaje que dice qué apareció.
 --
--- REVERSA. Están en la baseline del auditor con su huella exacta
--- (`drift-conocido.json`, entradas `funcion:…` y `funcion:…/grants`), así que la
--- definición no se pierde: se puede reponer desde #826. Retirar las seis
--- entradas de la baseline va en el PR que refresque `huella-produccion.json`
--- después de aplicar esto — la baseline sólo puede encoger, y encoge ahí.
+-- REVERSA. Hay DDL EJECUTABLE, y está acá:
+--
+--     supabase/reversas/20260910000400_reponer_helpers_rbac_huerfanos.sql
+--
+-- Sale de `pg_get_functiondef()` sobre el catálogo vivo de producción, leído el
+-- 2026-09-10, con los cuerpos copiados verbatim y con lo que una función
+-- restaurada a medias pierde: dueño, SECURITY DEFINER, `search_path` fijado, la
+-- ACL —EXECUTE revocado a PUBLIC— y el COMMENT.
+--
+-- UNA VERSIÓN ANTERIOR DE ESTA CABECERA DECÍA OTRA COSA, y estaba mal: afirmaba
+-- que la definición «no se pierde» porque su huella está en `drift-conocido.json`
+-- y el inventario en #826. Ninguna de las dos repone nada. Una huella es un
+-- `sha256(prosrc)`: sirve para DETECTAR que algo cambió, no para reconstruirlo.
+-- Y #826 nombra las tres firmas en su §3.5 pero no incluye una sola línea de su
+-- DDL. Era exactamente el mismo tipo de afirmación sin respaldo que esta
+-- migración vino a corregir en los `motivo` de la baseline.
+--
+-- Que la reversa repone lo que había no se afirma: se comprueba. El sandbox
+-- `supabase/tests/reversa_helpers_rbac/` la ejecuta contra un Postgres real y
+-- exige que las SEIS huellas resultantes —tres definiciones y tres grants—
+-- coincidan con las que la baseline declara para producción.
+--
+-- ANTES DE FUSIONAR, REVALIDAR. `supabase/reversas/20260910000400_revalidar_antes_de_fusionar.sql`
+-- es de sólo lectura y devuelve `SEGUIR` o `PARAR`. La evidencia de acá abajo se
+-- tomó el 2026-09-10; entre esa fecha y el despliegue alguien puede cablear una
+-- de estas funciones a una policy nueva.
+--
+-- Retirar las seis entradas de la baseline va en el PR que refresque
+-- `huella-produccion.json` después de aplicar esto — la baseline sólo puede
+-- encoger, y encoge ahí. Mientras esas entradas sigan, la reversa de arriba se
+-- puede seguir verificando contra ellas.
 --
 -- IDEMPOTENTE: `DROP FUNCTION IF EXISTS`. En cualquier entorno construido desde
 -- el repositorio es un no-op, porque las funciones nunca estuvieron.
