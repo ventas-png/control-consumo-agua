@@ -1,0 +1,28 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- Envoltorio de psql para fingerprint.sql
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- `fingerprint.sql` es SQL portable a propósito: se pega tal cual en el Editor
+-- SQL de Supabase, que es el único camino soportado para refrescar
+-- `huella-produccion.json` (ver README y decision-net-pg_net.md). Una
+-- meta-instrucción de psql ahí dentro lo rompía con ERROR 42601.
+--
+-- Pero psql con `-f` corre cada sentencia en su propia transacción: si el guard
+-- de separadores aborta, sin `ON_ERROR_STOP` psql seguiría hasta el SELECT
+-- final y emitiría una huella que el guard acaba de declarar no fiable. Fallar
+-- ABIERTO en un auditor es peor que no medir.
+--
+-- Así que la bandera vive del lado de psql, y este archivo es ese lado para
+-- quien lo corre a mano:
+--
+--     psql "$CONEXION" -tAq -f scripts/schema-drift/fingerprint.psql
+--
+-- Los llamadores programáticos (reconstruir.mjs, auditar.mjs) pasan
+-- `-v ON_ERROR_STOP=1` ellos mismos y apuntan al .sql: una prueba falla si
+-- alguno se la olvida.
+--
+-- `\ir` y no `\i`: incluye relativo a ESTE archivo, no al directorio desde el
+-- que se invocó psql. Con `\i` sólo funcionaría corriéndolo desde la raíz del
+-- repositorio.
+\set ON_ERROR_STOP on
+\ir fingerprint.sql

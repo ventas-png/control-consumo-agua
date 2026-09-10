@@ -218,6 +218,11 @@ node scripts/schema-drift/auditar.mjs --prueba-espacios
 # WITH GRANT OPTION moviendo la huella sin mover el conteo.
 node scripts/schema-drift/auditar.mjs --prueba-acl
 
+# Los DOS caminos de fingerprint.sql contra un Postgres real: que el Editor SQL
+# pueda ejecutarlo (sin meta-instrucciones de psql, sin ERROR 42601) y que
+# ninguno de los dos emita huella cuando el guard de separadores aborta.
+node scripts/schema-drift/auditar.mjs --prueba-portabilidad
+
 # El auditor de credenciales contra un Postgres DESECHABLE que levanta la
 # propia prueba: un rol culpable por cada privilegio que se rechaza, las dos
 # capas del ACL, privilegios por columna, secuencias, otorgantes, autoridad y
@@ -253,10 +258,11 @@ Requiere el **servidor** de Postgres, no sólo `psql`: hacen falta `initdb` y
 | Archivo | Qué es |
 | --- | --- |
 | `bootstrap.sql` | El andamiaje que Supabase da de fábrica y las migraciones dan por dado. Las formas se copiaron del catálogo real de producción para que ningún stub invente una diferencia. |
-| `fingerprint.sql` | La huella normalizada. **La misma consulta** corre contra la reconstrucción y contra producción. |
+| `fingerprint.sql` | La huella normalizada. **La misma consulta** corre contra la reconstrucción y contra producción. **SQL portable**: sin meta-instrucciones de psql, para que el Editor SQL de Supabase pueda ejecutarlo — ver [Refrescar la huella](#refrescar-la-huella-de-producción-a-mano). |
+| `fingerprint.psql` | Envoltorio de psql: pone `ON_ERROR_STOP` e incluye el `.sql`. Para correrlo a mano por psql. |
 | `reconstruir.mjs` | `initdb` → `bootstrap.sql` → las 449 migraciones en orden, cada una en su transacción con `ON_ERROR_STOP`. |
 | `auditar.mjs` | Comparación, veredicto y códigos de salida. Su lógica es pura y está probada. |
-| `huella-produccion.json` | Instantánea del catálogo de producción, `sha256:n` por grupo. Permite auditar en CI **sin ninguna credencial**. Se refresca **a mano**: ver `decision-net-pg_net.md`. |
+| `huella-produccion.json` | Instantánea del catálogo de producción, `sha256:n` por grupo. Permite auditar en CI **sin ninguna credencial**. Se refresca **a mano**: ver [Refrescar la huella](#refrescar-la-huella-de-producción-a-mano). |
 | `decision-net-pg_net.md` | Por qué no hay auditoría en vivo: la respuesta de Supabase Support sobre los grants de `pg_net` a `PUBLIC`, y qué se decidió. |
 | `drift-conocido.json` | La baseline explícita del drift conocido. |
 
@@ -338,6 +344,43 @@ En consecuencia, y a propósito:
 El detalle, la respuesta de Support y los atajos que NO se toman están en
 [`decision-net-pg_net.md`](decision-net-pg_net.md). Se retoma si Supabase
 publica un mecanismo de aislamiento soportado; el ticket quedó en su backlog.
+
+### Refrescar la huella de producción, a mano
+
+`huella-produccion.json` es lo único que el auditor no puede recalcular solo. Se
+refresca así, y el procedimiento **es ejecutable tal cual**:
+
+1. Abrí el **Editor SQL** del proyecto de producción en el dashboard de Supabase.
+2. Pegá el contenido **completo** de `scripts/schema-drift/fingerprint.sql` y
+   ejecutá. Devuelve una línea por grupo: `clave`, `sha256`, `n`.
+3. Volcá esas filas a `huella-produccion.json` con el formato `"clave":
+   "sha256:n"` que el archivo ya tiene, y anotá en el commit la fecha de la
+   captura y la versión de PostgreSQL.
+
+> **Por qué el archivo no lleva `\set ON_ERROR_STOP on`.** Lo llevaba, y el paso
+> 2 era imposible: `\set` lo interpreta psql, no el servidor, así que el Editor
+> SQL —que manda el texto tal cual— respondía **ERROR 42601**. La línea se movió
+> a los llamadores. El guard **no** se aflojó, y cada camino sigue siendo
+> fail-closed por su propio mecanismo:
+>
+> | Camino | Qué lo hace fail-closed |
+> | --- | --- |
+> | Editor SQL (o cualquier cliente que mande el archivo entero como **una** consulta) | PostgreSQL corre el lote en una transacción implícita: la excepción del guard lo aborta **completo** y el `SELECT` final no llega a emitir. No hace falta bandera. |
+> | `psql -f` | Cada sentencia es su propia transacción, así que **el llamador pasa `-v ON_ERROR_STOP=1`**. `reconstruir.mjs` y `auditar.mjs` lo hacen; una prueba falla si alguien agrega un llamador que se lo olvide. |
+> | `psql` a mano | `fingerprint.psql`, que pone la bandera e incluye el `.sql`. |
+
+Por psql, si tenés una conexión directa:
+
+```bash
+psql "$CONEXION" -tAq -f scripts/schema-drift/fingerprint.psql
+```
+
+Los dos caminos se miden contra un Postgres real —incluido el caso en que un
+objeto con un separador en el nombre debe impedir que se emita huella— con:
+
+```bash
+node scripts/schema-drift/auditar.mjs --prueba-portabilidad
+```
 
 **Lo que sí quedó** es el auditor de credenciales, que no necesita producción:
 mide qué puede hacer un rol y dice por qué no serviría. Se ejercita entero en

@@ -66,6 +66,28 @@ import { materializarMigraciones, migracionesEnDisco, migracionesEnRef, resolver
 const AQUI = dirname(fileURLToPath(import.meta.url))
 export const RUTA_PRODUCCION = join(AQUI, 'huella-produccion.json')
 export const RUTA_FINGERPRINT = join(AQUI, 'fingerprint.sql')
+/** Envoltorio de psql: pone `ON_ERROR_STOP` e incluye el .sql portable. */
+export const RUTA_FINGERPRINT_PSQL = join(AQUI, 'fingerprint.psql')
+
+/**
+ * ¿Esta línea de código INVOCA a psql sobre `fingerprint.sql`?
+ *
+ * Se exige `'-f'` junto al archivo: así una cadena que sólo NOMBRA el archivo
+ * —un mensaje, un comentario— no cuenta como invocación. Y el marcador deja
+ * fuera el caso negativo de `--prueba-portabilidad`, que corre sin bandera a
+ * propósito para medir que sin ella el guard fallaría abierto.
+ *
+ * El criterio vive acá, y no duplicado en la prueba, para que las dos formas de
+ * vigilarlo —la barata de vitest y la de `--prueba-portabilidad`— no puedan
+ * discrepar.
+ */
+export function esInvocacionDeFingerprint(linea) {
+  if (/SIN-BANDERA-A-PROPOSITO/.test(linea)) return false
+  if (/^\s*(\*|\/\/|--)/.test(linea)) return false
+  if (/RUTA_FINGERPRINT(_PSQL)?\s*=/.test(linea)) return false
+  if (!/'-f'/.test(linea)) return false
+  return /RUTA_FINGERPRINT\b|fingerprint\.sql/.test(linea)
+}
 export const RUTA_BASELINE = join(AQUI, 'drift-conocido.json')
 
 // ── funciones puras (las prueba __tests__/auditar.test.mjs) ─────────────────
@@ -2395,7 +2417,7 @@ COMMIT;
       'y se dice que se MIDIÓ, no que se declaró')
 
     const comoLector = parsearHuella(execFileSync(join(binarios(), 'psql'),
-      ['-U', 'drift_lector', '-tAq', '-f', RUTA_FINGERPRINT],
+      ['-U', 'drift_lector', '-v', 'ON_ERROR_STOP=1', '-tAq', '-f', RUTA_FINGERPRINT],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: db.entorno }).trim())
     const delDueno = parsearHuella(huella(db.psql))
     const distintos = [...delDueno].filter(([k, v]) => {
@@ -2417,6 +2439,132 @@ COMMIT;
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// `--prueba-portabilidad`: los DOS caminos de fingerprint.sql, medidos
+// ════════════════════════════════════════════════════════════════════════════
+//
+// EL FALLO QUE ESTO CIERRA. `fingerprint.sql` llevaba `\set ON_ERROR_STOP on`
+// en su cabecera. Eso lo interpreta psql, no el servidor, así que el Editor SQL
+// de Supabase —que manda el texto tal cual— respondía ERROR 42601 y el único
+// camino soportado para refrescar `huella-produccion.json` a mano no podía
+// ejecutar el archivo.
+//
+// Sacar la línea es trivial; sacarla SIN abrir el guard no lo es. Con `-f`,
+// psql corre cada sentencia en su propia transacción: si el guard de
+// separadores aborta y nadie puso la bandera, psql sigue hasta el SELECT final
+// y emite una huella que el guard acaba de declarar no fiable. Eso es fallar
+// ABIERTO, y en un auditor es peor que no medir.
+//
+// Por eso esto no se conforma con leer el archivo: levanta un Postgres,
+// inyecta un objeto culpable —una tabla con \x1e en el nombre, exactamente lo
+// que el guard existe para detectar— y mide qué hace cada camino. Incluye a
+// propósito el caso NEGATIVO (psql -f sin bandera sigue adelante), porque es la
+// razón por la que los llamadores tienen que pasarla y conviene que esté fijado
+// y no confiado a la memoria de quien lea el código.
+async function pruebaPortabilidad() {
+  const comprobar = (cond, etiqueta) => {
+    console.error(`${cond ? '✓' : '✗'} ${etiqueta}`)
+    if (!cond) process.exitCode = 1
+    return cond
+  }
+
+  const sql = readFileSync(RUTA_FINGERPRINT, 'utf8')
+
+  // ── 0 · Estático: ni una meta-instrucción de psql en el archivo portable ──
+  const metas = sql.split('\n')
+    .map((linea, i) => [i + 1, linea])
+    .filter(([, linea]) => /^\s*\\/.test(linea))
+  comprobar(metas.length === 0,
+    metas.length === 0
+      ? 'fingerprint.sql no tiene meta-instrucciones de psql (el Editor SQL puede ejecutarlo)'
+      : `fingerprint.sql tiene meta-instrucciones de psql: línea(s) ${metas.map(([n]) => n).join(', ')}`)
+
+  const db = reconstruir({ log: m => console.error(`  ${m}`) })
+  const psqlBin = join(binarios(), 'psql')
+  const correr = args => spawnSync(psqlBin, args, {
+    encoding: 'utf8', env: db.entorno, maxBuffer: 64 * 1024 * 1024,
+  })
+  /** El archivo entero como UNA consulta: así lo manda el Editor SQL, y así lo
+   *  corre PostgreSQL — en una transacción implícita que un error aborta. */
+  const comoEditorSql = () => correr(['-tAq', '-c', sql])
+  const grupos = texto => parsearHuella(texto.trim()).size
+
+  try {
+    if (db.fallos.length > 0) {
+      console.error(`✗ ${db.fallos.length} migración(es) no aplicaron.`); process.exit(1)
+    }
+
+    // ── 1 · Catálogo limpio: los dos caminos emiten LA MISMA huella ─────────
+    const editor = comoEditorSql()
+    comprobar(editor.status === 0 && !/42601/.test(editor.stderr ?? ''),
+      'CAMINO EDITOR SQL · el archivo entero como una consulta no da ERROR 42601')
+
+    const conBandera = correr(['-v', 'ON_ERROR_STOP=1', '-tAq', '-f', RUTA_FINGERPRINT])
+    const envoltorio = correr(['-tAq', '-f', RUTA_FINGERPRINT_PSQL])
+    comprobar(conBandera.status === 0 && envoltorio.status === 0,
+      'CAMINO psql · el .sql con la bandera del llamador y el envoltorio .psql corren')
+
+    const n = grupos(editor.stdout)
+    comprobar(n > 0, `los dos caminos emiten huella — ${n} grupo(s)`)
+    comprobar(editor.stdout.trim() === conBandera.stdout.trim(),
+      'y es la MISMA por los dos caminos: el corte no toca el algoritmo')
+    comprobar(envoltorio.stdout.trim() === conBandera.stdout.trim(),
+      'el envoltorio .psql da exactamente lo mismo que el .sql con la bandera')
+
+    // ── 2 · Con un objeto culpable: nadie emite una huella no fiable ────────
+    //
+    // \x1e es uno de los separadores de la serialización. Un objeto que lo
+    // lleve en el nombre hace que dos catálogos distintos hasheen igual — drift
+    // invisible, que es el único fallo que este auditor no se puede permitir.
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      `DO $inyectar$ BEGIN
+         EXECUTE format('CREATE TABLE public.%I (id int)', 'drift' || chr(30) || 'culpable');
+       END $inyectar$;`], { stdio: 'pipe' })
+
+    const editorSucio = comoEditorSql()
+    comprobar(editorSucio.status !== 0 && grupos(editorSucio.stdout) === 0,
+      'CAMINO EDITOR SQL · con un separador en el nombre aborta el lote y NO emite huella')
+    comprobar(/SEPARADOR DE LA HUELLA/.test(editorSucio.stderr ?? ''),
+      'y el error nombra el guard, no un fallo de sintaxis')
+
+    const conBanderaSucio = correr(['-v', 'ON_ERROR_STOP=1', '-tAq', '-f', RUTA_FINGERPRINT])
+    comprobar(conBanderaSucio.status !== 0 && grupos(conBanderaSucio.stdout) === 0,
+      'CAMINO psql · con la bandera del llamador sale distinto de cero y NO emite huella')
+
+    const envoltorioSucio = correr(['-tAq', '-f', RUTA_FINGERPRINT_PSQL])
+    comprobar(envoltorioSucio.status !== 0 && grupos(envoltorioSucio.stdout) === 0,
+      'el envoltorio .psql es fail-closed por sí solo, sin que el llamador sepa nada')
+
+    // ── 3 · El caso negativo, que es POR QUÉ la bandera es obligatoria ──────
+    const sinBandera = correr(['-tAq', '-f', RUTA_FINGERPRINT]) // SIN-BANDERA-A-PROPOSITO
+    comprobar(grupos(sinBandera.stdout) > 0,
+      'psql -f SIN la bandera SÍ emitiría una huella no fiable: por eso todos los llamadores la pasan')
+
+    // ── 4 · Y ningún llamador puede olvidarse ───────────────────────────────
+    const olvidos = []
+    for (const f of ['auditar.mjs', 'reconstruir.mjs']) {
+      for (const linea of readFileSync(join(AQUI, f), 'utf8').split('\n')) {
+        if (!esInvocacionDeFingerprint(linea)) continue
+        if (!/ON_ERROR_STOP=1/.test(linea)) olvidos.push(`${f}: ${linea.trim().slice(0, 90)}`)
+      }
+    }
+    comprobar(olvidos.length === 0,
+      olvidos.length === 0
+        ? 'todos los llamadores por psql pasan ON_ERROR_STOP=1'
+        : `llamadores sin ON_ERROR_STOP=1:\n    ${olvidos.join('\n    ')}`)
+
+    db.psql(['-v', 'ON_ERROR_STOP=1', '-q', '-c',
+      `DO $limpiar$ BEGIN
+         EXECUTE format('DROP TABLE public.%I', 'drift' || chr(30) || 'culpable');
+       END $limpiar$;`], { stdio: 'pipe' })
+
+    if (process.exitCode) console.error('\n✗ portabilidad: al menos una comprobación falló.')
+    else console.error('\n✓ portabilidad: el Editor SQL puede ejecutarlo y los dos caminos son fail-closed.')
+  } finally {
+    db.destruir()
+  }
+}
+
 async function principal() {
   const soloBaseline = bandera('--solo-baseline')
   const sembrarBaseline = bandera('--sembrar-baseline')
@@ -2430,6 +2578,7 @@ async function principal() {
 
   if (bandera('--prueba-tres-vias')) return pruebaTresVias()
   if (bandera('--prueba-credencial')) return pruebaCredencial()
+  if (bandera('--prueba-portabilidad')) return pruebaPortabilidad()
 
   const baseline = leerJson(RUTA_BASELINE)
   // Al sembrar todavía no hay huellas fijadas: validar aquí sería exigirle al
@@ -2501,7 +2650,7 @@ async function principal() {
       // ejecución. Si el orden del agregado dependiera del plan y no del
       // `ORDER BY ... COLLATE "C"`, esto lo delataría.
       db.psql(['-q','-c','SET enable_seqscan=off;','-c','SET enable_indexscan=off;'], { stdio: 'pipe' })
-      const c = db.psql(['-tAq','-c','SET enable_seqscan=off; SET enable_hashagg=off;','-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim()
+      const c = db.psql(['-v','ON_ERROR_STOP=1','-tAq','-c','SET enable_seqscan=off; SET enable_hashagg=off;','-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim()
       if (c !== a) { console.error('✗ EQUIVALENCIA: el mismo catálogo con otro plan dio otra huella.'); process.exit(1) }
       console.error('✓ equivalencia: mismo catálogo, otro plan de ejecución, misma huella')
 
@@ -2778,7 +2927,7 @@ async function principal() {
 
       const dueno = soloGrants(huella(db.psql))
       const lector = soloGrants(
-        db.psql(['-tAq', '-c', 'SET ROLE drift_solo_lectura;', '-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim())
+        db.psql(['-v', 'ON_ERROR_STOP=1', '-tAq', '-c', 'SET ROLE drift_solo_lectura;', '-f', RUTA_FINGERPRINT], { stdio: 'pipe' }).trim())
 
       if (dueno !== lector) {
         const a = dueno.split('\n'); const b = lector.split('\n')
