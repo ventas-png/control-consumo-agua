@@ -66,49 +66,70 @@ export async function fetchCuposDePlantillas(
   return { cupos: (data as CupoPausa[] | null) ?? [], error: null }
 }
 
+/** Lo que el formulario de la jornada declara, tal cual se teclea. */
+export interface DatosJornada {
+  nombre: string
+  codigo: string | null
+  turno: string
+  hora_inicio: string
+  hora_fin: string
+  cruza_medianoche: boolean
+  minutos_descanso: number
+  tolerancia_entrada_min: number
+  tolerancia_salida_min: number
+  demora_compensable_hasta_min: number
+  extra_requiere_autorizacion: boolean
+  color: string | null
+  notas: string | null
+}
+
 /**
- * Deja los cupos de una jornada EXACTAMENTE como dice `minutos`: da de alta los
- * nuevos, actualiza los que cambiaron y borra los que quedaron en cero o vacíos.
+ * Guarda la jornada y deja sus cupos EXACTAMENTE como dice `cupos` — las dos
+ * cosas, o ninguna.
+ *
+ * ANTES ERAN TRES VIAJES: crear/actualizar la jornada, borrar los cupos viejos,
+ * insertar los nuevos. Entre el segundo y el tercero caben una pestaña que se
+ * cierra y una red que se corta, y lo que quedaba entonces no era «lo de antes»
+ * ni «lo nuevo» sino una jornada SIN cupos — que es la peor de las tres, porque
+ * «sin cupo declarado» significa justamente que ese descanso no se juzga. Un
+ * guardado a medias acá no deja un formulario incompleto: deja la política
+ * apagada en silencio.
+ *
+ * Ahora es una sola llamada y una sola transacción (`turnos_guardar_jornada`,
+ * 20260909000100). La autorización no cambia: la RPC es SECURITY INVOKER y la
+ * siguen decidiendo las policies de las dos tablas.
  *
  * Se manda el estado completo deseado, no un delta, por lo mismo que en
  * `presencia_corregir`: así «esta jornada ya no da cena» se expresa quitando el
  * número, sin necesitar un centinela para distinguirlo de «no cambies».
  */
-export async function guardarCupos(params: {
+export async function guardarJornadaConCupos(params: {
   companyId: string
-  plantillaId: string
+  projectId: string
+  /** `null` = jornada nueva. */
+  plantillaId: string | null
+  datos: DatosJornada
   /** Código de tipo → minutos. Un 0, un vacío o un NaN significan «sin cupo». */
-  minutos: Record<string, number | null>
-  /** Los que ya existen, para saber qué borrar y qué actualizar. */
-  existentes: CupoPausa[]
-}): Promise<{ error: string | null }> {
-  const { companyId, plantillaId, minutos, existentes } = params
-  const previos = new Map(existentes.map(c => [c.tipo, c]))
-  const aInsertar: Array<{ company_id: string; plantilla_horario_id: string; tipo: string; minutos: number }> = []
-  const aBorrar: string[] = []
-
-  for (const [tipo, valor] of Object.entries(minutos)) {
+  cupos: Record<string, number | null>
+}): Promise<{ id: string | null; error: string | null }> {
+  const { companyId, projectId, plantillaId, datos, cupos } = params
+  // Se limpia acá lo que no es un cupo para no mandarle basura a la base: la
+  // RPC lo descarta igual, pero un `NaN` viajando como texto es ruido que
+  // aparece en los logs de PostgREST y confunde a quien los lee después.
+  const limpios: Record<string, number> = {}
+  for (const [tipo, valor] of Object.entries(cupos)) {
     const n = Number(valor)
-    const vale = Number.isFinite(n) && n > 0
-    const previo = previos.get(tipo)
-    if (vale && previo?.minutos === n) continue          // sin cambios
-    if (vale) aInsertar.push({ company_id: companyId, plantilla_horario_id: plantillaId, tipo, minutos: n })
-    else if (previo) aBorrar.push(previo.id)
+    if (Number.isFinite(n) && n > 0) limpios[tipo] = n
   }
-
-  if (aBorrar.length > 0) {
-    const { error } = await supabase.from('plantilla_cupos_pausa').delete().in('id', aBorrar)
-    if (error) return { error: error.message }
-  }
-  if (aInsertar.length > 0) {
-    // `upsert` sobre la llave natural: la jornada no puede tener dos cupos del
-    // mismo tipo (lo impide un UNIQUE), así que reescribir es lo correcto.
-    const { error } = await supabase
-      .from('plantilla_cupos_pausa')
-      .upsert(aInsertar, { onConflict: 'plantilla_horario_id,tipo' })
-    if (error) return { error: error.message }
-  }
-  return { error: null }
+  const { data, error } = await supabase.rpc('turnos_guardar_jornada', {
+    p_company_id: companyId,
+    p_project_id: projectId,
+    p_plantilla_id: plantillaId,
+    p_datos: datos,
+    p_cupos: limpios,
+  })
+  if (error) return { id: null, error: error.message }
+  return { id: (data as string | null) ?? null, error: null }
 }
 
 /**

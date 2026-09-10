@@ -14,7 +14,7 @@ import { hallazgosEnPalabras, resumirBalance, type BalanceDia } from '../balance
 function dia(over: Partial<BalanceDia> = {}): BalanceDia {
   return {
     personal_id: 'p1', nombre: 'Ada', cargo: 'Guardia', fecha: '2026-09-01',
-    bloque_id: 'b1', turno_inicio: '06:00:00', turno_fin: '14:00:00',
+    bloque_id: 'b1', bloques: 1, turno_inicio: '06:00:00', turno_fin: '14:00:00',
     horas_planificadas: 7.25, tiene_vara: true,
     registro_id: 'r1', hora_entrada: '06:00:00', hora_salida: '14:00:00',
     horas_estadia: 8, horas_descanso: 0.75, horas_laborales: 7.25,
@@ -97,5 +97,52 @@ describe('el resumen de un rango', () => {
       dias: 0, juzgables: 0, cumplen: 0,
       minutosTarde: 0, minutosSalidaTemprana: 0, minutosExcesoDescanso: 0, horasSobreJornada: 0,
     })
+  })
+})
+
+describe('cumple no puede convivir con hallazgos', () => {
+  it('un día que la base marcara como cumplido CON hallazgos no se cuenta', () => {
+    // La contradicción concreta que existía en SQL: `extra_sin_autorizar` en la
+    // lista y `cumple = true` al lado. Ya está arreglada allá, y el resumen
+    // vuelve a exigirlo acá porque es el número que alguien va a leer como «el
+    // equipo cumplió»: si las dos capas no coinciden, se nota.
+    const r = resumirBalance([
+      dia({ cumple: true, hallazgos: ['extra_sin_autorizar'], horas_sobre_jornada: 3.75 }),
+      dia({ fecha: '2026-09-02' }),
+    ])
+    expect(r.juzgables).toBe(2)
+    expect(r.cumplen).toBe(1)
+  })
+
+  it('el turno partido no se cuenta entre los juzgables', () => {
+    // Con un marcaje y dos bloques no se puede repartir la presencia, así que
+    // el día no es ni cumplido ni incumplido: es no juzgable, y contarlo de
+    // cualquiera de los dos lados sería inventar.
+    const r = resumirBalance([
+      dia({ bloques: 2, cumple: false, hallazgos: ['turno_partido'], horas_sobre_jornada: null }),
+      dia({ fecha: '2026-09-02' }),
+    ])
+    expect(r.dias).toBe(2)
+    expect(r.juzgables).toBe(1)
+    expect(r.cumplen).toBe(1)
+  })
+
+  it('las horas sobre la jornada en null no se suman como cero ni rompen la suma', () => {
+    const r = resumirBalance([
+      dia({ bloques: 2, hallazgos: ['turno_partido'], cumple: false, horas_sobre_jornada: null }),
+      dia({ fecha: '2026-09-02', horas_sobre_jornada: 2 }),
+    ])
+    expect(r.horasSobreJornada).toBe(2)
+  })
+})
+
+describe('los hallazgos que nacieron del turno partido', () => {
+  it('dicen por qué el día no se puede juzgar, sin acusar de nada', () => {
+    expect(hallazgosEnPalabras(dia({
+      bloques: 2, cumple: false, hallazgos: ['turno_partido'],
+    }))).toEqual(['turno partido: no se puede repartir la presencia entre los bloques'])
+    expect(hallazgosEnPalabras(dia({
+      tiene_vara: false, cumple: false, hallazgos: ['politica_ambigua'],
+    }))).toEqual(['los bloques del día esperan cosas distintas'])
   })
 })

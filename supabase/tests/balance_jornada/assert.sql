@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20260909000100 · el balance del día (Fase 2)
+-- Invariantes de 20260909000200 · el balance del día (Fase 2)
 -- ════════════════════════════════════════════════════════════════════════════
 -- La 1 vuelve a ser la más importante, por la misma razón que en la fase 1:
 -- esta migración se anuncia como LECTURA y no debe mover ni un número de la
@@ -25,9 +25,9 @@ BEGIN
           'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
           'Diurna 6-14', '06:00', '14:00', 45, 10, 5, 30, true)
   RETURNING id INTO v_plant;
-  INSERT INTO public.plantilla_cupos_pausa (company_id, plantilla_horario_id, tipo, minutos) VALUES
-    ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'almuerzo', 45),
-    ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'refaccion', 15);
+  INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos) VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'almuerzo', 45),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'refaccion', 15);
   RAISE NOTICE 'OK 0  escenario: jornada 06–14, tolerancia 10, compensable 30, cupos 45+15';
 END $$;
 
@@ -150,8 +150,19 @@ BEGIN
   PERFORM pg_temp.sembrar_dia(CURRENT_DATE - 26, '05:30', '14:00');
   SELECT * INTO b FROM public.presencia_balance_dia('11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 26, CURRENT_DATE - 26);
   IF b.minutos_tarde <> 0 THEN RAISE EXCEPTION 'INVARIANTE 4: media hora antes contó como % tarde', b.minutos_tarde; END IF;
-  IF NOT b.cumple THEN RAISE EXCEPTION 'INVARIANTE 4: llegar antes lo dejó en incumplimiento (%)', b.hallazgos; END IF;
-  RAISE NOTICE 'OK 4  llegar media hora antes no es una demora negativa: es cero';
+  IF 'demora' = ANY(b.hallazgos) THEN RAISE EXCEPTION 'INVARIANTE 4: llegar antes se reportó como demora'; END IF;
+  IF 'salida_temprana' = ANY(b.hallazgos) THEN RAISE EXCEPTION 'INVARIANTE 4: la salida a las 14:00 se leyó temprana'; END IF;
+  -- Y sin embargo el día NO cumple, con razón: media hora antes son 30 minutos
+  -- trabajados que nadie pidió, y esta jornada exige autorizar la extra. Que
+  -- «llegar antes no es demora» y «llegar antes no es gratis» convivan es
+  -- justamente lo que separa el desvío de horario del exceso de jornada.
+  IF NOT ('extra_sin_autorizar' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 4: la media hora de más no se señaló (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 4: un día con extra sin autorizar no puede decir que cumple';
+  END IF;
+  RAISE NOTICE 'OK 4  llegar media hora antes no es demora — y la media hora de más se señala igual';
 END $$;
 
 -- ── 5 · La salida temprana respeta su tolerancia ───────────────────────────
@@ -229,9 +240,10 @@ BEGIN
   -- Turno que empieza a las 22:00; la persona llega a las 00:30 del día
   -- siguiente: 150 minutos tarde. Con una resta a pelo darían −1290.
   INSERT INTO public.bloques_turno
-    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin,
+     cruza_medianoche, horas_planificadas)
   VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
-          '9e000000-0000-0000-0000-000000000005', CURRENT_DATE - 21, v_plant, '22:00', '06:00', 8);
+          '9e000000-0000-0000-0000-000000000005', CURRENT_DATE - 21, v_plant, '22:00', '06:00', true, 8);
   INSERT INTO public.presencia_personal
     (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
   VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
@@ -357,4 +369,229 @@ BEGIN
     NULL;
   END;
   RAISE NOTICE 'OK 15 el balance del equipo exige el permiso del tab, no basta con fichar';
+END $$;
+
+-- ── 16 · Los cuatro casos del turno nocturno, con fecha y no con corazonada ─
+--
+-- Turno 22:00–06:00. Las cuatro salidas de abajo son las que la resta de dos
+-- `time` no podía separar: 23:00 y 05:00 dan −7 h y −1 h respectivamente, y
+-- NINGÚN umbral en horas distingue «se fue a la hora, cruzando el día» de «se
+-- fue a mitad del turno». Lo que los separa es la fecha, que ahora está.
+DO $$
+DECLARE
+  v_plant uuid;
+  v_pid   uuid := '9e000000-0000-0000-0000-000000000005';
+  b       record;
+  caso    record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Nocturna 22-06';
+
+  FOR caso IN
+    SELECT * FROM (VALUES
+      -- fecha,                     salida,       esperado (min de salida anticipada)
+      (CURRENT_DATE - 45, time '23:00', 420),
+      (CURRENT_DATE - 44, time '05:00',  60),
+      (CURRENT_DATE - 43, time '06:00',   0),
+      -- Quedarse una hora de más no es salida anticipada: es cero por ese lado.
+      (CURRENT_DATE - 42, time '07:00',   0)
+    ) AS t(fecha, salida, esperado)
+  LOOP
+    INSERT INTO public.bloques_turno
+      (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin,
+       cruza_medianoche, horas_planificadas)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, caso.fecha, v_plant, '22:00', '06:00', true, 8);
+    INSERT INTO public.presencia_personal
+      (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_pid, 'Luz Jardinera', caso.fecha, '22:00', caso.salida, 'presente');
+
+    SELECT * INTO b FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000001'::uuid, caso.fecha, caso.fecha)
+    WHERE personal_id = v_pid;
+
+    IF b.minutos_salida_temprana <> caso.esperado THEN
+      RAISE EXCEPTION 'INVARIANTE 16: salida % dio % min anticipados (esperado %)',
+        caso.salida, b.minutos_salida_temprana, caso.esperado;
+    END IF;
+    IF b.minutos_tarde <> 0 THEN
+      RAISE EXCEPTION 'INVARIANTE 16: entrar a las 22:00 en punto dio % min tarde', b.minutos_tarde;
+    END IF;
+  END LOOP;
+  RAISE NOTICE 'OK 16 nocturno 22–06: salir 23:00 son 420 min antes, 05:00 son 60, 06:00 es 0 y 07:00 no es anticipada';
+END $$;
+
+-- ── 17 · El turno partido suma sus bloques y no inventa nada ───────────────
+--
+-- Dos bloques de 4 h (06–10 y 14–18) y UN marcaje de 06:00 a 18:00. Lo que se
+-- puede afirmar: se planificaron 8 h, se entró en hora y se salió en hora. Lo
+-- que NO: cuánto de esas 12 h de estadía fue trabajo. El hueco entre las 10:00
+-- y las 14:00 no está registrado en ningún lado, así que repartirlo sería
+-- inventarlo — y descartar un bloque, que es lo que hacía el primer borrador,
+-- producía 8 h de extra y 8 h de salida anticipada, las dos falsas.
+DO $$
+DECLARE
+  v_p1  uuid;
+  v_p2  uuid;
+  v_pid uuid := '9e000000-0000-0000-0000-000000000004';
+  b     record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  INSERT INTO public.plantillas_horario
+    (company_id, project_id, nombre, hora_inicio, hora_fin, minutos_descanso, tolerancia_entrada_min,
+     tolerancia_salida_min, demora_compensable_hasta_min, extra_requiere_autorizacion)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          'Partida manana', '06:00', '10:00', 0, 10, 5, 30, true)
+  RETURNING id INTO v_p1;
+  INSERT INTO public.plantillas_horario
+    (company_id, project_id, nombre, hora_inicio, hora_fin, minutos_descanso, tolerancia_entrada_min,
+     tolerancia_salida_min, demora_compensable_hasta_min, extra_requiere_autorizacion)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          'Partida tarde', '14:00', '18:00', 0, 10, 5, 30, true)
+  RETURNING id INTO v_p2;
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, CURRENT_DATE - 41, v_p1, '06:00', '10:00', 4),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, CURRENT_DATE - 41, v_p2, '14:00', '18:00', 4);
+
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Noe Nocturno', CURRENT_DATE - 41, '06:00', '18:00', 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 41, CURRENT_DATE - 41)
+  WHERE personal_id = v_pid;
+
+  IF b.bloques <> 2 THEN
+    RAISE EXCEPTION 'INVARIANTE 17: el día trajo % bloque(s), se descartó uno', b.bloques;
+  END IF;
+  IF b.horas_planificadas <> 8 THEN
+    RAISE EXCEPTION 'INVARIANTE 17: se planificaron % h y eran 8', b.horas_planificadas;
+  END IF;
+  IF b.turno_inicio <> time '06:00' OR b.turno_fin <> time '18:00' THEN
+    RAISE EXCEPTION 'INVARIANTE 17: la ventana del día quedó %–%', b.turno_inicio, b.turno_fin;
+  END IF;
+  IF b.minutos_salida_temprana <> 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 17: salir a las 18:00 dio % min anticipados — se midió contra el primer bloque',
+      b.minutos_salida_temprana;
+  END IF;
+  IF b.minutos_tarde <> 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 17: entrar a las 06:00 dio % min tarde', b.minutos_tarde;
+  END IF;
+  IF b.horas_sobre_jornada IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 17: se afirmaron % h sobre la jornada, y el hueco entre bloques no está registrado',
+      b.horas_sobre_jornada;
+  END IF;
+  IF 'extra_sin_autorizar' = ANY(b.hallazgos) THEN
+    RAISE EXCEPTION 'INVARIANTE 17: extra inventada en un turno partido';
+  END IF;
+  IF NOT ('turno_partido' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 17: el día partido no se marcó como tal (%)', b.hallazgos;
+  END IF;
+  IF b.cumple THEN
+    RAISE EXCEPTION 'INVARIANTE 17: se afirmó que cumple un día que no se puede juzgar';
+  END IF;
+  RAISE NOTICE 'OK 17 turno partido: 8 h planificadas, salida contra el ÚLTIMO bloque, y la extra no se inventa';
+END $$;
+
+-- ── 17b · Dos bloques con varas distintas no tienen vara del día ───────────
+DO $$
+DECLARE
+  v_p1  uuid;
+  v_p3  uuid;
+  v_pid uuid := '9e000000-0000-0000-0000-000000000004';
+  b     record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_p1 FROM public.plantillas_horario WHERE nombre = 'Partida manana';
+  -- Misma forma horaria, OTRA tolerancia: las dos varas del día discrepan.
+  INSERT INTO public.plantillas_horario
+    (company_id, project_id, nombre, hora_inicio, hora_fin, minutos_descanso, tolerancia_entrada_min,
+     tolerancia_salida_min, demora_compensable_hasta_min, extra_requiere_autorizacion)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          'Partida tarde estricta', '14:00', '18:00', 0, 0, 0, 0, false)
+  RETURNING id INTO v_p3;
+
+  INSERT INTO public.bloques_turno
+    (company_id, project_id, personal_id, fecha, plantilla_horario_id, hora_inicio, hora_fin, horas_planificadas)
+  VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, CURRENT_DATE - 40, v_p1, '06:00', '10:00', 4),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+     v_pid, CURRENT_DATE - 40, v_p3, '14:00', '18:00', 4);
+  INSERT INTO public.presencia_personal
+    (company_id, project_id, personal_id, nombre, fecha, hora_entrada, hora_salida, estado)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_pid, 'Noe Nocturno', CURRENT_DATE - 40, '06:30', '18:00', 'presente');
+
+  SELECT * INTO b FROM public.presencia_balance_dia(
+    '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 40, CURRENT_DATE - 40)
+  WHERE personal_id = v_pid;
+
+  IF b.tiene_vara THEN
+    RAISE EXCEPTION 'INVARIANTE 17b: se eligió una de las dos varas del día';
+  END IF;
+  IF NOT ('politica_ambigua' = ANY(b.hallazgos)) THEN
+    RAISE EXCEPTION 'INVARIANTE 17b: la discrepancia de varas no se dijo (%)', b.hallazgos;
+  END IF;
+  -- Media hora tarde con una tolerancia de 10 y otra de 0: cuál rige no lo dice
+  -- ningún dato, así que no se juzga la demora — pero el minutaje SÍ se informa.
+  IF b.tramo_demora IS NOT NULL THEN
+    RAISE EXCEPTION 'INVARIANTE 17b: se le puso tramo a una demora sin vara (%)', b.tramo_demora;
+  END IF;
+  IF b.minutos_tarde <> 30 THEN
+    RAISE EXCEPTION 'INVARIANTE 17b: los 30 min tarde se perdieron (%)', b.minutos_tarde;
+  END IF;
+  IF b.cumple THEN RAISE EXCEPTION 'INVARIANTE 17b: cumple sin vara'; END IF;
+  RAISE NOTICE 'OK 17b dos varas distintas en un día no son una vara: se dice, y no se elige';
+END $$;
+
+-- ── 18 · `cumple` no puede contradecir a `hallazgos`, nunca ────────────────
+--
+-- La contradicción concreta que existía: un día con `extra_sin_autorizar`
+-- afirmaba `cumple = true`, porque la condición estaba escrita dos veces y sólo
+-- se actualizó una. Esta invariante no comprueba ese caso: comprueba la REGLA,
+-- sobre TODAS las filas que el sandbox produjo, así que también atrapa al
+-- próximo hallazgo que alguien agregue y se olvide de restar.
+DO $$
+DECLARE
+  v_mal int;
+  v_fila record;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT count(*) INTO v_mal
+    FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 60, CURRENT_DATE) b
+   WHERE b.cumple AND cardinality(b.hallazgos) > 0;
+
+  IF v_mal > 0 THEN
+    FOR v_fila IN
+      SELECT b.fecha, b.nombre, b.hallazgos
+        FROM public.presencia_balance_dia(
+          '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 60, CURRENT_DATE) b
+       WHERE b.cumple AND cardinality(b.hallazgos) > 0
+    LOOP
+      RAISE WARNING 'cumple=true con hallazgos: % % %', v_fila.fecha, v_fila.nombre, v_fila.hallazgos;
+    END LOOP;
+    RAISE EXCEPTION 'INVARIANTE 18: % día(s) afirman cumplir con hallazgos encima', v_mal;
+  END IF;
+
+  -- Y la recíproca: un día sin hallazgos y con todo para juzgar TIENE que
+  -- cumplir. Sin esto, «cumple = false siempre» pasaría la prueba de arriba.
+  SELECT count(*) INTO v_mal
+    FROM public.presencia_balance_dia(
+      '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 60, CURRENT_DATE) b
+   WHERE NOT b.cumple AND cardinality(b.hallazgos) = 0
+     AND b.tiene_vara AND b.registro_id IS NOT NULL AND b.hora_salida IS NOT NULL;
+  IF v_mal > 0 THEN
+    RAISE EXCEPTION 'INVARIANTE 18: % día(s) sin un solo hallazgo dicen no cumplir', v_mal;
+  END IF;
+  RAISE NOTICE 'OK 18 cumple ⇔ no hay hallazgos: la regla se comprueba sobre todas las filas, no sobre un caso';
 END $$;

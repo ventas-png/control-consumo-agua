@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   createCondominioRow,
-  createCondominioRowReturning,
   deleteCondominioRow,
   generarBloquesTurno,
   updateCondominioRow,
@@ -19,7 +18,7 @@ import {
   horasJornada,
 } from '../../../domain/condominios/turnos'
 import {
-  fetchCuposDePlantillas, guardarCupos, minutosCupoQueDescuentan, tramosDemora,
+  fetchCuposDePlantillas, guardarJornadaConCupos, minutosCupoQueDescuentan, tramosDemora,
 } from '../../../domain/condominios/politicaJornada'
 import { fetchTiposPausa } from '../../../domain/condominios/pausasPresencia'
 import { DIAS_SEMANA_CORTOS, MESES, fechaISO, gridMes, moverMes, rangoMes } from '../../../lib/calendario'
@@ -78,7 +77,7 @@ const formJornadaVacio = {
   nombre: '', codigo: '', turno: 'manana' as TurnoTipo,
   hora_inicio: '06:00', hora_fin: '14:00', minutos_descanso: '0',
   tolerancia_entrada_min: '10', color: COLORES[0], notas: '',
-  // ── La vara (20260909000000). Declarada, todavía sin efectos.
+  // ── La vara (20260909000100). Declarada, todavía sin efectos.
   tolerancia_salida_min: '0',
   // 0 = no hay tramo compensable: la demora pasa directo a débito al salir de
   // la tolerancia. El número lo pone quien decide la política, no este default.
@@ -233,38 +232,22 @@ export default function TurnosTab({
       color: formJornada.color,
       notas: formJornada.notas.trim() || null,
     }
+    // UNA llamada, UNA transacción. La jornada y sus cupos se guardan juntos o
+    // no se guarda nada: antes eran tres viajes y un fallo en el tercero dejaba
+    // la jornada SIN cupos, que la fase 2 lee como «este descanso no se juzga».
     const creada = modalJornada === 'nueva'
-    // Al crear se pide la fila DE VUELTA: hace falta su id para colgarle los
-    // cupos, y sin eso la jornada nueva nacería sin la parte que se acaba de
-    // teclear en el mismo formulario.
-    const { data, error } = creada
-      ? await createCondominioRowReturning('plantillas_horario',
-          { company_id: companyId, project_id: proyectoId, ...payload }, 'id')
-      : { data: null, ...await updateCondominioRow('plantillas_horario', (modalJornada as PlantillaHorario).id, payload) }
+    const { error } = await guardarJornadaConCupos({
+      companyId,
+      projectId: proyectoId,
+      plantillaId: creada ? null : (modalJornada as PlantillaHorario).id,
+      datos: payload,
+      cupos: Object.fromEntries(
+        Object.entries(formCupos).map(([tipo, v]) => [tipo, v === '' ? null : Number(v)]),
+      ),
+    })
     if (error) {
       setSaving(false)
-      notify({ variant: 'error', title: 'Error', text: error.message }); return
-    }
-
-    // Los cupos van DESPUÉS y solo si la jornada se guardó: son hijos suyos, y
-    // si el primer paso falla no debe quedar un cupo colgando de nada.
-    const plantillaId = creada
-      ? (data as { id?: string } | null)?.id
-      : (modalJornada as PlantillaHorario).id
-    if (plantillaId) {
-      const { error: errCupos } = await guardarCupos({
-        companyId,
-        plantillaId,
-        minutos: Object.fromEntries(
-          Object.entries(formCupos).map(([tipo, v]) => [tipo, v === '' ? null : Number(v)]),
-        ),
-        existentes: cuposDe(plantillaId),
-      })
-      if (errCupos) {
-        setSaving(false)
-        notify({ variant: 'error', title: 'La jornada se guardó, los cupos no', text: errCupos })
-        return
-      }
+      notify({ variant: 'error', title: 'Error', text: error }); return
     }
     setSaving(false)
     setModalJornada(null)

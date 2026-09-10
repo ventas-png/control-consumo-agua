@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
     () => Promise<{ data: { id: string } | null; error: { message: string } | null }>
   >(async () => ({ data: { id: 'ph-nueva' }, error: null })),
   fetchCuposDePlantillas: vi.fn(async () => ({ cupos: [], error: null })),
-  guardarCupos: vi.fn(async () => ({ error: null })),
+  guardarJornadaConCupos: vi.fn<
+    () => Promise<{ id: string | null; error: string | null }>
+  >(async () => ({ id: 'ph-nueva', error: null })),
   fetchTiposPausa: vi.fn(async () => ({ tipos: TIPOS_PAUSA, error: null })),
 }))
 
@@ -47,7 +49,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 vi.mock('../../../../domain/condominios/politicaJornada', async (original) => ({
   ...(await original<typeof import('../../../../domain/condominios/politicaJornada')>()),
   fetchCuposDePlantillas: mocks.fetchCuposDePlantillas,
-  guardarCupos: mocks.guardarCupos,
+  guardarJornadaConCupos: mocks.guardarJornadaConCupos,
 }))
 vi.mock('../../../../domain/condominios/pausasPresencia', () => ({
   fetchTiposPausa: mocks.fetchTiposPausa,
@@ -147,9 +149,9 @@ describe('TurnosTab — asignación de turnos', () => {
     fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '14:00' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
-    const [tabla, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
-    expect(tabla).toBe('plantillas_horario')
+    await waitFor(() => expect(mocks.guardarJornadaConCupos).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarJornadaConCupos.mock.calls[0] as unknown as [Record<string, never>]
+    const payload = args.datos as unknown as Record<string, unknown>
     expect(payload.nombre).toBe('Diurno')
     // `horas_jornada` NO viaja en el payload: la sella el trigger.
     expect(payload.horas_jornada).toBeUndefined()
@@ -164,9 +166,9 @@ describe('TurnosTab — asignación de turnos', () => {
     fireEvent.change(screen.getByLabelText('Salida'), { target: { value: '06:00' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
-    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
-    expect(payload.cruza_medianoche).toBe(true)
+    await waitFor(() => expect(mocks.guardarJornadaConCupos).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarJornadaConCupos.mock.calls[0] as unknown as [Record<string, never>]
+    expect((args.datos as unknown as Record<string, unknown>).cruza_medianoche).toBe(true)
   })
 
   it('crea una regla semanal con sus días ISO', async () => {
@@ -251,7 +253,7 @@ describe('TurnosTab — asignación de turnos', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// La vara de la jornada (20260909000000)
+// La vara de la jornada (20260909000100)
 // ════════════════════════════════════════════════════════════════════════════
 // Lo que se cubre es lo que el sandbox SQL no ve: que quien configura la jornada
 // LEA la política que está declarando. Un tramo mal descrito no rompe ninguna
@@ -298,7 +300,7 @@ describe('la vara de la jornada', () => {
     expect(screen.queryByText(/Los cupos que descuentan suman/)).toBeNull()
   })
 
-  it('guarda la vara junto a la jornada, y los cupos después', async () => {
+  it('la jornada y sus cupos viajan en UNA sola llamada', async () => {
     await abrirJornadaNueva()
     fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Diurno' } })
     fireEvent.change(screen.getByLabelText('Tolerancia de salida (min)'), { target: { value: '5' } })
@@ -306,31 +308,36 @@ describe('la vara de la jornada', () => {
     fireEvent.change(screen.getByLabelText('Cupo de Almuerzo'), { target: { value: '45' } })
     fireEvent.click(screen.getByText('Guardar'))
 
-    await waitFor(() => expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1))
-    const [, payload] = mocks.createCondominioRowReturning.mock.calls[0] as unknown as [string, Record<string, unknown>]
-    expect(payload.tolerancia_salida_min).toBe(5)
-    expect(payload.demora_compensable_hasta_min).toBe(30)
-    expect(payload.extra_requiere_autorizacion).toBe(true)
-    // El cupo NO viaja en la jornada: es una tabla hija, y va después de que la
-    // jornada exista para que no quede colgando de nada.
-    expect(payload.cupos).toBeUndefined()
-
-    await waitFor(() => expect(mocks.guardarCupos).toHaveBeenCalledWith(
-      expect.objectContaining({ plantillaId: 'ph-nueva', minutos: expect.objectContaining({ almuerzo: 45 }) }),
-    ))
+    await waitFor(() => expect(mocks.guardarJornadaConCupos).toHaveBeenCalledTimes(1))
+    const [args] = mocks.guardarJornadaConCupos.mock.calls[0] as unknown as [Record<string, never>]
+    const datos = args.datos as unknown as Record<string, unknown>
+    expect(datos.tolerancia_salida_min).toBe(5)
+    expect(datos.demora_compensable_hasta_min).toBe(30)
+    expect(datos.extra_requiere_autorizacion).toBe(true)
+    expect(args.plantillaId).toBeNull()
+    expect(args.cupos).toEqual(expect.objectContaining({ almuerzo: 45 }))
+    // Y la jornada NO se escribe por su lado: si quedaran las dos vías, un
+    // fallo en los cupos volvería a poder dejar la jornada guardada sin ellos.
+    expect(mocks.createCondominioRow).not.toHaveBeenCalledWith(
+      'plantillas_horario', expect.anything(),
+    )
   })
 
-  it('si la jornada no se guarda, no se intentan los cupos', async () => {
-    mocks.createCondominioRowReturning.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
+  it('si el guardado falla, no se cierra el formulario ni se dice que quedó a medias', async () => {
+    mocks.guardarJornadaConCupos.mockResolvedValueOnce({ id: null, error: 'boom' })
     await abrirJornadaNueva()
     fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Diurno' } })
     fireEvent.change(screen.getByLabelText('Cupo de Almuerzo'), { target: { value: '45' } })
     fireEvent.click(screen.getByText('Guardar'))
 
     await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'error' }),
+      expect.objectContaining({ variant: 'error', text: 'boom' }),
     ))
-    expect(mocks.guardarCupos).not.toHaveBeenCalled()
+    // El aviso de «la jornada se guardó, los cupos no» ya no existe porque el
+    // estado que describía ya no existe: o se guardó todo, o no se guardó nada.
+    expect(mocks.notify).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringContaining('los cupos no') }),
+    )
   })
 
   it('dice que la vara se congela y que todavía no tiene efectos', async () => {

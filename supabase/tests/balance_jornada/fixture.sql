@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20260909000100 (el balance del día) contra un Postgres
+-- Fixture para EJECUTAR 20260909000200 (el balance del día) contra un Postgres
 -- de verdad. Hereda el de `politica_jornada` —y por debajo el de las pausas—
 -- porque el balance cruza TODA la cadena: el bloque planificado con su vara
 -- congelada, el marcaje, las pausas por tipo y la aritmética de jornada. Con
@@ -63,13 +63,23 @@ CREATE TABLE public.plantillas_horario (
   company_id             uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   project_id             uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   nombre                 text NOT NULL,
+  codigo                 text,
+  turno                  text NOT NULL DEFAULT 'manana',
   hora_inicio            time NOT NULL,
   hora_fin               time NOT NULL,
+  cruza_medianoche       boolean NOT NULL DEFAULT false,
+  color                  text,
+  notas                  text,
+  activo                 boolean NOT NULL DEFAULT true,
   -- Ya existía en producción (20260820000000) y es lo que hace que
   -- `horas_planificadas` venga NETO de descanso. La vara lo lleva en su foto
   -- para poder contrastarlo con la suma de los cupos.
   minutos_descanso       int  NOT NULL DEFAULT 0,
-  tolerancia_entrada_min int  NOT NULL DEFAULT 10
+  tolerancia_entrada_min int  NOT NULL DEFAULT 10,
+  -- El ancla de la FK compuesta la puso 20260907000200 en producción. Sin ella
+  -- la migración no puede declarar el aislamiento por tenant, así que el
+  -- sandbox tiene que traerla o estaría probando otra base.
+  CONSTRAINT plantillas_horario_id_tenant_uq UNIQUE (id, company_id, project_id)
 );
 
 CREATE TABLE public.bloques_turno (
@@ -82,6 +92,10 @@ CREATE TABLE public.bloques_turno (
   plantilla_horario_id uuid REFERENCES public.plantillas_horario(id) ON DELETE SET NULL,
   hora_inicio          time,
   hora_fin             time,
+  -- Sin esta columna la medianoche vuelve a ser una corazonada: es la que dice
+  -- que un 22:00–06:00 termina MAÑANA, y con ella la salida de las 23:00 del
+  -- mismo día se lee como lo que es.
+  cruza_medianoche     boolean NOT NULL DEFAULT false,
   horas_planificadas   numeric(5,2),
   -- Las dos columnas con las que se CIERRA un turno en producción. Están aquí
   -- para que la invariante 5 pruebe el UPDATE real —cerrar el turno— y no uno

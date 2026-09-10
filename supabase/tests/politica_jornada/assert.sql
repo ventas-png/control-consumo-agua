@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20260909000000 · la vara de la jornada (Fase 1)
+-- Invariantes de 20260909000100 · la vara de la jornada (Fase 1)
 -- ════════════════════════════════════════════════════════════════════════════
 -- La más importante es la 1: que declarar la vara NO cambie ni un número del
 -- cómputo de horas. Todo lo demás de esta migración es inerte por diseño, y una
@@ -47,9 +47,9 @@ BEGIN
          extra_requiere_autorizacion = true
    WHERE id = v_plant;
 
-  INSERT INTO public.plantilla_cupos_pausa (company_id, plantilla_horario_id, tipo, minutos) VALUES
-    ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'almuerzo', 45),
-    ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'refaccion', 15);
+  INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos) VALUES
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'almuerzo', 45),
+    ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'refaccion', 15);
 
   SELECT * INTO h_despues FROM public.calcular_horas_personal(
     '11111111-0000-0000-0000-000000000001'::uuid, CURRENT_DATE - 20, CURRENT_DATE - 20)
@@ -165,8 +165,8 @@ BEGIN
   VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
           'Nocturna 18-06', '18:00', '06:00', 60, 20)
   RETURNING id INTO v_otra;
-  INSERT INTO public.plantilla_cupos_pausa (company_id, plantilla_horario_id, tipo, minutos)
-  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', v_otra, 'cena', 40);
+  INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_otra, 'cena', 40);
 
   UPDATE public.bloques_turno SET plantilla_horario_id = v_otra WHERE fecha = CURRENT_DATE - 10;
 
@@ -280,8 +280,8 @@ BEGIN
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000002', true);
   SET LOCAL ROLE authenticated;
   BEGIN
-    INSERT INTO public.plantilla_cupos_pausa (company_id, plantilla_horario_id, tipo, minutos)
-    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'descanso', 120);
+    INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'descanso', 120);
     RESET ROLE;
     RAISE EXCEPTION 'INVARIANTE 11: un guardia se puso su propio cupo';
   EXCEPTION WHEN insufficient_privilege THEN
@@ -304,8 +304,8 @@ BEGIN
   SELECT id INTO v_plant FROM public.plantillas_horario WHERE nombre = 'Nocturna 18-06';
   PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-000000000003', true);
   SET LOCAL ROLE authenticated;
-  INSERT INTO public.plantilla_cupos_pausa (company_id, plantilla_horario_id, tipo, minutos)
-  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', v_plant, 'refaccion', 20);
+  INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_plant, 'refaccion', 20);
   RESET ROLE;
   RAISE NOTICE 'OK 12 con condominios.tab.turnos se administran los cupos de la jornada';
 END $$;
@@ -330,4 +330,231 @@ BEGIN
     RAISE EXCEPTION 'INVARIANTE 14: los cupos no quedaron inscritos en la bitácora';
   END IF;
   RAISE NOTICE 'OK 14 cambiar lo que se le exige a la gente deja rastro';
+END $$;
+
+-- ── 15 · Empresa A no puede colgarle un cupo a la jornada de la empresa B ──
+--
+-- Es el filo que la FK compuesta vino a cerrar. `supabase-js` deja mandar
+-- cualquier `company_id`, así que el intento se hace TAL COMO se haría desde el
+-- cliente: el tenant propio (que las policies aprueban) y una jornada ajena.
+-- Antes entraba. Los tres intentos de abajo son las tres formas de pedirlo.
+DO $$
+DECLARE
+  v_ajena uuid;
+  v_mia   uuid;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000b', true);
+  INSERT INTO public.plantillas_horario
+    (company_id, project_id, nombre, hora_inicio, hora_fin, minutos_descanso, tolerancia_entrada_min)
+  VALUES ('bbbbbbbb-0000-0000-0000-00000000000b', '22222222-0000-0000-0000-000000000001',
+          'Jornada de la empresa B', '08:00', '17:00', 60, 10)
+  RETURNING id INTO v_ajena;
+
+  SELECT id INTO v_mia FROM public.plantillas_horario WHERE nombre = 'Nocturna 18-06';
+
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+
+  -- (a) Tenant propio + jornada ajena: lo que mandaría un cliente manipulado.
+  BEGIN
+    INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+            v_ajena, 'almuerzo', 45);
+    RAISE EXCEPTION 'INVARIANTE 15: la empresa A le colgó un cupo a la jornada de la B';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  -- (b) Declarando el tenant de la jornada ajena: ahora la policy es la que
+  --     tiene que negarse, porque la FK sí cuadraría.
+  BEGIN
+    SET LOCAL ROLE authenticated;
+    INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+    VALUES ('bbbbbbbb-0000-0000-0000-00000000000b', '22222222-0000-0000-0000-000000000001',
+            v_ajena, 'almuerzo', 45);
+    RESET ROLE;
+    RAISE EXCEPTION 'INVARIANTE 15: la RLS dejó escribir en el tenant de otro';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RESET ROLE;
+  END;
+
+  -- (c) El proyecto equivocado DENTRO de la propia empresa: el condominio 2 no
+  --     es el de esa jornada, y la terna tiene que rechazarlo igual.
+  BEGIN
+    INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+    VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000002',
+            v_mia, 'almuerzo', 45);
+    RAISE EXCEPTION 'INVARIANTE 15: un cupo quedó colgado del condominio equivocado';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+
+  IF EXISTS (SELECT 1 FROM public.plantilla_cupos_pausa WHERE plantilla_horario_id = v_ajena) THEN
+    RAISE EXCEPTION 'INVARIANTE 15: quedó un cupo escrito sobre la jornada ajena';
+  END IF;
+  RAISE NOTICE 'OK 15 el cupo no puede cruzar de empresa ni de condominio: lo impide la terna, no el cliente';
+END $$;
+
+-- ── 16 · turnos_politica_efectiva no puede servir cupos de otro tenant ─────
+--
+-- Se fabrica a mano la fila que la FK ya no deja entrar —desactivando el
+-- disparador de la restricción— para comprobar que, aun así, la función no la
+-- recogería. Es el segundo candado: si mañana alguien afloja la FK, la vara
+-- congelada no se contamina.
+DO $$
+DECLARE
+  v_ajena uuid;
+  v_pol   jsonb;
+BEGIN
+  SELECT id INTO v_ajena FROM public.plantillas_horario WHERE nombre = 'Jornada de la empresa B';
+
+  SET session_replication_role = replica;   -- suspende FKs y triggers
+  INSERT INTO public.plantilla_cupos_pausa (company_id, project_id, plantilla_horario_id, tipo, minutos)
+  VALUES ('aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+          v_ajena, 'almuerzo', 999);
+  SET session_replication_role = origin;
+
+  v_pol := public.turnos_politica_efectiva(v_ajena);
+  IF v_pol->'cupos' ? 'almuerzo' THEN
+    RAISE EXCEPTION 'INVARIANTE 16: la vara de la empresa B recogió el cupo de la A (%)', v_pol;
+  END IF;
+
+  DELETE FROM public.plantilla_cupos_pausa WHERE minutos = 999;
+  RAISE NOTICE 'OK 16 la vara empareja por la terna completa: un cupo de otro tenant no entra en la foto';
+END $$;
+
+-- ── 17 · Los privilegios de tabla, declarados y no heredados ───────────────
+--
+-- RLS y GRANT son dos puertas distintas. Esta invariante mira la de los GRANT,
+-- que es la que no se ve en ninguna policy y la que #842 demostró que puede
+-- diferir entre el repo y producción si no se declara.
+DO $$
+BEGIN
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.plantilla_cupos_pausa'::regclass) THEN
+    RAISE EXCEPTION 'INVARIANTE 17: la tabla quedó sin RLS';
+  END IF;
+  IF NOT (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'public.plantilla_cupos_pausa'::regclass) THEN
+    RAISE EXCEPTION 'INVARIANTE 17: la RLS no es FORCE — el dueño se la saltaría';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.plantilla_cupos_pausa', 'SELECT')
+     OR has_table_privilege('anon', 'public.plantilla_cupos_pausa', 'INSERT')
+     OR has_table_privilege('anon', 'public.plantilla_cupos_pausa', 'UPDATE')
+     OR has_table_privilege('anon', 'public.plantilla_cupos_pausa', 'DELETE') THEN
+    RAISE EXCEPTION 'INVARIANTE 17: anon llega a los cupos';
+  END IF;
+
+  IF NOT (has_table_privilege('authenticated', 'public.plantilla_cupos_pausa', 'SELECT')
+          AND has_table_privilege('authenticated', 'public.plantilla_cupos_pausa', 'INSERT')
+          AND has_table_privilege('authenticated', 'public.plantilla_cupos_pausa', 'UPDATE')
+          AND has_table_privilege('authenticated', 'public.plantilla_cupos_pausa', 'DELETE')) THEN
+    RAISE EXCEPTION 'INVARIANTE 17: authenticated no puede hacer el CRUD que la pantalla necesita';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.plantilla_cupos_pausa', 'TRUNCATE') THEN
+    RAISE EXCEPTION 'INVARIANTE 17: authenticated puede TRUNCATE, que nadie usa';
+  END IF;
+
+  IF NOT has_table_privilege('service_role', 'public.plantilla_cupos_pausa', 'SELECT') THEN
+    RAISE EXCEPTION 'INVARIANTE 17: service_role perdió el acceso';
+  END IF;
+  RAISE NOTICE 'OK 17 privilegios DECLARADOS: anon fuera, authenticated con su CRUD bajo RLS, service_role intacto';
+END $$;
+
+-- ── 18 · Guardar la jornada y sus cupos es una sola operación ──────────────
+DO $$
+DECLARE
+  v_id  uuid;
+  v_n   int;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  v_id := public.turnos_guardar_jornada(
+    'aaaaaaaa-0000-0000-0000-00000000000a',
+    '11111111-0000-0000-0000-000000000001',
+    NULL,
+    jsonb_build_object('nombre', 'Partida 06-10 / 14-18', 'hora_inicio', '06:00',
+                       'hora_fin', '18:00', 'minutos_descanso', 60,
+                       'tolerancia_entrada_min', 10, 'tolerancia_salida_min', 5,
+                       'demora_compensable_hasta_min', 30),
+    jsonb_build_object('almuerzo', 45, 'refaccion', 15, 'cena', 0, 'vacio', ''));
+
+  SELECT count(*) INTO v_n FROM public.plantilla_cupos_pausa WHERE plantilla_horario_id = v_id;
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'INVARIANTE 18: se guardaron % cupos y debían ser 2 (el 0 y el vacío no son cupos)', v_n;
+  END IF;
+
+  -- Reemplazo completo: lo que no viene, se va.
+  PERFORM public.turnos_guardar_jornada(
+    'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_id,
+    jsonb_build_object('nombre', 'Partida 06-10 / 14-18'),
+    jsonb_build_object('almuerzo', 60));
+  SELECT count(*) INTO v_n FROM public.plantilla_cupos_pausa WHERE plantilla_horario_id = v_id;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'INVARIANTE 18: el reemplazo dejó % cupos', v_n;
+  END IF;
+  RAISE NOTICE 'OK 18 la jornada y sus cupos se guardan juntos, y el juego se reemplaza entero';
+END $$;
+
+-- ── 18b · Si un cupo falla, no queda NADA a medias ─────────────────────────
+--
+-- Es el fallo que motivó la RPC: antes se guardaba la jornada, se borraban los
+-- cupos y recién después se insertaban los nuevos. Un error en el tercer paso
+-- dejaba la jornada con CERO cupos, que no es «lo de antes» ni «lo nuevo» —
+-- es la política apagada en silencio.
+DO $$
+DECLARE
+  v_id     uuid;
+  v_nombre text;
+  v_min    int;
+BEGIN
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SELECT id INTO v_id FROM public.plantillas_horario WHERE nombre = 'Partida 06-10 / 14-18';
+
+  BEGIN
+    -- 1500 minutos viola el CHECK del cupo: el tercer paso revienta.
+    PERFORM public.turnos_guardar_jornada(
+      'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', v_id,
+      jsonb_build_object('nombre', 'NOMBRE QUE NO DEBE QUEDAR'),
+      jsonb_build_object('almuerzo', 30, 'cena', 1500));
+    RAISE EXCEPTION 'INVARIANTE 18b: un cupo de 1500 minutos se guardó';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  SELECT nombre INTO v_nombre FROM public.plantillas_horario WHERE id = v_id;
+  IF v_nombre <> 'Partida 06-10 / 14-18' THEN
+    RAISE EXCEPTION 'INVARIANTE 18b: la jornada se renombró aunque los cupos fallaron (%)', v_nombre;
+  END IF;
+
+  SELECT minutos INTO v_min FROM public.plantilla_cupos_pausa
+   WHERE plantilla_horario_id = v_id AND tipo = 'almuerzo';
+  IF v_min IS DISTINCT FROM 60 THEN
+    RAISE EXCEPTION 'INVARIANTE 18b: los cupos que ya estaban quedaron en % (debían seguir en 60)', v_min;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.plantilla_cupos_pausa
+              WHERE plantilla_horario_id = v_id AND tipo <> 'almuerzo') THEN
+    RAISE EXCEPTION 'INVARIANTE 18b: entró un cupo de la tanda que falló';
+  END IF;
+  RAISE NOTICE 'OK 18b si un cupo falla, ni la jornada ni los cupos que había cambian';
+END $$;
+
+-- ── 18c · La RPC no es una puerta trasera al tenant ajeno ──────────────────
+DO $$
+DECLARE v_ajena uuid;
+BEGIN
+  SELECT id INTO v_ajena FROM public.plantillas_horario WHERE nombre = 'Jornada de la empresa B';
+  PERFORM set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', true);
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    PERFORM public.turnos_guardar_jornada(
+      'bbbbbbbb-0000-0000-0000-00000000000b', '22222222-0000-0000-0000-000000000001', v_ajena,
+      jsonb_build_object('nombre', 'Secuestrada'),
+      jsonb_build_object('almuerzo', 45));
+    RESET ROLE;
+    RAISE EXCEPTION 'INVARIANTE 18c: la RPC dejó editar la jornada de otra empresa';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RESET ROLE;
+  END;
+
+  IF EXISTS (SELECT 1 FROM public.plantillas_horario
+              WHERE id = v_ajena AND nombre = 'Secuestrada') THEN
+    RAISE EXCEPTION 'INVARIANTE 18c: la jornada ajena cambió de nombre';
+  END IF;
+  RAISE NOTICE 'OK 18c SECURITY INVOKER: la RPC no puede más que quien la llama';
 END $$;

@@ -1,4 +1,4 @@
--- Fixture para EJECUTAR 20260909000000 (la vara de la jornada) contra un
+-- Fixture para EJECUTAR 20260909000100 (la vara de la jornada) contra un
 -- Postgres de verdad. Hereda el de `presencia_pausas` —mismas cuentas, mismos
 -- expedientes, la aritmética de jornada REAL y la cadena completa de presencia—
 -- porque la invariante más importante de este test es que el cómputo de horas
@@ -68,13 +68,23 @@ CREATE TABLE public.plantillas_horario (
   company_id             uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   project_id             uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   nombre                 text NOT NULL,
+  codigo                 text,
+  turno                  text NOT NULL DEFAULT 'manana',
   hora_inicio            time NOT NULL,
   hora_fin               time NOT NULL,
+  cruza_medianoche       boolean NOT NULL DEFAULT false,
+  color                  text,
+  notas                  text,
+  activo                 boolean NOT NULL DEFAULT true,
   -- Ya existía en producción (20260820000000) y es lo que hace que
   -- `horas_planificadas` venga NETO de descanso. La vara lo lleva en su foto
   -- para poder contrastarlo con la suma de los cupos.
   minutos_descanso       int  NOT NULL DEFAULT 0,
-  tolerancia_entrada_min int  NOT NULL DEFAULT 10
+  tolerancia_entrada_min int  NOT NULL DEFAULT 10,
+  -- El ancla de la FK compuesta la puso 20260907000200 en producción. Sin ella
+  -- la migración no puede declarar el aislamiento por tenant, así que el
+  -- sandbox tiene que traerla o estaría probando otra base.
+  CONSTRAINT plantillas_horario_id_tenant_uq UNIQUE (id, company_id, project_id)
 );
 
 CREATE TABLE public.bloques_turno (
@@ -87,6 +97,7 @@ CREATE TABLE public.bloques_turno (
   plantilla_horario_id uuid REFERENCES public.plantillas_horario(id) ON DELETE SET NULL,
   hora_inicio          time,
   hora_fin             time,
+  cruza_medianoche     boolean NOT NULL DEFAULT false,
   horas_planificadas   numeric(5,2),
   -- Las dos columnas con las que se CIERRA un turno en producción. Están aquí
   -- para que la invariante 5 pruebe el UPDATE real —cerrar el turno— y no uno
@@ -298,11 +309,16 @@ $$;
 -- DINA es conserje con cuenta pero SIN acceso al condominio donde tiene ficha;
 -- ANA es personal sin cuenta (el caso mayoritario); ADA administra.
 INSERT INTO public.companies (id, timezone) VALUES
-  ('aaaaaaaa-0000-0000-0000-00000000000a', 'America/Guatemala');
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'America/Guatemala'),
+  -- La empresa B existe SÓLO para que se pueda intentar el cruce de tenants.
+  -- Un sandbox de un solo inquilino no puede probar aislamiento: no hay de
+  -- quién aislarse, y todo pasa.
+  ('bbbbbbbb-0000-0000-0000-00000000000b', 'America/Guatemala');
 
 INSERT INTO public.projects (id, company_id) VALUES
   ('11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a'),
-  ('11111111-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a');
+  ('11111111-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('22222222-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-00000000000b');
 
 INSERT INTO auth.users (id, email) VALUES
   ('e0000000-0000-0000-0000-00000000000d', 'ada@empresa-a.com'),
@@ -310,7 +326,8 @@ INSERT INTO auth.users (id, email) VALUES
   ('e0000000-0000-0000-0000-000000000002', 'marco@empresa-a.com'),
   ('e0000000-0000-0000-0000-000000000003', 'sin.ficha@empresa-a.com'),
   ('e0000000-0000-0000-0000-000000000004', 'nocturno@empresa-a.com'),
-  ('e0000000-0000-0000-0000-000000000005', 'luz@empresa-a.com');
+  ('e0000000-0000-0000-0000-000000000005', 'luz@empresa-a.com'),
+  ('e0000000-0000-0000-0000-00000000000b', 'bruno@empresa-b.com');
 
 INSERT INTO public.app_users (id, full_name, role, activo, company_id, project_id) VALUES
   ('e0000000-0000-0000-0000-00000000000d', 'Ada Admin',      'admin',    true, 'aaaaaaaa-0000-0000-0000-00000000000a', NULL),
@@ -318,7 +335,8 @@ INSERT INTO public.app_users (id, full_name, role, activo, company_id, project_i
   ('e0000000-0000-0000-0000-000000000002', 'Marco Sical',    'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
   ('e0000000-0000-0000-0000-000000000003', 'Sin Ficha',      'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
   ('e0000000-0000-0000-0000-000000000004', 'Noe Nocturno',   'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
-  ('e0000000-0000-0000-0000-000000000005', 'Luz Jardinera',  'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001');
+  ('e0000000-0000-0000-0000-000000000005', 'Luz Jardinera',  'operator', true, 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001'),
+  ('e0000000-0000-0000-0000-00000000000b', 'Bruno Empresa B','admin',    true, 'bbbbbbbb-0000-0000-0000-00000000000b', NULL);
 
 INSERT INTO public.personal_condominio (id, company_id, project_id, nombre, cargo, estado, user_id) VALUES
   ('9e000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'Marco Antonio Sical', 'guardia',  'activo',   'e0000000-0000-0000-0000-000000000002'),

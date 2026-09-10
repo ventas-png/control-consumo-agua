@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Guards ESTÁTICOS de la vara de la jornada (20260909000000).
+// Guards ESTÁTICOS de la vara de la jornada (20260909000100).
 //
 // ALCANCE, igual que en presenciaPausas.test.ts. La conducta —que la vara se
 // congele, que no mueva el cómputo— la prueba supabase/tests/politica_jornada
@@ -12,7 +12,7 @@ import { resolve } from 'node:path'
 // Es lo más importante que se puede afirmar de ella. Se anuncia como inerte, y
 // una migración inerte que toca una función de cómputo mueve la planilla sin
 // que nadie lo note hasta que alguien cobra de menos.
-const RUTA = 'supabase/migrations/20260909000000_politica_de_jornada.sql'
+const RUTA = 'supabase/migrations/20260909000100_politica_de_jornada.sql'
 const SQL = readFileSync(resolve(RUTA), 'utf8')
 
 /** SQL sin comentarios: lo que la BD ejecuta, no lo que explicamos. */
@@ -96,5 +96,88 @@ describe('quién puede fijar la vara', () => {
       expect(codigo, `${fn} quedó expuesta`)
         .toMatch(new RegExp(`REVOKE EXECUTE ON FUNCTION public\\.${fn} FROM PUBLIC, anon, authenticated`))
     }
+  })
+})
+
+describe('el cupo no puede cruzar de inquilino', () => {
+  it('la jornada se referencia por la TERNA, no sólo por su id', () => {
+    // La FK simple sólo comprueba que la plantilla exista, no de quién es. Con
+    // ella sola, supabase-js podía mandar el company_id propio y un
+    // plantilla_horario_id ajeno: las policies veían un tenant correcto y la
+    // fila entraba. Este guard falla si alguien la reintroduce.
+    expect(codigo).toMatch(
+      /FOREIGN KEY\s*\(\s*plantilla_horario_id\s*,\s*company_id\s*,\s*project_id\s*\)\s*REFERENCES\s+public\.plantillas_horario\s*\(\s*id\s*,\s*company_id\s*,\s*project_id\s*\)/i,
+    )
+    expect(codigo, 'volvió la FK simple, que no mira el tenant')
+      .not.toMatch(/plantilla_horario_id\s+uuid\s+NOT NULL\s+REFERENCES\s+public\.plantillas_horario\s*\(\s*id\s*\)/i)
+  })
+
+  it('la RLS mira el tenant REAL de la plantilla, no el que venga en la fila', () => {
+    // Cuatro policies, y las cuatro tienen que preguntar por la jornada. Una
+    // que sólo compare `company_id` estaría gateando sobre un dato del cliente.
+    const policies = codigo.match(/CREATE POLICY "plantilla_cupos_pausa_\w+"[\s\S]*?;/g) ?? []
+    expect(policies).toHaveLength(4)
+    for (const p of policies) {
+      expect(p, `una policy de cupos no consulta la jornada:\n${p}`)
+        .toMatch(/turnos_puede_administrar_jornada\s*\(\s*plantilla_horario_id\s*\)/)
+    }
+  })
+
+  it('la foto de la vara empareja cupos por la terna completa', () => {
+    // Segundo candado: aunque la FK se aflojara, turnos_politica_efectiva no
+    // puede recoger el cupo de otro tenant y congelarlo en un bloque.
+    const fn = codigo.slice(
+      codigo.indexOf('FUNCTION public.turnos_politica_efectiva'),
+      codigo.indexOf('COMMENT ON FUNCTION public.turnos_politica_efectiva'),
+    )
+    expect(fn).toMatch(/c\.company_id\s*=\s*ph\.company_id/)
+    expect(fn).toMatch(/c\.project_id\s*=\s*ph\.project_id/)
+  })
+})
+
+describe('los privilegios de la tabla se declaran, no se heredan', () => {
+  it('anon y PUBLIC quedan fuera, y authenticated sólo con su CRUD', () => {
+    expect(codigo).toMatch(/REVOKE ALL ON TABLE public\.plantilla_cupos_pausa FROM PUBLIC, anon/)
+    expect(codigo).toMatch(
+      /GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public\.plantilla_cupos_pausa TO authenticated/,
+    )
+    expect(codigo).toMatch(/GRANT ALL\s+ON TABLE public\.plantilla_cupos_pausa TO service_role/)
+  })
+
+  it('la RLS es FORCE: ni el dueño de la tabla se la salta', () => {
+    expect(codigo).toMatch(/ALTER TABLE public\.plantilla_cupos_pausa FORCE ROW LEVEL SECURITY/)
+  })
+})
+
+describe('guardar la jornada y sus cupos es atómico', () => {
+  it('la RPC es SECURITY INVOKER: no puede más que quien la llama', () => {
+    const fn = codigo.slice(codigo.indexOf('FUNCTION public.turnos_guardar_jornada'))
+    expect(fn).toMatch(/SECURITY INVOKER/)
+    expect(fn, 'la RPC se volvió DEFINER sin reimplementar el gateo')
+      .not.toMatch(/SECURITY DEFINER/)
+    expect(fn).toMatch(/SET search_path = ''/)
+  })
+
+  it('borra e inserta los cupos DENTRO de la misma función', () => {
+    // Es lo único que aporta: si el DELETE y el INSERT volvieran a estar en dos
+    // llamadas del cliente, un fallo entre medias deja la jornada sin cupos.
+    const fn = codigo.slice(codigo.indexOf('FUNCTION public.turnos_guardar_jornada'))
+    expect(fn).toMatch(/DELETE FROM public\.plantilla_cupos_pausa/)
+    expect(fn).toMatch(/INSERT INTO public\.plantilla_cupos_pausa/)
+  })
+
+  it('el UPDATE no deja mover una jornada de tenant', () => {
+    // Sólo la lista de SET: en el WHERE los dos sí aparecen, y ahí es donde
+    // tienen que estar — acotando qué fila se toca, no cambiándola de dueño.
+    const desde = codigo.indexOf('UPDATE public.plantillas_horario SET')
+    const set = codigo.slice(desde, codigo.indexOf('WHERE id = p_plantilla_id', desde))
+    expect(set, 'el UPDATE reasigna el company_id').not.toMatch(/company_id\s*=/)
+    expect(set, 'el UPDATE reasigna el project_id').not.toMatch(/project_id\s*=/)
+  })
+
+  it('anon no la puede ejecutar', () => {
+    expect(codigo).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.turnos_guardar_jornada\([^)]*\) FROM PUBLIC, anon/,
+    )
   })
 })

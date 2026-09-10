@@ -27,7 +27,9 @@ export type TramoDemora = 'sin_consecuencia' | 'compensable' | 'debitada'
 /** Cada cosa que el día no cumplió. Vacío = el día cumple. */
 export type HallazgoBalance =
   | 'sin_vara'
+  | 'politica_ambigua'
   | 'sin_planificar'
+  | 'turno_partido'
   | 'sin_marcaje'
   | 'jornada_abierta'
   | 'demora'
@@ -43,6 +45,8 @@ export interface BalanceDia {
   fecha: string
   // Lo esperado
   bloque_id: string | null
+  /** Cuántos bloques tuvo el día. >1 = turno partido, y entonces no se juzga. */
+  bloques: number | null
   turno_inicio: string | null
   turno_fin: string | null
   horas_planificadas: number | null
@@ -59,6 +63,7 @@ export interface BalanceDia {
   tramo_demora: TramoDemora | null
   minutos_salida_temprana: number | null
   minutos_exceso_descanso: number | null
+  /** `null` = no se puede saber (turno partido con un solo marcaje). */
   horas_sobre_jornada: number | null
   extra_requiere_autorizacion: boolean | null
   cumple: boolean
@@ -88,6 +93,8 @@ export async function fetchBalanceDias(params: {
 /** Cómo se lee cada hallazgo, en la frase que va en pantalla. */
 const FRASES: Record<HallazgoBalance, string> = {
   sin_vara: 'la jornada no declara qué espera',
+  politica_ambigua: 'los bloques del día esperan cosas distintas',
+  turno_partido: 'turno partido: no se puede repartir la presencia entre los bloques',
   sin_planificar: 'no había turno planificado',
   sin_marcaje: 'el turno no se cubrió',
   jornada_abierta: 'la jornada quedó abierta',
@@ -147,18 +154,26 @@ export interface ResumenBalance {
 
 /**
  * Suma un rango. Los días que no se pueden juzgar (sin vara, sin marcaje, con la
- * jornada abierta) se cuentan aparte en vez de contarse como incumplidos: un
- * turno de esta noche que todavía no cerró no es una falta.
+ * jornada abierta, turno partido) se cuentan aparte en vez de contarse como
+ * incumplidos: un turno de esta noche que todavía no cerró no es una falta.
  */
 export function resumirBalance(dias: BalanceDia[]): ResumenBalance {
   const juzgable = (d: BalanceDia) =>
     d.tiene_vara &&
     !d.hallazgos.includes('sin_marcaje') &&
-    !d.hallazgos.includes('jornada_abierta')
+    !d.hallazgos.includes('jornada_abierta') &&
+    !d.hallazgos.includes('turno_partido')
+  // `cumple` YA sale de la base como «no hay ni un hallazgo», y esta condición
+  // lo vuelve a exigir acá. No es desconfianza en el SQL: es que este recuento
+  // es lo que alguien va a mirar para decir «el equipo cumplió», y una fila con
+  // hallazgos contada entre los cumplidos convierte el resumen en lo contrario
+  // de lo que dice ser. Que las dos capas tengan que estar de acuerdo es la
+  // única forma de que una regresión en cualquiera de las dos se note.
+  const cumplido = (d: BalanceDia) => juzgable(d) && d.cumple && d.hallazgos.length === 0
   return {
     dias: dias.length,
     juzgables: dias.filter(juzgable).length,
-    cumplen: dias.filter((d) => juzgable(d) && d.cumple).length,
+    cumplen: dias.filter(cumplido).length,
     minutosTarde: suma(dias.map((d) => d.minutos_tarde)),
     minutosSalidaTemprana: suma(dias.map((d) => d.minutos_salida_temprana)),
     minutosExcesoDescanso: suma(dias.map((d) => d.minutos_exceso_descanso)),
