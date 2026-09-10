@@ -126,6 +126,62 @@ de *Actions secrets*. Ver el recuadro de arriba.
 > proyecto y este equipo (ver `supabase/functions/_shared/cors.ts`). En
 > producción esa variable no se define: un preview es código sin revisar.
 
+#### El flag YA está puesto — no lo vuelvas a desplegar
+
+`ALLOW_VERCEL_PREVIEW_ORIGINS=true` está definido en el sandbox
+`jwpmivhvlstslncrtokb` y **no** en producción (`nnsqmeigtgewatameexo`). No es un
+paso pendiente: la suite corre 25/25 contra previews desde antes de esta nota.
+
+Si un preview te contesta 403, comprobá ANTES de tocar nada. Y si vas a
+redesplegar, hacelo por función: `supabase functions deploy` sin nombre sube las
+**40+** del repositorio a un sandbox que hoy tiene **cuatro** a propósito.
+
+**La trampa al comprobarlo.** El sandbox sólo tiene desplegadas las que la suite
+necesita:
+
+    accept-invitation · invite-user · delete-user · timbrar-documento
+
+`health` NO está entre ellas. Sondearlo devuelve `Access-Control-Allow-Origin: *`
+para CUALQUIER origen, y ese `*` no sale de `_shared/cors.ts` —que no lo emite
+nunca, sólo devuelve el Origin o el fallback— sino del 404 del gateway de
+Supabase: la petición jamás llegó al código. Un `*` uniforme, incluso para un
+origen de producción, es la firma de que no mediste nada.
+
+Por eso la sonda va contra `accept-invitation` (`verify_jwt = false`, maneja
+OPTIONS con `getCorsHeaders`) y **muestra el status**: sin él, un 404 se lee como
+un resultado.
+
+```bash
+P="https://<host-del-preview>.vercel.app"
+S="https://jwpmivhvlstslncrtokb.supabase.co"
+
+probe() {
+  h=$(curl -s -o /dev/null -D- -X OPTIONS "$1/functions/v1/accept-invitation" \
+      -H "Origin: $2" -H "Access-Control-Request-Method: POST" \
+      -H "Access-Control-Request-Headers: authorization, content-type" | tr -d '\r')
+  printf 'HTTP %s | ACAO: %s' \
+    "$(echo "$h" | head -1 | cut -d' ' -f2)" \
+    "$(echo "$h" | grep -i '^access-control-allow-origin' | cut -d' ' -f2-)"
+}
+
+probe $S "$P"                                                          # su Origin exacto
+probe $S "$P.evil.com"                                                 # fallback
+probe $S "$P/algo"                                                     # fallback
+probe $S "$P:8443"                                                     # fallback
+probe $S "${P/https:/http:}"                                           # fallback
+probe $S "https://control-consumo-agua.evil.com"                       # fallback
+probe $S "https://control-consumo-agua-x-otra-org-projects.vercel.app"  # fallback
+```
+
+Las siete tienen que dar **HTTP 200** — un 404 invalida esa fila. Sólo el preview
+legítimo recibe su propio Origin; el resto cae al fallback
+(`https://administratodo.com`), que es lo que hace al navegador bloquear la
+respuesta.
+
+La misma sonda contra producción tiene que devolver el fallback **también** para
+el preview legítimo. Si le devuelve su Origin, el flag se filtró a producción:
+quitalo de ahí antes que nada.
+
 #### Comprobá las credenciales ANTES de guardarlas
 
 Una credencial mal copiada no se nota al guardarla: se nota ~15 minutos después,
