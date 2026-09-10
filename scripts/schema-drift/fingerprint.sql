@@ -167,10 +167,36 @@
 -- Preferir no medir a medir mal — una colisión aquí es drift invisible, que es
 -- el único fallo que este auditor no se puede permitir.
 --
--- `ON_ERROR_STOP` va acá dentro y no en el llamador: el guard tiene que ser
--- fail-closed para CUALQUIERA que corra este archivo, no sólo para quien se
--- acuerde de pasar la bandera.
-\set ON_ERROR_STOP on
+-- ── DÓNDE VIVE `ON_ERROR_STOP`, Y POR QUÉ NO ACÁ ───────────────────────────
+--
+-- Este archivo es SQL PORTABLE: ni una sola meta-instrucción de psql. Llevaba
+-- `\set ON_ERROR_STOP on` en esta línea, con el argumento de que el guard debía
+-- ser fail-closed para cualquiera que corriera el archivo y no sólo para quien
+-- se acordara de la bandera. El argumento era bueno; el sitio, no. `\set` lo
+-- interpreta psql, no el servidor, así que el Editor SQL de Supabase —que manda
+-- el texto tal cual a PostgreSQL— lo recibía como sintaxis y respondía
+-- ERROR 42601. Es decir: el ÚNICO camino documentado para refrescar
+-- `huella-produccion.json` a mano no podía ejecutar este archivo.
+--
+-- La separación queda así, y cada camino es fail-closed por su propio
+-- mecanismo:
+--
+--   · EDITOR SQL (y cualquier cliente que mande el archivo entero como UNA
+--     consulta): las sentencias viajan juntas y PostgreSQL las corre en una
+--     transacción implícita. La excepción de este guard aborta el lote COMPLETO,
+--     así que el SELECT final no llega a emitir nada. No hace falta bandera:
+--     lo garantiza el protocolo.
+--
+--   · psql CON `-f`: cada sentencia es su propia transacción y, sin bandera,
+--     psql seguiría hasta el SELECT y emitiría una huella que el guard acaba de
+--     rechazar. Por eso TODOS los llamadores pasan `-v ON_ERROR_STOP=1`, y
+--     `fingerprint.psql` existe para quien lo corre a mano. Hay una prueba que
+--     falla si alguien agrega un llamador que se la olvide, y otra que mide el
+--     fail-closed de los dos caminos contra un Postgres real
+--     (`auditar.mjs --prueba-portabilidad`).
+--
+-- El algoritmo de la huella no cambia: esto es dónde se declara el corte, no
+-- qué se mide.
 
 DO $centinela$
 DECLARE

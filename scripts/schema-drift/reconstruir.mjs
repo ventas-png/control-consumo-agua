@@ -173,9 +173,18 @@ export function reconstruir({ log = () => {}, dirMigraciones = DIR_MIGRACIONES }
   }
 }
 
-/** Huella normalizada del esquema `public`: líneas `clave\thuella\tn`. */
+/**
+ * Huella normalizada del esquema `public`: líneas `clave\thuella\tn`.
+ *
+ * `ON_ERROR_STOP=1` lo pone el LLAMADOR, y es obligatorio. `fingerprint.sql` es
+ * SQL portable —sin meta-instrucciones de psql, para que el Editor SQL de
+ * Supabase pueda ejecutarlo— así que la bandera ya no viaja dentro del archivo.
+ * Sin ella, psql con `-f` seguiría después de que el guard de separadores
+ * abortara y emitiría una huella que el propio guard acaba de rechazar: fallo
+ * ABIERTO, que es el único que este auditor no se puede permitir.
+ */
 export function huella(psql) {
-  const salida = psql(['-tAq', '-f', join(AQUI, 'fingerprint.sql')], { stdio: 'pipe' })
+  const salida = psql(['-v', 'ON_ERROR_STOP=1', '-tAq', '-f', join(AQUI, 'fingerprint.sql')], { stdio: 'pipe' })
   return salida.trim()
 }
 
