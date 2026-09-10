@@ -115,25 +115,25 @@
       "repo": "afccce87b684bdc05b2181c621612c0bcffdb0f098160de08cef640576a10a19:1"
     },
     "funcion:has_role_any(p_roles text[])": {
-      "motivo": "Existe SÓLO en producción: ninguna migración la crea y el esquema reconstruido desde el repositorio no la tiene. Es uno de los doce helpers `Performance:` creados a mano en marzo–junio 2026; nueve volvieron al repositorio y estos tres nunca. En producción no tiene dependencias de catálogo (0, contra 47/40/35 de sus hermanos usados) y ninguna policy, vista, trigger ni función la referencia. Inventario en #826.",
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
       "produccion": "b71b07a39c96a790e3fe13745961462d64dbbda6f1a2e862e117b51d26a8e717:1",
       "repo": "AUSENTE"
     },
     "funcion:has_role_any(p_roles text[])/grants": {
-      "motivo": "SEGURIDAD · SIN EFECTO SOBRE EL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon (acl: postgres/authenticated/service_role). El repositorio NO concede nada, porque la función NO EXISTE en él: ninguna migración la crea, el esquema reconstruido desde las 458 migraciones no la tiene, y nada la referencia. La redacción anterior decía que «toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a anon», lo cual es imposible y se contradecía con el `repo: AUSENTE` de esta misma entrada: una función ausente no puede tener grants. Corregido con evidencia el 2026-09-10. Lo que hay que decidir no es un REVOKE sino si la función se incorpora al repositorio o se retira de producción; la auditoría está en #826.",
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "AUSENTE"
     },
     "funcion:has_super_or_owner_access(p_company_id uuid)": {
-      "motivo": "Existe SÓLO en producción: ninguna migración la crea y el esquema reconstruido desde el repositorio no la tiene. Es uno de los doce helpers `Performance:` creados a mano en marzo–junio 2026; nueve volvieron al repositorio y estos tres nunca. En producción no tiene dependencias de catálogo (0, contra 47/40/35 de sus hermanos usados) y ninguna policy, vista, trigger ni función la referencia. Inventario en #826.",
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
       "produccion": "f6db70ae8f9a6f493ce2644c4ee665527385ee8841993eb950e92bb0f75ad7b7:1",
       "repo": "AUSENTE"
     },
     "funcion:has_super_or_owner_access(p_company_id uuid)/grants": {
-      "motivo": "SEGURIDAD · SIN EFECTO SOBRE EL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon (acl: postgres/authenticated/service_role). El repositorio NO concede nada, porque la función NO EXISTE en él: ninguna migración la crea, el esquema reconstruido desde las 458 migraciones no la tiene, y nada la referencia. La redacción anterior decía que «toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a anon», lo cual es imposible y se contradecía con el `repo: AUSENTE` de esta misma entrada: una función ausente no puede tener grants. Corregido con evidencia el 2026-09-10. Lo que hay que decidir no es un REVOKE sino si la función se incorpora al repositorio o se retira de producción; la auditoría está en #826.",
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "AUSENTE"
@@ -145,13 +145,13 @@
       "repo": "fbf796accb327be3708240aede6b18bfa7b961cd6f534a945b8ebf990c11e1de:1"
     },
     "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])": {
-      "motivo": "Existe SÓLO en producción: ninguna migración la crea y el esquema reconstruido desde el repositorio no la tiene. Es uno de los doce helpers `Performance:` creados a mano en marzo–junio 2026; nueve volvieron al repositorio y estos tres nunca. En producción no tiene dependencias de catálogo (0, contra 47/40/35 de sus hermanos usados) y ninguna policy, vista, trigger ni función la referencia. Inventario en #826.",
+      "motivo": "Difiere la definición de la función (cuerpo, SECURITY DEFINER, search_path o volatilidad). Varias de estas funciones existen sólo en producción o se editaron ahí a mano durante marzo–junio 2026. Inventario en #826.",
       "desde": "2026-09-01",
       "produccion": "9bec92a81d951c09d57f5199e918fed1fd49a61deeabcf2fb21c68599e777f7d:1",
       "repo": "AUSENTE"
     },
     "funcion:is_user_in_company_with_role(p_company_id uuid, p_roles text[])/grants": {
-      "motivo": "SEGURIDAD · SIN EFECTO SOBRE EL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon (acl: postgres/authenticated/service_role). El repositorio NO concede nada, porque la función NO EXISTE en él: ninguna migración la crea, el esquema reconstruido desde las 458 migraciones no la tiene, y nada la referencia. La redacción anterior decía que «toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a anon», lo cual es imposible y se contradecía con el `repo: AUSENTE` de esta misma entrada: una función ausente no puede tener grants. Corregido con evidencia el 2026-09-10. Lo que hay que decidir no es un REVOKE sino si la función se incorpora al repositorio o se retira de producción; la auditoría está en #826.",
+      "motivo": "SEGURIDAD · ALTA, Y EN CONTRA DEL REPOSITORIO. Producción tiene EXECUTE revocado a PUBLIC/anon; el esquema reconstruido desde el repositorio se lo concede, porque ninguna migración escribe ese REVOKE — se hizo a mano en producción y nunca volvió al repo. Consecuencia: toda rama Preview construida desde este repositorio expone esta función SECURITY DEFINER a `anon`. Producción es el lado correcto; el repositorio hay que corregirlo con una migración forward-only. Sigue en #826.",
       "desde": "2026-09-01",
       "produccion": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
       "repo": "AUSENTE"
