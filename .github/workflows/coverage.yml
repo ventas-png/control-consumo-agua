@@ -410,6 +410,23 @@ jobs:
           PGPORT_TEST: 55493
         run: supabase/tests/rbac_recursos_humanos/run.sh
 
+      # La lectura de agua la declaraba el navegador: consumo, tarifa, canon,
+      # importe, proyecto y hasta el estado de cobro viajaban en el INSERT, y la
+      # RLS sólo miraba el proyecto. 20260910000000 lo mueve entero al servidor.
+      # Casi nada de eso se ve leyendo el SQL: que un payload con `monto 0` y
+      # `estado pagado` acabe escrito con otros números, que tres lecturas del
+      # mismo día encadenen en orden, que quien captura SIN poder leer la tabla
+      # obtenga igual la lectura anterior correcta, y que el bloqueo por
+      # contador serialice de verdad (dos conexiones, sobre un contador sin
+      # lecturas, que es donde un lock de fila no tendría nada que bloquear).
+      # Incluye la paridad del importe contra el mismo fichero de casos que
+      # ejercita el test de TypeScript.
+      - name: Lectura de agua autoritativa — el importe no es un parámetro
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55494
+        run: supabase/tests/registrar_lectura/run.sh
+
   rls-harness:
     name: RLS harness (server-side)
     runs-on: ubuntu-latest

@@ -1,7 +1,7 @@
 // T7/PR3 — Contrato de las mutaciones de agua (registros): fila + mapeo de error.
 import { describe, it, expect, vi } from 'vitest'
 
-const insertSelect = vi.fn()
+const rpc = vi.fn()
 const updateEq = vi.fn()
 const updateIn = vi.fn()
 // E2: deleteRegistro es soft delete — va por softDelete() (update + match + is).
@@ -11,34 +11,64 @@ vi.mock('../../../lib/supabase', () => {
   // `db` es la MISMA instancia que `supabase` (cast tipado) — el mock replica eso.
   const client = {
     from: () => ({
-      insert: () => ({ select: insertSelect }),
       update: () => ({ eq: updateEq, in: updateIn, match: () => ({ is: softDeleteIs }) }),
     }),
+    // Envuelto en una flecha (y no `rpc,` a secas) porque vi.mock se iza por
+    // encima de la declaración del spy: la referencia tiene que resolverse al
+    // LLAMAR, no al construir el objeto.
+    rpc: (nombre: string, args: unknown) => rpc(nombre, args),
     storage: { from: () => ({ upload: storageUpload }) },
     auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
   }
   return { supabase: client, db: client }
 })
 
-import { createRegistro, updateRegistro, deleteRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
+import { registrarLectura, updateRegistro, deleteRegistro, marcarRegistrosMora, uploadRegistroFoto } from '../mutations'
+import type { LecturaCaptura } from '../mutations'
 
-describe('createRegistro', () => {
-  it('éxito → devuelve la primera fila', async () => {
-    insertSelect.mockResolvedValueOnce({ data: [{ id: 'reg1' }], error: null })
-    expect(await createRegistro({})).toEqual({ data: { id: 'reg1' }, error: null, duplicado: false })
+const captura: LecturaCaptura = {
+  contadorId: 'c1',
+  lecturaActual: 130,
+  fecha: '2026-09-10',
+  idempotencyKey: 'op-1234567890',
+}
+
+describe('registrarLectura', () => {
+  it('éxito → devuelve la fila que construyó el servidor', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'reg1', consumo: 30 }, error: null })
+    expect(await registrarLectura(captura)).toEqual({
+      data: { id: 'reg1', consumo: 30 }, error: null, duplicado: false,
+    })
+  })
+
+  it('manda SÓLO lo que capturó el operador: nada que decida el cobro', async () => {
+    // Es el contrato entero de este PR. Si alguien vuelve a colar `consumo`,
+    // `monto_calculado`, `tarifa_aplicada`, `project_id` o `estado` en la
+    // llamada, la RPC los ignoraría, pero esta prueba lo dice antes.
+    rpc.mockResolvedValueOnce({ data: { id: 'reg1' }, error: null })
+    await registrarLectura({ ...captura, notas: 'nota', gps: { lat: 1, lng: 2 } })
+    const [nombre, args] = rpc.mock.calls.at(-1)!
+    expect(nombre).toBe('registrar_lectura')
+    expect(Object.keys(args as object).sort()).toEqual([
+      'p_contador_id', 'p_fecha', 'p_fecha_inicio_servicio', 'p_foto', 'p_gps',
+      'p_idempotency_key', 'p_lectura_actual', 'p_lectura_final_retirada',
+      'p_notas', 'p_reset_medidor',
+    ])
   })
 
   it('error → { data: null, error: mensaje }', async () => {
-    insertSelect.mockResolvedValueOnce({ data: null, error: { message: 'bad insert' } })
-    expect(await createRegistro({})).toEqual({ data: null, error: 'bad insert', duplicado: false })
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'lectura retroactiva' } })
+    expect(await registrarLectura(captura)).toEqual({
+      data: null, error: 'lectura retroactiva', duplicado: false,
+    })
   })
 
-  it('E1: 23505 (llave natural) → duplicado true con mensaje amigable', async () => {
-    insertSelect.mockResolvedValueOnce({
+  it('23505 (llave natural) → duplicado true con mensaje amigable', async () => {
+    rpc.mockResolvedValueOnce({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_registros_llave_natural"' },
     })
-    const r = await createRegistro({})
+    const r = await registrarLectura(captura)
     expect(r.duplicado).toBe(true)
     expect(r.data).toBeNull()
     expect(r.error).toContain('ya está registrada')

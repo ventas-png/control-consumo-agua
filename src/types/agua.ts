@@ -84,6 +84,22 @@ export interface Registro {
    * las lecturas anteriores a la migración.
    */
   creado_por?: string | null;
+  /**
+   * Captura autoritativa (migración 20260910000000). `secuencia` es el lugar de
+   * la lectura en la cadena de su contador, asignado por la base bajo bloqueo:
+   * es el orden total del que salen `lectura_anterior` y el consumo. `origen`
+   * dice por qué camino entró la fila. `es_reset` / `lectura_final_retirada`
+   * describen un cambio físico de medidor. `idempotency_key` identifica la
+   * OPERACIÓN de captura (la llave del reintento del outbox).
+   * Ausentes en las lecturas anteriores a esa migración.
+   */
+  created_at?: string | null;
+  secuencia?: number | null;
+  origen?: 'rpc' | 'directo' | null;
+  es_reset?: boolean | null;
+  lectura_final_retirada?: number | null;
+  idempotency_key?: string | null;
+  deleted_at?: string | null;
 }
 
 // ── Calidad de agua ─────────────────────────────────────────────────────────
