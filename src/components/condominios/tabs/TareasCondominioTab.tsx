@@ -1,17 +1,33 @@
+// Tab Tareas del condominio.
+//
+// El área ya no se transcribe. Era texto libre con placeholder "Piscina,
+// lobby…", así que la misma piscina se escribía distinto en cada tarea y
+// ninguna se podía cruzar con la programación de limpieza o la ronda de la
+// misma área. Desde 20260910000000 la tarea guarda `area_id` → el catálogo
+// canónico (`areas_condominio`, que se administra en el tab Áreas) y conserva
+// `area` como SNAPSHOT del nombre: las tareas legadas que el backfill no pudo
+// vincular (nombre ambiguo) se siguen mostrando con su texto, marcadas como lo
+// que son.
 import { hoyLocalISO } from '../../../lib/format'
 import { useState, type CSSProperties} from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { nombreAreaDe } from '../../../domain/condominios/areas'
 import { notify, confirm } from '../../shared/Dialog'
-import { TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
+import { AreaCondominio, TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
 import { ImportTareasModal } from '../ImportTareasModal'
 
 interface Props {
   tareas: TareaCondominio[]
+  /** Catálogo compartido: la tarea ELIGE de aquí, nunca escribe el nombre. */
+  areas: AreaCondominio[]
   proyectoId: string
   companyId: string
   moneda: string
   canCreate: boolean
   canEdit: boolean
+  /** Visibilidad del tab Áreas: decide si se ofrece el atajo para configurarlas. */
+  puedeConfigurarAreas: boolean
+  onIrATab: (tabId: 'areas_config') => void
   onRefresh: () => void
 }
 
@@ -45,28 +61,41 @@ function diasRestantes(fecha?: string | null): number | null {
   return Math.round((new Date(fecha).getTime() - Date.now()) / 86400000)
 }
 
-export default function TareasCondominioTab({ tareas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function TareasCondominioTab({ tareas, areas, proyectoId, companyId, moneda, canCreate, canEdit, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const [selected, setSelected] = useState<TareaCondominio | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoTarea | ''>('')
   const [filtroPrio, setFiltroPrio] = useState<PrioridadTarea | ''>('')
+  const [filtroArea, setFiltroArea] = useState('')
 
   const [form, setForm] = useState({
     titulo: '', descripcion: '', categoria: 'operativa' as CategoriaTareaCondominio,
     prioridad: 'media' as PrioridadTarea, asignado_a: '', reportado_por: '',
-    area: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '',
+    area_id: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '',
   })
+
+  // Solo las activas se ofrecen al capturar; las inactivas siguen renderizándose
+  // en las tareas que ya las usan (mismo criterio que Limpieza).
+  const areasActivas = [...areas]
+    .filter(a => a.activo)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre))
 
   const [comentario, setComentario] = useState({ autor: '', texto: '' })
 
   const lista = tareas.filter(t =>
     (filtroEstado === '' || t.estado === filtroEstado) &&
-    (filtroPrio === '' || t.prioridad === filtroPrio)
+    (filtroPrio === '' || t.prioridad === filtroPrio) &&
+    // 'sin_vincular' agrupa lo legado: tiene texto de área pero no catálogo.
+    (filtroArea === ''
+      || (filtroArea === 'sin_vincular' ? !t.area_id && !!t.area : t.area_id === filtroArea))
   )
 
   const kpis = ESTADOS.map(s => ({ ...s, count: tareas.filter(t => t.estado === s.value).length }))
+  // Tareas anteriores al catálogo cuyo texto de área quedó sin vincular (el
+  // backfill deja NULL los nombres ambiguos, a propósito).
+  const hayLegadas = tareas.some(t => !t.area_id && !!t.area)
   const vencidas = tareas.filter(t => {
     const d = diasRestantes(t.fecha_limite)
     return d !== null && d < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
@@ -74,20 +103,24 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
 
   async function guardar() {
     if (!form.titulo.trim()) { notify({ variant: 'warning', title: 'Faltan datos', text: 'Título obligatorio' }); return }
+    const areaSeleccionada = form.area_id ? areas.find(a => a.id === form.area_id) : undefined
     setSaving(true)
     const { error } = await createCondominioRow('tareas_condominio', {
       company_id: companyId, project_id: proyectoId,
       titulo: form.titulo.trim(), descripcion: form.descripcion.trim() || null,
       categoria: form.categoria, prioridad: form.prioridad, estado: 'pendiente' as EstadoTarea,
       asignado_a: form.asignado_a.trim() || null, reportado_por: form.reportado_por.trim() || null,
-      area: form.area.trim() || null,
+      // `area` es el snapshot del nombre al vincular; sin área, ambos van NULL
+      // (nunca texto suelto: eso es lo que esta pantalla dejó de hacer).
+      area_id: areaSeleccionada?.id ?? null,
+      area: areaSeleccionada?.nombre.trim() ?? null,
       fecha_inicio: form.fecha_inicio || null, fecha_limite: form.fecha_limite || null,
       costo_estimado: form.costo_estimado ? parseFloat(form.costo_estimado) : null,
       notas: form.notas.trim() || null,
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ titulo: '', descripcion: '', categoria: 'operativa', prioridad: 'media', asignado_a: '', reportado_por: '', area: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '' })
+    setForm({ titulo: '', descripcion: '', categoria: 'operativa', prioridad: 'media', asignado_a: '', reportado_por: '', area_id: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '' })
     setMostrarForm(false)
     onRefresh()
   }
@@ -164,6 +197,13 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
             <option value="">Todas las prioridades</option>
             {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
+          {/* Filtrar por área solo tiene sentido desde que el área es del
+              catálogo: antes cada tarea escribía su propio nombre. */}
+          <select aria-label="Filtrar por área" style={{ ...inp, marginTop: 6 }} value={filtroArea} onChange={e => setFiltroArea(e.target.value)}>
+            <option value="">Todas las áreas</option>
+            {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+            {hayLegadas && <option value="sin_vincular">⚠ Sin vincular al catálogo</option>}
+          </select>
         </div>
 
         {vencidas.length > 0 && (
@@ -224,7 +264,23 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
               </div>
               <div>
                 <label style={lbl}>Área</label>
-                <input style={inp} placeholder="Piscina, lobby…" value={form.area} onChange={e => setForm(p => ({ ...p, area: e.target.value }))} />
+                <select style={inp} value={form.area_id} onChange={e => setForm(p => ({ ...p, area_id: e.target.value }))}>
+                  <option value="">— Sin área específica —</option>
+                  {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
+                </select>
+                {areasActivas.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>
+                    Sin áreas activas.{' '}
+                    {puedeConfigurarAreas
+                      ? (
+                        <button type="button" onClick={() => onIrATab('areas_config')}
+                          style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+                          Crearlas en el tab Áreas
+                        </button>
+                      )
+                      : 'Se dan de alta en el tab Áreas.'}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={lbl}>Asignado a</label>
@@ -279,7 +335,16 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                     <span style={{ padding: '3px 10px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 12, fontWeight: 600 }}>{est?.label}</span>
                     <span style={{ fontSize: 12, color: prio?.color, fontWeight: 600 }}>{prio?.label}</span>
-                    {selected.area && <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>📍 {selected.area}</span>}
+                    {(selected.area_id || selected.area) && (
+                      <span data-testid="tarea-area" style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
+                        {(selected.area_id && areas.find(a => a.id === selected.area_id)?.icono) || '📍'}{' '}
+                        {nombreAreaDe(selected.area_id, areas, selected.area ?? '')}
+                        {!selected.area_id && (
+                          <span title="Texto libre anterior al catálogo: vuelve a guardar la tarea eligiendo el área para vincularla."
+                            style={{ marginLeft: 4, color: 'var(--at-warning-strong)' }}>⚠ sin vincular</span>
+                        )}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {canEdit && (
@@ -359,6 +424,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
 
       {showImportModal && (
         <ImportTareasModal
+          areas={areas}
           proyectoId={proyectoId}
           companyId={companyId}
           onClose={() => setShowImportModal(false)}
