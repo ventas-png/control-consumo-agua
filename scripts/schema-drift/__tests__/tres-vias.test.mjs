@@ -109,6 +109,84 @@ describe('diffMigraciones', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════
+// El único renombre tolerado: desempatar una colisión de versión que YA venía
+// en la base. Lo que se fija acá no es que funcione —eso es una línea— sino
+// que no abra nada más: cada condición se quita de a una y el renombre vuelve
+// a contar como migración eliminada.
+// ══════════════════════════════════════════════════════════════════════════
+describe('diffMigraciones — renombre por colisión de versión', () => {
+  // `main` el 2026-09-10: #845 y #846 salieron del mismo commit y las dos
+  // migraciones quedaron en 20260910000000.
+  const BASE_COLISIONADA = new Map([
+    ['20260729000300_security_logs_rls.sql', 'rls'],
+    ['20260910000000_areas.sql', 'areas'],
+    ['20260910000000_security_logs.sql', 'seclog'],
+    ['20260910000100_checklist.sql', 'check'],
+  ])
+  const cabeza = (nombre, blob = 'seclog') => {
+    const m = new Map(BASE_COLISIONADA)
+    m.delete('20260910000000_security_logs.sql')
+    m.set(nombre, blob)
+    return m
+  }
+
+  it('tolera el desempate: no cuenta como eliminada, ni agregada, ni intercalada', () => {
+    const d = diffMigraciones(BASE_COLISIONADA, cabeza('20260910000001_security_logs.sql'))
+    expect(d.eliminadas).toEqual([])
+    expect(d.agregadas).toEqual([])
+    expect(d.desordenadas).toEqual([])
+    expect(d.apendiceLimpio).toBe(true)
+    expect(d.renombradas).toEqual([
+      { desde: '20260910000000_security_logs.sql', hacia: '20260910000001_security_logs.sql' },
+    ])
+  })
+
+  it('el informe lo ANUNCIA: reaplica contra producción, no puede pasar callado', () => {
+    const d = diffMigraciones(BASE_COLISIONADA, cabeza('20260910000001_security_logs.sql'))
+    // El veredicto se construye con el evaluador de verdad, no a mano: un
+    // objeto sintético se queda sin campos y la prueba mide su propia maqueta.
+    const vacio = mapa({})
+    const texto = informe(
+      evaluarTresVias({ P: vacio, M: vacio, R: vacio, baseline: baselineCon({}), migraciones: d }),
+    ).join('\n')
+    expect(texto).toContain('RENOMBRE TOLERADO')
+    expect(texto).toContain('20260910000001_security_logs.sql')
+    expect(texto).toContain('REAPLICA')
+  })
+
+  it('PROHÍBE el renombre si la versión vieja NO colisionaba', () => {
+    const base = new Map([['20260910000000_security_logs.sql', 'seclog']])
+    const head = new Map([['20260910000001_security_logs.sql', 'seclog']])
+    const d = diffMigraciones(base, head)
+    expect(d.eliminadas).toEqual(['20260910000000_security_logs.sql'])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+
+  it('PROHÍBE aterrizar sobre una versión ya OCUPADA en la base', () => {
+    const base = new Map([...BASE_COLISIONADA, ['20260910000001_ocupada.sql', 'otra']])
+    const head = new Map(base)
+    head.delete('20260910000000_security_logs.sql')
+    head.set('20260910000001_security_logs.sql', 'seclog')
+    const d = diffMigraciones(base, head)
+    expect(d.eliminadas).toEqual(['20260910000000_security_logs.sql'])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+
+  it('PROHÍBE cambiar el nombre además de la versión: sería suplantar a otra migración', () => {
+    const d = diffMigraciones(BASE_COLISIONADA, cabeza('20260910000001_areas.sql'))
+    expect(d.eliminadas).toEqual(['20260910000000_security_logs.sql'])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+
+  it('PROHÍBE el renombre que además EDITA el SQL: el blob tiene que ser el mismo', () => {
+    const d = diffMigraciones(BASE_COLISIONADA, cabeza('20260910000001_security_logs.sql', 'EDITADO'))
+    expect(d.eliminadas).toEqual(['20260910000000_security_logs.sql'])
+    expect(d.agregadas).toEqual(['20260910000001_security_logs.sql'])
+    expect(d.apendiceLimpio).toBe(false)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
 // Las nueve situaciones obligatorias
 // ══════════════════════════════════════════════════════════════════════════
 
